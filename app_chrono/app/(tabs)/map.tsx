@@ -37,13 +37,17 @@ export default function MapPage() {
     const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
   // displayedRouteCoords is the progressively drawn polyline; we keep full route only inside fetch and animation
   const [displayedRouteCoords, setDisplayedRouteCoords] = useState<Coordinates[]>([]);
-    const [durationText, setDurationText] = useState<string | null>(null);
-    const [arrivalText, setArrivalText] = useState<string | null>(null);
+  const [durationText, setDurationText] = useState<string | null>(null);
     const [driverCoords, setDriverCoords] = useState<Coordinates | null>(null);
 
     const mapRef = useRef<MapView | null>(null);
     const polylineAnimRef = useRef<any>(null);
-    // no head marker; the polyline itself will be drawn progressively
+  // no head marker; the polyline itself will be drawn progressively
+  const [isSearchingDriver, setIsSearchingDriver] = useState(false);
+  const [searchSeconds, setSearchSeconds] = useState(0);
+  const searchIntervalRef = useRef<number | null>(null);
+  const searchTimeoutRef = useRef<number | null>(null);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
 
     // Animate polyline smoothly using requestAnimationFrame and interpolation
     const animatePolyline = (points: Coordinates[]) => {
@@ -151,17 +155,7 @@ export default function MapPage() {
       return points;
     };
 
-    const calcETA = (durationStr: string) => {
-      const now = new Date();
-      const m = durationStr.match(/(\d+)\s*min/);
-      const h = durationStr.match(/(\d+)\s*hour/);
-      let minutes = 0;
-      if (h) minutes += parseInt(h[1], 10) * 60;
-      if (m) minutes += parseInt(m[1], 10);
-      if (minutes === 0) return null;
-      const eta = new Date(now.getTime() + minutes * 60000);
-      return eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
+    
 
     const fitRoute = (coords: Coordinates[]) => {
       if (!mapRef.current || coords.length === 0) return;
@@ -198,6 +192,10 @@ export default function MapPage() {
           if (pickup && points.length > 0 && !almostEqual(points[0], pickup)) {
             points = [{ latitude: pickup.latitude, longitude: pickup.longitude }, ...points];
           }
+          // Ensure the polyline ends exactly at the dropoff/destination position.
+          if (dropoff && points.length > 0 && !almostEqual(points[points.length - 1], dropoff)) {
+            points = [...points, { latitude: dropoff.latitude, longitude: dropoff.longitude }];
+          }
           // animate the polyline drawing progressively
           animatePolyline(points);
           const leg = route.legs && route.legs[0];
@@ -218,14 +216,10 @@ export default function MapPage() {
               // Update duration text using the API text when available, otherwise format from seconds
               const text = (leg.duration_in_traffic && leg.duration_in_traffic.text) || (leg.duration && leg.duration.text) || `${Math.round(adjustedSeconds / 60)} min`;
               setDurationText(text);
-
-              // arrival time computed from adjusted seconds
-              const etaDate = new Date(Date.now() + adjustedSeconds * 1000);
-              setArrivalText(etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+              // arrival time computed from adjusted seconds (not shown in UI currently)
             } else {
               setDurationText(leg.duration?.text || null);
-              const arrival = leg.arrival_time?.text || calcETA(leg.duration?.text || '');
-              setArrivalText(arrival || null);
+              // arrival time not used here
             }
           }
           fitRoute(points);
@@ -257,6 +251,30 @@ export default function MapPage() {
         try { socket && socket.disconnect(); } catch {}
       };
     }, []);
+
+    // Pulse animation control for searching UI
+    useEffect(() => {
+      let loop: any;
+      if (isSearchingDriver) {
+        pulseAnim.setValue(0);
+        loop = Animated.loop(
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1400,
+            useNativeDriver: true,
+          })
+        );
+        loop.start();
+      } else {
+        // stop loop by resetting value
+        pulseAnim.stopAnimation(() => pulseAnim.setValue(0));
+        if (loop && loop.stop) loop.stop();
+      }
+
+      return () => {
+        if (loop && loop.stop) loop.stop();
+      };
+    }, [isSearchingDriver, pulseAnim]);
   
   const animatedHeight = useRef(new Animated.Value(isBottomSheetExpanded ? BOTTOM_SHEET_MAX_HEIGHT : BOTTOM_SHEET_MIN_HEIGHT)).current;
 
@@ -303,6 +321,43 @@ export default function MapPage() {
       toValue,
       useNativeDriver: false,
     }).start();
+  };
+
+  const startDriverSearch = () => {
+    setIsSearchingDriver(true);
+    setSearchSeconds(0);
+
+    // start seconds counter
+    if (searchIntervalRef.current) {
+      clearInterval(searchIntervalRef.current as any);
+      searchIntervalRef.current = null;
+    }
+    searchIntervalRef.current = (setInterval(() => {
+      setSearchSeconds((s) => s + 1);
+    }, 1000) as unknown) as number;
+
+    // demo: simulate a search that lasts at least 20s — do not display drivers during this demo search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current as any);
+      searchTimeoutRef.current = null;
+    }
+    searchTimeoutRef.current = (setTimeout(() => {
+      // End the searching state after 20s. No driver marker is placed in this demo.
+      stopDriverSearch();
+    }, 20000) as unknown) as number;
+  };
+
+  const stopDriverSearch = () => {
+    setIsSearchingDriver(false);
+    if (searchIntervalRef.current) {
+      clearInterval(searchIntervalRef.current as any);
+      searchIntervalRef.current = null;
+    }
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current as any);
+      searchTimeoutRef.current = null;
+    }
+    setSearchSeconds(0);
   };
 
   const deliveryMethods = [
@@ -395,31 +450,25 @@ export default function MapPage() {
     })();
   }, [setPickupLocation]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!pickupLocation || !deliveryLocation) {
       Alert.alert('Champs requis', 'Veuillez renseigner les deux adresses.');
       return;
     }
 
+    // Ensure we have the most recent route/duration so the badge on the map can show it immediately
+    try {
+      if (pickupCoords && dropoffCoords) {
+        await fetchRoute(pickupCoords, dropoffCoords);
+      }
+    } catch (err) {
+      console.warn('fetchRoute before search failed', err);
+    }
+
     // Créer la livraison dans le store
     createShipment();
-    
-    Alert.alert(
-      'Livraison créée !',
-      `Colis de "${pickupLocation}" vers "${deliveryLocation}" via ${selectedMethod.toUpperCase()}\n\nVotre livraison a été enregistrée.`,
-      [
-        {
-          text: 'Voir le résumé',
-          onPress: () => {
-            router.push('../summary');
-          }
-        },
-        {
-          text: 'Rester ici',
-          style: 'cancel'
-        }
-      ]
-    );
+    // Démarrer la recherche d'un livreur et afficher l'UI de recherche
+    startDriverSearch();
   };
 
   if (!region) {
@@ -447,9 +496,47 @@ export default function MapPage() {
             <Image source={require('../../assets/images/me.png')} style={styles.meMarker} />
           </Marker>
         )}
+        {/* Pulsing search rings + ETA badge while searching for a driver */}
+        {isSearchingDriver && pickupCoords && (
+          <Marker coordinate={pickupCoords} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Animated.View
+                style={[
+                  styles.pulseOuter,
+                  {
+                    transform: [
+                      {
+                        scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 2.2] }),
+                      },
+                    ],
+                    opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 0] }),
+                  },
+                ]}
+              />
+              <Animated.View
+                style={[
+                  styles.pulseInner,
+                  {
+                    transform: [
+                      {
+                        scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.4] }),
+                      },
+                    ],
+                    opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.2] }),
+                  },
+                ]}
+              />
+              {/* ETA badge */}
+              <View style={styles.etaBadge}>
+                <Text style={styles.etaBadgeText}>{durationText ? durationText : 'Recherche...'}</Text>
+                <Text style={styles.etaSmallBadge}>{searchSeconds}s</Text>
+              </View>
+            </View>
+          </Marker>
+        )}
         
-        {/* Véhicules disponibles selon la méthode sélectionnée */}
-        {getAvailableVehicles().map((vehicle) => (
+        {/* Véhicules disponibles selon la méthode sélectionnée (masqués pendant la recherche) */}
+        {!isSearchingDriver && getAvailableVehicles().map((vehicle) => (
           <Marker
             key={vehicle.id}
             coordinate={vehicle.coordinate}
@@ -476,9 +563,19 @@ export default function MapPage() {
           />
         )}
 
+        {/* Static ETA badge when a route is available (visible immediately with the polyline) */}
+        {durationText && pickupCoords && !isSearchingDriver && (
+          <Marker coordinate={pickupCoords} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <View style={styles.etaBadgeStatic}>
+              <Text style={styles.etaBadgeText}>{durationText}</Text>
+            </View>
+          </Marker>
+        )}
+
         {/* polyline is drawn progressively via displayedRouteCoords - no head marker */}
 
-        {driverCoords && (
+        {/* Driver marker not shown during demo search flow */}
+        {!isSearchingDriver && driverCoords && (
           <Marker coordinate={driverCoords} title="Livreur" anchor={{ x: 0.5, y: 0.5 }}>
             <Image source={require('../../assets/images/delivery.png')} style={styles.vehicleMarker} />
           </Marker>
@@ -552,12 +649,7 @@ export default function MapPage() {
               ))}
             </View>
 
-            {durationText && (
-              <View style={styles.etaBox}>
-                <Text style={styles.etaText}>Durée: {durationText}</Text>
-                {arrivalText && <Text style={styles.etaSmall}>Arrivée estimée: {arrivalText}</Text>}
-              </View>
-            )}
+            {/* Duration/ETA is shown on the map when searching; removed from bottom sheet per UX */}
 
             {/* Bouton de validation */}
             <TouchableOpacity
@@ -765,6 +857,66 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
+  },
+  pulseOuter: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#8A76FF',
+  },
+  pulseInner: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#8A76FF',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  etaBadge: {
+    marginTop: -70,
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#eee',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+  },
+  etaBadgeStatic: {
+    marginTop: -70,
+    backgroundColor: '#fff',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#eee',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+  },
+  etaBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8B5CF6',
+  },
+  etaSmallBadge: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
   },
   
 });
