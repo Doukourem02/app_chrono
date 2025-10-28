@@ -7,20 +7,22 @@ import MapView, { Marker, Region, Polyline } from 'react-native-maps';
 import { io } from 'socket.io-client';
 import { useShipmentStore } from '../../store/useShipmentStore';
 import PlacesAutocomplete from '../../components/PlacesAutocomplete';
+import { logger } from '../../utils/logger';
+import { useErrorHandler } from '../../utils/errorHandler';
+import { config } from '../../config';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-// Reduce the max height so the bottom sheet doesn't cover too much of the map
 const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.5; // was 0.65
 const BOTTOM_SHEET_MIN_HEIGHT = 100;
 
-// Définition du type pour les coordonnées
+
 type Coordinates = {
   latitude: number;
   longitude: number;
 };
 
 export default function MapPage() {
-  // 🔹 Obtenir la position actuelle au démarrage
+
   const {
     pickupLocation,
     deliveryLocation,
@@ -30,6 +32,8 @@ export default function MapPage() {
     setSelectedMethod,
     createShipment,
   } = useShipmentStore();
+  
+  const { handleError } = useErrorHandler();
   
   const [region, setRegion] = useState<Region | null>(null);
   const [pickupCoords, setPickupCoords] = useState<Coordinates | null>(null);
@@ -118,13 +122,11 @@ export default function MapPage() {
       polylineAnimRef.current = requestAnimationFrame(step) as any;
     };
 
-  // Replace with your Google API key (Directions API + Places)
-  // TEMPORARY: using the same key present in PlacesAutocomplete for quick testing.
-  // IMPORTANT: move this to a secure place (backend proxy or env) for production.
-  const GOOGLE_API_KEY = "AIzaSyCAN9p_0DsBFRl6Yaw3SCRel90kh1vJ3Tk";
-    const SOCKET_URL = 'http://localhost:4000';
+  // Utilisation de la configuration centralisée pour les API
+  const GOOGLE_API_KEY = config.googleApiKey;
+  const SOCKET_URL = config.socketUrl;
 
-    // decode polyline from Google Directions overview_polyline
+
     const decodePolyline = (t: string) => {
       let points: Coordinates[] = [];
       let index = 0, len = t.length;
@@ -165,13 +167,13 @@ export default function MapPage() {
           animated: true,
         });
       } catch (err) {
-        console.warn('fitToCoordinates failed', err);
+        logger.warn('fitToCoordinates failed', 'MapPage', err);
       }
     };
 
   const fetchRoute = async (pickup: Coordinates, dropoff: Coordinates) => {
       if (!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('<')) {
-        console.warn('Google API key not set - cannot fetch directions');
+        logger.warn('Google API key not set - cannot fetch directions', 'MapPage');
         return;
       }
 
@@ -179,80 +181,85 @@ export default function MapPage() {
         // Request directions with departure_time=now so Google can return traffic-aware durations
         const departureTs = Math.floor(Date.now() / 1000);
         const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${dropoff.latitude},${dropoff.longitude}&mode=driving&departure_time=${departureTs}&traffic_model=best_guess&key=${GOOGLE_API_KEY}`;
-        console.log('Fetching directions from', url);
+        logger.debug('Fetching directions', 'MapPage', { pickup, dropoff });
         const res = await fetch(url);
         const json = await res.json();
-        console.log('Directions response status', res.status, 'routes', json.routes && json.routes.length);
+        logger.debug('Directions response received', 'MapPage', { 
+          status: res.status, 
+          routesCount: json.routes?.length 
+        });
         if (json.routes && json.routes.length > 0) {
           const route = json.routes[0];
           let points = decodePolyline(route.overview_polyline.points);
-          // Ensure the polyline starts exactly at the user's pickup position.
+
           const almostEqual = (a: Coordinates, b: Coordinates, eps = 0.0001) =>
             Math.abs(a.latitude - b.latitude) < eps && Math.abs(a.longitude - b.longitude) < eps;
           if (pickup && points.length > 0 && !almostEqual(points[0], pickup)) {
             points = [{ latitude: pickup.latitude, longitude: pickup.longitude }, ...points];
           }
-          // Ensure the polyline ends exactly at the dropoff/destination position.
+
           if (dropoff && points.length > 0 && !almostEqual(points[points.length - 1], dropoff)) {
             points = [...points, { latitude: dropoff.latitude, longitude: dropoff.longitude }];
           }
-          // animate the polyline drawing progressively
+
           animatePolyline(points);
           const leg = route.legs && route.legs[0];
           if (leg) {
-            // Prefer duration_in_traffic when available (more accurate with current traffic)
+
             const durationTraffic = leg.duration_in_traffic && leg.duration_in_traffic.value; // seconds
             const durationBase = leg.duration && leg.duration.value; // seconds
 
-            // Apply a small vehicle-type multiplier to better reflect real-world times in Abidjan
             const vehicleMultiplier = selectedMethod === 'moto' ? 0.85 : selectedMethod === 'cargo' ? 1.25 : 1.0;
 
             const chosenSeconds = durationTraffic || durationBase;
-            if (!chosenSeconds) console.warn('No duration returned by Directions API for leg', leg);
+            if (!chosenSeconds) {
+              logger.warn('No duration returned by Directions API for leg', 'MapPage', { leg });
+            }
 
             const adjustedSeconds = chosenSeconds ? Math.round(chosenSeconds * vehicleMultiplier) : undefined;
 
             if (adjustedSeconds) {
-              // Update duration text using the API text when available, otherwise format from seconds
+
               const text = (leg.duration_in_traffic && leg.duration_in_traffic.text) || (leg.duration && leg.duration.text) || `${Math.round(adjustedSeconds / 60)} min`;
               setDurationText(text);
-              // arrival time computed from adjusted seconds (not shown in UI currently)
+  
             } else {
               setDurationText(leg.duration?.text || null);
-              // arrival time not used here
+          
             }
           }
           fitRoute(points);
         } else {
-          console.warn('No routes returned from Directions API', json);
+          logger.warn('No routes returned from Directions API', 'MapPage', { json });
         }
       } catch (err) {
-        console.warn('Directions fetch error', err);
+        handleError(err, 'MapPage', 'Erreur lors de la récupération de l\'itinéraire');
       }
     };
 
-    // connect to socket.io server to receive driver positions (optional)
+
     useEffect(() => {
       let socket: any;
       try {
         socket = io(SOCKET_URL);
-        socket.on('connect', () => console.log('socket connected', socket.id));
+        socket.on('connect', () => logger.info('Socket connected', 'MapPage', { socketId: socket.id }));
         socket.on('driver_position', (payload: any) => {
           const coords = payload.coords || payload;
           if (coords && coords.latitude && coords.longitude) {
             setDriverCoords({ latitude: coords.latitude, longitude: coords.longitude });
+            logger.debug('Driver position updated', 'MapPage', { coords });
           }
         });
       } catch (err) {
-        console.warn('Socket connection failed', err);
+        handleError(err, 'MapPage', 'Erreur de connexion au serveur');
       }
 
       return () => {
         try { socket && socket.disconnect(); } catch {}
       };
-    }, []);
+    }, [SOCKET_URL, handleError]);
 
-    // Pulse animation control for searching UI
+    
     useEffect(() => {
       let loop: any;
       if (isSearchingDriver) {
@@ -415,40 +422,64 @@ export default function MapPage() {
 
   // 🔹 Obtenir la position actuelle au démarrage
   useEffect(() => {
+    let isMounted = true; // Flag pour éviter les fuites mémoire
+    
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission refusée', 'Activez la localisation pour utiliser la carte.');
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-
-      const newRegion: Region = {
-        latitude,
-        longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      };
-
-      setRegion(newRegion);
-      setPickupCoords({ latitude, longitude });
-
-      // Reverse geocode to get a readable address and fill pickupLocation automatically
       try {
-        const geocoded = await Location.reverseGeocodeAsync({ latitude, longitude });
-        if (geocoded && geocoded.length > 0) {
-          const place = geocoded[0];
-          const addressParts = [place.name, place.street, place.city || place.region];
-          const address = addressParts.filter(Boolean).join(', ');
-          if (address) setPickupLocation(address);
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission refusée', 'Activez la localisation pour utiliser la carte.');
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({});
+        if (!isMounted) return; // Éviter les mises à jour si le composant est démonté
+        
+        const { latitude, longitude } = location.coords;
+
+        const newRegion: Region = {
+          latitude,
+          longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        };
+
+        setRegion(newRegion);
+        setPickupCoords({ latitude, longitude });
+
+        // Reverse geocode to get a readable address and fill pickupLocation automatically
+        try {
+          const geocoded = await Location.reverseGeocodeAsync({ latitude, longitude });
+          if (!isMounted) return;
+          
+          if (geocoded && geocoded.length > 0) {
+            const place = geocoded[0];
+            const addressParts = [place.name, place.street, place.city || place.region];
+            const address = addressParts.filter(Boolean).join(', ');
+            if (address && isMounted) {
+              // Utiliser le store directement pour éviter les dépendances
+              useShipmentStore.getState().setPickupLocation(address);
+            }
+          }
+        } catch (err: any) {
+          // Gérer silencieusement les erreurs de géolocalisation inverse pour éviter le spam
+          logger.warn('Reverse geocode failed - rate limit or network issue', 'MapPage', { 
+            message: err?.message || 'Unknown error' 
+          });
+          // Ne pas afficher d'erreur utilisateur pour éviter le spam
         }
       } catch (err) {
-        console.warn('Reverse geocode failed', err);
+        if (isMounted) {
+          logger.error('Location permission or access failed', 'MapPage', err);
+          Alert.alert('Erreur', 'Impossible d\'accéder à votre position');
+        }
       }
     })();
-  }, [setPickupLocation]);
+
+    return () => {
+      isMounted = false; // Nettoyer le flag au démontage
+    };
+  }, []); // Pas de dépendances pour éviter la boucle infinie
 
   const handleConfirm = async () => {
     if (!pickupLocation || !deliveryLocation) {
@@ -462,7 +493,7 @@ export default function MapPage() {
         await fetchRoute(pickupCoords, dropoffCoords);
       }
     } catch (err) {
-      console.warn('fetchRoute before search failed', err);
+      handleError(err, 'MapPage', 'Erreur lors de la préparation de l\'itinéraire');
     }
 
     // Créer la livraison dans le store

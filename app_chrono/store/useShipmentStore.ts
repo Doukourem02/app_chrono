@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { logger } from '../utils/logger';
 
 type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
 
@@ -56,22 +57,34 @@ export const useShipmentStore = create<ShipmentState>((set, get) => ({
   createShipment: () => {
     const state = get();
     if (state.pickupLocation && state.deliveryLocation) {
+      const newShipment = {
+        id: `shipment-${Date.now()}`, // ID unique basé sur le timestamp
+        status: 'confirmed' as const,
+        estimatedTime: '15-30 min', // Temps estimé basique
+      };
+      
+      logger.info('Shipment created', 'ShipmentStore', {
+        shipmentId: newShipment.id,
+        pickup: state.pickupLocation,
+        delivery: state.deliveryLocation,
+        method: state.selectedMethod
+      });
+      
       set({
-        currentShipment: {
-          id: `shipment-${Date.now()}`, // ID unique basé sur le timestamp
-          status: 'confirmed',
-          estimatedTime: '15-30 min', // Temps estimé basique
-        }
+        currentShipment: newShipment
       });
     }
   },
   
-  updateShipmentStatus: (status) => set((state) => ({
-    currentShipment: {
-      ...state.currentShipment,
-      status,
-    }
-  })),
+  updateShipmentStatus: (status) => {
+    logger.info('Shipment status updated', 'ShipmentStore', { status });
+    set((state) => ({
+      currentShipment: {
+        ...state.currentShipment,
+        status,
+      }
+    }));
+  },
   
   resetShipment: () => set({
     pickupLocation: '',

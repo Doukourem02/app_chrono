@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { logger } from '../utils/logger';
+import { useErrorHandler } from '../utils/errorHandler';
+import { config } from '../config';
 
 type Suggestion = {
   place_id: string;
@@ -10,7 +13,7 @@ type Props = {
   placeholder?: string;
   onPlaceSelected: (data: { description: string; coords?: { latitude: number; longitude: number } }) => void;
   initialValue?: string;
-  country?: string; // ISO country code e.g. 'ci' for Côte d'Ivoire
+  country?: string; 
 };
 
 export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initialValue = '', country }: Props) {
@@ -18,9 +21,10 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const timer = useRef<number | null>(null);
+  const { handleError } = useErrorHandler();
 
-  // TODO: Replace with your own Google Places API key and restrict it via HTTP referrers or server proxy
-  const GOOGLE_API_KEY = "AIzaSyCAN9p_0DsBFRl6Yaw3SCRel90kh1vJ3Tk";
+  // Utilisation de la configuration centralisée
+  const GOOGLE_API_KEY = config.googleApiKey;
 
   useEffect(() => {
     return () => {
@@ -28,7 +32,6 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
     };
   }, []);
 
-  // Keep internal query in sync when parent updates initialValue
   useEffect(() => {
     setQuery(initialValue || '');
   }, [initialValue]);
@@ -41,6 +44,8 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
 
     setLoading(true);
     try {
+      logger.debug('Fetching places suggestions', 'PlacesAutocomplete', { input, country });
+      
       const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
       url.searchParams.append('input', input);
       url.searchParams.append('key', GOOGLE_API_KEY);
@@ -49,13 +54,20 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
 
       const res = await fetch(url.toString());
       const json = await res.json();
+      
       if (json.status === 'OK') {
-        setSuggestions(json.predictions.map((p: any) => ({ place_id: p.place_id, description: p.description })));
+        const mappedSuggestions = json.predictions.map((p: any) => ({ 
+          place_id: p.place_id, 
+          description: p.description 
+        }));
+        setSuggestions(mappedSuggestions);
+        logger.debug('Places suggestions fetched', 'PlacesAutocomplete', { count: mappedSuggestions.length });
       } else {
         setSuggestions([]);
+        logger.warn('Places API returned non-OK status', 'PlacesAutocomplete', { status: json.status });
       }
     } catch (err) {
-      console.warn('Places autocomplete error', err);
+      handleError(err, 'PlacesAutocomplete', 'Erreur lors de la recherche d\'adresses');
       setSuggestions([]);
     } finally {
       setLoading(false);
@@ -70,6 +82,8 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
 
   const fetchPlaceDetails = async (placeId: string) => {
     try {
+      logger.debug('Fetching place details', 'PlacesAutocomplete', { placeId });
+      
       const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
       url.searchParams.append('place_id', placeId);
       url.searchParams.append('key', GOOGLE_API_KEY);
@@ -77,12 +91,17 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
 
       const res = await fetch(url.toString());
       const json = await res.json();
+      
       if (json.status === 'OK' && json.result && json.result.geometry) {
         const loc = json.result.geometry.location;
-        return { latitude: loc.lat, longitude: loc.lng };
+        const coords = { latitude: loc.lat, longitude: loc.lng };
+        logger.debug('Place details fetched', 'PlacesAutocomplete', { coords });
+        return coords;
+      } else {
+        logger.warn('Place details API returned invalid response', 'PlacesAutocomplete', { status: json.status });
       }
     } catch (err) {
-      console.warn('Place details error', err);
+      handleError(err, 'PlacesAutocomplete', 'Erreur lors de la récupération des détails de l\'adresse');
     }
     return undefined;
   };
