@@ -7,13 +7,25 @@ type Coordinates = {
   longitude: number;
 };
 
+interface OnlineDriver {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  vehicle_type: string;
+  current_latitude: number;
+  current_longitude: number;
+  is_available: boolean;
+  rating: number;
+}
+
 interface DeliveryMapViewProps {
-  mapRef: React.RefObject<MapView>;
+  mapRef: React.RefObject<MapView | null>;
   region: any;
   pickupCoords: Coordinates | null;
   dropoffCoords: Coordinates | null;
   displayedRouteCoords: Coordinates[];
   driverCoords: Coordinates | null;
+  onlineDrivers: OnlineDriver[]; // 🚗 NOUVEAU
   isSearchingDriver: boolean;
   pulseAnim: Animated.Value;
   destinationPulseAnim: Animated.Value;
@@ -32,6 +44,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   dropoffCoords,
   displayedRouteCoords,
   driverCoords,
+  onlineDrivers, // 🚗 NOUVEAU
   isSearchingDriver,
   pulseAnim,
   destinationPulseAnim,
@@ -58,6 +71,23 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       showsIndoors={false}
       showsPointsOfInterest={false}
     >
+
+      {/* 🚗 Chauffeurs en ligne disponibles */}
+      {onlineDrivers?.map((driver) => (
+        <Marker
+          key={driver.user_id}
+          coordinate={{
+            latitude: driver.current_latitude,
+            longitude: driver.current_longitude,
+          }}
+          title={`${driver.first_name} ${driver.last_name}`}
+          description={`${driver.vehicle_type} • Note: ${driver.rating}/5`}
+        >
+          <View style={styles.driverMarker}>
+            <Text style={styles.driverIcon}>🚗</Text>
+          </View>
+        </Marker>
+      ))}
 
       {/* ✅ Marqueur position - MASQUÉ pendant le pulse radar (showMethodSelection) */}
       {(() => {
@@ -359,5 +389,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#6366F1',
+  },
+
+  // 🚗 Styles pour les chauffeurs en ligne
+  driverMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  driverIcon: {
+    fontSize: 16,
+    color: '#FFFFFF',
   },
 });

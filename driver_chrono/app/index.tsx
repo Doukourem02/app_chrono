@@ -11,25 +11,18 @@ export default function RootIndex() {
     const checkAuthentication = async () => {
       try {
         if (isAuthenticated && user) {
-          console.log("🔍 Vérification de l'utilisateur authentifié...");
-          
-          // Vérifier si l'utilisateur existe toujours dans la base
           const userExists = await validateUserExists();
           
           if (!userExists) {
-            console.log("❌ Utilisateur supprimé, déconnexion forcée");
             logout();
             router.replace('/(auth)/register' as any);
           } else {
-            console.log("✅ Utilisateur valide, redirection vers tableau de bord");
             router.replace('/(tabs)' as any);
           }
         } else {
-          console.log("🚪 Aucune session, redirection vers authentification");
           router.replace('/(auth)/register' as any);
         }
-      } catch (error) {
-        console.error("❌ Erreur lors de la vérification:", error);
+      } catch {
         router.replace('/(auth)/register' as any);
       } finally {
         setIsChecking(false);

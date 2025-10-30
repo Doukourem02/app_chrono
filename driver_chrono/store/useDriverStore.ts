@@ -107,20 +107,15 @@ export const useDriverStore = create<DriverStore>()(
         if (!user?.email) return false;
 
         try {
-          console.log(`🔍 Vérification existence driver: ${user.email}`);
-          
           const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/check/${user.email}`);
           const data = await response.json();
 
           if (!response.ok || !data.success || !data.user) {
-            console.log("❌ Driver non trouvé dans la base");
             return false;
           }
 
-          console.log("✅ Driver trouvé dans la base");
           return true;
-        } catch (error) {
-          console.error("⚠️ Erreur vérification driver:", error);
+        } catch {
           // En cas d'erreur réseau, on assume que c'est OK pour éviter de déconnecter inutilement
           return true;
         }

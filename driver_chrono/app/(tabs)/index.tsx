@@ -44,20 +44,56 @@ export default function Index() {
     setIsOnline(value);
     setOnlineStatus(value); // Mettre à jour le store
     
-    // Mettre à jour la localisation si en ligne
-    if (value && location) {
-      setLocation(location);
-    }
-    
-    // Mettre à jour le statut sur le serveur si utilisateur connecté
-    if (user) {
-      try {
-        await apiService.updateDriverStatus(user.id, value);
-      } catch (err) {
-        console.error('Erreur mise à jour statut:', err);
+    // 📡 Synchroniser avec le backend
+    if (user?.id) {
+      const statusData: any = {
+        is_online: value,
+        is_available: value // Si online, disponible aussi
+      };
+      
+      // Ajouter la position si disponible et en ligne
+      if (value && location) {
+        statusData.current_latitude = location.latitude;
+        statusData.current_longitude = location.longitude;
+        setLocation(location);
+      }
+      
+      console.log('🔄 Synchronisation statut avec backend...');
+      const result = await apiService.updateDriverStatus(user.id, statusData);
+      
+      if (!result.success) {
+        console.error('❌ Échec synchronisation:', result.message);
+        // Optionnel: Afficher une alerte à l'utilisateur
+        Alert.alert(
+          "Erreur de synchronisation",
+          "Impossible de synchroniser votre statut avec le serveur.",
+          [{ text: "OK" }]
+        );
+      } else {
+        // Statut synchronisé avec succès (log supprimé)
       }
     }
   };
+
+  // 📍 Effet pour synchroniser automatiquement la position quand elle change
+  useEffect(() => {
+    const syncLocation = async () => {
+      if (isOnline && location && user?.id) {
+        try {
+          await apiService.updateDriverStatus(user.id, {
+            current_latitude: location.latitude,
+            current_longitude: location.longitude
+          });
+        } catch (error) {
+          console.log('⚠️ Erreur sync position:', error);
+        }
+      }
+    };
+
+    // Débounce - attendre 2 secondes avant de sync
+    const timeoutId = setTimeout(syncLocation, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [location, isOnline, user?.id]);
 
   // Région de la carte basée sur la localisation du chauffeur
   const mapRegion = location ? {

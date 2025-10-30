@@ -113,9 +113,6 @@ const checkUserInPostgreSQL = async (req, res) => {
   try {
     const { email } = req.params;
 
-    console.log(`🔍 Vérification utilisateur: ${email}`);
-
-
     const { data: users, error } = await supabase
       .from('users')
       .select('*')
@@ -132,14 +129,12 @@ const checkUserInPostgreSQL = async (req, res) => {
     }
 
     if (users && users.length > 0) {
-      console.log("✅ Utilisateur trouvé dans PostgreSQL !");
       res.json({
         success: true,
         message: "Utilisateur trouvé dans PostgreSQL",
         user: users[0]
       });
     } else {
-      console.log("❌ Utilisateur PAS trouvé dans PostgreSQL");
       res.json({
         success: false,
         message: "Utilisateur non trouvé dans PostgreSQL",

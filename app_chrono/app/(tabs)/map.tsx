@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView from 'react-native-maps';
 import { useShipmentStore } from '../../store/useShipmentStore';
 import { useMapLogic } from '../../hooks/useMapLogic';
 import { useDriverSearch } from '../../hooks/useDriverSearch';
+import { useOnlineDrivers } from '../../hooks/useOnlineDrivers';
 import { useBottomSheet } from '../../hooks/useBottomSheet';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { DeliveryMapView } from '../../components/DeliveryMapView';
@@ -48,11 +49,25 @@ export default function MapPage() {
     setPickupLocation,
     setDeliveryLocation,
     fetchRoute,
-    getAvailableVehicles,
     animateToCoordinate,
     startMethodSelection,
     resetAfterDriverSearch,
   } = useMapLogic({ mapRef: mapRef as React.RefObject<MapView> });
+
+  // Hook pour récupérer les chauffeurs online avec position stable
+  const stableUserLocation = useMemo(() => {
+    if (!region?.latitude || !region?.longitude) return undefined;
+    return {
+      latitude: Math.round(region.latitude * 10000) / 10000, // 4 décimales max
+      longitude: Math.round(region.longitude * 10000) / 10000
+    };
+  }, [region?.latitude, region?.longitude]);
+
+  const { drivers: onlineDrivers } = useOnlineDrivers({
+    userLocation: stableUserLocation,
+    autoRefresh: true,
+    refreshInterval: 5000 // 5 secondes pendant les tests (plus rapide pour voir les changements)
+  });
 
   const {
     isSearchingDriver,
@@ -131,23 +146,24 @@ export default function MapPage() {
       </TouchableOpacity>
 
       {/* Carte */}
-      <DeliveryMapView
-        mapRef={mapRef as React.RefObject<MapView>}
-        region={region}
-        pickupCoords={pickupCoords}
-        dropoffCoords={dropoffCoords}
-        displayedRouteCoords={displayedRouteCoords}
-        driverCoords={driverCoords}
-        isSearchingDriver={isSearchingDriver}
-        pulseAnim={pulseAnim}
-        destinationPulseAnim={destinationPulseAnim}
-        userPulseAnim={userPulseAnim}
-        durationText={durationText}
-        searchSeconds={searchSeconds}
-        selectedMethod={selectedMethod}
-        availableVehicles={getAvailableVehicles()}
-        showMethodSelection={showMethodSelection}
-      />
+              <DeliveryMapView
+          mapRef={mapRef}
+          region={region}
+          pickupCoords={pickupCoords}
+          dropoffCoords={dropoffCoords}
+          displayedRouteCoords={displayedRouteCoords}
+          driverCoords={driverCoords}
+          onlineDrivers={onlineDrivers} // 🚗 NOUVEAU
+          isSearchingDriver={isSearchingDriver}
+          pulseAnim={pulseAnim}
+          destinationPulseAnim={destinationPulseAnim}
+          userPulseAnim={userPulseAnim}
+          durationText={durationText}
+          searchSeconds={searchSeconds}
+          selectedMethod={selectedMethod}
+          availableVehicles={[]} // Remplacé par une valeur par défaut
+          showMethodSelection={showMethodSelection}
+        />
 
       {/* Bottom Sheet */}
       <DeliveryBottomSheet
