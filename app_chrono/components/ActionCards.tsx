@@ -1,26 +1,53 @@
 import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useRequireAuth } from "../hooks/useRequireAuth";
 
 export default function ActionCards() {
-return (
+  const { requireAuth } = useRequireAuth();
+
+  const handleNewDelivery = () => {
+    requireAuth(() => {
+      // Action à exécuter si l'utilisateur est connecté
+      console.log('Naviguer vers nouvelle livraison');
+      // TODO: Naviguer vers l'écran de nouvelle livraison
+      // router.push('/new-delivery');
+    });
+  };
+
+  const handleTrackPackage = () => {
+    requireAuth(() => {
+      // Action à exécuter si l'utilisateur est connecté
+      console.log('Naviguer vers suivi de colis');
+      // TODO: Naviguer vers l'écran de suivi
+      // router.push('/track-package');
+    });
+  };
+
+  return (
     <View style={styles.actionRow}>
-    <TouchableOpacity style={[styles.actionCard, { backgroundColor: "#F5E8FF" }]}>
+      <TouchableOpacity 
+        style={[styles.actionCard, { backgroundColor: "#F5E8FF" }]}
+        onPress={handleNewDelivery}
+      >
         <Text style={styles.cardTitle}>Nouvelle{"\n"}Livraison</Text>
         <Image
-        source={require("../assets/images/delivery.png")}
-        style={styles.cardImage}
+          source={require("../assets/images/delivery.png")}
+          style={styles.cardImage}
         />
-    </TouchableOpacity>
+      </TouchableOpacity>
 
-    <TouchableOpacity style={[styles.actionCard, { backgroundColor: "#eeeeeeff" }]}>
+      <TouchableOpacity 
+        style={[styles.actionCard, { backgroundColor: "#eeeeeeff" }]}
+        onPress={handleTrackPackage}
+      >
         <Text style={styles.cardTitle}>Suivis de{"\n"}Colis</Text>
         <Image
-        source={require("../assets/images/colis.png")}
-        style={styles.cardImage}
+          source={require("../assets/images/colis.png")}
+          style={styles.cardImage}
         />
-    </TouchableOpacity>
+      </TouchableOpacity>
     </View>
-);
+  );
 }
 
 const styles = StyleSheet.create({

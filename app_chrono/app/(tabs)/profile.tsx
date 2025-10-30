@@ -1,8 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useRequireAuth } from '../../hooks/useRequireAuth';
 
 export default function ProfilePage() {
+  const { requireAuth } = useRequireAuth();
+
+  // Vérifier l'authentification dès l'accès à la page
+  useEffect(() => {
+    requireAuth(() => {
+      // L'utilisateur est connecté, ne rien faire
+    });
+  }, [requireAuth]);
   return (
     <View style={styles.container}>
       <View style={styles.content}>

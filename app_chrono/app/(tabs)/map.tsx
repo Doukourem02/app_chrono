@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView from 'react-native-maps';
 import { useShipmentStore } from '../../store/useShipmentStore';
 import { useMapLogic } from '../../hooks/useMapLogic';
 import { useDriverSearch } from '../../hooks/useDriverSearch';
 import { useBottomSheet } from '../../hooks/useBottomSheet';
+import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { DeliveryMapView } from '../../components/DeliveryMapView';
 import { DeliveryBottomSheet } from '../../components/DeliveryBottomSheet';
 
@@ -17,9 +18,17 @@ type Coordinates = {
 };
 
 export default function MapPage() {
+  const { requireAuth } = useRequireAuth();
   const { setSelectedMethod } = useShipmentStore();
   
   const mapRef = useRef<MapView | null>(null);
+
+  // Vérifier l'authentification dès l'accès à la page
+  useEffect(() => {
+    requireAuth(() => {
+      // L'utilisateur est connecté, ne rien faire
+    });
+  }, [requireAuth]);
   
   // Hooks personnalisés pour séparer la logique
   const {
