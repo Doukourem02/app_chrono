@@ -26,7 +26,7 @@ export default function OTPMethodScreen() {
 
     try {
       // Appeler l'API backend pour envoyer l'OTP
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/send-otp`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

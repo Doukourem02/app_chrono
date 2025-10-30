@@ -455,7 +455,7 @@ const verifyOTPCode = async (req, res) => {
     storedOTP.verified = true;
     otpStorage.set(otpKey, storedOTP);
 
-    // Vérifier si l'utilisateur existe déjà
+    // Vérifier si l'utilisateur existe déjà dans PostgreSQL
     const { data: existingUsers, error: checkError } = await supabase
       .from('users')
       .select('*')
@@ -471,59 +471,103 @@ const verifyOTPCode = async (req, res) => {
 
     if (existingUsers && existingUsers.length > 0) {
       // 🔍 Utilisateur existant - connexion
-      console.log("👤 Utilisateur existant trouvé !");
+      console.log("👤 Utilisateur existant trouvé dans PostgreSQL !");
       userData = existingUsers[0];
     } else {
-      // 🆕 Nouvel utilisateur - création automatique
-      console.log("🆕 Création nouvel utilisateur...");
-      isNewUser = true;
-
-      // Créer dans Supabase Auth d'abord
-      const tempPassword = Math.random().toString(36).slice(-12);
-      const { data: authUser, error: authError } = await supabase.auth.signUp({
-        email: email,
-        password: tempPassword,
-        options: {
-          data: {
+      // 🆕 Nouvel utilisateur - vérifier d'abord dans Supabase Auth
+      console.log("🔍 Vérification dans Supabase Auth...");
+      
+      // Essayer de récupérer l'utilisateur depuis Supabase Auth par email
+      const { data: authUsers, error: authListError } = await supabase.auth.admin.listUsers();
+      
+      let existingAuthUser = null;
+      if (authUsers?.users) {
+        existingAuthUser = authUsers.users.find(user => user.email === email);
+      }
+      
+      if (existingAuthUser) {
+        // L'utilisateur existe dans Supabase Auth mais pas dans PostgreSQL
+        console.log("👤 Utilisateur trouvé dans Supabase Auth, synchronisation vers PostgreSQL...");
+        
+        // Créer dans PostgreSQL avec l'ID existant
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            id: existingAuthUser.id,  // ✅ Utiliser directement l'ID de Supabase Auth
+            email: email,
+            phone: phone,
             role: role,
-            phone: phone
-          }
+            created_at: existingAuthUser.created_at || new Date().toISOString()
+          }])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("❌ Erreur synchronisation PostgreSQL:", insertError);
+          return res.status(500).json({
+            success: false,
+            message: "Erreur lors de la synchronisation du profil utilisateur",
+            error: insertError.message
+          });
         }
-      });
 
-      if (authError) {
-        console.error("❌ Erreur création Supabase Auth:", authError);
-        return res.status(400).json({
-          success: false,
-          message: "Erreur lors de la création du compte",
-          error: authError.message
-        });
-      }
+        userData = newUser;
+        console.log("✅ Utilisateur synchronisé avec succès !");
+        
+      } else {
+        // Vraiment nouvel utilisateur - créer dans Supabase Auth puis PostgreSQL
+        console.log("🆕 Création nouvel utilisateur complet...");
+        isNewUser = true;
 
-      // Créer dans PostgreSQL
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .insert([{
-          id: authUser.user.id,
+        // Créer dans Supabase Auth d'abord
+        const tempPassword = Math.random().toString(36).slice(-12);
+        const { data: authUser, error: authError } = await supabase.auth.signUp({
           email: email,
-          phone: phone,
-          role: role,
-          created_at: new Date().toISOString()
-        }])
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error("❌ Erreur insertion PostgreSQL:", insertError);
-        return res.status(500).json({
-          success: false,
-          message: "Erreur lors de la création du profil utilisateur",
-          error: insertError.message
+          password: tempPassword,
+          options: {
+            data: {
+              role: role,
+              phone: phone
+            }
+          }
         });
-      }
 
-      userData = newUser;
-      console.log("✅ Nouvel utilisateur créé avec succès !");
+        if (authError) {
+          console.error("❌ Erreur création Supabase Auth:", authError);
+          return res.status(400).json({
+            success: false,
+            message: "Erreur lors de la création du compte",
+            error: authError.message
+          });
+        }
+
+        console.log("✅ Utilisateur créé dans Supabase Auth avec ID:", authUser.user.id);
+        
+        // Créer dans PostgreSQL avec l'ID du nouvel utilisateur Auth
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            id: authUser.user.id,
+            email: email,
+            phone: phone,
+            role: role,
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("❌ Erreur insertion PostgreSQL:", insertError);
+          return res.status(500).json({
+            success: false,
+            message: "Erreur lors de la création du profil utilisateur",
+            error: insertError.message
+          });
+        }
+
+        userData = newUser;
+        console.log("✅ Nouvel utilisateur créé avec succès !");
+      }
     }
 
     // Nettoyer le code OTP utilisé

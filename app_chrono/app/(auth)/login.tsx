@@ -33,7 +33,7 @@ export default function LoginScreen() {
 
     try {
       // Pour un utilisateur existant, envoyer OTP directement
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/send-otp`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

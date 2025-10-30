@@ -49,7 +49,7 @@ export default function VerificationScreen() {
     
     try {
       // Appeler l'API backend pour vérifier l'OTP (email ou SMS)
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/verify-otp`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,10 +72,10 @@ export default function VerificationScreen() {
 
       // Sauvegarder l'utilisateur dans le store
       const userData = {
-        id: data.user.id,
-        email: data.user.email,
-        phone: data.user.phone,
-        isVerified: data.user.isVerified,
+        id: data.data.user.id,
+        email: data.data.user.email,
+        phone: data.data.user.phone,
+        isVerified: data.data.user.isVerified || true, // Par défaut true après vérification OTP
       };
       
       setUser(userData);

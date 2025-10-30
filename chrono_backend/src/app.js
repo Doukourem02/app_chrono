@@ -7,6 +7,7 @@ import deliveryRoutes from './routes/deliveryRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import authRoutesDB from './routes/authRoutesDB.js';
 import authRoutesSimple from './routes/authRoutesSimple.js'; // 🎯 SOLUTION SIMPLE
+import syncRoutes from './routes/syncRoutes.js'; // 🔄 SYNCHRONISATION
 
 dotenv.config();
 const app = express();
@@ -22,5 +23,6 @@ app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/auth-db', authRoutesDB);
 app.use('/api/auth-simple', authRoutesSimple); // 🎯 SOLUTION SIMPLE !
+app.use('/api/sync', syncRoutes); // 🔄 SYNCHRONISATION
 
 export default app;
