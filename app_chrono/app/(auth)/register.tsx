@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTempAuthStore } from '../../store/useTempAuthStore';
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const setTempData = useTempAuthStore((state) => state.setTempData);
 
   const handleContinue = async () => {
     if (!email || !phoneNumber) {
@@ -37,22 +39,13 @@ export default function RegisterScreen() {
     }
 
     setIsLoading(true);
+
+    // Sauvegarder les données temporairement
+    setTempData(email, phoneNumber);
     
-    try {
-      // TODO: Appeler l'API backend pour envoyer l'OTP
-      console.log('Envoi OTP à:', { email, phoneNumber });
-      
-      // Simulation d'un délai d'API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Naviguer vers l'écran de vérification
-      router.push('./verification' as any);
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi OTP:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
-    } finally {
-      setIsLoading(false);
-    }
+    // Naviguer vers l'écran de choix de méthode OTP
+    router.push('./otpMethod' as any);
+    setIsLoading(false);
   };
 
   return (
@@ -69,9 +62,9 @@ export default function RegisterScreen() {
 
       {/* Titre et description */}
       <View style={styles.contentContainer}>
-        <Text style={styles.title}>OTP Verification</Text>
+        <Text style={styles.title}>Email OTP Verification</Text>
         <Text style={styles.subtitle}>
-          Enter email and phone number to send one time Password
+          Enter your email and phone number. We&apos;ll send a verification code to your email address.
         </Text>
 
         {/* Formulaire */}
@@ -105,15 +98,23 @@ export default function RegisterScreen() {
           </View>
 
           {/* Continue Button */}
-          <TouchableOpacity 
-            style={[styles.continueButton, isLoading && styles.buttonDisabled]}
+                    <TouchableOpacity 
+            style={[styles.continueButton, (!email || !phoneNumber || isLoading) && styles.buttonDisabled]}
             onPress={handleContinue}
-            disabled={isLoading}
+            disabled={!email || !phoneNumber || isLoading}
           >
             <Text style={styles.continueButtonText}>
-              {isLoading ? 'Envoi...' : 'Continue'}
+              Continue
             </Text>
           </TouchableOpacity>
+
+          {/* Lien vers la connexion OTP */}
+          <View style={styles.loginLinkContainer}>
+            <Text style={styles.loginLinkText}>Déjà un compte ? </Text>
+            <TouchableOpacity onPress={() => router.push('/(auth)/login' as any)}>
+              <Text style={styles.loginLink}>Recevoir un code</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -209,6 +210,21 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  loginLinkContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  loginLinkText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  loginLink: {
+    fontSize: 14,
+    color: '#8B7CF6',
     fontWeight: '600',
   },
 });

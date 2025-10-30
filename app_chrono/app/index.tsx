@@ -1,17 +1,35 @@
 import { useEffect } from 'react';
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { View, ActivityIndicator, Text } from 'react-native';
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function RootIndex() {
+  const { isAuthenticated, user } = useAuthStore();
+
   useEffect(() => {
-    // Rediriger directement vers l'app principale (tabs)
-    // L'utilisateur peut explorer l'app librement
     const timer = setTimeout(() => {
-      router.replace('/(tabs)' as any);
-    }, 100);
+      if (isAuthenticated && user) {
+        router.replace('/(tabs)' as any);
+      } else {
+        router.replace('/(auth)/register' as any);
+      }
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isAuthenticated, user]);
 
-  return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+  return (
+    <View style={{ 
+      flex: 1, 
+      backgroundColor: '#FFFFFF',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    }}>
+      <ActivityIndicator size="large" color="#8B7CF6" />
+      <Text style={{ marginTop: 20, color: '#6B7280', textAlign: 'center' }}>
+        Vérification...
+      </Text>
+    </View>
+  );
 }

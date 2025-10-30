@@ -9,11 +9,15 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useTempAuthStore } from '../../store/useTempAuthStore';
 
 export default function VerificationScreen() {
-  const [code, setCode] = useState(['', '', '', '']);
+  const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const setUser = useAuthStore((state) => state.setUser);
+  const { email, phoneNumber, otpMethod, clearTempData } = useTempAuthStore();
 
   const handleCodeChange = (text: string, index: number) => {
     const newCode = [...code];
@@ -21,7 +25,7 @@ export default function VerificationScreen() {
     setCode(newCode);
 
     // Auto-focus next input
-    if (text && index < 3) {
+    if (text && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -36,26 +40,55 @@ export default function VerificationScreen() {
   const handleConfirm = async () => {
     const fullCode = code.join('');
     
-    if (fullCode.length !== 4) {
-      Alert.alert('Erreur', 'Veuillez entrer le code complet');
+    if (fullCode.length !== 6) {
+      Alert.alert('Erreur', 'Veuillez entrer le code complet à 6 chiffres');
       return;
     }
 
     setIsLoading(true);
     
     try {
-      // TODO: Appeler l'API backend pour vérifier l'OTP
-      console.log('Vérification du code:', fullCode);
+      // Appeler l'API backend pour vérifier l'OTP (email ou SMS)
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          phone: phoneNumber,
+          otp: fullCode,
+          method: otpMethod,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Code de vérification incorrect');
+      }
+
+      console.log(`${otpMethod} OTP vérifié avec succès:`, data);
+
+      // Sauvegarder l'utilisateur dans le store
+      const userData = {
+        id: data.user.id,
+        email: data.user.email,
+        phone: data.user.phone,
+        isVerified: data.user.isVerified,
+      };
       
-      // Simulation d'un délai d'API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setUser(userData);
+      
+      // Nettoyer les données temporaires
+      clearTempData();
       
       // Naviguer vers l'écran de succès
       router.push('./success' as any);
     } catch (error) {
       console.error('Erreur lors de la vérification:', error);
-      Alert.alert('Erreur', 'Code de vérification incorrect. Veuillez réessayer.');
-      setCode(['', '', '', '']);
+      Alert.alert('Erreur', (error as Error).message || 'Code de vérification incorrect. Veuillez réessayer.');
+      setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {
       setIsLoading(false);
@@ -79,7 +112,7 @@ export default function VerificationScreen() {
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Verification Code</Text>
         <Text style={styles.subtitle}>
-          We have sent the verification code to your email address
+          We have sent the verification code to your {otpMethod === 'email' ? 'email address' : 'phone number'}
         </Text>
 
         {/* Code Inputs */}
@@ -165,15 +198,16 @@ const styles = StyleSheet.create({
   codeContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
+    gap: 8,
     marginBottom: 40,
+    flexWrap: 'wrap',
   },
   codeInput: {
-    width: 60,
-    height: 60,
+    width: 45,
+    height: 50,
     borderRadius: 12,
     textAlign: 'center',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
   },

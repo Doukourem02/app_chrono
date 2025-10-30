@@ -8,12 +8,10 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../../store/useAuthStore';
 
 export default function SuccessScreen() {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const setUser = useAuthStore((state) => state.setUser);
 
   useEffect(() => {
     // Animation d'entrée
@@ -32,15 +30,7 @@ export default function SuccessScreen() {
   });
 
   const handleContinue = () => {
-    // Simuler un utilisateur connecté pour la démo
-    // TODO: Remplacer par les vraies données de l'utilisateur
-    setUser({
-      id: '1',
-      email: 'user@example.com',
-      phone: '+225077873971',
-      isVerified: true,
-    });
-    
+    // L'utilisateur a déjà été défini dans l'écran de vérification
     // Naviguer vers l'app principale
     router.push('/(tabs)' as any);
   };
