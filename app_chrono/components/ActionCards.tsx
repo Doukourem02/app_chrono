@@ -7,19 +7,17 @@ export default function ActionCards() {
 
   const handleNewDelivery = () => {
     requireAuth(() => {
-      // Action à exécuter si l'utilisateur est connecté
+      
       console.log('Naviguer vers nouvelle livraison');
-      // TODO: Naviguer vers l'écran de nouvelle livraison
-      // router.push('/new-delivery');
+    
     });
   };
 
   const handleTrackPackage = () => {
     requireAuth(() => {
-      // Action à exécuter si l'utilisateur est connecté
+      
       console.log('Naviguer vers suivi de colis');
-      // TODO: Naviguer vers l'écran de suivi
-      // router.push('/track-package');
+    
     });
   };
 

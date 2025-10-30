@@ -53,7 +53,7 @@ export default function ValidateScreen() {
         <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
           <Text style={styles.title}>Success!</Text>
           <Text style={styles.subtitle}>
-            Congratulations! You have been successfully authenticated
+          Félicitations ! Vous avez été authentifié avec succès.
           </Text>
         </Animated.View>
 

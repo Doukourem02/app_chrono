@@ -1,16 +1,10 @@
 import nodemailer from 'nodemailer';
 
-/**
- * 📧 SERVICE D'ENVOI D'EMAIL AVEC GMAIL
- * 
- * Utilise votre configuration Gmail existante du .env
- */
 
-// Configuration du transporteur Gmail
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: parseInt(process.env.EMAIL_PORT),
-  secure: false, // true pour 465, false pour autres ports
+  secure: false, 
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,

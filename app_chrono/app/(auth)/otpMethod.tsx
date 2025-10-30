@@ -75,9 +75,9 @@ export default function OTPMethodScreen() {
 
       {/* Contenu */}
       <View style={styles.contentContainer}>
-        <Text style={styles.title}>Choose Verification Method</Text>
+        <Text style={styles.title}>Choisissez la méthode de vérification</Text>
         <Text style={styles.subtitle}>
-          How would you like to receive your verification code?
+          Comment souhaitez-vous recevoir votre code de vérification ?
         </Text>
 
         {/* Options de méthode */}

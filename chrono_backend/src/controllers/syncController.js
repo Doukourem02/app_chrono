@@ -1,8 +1,6 @@
 import { supabase } from '../config/supabase.js';
 
-/**
- * 🔄 SYNCHRONISER LES UTILISATEURS SUPABASE AUTH VERS POSTGRESQL
- */
+
 export const syncUsersFromAuth = async (req, res) => {
   try {
     console.log('🔄 Début synchronisation des utilisateurs...');
@@ -104,9 +102,6 @@ export const syncUsersFromAuth = async (req, res) => {
   }
 };
 
-/**
- * 📊 VÉRIFIER L'ÉTAT DE LA SYNCHRONISATION
- */
 export const checkSyncStatus = async (req, res) => {
   try {
     // Compter les utilisateurs PostgreSQL

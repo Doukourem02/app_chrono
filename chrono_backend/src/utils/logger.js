@@ -1,5 +1,3 @@
-// utils/logger.js - Logger simple pour l'application
-
 export const logger = {
   info: (message, data = {}) => {
     console.log(`[INFO] ${new Date().toISOString()} - ${message}`, data);

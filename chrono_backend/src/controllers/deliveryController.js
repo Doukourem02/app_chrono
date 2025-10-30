@@ -1,4 +1,3 @@
-// src/controllers/deliveryController.js
 import pool from '../config/db.js';
 
 export const createDelivery = async (req, res) => {

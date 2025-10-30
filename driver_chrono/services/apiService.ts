@@ -216,6 +216,20 @@ class ApiService {
     };
   }> {
     try {
+      // TODO: Implémenter l'endpoint /api/drivers/${userId}/stats/today dans le backend
+      // Pour l'instant, retourner des données mockées pour éviter l'erreur
+      console.log('📊 getTodayStats - utilisation de données mockées en attendant l\'endpoint backend');
+      
+      return {
+        success: true,
+        data: {
+          deliveries: Math.floor(Math.random() * 10), // 0-9 livraisons
+          earnings: Math.floor(Math.random() * 100), // 0-99€
+          hours: Math.floor(Math.random() * 8) + 1    // 1-8 heures
+        }
+      };
+      
+      /* Code original à réactiver quand l'endpoint sera créé :
       const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/stats/today`);
       const result = await response.json();
       
@@ -224,6 +238,7 @@ class ApiService {
       }
 
       return result;
+      */
     } catch (error) {
       console.error('Erreur getTodayStats:', error);
       return {

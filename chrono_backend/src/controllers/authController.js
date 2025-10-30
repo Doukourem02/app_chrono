@@ -1,318 +1,200 @@
-// src/controllers/authController.js
-import supabase from '../config/supabase.js';
-import { sendOTP } from '../utils/notification.js';
-import { logger } from '../utils/logger.js';
+import { supabase } from '../config/supabase.js';
+import pkg from 'pg';
+const { Client } = pkg;
 
-// Stockage temporaire des codes OTP (en production, utiliser Redis)
-const otpStore = new Map();
 
-/**
- * Générer un code OTP
- */
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
+const otpStorage = new Map();
 
-/**
- * Envoyer OTP pour inscription
- */
-export const sendRegistrationOTP = async (req, res) => {
+
+import { sendOTPEmail, sendOTPSMS } from '../services/emailService.js';
+
+
+const registerUserWithPostgreSQL = async (req, res) => {
   try {
-    const { email, phone, method, role = 'client' } = req.body;
+    const { email, password, phone, role = 'client', firstName, lastName } = req.body;
 
-    // Validation
-    if (!email && !phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email ou téléphone requis'
-      });
-    }
+    console.log(`📝 Inscription utilisateur : ${email} avec rôle ${role}`);
 
-    if (!['email', 'sms'].includes(method)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Méthode invalide (email ou sms)'
-      });
-    }
 
-    if (!['client', 'driver', 'partner'].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Rôle invalide (client, driver, partner)'
-      });
-    }
-
-    // Vérifier si l'utilisateur existe déjà
-    const contact = method === 'email' ? email : phone;
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id, email, phone, role, status')
-      .or(`email.eq.${email || 'null'},phone.eq.${phone || 'null'}`)
-      .single();
-
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Un compte existe déjà avec ces informations'
-      });
-    }
-
-    // Générer et envoyer l'OTP
-    const otp = generateOTP();
-    const key = `registration_${contact}`;
-    
-    // Stocker temporairement les données d'inscription
-    otpStore.set(key, {
-      otp,
-      email,
-      phone,
-      role,
-      method,
-      timestamp: Date.now(),
-      verified: false
-    });
-
-    // Envoyer l'OTP
-    try {
-      await sendOTP(contact, otp, method);
-      
-      logger.info(`OTP d'inscription envoyé`, { 
-        contact, 
-        method, 
-        role,
-        timestamp: new Date().toISOString() 
-      });
-
-      res.json({
-        success: true,
-        message: `Code de vérification envoyé par ${method === 'email' ? 'email' : 'SMS'}`,
+    console.log("⏳ Création compte Supabase Auth...");
+    const { data: authUser, error: authError } = await supabase.auth.signUp({
+      email: email,
+      password: password || Math.random().toString(36).slice(-8), 
+      options: {
         data: {
-          contact: method === 'email' ? email : phone,
-          method,
-          role
+          role: role,
+          phone: phone,
+          first_name: firstName || '',
+          last_name: lastName || ''
         }
-      });
-
-    } catch (error) {
-      logger.error('Erreur envoi OTP:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Erreur lors de l\'envoi du code de vérification'
-      });
-    }
-
-  } catch (error) {
-    logger.error('Erreur sendRegistrationOTP:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur'
-    });
-  }
-};
-
-/**
- * Vérifier OTP et créer l'utilisateur
- */
-export const verifyRegistrationOTP = async (req, res) => {
-  try {
-    const { email, phone, otp, method, profileData = {} } = req.body;
-
-    const contact = method === 'email' ? email : phone;
-    const key = `registration_${contact}`;
-    const storedData = otpStore.get(key);
-
-    if (!storedData) {
-      return res.status(400).json({
-        success: false,
-        message: 'Code de vérification expiré ou invalide'
-      });
-    }
-
-    // Vérifier le code OTP
-    if (storedData.otp !== otp) {
-      return res.status(400).json({
-        success: false,
-        message: 'Code de vérification incorrect'
-      });
-    }
-
-    // Vérifier l'expiration (10 minutes)
-    if (Date.now() - storedData.timestamp > 10 * 60 * 1000) {
-      otpStore.delete(key);
-      return res.status(400).json({
-        success: false,
-        message: 'Code de vérification expiré'
-      });
-    }
-
-    try {
-      // Créer l'utilisateur dans Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: storedData.email,
-        phone: storedData.phone,
-        email_confirm: method === 'email',
-        phone_confirm: method === 'sms',
-        user_metadata: {
-          role: storedData.role,
-          registration_method: method
-        }
-      });
-
-      if (authError) {
-        logger.error('Erreur création utilisateur Supabase Auth:', authError);
-        return res.status(500).json({
-          success: false,
-          message: 'Erreur lors de la création du compte'
-        });
       }
+    });
+    if (authError) {
+      console.log("❌ Erreur Supabase Auth:", authError);
+      console.log("🔍 Détails erreur:", JSON.stringify(authError, null, 2));
+      
 
-      // Créer l'entrée dans la table users personnalisée
-      const { data: userData, error: userError } = await supabase
+      let errorMessage = authError.message;
+      if (authError.message.includes('not allowed')) {
+        errorMessage = 'Inscription non autorisée. Vérifiez la configuration Supabase Auth.';
+      } else if (authError.message.includes('already registered')) {
+        errorMessage = 'Cet email est déjà utilisé.';
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: errorMessage,
+        details: authError
+      });
+    }
+
+    console.log("✅ Compte Supabase créé ! ID:", authUser.user.id);
+
+  
+    console.log("⏳ Ajout dans votre table PostgreSQL users...");
+    
+    try {
+    
+      const { data: userData, error: dbError } = await supabase
         .from('users')
-        .insert({
-          email: storedData.email,
-          phone: storedData.phone,
-          role: storedData.role,
-          status: 'active',
-          email_verified: method === 'email',
-          phone_verified: method === 'sms',
-          auth_user_id: authData.user.id
-        })
+        .insert([
+          {
+            id: authUser.user.id,
+            email: email,
+            phone: phone,
+            role: role,
+            created_at: new Date().toISOString()
+          }
+        ])
         .select()
         .single();
 
-      if (userError) {
-        logger.error('Erreur création utilisateur table users:', userError);
-        // Nettoyer l'utilisateur Supabase Auth en cas d'erreur
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        return res.status(500).json({
-          success: false,
-          message: 'Erreur lors de la création du profil'
-        });
+      if (dbError) {
+        console.log("❌ Erreur PostgreSQL via Supabase:", dbError);
+        throw new Error(`Erreur base de données: ${dbError.message}`);
       }
 
-      // Créer le profil spécialisé selon le rôle
-      let profileResult = null;
-      if (storedData.role === 'client') {
-        profileResult = await createClientProfile(userData.id, profileData);
-      } else if (storedData.role === 'driver') {
-        profileResult = await createDriverProfile(userData.id, profileData);
-      } else if (storedData.role === 'partner') {
-        profileResult = await createPartnerProfile(userData.id, profileData);
-      }
+      console.log("✅ Utilisateur ajouté dans PostgreSQL !");
+      console.log("📊 Données PostgreSQL:", userData);
 
-      // Nettoyer le stockage temporaire
-      otpStore.delete(key);
-
-      logger.info('Utilisateur créé avec succès', {
-        userId: userData.id,
-        email: userData.email,
-        role: userData.role,
-        method
-      });
-
-      res.json({
+      let profile = null;
+    
+      res.status(201).json({
         success: true,
-        message: 'Compte créé avec succès',
+        message: "Utilisateur créé avec succès !",
         data: {
-          user: {
-            id: userData.id,
-            email: userData.email,
-            phone: userData.phone,
-            role: userData.role,
-            status: userData.status
-          },
-          profile: profileResult?.data || null,
-          authUser: {
-            id: authData.user.id,
-            email: authData.user.email
-          }
+          user: userData,
+          profile: profile,
+          session: authUser.session
         }
       });
 
-    } catch (error) {
-      logger.error('Erreur lors de la création complète de l\'utilisateur:', error);
+    } catch (dbError) {
+      console.error("❌ Erreur base de données:", dbError);
       res.status(500).json({
         success: false,
-        message: 'Erreur lors de la création du compte'
+        message: "Erreur lors de l'ajout en base de données",
+        error: dbError.message
       });
     }
 
   } catch (error) {
-    logger.error('Erreur verifyRegistrationOTP:', error);
+    console.error("❌ Erreur générale:", error);
     res.status(500).json({
       success: false,
-      message: 'Erreur serveur'
+      message: "Erreur lors de l'inscription",
+      error: error.message
     });
   }
 };
 
-/**
- * Créer un profil client
- */
-const createClientProfile = async (userId, profileData) => {
-  return await supabase
-    .from('client_profiles')
-    .insert({
-      user_id: userId,
-      first_name: profileData.firstName || '',
-      last_name: profileData.lastName || '',
-      date_of_birth: profileData.dateOfBirth || null,
-      address: profileData.address || '',
-      city: profileData.city || '',
-      postal_code: profileData.postalCode || ''
-    })
-    .select()
-    .single();
-};
 
-/**
- * Créer un profil chauffeur
- */
-const createDriverProfile = async (userId, profileData) => {
-  return await supabase
-    .from('driver_profiles')
-    .insert({
-      user_id: userId,
-      first_name: profileData.firstName || '',
-      last_name: profileData.lastName || '',
-      date_of_birth: profileData.dateOfBirth || null,
-      license_number: profileData.licenseNumber || '',
-      vehicle_type: profileData.vehicleType || '',
-      vehicle_plate: profileData.vehiclePlate || '',
-      vehicle_model: profileData.vehicleModel || ''
-    })
-    .select()
-    .single();
-};
-
-/**
- * Créer un profil partenaire
- */
-const createPartnerProfile = async (userId, profileData) => {
-  return await supabase
-    .from('partner_profiles')
-    .insert({
-      user_id: userId,
-      business_name: profileData.businessName || '',
-      business_type: profileData.businessType || '',
-      contact_person: profileData.contactPerson || '',
-      address: profileData.address || '',
-      city: profileData.city || '',
-      postal_code: profileData.postalCode || ''
-    })
-    .select()
-    .single();
-};
-
-/**
- * Connexion utilisateur
- */
-export const loginUser = async (req, res) => {
+const checkUserInPostgreSQL = async (req, res) => {
   try {
-    const { email, phone, password } = req.body;
+    const { email } = req.params;
 
-    // Pour l'instant, utilisons Supabase Auth avec email/password
+    console.log(`🔍 Vérification utilisateur: ${email}`);
+
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .limit(1);
+
+    if (error) {
+      console.error("❌ Erreur Supabase:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Erreur lors de la vérification",
+        error: error.message
+      });
+    }
+
+    if (users && users.length > 0) {
+      console.log("✅ Utilisateur trouvé dans PostgreSQL !");
+      res.json({
+        success: true,
+        message: "Utilisateur trouvé dans PostgreSQL",
+        user: users[0]
+      });
+    } else {
+      console.log("❌ Utilisateur PAS trouvé dans PostgreSQL");
+      res.json({
+        success: false,
+        message: "Utilisateur non trouvé dans PostgreSQL",
+        user: null
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Erreur vérification:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la vérification",
+      error: error.message
+    });
+  }
+};
+
+
+const getAllUsersFromPostgreSQL = async (req, res) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const query = `SELECT id, email, phone, role, created_at FROM users ORDER BY created_at DESC`;
+      const result = await client.query(query);
+
+      console.log(`📊 ${result.rows.length} utilisateurs trouvés dans PostgreSQL`);
+
+      res.json({
+        success: true,
+        message: `${result.rows.length} utilisateurs trouvés`,
+        users: result.rows
+      });
+
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error("❌ Erreur liste utilisateurs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la récupération des utilisateurs",
+      error: error.message
+    });
+  }
+};
+
+
+const loginUserWithPostgreSQL = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    console.log(`🔐 Connexion utilisateur : ${email}`);
+
+
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -320,101 +202,351 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
+
+    console.log("⏳ Connexion Supabase Auth...");
+    const { data: authUser, error: authError } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password
     });
 
-    if (error) {
-      logger.error('Erreur connexion:', error);
-      return res.status(401).json({
+    if (authError) {
+      console.log("❌ Erreur Supabase Auth:", authError.message);
+      return res.status(400).json({
         success: false,
-        message: 'Identifiants incorrects'
+        message: `Erreur connexion : ${authError.message}`
       });
     }
 
-    // Récupérer les données utilisateur complètes
-    const { data: userData } = await supabase
-      .from('users')
-      .select(`
-        *,
-        client_profiles (*),
-        driver_profiles (*),
-        partner_profiles (*)
-      `)
-      .eq('auth_user_id', data.user.id)
-      .single();
+    console.log("✅ Connexion Supabase réussie ! ID:", authUser.user.id);
+
+
+    console.log("⏳ Récupération données PostgreSQL...");
+    
+    const client = await pool.connect();
+    try {
+  
+      const userQuery = `SELECT * FROM users WHERE id = $1`;
+      const userResult = await client.query(userQuery, [authUser.user.id]);
+
+      if (userResult.rows.length === 0) {
+        console.log("❌ Utilisateur pas trouvé dans PostgreSQL");
+        return res.status(404).json({
+          success: false,
+          message: "Utilisateur non trouvé dans la base de données"
+        });
+      }
+
+      const user = userResult.rows[0];
+      console.log("✅ Utilisateur trouvé dans PostgreSQL !");
+
+
+      res.json({
+        success: true,
+        message: "Connexion réussie !",
+        data: {
+          user: user,
+          session: authUser.session
+        }
+      });
+
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error("❌ Erreur générale:", error);
+    res.status(500).json({
+      success: false,
+      message: "Erreur lors de la connexion",
+      error: error.message
+    });
+  }
+};
+
+
+const sendOTPCode = async (req, res) => {
+  try {
+    const { email, phone, otpMethod = 'email', role = 'client' } = req.body;
+
+    console.log(`📲 Envoi OTP pour ${email} via ${otpMethod} avec rôle ${role}`);
+
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+
+    const otpKey = `${email}_${phone}_${role}`;
+    otpStorage.set(otpKey, {
+      code: otpCode,
+      email,
+      phone,
+      role,
+      method: otpMethod,
+      createdAt: new Date(),
+      verified: false
+    });
+
+
+    setTimeout(() => {
+      otpStorage.delete(otpKey);
+    }, 5 * 60 * 1000);
+
+    if (otpMethod === 'email') {
+  
+      console.log(`📧 Code OTP ${otpCode} envoyé par email à ${email}`);
+      
+      const emailResult = await sendOTPEmail(email, otpCode, role);
+      
+      if (!emailResult.success) {
+        console.error('❌ Échec envoi email:', emailResult.error);
+        console.log(`
+          ========================================
+          📧 FALLBACK EMAIL OTP pour ${role.toUpperCase()}
+          ========================================
+          À: ${email}
+          Sujet: Code de vérification ${role}
+          
+          Votre code de vérification est: ${otpCode}
+          
+          Ce code expire dans 5 minutes.
+          ========================================
+        `);
+      } else {
+        console.log('✅ Email OTP envoyé avec succès !');
+      }
+      
+    } else if (otpMethod === 'sms') {
+      // 📱 Envoi par SMS
+      console.log(`📱 Code OTP ${otpCode} envoyé par SMS au ${phone}`);
+      
+      const smsResult = await sendOTPSMS(phone, otpCode, role);
+      
+      if (!smsResult.success) {
+        console.error('❌ Échec envoi SMS:', smsResult.error);
+      } else {
+        console.log('✅ SMS OTP envoyé avec succès !');
+      }
+    }
 
     res.json({
       success: true,
-      message: 'Connexion réussie',
+      message: `Code OTP envoyé par ${otpMethod}`,
       data: {
-        user: userData,
-        session: data.session
+        method: otpMethod,
+        email,
+        phone,
+        role,
+  
+        debug_code: process.env.NODE_ENV === 'development' ? otpCode : undefined
       }
     });
 
   } catch (error) {
-    logger.error('Erreur loginUser:', error);
+    console.error("❌ Erreur envoi OTP:", error);
     res.status(500).json({
       success: false,
-      message: 'Erreur serveur'
+      message: "Erreur lors de l'envoi du code OTP",
+      error: error.message
     });
   }
 };
 
-/**
- * Obtenir le profil utilisateur
- */
-export const getUserProfile = async (req, res) => {
+const verifyOTPCode = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({
+    const { email, phone, otp, method, role = 'client' } = req.body;
+
+    console.log(`✅ Vérification OTP pour ${email} avec code ${otp}`);
+
+    // Vérifier le code OTP
+    const otpKey = `${email}_${phone}_${role}`;
+    const storedOTP = otpStorage.get(otpKey);
+
+    if (!storedOTP) {
+      return res.status(400).json({
         success: false,
-        message: 'Token d\'authentification requis'
+        message: "Code OTP non trouvé ou expiré"
       });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      return res.status(401).json({
+    if (storedOTP.code !== otp) {
+      return res.status(400).json({
         success: false,
-        message: 'Token invalide'
+        message: "Code OTP incorrect"
       });
     }
 
-    // Récupérer les données utilisateur complètes
-    const { data: userData } = await supabase
+    // Vérifier expiration (5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    if (storedOTP.createdAt < fiveMinutesAgo) {
+      otpStorage.delete(otpKey);
+      return res.status(400).json({
+        success: false,
+        message: "Code OTP expiré"
+      });
+    }
+
+    console.log("✅ Code OTP valide !");
+
+    // Marquer comme vérifié
+    storedOTP.verified = true;
+    otpStorage.set(otpKey, storedOTP);
+
+    // Vérifier si l'utilisateur existe déjà dans PostgreSQL
+    const { data: existingUsers, error: checkError } = await supabase
       .from('users')
-      .select(`
-        *,
-        client_profiles (*),
-        driver_profiles (*),
-        partner_profiles (*)
-      `)
-      .eq('auth_user_id', user.id)
-      .single();
+      .select('*')
+      .eq('email', email)
+      .limit(1);
+
+    if (checkError) {
+      console.error("❌ Erreur vérification utilisateur:", checkError);
+    }
+
+    let userData;
+    let isNewUser = false;
+
+    if (existingUsers && existingUsers.length > 0) {
+      // 🔍 Utilisateur existant - connexion
+      console.log("👤 Utilisateur existant trouvé dans PostgreSQL !");
+      userData = existingUsers[0];
+    } else {
+      // 🆕 Nouvel utilisateur - vérifier d'abord dans Supabase Auth
+      console.log("🔍 Vérification dans Supabase Auth...");
+      
+      // Essayer de récupérer l'utilisateur depuis Supabase Auth par email
+      const { data: authUsers, error: authListError } = await supabase.auth.admin.listUsers();
+      
+      let existingAuthUser = null;
+      if (authUsers?.users) {
+        existingAuthUser = authUsers.users.find(user => user.email === email);
+      }
+      
+      if (existingAuthUser) {
+        // L'utilisateur existe dans Supabase Auth mais pas dans PostgreSQL
+        console.log("👤 Utilisateur trouvé dans Supabase Auth, synchronisation vers PostgreSQL...");
+        
+        // Créer dans PostgreSQL avec l'ID existant
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            id: existingAuthUser.id,  // ✅ Utiliser directement l'ID de Supabase Auth
+            email: email,
+            phone: phone,
+            role: role,
+            created_at: existingAuthUser.created_at || new Date().toISOString()
+          }])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("❌ Erreur synchronisation PostgreSQL:", insertError);
+          return res.status(500).json({
+            success: false,
+            message: "Erreur lors de la synchronisation du profil utilisateur",
+            error: insertError.message
+          });
+        }
+
+        userData = newUser;
+        console.log("✅ Utilisateur synchronisé avec succès !");
+        
+      } else {
+        // Vraiment nouvel utilisateur - créer dans Supabase Auth puis PostgreSQL
+        console.log("🆕 Création nouvel utilisateur complet...");
+        isNewUser = true;
+
+        // Créer dans Supabase Auth d'abord
+        const tempPassword = Math.random().toString(36).slice(-12);
+        const { data: authUser, error: authError } = await supabase.auth.signUp({
+          email: email,
+          password: tempPassword,
+          options: {
+            data: {
+              role: role,
+              phone: phone
+            }
+          }
+        });
+
+        if (authError) {
+          console.error("❌ Erreur création Supabase Auth:", authError);
+          return res.status(400).json({
+            success: false,
+            message: "Erreur lors de la création du compte",
+            error: authError.message
+          });
+        }
+
+        console.log("✅ Utilisateur créé dans Supabase Auth avec ID:", authUser.user.id);
+        
+        // Créer dans PostgreSQL avec l'ID du nouvel utilisateur Auth
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            id: authUser.user.id,
+            email: email,
+            phone: phone,
+            role: role,
+            created_at: new Date().toISOString()
+          }])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("❌ Erreur insertion PostgreSQL:", insertError);
+          return res.status(500).json({
+            success: false,
+            message: "Erreur lors de la création du profil utilisateur",
+            error: insertError.message
+          });
+        }
+
+        userData = newUser;
+        console.log("✅ Nouvel utilisateur créé avec succès !");
+      }
+    }
+
+    // Nettoyer le code OTP utilisé
+    otpStorage.delete(otpKey);
+
+    // Créer une session Supabase si c'est un nouvel utilisateur
+    let sessionData = null;
+    if (!isNewUser) {
+      // Pour un utilisateur existant, on peut créer une session
+      const { data: sessionResult, error: sessionError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: 'otp-verified-session' // Placeholder, à améliorer
+      });
+      
+      if (!sessionError) {
+        sessionData = sessionResult.session;
+      }
+    }
 
     res.json({
       success: true,
-      data: userData
+      message: isNewUser ? "Compte créé avec succès !" : "Connexion réussie !",
+      data: {
+        user: userData,
+        session: sessionData,
+        isNewUser
+      }
     });
 
   } catch (error) {
-    logger.error('Erreur getUserProfile:', error);
+    console.error("❌ Erreur vérification OTP:", error);
     res.status(500).json({
       success: false,
-      message: 'Erreur serveur'
+      message: "Erreur lors de la vérification",
+      error: error.message
     });
   }
 };
 
-export default {
-  sendRegistrationOTP,
-  verifyRegistrationOTP,
-  loginUser,
-  getUserProfile
+export {
+  registerUserWithPostgreSQL,
+  loginUserWithPostgreSQL,
+  checkUserInPostgreSQL,
+  getAllUsersFromPostgreSQL,
+  sendOTPCode,
+  verifyOTPCode
 };

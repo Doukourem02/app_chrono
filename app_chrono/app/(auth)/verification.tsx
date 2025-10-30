@@ -112,7 +112,7 @@ export default function VerificationScreen() {
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Verification Code</Text>
         <Text style={styles.subtitle}>
-          We have sent the verification code to your {otpMethod === 'email' ? 'email address' : 'phone number'}
+    Nous avons envoyé le code de vérification à votre {otpMethod === 'email' ? 'email address' : 'phone number'}
         </Text>
 
         {/* Code Inputs */}

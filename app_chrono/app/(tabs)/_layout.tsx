@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-evenly', 
     alignItems: 'center',
-    paddingHorizontal: 10, 
+    paddingHorizontal: 5, 
 
     // Ombre douce
     shadowColor: '#000',

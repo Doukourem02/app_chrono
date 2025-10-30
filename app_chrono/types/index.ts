@@ -1,4 +1,4 @@
-// Types communs pour l'application
+
 export interface Coordinates {
   latitude: number;
   longitude: number;
