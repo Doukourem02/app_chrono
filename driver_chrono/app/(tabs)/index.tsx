@@ -10,19 +10,28 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusToggle } from "../../components/StatusToggle";
 import { StatsCards } from "../../components/StatsCards";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
+import { useDriverStore } from "../../store/useDriverStore";
+import { apiService } from "../../services/apiService";
 
 export default function Index() {
-  const [isOnline, setIsOnline] = useState(false);
-  const [stats, setStats] = useState({
-    todayDeliveries: 0,
-    totalRevenue: 0,
-  });
+  // Store du chauffeur
+  const { 
+    isOnline: storeIsOnline, 
+    setOnlineStatus, 
+    setLocation,
+    todayStats,
+    updateTodayStats,
+    user,
+    profile 
+  } = useDriverStore();
+  
+  const [isOnline, setIsOnline] = useState(storeIsOnline);
   
   // Hook de géolocalisation
   const { location, error } = useDriverLocation(isOnline);
 
   // Gestion du changement de statut
-  const handleToggleOnline = (value: boolean) => {
+  const handleToggleOnline = async (value: boolean) => {
     if (value && error) {
       Alert.alert(
         "Erreur de localisation", 
@@ -31,7 +40,23 @@ export default function Index() {
       );
       return;
     }
+    
     setIsOnline(value);
+    setOnlineStatus(value); // Mettre à jour le store
+    
+    // Mettre à jour la localisation si en ligne
+    if (value && location) {
+      setLocation(location);
+    }
+    
+    // Mettre à jour le statut sur le serveur si utilisateur connecté
+    if (user) {
+      try {
+        await apiService.updateDriverStatus(user.id, value);
+      } catch (err) {
+        console.error('Erreur mise à jour statut:', err);
+      }
+    }
   };
 
   // Région de la carte basée sur la localisation du chauffeur
@@ -48,19 +73,22 @@ export default function Index() {
   };
 
   useEffect(() => {
-    // Simuler la récupération des stats depuis une API
-    if (isOnline) {
-      setStats({
-        todayDeliveries: 3,
-        totalRevenue: 45.50,
-      });
-    } else {
-      setStats({
-        todayDeliveries: 0,
-        totalRevenue: 0,
-      });
-    }
-  }, [isOnline]);
+    // Charger les stats depuis le serveur si utilisateur connecté
+    const loadTodayStats = async () => {
+      if (user && isOnline) {
+        try {
+          const result = await apiService.getTodayStats(user.id);
+          if (result.success && result.data) {
+            updateTodayStats(result.data);
+          }
+        } catch (err) {
+          console.error('Erreur chargement stats:', err);
+        }
+      }
+    };
+
+    loadTodayStats();
+  }, [isOnline, user, updateTodayStats]);
 
   return (
     <View style={styles.container}>
@@ -98,8 +126,8 @@ export default function Index() {
 
       {/* STATS CARDS */}
       <StatsCards 
-        todayDeliveries={stats.todayDeliveries}
-        totalRevenue={stats.totalRevenue}
+        todayDeliveries={todayStats.deliveries}
+        totalRevenue={profile?.total_earnings || 0}
         isOnline={isOnline}
       />
 
