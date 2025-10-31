@@ -153,7 +153,7 @@ export default function MapPage() {
         }
       };
       
-      const success = userOrderSocketService.createOrder(orderData);
+      const success = await userOrderSocketService.createOrder(orderData);
       if (success) {
         // Démarrer la recherche de chauffeur avec animation/pulse (20s)
         // Le radar/pulse sert désormais de feedback visuel pour l'utilisateur

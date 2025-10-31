@@ -33,7 +33,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
     { label: "Livreur en route pour récupérer le colis ", key: "accepted" },
     { label: "Colis pris en charge", key: "picked_up" },
     { label: "En cours de livraison", key: "in_progress" },
-    { label: "Livré", key: "completed" },
+    { label: "Colis Livré", key: "completed" },
   ];
 
   const activeIndex = Math.max(

@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { useOrderStore } from '../store/useOrderStore';
 import { userApiService } from './userApiService';
+import { logger } from '../utils/logger';
 
 class UserOrderSocketService {
   private socket: Socket | null = null;
@@ -16,22 +17,30 @@ class UserOrderSocketService {
     this.socket = io(process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000');
 
     this.socket.on('connect', () => {
-      console.log('🔌 Socket user connecté pour commandes');
+      logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
       this.isConnected = true;
       
       // S'identifier comme user
-      console.log('👤 Identification comme user:', userId);
+      logger.info('👤 Identification comme user', 'userOrderSocketService', { userId });
       this.socket?.emit('user-connect', userId);
+
+      // Ask server to resync any existing order state for this user
+      // (backend should reply with an event like `resync-order-state`)
+      try {
+        this.socket?.emit('user-reconnect', { userId });
+      } catch (err) {
+        logger.warn('Resync emit failed', 'userOrderSocketService', err);
+      }
     });
 
     this.socket.on('disconnect', () => {
-      console.log('🔌 Socket user déconnecté');
+      logger.info('🔌 Socket user déconnecté', 'userOrderSocketService');
       this.isConnected = false;
     });
 
     // 📦 Confirmation création commande
     this.socket.on('order-created', (data) => {
-      console.log('📦 Commande créée:', data);
+      logger.info('📦 Commande créée', 'userOrderSocketService', data);
       // Stocker comme pendingOrder
       try {
         const order = data?.order;
@@ -39,19 +48,19 @@ class UserOrderSocketService {
           useOrderStore.getState().setPendingOrder(order as any);
         }
       } catch (err) {
-        console.warn('Unable to store pending order', err);
+        logger.warn('Unable to store pending order', 'userOrderSocketService', err);
       }
     });
 
     // ❌ Aucun chauffeur disponible
     this.socket.on('no-drivers-available', (data) => {
-      console.log('❌ Aucun chauffeur disponible:', data);
+      logger.info('❌ Aucun chauffeur disponible', 'userOrderSocketService', data);
       // Ici on peut afficher une alerte à l'utilisateur
     });
 
     // ✅ Commande acceptée par un driver
     this.socket.on('order-accepted', (data) => {
-      console.log('✅ Commande acceptée par driver:', data);
+      logger.info('✅ Commande acceptée par driver', 'userOrderSocketService', data);
       try {
         const { order, driverInfo } = data || {};
         if (order) {
@@ -95,19 +104,40 @@ class UserOrderSocketService {
                   }
                 }
               } catch (err) {
-                console.warn('Impossible de récupérer les détails du chauffeur', err);
+                logger.warn('Impossible de récupérer les détails du chauffeur', 'userOrderSocketService', err);
               }
             })();
           }
         }
       } catch (err) {
-        console.warn('Error handling order-accepted', err);
+        logger.warn('Error handling order-accepted', 'userOrderSocketService', err);
+      }
+    });
+
+    // Server may send a resync containing pending/current order after reconnect
+    this.socket.on('resync-order-state', (data) => {
+      try {
+        const { pendingOrder, currentOrder, driverCoords } = data || {};
+        if (pendingOrder) {
+          useOrderStore.getState().setPendingOrder(pendingOrder as any);
+        }
+        if (currentOrder) {
+          useOrderStore.getState().setCurrentOrder(currentOrder as any);
+        }
+        if (driverCoords && driverCoords.latitude && driverCoords.longitude) {
+          useOrderStore.getState().setDriverCoords({
+            latitude: driverCoords.latitude,
+            longitude: driverCoords.longitude,
+          });
+        }
+      } catch (err) {
+        logger.warn('Error handling resync-order-state', 'userOrderSocketService', err);
       }
     });
 
     // 🚛 Mise à jour statut livraison (et position)
     this.socket.on('delivery-status-update', (data) => {
-      console.log('🚛 Statut livraison:', data);
+      logger.debug('🚛 Statut livraison', 'userOrderSocketService', data);
       try {
         const { order, location, status } = data || {};
         if (order) {
@@ -123,13 +153,13 @@ class UserOrderSocketService {
           useOrderStore.getState().updateOrderStatus(order.id, status as any);
         }
       } catch (err) {
-        console.warn('Error handling delivery-status-update', err);
+        logger.warn('Error handling delivery-status-update', 'userOrderSocketService', err);
       }
     });
 
     // ❌ Erreur commande
     this.socket.on('order-error', (data) => {
-      console.error('❌ Erreur commande:', data);
+      logger.error('❌ Erreur commande:', 'userOrderSocketService', data);
       // clear pending if present
       try {
         useOrderStore.getState().setPendingOrder(null);
@@ -137,7 +167,7 @@ class UserOrderSocketService {
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('❌ Erreur connexion socket user:', error);
+      logger.error('❌ Erreur connexion socket user:', 'userOrderSocketService', error);
     });
   }
 
@@ -168,18 +198,54 @@ class UserOrderSocketService {
       phone?: string;
     };
   }) {
-    if (!this.socket || !this.userId) {
-      console.error('❌ Socket non connecté');
-      return false;
-    }
+    return new Promise<boolean>((resolve) => {
+      if (!this.socket || !this.userId) {
+        logger.error('❌ Socket non connecté');
+        resolve(false);
+        return;
+      }
 
-    console.log('📦 Envoi commande:', orderData);
-    this.socket.emit('create-order', {
-      ...orderData,
-      userId: this.userId
+      const payload = {
+        ...orderData,
+        userId: this.userId,
+      };
+
+  logger.info('📦 Envoi commande (avec ack):', 'userOrderSocketService', payload);
+
+      // Emit with acknowledgement callback (server should call the ack)
+      let settled = false;
+      const timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          logger.warn('⚠️ createOrder ack timeout');
+          resolve(false);
+        }
+      }, 10000); // 10s timeout
+
+      try {
+        this.socket.emit('create-order', payload, (ackResponse: any) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          try {
+            if (ackResponse && ackResponse.success) {
+              // server should have emitted 'order-created' after creating the order
+              resolve(true);
+            } else {
+              logger.warn('❌ createOrder rejected by server', ackResponse);
+              resolve(false);
+            }
+          } catch (err) {
+            logger.warn('Error parsing createOrder ack', 'userOrderSocketService', err);
+            resolve(false);
+          }
+        });
+      } catch (err) {
+        clearTimeout(timeout);
+        logger.error('❌ Error emitting create-order', 'userOrderSocketService', err);
+        resolve(false);
+      }
     });
-
-    return true;
   }
 
   // Vérifier la connexion

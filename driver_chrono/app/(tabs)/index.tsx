@@ -15,6 +15,7 @@ import { useDriverStore } from "../../store/useDriverStore";
 import { useOrderStore } from "../../store/useOrderStore";
 import { apiService } from "../../services/apiService";
 import { orderSocketService } from "../../services/orderSocketService";
+import { logger } from '../../../app_chrono/utils/logger';
 
 export default function Index() {
   // Store du chauffeur
@@ -33,7 +34,7 @@ export default function Index() {
     pendingOrder, 
     setPendingOrder,
     currentOrder,
-  } = useOrderStore();
+    } = useOrderStore();
   
   const [isOnline, setIsOnline] = useState(storeIsOnline);
   
@@ -162,7 +163,7 @@ export default function Index() {
   // Debug: vérifier que currentOrder et location sont bien reçus
   useEffect(() => {
     if (currentOrder) {
-      console.log('🧭 DEBUG currentOrder:', {
+      logger.debug('DEBUG currentOrder', 'driverIndex', {
         id: currentOrder.id,
         status: currentOrder.status,
         pickup_raw: currentOrder.pickup,
@@ -170,11 +171,11 @@ export default function Index() {
         dropoff_resolved: resolveCoords(currentOrder.dropoff),
       });
     } else {
-      console.log('🧭 DEBUG currentOrder: null');
+      logger.debug('DEBUG currentOrder: null', 'driverIndex');
     }
 
     if (location) {
-      console.log('🧭 DEBUG driver location:', location);
+      logger.debug('DEBUG driver location', 'driverIndex', location);
     }
   }, [currentOrder, location]);
 

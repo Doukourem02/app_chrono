@@ -86,27 +86,31 @@ async function findNearbyDrivers(pickupCoords, deliveryMethod, maxDistance = 10)
 }
 
 const setupOrderSocket = (io) => {
+  const DEBUG = process.env.DEBUG_SOCKETS === 'true';
+
   io.on('connection', (socket) => {
-    console.log(`🔌 Nouvelle connexion Socket: ${socket.id}`);
+    if (DEBUG) console.log(`🔌 Nouvelle connexion Socket: ${socket.id}`);
     
     // 📱 Enregistrement d'un driver
     socket.on('driver-connect', (driverId) => {
       connectedDrivers.set(driverId, socket.id);
       socket.driverId = driverId;
-      console.log(`🚗 Driver connecté: ${driverId}`);
+      if (DEBUG) console.log(`🚗 Driver connecté: ${driverId}`);
     });
     
     // 👤 Enregistrement d'un user
     socket.on('user-connect', (userId) => {
       connectedUsers.set(userId, socket.id);
       socket.userId = userId;
-      console.log(`👤 User connecté: ${userId}`);
+      if (DEBUG) console.log(`👤 User connecté: ${userId}`);
     });
     
     // 📦 Nouvelle commande depuis un user
-    socket.on('create-order', async (orderData) => {
+    // Create-order now supports an acknowledgement callback from the client
+    // so the client can know if the server accepted/created the order.
+    socket.on('create-order', async (orderData, ack) => {
       try {
-        console.log(`📦 Nouvelle commande de ${socket.userId}:`, orderData);
+        if (DEBUG) console.log(`📦 Nouvelle commande de ${socket.userId}:`, orderData);
 
         const {
           pickup,
@@ -156,26 +160,33 @@ const setupOrderSocket = (io) => {
         // Stocker la commande
         activeOrders.set(order.id, order);
 
-        // Confirmer la création au user
-        socket.emit('order-created', {
+        // Emit event to the user socket
+        io.to(socket.id).emit('order-created', {
           success: true,
           order,
           message: 'Commande créée, recherche de chauffeur...'
         });
 
+        // Acknowledge to the client (if provided)
+        try {
+          if (typeof ack === 'function') ack({ success: true, orderId: order.id });
+        } catch (e) {
+          if (DEBUG) console.warn('Ack callback failed for create-order', e);
+        }
+
         // Chercher des chauffeurs proches
         const nearbyDrivers = await findNearbyDrivers(pickup.coordinates, deliveryMethod);
 
         if (nearbyDrivers.length === 0) {
-          console.log(`❌ Aucun chauffeur disponible dans la zone pour la commande ${order.id}`);
-          socket.emit('no-drivers-available', {
+          if (DEBUG) console.log(`❌ Aucun chauffeur disponible dans la zone pour la commande ${order.id}`);
+          io.to(socket.id).emit('no-drivers-available', {
             orderId: order.id,
             message: 'Aucun chauffeur disponible dans votre zone'
           });
           return;
         }
 
-        console.log(`🔍 ${nearbyDrivers.length} chauffeurs trouvés pour la commande ${order.id}`);
+  if (DEBUG) console.log(`🔍 ${nearbyDrivers.length} chauffeurs trouvés pour la commande ${order.id}`);
 
         // Envoyer la commande aux chauffeurs proches (un par un)
         let driverIndex = 0;
@@ -194,21 +205,21 @@ const setupOrderSocket = (io) => {
           const driverSocketId = connectedDrivers.get(driver.driverId);
 
           if (driverSocketId) {
-            console.log(`📤 Envoi commande à driver ${driver.driverId} (socket: ${driverSocketId})`);
+            if (DEBUG) console.log(`📤 Envoi commande à driver ${driver.driverId} (socket: ${driverSocketId})`);
             io.to(driverSocketId).emit('new-order-request', order);
 
             // Timer d'attente (20 secondes)
             setTimeout(() => {
               const currentOrder = activeOrders.get(order.id);
               if (currentOrder && currentOrder.status === 'pending') {
-                console.log(`⏰ Timeout driver ${driver.driverId} pour commande ${order.id}`);
+                if (DEBUG) console.log(`⏰ Timeout driver ${driver.driverId} pour commande ${order.id}`);
                 driverIndex++;
                 tryNextDriver();
               }
             }, 20000);
           } else {
             // Driver pas connecté, essayer le suivant
-            console.log(`⚠️ Chauffeur ${driver.driverId} trouvé mais socket non connecté.`);
+            if (DEBUG) console.log(`⚠️ Chauffeur ${driver.driverId} trouvé mais socket non connecté.`);
             driverIndex++;
             tryNextDriver();
           }
@@ -246,7 +257,7 @@ const setupOrderSocket = (io) => {
       order.driverId = driverId;
       order.acceptedAt = new Date();
 
-      console.log(`✅ Commande ${orderId} acceptée par driver ${driverId}`);
+  if (DEBUG) console.log(`✅ Commande ${orderId} acceptée par driver ${driverId}`);
 
       // Confirmer au driver
       socket.emit('order-accepted-confirmation', {
@@ -299,7 +310,7 @@ const setupOrderSocket = (io) => {
         return;
       }
 
-      console.log(`❌ Commande ${orderId} déclinée par driver ${driverId}`);
+  if (DEBUG) console.log(`❌ Commande ${orderId} déclinée par driver ${driverId}`);
 
       // Confirmer au driver
       socket.emit('order-declined-confirmation', {
@@ -326,7 +337,7 @@ const setupOrderSocket = (io) => {
         order.completedAt = new Date();
       }
       
-      console.log(`🚛 Statut livraison ${orderId}: ${status}`);
+  if (DEBUG) console.log(`🚛 Statut livraison ${orderId}: ${status}`);
       
       // Notifier le user
       const userSocketId = connectedUsers.get(order.user.id);
@@ -341,24 +352,61 @@ const setupOrderSocket = (io) => {
       if (status === 'completed') {
         setTimeout(() => {
           activeOrders.delete(orderId);
-          console.log(`🗑️ Commande ${orderId} supprimée du cache`);
+          if (DEBUG) console.log(`🗑️ Commande ${orderId} supprimée du cache`);
         }, 300000); // 5 minutes
       }
     });
     
+    // Handle resync requests from clients (user / driver reconnect)
+    socket.on('user-reconnect', ({ userId } = {}) => {
+      try {
+        if (!userId) return;
+        const pending = [];
+        const current = [];
+        for (const [, o] of activeOrders.entries()) {
+          if (o.user && o.user.id === userId) {
+            if (o.status === 'pending') pending.push(o);
+            else current.push(o);
+          }
+        }
+        io.to(socket.id).emit('resync-order-state', {
+          pendingOrder: pending.length ? pending[0] : null,
+          currentOrder: current.length ? current[0] : null,
+        });
+      } catch (err) {
+        if (DEBUG) console.warn('Error handling user-reconnect', err);
+      }
+    });
+
+    socket.on('driver-reconnect', ({ driverId } = {}) => {
+      try {
+        if (!driverId) return;
+        const assigned = [];
+        for (const [, o] of activeOrders.entries()) {
+          if (o.driverId === driverId) assigned.push(o);
+        }
+        io.to(socket.id).emit('resync-order-state', {
+          pendingOrder: null,
+          currentOrder: assigned.length ? assigned[0] : null,
+        });
+      } catch (err) {
+        if (DEBUG) console.warn('Error handling driver-reconnect', err);
+      }
+    });
+
     // 🔌 Déconnexion
     socket.on('disconnect', () => {
-      console.log(`🔌 Déconnexion Socket: ${socket.id}`);
-      
+      if (DEBUG) console.log(`🔌 Déconnexion Socket: ${socket.id}`);
+
       // Nettoyer les maps
       if (socket.driverId) {
         connectedDrivers.delete(socket.driverId);
-        console.log(`🚗 Driver déconnecté: ${socket.driverId}`);
+        if (DEBUG) console.log(`🚗 Driver déconnecté: ${socket.driverId}`);
       }
-      
+
       if (socket.userId) {
         connectedUsers.delete(socket.userId);
-        console.log(`👤 User déconnecté: ${socket.userId}`);
+        if (DEBUG) console.log(`👤 User déconnecté: ${socket.userId}`);
       }
     });
   });
