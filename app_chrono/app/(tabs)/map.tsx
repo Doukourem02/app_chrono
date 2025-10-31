@@ -13,6 +13,8 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { DeliveryMapView } from '../../components/DeliveryMapView';
 import { DeliveryBottomSheet } from '../../components/DeliveryBottomSheet';
+// Explicit extension to help some editors/resolvers find the file reliably
+import TrackingBottomSheet from '../../components/TrackingBottomSheet.tsx';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { useOrderStore } from '../../store/useOrderStore';
 
@@ -94,6 +96,7 @@ export default function MapPage() {
 
   const orderDriverCoords = useOrderStore((s) => s.driverCoords);
   const currentOrder = useOrderStore((s) => s.currentOrder);
+  const pendingOrder = useOrderStore((s) => s.pendingOrder);
 
   const {
     animatedHeight,
@@ -225,20 +228,47 @@ export default function MapPage() {
 
       {/* Bouton de test supprimé */}
 
-      {/* Bottom Sheet */}
-      <DeliveryBottomSheet
-        animatedHeight={animatedHeight}
-        panResponder={panResponder}
-        isExpanded={isExpanded}
-        onToggle={toggleBottomSheet}
-        pickupLocation={pickupLocation}
-        deliveryLocation={deliveryLocation}
-        selectedMethod={selectedMethod}
-        onPickupSelected={handlePickupSelected}
-        onDeliverySelected={handleDeliverySelected}
-        onMethodSelected={handleMethodSelected}
-        onConfirm={handleConfirm}
-      />
+      {/* Bottom Sheet: render only one at a time depending on delivery stage */}
+      {(() => {
+        const deliveryStage = (() => {
+          if (pendingOrder) return 'searching';
+          if (!currentOrder) return 'idle';
+          if (currentOrder.status === 'accepted') return 'accepted';
+          if (currentOrder.status === 'in_progress') return 'delivering';
+          if (currentOrder.status === 'completed') return 'done';
+          return 'idle';
+        })();
+
+        return (
+          <>
+            {deliveryStage === 'idle' && (
+              <DeliveryBottomSheet
+                animatedHeight={animatedHeight}
+                panResponder={panResponder}
+                isExpanded={isExpanded}
+                onToggle={toggleBottomSheet}
+                pickupLocation={pickupLocation}
+                deliveryLocation={deliveryLocation}
+                selectedMethod={selectedMethod}
+                onPickupSelected={handlePickupSelected}
+                onDeliverySelected={handleDeliverySelected}
+                onMethodSelected={handleMethodSelected}
+                onConfirm={handleConfirm}
+              />
+            )}
+
+            {(deliveryStage === 'accepted' || deliveryStage === 'delivering') && (
+              <TrackingBottomSheet
+                currentOrder={currentOrder}
+                panResponder={panResponder}
+                animatedHeight={animatedHeight}
+                isExpanded={isExpanded}
+                onToggle={toggleBottomSheet}
+              />
+            )}
+          </>
+        );
+      })()}
     </View>
   );
 }

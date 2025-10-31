@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -8,10 +8,8 @@ import {
   ScrollView,
   Image,
   Alert,
-  Linking
 } from 'react-native';
-import { useOrderStore } from '../store/useOrderStore';
-import { Ionicons } from '@expo/vector-icons';
+// Tracking moved to dedicated component (TrackingBottomSheet)
 import PlacesAutocomplete from './PlacesAutocomplete';
 import { useShipmentStore } from '../store/useShipmentStore';
 
@@ -54,8 +52,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   onConfirm,
 }) => {
   const { createShipment } = useShipmentStore();
-  const currentOrder = useOrderStore((s) => s.currentOrder);
-  const [trackingExpanded, setTrackingExpanded] = useState(false);
+  // currentOrder tracking moved to TrackingBottomSheet component
 
   const handleConfirm = () => {
     if (!pickupLocation || !deliveryLocation) {
@@ -69,120 +66,9 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   // Bottom sheet now always displays the shipment form. Order tracking
   // UI was removed per request to keep the original behavior.
 
-  // If there's an active accepted/in_progress order, show a compact floating pill
-  const isTrackingVisible = !!currentOrder && (currentOrder.status === 'accepted' || currentOrder.status === 'in_progress');
+  
 
-  const handleCallDriver = () => {
-  const phone = currentOrder?.driver?.phone;
-    if (!phone) {
-      Alert.alert('Téléphone non disponible', 'Le numéro du chauffeur n\'est pas disponible pour le moment.');
-      return;
-    }
-    const url = `tel:${phone}`;
-    Linking.canOpenURL(url).then((supported) => {
-      if (supported) Linking.openURL(url);
-      else Alert.alert('Impossible', 'Impossible d\'ouvrir l\'application téléphone.');
-    });
-  };
-
-  const handleMessageDriver = () => {
-  const phone = currentOrder?.driver?.phone;
-    if (!phone) {
-      Alert.alert('Message non disponible', 'Le contact du chauffeur n\'est pas disponible.');
-      return;
-    }
-    const url = `sms:${phone}`;
-    Linking.canOpenURL(url).then((supported) => {
-      if (supported) Linking.openURL(url);
-      else Alert.alert('Impossible', 'Impossible d\'ouvrir l\'application de messages.');
-    });
-  };
-
-  if (isTrackingVisible) {
-    return (
-      <View style={styles.pillWrapper} pointerEvents="box-none">
-        <View style={styles.outerPill}>
-            <View style={styles.topBarWrapper} pointerEvents="none">
-              <View style={styles.topBar} />
-            </View>
-            <TouchableOpacity style={styles.compactPill} activeOpacity={0.9} onPress={() => setTrackingExpanded(true)}>
-          <View style={styles.leftAvatar}>
-            {currentOrder?.driver?.avatar ? (
-              <Image source={{ uri: currentOrder.driver.avatar }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarPlaceholder} />
-            )}
-          </View>
-
-          <View style={styles.rightActions}>
-            <TouchableOpacity style={styles.actionCircle} onPress={handleMessageDriver}>
-              <Ionicons name="chatbubble" size={24} color="#fff" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionCircle} onPress={handleCallDriver}>
-              <Ionicons name="call" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-        </View>
-        {trackingExpanded && (
-          <Animated.View style={styles.expandedSheet}>
-            <View style={styles.expandedHeader}>
-              <TouchableOpacity onPress={() => setTrackingExpanded(false)} style={styles.dragHandle} />
-            </View>
-
-            <ScrollView style={styles.expandedContent} showsVerticalScrollIndicator={false}>
-              <Text style={styles.expandedTitle}>Status de la commande</Text>
-
-              <View style={styles.timelineContainer}>
-                {[
-                  'En route pour récupérer',
-                  'Colis pris en charge',
-                  'En cours de livraison',
-                  'Livré',
-                ].map((label, idx) => {
-                  const active = (currentOrder?.status === 'completed') ? true : (currentOrder?.status === 'in_progress' ? idx < 2 : idx < 1 && currentOrder?.status === 'accepted');
-                  return (
-                    <View key={label} style={styles.timelineRow}>
-                      <View style={styles.timelineLeft}>
-                        <View style={[styles.timelineBullet, active ? styles.timelineBulletActive : styles.timelineBulletInactive]} />
-                        {idx < 3 && <View style={[styles.timelineLine, active ? styles.timelineLineActive : styles.timelineLineInactive]} />}
-                      </View>
-                      <View style={styles.timelineRight}>
-                        <Text style={[styles.timelineText, active ? styles.timelineTextActive : styles.timelineTextInactive]}>{label}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
-
-            <View style={styles.expandedPillContainer} pointerEvents="box-none">
-              <TouchableOpacity style={styles.compactPill} activeOpacity={0.9} onPress={() => setTrackingExpanded(false)}>
-                <View style={styles.leftAvatar}>
-                  {currentOrder?.driver?.avatar ? (
-                    <Image source={{ uri: currentOrder.driver.avatar }} style={styles.avatarImage} />
-                  ) : (
-                    <View style={styles.avatarPlaceholder} />
-                  )}
-                </View>
-
-                <View style={styles.rightActions}>
-                  <TouchableOpacity style={styles.actionCircle} onPress={handleMessageDriver}>
-                    <Ionicons name="chatbubble" size={24} color="#fff" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.actionCircle} onPress={handleCallDriver}>
-                    <Ionicons name="call" size={24} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        )}
-      </View>
-    );
-  }
+  
 
   return (
     <Animated.View 
