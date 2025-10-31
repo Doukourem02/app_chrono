@@ -25,7 +25,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   isExpanded,
   onToggle,
 }) => {
-  const insets = useSafeAreaInsets(); // ✅ pour iPhone / Android bottom safe-area
+  const insets = useSafeAreaInsets();
 
   const status = currentOrder?.status || "accepted";
 
@@ -48,7 +48,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         styles.sheetContainer,
         {
           height: animatedHeight,
-          bottom: insets.bottom + 10, // ✅ la sheet flotte, ne touche pas le bas
+          bottom: insets.bottom + 25,
         },
       ]}
     >
@@ -77,9 +77,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
       {/* ✅ EXPANDÉ */}
       {isExpanded && (
-        <View style={styles.content}>
+        <View style={styles.expandedCard}>
           <Text style={styles.title}>Statut de la commande</Text>
 
+          {/* Timeline */}
           <View style={styles.timelineContainer}>
             {statusSteps.map((step, index) => {
               const isActive = index <= activeIndex;
@@ -89,7 +90,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                     <View
                       style={[
                         styles.line,
-                        { backgroundColor: isActive ? "#7C3AED" : "#ccc" },
+                        { backgroundColor: isActive ? "#7C3AED" : "#E0E0E0" },
                       ]}
                     />
                   )}
@@ -115,6 +116,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
             })}
           </View>
 
+          {/* Barre d’action */}
           <View style={styles.actionBar}>
             <View style={styles.driverAvatar} />
             <View style={styles.actionButtons}>
@@ -139,6 +141,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
+    alignItems: "center",
     backgroundColor: "transparent",
   },
 
@@ -197,13 +200,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  content: {
-    flex: 1,
+  // ✅ NOUVELLE PARTIE FIDÈLE AU FIGMA
+  expandedCard: {
+    width: "92%",
     backgroundColor: "#fff",
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    borderRadius: 28,
+    paddingTop: 20,
+    paddingHorizontal: 22,
+    paddingBottom: 18,
+    alignSelf: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
 
   title: {
@@ -211,18 +221,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333",
     textAlign: "center",
-    marginBottom: 12,
+    marginBottom: 16,
   },
 
   timelineContainer: {
-    marginBottom: 22,
-    paddingHorizontal: 10,
+    marginBottom: 24,
+    paddingLeft: 6,
   },
 
   stepContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 12,
     position: "relative",
   },
 
@@ -231,41 +241,47 @@ const styles = StyleSheet.create({
     left: 7,
     top: -14,
     width: 2,
-    height: 22,
+    height: 26,
   },
 
   circle: {
-    width: 15,
-    height: 15,
+    width: 16,
+    height: 16,
     borderRadius: 8,
     borderWidth: 1.5,
-    marginRight: 10,
+    marginRight: 12,
   },
 
   stepText: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: "500",
   },
 
   actionBar: {
     flexDirection: "row",
     backgroundColor: "#7C3AED",
-    borderRadius: 30,
+    borderRadius: 35,
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     alignItems: "center",
     justifyContent: "space-between",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
 
   actionButtons: {
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
   },
 
   actionButton: {
     backgroundColor: "#000",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
   },
