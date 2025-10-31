@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import React, { useRef, useEffect, useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import MapView from 'react-native-maps';
 import { useShipmentStore } from '../../store/useShipmentStore';
 import { useMapLogic } from '../../hooks/useMapLogic';
@@ -10,8 +10,11 @@ import { useDriverSearch } from '../../hooks/useDriverSearch';
 import { useOnlineDrivers } from '../../hooks/useOnlineDrivers';
 import { useBottomSheet } from '../../hooks/useBottomSheet';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
+import { useAuthStore } from '../../store/useAuthStore';
 import { DeliveryMapView } from '../../components/DeliveryMapView';
 import { DeliveryBottomSheet } from '../../components/DeliveryBottomSheet';
+import { userOrderSocketService } from '../../services/userOrderSocketService';
+import { useOrderStore } from '../../store/useOrderStore';
 
 type Coordinates = {
   latitude: number;
@@ -21,6 +24,7 @@ type Coordinates = {
 export default function MapPage() {
   const { requireAuth } = useRequireAuth();
   const { setSelectedMethod } = useShipmentStore();
+  const { user } = useAuthStore();
   
   const mapRef = useRef<MapView | null>(null);
 
@@ -30,6 +34,17 @@ export default function MapPage() {
       // L'utilisateur est connecté, ne rien faire
     });
   }, [requireAuth]);
+
+  // 🔌 Connexion Socket pour les commandes
+  useEffect(() => {
+    if (user?.id) {
+      userOrderSocketService.connect(user.id);
+    }
+
+    return () => {
+      userOrderSocketService.disconnect();
+    };
+  }, [user?.id]);
   
   // Hooks personnalisés pour séparer la logique
   const {
@@ -77,6 +92,9 @@ export default function MapPage() {
     startDriverSearch,
   } = useDriverSearch(resetAfterDriverSearch);
 
+  const orderDriverCoords = useOrderStore((s) => s.driverCoords);
+  const currentOrder = useOrderStore((s) => s.currentOrder);
+
   const {
     animatedHeight,
     isExpanded,
@@ -84,7 +102,8 @@ export default function MapPage() {
     toggle: toggleBottomSheet,
   } = useBottomSheet();
 
-  // Gestionnaires d'événements
+  // NOTE: Bouton de test retiré en production — la création de commande
+  // est maintenant déclenchée via le flow utilisateur (handleConfirm)
   const handlePickupSelected = ({ description, coords }: { description: string; coords?: Coordinates }) => {
     setPickupLocation(description);
     if (coords) {
@@ -110,7 +129,41 @@ export default function MapPage() {
   const handleConfirm = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); // Feedback haptic confirmation
     
-    // Assurer que l'itinéraire est prêt
+    // 📦 TEST: Envoyer une commande réelle via Socket.IO
+    if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user) {
+      console.log('📦 Envoi commande test...');
+      
+      const orderData = {
+        pickup: {
+          address: pickupLocation,
+          coordinates: pickupCoords
+        },
+        dropoff: {
+          address: deliveryLocation,
+          coordinates: dropoffCoords
+        },
+        deliveryMethod: selectedMethod as 'moto' | 'vehicule' | 'cargo',
+        userInfo: {
+          name: user.email?.split('@')[0] || 'Client',
+          rating: 4.5,
+          phone: user.phone
+        }
+      };
+      
+      const success = userOrderSocketService.createOrder(orderData);
+      if (success) {
+        // Démarrer la recherche de chauffeur avec animation/pulse (20s)
+        // Le radar/pulse sert désormais de feedback visuel pour l'utilisateur
+        startDriverSearch();
+      } else {
+        Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
+      }
+      // Ne pas return — continuer le flow si nécessaire (caméra/route)
+    }
+    
+    // Si la commande n'a pas été créée (par exemple utilisateur ne fournit
+    // pas toutes les infos), continuer le flow normal : préparer la route
+    // puis lancer la recherche locale de chauffeurs (pulse)
     try {
       if (pickupCoords && dropoffCoords) {
         await fetchRoute(pickupCoords, dropoffCoords);
@@ -124,7 +177,10 @@ export default function MapPage() {
       animateToCoordinate(pickupCoords, 0.01);
     }
 
-    startDriverSearch();
+    // Démarrer la recherche seulement si on ne l'a pas déjà démarrée via la création de commande
+    if (!isSearchingDriver) {
+      startDriverSearch();
+    }
   };
 
   if (!region) {
@@ -153,6 +209,8 @@ export default function MapPage() {
           dropoffCoords={dropoffCoords}
           displayedRouteCoords={displayedRouteCoords}
           driverCoords={driverCoords}
+          orderDriverCoords={orderDriverCoords}
+          orderStatus={currentOrder?.status}
           onlineDrivers={onlineDrivers} // 🚗 NOUVEAU
           isSearchingDriver={isSearchingDriver}
           pulseAnim={pulseAnim}
@@ -164,6 +222,8 @@ export default function MapPage() {
           availableVehicles={[]} // Remplacé par une valeur par défaut
           showMethodSelection={showMethodSelection}
         />
+
+      {/* Bouton de test supprimé */}
 
       {/* Bottom Sheet */}
       <DeliveryBottomSheet
@@ -203,7 +263,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowRadius: 4,
     elevation: 5,
   },
   loadingContainer: {

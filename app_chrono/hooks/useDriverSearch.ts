@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 import { io } from 'socket.io-client';
 import { logger } from '../utils/logger';
-import { useErrorHandler } from '../utils/errorHandler';
+import { errorHandler } from '../utils/errorHandler';
 import { config } from '../config';
 
 type Coordinates = {
@@ -11,7 +11,8 @@ type Coordinates = {
 };
 
 export const useDriverSearch = (onSearchComplete?: () => void) => {
-  const { handleError } = useErrorHandler();
+  // use a stable error handler instance to avoid recreating this effect
+  // on every render (which caused repeated socket creations).
   
   const [isSearchingDriver, setIsSearchingDriver] = useState(false);
   const [searchSeconds, setSearchSeconds] = useState(0);
@@ -58,17 +59,19 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
         }
       });
     } catch (err) {
-      handleError(err, 'useDriverSearch', 'Erreur de connexion au serveur');
+      // use stable instance to report the error without changing the effect deps
+      errorHandler.handle(errorHandler.createAPIError('Erreur de connexion au serveur', err, 'useDriverSearch'));
     }
 
     return () => {
-      try { 
-        socket && socket.disconnect(); 
+      try {
+        socket && socket.disconnect();
       } catch {
         // Ignorer les erreurs de déconnexion
       }
     };
-  }, [handleError]);
+    // Intentionally empty dependency array: we want this effect to run once.
+  }, []);
 
   const startDriverSearch = () => {
     setIsSearchingDriver(true);

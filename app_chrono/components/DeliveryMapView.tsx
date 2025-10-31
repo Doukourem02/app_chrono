@@ -25,6 +25,8 @@ interface DeliveryMapViewProps {
   dropoffCoords: Coordinates | null;
   displayedRouteCoords: Coordinates[];
   driverCoords: Coordinates | null;
+  orderDriverCoords?: Coordinates | null;
+  orderStatus?: string | null;
   onlineDrivers: OnlineDriver[]; // 🚗 NOUVEAU
   isSearchingDriver: boolean;
   pulseAnim: Animated.Value;
@@ -44,6 +46,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   dropoffCoords,
   displayedRouteCoords,
   driverCoords,
+  orderDriverCoords,
+  orderStatus,
   onlineDrivers, // 🚗 NOUVEAU
   isSearchingDriver,
   pulseAnim,
@@ -194,6 +198,39 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
           lineJoin="round"
           lineCap="round"
         />
+      )}
+
+      {/* Marker + polyline pour la commande en cours (driver -> pickup/dropoff) */}
+      {orderDriverCoords && (
+        <>
+          <Marker
+            coordinate={orderDriverCoords}
+            title={`Livreur`}
+            description={/* fallback */ 'Livreur en route'}
+          >
+            <View style={styles.orderDriverMarker}>
+              <Text style={styles.driverIcon}>🚚</Text>
+            </View>
+          </Marker>
+
+          {/* Polyline dynamique: si status est 'accepted' or 'pending' -> driver -> pickup */}
+          {((orderStatus === 'accepted' || orderStatus === 'pending') && pickupCoords) && (
+            <Polyline
+              coordinates={[orderDriverCoords, pickupCoords]}
+              strokeColor="#10B981"
+              strokeWidth={4}
+            />
+          )}
+
+          {/* Si en cours ou après pickup -> driver -> dropoff */}
+          {(orderStatus === 'in_progress' && dropoffCoords) && (
+            <Polyline
+              coordinates={[orderDriverCoords, dropoffCoords]}
+              strokeColor="#EF4444"
+              strokeWidth={4}
+            />
+          )}
+        </>
       )}
 
       {/* Badge ETA - Visible sauf pendant recherche */}
@@ -354,5 +391,20 @@ const styles = StyleSheet.create({
   driverIcon: {
     fontSize: 16,
     color: '#FFFFFF',
+  },
+  orderDriverMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#111827',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
   },
 });

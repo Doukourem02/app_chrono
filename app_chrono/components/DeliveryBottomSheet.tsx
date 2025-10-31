@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -7,8 +7,11 @@ import {
   Animated, 
   ScrollView,
   Image,
-  Alert 
+  Alert,
+  Linking
 } from 'react-native';
+import { useOrderStore } from '../store/useOrderStore';
+import { Ionicons } from '@expo/vector-icons';
 import PlacesAutocomplete from './PlacesAutocomplete';
 import { useShipmentStore } from '../store/useShipmentStore';
 
@@ -51,6 +54,8 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   onConfirm,
 }) => {
   const { createShipment } = useShipmentStore();
+  const currentOrder = useOrderStore((s) => s.currentOrder);
+  const [trackingExpanded, setTrackingExpanded] = useState(false);
 
   const handleConfirm = () => {
     if (!pickupLocation || !deliveryLocation) {
@@ -61,6 +66,123 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
     createShipment();
     onConfirm();
   };
+  // Bottom sheet now always displays the shipment form. Order tracking
+  // UI was removed per request to keep the original behavior.
+
+  // If there's an active accepted/in_progress order, show a compact floating pill
+  const isTrackingVisible = !!currentOrder && (currentOrder.status === 'accepted' || currentOrder.status === 'in_progress');
+
+  const handleCallDriver = () => {
+  const phone = currentOrder?.driver?.phone;
+    if (!phone) {
+      Alert.alert('Téléphone non disponible', 'Le numéro du chauffeur n\'est pas disponible pour le moment.');
+      return;
+    }
+    const url = `tel:${phone}`;
+    Linking.canOpenURL(url).then((supported) => {
+      if (supported) Linking.openURL(url);
+      else Alert.alert('Impossible', 'Impossible d\'ouvrir l\'application téléphone.');
+    });
+  };
+
+  const handleMessageDriver = () => {
+  const phone = currentOrder?.driver?.phone;
+    if (!phone) {
+      Alert.alert('Message non disponible', 'Le contact du chauffeur n\'est pas disponible.');
+      return;
+    }
+    const url = `sms:${phone}`;
+    Linking.canOpenURL(url).then((supported) => {
+      if (supported) Linking.openURL(url);
+      else Alert.alert('Impossible', 'Impossible d\'ouvrir l\'application de messages.');
+    });
+  };
+
+  if (isTrackingVisible) {
+    return (
+      <View style={styles.pillWrapper} pointerEvents="box-none">
+        <View style={styles.outerPill}>
+            <View style={styles.topBarWrapper} pointerEvents="none">
+              <View style={styles.topBar} />
+            </View>
+            <TouchableOpacity style={styles.compactPill} activeOpacity={0.9} onPress={() => setTrackingExpanded(true)}>
+          <View style={styles.leftAvatar}>
+            {currentOrder?.driver?.avatar ? (
+              <Image source={{ uri: currentOrder.driver.avatar }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )}
+          </View>
+
+          <View style={styles.rightActions}>
+            <TouchableOpacity style={styles.actionCircle} onPress={handleMessageDriver}>
+              <Ionicons name="chatbubble" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionCircle} onPress={handleCallDriver}>
+              <Ionicons name="call" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+        </View>
+        {trackingExpanded && (
+          <Animated.View style={styles.expandedSheet}>
+            <View style={styles.expandedHeader}>
+              <TouchableOpacity onPress={() => setTrackingExpanded(false)} style={styles.dragHandle} />
+            </View>
+
+            <ScrollView style={styles.expandedContent} showsVerticalScrollIndicator={false}>
+              <Text style={styles.expandedTitle}>Status de la commande</Text>
+
+              <View style={styles.timelineContainer}>
+                {[
+                  'En route pour récupérer',
+                  'Colis pris en charge',
+                  'En cours de livraison',
+                  'Livré',
+                ].map((label, idx) => {
+                  const active = (currentOrder?.status === 'completed') ? true : (currentOrder?.status === 'in_progress' ? idx < 2 : idx < 1 && currentOrder?.status === 'accepted');
+                  return (
+                    <View key={label} style={styles.timelineRow}>
+                      <View style={styles.timelineLeft}>
+                        <View style={[styles.timelineBullet, active ? styles.timelineBulletActive : styles.timelineBulletInactive]} />
+                        {idx < 3 && <View style={[styles.timelineLine, active ? styles.timelineLineActive : styles.timelineLineInactive]} />}
+                      </View>
+                      <View style={styles.timelineRight}>
+                        <Text style={[styles.timelineText, active ? styles.timelineTextActive : styles.timelineTextInactive]}>{label}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <View style={styles.expandedPillContainer} pointerEvents="box-none">
+              <TouchableOpacity style={styles.compactPill} activeOpacity={0.9} onPress={() => setTrackingExpanded(false)}>
+                <View style={styles.leftAvatar}>
+                  {currentOrder?.driver?.avatar ? (
+                    <Image source={{ uri: currentOrder.driver.avatar }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder} />
+                  )}
+                </View>
+
+                <View style={styles.rightActions}>
+                  <TouchableOpacity style={styles.actionCircle} onPress={handleMessageDriver}>
+                    <Ionicons name="chatbubble" size={24} color="#fff" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.actionCircle} onPress={handleCallDriver}>
+                    <Ionicons name="call" size={24} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <Animated.View 
@@ -281,5 +403,179 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#475569',
     lineHeight: 18,
+  },
+  /* Compact pill (tracking) styles */
+  pillWrapper: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 28,
+    alignItems: 'center',
+    zIndex: 50,
+  },
+  compactPill: {
+    width: '100%',
+    backgroundColor: '#7B61FF',
+    borderRadius: 28,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  expandedSheet: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 80,
+    top: 80,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    zIndex: 60,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    overflow: 'hidden',
+  },
+  expandedHeader: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: 'transparent',
+  },
+  expandedContent: {
+    paddingHorizontal: 18,
+    paddingBottom: 120,
+  },
+  expandedTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  timelineContainer: {
+    paddingVertical: 6,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 18,
+  },
+  timelineLeft: {
+    width: 36,
+    alignItems: 'center',
+  },
+  timelineBullet: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  timelineBulletActive: {
+    backgroundColor: '#7B61FF',
+  },
+  timelineBulletInactive: {
+    backgroundColor: '#E5E7EB',
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+  },
+  timelineLineActive: {
+    backgroundColor: '#C7B7FF',
+  },
+  timelineLineInactive: {
+    backgroundColor: '#F1F5F9',
+  },
+  timelineRight: {
+    flex: 1,
+    paddingLeft: 12,
+  },
+  timelineText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  timelineTextActive: {
+    color: '#111827',
+    fontWeight: '700',
+  },
+  timelineTextInactive: {
+    color: '#6B7280',
+  },
+  expandedPillContainer: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 18,
+    alignItems: 'center',
+  },
+  outerPill: {
+    backgroundColor: '#fff',
+    borderRadius: 40,
+    padding: 10,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  topBarWrapper: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+    // place inside the white outer container above the purple pill
+    paddingTop: 0,
+  },
+  topBar: {
+    width: 60,
+    height: 4,
+    backgroundColor: '#c8c8c8ff',
+    borderRadius: 2,
+    marginTop: -9,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  /* Larger avatar + action sizes to match design */
+  leftAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#D9D9D9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  avatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E6E6E6',
+  },
+  actionCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
   },
 });

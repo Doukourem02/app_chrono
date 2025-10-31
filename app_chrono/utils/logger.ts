@@ -56,18 +56,35 @@ class Logger {
     // Afficher dans la console en mode développement
     if (__DEV__) {
       const formattedMessage = this.formatMessage(level, message, component);
+      const hasExtra = typeof extra !== 'undefined';
       switch (level) {
         case LogLevel.DEBUG:
-          console.log(formattedMessage, extra);
+          if (hasExtra) {
+            console.log(formattedMessage, extra);
+          } else {
+            console.log(formattedMessage);
+          }
           break;
         case LogLevel.INFO:
-          console.info(formattedMessage, extra);
+          if (hasExtra) {
+            console.info(formattedMessage, extra);
+          } else {
+            console.info(formattedMessage);
+          }
           break;
         case LogLevel.WARN:
-          console.warn(formattedMessage, extra);
+          if (hasExtra) {
+            console.warn(formattedMessage, extra);
+          } else {
+            console.warn(formattedMessage);
+          }
           break;
         case LogLevel.ERROR:
-          console.error(formattedMessage, extra);
+          if (hasExtra) {
+            console.error(formattedMessage, extra);
+          } else {
+            console.error(formattedMessage);
+          }
           break;
       }
     }

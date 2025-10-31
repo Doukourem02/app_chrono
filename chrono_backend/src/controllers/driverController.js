@@ -5,7 +5,7 @@ import { supabase } from '../config/supabase.js';
  */
 
 // 💾 Stockage en mémoire des statuts réels des chauffeurs
-const realDriverStatuses = new Map();
+export const realDriverStatuses = new Map();
 
 // 🎭 Données de test pour compléter (TEMPORAIREMENT DÉSACTIVÉES)
 const mockDrivers = [

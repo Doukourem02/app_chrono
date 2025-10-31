@@ -5,13 +5,16 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, Polyline } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusToggle } from "../../components/StatusToggle";
 import { StatsCards } from "../../components/StatsCards";
+import { OrderRequestPopup } from "../../components/OrderRequestPopup";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
 import { useDriverStore } from "../../store/useDriverStore";
+import { useOrderStore } from "../../store/useOrderStore";
 import { apiService } from "../../services/apiService";
+import { orderSocketService } from "../../services/orderSocketService";
 
 export default function Index() {
   // Store du chauffeur
@@ -25,10 +28,41 @@ export default function Index() {
     profile 
   } = useDriverStore();
   
+  // Store des commandes
+  const { 
+    pendingOrder, 
+    setPendingOrder,
+    currentOrder,
+  } = useOrderStore();
+  
   const [isOnline, setIsOnline] = useState(storeIsOnline);
   
   // Hook de géolocalisation
   const { location, error } = useDriverLocation(isOnline);
+
+  // 🔌 Connexion Socket pour les commandes
+  useEffect(() => {
+    if (isOnline && user?.id) {
+      orderSocketService.connect(user.id);
+    } else {
+      orderSocketService.disconnect();
+    }
+
+    return () => {
+      orderSocketService.disconnect();
+    };
+  }, [isOnline, user?.id]);
+
+  // Gestion des commandes
+  const handleAcceptOrder = (orderId: string) => {
+    orderSocketService.acceptOrder(orderId);
+    setPendingOrder(null); // Fermer le popup
+  };
+
+  const handleDeclineOrder = (orderId: string) => {
+    orderSocketService.declineOrder(orderId);
+    setPendingOrder(null); // Fermer le popup
+  };
 
   // Gestion du changement de statut
   const handleToggleOnline = async (value: boolean) => {
@@ -107,6 +141,44 @@ export default function Index() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   };
+  // Normaliser plusieurs formats de coordonnées possibles (latitude/longitude ou lat/lng)
+  const resolveCoords = (candidate?: any) => {
+    if (!candidate) return null;
+
+    // candidate may be: { coordinates: { latitude, longitude } } OR { coords: { lat, lng } } OR direct { latitude, longitude }
+    const c = candidate.coordinates || candidate.coords || candidate.location || candidate;
+    const lat = c?.latitude ?? c?.lat ?? c?.latitude ?? c?.Lat ?? c?.y;
+    const lng = c?.longitude ?? c?.lng ?? c?.lon ?? c?.long ?? c?.Longitude ?? c?.x;
+
+    if (lat == null || lng == null) return null;
+    const latN = Number(lat);
+    const lngN = Number(lng);
+    if (Number.isNaN(latN) || Number.isNaN(lngN)) return null;
+    return { latitude: latN, longitude: lngN };
+  };
+
+  // distanceMeters removed — no longer used (polyline always points to pickup after accept)
+
+  // Debug: vérifier que currentOrder et location sont bien reçus
+  useEffect(() => {
+    if (currentOrder) {
+      console.log('🧭 DEBUG currentOrder:', {
+        id: currentOrder.id,
+        status: currentOrder.status,
+        pickup_raw: currentOrder.pickup,
+        pickup_resolved: resolveCoords(currentOrder.pickup),
+        dropoff_resolved: resolveCoords(currentOrder.dropoff),
+      });
+    } else {
+      console.log('🧭 DEBUG currentOrder: null');
+    }
+
+    if (location) {
+      console.log('🧭 DEBUG driver location:', location);
+    }
+  }, [currentOrder, location]);
+
+  // NOTE: removed automatic fitToCoordinates to avoid abrupt map zooming; map remains centered on driver's region.
 
   useEffect(() => {
     // Charger les stats depuis le serveur si utilisateur connecté
@@ -151,6 +223,78 @@ export default function Index() {
             </View>
           </Marker>
         )}
+
+        {/* Polyline pour la commande active
+            - Affichée seulement après acceptation (status === 'accepted' ou 'in_progress')
+            - Trace toujours chauffeur -> pickup (le chauffeur doit aller récupérer le colis chez l'expéditeur)
+        */}
+        {isOnline && location && currentOrder && (currentOrder.status === 'accepted' || currentOrder.status === 'in_progress') && (() => {
+          const pickupCoord = resolveCoords(currentOrder.pickup);
+          if (!pickupCoord) {
+            console.warn('⚠️ currentOrder has no resolvable pickup coord', currentOrder);
+            return null;
+          }
+
+          return (
+            <Polyline
+              coordinates={[
+                { latitude: location.latitude, longitude: location.longitude },
+                { latitude: pickupCoord.latitude, longitude: pickupCoord.longitude }
+              ]}
+              strokeColor="#8B5CF6"
+              strokeWidth={4}
+              lineCap="round"
+            />
+          );
+        })()}
+
+        {/* Markers pour pickup / dropoff (si commande active) - labels clarifiés */}
+        {currentOrder && (() => {
+          const pickupCoord = resolveCoords(currentOrder.pickup);
+          const dropoffCoord = resolveCoords(currentOrder.dropoff);
+
+          return (
+            <>
+              {pickupCoord && (
+                <Marker
+                  coordinate={pickupCoord}
+                  title={currentOrder.user?.name ? `Récupérer : ${currentOrder.user.name}` : 'Récupérer (client)'}
+                  description={currentOrder.pickup?.address}
+                >
+                  <View style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: '#fff',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 3,
+                    borderColor: '#8B5CF6'
+                  }} />
+                </Marker>
+              )}
+
+              {dropoffCoord && (
+                <Marker
+                  coordinate={dropoffCoord}
+                  title={'Livrer : Destinataire'}
+                  description={currentOrder.dropoff?.address}
+                >
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: '#fff',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: '#94A3B8'
+                  }} />
+                </Marker>
+              )}
+            </>
+          );
+        })()}
       </MapView>
 
       {/* SWITCH ONLINE/OFFLINE */}
@@ -177,6 +321,15 @@ export default function Index() {
           <Ionicons name="list" size={22} color="#8B5CF6" />
         </TouchableOpacity>
       </View>
+
+      {/* 📦 POPUP COMMANDE */}
+      <OrderRequestPopup
+        order={pendingOrder}
+        visible={!!pendingOrder}
+        onAccept={handleAcceptOrder}
+        onDecline={handleDeclineOrder}
+        autoDeclineTimer={30}
+      />
     </View>
   );
 }
