@@ -152,18 +152,6 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     destinationPulseAnim.setValue(0);
   };
 
-  // Animation pulse pour le marqueur utilisateur
-  const startUserPulse = () => {
-    const animation = Animated.loop(
-      Animated.timing(userPulseAnim, {
-        toValue: 1,
-        duration: 1200,
-        useNativeDriver: true,
-      })
-    );
-    animation.start();
-  };
-
   // Arrêter l'animation pulse pour le marqueur utilisateur
   const stopUserPulse = () => {
     userPulseAnim.stopAnimation();
@@ -182,10 +170,8 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
 
   // Démarrer le mode sélection de méthode
   const startMethodSelection = () => {
-     console.log('🚀 startMethodSelection called - setting showMethodSelection to TRUE');
     setShowMethodSelection(true);
     stopDestinationPulse();
-    startUserPulse();
   };
 
   // Récupérer l'itinéraire

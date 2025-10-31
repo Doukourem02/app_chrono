@@ -89,77 +89,21 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </Marker>
       ))}
 
-      {/* ✅ Marqueur position - MASQUÉ pendant le pulse radar (showMethodSelection) */}
-      {(() => {
-        const shouldShow = pickupCoords && !showMethodSelection && !isSearchingDriver;
-        // console.log('🔵 Marqueur position - shouldShow:', shouldShow, 'showMethodSelection:', showMethodSelection, 'isSearchingDriver:', isSearchingDriver);
-
-        return shouldShow ? (
-          <Marker 
-            coordinate={pickupCoords} 
-            title="Ma position" 
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={styles.userLocationMarker}>
-              <View style={styles.userLocationDot} />
-            </View>
-          </Marker>
-        ) : null;
-      })()}
-
-      {/* PULSE RADAR GÉANT pour cacher le marqueur pendant showMethodSelection */}
-      {showMethodSelection && pickupCoords && (
+      {/* ✅ Marqueur position - Toujours visible */}
+      {pickupCoords && (
         <Marker 
           coordinate={pickupCoords} 
-          anchor={{ x: 0.5, y: 0.5 }} 
-          tracksViewChanges={false}
+          title="Ma position" 
+          anchor={{ x: 0.5, y: 0.5 }}
         >
-          <View style={styles.pulseContainerInvisible}>
-            <Animated.View 
-              style={[
-                styles.pulseOuter,
-                {
-                  transform: [
-                    {
-                      scale: userPulseAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [2.0, 8.0] // BEAUCOUP PLUS GRAND
-                      })
-                    }
-                  ],
-                  opacity: userPulseAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.9, 0]
-                  })
-                }
-              ]}
-            />
-            <Animated.View 
-              style={[
-                styles.pulseInner,
-                {
-                  transform: [
-                    {
-                      scale: userPulseAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1.5, 6.0] // BEAUCOUP PLUS GRAND
-                      })
-                    }
-                  ],
-                  opacity: userPulseAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.7, 0]
-                  })
-                }
-              ]}
-            />
-            {/* AUCUN élément central - TOTALEMENT INVISIBLE */}
+          <View style={styles.userLocationMarker}>
+            <View style={styles.userLocationDot} />
           </View>
         </Marker>
       )}
 
-      {/* ✅ Animation de recherche - pulsation SANS searchDot pendant showMethodSelection */}
-      {isSearchingDriver && pickupCoords && !showMethodSelection && (
+      {/* Animation pulse uniquement pendant la recherche de chauffeur */}
+      {isSearchingDriver && pickupCoords && (
         <Marker 
           coordinate={pickupCoords} 
           anchor={{ x: 0.5, y: 0.5 }} 
@@ -209,8 +153,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </Marker>
       )}
 
-      {/* Marqueur de destination - MASQUÉ pendant le pulse radar (showMethodSelection) et pendant recherche */}
-      {!isSearchingDriver && !showMethodSelection && dropoffCoords && (
+      {/* Marqueur de destination - Toujours visible sauf pendant recherche */}
+      {!isSearchingDriver && dropoffCoords && (
         <Marker 
           coordinate={dropoffCoords} 
           title="Destination" 
@@ -241,8 +185,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </Marker>
       )}
 
-      {/* Polyline - MASQUÉE pendant le pulse radar (showMethodSelection) et pendant recherche */}
-      {!isSearchingDriver && !showMethodSelection && displayedRouteCoords && displayedRouteCoords.length > 0 && (
+      {/* Polyline - Visible sauf pendant recherche */}
+      {!isSearchingDriver && displayedRouteCoords && displayedRouteCoords.length > 0 && (
         <Polyline
           coordinates={displayedRouteCoords}
           strokeColor="#6366F1"
@@ -252,8 +196,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         />
       )}
 
-      {/* Badge ETA - MASQUÉ pendant le pulse radar (showMethodSelection) et pendant recherche */}
-      {!isSearchingDriver && !showMethodSelection && durationText && pickupCoords && (
+      {/* Badge ETA - Visible sauf pendant recherche */}
+      {!isSearchingDriver && durationText && pickupCoords && (
         <Marker 
           coordinate={pickupCoords} 
           anchor={{ x: 0.5, y: 0.5 }} 
