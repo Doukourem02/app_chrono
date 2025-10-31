@@ -30,7 +30,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const status = currentOrder?.status || "accepted";
 
   const statusSteps = [
-    { label: "En route pour récupérer", key: "accepted" },
+    { label: "Livreur en route pour récupérer le colis ", key: "accepted" },
     { label: "Colis pris en charge", key: "picked_up" },
     { label: "En cours de livraison", key: "in_progress" },
     { label: "Livré", key: "completed" },
