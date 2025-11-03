@@ -168,6 +168,8 @@ export const getDriverRevenues = async (req, res) => {
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
 
+    console.log('🔍 DÉBUT getDriverRevenues pour userId:', userId, 'period:', period);
+
     if (!userId) {
       return res.status(400).json({
         success: false,
@@ -194,14 +196,24 @@ export const getDriverRevenues = async (req, res) => {
         }
       });
     }
+    
+    // Vérifier d'abord TOUTES les commandes completed
+    const allCompletedQuery = await pool.query(
+      `SELECT COUNT(*) as count FROM orders WHERE status = 'completed'`
+    );
+    const allCompletedCount = parseInt(allCompletedQuery.rows[0]?.count || 0);
+    console.log('📊 Total commandes completed (sans filtre):', allCompletedCount);
 
     // Calculer les dates selon la période
     let queryDate = '';
     let dateParams = [];
     
+    console.log('📅 Calcul des dates - period:', period, 'startDate:', startDate, 'endDate:', endDate);
+    
     if (startDate && endDate) {
       queryDate = 'AND completed_at >= $2 AND completed_at <= $3';
       dateParams = [userId, startDate, endDate];
+      console.log('📅 Utilisation dates personnalisées:', startDate, 'à', endDate);
     } else {
       const now = new Date();
       let start = new Date();
@@ -220,14 +232,29 @@ export const getDriverRevenues = async (req, res) => {
         default:
           queryDate = 'AND completed_at IS NOT NULL';
           dateParams = [userId];
+          console.log('📅 Période: all - pas de filtre de date');
           break;
       }
       
       if (period !== 'all') {
         queryDate = 'AND completed_at >= $2 AND completed_at <= $3';
         dateParams = [userId, start.toISOString(), now.toISOString()];
+        console.log('📅 Filtre date:', start.toISOString(), 'à', now.toISOString());
       }
     }
+    
+    console.log('📅 queryDate:', queryDate);
+    console.log('📅 dateParams:', dateParams);
+
+    // Lister TOUTES les colonnes de orders pour debug
+    const allColumnsResult = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'orders'
+       ORDER BY ordinal_position`
+    );
+    const allColumns = allColumnsResult.rows.map(row => row.column_name);
+    console.log('📋 Colonnes disponibles dans orders:', allColumns.join(', '));
 
     // Vérifier dynamiquement les colonnes disponibles (compatibilité anciennes/nouvelles migrations)
     const columnsInfo = await pool.query(
@@ -246,6 +273,8 @@ export const getDriverRevenues = async (req, res) => {
         ? 'price'
         : null;
 
+    console.log('💰 Colonne de prix trouvée:', priceColumn);
+
     if (!priceColumn) {
       throw new Error("La colonne 'price' (ou 'price_cfa') est absente de la table orders. Exécutez les migrations.");
     }
@@ -257,12 +286,15 @@ export const getDriverRevenues = async (req, res) => {
         : null;
 
     const distanceSelect = distanceColumn ? distanceColumn : 'NULL::numeric';
+    console.log('📏 Colonne de distance trouvée:', distanceColumn);
 
     const driverColumn = columnSet.has('driver_id')
       ? 'driver_id'
       : columnSet.has('driver_uuid')
         ? 'driver_uuid'
         : null;
+
+    console.log('🔑 Colonne driver trouvée:', driverColumn);
 
     // Vérifier si order_assignments existe si driverColumn n'existe pas
     let hasOrderAssignments = false;
@@ -276,15 +308,43 @@ export const getDriverRevenues = async (req, res) => {
           )`
         );
         hasOrderAssignments = tableCheck.rows[0]?.exists === true;
+        console.log('📋 Table order_assignments existe:', hasOrderAssignments);
       } catch (err) {
         logger.warn('⚠️ Erreur vérification order_assignments:', err.message);
       }
     }
+    
+    // Vérifier quelques commandes completed pour debug
+    const sampleQuery = await pool.query(
+      `SELECT id, status, ${driverColumn || 'NULL as driver_id'}, ${priceColumn}, completed_at 
+       FROM orders 
+       WHERE status = 'completed' 
+       LIMIT 5`
+    );
+    console.log('📋 Exemple de commandes completed:', JSON.stringify(sampleQuery.rows, null, 2));
 
     // Récupérer les commandes terminées du chauffeur
     let query, result;
     try {
       if (driverColumn) {
+        console.log(`🔍 Requête avec ${driverColumn} pour userId:`, userId);
+        // Vérifier d'abord combien de commandes completed ont un driver_id défini
+        const withDriverQuery = await pool.query(
+          `SELECT COUNT(*) as count FROM orders 
+           WHERE ${driverColumn} IS NOT NULL AND status = 'completed'`
+        );
+        const withDriverCount = parseInt(withDriverQuery.rows[0]?.count || 0);
+        console.log(`📊 Commandes completed avec ${driverColumn} défini:`, withDriverCount);
+        
+        // Compter pour ce livreur spécifique
+        const forThisDriverQuery = await pool.query(
+          `SELECT COUNT(*) as count FROM orders 
+           WHERE ${driverColumn} = $1 AND status = 'completed'`,
+          [userId]
+        );
+        const forThisDriverCount = parseInt(forThisDriverQuery.rows[0]?.count || 0);
+        console.log(`📊 Commandes completed pour ce livreur (${userId}):`, forThisDriverCount);
+        
         query = `
           SELECT 
             id,
@@ -300,7 +360,20 @@ export const getDriverRevenues = async (req, res) => {
           ORDER BY completed_at DESC
         `;
         result = await pool.query(query, dateParams);
+        console.log('✅ Résultat requête avec driverColumn:', result.rows.length, 'lignes');
       } else if (hasOrderAssignments) {
+        console.log('🔍 Requête via order_assignments pour userId:', userId);
+        // Compter les commandes via order_assignments
+        const viaAssignmentsQuery = await pool.query(
+          `SELECT COUNT(DISTINCT o.id) as count 
+           FROM orders o
+           INNER JOIN order_assignments oa ON oa.order_id = o.id
+           WHERE oa.driver_id = $1 AND o.status = 'completed'`,
+          [userId]
+        );
+        const viaAssignmentsCount = parseInt(viaAssignmentsQuery.rows[0]?.count || 0);
+        console.log('📊 Commandes completed via order_assignments:', viaAssignmentsCount);
+        
         query = `
           SELECT 
             o.id,
@@ -317,12 +390,15 @@ export const getDriverRevenues = async (req, res) => {
           ORDER BY o.completed_at DESC
         `;
         result = await pool.query(query, dateParams);
+        console.log('✅ Résultat requête via order_assignments:', result.rows.length, 'lignes');
       } else {
         // Aucune colonne driver et pas de table order_assignments => retourner résultat vide
+        console.log('❌ Impossible de calculer les revenus: ni driver_id, ni order_assignments');
         logger.warn(`⚠️ Impossible de calculer les revenus: ni colonne driver dans orders, ni table order_assignments pour userId ${userId}`);
         result = { rows: [] };
       }
     } catch (queryError) {
+      console.error('❌ Erreur requête getDriverRevenues:', queryError);
       logger.error('❌ Erreur requête getDriverRevenues:', queryError);
       // En cas d'erreur SQL, retourner un résultat vide plutôt que planter
       result = { rows: [] };
@@ -332,6 +408,20 @@ export const getDriverRevenues = async (req, res) => {
     const totalEarnings = result.rows.reduce((sum, order) => sum + (Number(order.price) || 0), 0);
     const totalDeliveries = result.rows.length;
     const totalDistance = result.rows.reduce((sum, order) => sum + (Number(order.distance) || 0), 0);
+    
+    console.log('💰 Résultats finaux getDriverRevenues:');
+    console.log('   - Total livraisons:', totalDeliveries);
+    console.log('   - Total gains:', totalEarnings, 'FCFA');
+    console.log('   - Total distance:', totalDistance, 'km');
+    console.log('   - Période:', period);
+    
+    // Log des détails des commandes récupérées
+    if (result.rows.length > 0) {
+      console.log('📦 Détails des commandes récupérées:');
+      result.rows.slice(0, 3).forEach((order, index) => {
+        console.log(`   ${index + 1}. Order ${order.id.slice(0, 8)}: ${order.price} FCFA, méthode: ${order.delivery_method}, distance: ${order.distance} km`);
+      });
+    }
     
     // Par méthode de livraison
     const earningsByMethod = {
@@ -604,14 +694,34 @@ export const getDriverStatistics = async (req, res) => {
         success: true,
         data: {
           completedDeliveries: 0,
-          averageRating: 5.0
+          averageRating: 5.0,
+          totalEarnings: 0
         }
       });
     }
 
     try {
-      // Compter les livraisons complétées (status = 'completed')
-      // Vérifier d'abord les colonnes disponibles
+      console.log('🔍 DÉBUT getDriverStatistics pour userId:', userId);
+      
+      // Lister TOUTES les colonnes de la table orders pour debug
+      const allColumnsResult = await pool.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'orders'
+         ORDER BY ordinal_position`
+      );
+      const allColumns = allColumnsResult.rows.map(row => row.column_name);
+      console.log('📋 Colonnes disponibles dans orders:', allColumns.join(', '));
+      logger.info(`📋 Colonnes disponibles dans orders: ${allColumns.join(', ')}`);
+      
+      // Compter TOUTES les commandes completed d'abord
+      const allCompletedQuery = await pool.query(
+        `SELECT COUNT(*) as count FROM orders WHERE status = 'completed'`
+      );
+      const allCompletedCount = parseInt(allCompletedQuery.rows[0]?.count || 0);
+      console.log('📊 Total commandes completed (sans filtre):', allCompletedCount);
+      
+      // Vérifier la colonne driver_id dans orders
       const columnsInfo = await pool.query(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = 'public'
@@ -626,42 +736,73 @@ export const getDriverStatistics = async (req, res) => {
         : columnSet.has('driver_uuid')
           ? 'driver_uuid'
           : null;
+      
+      console.log('🔑 Colonne driver trouvée:', driverColumn);
 
       let completedDeliveries = 0;
 
-      if (driverColumn) {
-        // Compter via la colonne driver dans orders
+      // Vérifier d'abord toutes les commandes completed avec leur driver_id (ou NULL)
+      const checkCompletedQuery = await pool.query(
+        `SELECT id, status, ${driverColumn || 'NULL as driver_id'}, price_cfa 
+         FROM orders 
+         WHERE status = 'completed' 
+         LIMIT 10`
+      );
+      console.log('📋 Exemple de commandes completed:', JSON.stringify(checkCompletedQuery.rows, null, 2));
+      
+      if (!driverColumn) {
+        console.log('❌ Colonne driver_id/driver_uuid non trouvée dans orders');
+        logger.warn(`⚠️ Colonne driver_id/driver_uuid non trouvée dans orders. Essai avec order_assignments...`);
+        
+        // Vérifier si order_assignments existe
+        const tableCheck = await pool.query(
+          `SELECT EXISTS (
+            SELECT FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name = 'order_assignments'
+          )`
+        );
+        const hasOrderAssignments = tableCheck.rows[0]?.exists === true;
+        console.log('📋 Table order_assignments existe:', hasOrderAssignments);
+        
+        if (hasOrderAssignments) {
+          // Compter via order_assignments
+          const deliveriesResult = await pool.query(
+            `SELECT COUNT(DISTINCT o.id) as count 
+             FROM orders o
+             INNER JOIN order_assignments oa ON oa.order_id = o.id
+             WHERE oa.driver_id = $1 AND o.status = 'completed'`,
+            [userId]
+          );
+          completedDeliveries = parseInt(deliveriesResult.rows[0]?.count || 0);
+          console.log('📊 Commandes completed via order_assignments:', completedDeliveries);
+          logger.info(`📊 Commandes completed via order_assignments pour ${userId}: ${completedDeliveries}`);
+        } else {
+          console.log('❌ Table order_assignments n\'existe pas');
+          logger.warn(`⚠️ Table order_assignments n'existe pas non plus. Impossible de compter les livraisons.`);
+        }
+      } else {
+        // Compter directement depuis orders avec driver_id
+        // Vérifier les commandes avec driver_id défini (peu importe quel driver)
+        const withDriverResult = await pool.query(
+          `SELECT COUNT(*) as count FROM orders WHERE ${driverColumn} IS NOT NULL AND status = 'completed'`
+        );
+        const withDriver = parseInt(withDriverResult.rows[0]?.count || 0);
+        console.log(`📊 Commandes completed avec ${driverColumn} défini:`, withDriver);
+        
+        // Compter pour ce livreur spécifique
         const deliveriesResult = await pool.query(
           `SELECT COUNT(*) as count FROM orders 
            WHERE ${driverColumn} = $1 AND status = 'completed'`,
           [userId]
         );
         completedDeliveries = parseInt(deliveriesResult.rows[0]?.count || 0);
-      } else {
-        // Essayer avec order_assignments
-        try {
-          const tableCheck = await pool.query(
-            `SELECT EXISTS (
-              SELECT FROM information_schema.tables
-              WHERE table_schema = 'public'
-              AND table_name = 'order_assignments'
-            )`
-          );
-          const hasOrderAssignments = tableCheck.rows[0]?.exists === true;
-
-          if (hasOrderAssignments) {
-            const deliveriesResult = await pool.query(
-              `SELECT COUNT(DISTINCT o.id) as count 
-               FROM orders o
-               INNER JOIN order_assignments oa ON oa.order_id = o.id
-               WHERE oa.driver_id = $1 AND o.status = 'completed'`,
-              [userId]
-            );
-            completedDeliveries = parseInt(deliveriesResult.rows[0]?.count || 0);
-          }
-        } catch (err) {
-          logger.warn('⚠️ Erreur vérification order_assignments pour getDriverStatistics:', err.message);
-        }
+        console.log(`📊 Commandes completed pour ce livreur (${userId}):`, completedDeliveries);
+        
+        logger.info(`📊 Debug getDriverStatistics pour ${userId}:`);
+        logger.info(`   - Total commandes completed: ${allCompletedCount}`);
+        logger.info(`   - Commandes completed avec ${driverColumn} défini: ${withDriver}`);
+        logger.info(`   - Commandes completed pour ce livreur: ${completedDeliveries}`);
       }
 
       // Récupérer la note moyenne depuis driver_profiles (ou calculer depuis les évaluations si disponible)
@@ -681,11 +822,98 @@ export const getDriverStatistics = async (req, res) => {
         logger.warn('⚠️ Erreur récupération rating depuis driver_profiles:', err.message);
       }
 
+      // Calculer les gains totaux : somme de price_cfa pour toutes les commandes completed
+      let totalEarnings = 0;
+      try {
+        // Détecter la colonne de prix
+        const priceColumnsInfo = await pool.query(
+          `SELECT column_name FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'orders'
+             AND column_name = ANY($1)`,
+          [['price_cfa', 'price']]
+        );
+        const priceColumnSet = new Set(priceColumnsInfo.rows.map((row) => row.column_name));
+        const priceColumn = priceColumnSet.has('price_cfa') ? 'price_cfa' : priceColumnSet.has('price') ? 'price' : null;
+
+        if (priceColumn) {
+          console.log('💰 Colonne de prix trouvée:', priceColumn);
+          
+          // D'abord, vérifier la somme totale de toutes les commandes completed
+          const allEarningsQuery = await pool.query(
+            `SELECT COALESCE(SUM(${priceColumn}), 0) as total 
+             FROM orders 
+             WHERE status = 'completed'`
+          );
+          const allEarningsTotal = parseFloat(allEarningsQuery.rows[0]?.total || 0);
+          console.log('💰 Total gains toutes commandes completed (sans filtre):', allEarningsTotal, 'FCFA');
+          
+          if (driverColumn) {
+            // Calculer depuis orders avec driver_id
+            const withDriverEarningsQuery = await pool.query(
+              `SELECT COALESCE(SUM(${priceColumn}), 0) as total 
+               FROM orders 
+               WHERE ${driverColumn} IS NOT NULL AND status = 'completed'`
+            );
+            const withDriverEarnings = parseFloat(withDriverEarningsQuery.rows[0]?.total || 0);
+            console.log(`💰 Total gains commandes completed avec ${driverColumn}:`, withDriverEarnings, 'FCFA');
+            
+            const earningsResult = await pool.query(
+              `SELECT COALESCE(SUM(${priceColumn}), 0) as total 
+               FROM orders 
+               WHERE ${driverColumn} = $1 AND status = 'completed'`,
+              [userId]
+            );
+            totalEarnings = parseFloat(earningsResult.rows[0]?.total || 0);
+            console.log(`💰 Gains pour ce livreur (${userId}):`, totalEarnings, 'FCFA');
+            
+            logger.info(`📊 Debug gains pour ${userId}:`);
+            logger.info(`   - Total gains toutes commandes completed: ${allEarningsTotal} FCFA`);
+            logger.info(`   - Total gains commandes completed avec ${driverColumn}: ${withDriverEarnings} FCFA`);
+            logger.info(`   - Gains pour ce livreur: ${totalEarnings} FCFA (${priceColumn})`);
+          } else {
+            // Si pas de driver_id, essayer avec order_assignments
+            const tableCheck = await pool.query(
+              `SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_name = 'order_assignments'
+              )`
+            );
+            const hasOrderAssignments = tableCheck.rows[0]?.exists === true;
+            
+            if (hasOrderAssignments) {
+              const earningsResult = await pool.query(
+                `SELECT COALESCE(SUM(o.${priceColumn}), 0) as total 
+                 FROM orders o
+                 INNER JOIN order_assignments oa ON oa.order_id = o.id
+                 WHERE oa.driver_id = $1 AND o.status = 'completed'`,
+                [userId]
+              );
+              totalEarnings = parseFloat(earningsResult.rows[0]?.total || 0);
+              console.log('💰 Gains calculés via order_assignments:', totalEarnings, 'FCFA');
+              logger.info(`📊 Gains calculés via order_assignments pour ${userId}: ${totalEarnings} FCFA`);
+            } else {
+              console.log('❌ Impossible de calculer gains: pas de driver_id et pas de order_assignments');
+              logger.warn(`⚠️ Impossible de calculer gains: pas de driver_id dans orders et pas de order_assignments`);
+            }
+          }
+        } else {
+          console.log('❌ Colonne de prix (price_cfa/price) non trouvée');
+          logger.warn(`⚠️ Colonne de prix (price_cfa/price) non trouvée dans orders`);
+        }
+        
+        console.log('✅ FIN getDriverStatistics - Livraisons:', completedDeliveries, 'Gains:', totalEarnings);
+      } catch (err) {
+        logger.warn('⚠️ Erreur calcul gains totaux pour getDriverStatistics:', err.message);
+      }
+
       res.json({
         success: true,
         data: {
           completedDeliveries,
-          averageRating: parseFloat(averageRating.toFixed(1))
+          averageRating: parseFloat(averageRating.toFixed(1)),
+          totalEarnings
         }
       });
     } catch (queryError) {
@@ -695,7 +923,8 @@ export const getDriverStatistics = async (req, res) => {
         success: true,
         data: {
           completedDeliveries: 0,
-          averageRating: 5.0
+          averageRating: 5.0,
+          totalEarnings: 0
         }
       });
     }
@@ -706,7 +935,8 @@ export const getDriverStatistics = async (req, res) => {
       success: true,
       data: {
         completedDeliveries: 0,
-        averageRating: 5.0
+        averageRating: 5.0,
+        totalEarnings: 0
       }
     });
   }

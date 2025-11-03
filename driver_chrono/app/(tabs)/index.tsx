@@ -32,6 +32,15 @@ export default function Index() {
     profile 
   } = useDriverStore();
   
+  // État pour les statistiques réelles depuis le backend
+  const [driverStats, setDriverStats] = useState<{
+    todayDeliveries: number;
+    totalRevenue: number;
+  }>({
+    todayDeliveries: 0,
+    totalRevenue: 0,
+  });
+  
   // Store des commandes
   const { 
     pendingOrder, 
@@ -288,22 +297,57 @@ export default function Index() {
   }, [currentOrder?.status, currentOrder, location]);
 
   useEffect(() => {
-    // Charger les stats depuis le serveur si utilisateur connecté
-    const loadTodayStats = async () => {
-      if (user && isOnline) {
-        try {
-          const result = await apiService.getTodayStats(user.id);
-          if (result.success && result.data) {
-            updateTodayStats(result.data);
-          }
-        } catch (err) {
-          console.error('Erreur chargement stats:', err);
+    // Charger les stats depuis le serveur si utilisateur connecté (même si offline)
+    const loadStats = async () => {
+      if (!user?.id) {
+        console.log('⚠️ [Index] Pas de user.id pour charger les stats');
+        return;
+      }
+
+      try {
+        console.log('🔍 [Index] Chargement stats pour userId:', user.id);
+        
+        // Charger les stats d'aujourd'hui
+        const todayResult = await apiService.getTodayStats(user.id);
+        console.log('📊 [Index] Résultat getTodayStats:', todayResult);
+        
+        if (todayResult.success && todayResult.data) {
+          console.log('✅ [Index] Stats aujourd\'hui reçues:', todayResult.data);
+          updateTodayStats(todayResult.data);
+          setDriverStats(prev => ({
+            ...prev,
+            todayDeliveries: todayResult.data?.deliveries || 0,
+          }));
+        } else {
+          console.warn('⚠️ [Index] getTodayStats échoué ou pas de données');
         }
+        
+        // Charger les statistiques totales (pour les revenus totaux)
+        const statsResult = await apiService.getDriverStatistics(user.id);
+        console.log('📊 [Index] Résultat getDriverStatistics:', statsResult);
+        
+        if (statsResult.success && statsResult.data) {
+          console.log('✅ [Index] Stats totales reçues:', statsResult.data);
+          setDriverStats(prev => ({
+            ...prev,
+            totalRevenue: statsResult.data?.totalEarnings || 0,
+          }));
+        } else {
+          console.warn('⚠️ [Index] getDriverStatistics échoué ou pas de données');
+        }
+      } catch (err) {
+        console.error('❌ [Index] Erreur chargement stats:', err);
       }
     };
 
-    loadTodayStats();
-  }, [isOnline, user, updateTodayStats]);
+    loadStats();
+    
+    // Recharger les stats toutes les 30 secondes quand online, sinon toutes les 60 secondes
+    const interval = setInterval(loadStats, isOnline ? 30000 : 60000);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [user?.id, updateTodayStats, isOnline]);
 
   return (
     <View style={styles.container}>
@@ -455,8 +499,8 @@ export default function Index() {
 
       {/* STATS CARDS */}
       <StatsCards 
-        todayDeliveries={todayStats.deliveries}
-        totalRevenue={profile?.total_earnings || 0}
+        todayDeliveries={driverStats.todayDeliveries || todayStats.deliveries}
+        totalRevenue={driverStats.totalRevenue || profile?.total_earnings || 0}
         isOnline={isOnline}
       />
 

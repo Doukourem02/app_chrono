@@ -47,23 +47,38 @@ export default function RevenusPage() {
   const { user } = useDriverStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<Period>('today');
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>('all'); // Commencer par 'all' pour voir toutes les données
   const [revenuesData, setRevenuesData] = useState<RevenuesData | null>(null);
 
   const loadRevenues = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('⚠️ [Revenus] Pas de user.id, impossible de charger les revenus');
+      return;
+    }
 
     try {
+      console.log('🔍 [Revenus] Chargement revenus pour userId:', user.id, 'période:', selectedPeriod);
       setLoading(true);
       const result = await apiService.getDriverRevenues(user.id, {
         period: selectedPeriod,
       });
 
+      console.log('📊 [Revenus] Résultat API:', JSON.stringify(result, null, 2));
+
       if (result.success && result.data) {
+        console.log('✅ [Revenus] Données reçues:');
+        console.log('   - Livraisons:', result.data.totalDeliveries);
+        console.log('   - Gains:', result.data.totalEarnings, 'FCFA');
+        console.log('   - Distance:', result.data.totalDistance, 'km');
+        console.log('   - Commandes:', result.data.orders?.length || 0);
         setRevenuesData(result.data);
+      } else {
+        console.warn('⚠️ [Revenus] result.success=false ou pas de data:', result);
+        setRevenuesData(null);
       }
     } catch (error) {
-      console.error('Erreur chargement revenus:', error);
+      console.error('❌ [Revenus] Erreur chargement revenus:', error);
+      setRevenuesData(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -143,7 +158,10 @@ export default function RevenusPage() {
         styles.periodButton,
         selectedPeriod === item.key && styles.periodButtonActive,
       ]}
-      onPress={() => setSelectedPeriod(item.key)}
+      onPress={() => {
+        console.log('🔄 [Revenus] Changement période:', item.key);
+        setSelectedPeriod(item.key);
+      }}
     >
       <Text
         style={[

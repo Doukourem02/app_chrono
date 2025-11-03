@@ -206,14 +206,21 @@ class ApiService {
         Authorization: `Bearer ${tokenResult.token}`,
       };
       
+      console.log('🔍 [apiService.getDriverRevenues] Appel API:', url);
+      
       const response = await fetch(url, {
         method: 'GET',
         headers,
       });
       
+      console.log('📡 [apiService.getDriverRevenues] Status:', response.status, response.statusText);
+      
       const result = await response.json();
       
+      console.log('📦 [apiService.getDriverRevenues] Réponse:', JSON.stringify(result, null, 2));
+      
       if (!response.ok) {
+        console.error('❌ [apiService.getDriverRevenues] Erreur HTTP:', result);
         throw new Error(result.message || 'Erreur récupération revenus');
       }
       
@@ -283,6 +290,7 @@ class ApiService {
     data?: {
       completedDeliveries: number;
       averageRating: number;
+      totalEarnings?: number;
     };
   }> {
     try {
@@ -293,7 +301,8 @@ class ApiService {
           message: 'Session expirée. Veuillez vous reconnecter.',
           data: {
             completedDeliveries: 0,
-            averageRating: 5.0
+            averageRating: 5.0,
+            totalEarnings: 0
           }
         };
       }
@@ -322,7 +331,8 @@ class ApiService {
         message: error instanceof Error ? error.message : 'Erreur de connexion',
         data: {
           completedDeliveries: 0,
-          averageRating: 5.0
+          averageRating: 5.0,
+          totalEarnings: 0
         }
       };
     }

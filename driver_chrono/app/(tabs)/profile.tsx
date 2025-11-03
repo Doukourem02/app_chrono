@@ -17,6 +17,7 @@ import { apiService } from '../../services/apiService';
 interface DriverStatistics {
   completedDeliveries: number;
   averageRating: number;
+  totalEarnings?: number;
 }
 
 export default function ProfilePage() {
@@ -24,7 +25,8 @@ export default function ProfilePage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [statistics, setStatistics] = useState<DriverStatistics>({
     completedDeliveries: 0,
-    averageRating: 5.0
+    averageRating: 5.0,
+    totalEarnings: 0
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
@@ -152,7 +154,7 @@ export default function ProfilePage() {
             <Text style={styles.userName}>
               {profile?.first_name && profile?.last_name 
                 ? `${profile.first_name} ${profile.last_name}`
-                : 'Chauffeur'
+                : 'Livreur'
               }
             </Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
@@ -178,7 +180,7 @@ export default function ProfilePage() {
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>
-              {formatCurrency(profile?.total_earnings ?? 0)}
+              {isLoadingStats ? '...' : formatCurrency(statistics.totalEarnings ?? profile?.total_earnings ?? 0)}
             </Text>
             <Text style={styles.statLabel}>Gains</Text>
             <Text style={styles.statSubLabel}>Total</Text>

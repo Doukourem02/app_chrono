@@ -85,26 +85,70 @@ async function recordStatusHistory(orderId, status, detail = {}) {
 async function upsertOrderAssignment(orderId, driverId, { assignedAt, acceptedAt, declinedAt } = {}) {
   if (!orderId || !driverId) return;
 
-  const assigned = coerceDate(assignedAt) || new Date();
-  const accepted = coerceDate(acceptedAt);
-  const declined = coerceDate(declinedAt);
-
-  const updateResult = await pool.query(
-    `UPDATE order_assignments
-       SET assigned_at = COALESCE($3, assigned_at),
-           accepted_at = COALESCE($4, accepted_at),
-           declined_at = COALESCE($5, declined_at)
-     WHERE order_id = $1 AND driver_id = $2
-     RETURNING id`,
-    [orderId, driverId, assigned, accepted, declined]
-  );
-
-  if (updateResult.rowCount === 0) {
-    await pool.query(
-      `INSERT INTO order_assignments (id, order_id, driver_id, assigned_at, accepted_at, declined_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)` ,
-      [orderId, driverId, assigned, accepted, declined]
+  try {
+    // Vérifier si la table order_assignments existe
+    const tableCheck = await pool.query(
+      `SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'order_assignments'
+      )`
     );
+    const hasOrderAssignments = tableCheck.rows[0]?.exists === true;
+    
+    if (!hasOrderAssignments) {
+      // Table n'existe pas, ignorer silencieusement
+      return;
+    }
+
+    // Vérifier si la colonne id existe
+    const idColumnCheck = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'order_assignments'
+         AND column_name = 'id'`
+    );
+    const hasIdColumn = idColumnCheck.rows.length > 0;
+
+    const assigned = coerceDate(assignedAt) || new Date();
+    const accepted = coerceDate(acceptedAt);
+    const declined = coerceDate(declinedAt);
+
+    // Construire la requête UPDATE avec ou sans RETURNING id
+    const updateQuery = hasIdColumn
+      ? `UPDATE order_assignments
+           SET assigned_at = COALESCE($3, assigned_at),
+               accepted_at = COALESCE($4, accepted_at),
+               declined_at = COALESCE($5, declined_at)
+         WHERE order_id = $1 AND driver_id = $2
+         RETURNING id`
+      : `UPDATE order_assignments
+           SET assigned_at = COALESCE($3, assigned_at),
+               accepted_at = COALESCE($4, accepted_at),
+               declined_at = COALESCE($5, declined_at)
+         WHERE order_id = $1 AND driver_id = $2`;
+
+    const updateResult = await pool.query(updateQuery, [orderId, driverId, assigned, accepted, declined]);
+
+    if (updateResult.rowCount === 0) {
+      // Construire l'INSERT avec ou sans la colonne id
+      if (hasIdColumn) {
+        await pool.query(
+          `INSERT INTO order_assignments (id, order_id, driver_id, assigned_at, accepted_at, declined_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)` ,
+          [orderId, driverId, assigned, accepted, declined]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO order_assignments (order_id, driver_id, assigned_at, accepted_at, declined_at)
+           VALUES ($1, $2, $3, $4, $5)` ,
+          [orderId, driverId, assigned, accepted, declined]
+        );
+      }
+    }
+  } catch (error) {
+    // Ignorer les erreurs silencieusement (table ou colonnes manquantes)
+    // La fonction recordOrderAssignment() gère déjà les erreurs
   }
 }
 
@@ -300,21 +344,34 @@ export async function saveOrder(order) {
 
 /**
  * Met à jour le statut d'une commande
+ * Détecte dynamiquement les colonnes disponibles pour compatibilité
  */
 export async function updateOrderStatus(orderId, status, updates = {}) {
   try {
-    // Vérifier si driver_id existe dans la table
-    const driverColumnCheck = await pool.query(
+    // Détecter les colonnes disponibles
+    const columnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public'
          AND table_name = 'orders'
-         AND column_name = 'driver_id'`
+         AND column_name = ANY($1)`,
+      [['driver_id', 'accepted_at', 'completed_at', 'cancelled_at', 'updated_at']]
     );
-    const hasDriverColumn = driverColumnCheck.rows.length > 0;
 
-    const setClauses = ['status = $2', 'updated_at = now()'];
+    const columnSet = new Set(columnsInfo.rows.map((row) => row.column_name));
+    const hasDriverColumn = columnSet.has('driver_id');
+    const hasUpdatedAt = columnSet.has('updated_at');
+    const hasAcceptedAt = columnSet.has('accepted_at');
+    const hasCompletedAt = columnSet.has('completed_at');
+    const hasCancelledAt = columnSet.has('cancelled_at');
+
+    const setClauses = ['status = $2'];
     const values = [orderId, status];
     let paramIndex = 3;
+
+    // Ajouter updated_at seulement si la colonne existe
+    if (hasUpdatedAt) {
+      setClauses.push('updated_at = now()');
+    }
 
     const driverId = updates.driver_id || null;
     const acceptedAt = coerceDate(updates.accepted_at) || (status === 'accepted' ? new Date() : null);
@@ -325,21 +382,29 @@ export async function updateOrderStatus(orderId, status, updates = {}) {
       setClauses.push(`driver_id = $${paramIndex}`);
       values.push(driverId);
       paramIndex++;
+      console.log(`✅ Mise à jour driver_id pour order ${orderId}: ${driverId}`);
+    } else if (hasDriverColumn && !driverId) {
+      console.log(`⚠️ hasDriverColumn=true mais driverId est null/undefined pour order ${orderId}`);
+    } else if (!hasDriverColumn) {
+      console.log(`⚠️ Colonne driver_id n'existe pas dans orders pour order ${orderId}`);
     }
 
-    if (acceptedAt) {
+    // Ajouter accepted_at seulement si la colonne existe ET si on a une valeur
+    if (hasAcceptedAt && acceptedAt) {
       setClauses.push(`accepted_at = $${paramIndex}`);
       values.push(acceptedAt);
       paramIndex++;
     }
 
-    if (completedAt) {
+    // Ajouter completed_at seulement si la colonne existe ET si on a une valeur
+    if (hasCompletedAt && completedAt) {
       setClauses.push(`completed_at = $${paramIndex}`);
       values.push(completedAt);
       paramIndex++;
     }
 
-    if (cancelledAt) {
+    // Ajouter cancelled_at seulement si la colonne existe ET si on a une valeur
+    if (hasCancelledAt && cancelledAt) {
       setClauses.push(`cancelled_at = $${paramIndex}`);
       values.push(cancelledAt);
       paramIndex++;
