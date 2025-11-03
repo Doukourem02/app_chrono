@@ -51,25 +51,27 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
     setLoading(true);
     setError(null);
 
-    try {
-      const result = await userApiService.getOnlineDrivers(stableUserLocation);
-      
-      if (result.success && result.data) {
-        setDrivers(result.data);
-        setLastUpdate(new Date());
-        if (result.data.length > 0) {
-          console.log(`🚗 ${result.data.length} chauffeur(s) en ligne`);
+      try {
+        const result = await userApiService.getOnlineDrivers(stableUserLocation);
+        
+        if (result.success && result.data) {
+          // 🔍 Filtrer strictement pour ne garder QUE les chauffeurs en ligne
+          const onlineOnly = result.data.filter(driver => driver.is_online === true);
+          setDrivers(onlineOnly);
+          setLastUpdate(new Date());
+          if (onlineOnly.length > 0) {
+            console.log(`🚗 ${onlineOnly.length} chauffeur(s) en ligne`);
+          }
+        } else {
+          setError(result.message || 'Erreur de récupération');
+          setDrivers([]);
         }
-      } else {
-        setError(result.message || 'Erreur de récupération');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erreur inconnue');
         setDrivers([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      setDrivers([]);
-    } finally {
-      setLoading(false);
-    }
   }, [stableUserLocation]);
 
   // Effet pour le chargement initial et le rafraîchissement automatique
@@ -82,7 +84,9 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
         const result = await userApiService.getOnlineDrivers(stableUserLocation);
         
         if (result.success && result.data) {
-          setDrivers(result.data);
+          // 🔍 Filtrer strictement pour ne garder QUE les chauffeurs en ligne
+          const onlineOnly = result.data.filter(driver => driver.is_online === true);
+          setDrivers(onlineOnly);
           setLastUpdate(new Date());
           // Log uniquement s'il y a des changements significatifs
         } else {

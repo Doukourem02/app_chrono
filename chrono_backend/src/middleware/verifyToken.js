@@ -1,0 +1,48 @@
+import { verifyAccessToken } from '../utils/jwt.js';
+
+/**
+ * 🔒 Middleware de vérification JWT
+ * Vérifie le token d'accès et attache les infos utilisateur à la requête
+ */
+export const verifyJWT = (req, res, next) => {
+  const auth = req.headers.authorization || req.headers.Authorization;
+  if (!auth) {
+    return res.status(401).json({ 
+      success: false,
+      message: 'Missing Authorization header' 
+    });
+  }
+
+  const parts = auth.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    return res.status(401).json({ 
+      success: false,
+      message: 'Invalid Authorization format. Expected: Bearer <token>' 
+    });
+  }
+
+  const token = parts[1];
+  try {
+    const decoded = verifyAccessToken(token);
+    // Attacher les infos décodées à la requête pour les handlers suivants
+    req.user = decoded;
+    return next();
+  } catch (err) {
+    // Gestion des erreurs spécifiques
+    if (err.message === 'Token expiré') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token expiré. Utilisez /refresh-token pour obtenir un nouveau token',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    return res.status(401).json({ 
+      success: false,
+      message: err.message || 'Token invalide',
+      code: 'INVALID_TOKEN'
+    });
+  }
+};
+
+export default verifyJWT;

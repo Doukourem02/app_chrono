@@ -17,6 +17,15 @@ export default function ProfilePage() {
   const { user, profile, isOnline, logout, setOnlineStatus } = useDriverStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
+  const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat('fr-FR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount ?? 0);
+
+    return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
+  };
+
   const handleLogout = () => {
     Alert.alert(
       'Déconnexion',
@@ -115,7 +124,7 @@ export default function ProfilePage() {
             <Text style={styles.statLabel}>Note</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile?.total_earnings || 0}€</Text>
+            <Text style={styles.statNumber}>{formatCurrency(profile?.total_earnings ?? 0)}</Text>
             <Text style={styles.statLabel}>Gains</Text>
           </View>
         </View>
@@ -134,7 +143,33 @@ export default function ProfilePage() {
         </View>
         <Switch
           value={isOnline}
-          onValueChange={setOnlineStatus}
+          onValueChange={async (value) => {
+            // Mettre à jour le store directement (sera synchronisé avec index.tsx)
+            setOnlineStatus(value);
+            
+            // Synchroniser avec le backend si l'utilisateur est connecté
+            const currentState = useDriverStore.getState();
+            if (currentState.user?.id) {
+              try {
+                const { apiService } = await import('../../services/apiService');
+                await apiService.updateDriverStatus(currentState.user.id, {
+                  is_online: value,
+                  is_available: value,
+                  current_latitude: currentState.currentLocation?.latitude,
+                  current_longitude: currentState.currentLocation?.longitude,
+                });
+              } catch (error) {
+                console.error('Erreur synchronisation statut depuis profile:', error);
+                // Rollback en cas d'erreur
+                setOnlineStatus(!value);
+                Alert.alert(
+                  'Erreur',
+                  'Impossible de synchroniser votre statut avec le serveur.',
+                  [{ text: 'OK' }]
+                );
+              }
+            }
+          }}
           trackColor={{ false: '#E5E7EB', true: '#8B5CF6' }}
           thumbColor={isOnline ? '#FFFFFF' : '#9CA3AF'}
         />

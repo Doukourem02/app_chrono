@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -27,19 +27,92 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
 
-  const status = currentOrder?.status || "accepted";
+  const status: string = currentOrder?.status || "accepted";
+  const isCompleted = status === 'completed';
 
+  // Harmoniser avec OrderStatus: 'accepted' | 'enroute' | 'picked_up' | 'completed'
   const statusSteps = [
-    { label: "Livreur en route pour récupérer le colis ", key: "accepted" },
+    { label: "Livreur en route pour récupérer le colis", key: "accepted" },
     { label: "Colis pris en charge", key: "picked_up" },
-    { label: "En cours de livraison", key: "in_progress" },
-    { label: "Colis Livré", key: "completed" },
+    { label: "En cours de livraison", key: "enroute" },
+    { label: "Colis livré", key: "completed" },
   ];
 
   const activeIndex = Math.max(
     0,
     statusSteps.findIndex((s) => s.key === status)
   );
+
+  // 🎨 Animations pour les transitions de statut
+  const stepAnimations = useRef(
+    statusSteps.map((_, index) => {
+      const initialActive = index <= activeIndex;
+      return {
+        color: new Animated.Value(initialActive ? 1 : 0),
+        scale: new Animated.Value(1),
+        opacity: new Animated.Value(initialActive ? 1 : 0.5),
+      };
+    })
+  ).current;
+
+  // Animer les transitions quand le statut change
+  useEffect(() => {
+    statusSteps.forEach((_, index) => {
+      const isActive = index <= activeIndex;
+      const targetColor = isActive ? 1 : 0;
+      const targetOpacity = isActive ? 1 : 0.5;
+      const isCurrentStep = index === activeIndex;
+
+      // 🔧 Arrêter les animations en cours pour éviter les conflits
+      stepAnimations[index].color.stopAnimation();
+      stepAnimations[index].scale.stopAnimation();
+      stepAnimations[index].opacity.stopAnimation();
+
+      // Animation de couleur pour le cercle et la ligne (fluide)
+      // Utiliser uniquement JS driver pour éviter les conflits avec les autres animations
+      Animated.spring(stepAnimations[index].color, {
+        toValue: targetColor,
+        useNativeDriver: false, // Couleur nécessite le driver JS
+        tension: 65,
+        friction: 8,
+      }).start();
+
+      // Animation de scale avec pulse pour le statut actuel (effet visuel)
+      // Utiliser JS driver pour éviter les conflits avec l'animation de couleur
+      if (isCurrentStep && isActive) {
+        // Petit pulse quand le statut devient actif
+        Animated.sequence([
+          Animated.spring(stepAnimations[index].scale, {
+            toValue: 1.25,
+            useNativeDriver: false, // Utiliser JS driver pour cohérence
+            tension: 65,
+            friction: 5,
+          }),
+          Animated.spring(stepAnimations[index].scale, {
+            toValue: 1,
+            useNativeDriver: false,
+            tension: 65,
+            friction: 7,
+          }),
+        ]).start();
+      } else {
+        Animated.spring(stepAnimations[index].scale, {
+          toValue: 1,
+          useNativeDriver: false,
+          tension: 65,
+          friction: 7,
+        }).start();
+      }
+
+      // Animation d'opacité pour le texte (transition douce)
+      // Utiliser JS driver pour éviter les conflits
+      Animated.timing(stepAnimations[index].opacity, {
+        toValue: targetOpacity,
+        duration: 400,
+        useNativeDriver: false, // Utiliser JS driver pour cohérence
+      }).start();
+    });
+  }, [activeIndex, status]);
 
   return (
     <Animated.View
@@ -63,14 +136,22 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
           <View style={styles.collapsedContainer}>
             <View style={styles.driverAvatar} />
 
-            <View style={styles.actionButtonsCollapsed}>
-              <TouchableOpacity style={styles.iconCircle}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconCircle}>
-                <Ionicons name="call-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
+            {/* If completed, show a small badge so the user sees confirmation even when collapsed */}
+            {isCompleted ? (
+              <View style={styles.completedBadge}>
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={styles.completedBadgeText}>Livré</Text>
+              </View>
+            ) : (
+              <View style={styles.actionButtonsCollapsed}>
+                <TouchableOpacity style={styles.iconCircle}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconCircle}>
+                  <Ionicons name="call-outline" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -80,41 +161,83 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         <View style={styles.expandedCard}>
           <Text style={styles.title}>Statut de la commande</Text>
 
-          {/* Timeline */}
+          {/* Confirmation banner when order is completed */}
+          {isCompleted && (
+            <View style={styles.completedBanner}>
+              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              <Text style={styles.completedBannerText}>
+                Course terminée{currentOrder?.proof?.uploadedAt ? ' — preuve reçue' : ''}
+              </Text>
+            </View>
+          )}
+
+          {/* Timeline avec animations fluides */}
           <View style={styles.timelineContainer}>
             {statusSteps.map((step, index) => {
               const isActive = index <= activeIndex;
+              const anim = stepAnimations[index];
+              
+              // Interpolations pour les animations
+              const circleColor = anim.color.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['#E0E0E0', '#7C3AED'],
+              });
+              
+              const lineColor = anim.color.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['#E0E0E0', '#7C3AED'],
+              });
+              
+              const textColor = anim.color.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['#aaa', '#000'],
+              });
+
               return (
                 <View key={step.key} style={styles.stepContainer}>
                   {index !== 0 && (
-                    <View
+                    <Animated.View
                       style={[
                         styles.line,
-                        { backgroundColor: isActive ? "#7C3AED" : "#E0E0E0" },
+                        { backgroundColor: lineColor },
                       ]}
                     />
                   )}
-                  <View
+                  <Animated.View
                     style={[
                       styles.circle,
                       {
-                        backgroundColor: isActive ? "#7C3AED" : "#E0E0E0",
-                        borderColor: isActive ? "#7C3AED" : "#ccc",
+                        backgroundColor: circleColor,
+                        borderColor: circleColor,
+                        transform: [{ scale: anim.scale }],
                       },
                     ]}
                   />
-                  <Text
+                  <Animated.Text
                     style={[
                       styles.stepText,
-                      { color: isActive ? "#000" : "#aaa" },
+                      { 
+                        color: textColor,
+                        opacity: anim.opacity,
+                      },
                     ]}
                   >
                     {step.label}
-                  </Text>
+                  </Animated.Text>
                 </View>
               );
             })}
           </View>
+
+          {/* Preuve de livraison si disponible */}
+          {currentOrder?.proof?.uploadedAt && (
+            <View style={styles.proofRow}>
+              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+              <Text style={styles.proofText}>
+                Preuve de livraison reçue
+              </Text>
+            </View>
+          )}
 
           {/* Barre d’action */}
           <View style={styles.actionBar}>
@@ -284,5 +407,46 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
+  },
+  proofRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  proofText: {
+    fontSize: 14,
+    color: '#065F46',
+    fontWeight: '500',
+  },
+  completedBadge: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  completedBadgeText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  completedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  completedBannerText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 15,
   },
 });

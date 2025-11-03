@@ -4,43 +4,39 @@ import { AppState } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 
 export default function RootLayout() {
-  const { user, logout, validateUserExists } = useDriverStore();
+  const { user, validateUserExists, logout } = useDriverStore();
 
   useEffect(() => {
-    // Vérifier si l'utilisateur existe toujours au démarrage
+    // Vérification optionnelle en arrière-plan (non bloquante)
     const checkUserValidity = async () => {
       if (user?.id) {
-        try {
-          const isValid = await validateUserExists();
-          if (!isValid) {
-            logout();
-          }
-        } catch {
-          // En cas d'erreur réseau, on garde la session locale
+        const result = await validateUserExists();
+        if (result === false) {
+          logout();
         }
       }
     };
 
     checkUserValidity();
-  }, [user?.id, logout, validateUserExists]);
+  }, [user?.id, validateUserExists, logout]);
 
   useEffect(() => {
-    // Vérification périodique quand l'app devient active
+    // Vérification périodique optionnelle quand l'app devient active
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === 'active' && user?.id) {
-        validateUserExists().then(isValid => {
-          if (!isValid) {
+        validateUserExists().then((result) => {
+          if (result === false) {
             logout();
           }
         }).catch(() => {
-          // Ignorer les erreurs réseau
+          // ignorer
         });
       }
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [user?.id, logout, validateUserExists]);
+  }, [user?.id, validateUserExists, logout]);
 
   return (
       <Stack

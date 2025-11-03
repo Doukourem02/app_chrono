@@ -4,35 +4,32 @@ import { View, ActivityIndicator, Text } from 'react-native';
 import { useDriverStore } from '../store/useDriverStore';
 
 export default function RootIndex() {
-  const { isAuthenticated, user, validateUserExists, logout } = useDriverStore();
+  const { isAuthenticated, user, accessToken, validateUserExists, logout } = useDriverStore();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     const checkAuthentication = async () => {
-      try {
-        if (isAuthenticated && user) {
-          const userExists = await validateUserExists();
-          
-          if (!userExists) {
-            logout();
-            router.replace('/(auth)/register' as any);
-          } else {
-            router.replace('/(tabs)' as any);
-          }
+      if (isAuthenticated && user) {
+        const validationResult = await validateUserExists();
+
+        if (validationResult === true || validationResult === null || validationResult === 'not_found') {
+          router.replace('/(tabs)' as any);
         } else {
+          // validationResult === false : suppression explicite côté backend
+          logout();
           router.replace('/(auth)/register' as any);
         }
-      } catch {
+      } else {
         router.replace('/(auth)/register' as any);
-      } finally {
-        setIsChecking(false);
       }
+
+      setIsChecking(false);
     };
 
     // Petite attente pour éviter le flash
     const timer = setTimeout(checkAuthentication, 1000);
     return () => clearTimeout(timer);
-  }, [isAuthenticated, user, validateUserExists, logout]);
+  }, [isAuthenticated, user, accessToken, validateUserExists, logout]);
 
   if (isChecking) {
     return (

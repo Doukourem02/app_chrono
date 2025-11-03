@@ -1,11 +1,12 @@
 import { io, Socket } from 'socket.io-client';
 import { useOrderStore, OrderRequest } from '../store/useOrderStore';
-import { logger } from '../../app_chrono/utils/logger';
+import { logger } from '../utils/logger';
 
 class OrderSocketService {
   private socket: Socket | null = null;
   private driverId: string | null = null;
   private isConnected = false;
+  private retryCount = 0;
 
   connect(driverId: string) {
     if (this.socket && this.isConnected) {
@@ -18,6 +19,7 @@ class OrderSocketService {
     this.socket.on('connect', () => {
           logger.info('🔌 Socket connecté pour commandes');
       this.isConnected = true;
+      this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
       
       // S'identifier comme driver
           logger.info('🚗 Identification comme driver', undefined, { driverId });
@@ -33,6 +35,14 @@ class OrderSocketService {
     this.socket.on('disconnect', () => {
           logger.info('🔌 Socket déconnecté');
       this.isConnected = false;
+      
+      // Auto-reconnect après 3 secondes
+      setTimeout(() => {
+        if (this.driverId && !this.isConnected) {
+          logger.info('🔄 Tentative de reconnexion automatique...', undefined);
+          this.connect(this.driverId);
+        }
+      }, 3000);
     });
 
     // 📦 Nouvelle commande reçue
@@ -80,6 +90,18 @@ class OrderSocketService {
 
     this.socket.on('connect_error', (error) => {
           logger.error('❌ Erreur connexion socket:', undefined, error);
+      this.isConnected = false;
+      
+      // Retry avec backoff exponentiel (5, 10, 20 secondes)
+      const retryDelay = Math.min(5000 * Math.pow(2, this.retryCount || 0), 20000);
+      this.retryCount = (this.retryCount || 0) + 1;
+      
+      setTimeout(() => {
+        if (this.driverId && !this.isConnected) {
+          logger.info(`🔄 Reconnexion dans ${retryDelay / 1000}s...`, undefined);
+          this.connect(this.driverId);
+        }
+      }, retryDelay);
     });
   }
 
@@ -139,6 +161,16 @@ class OrderSocketService {
 
     // Mettre à jour le store local
     useOrderStore.getState().updateOrderStatus(orderId, status as any);
+
+    // If the driver marks the order as completed, move it to history / clear currentOrder
+    // so the map and UI return to a normal state (no leftover markers/lines) immediately.
+    if (String(status) === 'completed') {
+      try {
+        useOrderStore.getState().completeOrder(orderId);
+      } catch (err) {
+        logger.warn('Failed to complete order locally', undefined, err);
+      }
+    }
   }
 
   // Vérifier la connexion

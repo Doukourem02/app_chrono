@@ -21,6 +21,15 @@ export default function ProfilePage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
 
+  const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat('fr-FR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount ?? 0);
+
+    return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
+  };
+
   // Mock profile data - À remplacer par vraies données
   const profile = {
     first_name: 'Client',
@@ -167,8 +176,8 @@ export default function ProfilePage() {
               <Text style={styles.statLabel}>Commandes</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{profile?.total_saved || 0}€</Text>
-              <Text style={styles.statLabel}>Économisé</Text>
+              <Text style={styles.statNumber}>{formatCurrency(profile?.total_saved ?? 0)}</Text>
+              <Text style={styles.statLabel}>Économies</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{profile?.loyalty_points || 0}</Text>

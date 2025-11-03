@@ -4,19 +4,43 @@ import { View, ActivityIndicator, Text } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 
 export default function RootIndex() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, validateUser, logout } = useAuthStore();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let cancelled = false;
+
+    const checkSession = async () => {
       if (isAuthenticated && user) {
-        router.replace('/(tabs)' as any);
+        const validationResult = await validateUser();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (validationResult === true || validationResult === null || validationResult === 'not_found') {
+          router.replace('/(tabs)' as any);
+        } else {
+          logout();
+          router.replace('/(auth)/register' as any);
+        }
       } else {
         router.replace('/(auth)/register' as any);
       }
-    }, 1000);
+    };
 
-    return () => clearTimeout(timer);
-  }, [isAuthenticated, user]);
+    const timer = setTimeout(() => {
+      checkSession().catch(() => {
+        if (!cancelled) {
+          router.replace('/(tabs)' as any);
+        }
+      });
+    }, 800);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isAuthenticated, user, validateUser, logout]);
 
   return (
     <View style={{ 

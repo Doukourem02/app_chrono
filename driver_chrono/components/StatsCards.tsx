@@ -17,6 +17,15 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
   isOnline = false,
   todayDeliveries = 0
 }) => {
+  const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat('fr-FR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount ?? 0);
+
+    return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
+  };
+
   return (
     <View style={styles.statsContainer}>
       <View style={[styles.card, !isOnline && styles.cardDisabled]}>
@@ -46,7 +55,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
             Revenus total
           </Text>
           <Text style={[styles.cardSubtitle, !isOnline && styles.textDisabled]}>
-            {totalRevenue.toFixed(0)}€
+            {formatCurrency(totalRevenue)}
           </Text>
         </View>
       </View>

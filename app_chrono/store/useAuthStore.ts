@@ -13,19 +13,25 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
   
   // Actions
   setUser: (user: User) => void;
   logout: () => void;
   setLoading: (loading: boolean) => void;
+  setTokens: (tokens: { accessToken: string | null; refreshToken: string | null }) => void;
+  validateUser: () => Promise<boolean | 'not_found' | null>;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      accessToken: null,
+      refreshToken: null,
       
       setUser: (user) => {
         set({ 
@@ -39,11 +45,44 @@ export const useAuthStore = create<AuthState>()(
         set({ 
           user: null, 
           isAuthenticated: false,
-          isLoading: false 
+          isLoading: false,
+          accessToken: null,
+          refreshToken: null,
         });
       },
       
       setLoading: (loading) => set({ isLoading: loading }),
+
+      setTokens: ({ accessToken, refreshToken }) => {
+        set({
+          accessToken: accessToken ?? null,
+          refreshToken: refreshToken ?? null,
+        });
+      },
+
+      validateUser: async () => {
+        const { user } = get();
+        if (!user?.email) {
+          return false;
+        }
+
+        try {
+          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/check/${encodeURIComponent(user.email)}`);
+          const data = await response.json();
+
+          if (!response.ok) {
+            return null;
+          }
+
+          if (data?.success && data?.user) {
+            return true;
+          }
+
+          return 'not_found';
+        } catch (error) {
+          return null;
+        }
+      },
     }),
     {
       name: 'auth-storage',

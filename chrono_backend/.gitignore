@@ -1,0 +1,19 @@
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+
+# Temporary files
+tmp_proofs/
+*.tmp
+

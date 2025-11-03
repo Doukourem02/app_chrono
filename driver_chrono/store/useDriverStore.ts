@@ -35,6 +35,8 @@ interface DriverStore {
   isAuthenticated: boolean;
   user: DriverUser | null;
   profile: DriverProfile | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   
   // État de l'application
   isOnline: boolean;
@@ -43,8 +45,9 @@ interface DriverStore {
   // Actions d'authentification
   setUser: (user: DriverUser) => void;
   setProfile: (profile: DriverProfile) => void;
+  setTokens: (tokens: { accessToken: string; refreshToken: string }) => void;
   logout: () => void;
-  validateUserExists: () => Promise<boolean>;
+  validateUserExists: () => Promise<boolean | 'not_found' | null>;
   
   // Actions driver
   setOnlineStatus: (isOnline: boolean) => void;
@@ -67,6 +70,8 @@ export const useDriverStore = create<DriverStore>()(
       isAuthenticated: false,
       user: null,
       profile: null,
+      accessToken: null,
+      refreshToken: null,
       isOnline: false,
       currentLocation: null,
       todayStats: {
@@ -87,11 +92,20 @@ export const useDriverStore = create<DriverStore>()(
         set({ profile });
       },
 
+      setTokens: (tokens) => {
+        set({ 
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken
+        });
+      },
+
       logout: () => {
         set({
           isAuthenticated: false,
           user: null,
           profile: null,
+          accessToken: null,
+          refreshToken: null,
           isOnline: false,
           currentLocation: null,
           todayStats: {
@@ -104,20 +118,26 @@ export const useDriverStore = create<DriverStore>()(
 
       validateUserExists: async () => {
         const { user } = get();
-        if (!user?.email) return false;
+        if (!user?.email) {
+          return false;
+        }
 
         try {
-          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/check/${user.email}`);
+          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/check/${encodeURIComponent(user.email)}`);
           const data = await response.json();
 
-          if (!response.ok || !data.success || !data.user) {
-            return false;
+          if (!response.ok) {
+            return null;
           }
 
-          return true;
-        } catch {
-          // En cas d'erreur réseau, on assume que c'est OK pour éviter de déconnecter inutilement
-          return true;
+          if (data?.success && data?.user) {
+            return true;
+          }
+
+          return 'not_found';
+        } catch (error) {
+          // En cas d'erreur réseau, retourner null pour indiquer l'impossibilité de vérifier
+          return null;
         }
       },
 
@@ -182,6 +202,8 @@ export const useDriverStore = create<DriverStore>()(
         isAuthenticated: state.isAuthenticated,
         user: state.user,
         profile: state.profile,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
         todayStats: state.todayStats,
       }),
     }

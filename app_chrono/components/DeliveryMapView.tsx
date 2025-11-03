@@ -37,6 +37,7 @@ interface DeliveryMapViewProps {
   selectedMethod: string;
   availableVehicles: any[];
   showMethodSelection: boolean;
+  onMapPress?: () => void; // 🆕 Callback pour ouvrir le bottom sheet au clic
 }
 
 export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
@@ -58,6 +59,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   selectedMethod,
   availableVehicles,
   showMethodSelection,
+  onMapPress, // 🆕
 }) => {
   // console.log('🗺️ DeliveryMapView render - showMethodSelection:', showMethodSelection);
   
@@ -74,24 +76,27 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       showsTraffic={false}
       showsIndoors={false}
       showsPointsOfInterest={false}
+      onPress={onMapPress} // 🆕 Ouvrir automatiquement le bottom sheet au clic sur la carte
     >
 
-      {/* 🚗 Chauffeurs en ligne disponibles */}
-      {onlineDrivers?.map((driver) => (
-        <Marker
-          key={driver.user_id}
-          coordinate={{
-            latitude: driver.current_latitude,
-            longitude: driver.current_longitude,
-          }}
-          title={`${driver.first_name} ${driver.last_name}`}
-          description={`${driver.vehicle_type} • Note: ${driver.rating}/5`}
-        >
-          <View style={styles.driverMarker}>
-            <Text style={styles.driverIcon}>🚗</Text>
-          </View>
-        </Marker>
-      ))}
+      {/* 🚗 Chauffeurs en ligne disponibles - Filtrer strictement les chauffeurs online */}
+      {onlineDrivers
+        ?.filter(driver => driver.is_online === true) // 🔍 Double filtre de sécurité
+        .map((driver) => (
+          <Marker
+            key={driver.user_id}
+            coordinate={{
+              latitude: driver.current_latitude,
+              longitude: driver.current_longitude,
+            }}
+            title={`${driver.first_name} ${driver.last_name}`}
+            description={`${driver.vehicle_type} • Note: ${driver.rating}/5`}
+          >
+            <View style={styles.driverMarker}>
+              <Text style={styles.driverIcon}>🚗</Text>
+            </View>
+          </Marker>
+        ))}
 
       {/* ✅ Marqueur position - Toujours visible */}
       {pickupCoords && (
@@ -157,8 +162,14 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </Marker>
       )}
 
-      {/* Marqueur de destination - Toujours visible sauf pendant recherche */}
-      {!isSearchingDriver && dropoffCoords && (
+      {/* Marqueur de destination - Visible UNIQUEMENT avant qu'une commande soit acceptée */}
+      {/* 🆕 Cacher dès que le livreur accepte pour ne montrer que le tracking en direct */}
+      {!isSearchingDriver && 
+       dropoffCoords && 
+       !orderDriverCoords && // Ne pas afficher si une commande est acceptée (tracking actif)
+       orderStatus !== 'completed' && 
+       orderStatus !== 'cancelled' && 
+       orderStatus !== 'declined' && (
         <Marker 
           coordinate={dropoffCoords} 
           title="Destination" 
@@ -189,8 +200,15 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </Marker>
       )}
 
-      {/* Polyline - Visible sauf pendant recherche */}
-      {!isSearchingDriver && displayedRouteCoords && displayedRouteCoords.length > 0 && (
+      {/* Polyline violet (route initiale) - Visible UNIQUEMENT avant qu'une commande soit acceptée */}
+      {/* 🆕 Cacher dès que le livreur accepte pour ne montrer que le tracking en direct */}
+      {!isSearchingDriver && 
+       displayedRouteCoords && 
+       displayedRouteCoords.length > 0 && 
+       !orderDriverCoords && // Ne pas afficher si une commande est acceptée (tracking actif)
+       orderStatus !== 'completed' && 
+       orderStatus !== 'cancelled' && 
+       orderStatus !== 'declined' && (
         <Polyline
           coordinates={displayedRouteCoords}
           strokeColor="#6366F1"
@@ -201,7 +219,11 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       )}
 
       {/* Marker + polyline pour la commande en cours (driver -> pickup/dropoff) */}
-      {orderDriverCoords && (
+      {/* 🆕 Ne pas afficher si la commande est terminée/annulée/refusée */}
+      {orderDriverCoords && 
+       orderStatus !== 'completed' && 
+       orderStatus !== 'cancelled' && 
+       orderStatus !== 'declined' && (
         <>
           <Marker
             coordinate={orderDriverCoords}
@@ -213,28 +235,55 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             </View>
           </Marker>
 
-          {/* Polyline dynamique: si status est 'accepted' or 'pending' -> driver -> pickup */}
-          {((orderStatus === 'accepted' || orderStatus === 'pending') && pickupCoords) && (
+          {/* 🟢 Polyline VERT: livreur -> pickup (quand status est 'accepted' ou 'pending') */}
+          {/* Animation fluide avec un draw progressif */}
+          {/* S'assurer que orderDriverCoords est disponible avant d'afficher */}
+          {((orderStatus === 'accepted' || orderStatus === 'pending') && 
+            pickupCoords && 
+            orderDriverCoords &&
+            orderDriverCoords.latitude && 
+            orderDriverCoords.longitude) && (
             <Polyline
               coordinates={[orderDriverCoords, pickupCoords]}
               strokeColor="#10B981"
-              strokeWidth={4}
+              strokeWidth={5}
+              lineJoin="round"
+              lineCap="round"
             />
           )}
 
-          {/* Si en cours ou après pickup -> driver -> dropoff */}
-          {(orderStatus === 'in_progress' && dropoffCoords) && (
+          {/* 🔴 Polyline ROUGE: livreur -> dropoff (quand status est 'enroute' ou 'picked_up') */}
+          {/* Le polyline vert disparaît automatiquement, seul le rouge est visible */}
+          {/* S'assurer que orderDriverCoords est disponible et valide avant d'afficher */}
+          {/* Pour "picked_up", on affiche seulement si onroute était déjà affiché ou après un court délai */}
+          {(((orderStatus === 'enroute') || (orderStatus === 'picked_up')) && 
+            dropoffCoords && 
+            orderDriverCoords &&
+            orderDriverCoords.latitude && 
+            orderDriverCoords.longitude &&
+            // Pour picked_up, s'assurer que les coordonnées sont bien à jour (pas null/undefined/0)
+            Math.abs(orderDriverCoords.latitude) > 0.0001 &&
+            Math.abs(orderDriverCoords.longitude) > 0.0001) && (
             <Polyline
               coordinates={[orderDriverCoords, dropoffCoords]}
               strokeColor="#EF4444"
-              strokeWidth={4}
+              strokeWidth={5}
+              lineJoin="round"
+              lineCap="round"
             />
           )}
         </>
       )}
 
-      {/* Badge ETA - Visible sauf pendant recherche */}
-      {!isSearchingDriver && durationText && pickupCoords && (
+      {/* Badge ETA - Visible UNIQUEMENT avant qu'une commande soit acceptée */}
+      {/* 🆕 Cacher dès que le livreur accepte pour ne montrer que le tracking en direct */}
+      {!isSearchingDriver && 
+       durationText && 
+       pickupCoords && 
+       !orderDriverCoords && // Ne pas afficher si une commande est acceptée (tracking actif)
+       orderStatus !== 'completed' && 
+       orderStatus !== 'cancelled' && 
+       orderStatus !== 'declined' && (
         <Marker 
           coordinate={pickupCoords} 
           anchor={{ x: 0.5, y: 0.5 }} 

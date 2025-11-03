@@ -17,6 +17,7 @@ export default function VerificationScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const setUser = useAuthStore((state) => state.setUser);
+  const setTokens = useAuthStore((state) => state.setTokens);
   const { email, phoneNumber, otpMethod, clearTempData } = useTempAuthStore();
 
   const handleCodeChange = (text: string, index: number) => {
@@ -79,6 +80,11 @@ export default function VerificationScreen() {
       };
       
       setUser(userData);
+      const tokens = data.data.tokens || {};
+      setTokens({
+        accessToken: tokens.accessToken ?? null,
+        refreshToken: tokens.refreshToken ?? null,
+      });
       
       // Nettoyer les données temporaires
       clearTempData();

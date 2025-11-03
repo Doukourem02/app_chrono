@@ -16,7 +16,7 @@ export default function VerificationScreen() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
-  const { setUser, setProfile } = useDriverStore();
+  const { setUser, setProfile, setTokens } = useDriverStore();
   const { email, phoneNumber, otpMethod, setIsNewUser } = useTempDriverStore();
 
   const handleCodeChange = (text: string, index: number) => {
@@ -82,6 +82,14 @@ export default function VerificationScreen() {
           phone: data.data.user.phone,
           role: data.data.user.role,
           created_at: data.data.user.created_at || new Date().toISOString(),
+        });
+      }
+
+      // Sauvegarder les tokens JWT s'ils sont fournis
+      if (data.data.tokens && data.data.tokens.accessToken && data.data.tokens.refreshToken) {
+        setTokens({
+          accessToken: data.data.tokens.accessToken,
+          refreshToken: data.data.tokens.refreshToken
         });
       }
 

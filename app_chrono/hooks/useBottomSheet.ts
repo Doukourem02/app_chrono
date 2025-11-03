@@ -51,6 +51,8 @@ export const useBottomSheet = () => {
     Animated.spring(animatedHeight, {
       toValue: BOTTOM_SHEET_MAX_HEIGHT,
       useNativeDriver: false,
+      tension: 65, // Augmenter la tension pour une animation plus rapide
+      friction: 8, // Réduire la friction pour moins de rebond
     }).start();
   };
 
@@ -59,6 +61,8 @@ export const useBottomSheet = () => {
     Animated.spring(animatedHeight, {
       toValue: BOTTOM_SHEET_MIN_HEIGHT,
       useNativeDriver: false,
+      tension: 65, // Augmenter la tension pour une animation plus rapide
+      friction: 8, // Réduire la friction pour moins de rebond
     }).start();
   };
 

@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "simulate": "node scripts/simulate_flow.js",
+    "simulate:ws": "SOCKET_URL=http://127.0.0.1:4000 node scripts/simulate_flow.js"
   },
   "keywords": [],
   "author": "",
@@ -18,12 +20,16 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
+    "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.1",
     "nodemailer": "^7.0.10",
     "pg": "^8.16.3",
     "resend": "^6.3.0",
     "socket.io": "^4.8.1",
-    "uuid": "^13.0.0"
+    "socket.io-client": "^4.8.1",
+    "uuid": "^13.0.0",
+    "winston": "^3.18.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

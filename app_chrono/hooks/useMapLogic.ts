@@ -158,6 +158,20 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     userPulseAnim.setValue(0);
   };
 
+  // Clear route and related animations/state
+  const clearRoute = () => {
+    try {
+      if (polylineAnimRef.current) {
+        cancelAnimationFrame(polylineAnimRef.current as any);
+        polylineAnimRef.current = null;
+      }
+    } catch {}
+
+    setDisplayedRouteCoords([]);
+    setDurationText(null);
+    stopDestinationPulse();
+  };
+
   // Réinitialiser l'état après recherche chauffeur
   const resetAfterDriverSearch = () => {
     setShowMethodSelection(false);
@@ -497,5 +511,6 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     stopDestinationPulse,
     stopUserPulse,
     resetAfterDriverSearch,
+    clearRoute,
   };
 };
