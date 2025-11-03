@@ -2,6 +2,7 @@ import pool from '../config/db.js';
 import fs from 'fs';
 import path from 'path';
 import { activeOrders, connectedUsers } from '../sockets/orderSocket.js';
+import logger from '../utils/logger.js';
 
 export const createDelivery = async (req, res) => {
   try {
@@ -313,5 +314,85 @@ export const uploadDeliveryProof = async (req, res) => {
   } catch (err) {
     console.error('Error uploadDeliveryProof:', err);
     return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * 📊 Récupérer les statistiques d'un client
+ * Retourne : nombre de commandes complétées, points de fidélité, économies totales
+ */
+export const getUserStatistics = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId est requis'
+      });
+    }
+
+    // Vérifier que la connexion DB est configurée
+    if (!process.env.DATABASE_URL) {
+      logger.warn('⚠️ DATABASE_URL non configuré pour getUserStatistics');
+      return res.json({
+        success: true,
+        data: {
+          completedOrders: 0,
+          loyaltyPoints: 0,
+          totalSaved: 0
+        }
+      });
+    }
+
+    try {
+      // Compter les commandes complétées (status = 'completed')
+      const completedOrdersResult = await pool.query(
+        `SELECT COUNT(*) as count FROM orders 
+         WHERE user_id = $1 AND status = 'completed'`,
+        [userId]
+      );
+      const completedOrders = parseInt(completedOrdersResult.rows[0]?.count || 0);
+
+      // Calculer les points de fidélité : 1 point par commande complétée
+      // + bonus : 5 points supplémentaires toutes les 10 commandes
+      const basePoints = completedOrders; // 1 point par commande
+      const bonusPoints = Math.floor(completedOrders / 10) * 5; // 5 points bonus toutes les 10 commandes
+      const loyaltyPoints = basePoints + bonusPoints;
+
+      // Calculer les économies totales (pour l'instant = 0, à implémenter avec les codes promo)
+      const totalSaved = 0;
+
+      res.json({
+        success: true,
+        data: {
+          completedOrders,
+          loyaltyPoints,
+          totalSaved
+        }
+      });
+    } catch (queryError) {
+      logger.error('❌ Erreur requête getUserStatistics:', queryError);
+      // En cas d'erreur SQL, retourner un résultat vide plutôt que planter
+      return res.json({
+        success: true,
+        data: {
+          completedOrders: 0,
+          loyaltyPoints: 0,
+          totalSaved: 0
+        }
+      });
+    }
+  } catch (error) {
+    logger.error('❌ Erreur getUserStatistics:', error);
+    // Retourner un résultat vide en cas d'erreur pour éviter de crasher l'app
+    return res.json({
+      success: true,
+      data: {
+        completedOrders: 0,
+        loyaltyPoints: 0,
+        totalSaved: 0
+      }
+    });
   }
 };

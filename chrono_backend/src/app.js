@@ -4,6 +4,7 @@ import userRoutes from './routes/userRoutes.js';
 import deliveryRoutes from './routes/deliveryRoutes.js';
 import authRoutes from './routes/authRoutes.js'; 
 import driverRoutes from './routes/driverRoutes.js'; // 🚗 NOUVEAU
+import ratingRoutes from './routes/ratingRoutes.js'; // ⭐ NOUVEAU
 import syncRoutes from './routes/syncRoutes.js'; 
 import { errorHandler } from './middleware/errorHandler.js';
 const app = express();
@@ -36,6 +37,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/auth-simple', authRoutes); 
 app.use('/api/drivers', driverRoutes); // 🚗 NOUVEAU
+app.use('/api/ratings', ratingRoutes); // ⭐ NOUVEAU
 app.use('/api/sync', syncRoutes); 
 
 // Middleware de gestion d'erreurs global (doit être en dernier)

@@ -14,12 +14,25 @@ import {
 import { router } from 'expo-router';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
+import { userApiService } from '../../services/userApiService';
+
+interface UserStatistics {
+  completedOrders: number;
+  loyaltyPoints: number;
+  totalSaved: number;
+}
 
 export default function ProfilePage() {
   const { requireAuth } = useRequireAuth();
   const { user, logout } = useAuthStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
+  const [statistics, setStatistics] = useState<UserStatistics>({
+    completedOrders: 0,
+    loyaltyPoints: 0,
+    totalSaved: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat('fr-FR', {
@@ -30,22 +43,35 @@ export default function ProfilePage() {
     return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
   };
 
-  // Mock profile data - À remplacer par vraies données
+  // Mock profile data - À remplacer par vraies données depuis le backend si disponible
   const profile = {
     first_name: 'Client',
     last_name: 'Chrono',
     profile_image_url: null,
-    total_orders: 12,
-    total_saved: 45,
-    loyalty_points: 128
   };
 
-  // Vérifier l'authentification dès l'accès à la page
+  // Charger les statistiques depuis le backend
   useEffect(() => {
+    const loadStatistics = async () => {
+      if (!user?.id) return;
+
+      setIsLoadingStats(true);
+      try {
+        const result = await userApiService.getUserStatistics(user.id);
+        if (result.success && result.data) {
+          setStatistics(result.data);
+        }
+      } catch (error) {
+        console.error('Erreur chargement statistiques:', error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
     requireAuth(() => {
-      // L'utilisateur est connecté, ne rien faire
+      loadStatistics();
     });
-  }, [requireAuth]);
+  }, [requireAuth, user?.id]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -110,6 +136,22 @@ export default function ProfilePage() {
       subtitle: 'Mes réductions et offres',
       onPress: () => console.log('Codes promo'),
       color: '#EC4899'
+    },
+    {
+      icon: 'trophy-outline',
+      title: 'Points de fidélité',
+      subtitle: 'Utilisez vos points pour des avantages',
+      onPress: () => {
+        Alert.alert(
+          'Points de fidélité',
+          `Vous avez ${statistics.loyaltyPoints} points.\n\n` +
+          `• 1 point par commande complétée\n` +
+          `• 5 points bonus toutes les 10 commandes\n\n` +
+          `Utilisez vos points pour obtenir des réductions et des avantages exclusifs !`,
+          [{ text: 'OK' }]
+        );
+      },
+      color: '#F59E0B'
     }
   ];
 
@@ -172,16 +214,25 @@ export default function ProfilePage() {
           {/* Statistiques rapides */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{profile?.total_orders || 0}</Text>
+              <Text style={styles.statNumber}>
+                {isLoadingStats ? '...' : statistics.completedOrders}
+              </Text>
               <Text style={styles.statLabel}>Commandes</Text>
+              <Text style={styles.statSubLabel}>Complétées</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{formatCurrency(profile?.total_saved ?? 0)}</Text>
+              <Text style={styles.statNumber}>
+                {isLoadingStats ? '...' : formatCurrency(statistics.totalSaved)}
+              </Text>
               <Text style={styles.statLabel}>Économies</Text>
+              <Text style={styles.statSubLabel}>Total</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{profile?.loyalty_points || 0}</Text>
+              <Text style={styles.statNumber}>
+                {isLoadingStats ? '...' : statistics.loyaltyPoints}
+              </Text>
               <Text style={styles.statLabel}>Points</Text>
+              <Text style={styles.statSubLabel}>Fidélité</Text>
             </View>
           </View>
         </View>
@@ -367,6 +418,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textTransform: 'uppercase',
     fontWeight: '500',
+    marginTop: 2,
+  },
+  statSubLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 2,
   },
   quickSettings: {
     backgroundColor: '#FFFFFF',

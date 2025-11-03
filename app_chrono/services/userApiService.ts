@@ -233,6 +233,144 @@ class UserApiService {
       return null;
     }
   }
+
+  /**
+   * 📊 Récupérer les statistiques du client
+   * Retourne : nombre de commandes complétées, points de fidélité, économies totales
+   */
+  async getUserStatistics(userId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      completedOrders: number;
+      loyaltyPoints: number;
+      totalSaved: number;
+    };
+  }> {
+    try {
+      const token = await this.ensureAccessToken();
+      if (!token) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/deliveries/${userId}/statistics`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur récupération statistiques');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur getUserStatistics:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion',
+        data: {
+          completedOrders: 0,
+          loyaltyPoints: 0,
+          totalSaved: 0
+        }
+      };
+    }
+  }
+
+  /**
+   * ⭐ Soumettre une évaluation d'un livreur
+   */
+  async submitRating(orderId: string, rating: number, comment?: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      ratingId: string;
+      orderId: string;
+      driverId: string;
+      rating: number;
+      comment: string | null;
+    };
+  }> {
+    try {
+      const token = await this.ensureAccessToken();
+      if (!token) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/ratings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId,
+          rating,
+          comment: comment || null
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de l\'enregistrement de l\'évaluation');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur submitRating:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
+   * 🔍 Vérifier si une commande a déjà été évaluée
+   */
+  async getOrderRating(orderId: string): Promise<{
+    success: boolean;
+    data?: {
+      id: string;
+      rating: number;
+      comment: string | null;
+      createdAt: string;
+      updatedAt: string;
+    } | null;
+  }> {
+    try {
+      const token = await this.ensureAccessToken();
+      if (!token) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/ratings/order/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la récupération de l\'évaluation');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur getOrderRating:', error);
+      return {
+        success: false,
+        data: null
+      };
+    }
+  }
 }
 
 // Export singleton

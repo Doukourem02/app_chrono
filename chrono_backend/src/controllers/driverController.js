@@ -581,3 +581,133 @@ export const getDriverDetails = async (req, res) => {
     });
   }
 };
+
+/**
+ * 📊 Récupérer les statistiques d'un livreur
+ * Retourne : nombre de livraisons complétées, note moyenne
+ */
+export const getDriverStatistics = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId est requis'
+      });
+    }
+
+    // Vérifier que la connexion DB est configurée
+    if (!process.env.DATABASE_URL) {
+      logger.warn('⚠️ DATABASE_URL non configuré pour getDriverStatistics');
+      return res.json({
+        success: true,
+        data: {
+          completedDeliveries: 0,
+          averageRating: 5.0
+        }
+      });
+    }
+
+    try {
+      // Compter les livraisons complétées (status = 'completed')
+      // Vérifier d'abord les colonnes disponibles
+      const columnsInfo = await pool.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'orders'
+           AND column_name = ANY($1)`,
+        [['driver_id', 'driver_uuid']]
+      );
+
+      const columnSet = new Set(columnsInfo.rows.map((row) => row.column_name));
+      const driverColumn = columnSet.has('driver_id')
+        ? 'driver_id'
+        : columnSet.has('driver_uuid')
+          ? 'driver_uuid'
+          : null;
+
+      let completedDeliveries = 0;
+
+      if (driverColumn) {
+        // Compter via la colonne driver dans orders
+        const deliveriesResult = await pool.query(
+          `SELECT COUNT(*) as count FROM orders 
+           WHERE ${driverColumn} = $1 AND status = 'completed'`,
+          [userId]
+        );
+        completedDeliveries = parseInt(deliveriesResult.rows[0]?.count || 0);
+      } else {
+        // Essayer avec order_assignments
+        try {
+          const tableCheck = await pool.query(
+            `SELECT EXISTS (
+              SELECT FROM information_schema.tables
+              WHERE table_schema = 'public'
+              AND table_name = 'order_assignments'
+            )`
+          );
+          const hasOrderAssignments = tableCheck.rows[0]?.exists === true;
+
+          if (hasOrderAssignments) {
+            const deliveriesResult = await pool.query(
+              `SELECT COUNT(DISTINCT o.id) as count 
+               FROM orders o
+               INNER JOIN order_assignments oa ON oa.order_id = o.id
+               WHERE oa.driver_id = $1 AND o.status = 'completed'`,
+              [userId]
+            );
+            completedDeliveries = parseInt(deliveriesResult.rows[0]?.count || 0);
+          }
+        } catch (err) {
+          logger.warn('⚠️ Erreur vérification order_assignments pour getDriverStatistics:', err.message);
+        }
+      }
+
+      // Récupérer la note moyenne depuis driver_profiles (ou calculer depuis les évaluations si disponible)
+      // Pour l'instant, on retourne 5.0 par défaut si aucune note n'est trouvée
+      let averageRating = 5.0;
+      try {
+        const { data: driverProfile, error: profileError } = await supabase
+          .from('driver_profiles')
+          .select('rating')
+          .eq('user_id', userId)
+          .single();
+
+        if (!profileError && driverProfile && driverProfile.rating != null) {
+          averageRating = parseFloat(driverProfile.rating) || 5.0;
+        }
+      } catch (err) {
+        logger.warn('⚠️ Erreur récupération rating depuis driver_profiles:', err.message);
+      }
+
+      res.json({
+        success: true,
+        data: {
+          completedDeliveries,
+          averageRating: parseFloat(averageRating.toFixed(1))
+        }
+      });
+    } catch (queryError) {
+      logger.error('❌ Erreur requête getDriverStatistics:', queryError);
+      // En cas d'erreur SQL, retourner un résultat vide plutôt que planter
+      return res.json({
+        success: true,
+        data: {
+          completedDeliveries: 0,
+          averageRating: 5.0
+        }
+      });
+    }
+  } catch (error) {
+    logger.error('❌ Erreur getDriverStatistics:', error);
+    // Retourner un résultat vide en cas d'erreur pour éviter de crasher l'app
+    return res.json({
+      success: true,
+      data: {
+        completedDeliveries: 0,
+        averageRating: 5.0
+      }
+    });
+  }
+};

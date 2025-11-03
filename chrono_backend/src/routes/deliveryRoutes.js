@@ -5,7 +5,8 @@ import {
 	getUserDeliveries,
 	updateDeliveryStatus,
 	uploadDeliveryProof,
-	cancelOrder
+	cancelOrder,
+	getUserStatistics
 } from '../controllers/deliveryController.js';
 import { verifyJWT } from '../middleware/verifyToken.js';
 import { validateDeliveryStatus, validateCreateOrder } from '../middleware/validators.js';
@@ -18,6 +19,9 @@ router.post('/', orderLimiter, validateCreateOrder, createDelivery);
 
 // Get deliveries for a user
 router.get('/:userId', getUserDeliveries);
+
+// Get user statistics (completed orders, loyalty points, total saved)
+router.get('/:userId/statistics', getUserStatistics);
 
 // Cancel order (user) - requires JWT
 router.post('/:orderId/cancel', verifyJWT, cancelOrder);

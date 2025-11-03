@@ -3,10 +3,15 @@ import Octicons from '@expo/vector-icons/Octicons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import { RatingModal } from '../../components/RatingModal';
+import { useRatingStore } from '../../store/useRatingStore';
 
 export default function TabLayout() {
+  const { showRatingModal, orderId, driverName, resetRatingModal } = useRatingStore();
+
   return (
-    <Tabs
+    <>
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
@@ -66,8 +71,21 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    );
-  }
+      
+      {/* Modal d'évaluation global */}
+      <RatingModal
+        visible={showRatingModal}
+        orderId={orderId || ''}
+        driverName={driverName || undefined}
+        onClose={resetRatingModal}
+        onRatingSubmitted={() => {
+          // Rafraîchir les statistiques si nécessaire
+          resetRatingModal();
+        }}
+      />
+    </>
+  );
+}
 
 const styles = StyleSheet.create({
   navBar: {

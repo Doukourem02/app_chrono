@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { useOrderStore } from '../store/useOrderStore';
+import { useRatingStore } from '../store/useRatingStore';
 import { userApiService } from './userApiService';
 import { logger } from '../utils/logger';
 import { Alert } from 'react-native';
@@ -215,6 +216,24 @@ class UserOrderSocketService {
             }
           : null;
         useOrderStore.getState().updateFromSocket({ order: order as any, location: normLocation });
+
+        // Si la commande est complétée, afficher le modal d'évaluation
+        if (order && order.status === 'completed' && order.id && order.driver?.id) {
+          try {
+            const driverName = order.driver?.name || order.driver?.first_name 
+              ? `${order.driver.first_name || ''} ${order.driver.last_name || ''}`.trim() 
+              : 'Votre livreur';
+            useRatingStore.getState().setRatingModal(
+              true,
+              order.id,
+              order.driver.id,
+              driverName || 'Votre livreur'
+            );
+            logger.info('⭐ Modal d\'évaluation déclenché pour commande complétée', 'userOrderSocketService', { orderId: order.id });
+          } catch (err) {
+            logger.warn('Erreur déclenchement modal évaluation', 'userOrderSocketService', err);
+          }
+        }
 
         // If DB persistence for this status update failed, notify the user
         if (data && data.dbSaved === false) {

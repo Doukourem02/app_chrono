@@ -3,7 +3,8 @@ import {
   updateDriverStatus, 
   getOnlineDrivers, 
   getDriverDetails,
-  getDriverRevenues
+  getDriverRevenues,
+  getDriverStatistics
 } from '../controllers/driverController.js';
 import { validateDriverStatus } from '../middleware/validators.js';
 import { verifyJWTOptional } from '../middleware/verifyTokenOptional.js';
@@ -31,5 +32,9 @@ router.get('/:driverId/details', getDriverDetails);
 // 💰 Récupérer les revenus d'un chauffeur
 // GET /api/drivers/:userId/revenues?period=today|week|month|all
 router.get('/:userId/revenues', getDriverRevenues);
+
+// 📊 Récupérer les statistiques d'un chauffeur (livraisons complétées, note moyenne)
+// GET /api/drivers/:userId/statistics
+router.get('/:userId/statistics', getDriverStatistics);
 
 export default router;

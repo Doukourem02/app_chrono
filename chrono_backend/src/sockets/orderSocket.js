@@ -224,11 +224,37 @@ const setupOrderSocket = (io) => {
         let driverIndex = 0;
         const tryNextDriver = async () => {
           if (driverIndex >= nearbyDrivers.length) {
-            console.log(`❌ Tous les chauffeurs sont occupés pour la commande ${order.id}`);
+            // Tous les chauffeurs ont été essayés, annuler la commande
+            console.log(`❌ Tous les chauffeurs sont occupés pour la commande ${order.id} - Annulation automatique`);
+            
+            // Annuler la commande dans la DB
+            try {
+              order.status = 'cancelled';
+              order.cancelledAt = new Date();
+              await updateOrderStatusDB(order.id, 'cancelled', {
+                cancelled_at: order.cancelledAt
+              });
+              console.log(`✅ Commande ${order.id} annulée automatiquement en DB`);
+            } catch (dbError) {
+              console.warn(`⚠️ Échec annulation DB pour ${order.id}:`, dbError.message);
+            }
+
+            // Notifier le client que la commande a été annulée
+            const userSocketId = connectedUsers.get(order.user.id);
+            if (userSocketId) {
+              io.to(userSocketId).emit('order-cancelled', {
+                orderId: order.id,
+                reason: 'no_drivers_available',
+                message: 'Aucun chauffeur disponible - Commande annulée'
+              });
+            }
+            
             socket.emit('no-drivers-available', {
               orderId: order.id,
-              message: 'Tous les chauffeurs sont occupés'
+              message: 'Tous les chauffeurs sont occupés - Commande annulée'
             });
+            
+            // Retirer de la mémoire
             activeOrders.delete(order.id);
             return;
           }

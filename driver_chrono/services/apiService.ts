@@ -272,6 +272,61 @@ class ApiService {
       };
     }
   }
+
+  /**
+   * 📊 Récupérer les statistiques du livreur
+   * Retourne : nombre de livraisons complétées, note moyenne
+   */
+  async getDriverStatistics(userId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      completedDeliveries: number;
+      averageRating: number;
+    };
+  }> {
+    try {
+      const accessToken = await this.ensureAccessToken();
+      if (!accessToken) {
+        return {
+          success: false,
+          message: 'Session expirée. Veuillez vous reconnecter.',
+          data: {
+            completedDeliveries: 0,
+            averageRating: 5.0
+          }
+        };
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/statistics`, {
+        method: 'GET',
+        headers,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur récupération statistiques');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur getDriverStatistics:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion',
+        data: {
+          completedDeliveries: 0,
+          averageRating: 5.0
+        }
+      };
+    }
+  }
 }
 
 // Export singleton

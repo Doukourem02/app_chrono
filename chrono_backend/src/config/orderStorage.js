@@ -118,6 +118,7 @@ export async function recordOrderAssignment(orderId, driverId, timestamps = {}) 
 
 /**
  * Sauvegarde une commande dans PostgreSQL
+ * Détecte dynamiquement les colonnes disponibles pour compatibilité
  */
 export async function saveOrder(order) {
   try {
@@ -130,49 +131,156 @@ export async function saveOrder(order) {
     const driverId = order.driverId || order.driver?.id || null;
     const etaMinutes = parseDurationToMinutes(order.estimatedDuration);
 
+    // Détecter les colonnes disponibles
+    const columnsInfo = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'orders'
+         AND column_name = ANY($1)`,
+      [['pickup', 'pickup_address', 'dropoff', 'dropoff_address', 'driver_id', 'price', 'price_cfa', 'distance', 'distance_km', 'accepted_at', 'completed_at', 'cancelled_at', 'updated_at']]
+    );
+
+    const columnSet = new Set(columnsInfo.rows.map((row) => row.column_name));
+    
+    // Déterminer les noms de colonnes
+    const pickupColumn = columnSet.has('pickup_address') ? 'pickup_address' : columnSet.has('pickup') ? 'pickup' : null;
+    const dropoffColumn = columnSet.has('dropoff_address') ? 'dropoff_address' : columnSet.has('dropoff') ? 'dropoff' : null;
+    const priceColumn = columnSet.has('price_cfa') ? 'price_cfa' : columnSet.has('price') ? 'price' : null;
+    const distanceColumn = columnSet.has('distance_km') ? 'distance_km' : columnSet.has('distance') ? 'distance' : null;
+    const hasDriverColumn = columnSet.has('driver_id');
+
+    if (!pickupColumn || !dropoffColumn) {
+      throw new Error('Colonnes pickup/dropoff non trouvées dans la table orders');
+    }
+
+    // Construire la requête dynamiquement
+    const columns = ['id', 'user_id'];
+    const values = [order.id, order.user?.id];
+    const placeholders = ['$1', '$2'];
+    let paramIndex = 3;
+
+    // Ajouter driver_id seulement si la colonne existe
+    if (hasDriverColumn && driverId) {
+      columns.push('driver_id');
+      values.push(driverId);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    // Colonnes pickup/dropoff (JSONB)
+    columns.push(pickupColumn, dropoffColumn);
+    values.push(JSON.stringify(order.pickup || null), JSON.stringify(order.dropoff || null));
+    placeholders.push(`$${paramIndex}`, `$${paramIndex + 1}`);
+    paramIndex += 2;
+
+    // Colonnes méthode, prix, distance, ETA
+    columns.push('delivery_method');
+    values.push(order.deliveryMethod || order.method || null);
+    placeholders.push(`$${paramIndex}`);
+    paramIndex++;
+
+    if (priceColumn) {
+      columns.push(priceColumn);
+      values.push(Number.isFinite(order.price) ? Math.round(order.price) : null);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    if (distanceColumn) {
+      columns.push(distanceColumn);
+      values.push(order.distance != null ? Number(order.distance) : null);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    // ETA minutes (peut être eta_minutes ou estimated_duration)
+    const etaColumn = columnSet.has('eta_minutes') ? 'eta_minutes' : columnSet.has('estimated_duration') ? 'estimated_duration' : null;
+    if (etaColumn) {
+      columns.push(etaColumn);
+      values.push(etaMinutes);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    // Colonnes statut et timestamps (vérifier l'existence)
+    columns.push('status', 'created_at');
+    values.push(order.status || 'pending', createdAt);
+    placeholders.push(`$${paramIndex}`, `$${paramIndex + 1}`);
+    paramIndex += 2;
+
+    // Ajouter updated_at si la colonne existe
+    if (columnSet.has('updated_at')) {
+      columns.push('updated_at');
+      values.push(updatedAt);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    // Ajouter accepted_at si la colonne existe
+    if (columnSet.has('accepted_at') && acceptedAt) {
+      columns.push('accepted_at');
+      values.push(acceptedAt);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    // Ajouter completed_at si la colonne existe
+    if (columnSet.has('completed_at') && completedAt) {
+      columns.push('completed_at');
+      values.push(completedAt);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    // Ajouter cancelled_at si la colonne existe
+    if (columnSet.has('cancelled_at') && cancelledAt) {
+      columns.push('cancelled_at');
+      values.push(cancelledAt);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    // Construire la clause ON CONFLICT dynamiquement
+    const updateClauses = [];
+    if (hasDriverColumn && driverId) {
+      updateClauses.push(`driver_id = EXCLUDED.driver_id`);
+    }
+    updateClauses.push(
+      `${pickupColumn} = EXCLUDED.${pickupColumn}`,
+      `${dropoffColumn} = EXCLUDED.${dropoffColumn}`,
+      `delivery_method = EXCLUDED.delivery_method`
+    );
+    if (priceColumn) {
+      updateClauses.push(`${priceColumn} = EXCLUDED.${priceColumn}`);
+    }
+    if (distanceColumn) {
+      updateClauses.push(`${distanceColumn} = EXCLUDED.${distanceColumn}`);
+    }
+    if (etaColumn) {
+      updateClauses.push(`${etaColumn} = EXCLUDED.${etaColumn}`);
+    }
+    updateClauses.push(`status = EXCLUDED.status`);
+    
+    // Ajouter les colonnes de timestamps seulement si elles existent
+    if (columnSet.has('updated_at')) {
+      updateClauses.push(`updated_at = EXCLUDED.updated_at`);
+    }
+    if (columnSet.has('accepted_at')) {
+      updateClauses.push(`accepted_at = EXCLUDED.accepted_at`);
+    }
+    if (columnSet.has('completed_at')) {
+      updateClauses.push(`completed_at = EXCLUDED.completed_at`);
+    }
+    if (columnSet.has('cancelled_at')) {
+      updateClauses.push(`cancelled_at = EXCLUDED.cancelled_at`);
+    }
+
     await pool.query(
-      `INSERT INTO orders (
-        id, user_id, driver_id,
-        pickup_address, dropoff_address,
-        delivery_method, price_cfa, distance_km, eta_minutes,
-        status, created_at, updated_at, accepted_at, completed_at, cancelled_at
-      ) VALUES (
-        $1, $2, $3,
-        $4, $5,
-        $6, $7, $8, $9,
-        $10, $11, $12, $13, $14, $15
-      )
-      ON CONFLICT (id)
-      DO UPDATE SET
-        driver_id = EXCLUDED.driver_id,
-        pickup_address = EXCLUDED.pickup_address,
-        dropoff_address = EXCLUDED.dropoff_address,
-        delivery_method = EXCLUDED.delivery_method,
-        price_cfa = EXCLUDED.price_cfa,
-        distance_km = EXCLUDED.distance_km,
-        eta_minutes = EXCLUDED.eta_minutes,
-        status = EXCLUDED.status,
-        accepted_at = EXCLUDED.accepted_at,
-        completed_at = EXCLUDED.completed_at,
-        cancelled_at = EXCLUDED.cancelled_at,
-        updated_at = EXCLUDED.updated_at`,
-      [
-        order.id,
-        order.user?.id,
-        driverId,
-        JSON.stringify(order.pickup || null),
-        JSON.stringify(order.dropoff || null),
-        order.deliveryMethod || order.method || null,
-        Number.isFinite(order.price) ? Math.round(order.price) : null,
-        order.distance != null ? Number(order.distance) : null,
-        etaMinutes,
-        order.status || 'pending',
-        createdAt,
-        updatedAt,
-        acceptedAt,
-        completedAt,
-        cancelledAt
-      ]
+      `INSERT INTO orders (${columns.join(', ')})
+       VALUES (${placeholders.join(', ')})
+       ON CONFLICT (id)
+       DO UPDATE SET ${updateClauses.join(', ')}`,
+      values
     );
 
     await recordStatusHistory(order.id, order.status || 'pending', buildHistoryDetail({
@@ -195,6 +303,15 @@ export async function saveOrder(order) {
  */
 export async function updateOrderStatus(orderId, status, updates = {}) {
   try {
+    // Vérifier si driver_id existe dans la table
+    const driverColumnCheck = await pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'orders'
+         AND column_name = 'driver_id'`
+    );
+    const hasDriverColumn = driverColumnCheck.rows.length > 0;
+
     const setClauses = ['status = $2', 'updated_at = now()'];
     const values = [orderId, status];
     let paramIndex = 3;
@@ -204,7 +321,7 @@ export async function updateOrderStatus(orderId, status, updates = {}) {
     const completedAt = coerceDate(updates.completed_at) || (status === 'completed' ? new Date() : null);
     const cancelledAt = coerceDate(updates.cancelled_at) || (status === 'cancelled' ? new Date() : null);
 
-    if (driverId) {
+    if (hasDriverColumn && driverId) {
       setClauses.push(`driver_id = $${paramIndex}`);
       values.push(driverId);
       paramIndex++;

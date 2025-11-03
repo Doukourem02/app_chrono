@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,21 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
+import { apiService } from '../../services/apiService';
+
+interface DriverStatistics {
+  completedDeliveries: number;
+  averageRating: number;
+}
 
 export default function ProfilePage() {
   const { user, profile, isOnline, logout, setOnlineStatus } = useDriverStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [statistics, setStatistics] = useState<DriverStatistics>({
+    completedDeliveries: 0,
+    averageRating: 5.0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat('fr-FR', {
@@ -25,6 +36,27 @@ export default function ProfilePage() {
 
     return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
   };
+
+  // Charger les statistiques depuis le backend
+  useEffect(() => {
+    const loadStatistics = async () => {
+      if (!user?.id) return;
+
+      setIsLoadingStats(true);
+      try {
+        const result = await apiService.getDriverStatistics(user.id);
+        if (result.success && result.data) {
+          setStatistics(result.data);
+        }
+      } catch (error) {
+        console.error('Erreur chargement statistiques:', error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    loadStatistics();
+  }, [user?.id]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -68,6 +100,21 @@ export default function ProfilePage() {
       title: 'Statistiques',
       subtitle: 'Voir vos performances',
       onPress: () => console.log('Statistiques'),
+    },
+    {
+      icon: 'star-outline',
+      title: 'Ma note',
+      subtitle: 'Votre évaluation par les clients',
+      onPress: () => {
+        Alert.alert(
+          'Ma note moyenne',
+          `Vous avez une note de ${statistics.averageRating.toFixed(1)}/5.0\n\n` +
+          `• Basée sur ${statistics.completedDeliveries} livraisons complétées\n` +
+          `• Cette note reflète la satisfaction de vos clients\n\n` +
+          `Continuez à offrir un excellent service pour maintenir une note élevée !`,
+          [{ text: 'OK' }]
+        );
+      },
     },
     {
       icon: 'settings-outline',
@@ -116,16 +163,25 @@ export default function ProfilePage() {
         {/* Statistiques rapides */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile?.total_deliveries || 0}</Text>
+            <Text style={styles.statNumber}>
+              {isLoadingStats ? '...' : statistics.completedDeliveries}
+            </Text>
             <Text style={styles.statLabel}>Livraisons</Text>
+            <Text style={styles.statSubLabel}>Complétées</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile?.rating?.toFixed(1) || '5.0'}</Text>
+            <Text style={styles.statNumber}>
+              {isLoadingStats ? '...' : statistics.averageRating.toFixed(1)}
+            </Text>
             <Text style={styles.statLabel}>Note</Text>
+            <Text style={styles.statSubLabel}>Moyenne</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{formatCurrency(profile?.total_earnings ?? 0)}</Text>
+            <Text style={styles.statNumber}>
+              {formatCurrency(profile?.total_earnings ?? 0)}
+            </Text>
             <Text style={styles.statLabel}>Gains</Text>
+            <Text style={styles.statSubLabel}>Total</Text>
           </View>
         </View>
       </View>
@@ -326,6 +382,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textTransform: 'uppercase',
     fontWeight: '500',
+    marginTop: 2,
+  },
+  statSubLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 2,
   },
   onlineToggleContainer: {
     backgroundColor: '#FFFFFF',
