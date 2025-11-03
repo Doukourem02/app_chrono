@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import MapView from 'react-native-maps';
@@ -260,7 +261,7 @@ export default function MapPage() {
   const { showRatingBottomSheet, orderId: ratingOrderId, driverName: ratingDriverName, resetRatingBottomSheet } = useRatingStore();
 
   // 🧹 Fonction utilitaire pour nettoyer complètement l'état
-  const cleanupOrderState = useCallback(() => {
+  const cleanupOrderState = useCallback(async () => {
     logger.info('🧹 Nettoyage complet de l\'état de commande', 'map.tsx');
     
     // 🛑 Arrêter la recherche de chauffeur si elle est en cours
@@ -291,12 +292,39 @@ export default function MapPage() {
     setPickupLocation('');
     setDeliveryLocation('');
     
-    // Animer la caméra vers la position de l'utilisateur
-    if (region) {
-      // Petit délai pour permettre l'animation
-      setTimeout(() => {
-        animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
-      }, 100);
+    // 🆕 Récupérer la position actuelle du client et recentrer la carte
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        
+        const { latitude, longitude } = currentLocation.coords;
+        
+        // Mettre à jour les coordonnées de pickup avec la position actuelle
+        setPickupCoords({ latitude, longitude });
+        
+        // Animer la caméra vers la position actuelle du client
+        setTimeout(() => {
+          animateToCoordinate({ latitude, longitude }, 0.01);
+        }, 100);
+      } else {
+        // Fallback sur region si pas de permission
+        if (region) {
+          setTimeout(() => {
+            animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
+          }, 100);
+        }
+      }
+    } catch (error) {
+      logger.warn('Erreur récupération position actuelle', 'map.tsx', error);
+      // Fallback sur region en cas d'erreur
+      if (region) {
+        setTimeout(() => {
+          animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
+        }, 100);
+      }
     }
   }, [clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, animateToCoordinate, region, isSearchingDriver, stopDriverSearch, collapseRatingBottomSheet]);
 

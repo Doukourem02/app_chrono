@@ -305,13 +305,13 @@ export default function BoxPage() {
   const getDeliveryMethodIcon = (method: 'moto' | 'vehicule' | 'cargo') => {
     switch (method) {
       case 'moto':
-        return '🚲';
+        return require('../../assets/images/motoo.png');
       case 'vehicule':
-        return '🚗';
+        return require('../../assets/images/carrss.png');
       case 'cargo':
-        return '🚚';
+        return require('../../assets/images/ccargo.png');
       default:
-        return '📦';
+        return require('../../assets/images/motoo.png');
     }
   };
 
@@ -383,9 +383,11 @@ export default function BoxPage() {
         <View style={styles.orderCardContent}>
           <View style={styles.orderCardLeft}>
             <View style={styles.orderCardIcon}>
-              <Text style={styles.orderCardIconText}>
-                {getDeliveryMethodIcon(order.deliveryMethod || 'moto')}
-              </Text>
+              <Image 
+                source={getDeliveryMethodIcon(order.deliveryMethod || 'moto')}
+                style={styles.orderCardIconImage}
+                resizeMode="contain"
+              />
             </View>
             <View style={styles.orderCardInfo}>
               <Text style={styles.orderCardTitle}>{orderName}</Text>
@@ -540,10 +542,16 @@ export default function BoxPage() {
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Méthode de livraison</Text>
-                  <Text style={styles.detailValue}>
-                    {getDeliveryMethodIcon(selectedOrder.deliveryMethod || 'moto')}{' '}
-                    {selectedOrder.deliveryMethod || 'moto'}
-                  </Text>
+                  <View style={styles.detailValueWithIcon}>
+                    <Image 
+                      source={getDeliveryMethodIcon(selectedOrder.deliveryMethod || 'moto')}
+                      style={styles.detailIconImage}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.detailValue}>
+                      {selectedOrder.deliveryMethod || 'moto'}
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Prix</Text>
@@ -795,8 +803,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  orderCardIconText: {
-    fontSize: 24,
+  orderCardIconImage: {
+    width: 40,
+    height: 40,
   },
   orderCardInfo: {
     flex: 1,
@@ -898,6 +907,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  detailValueWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailIconImage: {
+    width: 24,
+    height: 24,
   },
   detailPrice: {
     color: '#8B5CF6',

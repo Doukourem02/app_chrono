@@ -105,7 +105,7 @@ export default function Index() {
     location,
     routeToDestination ? { coordinates: routeToDestination.coordinates } : null,
     currentOrder,
-    isOnline && !!currentOrder
+    isOnline // Suivre le driver même quand il n'y a pas de commande active
   );
 
   // Animated driver position for simple delivery animation
@@ -287,14 +287,15 @@ export default function Index() {
       animationTimeoutsRef.current.forEach(id => clearTimeout(id));
       animationTimeoutsRef.current = [];
 
-      // animate back to driver's real location if available
-      if (location) {
-        try {
-          mapRef.current?.animateToRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 500);
-        } catch {}
+      // Recentrer sur la position du livreur après une course
+      if (isOnline && location) {
+        // Utiliser la fonction du hook pour recentrer proprement
+        setTimeout(() => {
+          centerOnDriver();
+        }, 300);
       }
     }
-  }, [currentOrder?.status, currentOrder, location]);
+  }, [currentOrder?.status, currentOrder, location, isOnline, centerOnDriver]);
 
   useEffect(() => {
     // Charger les stats depuis le serveur si utilisateur connecté (même si offline)

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   FlatList,
+  Image,
 } from 'react-native';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
@@ -112,13 +113,13 @@ export default function RevenusPage() {
   const getMethodIcon = (method: string) => {
     switch (method) {
       case 'moto':
-        return '🚲';
+        return require('../../assets/images/motoo.png');
       case 'vehicule':
-        return '🚗';
+        return require('../../assets/images/carrss.png');
       case 'cargo':
-        return '🚚';
+        return require('../../assets/images/ccargo.png');
       default:
-        return '📦';
+        return require('../../assets/images/motoo.png');
     }
   };
 
@@ -333,7 +334,11 @@ export default function RevenusPage() {
                 >
                   <View style={styles.methodHeader}>
                     <View style={styles.methodIconContainer}>
-                      <Text style={styles.methodIcon}>{getMethodIcon(method)}</Text>
+                      <Image
+                        source={getMethodIcon(method)}
+                        style={styles.methodIconImage}
+                        resizeMode="contain"
+                      />
                     </View>
                     <View style={styles.methodInfo}>
                       <Text style={styles.methodName}>{getMethodLabel(method)}</Text>
@@ -362,9 +367,11 @@ export default function RevenusPage() {
                 style={[styles.historyCard, index === recentOrders.length - 1 && styles.historyCardLast]}
               >
                 <View style={styles.historyHeader}>
-                  <Text style={styles.historyIcon}>
-                    {getMethodIcon(order.delivery_method)}
-                  </Text>
+                  <Image
+                    source={getMethodIcon(order.delivery_method)}
+                    style={styles.historyIconImage}
+                    resizeMode="contain"
+                  />
                   <View style={styles.historyInfo}>
                     <Text style={styles.historyId}>
                       Commande #{order.id.slice(0, 8)}
@@ -636,8 +643,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 14,
   },
-  methodIcon: {
-    fontSize: 24,
+  methodIconImage: {
+    width: 40,
+    height: 40,
   },
   methodInfo: {
     flex: 1,
@@ -685,8 +693,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  historyIcon: {
-    fontSize: 18,
+  historyIconImage: {
+    width: 24,
+    height: 24,
     marginRight: 12,
   },
   historyInfo: {

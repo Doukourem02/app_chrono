@@ -197,10 +197,10 @@ export async function cleanupExpiredOTP() {
     return result.rows.length;
   } catch (error) {
     // Ne pas logger en erreur si c'est juste que la table n'existe pas encore
+    // Le fallback mémoire fonctionne automatiquement
     if (error.message && error.message.includes('does not exist')) {
-      if (process.env.NODE_ENV !== 'production') {
-        logger.warn('⚠️ Table otp_codes n\'existe pas encore, migrations à exécuter');
-      }
+      // Table n'existe pas - fallback mémoire utilisé, pas besoin d'avertir
+      return 0;
     } else if (error.message && error.message.includes('password must be a string')) {
       logger.warn('⚠️ Connexion DB non configurée correctement, nettoyage OTP ignoré');
     } else {

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { MapView } from 'react-native-maps';
 import { logger } from '../utils/logger';
 
@@ -115,7 +115,7 @@ export const useMapCamera = (
   };
 
   // Fonction pour centrer sur le driver
-  const centerOnDriver = () => {
+  const centerOnDriver = useCallback(() => {
     if (!driverLocation || !mapRef.current) return;
 
     try {
@@ -128,7 +128,7 @@ export const useMapCamera = (
     } catch (err) {
       logger.warn('Center on driver error', 'useMapCamera', err);
     }
-  };
+  }, [driverLocation]);
 
   return {
     fitToRoute,

@@ -5,6 +5,60 @@ import { storeOTP, verifyOTP } from '../config/otpStorage.js';
 import { generateTokens, refreshAccessToken } from '../utils/jwt.js';
 import logger from '../utils/logger.js';
 
+/**
+ * Crée automatiquement un profil driver dans driver_profiles
+ * lorsque l'utilisateur s'inscrit avec le rôle 'driver'
+ */
+const createDriverProfile = async (userId, email, phone, firstName, lastName) => {
+  try {
+    const clientForInsert = supabaseAdmin || supabase;
+    
+    // Vérifier si un profil driver existe déjà
+    const { data: existingProfile, error: checkError } = await clientForInsert
+      .from('driver_profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+    
+    if (existingProfile) {
+      logger.info(`✅ Profil driver déjà existant pour user ${userId}`);
+      return existingProfile;
+    }
+    
+    // Créer le profil driver
+    const { data: driverProfile, error: insertError } = await clientForInsert
+      .from('driver_profiles')
+      .insert([{
+        user_id: userId,
+        email: email,
+        phone: phone || null,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        vehicle_type: 'moto', // Valeur par défaut
+        is_online: false,
+        is_available: true,
+        rating: 5.0, // Note par défaut
+        total_deliveries: 0
+      }])
+      .select()
+      .single();
+    
+    if (insertError) {
+      logger.error(`❌ Erreur création profil driver pour ${userId}:`, insertError);
+      // Ne pas bloquer l'inscription si la création du profil échoue
+      // Le profil pourra être créé plus tard
+      return null;
+    }
+    
+    logger.info(`✅ Profil driver créé avec succès pour user ${userId}`);
+    return driverProfile;
+  } catch (error) {
+    logger.error(`❌ Erreur création profil driver pour ${userId}:`, error);
+    // Ne pas bloquer l'inscription
+    return null;
+  }
+};
+
 
 const registerUserWithPostgreSQL = async (req, res) => {
   try {
@@ -143,7 +197,17 @@ const registerUserWithPostgreSQL = async (req, res) => {
       logger.info("✅ Utilisateur ajouté dans PostgreSQL !");
       logger.debug("📊 Données PostgreSQL:", userData);
 
+      // Créer automatiquement un profil driver si le rôle est 'driver'
       let profile = null;
+      if (role === 'driver') {
+        logger.info("🚗 Création automatique du profil driver...");
+        profile = await createDriverProfile(userId, email, phone, firstName, lastName);
+        if (profile) {
+          logger.info("✅ Profil driver créé avec succès !");
+        } else {
+          logger.warn("⚠️ Échec création profil driver (non bloquant)");
+        }
+      }
     
       res.status(201).json({
         success: true,
@@ -503,6 +567,24 @@ const verifyOTPCode = async (req, res) => {
         } else {
           userData = newUser;
         }
+        
+        // Créer automatiquement un profil driver si le rôle est 'driver'
+        if (role === 'driver' && userData && userData.id) {
+          logger.info("🚗 Création automatique du profil driver pour utilisateur synchronisé...");
+          const driverProfile = await createDriverProfile(
+            userData.id,
+            email,
+            phone,
+            null,
+            null
+          );
+          if (driverProfile) {
+            logger.info("✅ Profil driver créé avec succès !");
+          } else {
+            logger.warn("⚠️ Échec création profil driver (non bloquant)");
+          }
+        }
+        
         logger.info("✅ Utilisateur synchronisé avec succès !");
         
       } else {
@@ -622,6 +704,23 @@ const verifyOTPCode = async (req, res) => {
           }
         } else {
           userData = newUser;
+        }
+
+        // Créer automatiquement un profil driver si le rôle est 'driver'
+        if (role === 'driver' && userData && userData.id) {
+          logger.info("🚗 Création automatique du profil driver...");
+          const driverProfile = await createDriverProfile(
+            userData.id,
+            email,
+            phone,
+            null, // firstName non disponible dans verifyOTPCode
+            null  // lastName non disponible dans verifyOTPCode
+          );
+          if (driverProfile) {
+            logger.info("✅ Profil driver créé avec succès !");
+          } else {
+            logger.warn("⚠️ Échec création profil driver (non bloquant)");
+          }
         }
 
         logger.info("✅ Nouvel utilisateur créé avec succès !");
