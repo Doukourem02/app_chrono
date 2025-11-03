@@ -112,9 +112,11 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         const stage = mapping[status] || 'idle';
         set({ deliveryStage: stage });
         
-        // Si la commande est terminée/annulée/refusée, nettoyer immédiatement
-        if (status === 'completed' || status === 'cancelled' || status === 'declined') {
-          // Nettoyer les commandes terminées/annulées après un court délai pour permettre l'affichage du tracking
+        // Si la commande est annulée/refusée, nettoyer immédiatement
+        // Pour 'completed', on ne nettoie PAS automatiquement - on attend que le RatingBottomSheet soit fermé
+        // Le nettoyage sera géré par map.tsx après soumission/fermeture du RatingBottomSheet
+        if (status === 'cancelled' || status === 'declined') {
+          // Nettoyer les commandes annulées/refusées après un court délai pour permettre l'affichage du tracking
           setTimeout(() => {
             const currentState = get();
             // Vérifier que c'est toujours la même commande avant de nettoyer
@@ -129,6 +131,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
             }
           }, 2000); // 2 secondes de délai pour permettre l'affichage du message de confirmation
         }
+        // Pour 'completed', on ne nettoie PAS ici - on conserve currentOrder jusqu'à ce que le RatingBottomSheet soit fermé
       }
 
       if (location && location.latitude && location.longitude) {

@@ -15,8 +15,10 @@ import { DeliveryMapView } from '../../components/DeliveryMapView';
 import { DeliveryBottomSheet } from '../../components/DeliveryBottomSheet';
 // Explicit extension to help some editors/resolvers find the file reliably
 import TrackingBottomSheet from '../../components/TrackingBottomSheet.tsx';
+import RatingBottomSheet from '../../components/RatingBottomSheet';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { useOrderStore } from '../../store/useOrderStore';
+import { useRatingStore } from '../../store/useRatingStore';
 import { logger } from '../../utils/logger';
 
 type Coordinates = {
@@ -30,6 +32,7 @@ export default function MapPage() {
   const { user } = useAuthStore();
   
   const mapRef = useRef<MapView | null>(null);
+  const hasInitializedRef = useRef<boolean>(false);
 
   // Vérifier l'authentification dès l'accès à la page
   useEffect(() => {
@@ -48,43 +51,6 @@ export default function MapPage() {
       userOrderSocketService.disconnect();
     };
   }, [user?.id]);
-
-  // Réinitialiser l'état au montage du composant (quand on arrive sur la page)
-  // S'assurer que le bottom sheet est toujours visible si aucune commande n'est active
-  useEffect(() => {
-    // Au montage, nettoyer les commandes bloquées ou terminées
-    const store = useOrderStore.getState();
-    
-    // Si on a un currentOrder terminé/annulé/refusé, le nettoyer immédiatement
-    if (store.currentOrder && (
-      store.currentOrder.status === 'completed' || 
-      store.currentOrder.status === 'cancelled' || 
-      store.currentOrder.status === 'declined'
-    )) {
-      logger.info('🧹 Nettoyage commande terminée/annulée/refusée au montage', 'map.tsx', { status: store.currentOrder.status });
-      store.clear();
-    }
-    
-    // Si on a un pendingOrder, vérifier s'il est trop ancien (plus de 10 secondes)
-    // et le nettoyer pour permettre une nouvelle commande
-    if (store.pendingOrder) {
-      const orderAge = store.pendingOrder.createdAt 
-        ? new Date().getTime() - new Date(store.pendingOrder.createdAt).getTime()
-        : Infinity;
-      
-      // Nettoyer les pendingOrders anciens (plus de 10 secondes) pour forcer l'affichage du bottom sheet
-      if (orderAge > 10000) {
-        logger.info('🧹 Nettoyage pendingOrder bloqué au montage', 'map.tsx', { orderId: store.pendingOrder.id, orderAge });
-        store.setPendingOrder(null);
-        store.setDeliveryStage('idle');
-      }
-    }
-    
-    // S'assurer que le deliveryStage est 'idle' si aucune commande active
-    if (!store.currentOrder && !store.pendingOrder) {
-      store.setDeliveryStage('idle');
-    }
-  }, []); // Seulement au montage
 
   // Hooks personnalisés pour séparer la logique
   const {
@@ -109,6 +75,99 @@ export default function MapPage() {
     startMethodSelection,
     resetAfterDriverSearch,
   } = useMapLogic({ mapRef: mapRef as React.RefObject<MapView> });
+
+  // Réinitialiser l'état au montage INITIAL du composant (quand on arrive sur la page)
+  // S'assurer que le bottom sheet est toujours visible si aucune commande n'est active
+  useEffect(() => {
+    // Ne s'exécuter qu'une seule fois au montage initial
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+    
+    // Au montage initial, nettoyer les commandes bloquées ou terminées
+    const store = useOrderStore.getState();
+    const ratingStore = useRatingStore.getState();
+    
+    // Si on a un currentOrder terminé/annulé/refusé, le nettoyer immédiatement
+    // MAIS seulement si c'est vraiment ancien (pas une commande qui vient juste d'être complétée)
+    if (store.currentOrder && (
+      store.currentOrder.status === 'cancelled' || 
+      store.currentOrder.status === 'declined'
+    )) {
+      logger.info('🧹 Nettoyage commande terminée/annulée/refusée au montage initial', 'map.tsx', { status: store.currentOrder.status });
+      
+      // Nettoyer aussi le RatingBottomSheet s'il est ouvert
+      if (ratingStore.showRatingBottomSheet) {
+        logger.info('🧹 Fermeture RatingBottomSheet au montage initial (commande terminée)', 'map.tsx');
+        ratingStore.resetRatingBottomSheet();
+      }
+      
+      // Nettoyer complètement l'état de la commande
+      store.clear();
+      
+      // Nettoyer aussi les routes et coordonnées
+      try {
+        clearRoute();
+      } catch {}
+      setPickupCoords(null);
+      setDropoffCoords(null);
+      setPickupLocation('');
+      setDeliveryLocation('');
+    } else if (store.currentOrder && store.currentOrder.status === 'completed') {
+      // Pour les commandes complétées, ne pas nettoyer immédiatement si le RatingBottomSheet n'a pas encore été ouvert
+      // On attend que le RatingBottomSheet s'ouvre, puis on nettoiera après sa fermeture
+      logger.info('✅ Commande complétée au montage initial - attente du RatingBottomSheet', 'map.tsx', { 
+        hasRatingBottomSheet: ratingStore.showRatingBottomSheet 
+      });
+      
+      // Si le RatingBottomSheet n'a pas été ouvert et que la commande est ancienne (plus de 1 minute), nettoyer
+      // Utiliser completed_at si disponible, sinon calculer depuis createdAt
+      const completedAt = (store.currentOrder as any)?.completed_at || (store.currentOrder as any)?.completedAt;
+      const orderAge = completedAt 
+        ? new Date().getTime() - new Date(completedAt).getTime()
+        : Infinity;
+      
+      if (!ratingStore.showRatingBottomSheet && orderAge > 60000) {
+        logger.info('🧹 Nettoyage commande complétée ancienne au montage initial', 'map.tsx', { orderAge });
+        store.clear();
+        try {
+          clearRoute();
+        } catch {}
+        setPickupCoords(null);
+        setDropoffCoords(null);
+        setPickupLocation('');
+        setDeliveryLocation('');
+      }
+    }
+    
+    // Si on a un pendingOrder, vérifier s'il est trop ancien (plus de 10 secondes)
+    // et le nettoyer pour permettre une nouvelle commande
+    if (store.pendingOrder) {
+      const orderAge = store.pendingOrder.createdAt 
+        ? new Date().getTime() - new Date(store.pendingOrder.createdAt).getTime()
+        : Infinity;
+      
+      // Nettoyer les pendingOrders anciens (plus de 10 secondes) pour forcer l'affichage du bottom sheet
+      if (orderAge > 10000) {
+        logger.info('🧹 Nettoyage pendingOrder bloqué au montage initial', 'map.tsx', { orderId: store.pendingOrder.id, orderAge });
+        store.setPendingOrder(null);
+        store.setDeliveryStage('idle');
+      }
+    }
+    
+    // S'assurer que le deliveryStage est 'idle' si aucune commande active
+    if (!store.currentOrder && !store.pendingOrder) {
+      store.setDeliveryStage('idle');
+    }
+    
+    // Nettoyer aussi le RatingBottomSheet s'il reste ouvert sans raison valide (sauf si c'est une commande récente complétée)
+    if (ratingStore.showRatingBottomSheet && !store.currentOrder) {
+      logger.info('🧹 Fermeture RatingBottomSheet au montage initial (pas de commande active)', 'map.tsx');
+      ratingStore.resetRatingBottomSheet();
+    }
+    // Ce useEffect doit s'exécuter UNIQUEMENT au montage initial pour nettoyer l'état au retour dans l'app
+    // Les fonctions clearRoute, setPickupCoords, etc. sont stables et référencées via useRef pour éviter les re-exécutions
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Hook pour récupérer les chauffeurs online avec position stable
   const stableUserLocation = useMemo(() => {
@@ -178,6 +237,28 @@ export default function MapPage() {
     }
   }, [orderDriverCoords, displayedRouteCoords.length, clearRoute]);
 
+  // Bottom sheet pour les commandes normales (création/tracking)
+  const {
+    animatedHeight,
+    isExpanded,
+    panResponder,
+    toggle: toggleBottomSheet,
+    expand: expandBottomSheet, // 🆕 Exposer la fonction expand
+  } = useBottomSheet();
+
+  // Bottom sheet séparé pour l'évaluation (ne pas interférer avec le bottom sheet principal)
+  const {
+    animatedHeight: ratingAnimatedHeight,
+    isExpanded: ratingIsExpanded,
+    panResponder: ratingPanResponder,
+    expand: expandRatingBottomSheet,
+    collapse: collapseRatingBottomSheet,
+    toggle: toggleRatingBottomSheet,
+  } = useBottomSheet();
+
+  // État du rating bottom sheet
+  const { showRatingBottomSheet, orderId: ratingOrderId, driverName: ratingDriverName, resetRatingBottomSheet } = useRatingStore();
+
   // 🧹 Fonction utilitaire pour nettoyer complètement l'état
   const cleanupOrderState = useCallback(() => {
     logger.info('🧹 Nettoyage complet de l\'état de commande', 'map.tsx');
@@ -189,6 +270,14 @@ export default function MapPage() {
     
     // Nettoyer immédiatement l'état de la commande (inclut driverCoords)
     useOrderStore.getState().clear();
+    
+    // Nettoyer aussi le RatingBottomSheet s'il est ouvert
+    const ratingStore = useRatingStore.getState();
+    if (ratingStore.showRatingBottomSheet) {
+      logger.info('🧹 Fermeture RatingBottomSheet lors du nettoyage', 'map.tsx');
+      ratingStore.resetRatingBottomSheet();
+      collapseRatingBottomSheet();
+    }
     
     // Nettoyer la route et les coordonnées
     try {
@@ -209,18 +298,74 @@ export default function MapPage() {
         animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
       }, 100);
     }
-  }, [clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, animateToCoordinate, region, isSearchingDriver, stopDriverSearch]);
+  }, [clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, animateToCoordinate, region, isSearchingDriver, stopDriverSearch, collapseRatingBottomSheet]);
 
   // Détecter quand une commande est terminée/annulée/refusée et nettoyer immédiatement
   useEffect(() => {
     const status = currentOrder?.status;
     
     // Si la commande est terminée, annulée ou refusée, nettoyer immédiatement
-    if (status === 'completed' || status === 'cancelled' || status === 'declined') {
+    // Pour 'completed', on ne nettoie PAS immédiatement - on attend que le RatingBottomSheet soit fermé
+    if (status === 'cancelled' || status === 'declined') {
       logger.info('🧹 Nettoyage commande terminée/annulée/refusée', 'map.tsx', { status });
       cleanupOrderState();
+    } else if (status === 'completed') {
+      // Pour completed, on ne nettoie PAS l'état immédiatement
+      // Le nettoyage se fera quand le RatingBottomSheet sera fermé
+      // Le rating bottom sheet sera déclenché par userOrderSocketService
+      logger.info('✅ Commande complétée - attente du RatingBottomSheet avant nettoyage', 'map.tsx');
+      // Ne pas nettoyer ici - laisser le RatingBottomSheet s'afficher
     }
   }, [currentOrder?.status, cleanupOrderState]);
+
+  // Gérer l'affichage du rating bottom sheet
+  useEffect(() => {
+    logger.debug('🔍 RatingBottomSheet state changed', 'map.tsx', { 
+      showRatingBottomSheet, 
+      ratingOrderId,
+      isExpanded: ratingIsExpanded
+    });
+    
+    if (showRatingBottomSheet && ratingOrderId) {
+      // Ouvrir automatiquement le rating bottom sheet
+      logger.info('⭐ Ouverture automatique rating bottom sheet', 'map.tsx', { 
+        orderId: ratingOrderId,
+        driverName: ratingDriverName 
+      });
+      
+      // Petit délai pour s'assurer que le composant est prêt
+      setTimeout(() => {
+        expandRatingBottomSheet();
+        logger.info('✅ RatingBottomSheet ouvert', 'map.tsx', { orderId: ratingOrderId });
+      }, 100);
+    } else if (!showRatingBottomSheet) {
+      // Fermer si on doit le cacher
+      collapseRatingBottomSheet();
+      logger.debug('❌ RatingBottomSheet fermé', 'map.tsx');
+    }
+  }, [showRatingBottomSheet, ratingOrderId, ratingDriverName, expandRatingBottomSheet, collapseRatingBottomSheet, ratingIsExpanded]);
+
+  // Callback quand l'évaluation est soumise
+  const handleRatingSubmitted = useCallback(() => {
+    logger.info('✅ Évaluation soumise, fermeture rating bottom sheet', 'map.tsx');
+    resetRatingBottomSheet();
+    collapseRatingBottomSheet();
+    // Nettoyer l'état de la commande maintenant que le rating est soumis
+    setTimeout(() => {
+      cleanupOrderState();
+    }, 300); // Petit délai pour laisser le bottom sheet se fermer
+  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState]);
+
+  // Callback quand le rating bottom sheet est fermé
+  const handleRatingClose = useCallback(() => {
+    logger.info('❌ Rating bottom sheet fermé', 'map.tsx');
+    resetRatingBottomSheet();
+    collapseRatingBottomSheet();
+    // Nettoyer l'état de la commande maintenant que le rating bottom sheet est fermé
+    setTimeout(() => {
+      cleanupOrderState();
+    }, 300); // Petit délai pour laisser le bottom sheet se fermer
+  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState]);
 
   // 🆕 Vérifier si une commande est trop ancienne et la nettoyer automatiquement
   // (par exemple, si elle est restée en "accepted" ou "enroute" depuis plus de 30 minutes)
@@ -261,14 +406,6 @@ export default function MapPage() {
 
     return () => clearInterval(checkInterval);
   }, [currentOrder, cleanupOrderState]);
-
-  const {
-    animatedHeight,
-    isExpanded,
-    panResponder,
-    toggle: toggleBottomSheet,
-    expand: expandBottomSheet, // 🆕 Exposer la fonction expand
-  } = useBottomSheet();
 
   const hasAutoOpenedRef = useRef(false);
 
@@ -433,11 +570,28 @@ export default function MapPage() {
         }}
       />
 
+      {/* Rating Bottom Sheet: Priorité la plus haute - s'affiche après qu'une commande soit complétée */}
+      {showRatingBottomSheet && ratingOrderId && (
+        <RatingBottomSheet
+          orderId={ratingOrderId}
+          driverName={ratingDriverName || undefined}
+          panResponder={ratingPanResponder}
+          animatedHeight={ratingAnimatedHeight}
+          isExpanded={ratingIsExpanded}
+          onToggle={toggleRatingBottomSheet}
+          onRatingSubmitted={handleRatingSubmitted}
+          onClose={handleRatingClose}
+        />
+      )}
+
       {/* Bottom Sheet: render only one at a time depending on delivery stage */}
-      {(() => {
+      {/* Ne pas afficher si le rating bottom sheet est visible */}
+      {!showRatingBottomSheet && (() => {
         // Logique : 
         // 1. Si on a une commande ACTIVE (en cours, pas terminée/annulée/refusée), afficher le tracking
         // 2. Sinon, TOUJOURS afficher le formulaire de création de commande
+        // Note: Si status = 'completed', on ne montre PAS le TrackingBottomSheet même si currentOrder existe
+        // car on attend que le RatingBottomSheet s'affiche
         const isActiveOrder = currentOrder && 
           currentOrder.status !== 'completed' && 
           currentOrder.status !== 'cancelled' && 
@@ -449,13 +603,15 @@ export default function MapPage() {
             isActiveOrder,
             currentOrderStatus: currentOrder?.status,
             pendingOrder: !!pendingOrder,
+            showRatingBottomSheet,
           });
         }
 
         return (
           <>
             {/* Afficher le bottom sheet de création de commande SAUF si on a une commande active */}
-            {!isActiveOrder && (
+            {/* Si status = 'completed', on n'affiche pas non plus le DeliveryBottomSheet - on attend le RatingBottomSheet */}
+            {!isActiveOrder && currentOrder?.status !== 'completed' && (
               <DeliveryBottomSheet
                 animatedHeight={animatedHeight}
                 panResponder={panResponder}
@@ -472,6 +628,7 @@ export default function MapPage() {
             )}
 
             {/* Afficher le tracking bottom sheet UNIQUEMENT quand on a une commande active */}
+            {/* Si status = 'completed', on ne montre PAS le TrackingBottomSheet - on attend le RatingBottomSheet */}
             {isActiveOrder && (
               <TrackingBottomSheet
                 currentOrder={currentOrder}

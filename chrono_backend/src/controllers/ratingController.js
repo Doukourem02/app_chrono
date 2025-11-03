@@ -112,6 +112,48 @@ export const submitRating = async (req, res) => {
         });
       }
 
+      // Vérifier que la table ratings existe
+      try {
+        const tableCheck = await pool.query(
+          `SELECT EXISTS (
+            SELECT FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name = 'ratings'
+          )`
+        );
+        const tableExists = tableCheck.rows[0]?.exists === true;
+        
+        if (!tableExists) {
+          logger.error('❌ Table ratings n\'existe pas');
+          return res.status(500).json({
+            success: false,
+            message: 'Table ratings n\'existe pas. Veuillez exécuter la migration 010_create_ratings_table.sql'
+          });
+        }
+
+        // Vérifier que la colonne comment existe
+        const columnCheck = await pool.query(
+          `SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_schema = 'public'
+            AND table_name = 'ratings'
+            AND column_name = 'comment'
+          )`
+        );
+        const columnExists = columnCheck.rows[0]?.exists === true;
+        
+        if (!columnExists) {
+          logger.error('❌ Colonne comment n\'existe pas dans ratings');
+          return res.status(500).json({
+            success: false,
+            message: 'Colonne comment n\'existe pas dans ratings. Veuillez exécuter la migration 010_create_ratings_table.sql'
+          });
+        }
+      } catch (checkError) {
+        logger.error('❌ Erreur vérification table ratings:', checkError);
+        // Continuer quand même - peut-être que c'est juste un problème de permissions
+      }
+
       // Vérifier si l'utilisateur a déjà évalué cette commande
       const existingRatingResult = await pool.query(
         `SELECT id FROM ratings WHERE order_id = $1 AND user_id = $2`,
@@ -122,23 +164,65 @@ export const submitRating = async (req, res) => {
       if (existingRatingResult.rows.length > 0) {
         // Mettre à jour l'évaluation existante
         ratingId = existingRatingResult.rows[0].id;
-        await pool.query(
-          `UPDATE ratings 
-           SET rating = $1, comment = $2, updated_at = NOW()
-           WHERE id = $3`,
-          [rating, comment || null, ratingId]
-        );
-        logger.info(`✅ Évaluation mise à jour : ${ratingId} pour commande ${orderId}`);
+        logger.info(`📝 Mise à jour évaluation existante : ${ratingId} pour commande ${orderId}`, {
+          rating,
+          hasComment: !!comment,
+          commentLength: comment?.length || 0
+        });
+
+        try {
+          await pool.query(
+            `UPDATE ratings 
+             SET rating = $1, comment = $2, updated_at = NOW()
+             WHERE id = $3`,
+            [rating, comment || null, ratingId]
+          );
+          logger.info(`✅ Évaluation mise à jour : ${ratingId} pour commande ${orderId}`);
+        } catch (updateError) {
+          logger.error('❌ Erreur UPDATE ratings:', updateError);
+          logger.error('❌ Détails UPDATE:', {
+            ratingId,
+            rating,
+            comment: comment ? comment.substring(0, 50) : null,
+            errorCode: updateError.code,
+            errorDetail: updateError.detail,
+            errorMessage: updateError.message
+          });
+          throw updateError;
+        }
       } else {
         // Créer une nouvelle évaluation
-        const insertResult = await pool.query(
-          `INSERT INTO ratings (order_id, user_id, driver_id, rating, comment)
-           VALUES ($1, $2, $3, $4, $5)
-           RETURNING id`,
-          [orderId, userId, driverId, rating, comment || null]
-        );
-        ratingId = insertResult.rows[0].id;
-        logger.info(`✅ Nouvelle évaluation créée : ${ratingId} pour commande ${orderId}`);
+        logger.info(`📝 Création nouvelle évaluation pour commande ${orderId}`, {
+          userId,
+          driverId,
+          rating,
+          hasComment: !!comment,
+          commentLength: comment?.length || 0
+        });
+
+        try {
+          const insertResult = await pool.query(
+            `INSERT INTO ratings (order_id, user_id, driver_id, rating, comment)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id`,
+            [orderId, userId, driverId, rating, comment || null]
+          );
+          ratingId = insertResult.rows[0].id;
+          logger.info(`✅ Nouvelle évaluation créée : ${ratingId} pour commande ${orderId}`);
+        } catch (insertError) {
+          logger.error('❌ Erreur INSERT ratings:', insertError);
+          logger.error('❌ Détails INSERT:', {
+            orderId,
+            userId,
+            driverId,
+            rating,
+            comment: comment ? comment.substring(0, 50) : null,
+            errorCode: insertError.code,
+            errorDetail: insertError.detail,
+            errorMessage: insertError.message
+          });
+          throw insertError;
+        }
       }
 
       // La fonction trigger_update_driver_rating() mettra à jour automatiquement la note moyenne du livreur

@@ -217,21 +217,47 @@ class UserOrderSocketService {
           : null;
         useOrderStore.getState().updateFromSocket({ order: order as any, location: normLocation });
 
-        // Si la commande est complétée, afficher le modal d'évaluation
-        if (order && order.status === 'completed' && order.id && order.driver?.id) {
+        // Si la commande est complétée, afficher le bottom sheet d'évaluation
+        if (order && order.status === 'completed' && order.id) {
           try {
-            const driverName = order.driver?.name || order.driver?.first_name 
-              ? `${order.driver.first_name || ''} ${order.driver.last_name || ''}`.trim() 
-              : 'Votre livreur';
-            useRatingStore.getState().setRatingModal(
-              true,
-              order.id,
-              order.driver.id,
-              driverName || 'Votre livreur'
-            );
-            logger.info('⭐ Modal d\'évaluation déclenché pour commande complétée', 'userOrderSocketService', { orderId: order.id });
+            // Récupérer le driver_id depuis l'order ou depuis currentOrder dans le store
+            const currentOrder = useOrderStore.getState().currentOrder;
+            const driverId = order.driver?.id || order.driverId || currentOrder?.driver?.id || currentOrder?.driverId;
+            
+            if (driverId) {
+              // Récupérer le nom du livreur
+              const driverName = order.driver?.name || 
+                                (order.driver?.first_name ? `${order.driver.first_name || ''} ${order.driver.last_name || ''}`.trim() : null) ||
+                                currentOrder?.driver?.name ||
+                                'Votre livreur';
+              
+              logger.info('⭐ Déclenchement RatingBottomSheet pour commande complétée', 'userOrderSocketService', { 
+                orderId: order.id, 
+                driverId,
+                driverName,
+                orderHasDriver: !!order.driver?.id,
+                currentOrderHasDriver: !!currentOrder?.driver?.id
+              });
+              
+              useRatingStore.getState().setRatingBottomSheet(
+                true,
+                order.id,
+                driverId,
+                driverName || 'Votre livreur'
+              );
+              
+              logger.info('✅ RatingBottomSheet déclenché avec succès', 'userOrderSocketService', { orderId: order.id });
+            } else {
+              logger.warn('⚠️ Impossible de déclencher RatingBottomSheet : driverId manquant', 'userOrderSocketService', {
+                orderId: order.id,
+                orderDriver: order.driver,
+                orderDriverId: order.driverId,
+                currentOrderDriver: currentOrder?.driver,
+                currentOrderDriverId: currentOrder?.driverId
+              });
+            }
           } catch (err) {
-            logger.warn('Erreur déclenchement modal évaluation', 'userOrderSocketService', err);
+            logger.error('❌ Erreur déclenchement bottom sheet évaluation', 'userOrderSocketService', err);
           }
         }
 

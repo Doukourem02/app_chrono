@@ -99,6 +99,46 @@ CREATE TRIGGER after_rating_insert_update_avg
     FOR EACH ROW
     EXECUTE FUNCTION trigger_update_driver_rating();
 
+-- RLS (Row Level Security) - IMPORTANT pour permettre les insertions
+-- Activer RLS sur la table ratings
+ALTER TABLE public.ratings ENABLE ROW LEVEL SECURITY;
+
+-- Politique pour permettre aux clients d'insérer leurs propres évaluations
+-- Les clients peuvent créer une évaluation si user_id correspond à leur auth.uid()
+CREATE POLICY "Users can insert own ratings" ON public.ratings
+    FOR INSERT
+    WITH CHECK (
+        auth.uid() = user_id
+    );
+
+-- Politique pour permettre aux clients de voir leurs propres évaluations
+CREATE POLICY "Users can view own ratings" ON public.ratings
+    FOR SELECT
+    USING (
+        auth.uid() = user_id
+    );
+
+-- Politique pour permettre aux clients de mettre à jour leurs propres évaluations
+CREATE POLICY "Users can update own ratings" ON public.ratings
+    FOR UPDATE
+    USING (
+        auth.uid() = user_id
+    );
+
+-- Politique pour permettre aux livreurs de voir les évaluations les concernant
+CREATE POLICY "Drivers can view ratings about them" ON public.ratings
+    FOR SELECT
+    USING (
+        auth.uid() = driver_id
+    );
+
+-- Politique pour permettre au service role (backend) d'accéder à toutes les évaluations
+-- Note: Cette politique sera utilisée par le backend avec le service role key
+CREATE POLICY "Service role can do all operations" ON public.ratings
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
+
 -- Commentaires
 COMMENT ON TABLE public.ratings IS 'Évaluations des livreurs par les clients après chaque livraison';
 COMMENT ON COLUMN public.ratings.rating IS 'Note globale de 1 à 5';

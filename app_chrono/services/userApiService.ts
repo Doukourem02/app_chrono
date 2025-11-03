@@ -188,26 +188,73 @@ class UserApiService {
         logout,
       } = useAuthStore.getState();
 
-      if (accessToken) {
+      // Vérifier si le token existe et s'il n'est pas expiré
+      if (accessToken && this.isTokenValid(accessToken)) {
         return accessToken;
       }
 
+      // Si le token est expiré ou absent, essayer de le rafraîchir
       if (!refreshToken) {
+        console.warn('⚠️ Pas de refreshToken disponible');
         return null;
       }
 
+      console.log('🔄 Token expiré ou absent, rafraîchissement en cours...');
       const newAccessToken = await this.refreshAccessToken(refreshToken);
       if (newAccessToken) {
         setTokens({ accessToken: newAccessToken, refreshToken });
+        console.log('✅ Token rafraîchi avec succès');
         return newAccessToken;
       }
 
       // Impossible de rafraîchir => déconnexion propre
+      console.error('❌ Impossible de rafraîchir le token, déconnexion...');
       logout();
       return null;
     } catch (error) {
       console.error('❌ Erreur ensureAccessToken:', error);
       return null;
+    }
+  }
+
+  /**
+   * Vérifie si un token JWT est valide (non expiré)
+   * @param token Token JWT à vérifier
+   * @returns true si le token est valide, false sinon
+   */
+  private isTokenValid(token: string): boolean {
+    try {
+      // Décoder le payload du JWT (sans vérification de signature)
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        return false;
+      }
+
+      // Décoder le payload (base64url)
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+      // Vérifier l'expiration (exp est en secondes)
+      if (payload.exp) {
+        const expirationTime = payload.exp * 1000; // Convertir en millisecondes
+        const now = Date.now();
+        const isExpired = now >= expirationTime;
+        
+        if (isExpired) {
+          console.log('⚠️ Token expiré, expiration:', new Date(expirationTime).toISOString());
+          return false;
+        }
+        
+        // Token valide si pas expiré
+        return true;
+      }
+
+      // Si pas d'expiration définie, considérer comme valide (mais ça ne devrait pas arriver)
+      console.warn('⚠️ Token sans expiration définie');
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur vérification token:', error);
+      // En cas d'erreur de décodage, considérer comme invalide
+      return false;
     }
   }
 

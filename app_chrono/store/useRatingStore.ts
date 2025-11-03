@@ -1,30 +1,30 @@
 import { create } from 'zustand';
 
 interface RatingStore {
-  showRatingModal: boolean;
+  showRatingBottomSheet: boolean;
   orderId: string | null;
   driverId: string | null;
   driverName: string | null;
-  setRatingModal: (show: boolean, orderId?: string | null, driverId?: string | null, driverName?: string | null) => void;
-  resetRatingModal: () => void;
+  setRatingBottomSheet: (show: boolean, orderId?: string | null, driverId?: string | null, driverName?: string | null) => void;
+  resetRatingBottomSheet: () => void;
 }
 
 export const useRatingStore = create<RatingStore>((set) => ({
-  showRatingModal: false,
+  showRatingBottomSheet: false,
   orderId: null,
   driverId: null,
   driverName: null,
-  setRatingModal: (show, orderId = null, driverId = null, driverName = null) => {
+  setRatingBottomSheet: (show, orderId = null, driverId = null, driverName = null) => {
     set({
-      showRatingModal: show,
+      showRatingBottomSheet: show,
       orderId,
       driverId,
       driverName,
     });
   },
-  resetRatingModal: () => {
+  resetRatingBottomSheet: () => {
     set({
-      showRatingModal: false,
+      showRatingBottomSheet: false,
       orderId: null,
       driverId: null,
       driverName: null,

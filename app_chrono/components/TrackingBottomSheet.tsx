@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -31,12 +31,13 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const isCompleted = status === 'completed';
 
   // Harmoniser avec OrderStatus: 'accepted' | 'enroute' | 'picked_up' | 'completed'
-  const statusSteps = [
+  // Utiliser useMemo pour éviter la recréation à chaque render
+  const statusSteps = useMemo(() => [
     { label: "Livreur en route pour récupérer le colis", key: "accepted" },
     { label: "Colis pris en charge", key: "picked_up" },
     { label: "En cours de livraison", key: "enroute" },
     { label: "Colis livré", key: "completed" },
-  ];
+  ], []);
 
   const activeIndex = Math.max(
     0,
@@ -112,7 +113,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         useNativeDriver: false, // Utiliser JS driver pour cohérence
       }).start();
     });
-  }, [activeIndex, status]);
+  }, [activeIndex, status, statusSteps, stepAnimations]);
 
   return (
     <Animated.View
@@ -174,7 +175,6 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
           {/* Timeline avec animations fluides */}
           <View style={styles.timelineContainer}>
             {statusSteps.map((step, index) => {
-              const isActive = index <= activeIndex;
               const anim = stepAnimations[index];
               
               // Interpolations pour les animations
