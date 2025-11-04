@@ -1,22 +1,12 @@
 import React from 'react';
 import { StyleSheet, View, Text, Animated } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+import { OnlineDriver } from '../hooks/useOnlineDrivers';
 
 type Coordinates = {
   latitude: number;
   longitude: number;
 };
-
-interface OnlineDriver {
-  user_id: string;
-  first_name: string;
-  last_name: string;
-  vehicle_type: string;
-  current_latitude: number;
-  current_longitude: number;
-  is_available: boolean;
-  rating: number;
-}
 
 interface DeliveryMapViewProps {
   mapRef: React.RefObject<MapView | null>;
@@ -27,7 +17,7 @@ interface DeliveryMapViewProps {
   driverCoords: Coordinates | null;
   orderDriverCoords?: Coordinates | null;
   orderStatus?: string | null;
-  onlineDrivers: OnlineDriver[]; // 🚗 NOUVEAU
+  onlineDrivers: OnlineDriver[]; 
   isSearchingDriver: boolean;
   pulseAnim: Animated.Value;
   destinationPulseAnim: Animated.Value;
@@ -37,7 +27,7 @@ interface DeliveryMapViewProps {
   selectedMethod: string;
   availableVehicles: any[];
   showMethodSelection: boolean;
-  onMapPress?: () => void; // 🆕 Callback pour ouvrir le bottom sheet au clic
+  onMapPress?: () => void; 
 }
 
 export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
@@ -49,7 +39,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   driverCoords,
   orderDriverCoords,
   orderStatus,
-  onlineDrivers, // 🚗 NOUVEAU
+  onlineDrivers, 
   isSearchingDriver,
   pulseAnim,
   destinationPulseAnim,
@@ -61,7 +51,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   showMethodSelection,
   onMapPress, // 🆕
 }) => {
-  // console.log('🗺️ DeliveryMapView render - showMethodSelection:', showMethodSelection);
+
   
   return (
     <MapView 
@@ -76,12 +66,12 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       showsTraffic={false}
       showsIndoors={false}
       showsPointsOfInterest={false}
-      onPress={onMapPress} // 🆕 Ouvrir automatiquement le bottom sheet au clic sur la carte
+      onPress={onMapPress} 
     >
 
-      {/* 🚗 Chauffeurs en ligne disponibles - Filtrer strictement les chauffeurs online */}
+
       {onlineDrivers
-        ?.filter(driver => driver.is_online === true) // 🔍 Double filtre de sécurité
+        ?.filter(driver => driver.is_online === true) 
         .map((driver) => (
           <Marker
             key={driver.user_id}
@@ -98,7 +88,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
           </Marker>
         ))}
 
-      {/* ✅ Marqueur position - Toujours visible */}
       {pickupCoords && (
         <Marker 
           coordinate={pickupCoords} 
@@ -111,7 +100,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </Marker>
       )}
 
-      {/* Animation pulse uniquement pendant la recherche de chauffeur */}
+      
       {isSearchingDriver && pickupCoords && (
         <Marker 
           coordinate={pickupCoords} 
@@ -157,19 +146,17 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
                 },
               ]}
             />
-            {/* Plus d'élément central - pulsation pure */}
+          
           </View>
         </Marker>
       )}
 
-      {/* Marqueur de destination - Visible UNIQUEMENT avant qu'une commande soit acceptée */}
-      {/* 🆕 Cacher dès que le livreur accepte pour ne montrer que le tracking en direct */}
       {!isSearchingDriver && 
-       dropoffCoords && 
-       !orderDriverCoords && // Ne pas afficher si une commande est acceptée (tracking actif)
-       orderStatus !== 'completed' && 
-       orderStatus !== 'cancelled' && 
-       orderStatus !== 'declined' && (
+      dropoffCoords && 
+       !orderDriverCoords && 
+      orderStatus !== 'completed' && 
+      orderStatus !== 'cancelled' && 
+      orderStatus !== 'declined' && (
         <Marker 
           coordinate={dropoffCoords} 
           title="Destination" 
@@ -200,12 +187,10 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </Marker>
       )}
 
-      {/* Polyline violet (route initiale) - Visible UNIQUEMENT avant qu'une commande soit acceptée */}
-      {/* 🆕 Cacher dès que le livreur accepte pour ne montrer que le tracking en direct */}
       {!isSearchingDriver && 
        displayedRouteCoords && 
        displayedRouteCoords.length > 0 && 
-       !orderDriverCoords && // Ne pas afficher si une commande est acceptée (tracking actif)
+       !orderDriverCoords && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
@@ -218,8 +203,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         />
       )}
 
-      {/* Marker + polyline pour la commande en cours (driver -> pickup/dropoff) */}
-      {/* 🆕 Ne pas afficher si la commande est terminée/annulée/refusée */}
       {orderDriverCoords && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
@@ -228,16 +211,14 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
           <Marker
             coordinate={orderDriverCoords}
             title={`Livreur`}
-            description={/* fallback */ 'Livreur en route'}
+            description={'Livreur en route'}
           >
             <View style={styles.orderDriverMarker}>
               <Text style={styles.driverIcon}>🚚</Text>
             </View>
           </Marker>
 
-          {/* 🟢 Polyline VERT: livreur -> pickup (quand status est 'accepted' ou 'pending') */}
-          {/* Animation fluide avec un draw progressif */}
-          {/* S'assurer que orderDriverCoords est disponible avant d'afficher */}
+      
           {((orderStatus === 'accepted' || orderStatus === 'pending') && 
             pickupCoords && 
             orderDriverCoords &&
@@ -252,16 +233,11 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             />
           )}
 
-          {/* 🔴 Polyline ROUGE: livreur -> dropoff (quand status est 'enroute' ou 'picked_up') */}
-          {/* Le polyline vert disparaît automatiquement, seul le rouge est visible */}
-          {/* S'assurer que orderDriverCoords est disponible et valide avant d'afficher */}
-          {/* Pour "picked_up", on affiche seulement si onroute était déjà affiché ou après un court délai */}
           {(((orderStatus === 'enroute') || (orderStatus === 'picked_up')) && 
             dropoffCoords && 
             orderDriverCoords &&
             orderDriverCoords.latitude && 
             orderDriverCoords.longitude &&
-            // Pour picked_up, s'assurer que les coordonnées sont bien à jour (pas null/undefined/0)
             Math.abs(orderDriverCoords.latitude) > 0.0001 &&
             Math.abs(orderDriverCoords.longitude) > 0.0001) && (
             <Polyline
@@ -275,12 +251,11 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </>
       )}
 
-      {/* Badge ETA - Visible UNIQUEMENT avant qu'une commande soit acceptée */}
-      {/* 🆕 Cacher dès que le livreur accepte pour ne montrer que le tracking en direct */}
+
       {!isSearchingDriver && 
        durationText && 
        pickupCoords && 
-       !orderDriverCoords && // Ne pas afficher si une commande est acceptée (tracking actif)
+       !orderDriverCoords && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
@@ -302,8 +277,7 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  
-  // Marqueur position utilisateur - Style moderne
+
   userLocationMarker: {
     width: 24,
     height: 24,
@@ -324,7 +298,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  // Conteneur pour pulse radar pur
+
   pulseContainer: {
     width: 100,
     height: 100,
@@ -332,7 +306,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Conteneur pour pulse radar COMPLÈTEMENT invisible au centre
+
   pulseContainerInvisible: {
     width: 1,
     height: 1,
@@ -342,7 +316,6 @@ const styles = StyleSheet.create({
 
 
 
-  // Marqueur destination - Style pin moderne
   destinationMarker: {
     alignItems: 'center',
     justifyContent: 'flex-end',
@@ -369,7 +342,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Animation de recherche - Plus subtile
+
   searchContainer: {
     alignItems: 'center',
     justifyContent: 'center',

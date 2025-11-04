@@ -99,7 +99,7 @@ export const useLocation = () => {
 
       setState(prev => ({ ...prev, coords, loading: false }));
 
-      // Géocodage inverse avec cache et throttling
+
       await reverseGeocodeWithCache(coords);
       
       return coords;
@@ -115,11 +115,11 @@ export const useLocation = () => {
     }
   }, [reverseGeocodeWithCache]);
 
-  // Initialisation automatique au montage
+
   useEffect(() => {
     requestLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Volontairement vide pour ne s'exécuter qu'une fois
+  }, []); 
 
   return {
     ...state,

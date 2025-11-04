@@ -72,12 +72,48 @@ export const getUserDeliveries = async (req, res) => {
     
     res.json({
       success: true,
-      data: result.rows.map(order => ({
-        ...order,
-        pickup: typeof order.pickup === 'string' ? JSON.parse(order.pickup) : order.pickup,
-        dropoff: typeof order.dropoff === 'string' ? JSON.parse(order.dropoff) : order.dropoff,
-        proof: order.proof ? (typeof order.proof === 'string' ? JSON.parse(order.proof) : order.proof) : null
-      })),
+      data: result.rows.map(order => {
+        // Parser pickup et dropoff (peuvent être pickup/dropoff ou pickup_address/dropoff_address)
+        let pickup = order.pickup_address || order.pickup;
+        let dropoff = order.dropoff_address || order.dropoff;
+        
+        // Parser si c'est une string JSON
+        if (typeof pickup === 'string') {
+          try {
+            pickup = JSON.parse(pickup);
+          } catch (e) {
+            console.warn('⚠️ Erreur parsing pickup:', e);
+          }
+        }
+        
+        if (typeof dropoff === 'string') {
+          try {
+            dropoff = JSON.parse(dropoff);
+          } catch (e) {
+            console.warn('⚠️ Erreur parsing dropoff:', e);
+          }
+        }
+        
+        // Parser proof si présent
+        let proof = order.proof;
+        if (proof && typeof proof === 'string') {
+          try {
+            proof = JSON.parse(proof);
+          } catch (e) {
+            console.warn('⚠️ Erreur parsing proof:', e);
+            proof = null;
+          }
+        }
+        
+        return {
+          ...order,
+          pickup: pickup || order.pickup,
+          dropoff: dropoff || order.dropoff,
+          pickup_address: pickup, // Alias pour compatibilité
+          dropoff_address: dropoff, // Alias pour compatibilité
+          proof: proof || null
+        };
+      }),
       pagination: {
         page,
         limit,

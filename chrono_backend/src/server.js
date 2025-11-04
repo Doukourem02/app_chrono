@@ -8,7 +8,7 @@ import { setupOrderSocket } from './sockets/orderSocket.js';
 const PORT = process.env.PORT || 4000;
 const server = http.createServer(app);
 
-// 🔒 CORS sécurisé pour Socket.io - Origines autorisées uniquement
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
   'http://localhost:8081',
   'http://localhost:19006',
@@ -18,7 +18,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      // Autoriser les requêtes sans origin (mobile apps)
+      
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
@@ -31,7 +31,7 @@ const io = new Server(server, {
   }
 });
 
-// 🚚 Socket pour les livraisons existantes
+
 io.on('connection', (socket) => {
   console.log('🟢 Client connecté :', socket.id);
 
@@ -42,7 +42,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// 📦 Socket pour les commandes (nouveau système)
+
 setupOrderSocket(io);
 
 app.set('io', io);

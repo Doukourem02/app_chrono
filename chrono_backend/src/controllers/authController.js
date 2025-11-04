@@ -5,15 +5,12 @@ import { storeOTP, verifyOTP } from '../config/otpStorage.js';
 import { generateTokens, refreshAccessToken } from '../utils/jwt.js';
 import logger from '../utils/logger.js';
 
-/**
- * Crée automatiquement un profil driver dans driver_profiles
- * lorsque l'utilisateur s'inscrit avec le rôle 'driver'
- */
+
 const createDriverProfile = async (userId, email, phone, firstName, lastName) => {
   try {
     const clientForInsert = supabaseAdmin || supabase;
     
-    // Vérifier si un profil driver existe déjà
+
     const { data: existingProfile, error: checkError } = await clientForInsert
       .from('driver_profiles')
       .select('id')
@@ -25,7 +22,7 @@ const createDriverProfile = async (userId, email, phone, firstName, lastName) =>
       return existingProfile;
     }
     
-    // Créer le profil driver
+
     const { data: driverProfile, error: insertError } = await clientForInsert
       .from('driver_profiles')
       .insert([{
@@ -34,10 +31,10 @@ const createDriverProfile = async (userId, email, phone, firstName, lastName) =>
         phone: phone || null,
         first_name: firstName || null,
         last_name: lastName || null,
-        vehicle_type: 'moto', // Valeur par défaut
+        vehicle_type: 'moto', 
         is_online: false,
         is_available: true,
-        rating: 5.0, // Note par défaut
+        rating: 5.0, 
         total_deliveries: 0
       }])
       .select()
@@ -45,8 +42,7 @@ const createDriverProfile = async (userId, email, phone, firstName, lastName) =>
     
     if (insertError) {
       logger.error(`❌ Erreur création profil driver pour ${userId}:`, insertError);
-      // Ne pas bloquer l'inscription si la création du profil échoue
-      // Le profil pourra être créé plus tard
+    
       return null;
     }
     
@@ -54,7 +50,7 @@ const createDriverProfile = async (userId, email, phone, firstName, lastName) =>
     return driverProfile;
   } catch (error) {
     logger.error(`❌ Erreur création profil driver pour ${userId}:`, error);
-    // Ne pas bloquer l'inscription
+    
     return null;
   }
 };
@@ -68,14 +64,14 @@ const registerUserWithPostgreSQL = async (req, res) => {
 
 
     logger.info("⏳ Création compte Supabase Auth...");
-    // Essayer d'abord avec admin API si service role key disponible
+
     let authUser, authError;
     if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      // Utiliser admin.createUser pour créer un utilisateur confirmé directement
+
       const result = await supabase.auth.admin.createUser({
         email: email,
         password: password || Math.random().toString(36).slice(-8),
-        email_confirm: true, // Confirmer l'email automatiquement
+        email_confirm: true, 
         user_metadata: {
           role: role,
           phone: phone,
@@ -86,7 +82,7 @@ const registerUserWithPostgreSQL = async (req, res) => {
       authUser = result.data;
       authError = result.error;
     } else {
-      // Fallback vers signUp si service role key non disponible
+      
       logger.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY non défini, utilisation de signUp() (nécessite confirmation email)");
       const result = await supabase.auth.signUp({
         email: email,

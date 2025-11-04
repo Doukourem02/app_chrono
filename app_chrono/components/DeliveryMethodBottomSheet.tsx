@@ -148,22 +148,21 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
   );
   const [isThermalBag, setIsThermalBag] = useState(false);
   const dragHandleRef = useRef<View>(null);
-  const [dragHandleLayout, setDragHandleLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
   const selectedMethodData = deliveryMethods.find(m => m.id === selectedMethod) || deliveryMethods[0];
   
-  // Calculer le prix réel basé sur la distance
+
   const calculatedPrice = useMemo(() => {
     if (pickupCoords && dropoffCoords) {
       const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
       const realPrice = calculatePrice(distanceKm, selectedMethod as 'moto' | 'vehicule' | 'cargo');
       return realPrice;
     }
-    // Fallback sur le prix passé en prop ou prix de base
+  
     return price || selectedMethodData?.price || 0;
   }, [pickupCoords, dropoffCoords, selectedMethod, price, selectedMethodData]);
 
-  // Calculer le temps estimé réel basé sur la distance
+
   const calculatedTime = useMemo(() => {
     if (pickupCoords && dropoffCoords) {
       const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
@@ -173,15 +172,15 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
     return estimatedTime || selectedMethodData?.avgTime || '';
   }, [pickupCoords, dropoffCoords, selectedMethod, estimatedTime, selectedMethodData]);
 
-  // Prix de base pour affichage "à partir de"
+
   const basePrice = selectedMethodData?.price || 0;
-  // Prix réel calculé pour affichage du coût estimé
+
   const displayPrice = calculatedPrice;
 
-  // Animation pour le prix
+
   const scaleAnimation = useRef(new Animated.Value(1)).current;
 
-  // Réinitialiser la sélection quand la méthode change
+
   useEffect(() => {
     const options = getDeliveryOptions(selectedMethod);
     if (options.length > 0) {
@@ -189,7 +188,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
     }
   }, [selectedMethod]);
 
-  // Animer le prix quand il change (prix calculé ou méthode)
+ 
   useEffect(() => {
     Animated.sequence([
       Animated.timing(scaleAnimation, {
@@ -205,32 +204,21 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
     ]).start();
   }, [calculatedPrice, selectedMethod, scaleAnimation]);
 
-  // PanResponder personnalisé qui ne réagit QUE sur le drag handle
-  // Ce panResponder ne prend le contrôle que si le geste commence dans la zone du drag handle
-  const customPanResponder = useRef(
+const customPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false, // Ne jamais prendre le contrôle au début
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Utiliser locationX et locationY qui sont relatifs au parent (le drag handle container)
-        // Ces coordonnées sont déjà relatives au View qui contient le panResponder
         const { locationX, locationY } = evt.nativeEvent;
-        
-        // Le drag handle container fait environ 60px de haut (padding + handle)
-        // On accepte les gestes dans cette zone uniquement
+    
         const DRAG_HANDLE_HEIGHT = 60;
-        const DRAG_HANDLE_WIDTH = 200; // Largeur approximative
+        const DRAG_HANDLE_WIDTH = 200; 
         
-        // Vérifier si le geste commence dans la zone du drag handle
-        // locationX et locationY sont relatifs au View parent (dragIndicatorContainer)
-        const isInDragHandle = 
+      const isInDragHandle = 
           locationY >= 0 && 
           locationY <= DRAG_HANDLE_HEIGHT &&
           Math.abs(locationX) < DRAG_HANDLE_WIDTH;
         
-        // Ne prendre le contrôle que si :
-        // 1. Le geste commence dans la zone du drag handle
-        // 2. C'est un geste principalement vertical vers le bas (pour fermer)
-        // 3. Le mouvement est suffisant (vers le bas uniquement)
+      
         if (isInDragHandle && gestureState.dy > 0 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && gestureState.dy > 15) {
           return true;
         }
@@ -244,10 +232,10 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
       },
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.vy > 0.8 || gestureState.dy > 100) {
-          // Swipe down -> collapse
+       
           onToggle();
         } else {
-          // Retourner à l'état expansé
+      
           Animated.spring(animatedHeight, {
             toValue: DELIVERY_METHOD_MAX_HEIGHT,
             useNativeDriver: false,
@@ -259,8 +247,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
     })
   ).current;
 
-  // S'assurer que le bottom sheet s'ouvre à la hauteur maximale (85% de l'écran)
-  useEffect(() => {
+useEffect(() => {
     if (isExpanded) {
       Animated.spring(animatedHeight, {
         toValue: DELIVERY_METHOD_MAX_HEIGHT,
@@ -275,18 +262,9 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
     <Animated.View
       style={[styles.bottomSheet, { height: animatedHeight }]}
     >
-      {/* Indicateur de glissement avec panResponder personnalisé uniquement ici */}
-      <View
+    <View
         ref={dragHandleRef}
         style={styles.dragIndicatorContainer}
-        onLayout={() => {
-          // Mesurer la position du drag handle après le layout
-          setTimeout(() => {
-            dragHandleRef.current?.measure((fx, fy, width, height, px, py) => {
-              setDragHandleLayout({ x: px, y: py, width, height });
-            });
-          }, 100);
-        }}
         {...customPanResponder.panHandlers}
       >
         <TouchableOpacity
@@ -307,10 +285,10 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
           bounces={false}
           scrollEventThrottle={16}
           onScrollBeginDrag={() => {
-            // Désactiver le panResponder pendant le scroll
+            
           }}
         >
-          {/* Header avec titre, prix et temps */}
+      
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Text style={styles.headerTitle}>{selectedMethodData.name}</Text>
@@ -334,7 +312,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
             </TouchableOpacity>
           </View>
 
-          {/* Grande illustration du véhicule sélectionné */}
+      
           <View style={styles.largeVehicleContainer}>
             <Image
               source={selectedMethodData.largeImage}
@@ -343,7 +321,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
             />
           </View>
 
-          {/* Options de méthodes de livraison - HORIZONTALES */}
+  
           <View style={styles.methodOptionsContainer}>
             {deliveryMethods.map((method) => (
               <TouchableOpacity
@@ -397,9 +375,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
             ))}
           </View>
 
-          {/* Section "Options de livraison" - Options spécifiques selon la méthode */}
-          {/* Pour cargo, on ne montre PAS cette section - seulement les sections spéciales */}
-          {selectedMethod !== 'cargo' && getDeliveryOptions(selectedMethod).length > 0 && (
+        {selectedMethod !== 'cargo' && getDeliveryOptions(selectedMethod).length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
                 {selectedMethod === 'vehicule' ? 'Type de service' : 'Mode de livraison'}
@@ -447,7 +423,6 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
             </View>
           )}
 
-          {/* Section spéciale pour Express Cargo - UNIQUE à notre app */}
           {selectedMethod === 'cargo' && (
             <>
               <TouchableOpacity style={styles.specialSection}>
@@ -465,7 +440,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
                 <View style={styles.specialSectionLeft}>
                   <Ionicons name="calendar-outline" size={24} color="#8B5CF6" style={{ marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.specialSectionTitle}>Réserver à l'avance</Text>
+                    <Text style={styles.specialSectionTitle}>Réserver à l&apos;avance</Text>
                     <Text style={styles.specialSectionSubtitle}>Programmez votre livraison pour plus de flexibilité</Text>
                   </View>
                 </View>
@@ -524,7 +499,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
 
               {/* Commentaire à l'attention du livreur - Uniquement pour moto */}
               <TouchableOpacity style={styles.additionalOption}>
-                <Text style={styles.additionalOptionText}>Commentaire à l'attention du livreur</Text>
+                <Text style={styles.additionalOptionText}>Commentaire à l&apos;attention du livreur</Text>
                 <Ionicons name="arrow-forward" size={20} color="#666" />
               </TouchableOpacity>
 
@@ -601,6 +576,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
+  },
+  dragIndicatorContainer: {
+    alignItems: 'center',
+    paddingVertical: 10,
   },
   dragIndicator: {
     alignItems: 'center',

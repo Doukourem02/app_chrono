@@ -9,7 +9,6 @@ import {
   Image,
   Alert,
 } from 'react-native';
-// Tracking moved to dedicated component (TrackingBottomSheet)
 import PlacesAutocomplete from './PlacesAutocomplete';
 import { useShipmentStore } from '../store/useShipmentStore';
 
@@ -52,7 +51,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   onConfirm,
 }) => {
   const { createShipment } = useShipmentStore();
-  // currentOrder tracking moved to TrackingBottomSheet component
+
 
   const handleConfirm = () => {
     if (!pickupLocation || !deliveryLocation) {
@@ -63,8 +62,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
     createShipment();
     onConfirm();
   };
-  // Bottom sheet now always displays the shipment form. Order tracking
-  // UI was removed per request to keep the original behavior.
+
 
   
 
@@ -75,7 +73,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
       style={[styles.bottomSheet, { height: animatedHeight }]}
       {...panResponder.panHandlers}
     >
-      {/* Indicateur de glissement */}
+  
       <TouchableOpacity 
         style={styles.dragIndicator} 
         onPress={onToggle} 
@@ -111,7 +109,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
             />
           </View>
 
-          {/* Options de méthodes de livraison */}
+          
           <View style={styles.deliveryMethodsContainer}>
             <Text style={styles.deliveryMethodsTitle}>Méthode de livraison</Text>
             <View style={styles.deliveryOptions}>
@@ -139,7 +137,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
             </View>
           </View>
 
-          {/* Bouton de validation */}
+      
           <TouchableOpacity
             style={[
               styles.chooseButton,
@@ -284,7 +282,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   
-  // Nouvelles informations de trajet
+  
   tripInfo: {
     backgroundColor: '#F8FAFC',
     borderRadius: 16,
@@ -314,7 +312,7 @@ const styles = StyleSheet.create({
     color: '#475569',
     lineHeight: 18,
   },
-  /* Compact pill (tracking) styles */
+
   pillWrapper: {
     position: 'absolute',
     left: 20,
@@ -443,7 +441,7 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     zIndex: 10,
-    // place inside the white outer container above the purple pill
+  
     paddingTop: 0,
   },
   topBar: {
@@ -458,7 +456,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  /* Larger avatar + action sizes to match design */
+
   leftAvatar: {
     width: 64,
     height: 64,

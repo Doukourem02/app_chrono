@@ -11,8 +11,7 @@ type Coordinates = {
 };
 
 export const useDriverSearch = (onSearchComplete?: () => void) => {
-  // use a stable error handler instance to avoid recreating this effect
-  // on every render (which caused repeated socket creations).
+  
   
   const [isSearchingDriver, setIsSearchingDriver] = useState(false);
   const [searchSeconds, setSearchSeconds] = useState(0);
@@ -22,7 +21,7 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
   const searchTimeoutRef = useRef<number | null>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
-  // Animation de pulsation
+
   useEffect(() => {
     let loop: any;
     if (isSearchingDriver) {
@@ -45,7 +44,6 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
     };
   }, [isSearchingDriver, pulseAnim]);
 
-  // Connexion Socket.IO
   useEffect(() => {
     let socket: any;
     try {
@@ -59,19 +57,17 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
         }
       });
     } catch (err) {
-      // use stable instance to report the error without changing the effect deps
-      errorHandler.handle(errorHandler.createAPIError('Erreur de connexion au serveur', err, 'useDriverSearch'));
+    errorHandler.handle(errorHandler.createAPIError('Erreur de connexion au serveur', err, 'useDriverSearch'));
     }
 
     return () => {
       try {
         socket && socket.disconnect();
       } catch {
-        // Ignorer les erreurs de déconnexion
+      
       }
     };
-    // Intentionally empty dependency array: we want this effect to run once.
-  }, []);
+}, []);
 
   const startDriverSearch = () => {
     setIsSearchingDriver(true);
@@ -106,7 +102,7 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
     }
     setSearchSeconds(0);
     
-    // Appeler la fonction de callback pour réinitialiser l'état
+ 
     if (onSearchComplete) {
       onSearchComplete();
     }

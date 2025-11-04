@@ -3,6 +3,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { OrderRequest } from "../store/useOrderStore";
+import { formatDurationLabel } from "../services/orderApi";
 
 interface ShipmentCardProps {
   order: OrderRequest;
@@ -19,12 +20,46 @@ export default function ShipmentCard({
   progressColor,
   inactiveColor = "rgba(0,0,0,0.15)",
 }: ShipmentCardProps) {
-  const dropoffAddress = order.dropoff?.address || 'Adresse non définie';
-  const location = dropoffAddress.split(',')[0] || dropoffAddress;
-  const deliveryTime = order.estimatedDuration || 'Non estimé';
+  // Extraire l'adresse directement depuis order.dropoff.address
+  // Les données sont maintenant correctement formatées dans ShipmentList
+  const dropoffAddress = order.dropoff?.address || '';
+  
+  // Limiter l'adresse à 30 caractères maximum pour éviter qu'elle déborde
+  const location = dropoffAddress 
+    ? (dropoffAddress.length > 30 ? dropoffAddress.substring(0, 30) + '...' : dropoffAddress)
+    : 'Adresse non définie';
+  
+  // Formater le délai de livraison
+  // estimatedDuration peut être un nombre (minutes), une string formatée, ou null/undefined
+  let deliveryTime = 'Non estimé';
+  
+  if (order.estimatedDuration !== null && order.estimatedDuration !== undefined && order.estimatedDuration !== '') {
+    if (typeof order.estimatedDuration === 'number') {
+      // Si c'est un nombre (minutes), le formater
+      const formatted = formatDurationLabel(order.estimatedDuration);
+      deliveryTime = formatted || `${order.estimatedDuration} min`;
+    } else if (typeof order.estimatedDuration === 'string') {
+      const trimmed = order.estimatedDuration.trim();
+      if (trimmed !== '') {
+        // Si c'est déjà une string formatée, l'utiliser directement
+        // Mais vérifier si c'est juste un nombre pour le formater
+        const numericValue = parseFloat(trimmed);
+        if (!isNaN(numericValue) && isFinite(numericValue)) {
+          // Si c'est un nombre en string, le formater
+          const formatted = formatDurationLabel(Math.round(numericValue));
+          deliveryTime = formatted || `${Math.round(numericValue)} min`;
+        } else {
+          // Sinon, utiliser la string telle quelle (déjà formatée)
+          deliveryTime = trimmed;
+        }
+      }
+    }
+  }
   
   // Extraire le nom du produit depuis l'adresse ou utiliser un placeholder
-  const productName = order.dropoff?.address?.split(',')[0] || `Commande #${order.id.slice(0, 8)}`;
+  const productName = dropoffAddress 
+    ? (dropoffAddress.split(',')[0] || dropoffAddress.substring(0, 30))
+    : `Commande #${order.id.slice(0, 8)}`;
   
   return (
     <View style={[styles.card, { backgroundColor }]}>
@@ -89,18 +124,26 @@ export default function ShipmentCard({
       {/* INFOS DE LIVRAISON */}
       <View style={styles.deliveryInfo}>
         <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
-            <Ionicons name="location-outline" size={16} color="#666" />
-            <Text style={styles.infoLabel}>Localisation</Text>
+          <View style={styles.infoColumn}>
+            <View style={styles.infoItem}>
+              <Ionicons name="location-outline" size={16} color="#666" />
+              <Text style={styles.infoLabel}>Localisation</Text>
+            </View>
+            <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">
+              {location}
+            </Text>
           </View>
-          <View style={styles.infoItem}>
-            <Ionicons name="time-outline" size={16} color="#666" />
-            <Text style={styles.infoLabel}>Délai de livraison</Text>
+          <View style={[styles.infoColumn, styles.rightColumn]}>
+            <View style={[styles.infoItem, styles.centeredItem]}>
+              <Ionicons name="time-outline" size={16} color="#666" />
+              <Text style={styles.infoLabel} numberOfLines={2}>
+                Délai de livraison
+              </Text>
+            </View>
+            <Text style={[styles.infoValue, styles.centeredValue]} numberOfLines={1}>
+              {deliveryTime}
+            </Text>
           </View>
-        </View>
-        <View style={styles.infoValues}>
-          <Text style={styles.infoValue}>{location}</Text>
-          <Text style={styles.infoValue}>{deliveryTime}</Text>
         </View>
       </View>
     </View>
@@ -215,25 +258,41 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  infoColumn: {
+    flex: 1,
+    minWidth: 0, // Permet au texte de se tronquer correctement
+    maxWidth: '48%', // Limite la largeur pour éviter que le texte soit tronqué
+  },
+  rightColumn: {
+    alignItems: "center",
   },
   infoItem: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 6,
+    flexWrap: 'wrap', // Permet au texte de passer à la ligne si nécessaire
+  },
+  centeredItem: {
+    justifyContent: "center",
   },
   infoLabel: {
     fontSize: 13,
     color: "#666",
     marginLeft: 6,
-  },
-  infoValues: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexShrink: 0, // Empêche le texte de se rétrécir
   },
   infoValue: {
     fontSize: 15,
     fontWeight: "500",
     color: "#333",
+    marginTop: 2,
+  },
+  centeredValue: {
+    textAlign: "center",
+    alignSelf: "center",
   },
   // Petit espace pour séparer les éléments
   spacer: {

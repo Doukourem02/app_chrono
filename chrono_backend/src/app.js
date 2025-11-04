@@ -3,13 +3,13 @@ import cors from 'cors';
 import userRoutes from './routes/userRoutes.js';
 import deliveryRoutes from './routes/deliveryRoutes.js';
 import authRoutes from './routes/authRoutes.js'; 
-import driverRoutes from './routes/driverRoutes.js'; // 🚗 NOUVEAU
-import ratingRoutes from './routes/ratingRoutes.js'; // ⭐ NOUVEAU
+import driverRoutes from './routes/driverRoutes.js'; 
+import ratingRoutes from './routes/ratingRoutes.js';
 import syncRoutes from './routes/syncRoutes.js'; 
 import { errorHandler } from './middleware/errorHandler.js';
 const app = express();
 
-// 🔒 CORS sécurisé - Origines autorisées uniquement
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
   'http://localhost:8081',
   'http://localhost:19006',
@@ -18,7 +18,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Autoriser les requêtes sans origin (mobile apps, Postman, etc.)
+
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.includes(origin)) {
@@ -36,11 +36,11 @@ app.get('/', (req, res) => res.send('Chrono Livraison API 🚚'));
 app.use('/api/users', userRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/auth-simple', authRoutes); 
-app.use('/api/drivers', driverRoutes); // 🚗 NOUVEAU
-app.use('/api/ratings', ratingRoutes); // ⭐ NOUVEAU
+app.use('/api/drivers', driverRoutes); 
+app.use('/api/ratings', ratingRoutes); 
 app.use('/api/sync', syncRoutes); 
 
-// Middleware de gestion d'erreurs global (doit être en dernier)
+
 app.use(errorHandler);
 
 export default app;

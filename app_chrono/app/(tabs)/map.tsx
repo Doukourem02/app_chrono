@@ -407,8 +407,16 @@ export default function MapPage() {
     // Nettoyer l'état de la commande maintenant que le rating est soumis
     setTimeout(() => {
       cleanupOrderState();
+      // Réinitialiser les refs pour permettre la réouverture automatique
+      hasAutoOpenedRef.current = false;
+      userManuallyClosedRef.current = false; // 🆕 Réinitialiser le flag de fermeture manuelle
+      isProgrammaticCloseRef.current = true; // 🆕 Marquer comme fermeture programmatique
+      // Réouvrir le bottom sheet de création de commande
+      setTimeout(() => {
+        expandBottomSheet();
+      }, 200);
     }, 300); // Petit délai pour laisser le bottom sheet se fermer
-  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState]);
+  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState, expandBottomSheet]);
 
   // Callback quand le rating bottom sheet est fermé
   const handleRatingClose = useCallback(() => {
@@ -418,8 +426,16 @@ export default function MapPage() {
     // Nettoyer l'état de la commande maintenant que le rating bottom sheet est fermé
     setTimeout(() => {
       cleanupOrderState();
+      // Réinitialiser les refs pour permettre la réouverture automatique
+      hasAutoOpenedRef.current = false;
+      userManuallyClosedRef.current = false; // 🆕 Réinitialiser le flag de fermeture manuelle
+      isProgrammaticCloseRef.current = true; // 🆕 Marquer comme fermeture programmatique
+      // Réouvrir le bottom sheet de création de commande
+      setTimeout(() => {
+        expandBottomSheet();
+      }, 200);
     }, 300); // Petit délai pour laisser le bottom sheet se fermer
-  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState]);
+  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState, expandBottomSheet]);
 
   // 🆕 Vérifier si une commande est trop ancienne et la nettoyer automatiquement
   // (par exemple, si elle est restée en "accepted" ou "enroute" depuis plus de 30 minutes)
@@ -462,14 +478,28 @@ export default function MapPage() {
   }, [currentOrder, cleanupOrderState]);
 
   const hasAutoOpenedRef = useRef(false);
+  const userManuallyClosedRef = useRef(false); // 🆕 Suivre si l'utilisateur a fermé manuellement
+  const isProgrammaticCloseRef = useRef(false); // 🆕 Suivre si on ferme programmatiquement (pour éviter de marquer comme fermeture manuelle)
+  const previousIsExpandedRef = useRef(isExpanded); // 🆕 Suivre l'état précédent de isExpanded
+
+  // 🆕 Détecter quand le bottom sheet est fermé (par glissement ou toggle)
+  // et marquer comme fermeture manuelle si ce n'est pas une fermeture programmatique
+  useEffect(() => {
+    // Si le bottom sheet passe de expanded à collapsed, et que ce n'est pas une fermeture programmatique
+    // alors c'est une fermeture manuelle
+    if (previousIsExpandedRef.current && !isExpanded && !isProgrammaticCloseRef.current) {
+      userManuallyClosedRef.current = true;
+      logger.debug('🔒 Bottom sheet fermé manuellement par l\'utilisateur', 'map.tsx');
+    }
+    // Mettre à jour l'état précédent
+    previousIsExpandedRef.current = isExpanded;
+    // Réinitialiser le flag de fermeture programmatique après chaque changement
+    isProgrammaticCloseRef.current = false;
+  }, [isExpanded]);
 
   // 🆕 Ouvrir automatiquement le bottom sheet à chaque fois qu'on arrive sur la page
   // (si aucune commande active n'est en cours)
   useEffect(() => {
-    if (hasAutoOpenedRef.current) {
-      return;
-    }
-
     const store = useOrderStore.getState();
     const isActiveOrder = store.currentOrder && 
       store.currentOrder.status !== 'completed' && 
@@ -477,18 +507,45 @@ export default function MapPage() {
       store.currentOrder.status !== 'declined';
     
     // Ouvrir automatiquement si pas de commande active et que le bottom sheet n'est pas déjà ouvert
+    // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
     // Cela se déclenchera à chaque montage du composant (chaque fois qu'on arrive sur la page)
-    if (!isActiveOrder && !isExpanded) {
-      hasAutoOpenedRef.current = true;
+    // OU après le nettoyage d'une commande terminée
+    if (!isActiveOrder && !isExpanded && !showRatingBottomSheet && !userManuallyClosedRef.current) {
+      if (!hasAutoOpenedRef.current) {
+        hasAutoOpenedRef.current = true;
+        const timer = setTimeout(() => {
+          expandBottomSheet();
+        }, 100);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [expandBottomSheet, isExpanded, currentOrder, showRatingBottomSheet]);
+
+  // 🆕 Réouvrir automatiquement le bottom sheet après le nettoyage d'une commande
+  // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
+  useEffect(() => {
+    const store = useOrderStore.getState();
+    const isActiveOrder = store.currentOrder && 
+      store.currentOrder.status !== 'completed' && 
+      store.currentOrder.status !== 'cancelled' && 
+      store.currentOrder.status !== 'declined';
+    
+    // Si on n'a pas de commande active et que le bottom sheet n'est pas ouvert, le réouvrir
+    // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
+    if (!isActiveOrder && !currentOrder && !isExpanded && !showRatingBottomSheet && !userManuallyClosedRef.current) {
+      // Réinitialiser hasAutoOpenedRef pour permettre la réouverture
+      hasAutoOpenedRef.current = false;
+      isProgrammaticCloseRef.current = true; // 🆕 Marquer comme fermeture programmatique (si on ferme avant)
       const timer = setTimeout(() => {
+        isProgrammaticCloseRef.current = false; // Réinitialiser avant l'ouverture
         expandBottomSheet();
-      }, 100);
+        hasAutoOpenedRef.current = true;
+      }, 300);
 
       return () => clearTimeout(timer);
     }
-
-    hasAutoOpenedRef.current = true;
-  }, [expandBottomSheet, isExpanded]);
+  }, [currentOrder, isExpanded, showRatingBottomSheet, expandBottomSheet]);
 
   // NOTE: Bouton de test retiré en production — la création de commande
   // est maintenant déclenchée via le flow utilisateur (handleConfirm)
@@ -717,7 +774,9 @@ export default function MapPage() {
             currentOrder.status !== 'declined';
           
           // Ouvrir immédiatement avec animation, sans délai
+          // Réinitialiser le flag de fermeture manuelle car l'utilisateur veut voir le bottom sheet
           if (!isActiveOrder) {
+            userManuallyClosedRef.current = false;
             expandBottomSheet();
           }
         }}
@@ -763,13 +822,23 @@ export default function MapPage() {
         return (
           <>
             {/* Afficher le bottom sheet de création de commande SAUF si on a une commande active */}
-            {/* Si status = 'completed', on n'affiche pas non plus le DeliveryBottomSheet - on attend le RatingBottomSheet */}
-            {!isActiveOrder && currentOrder?.status !== 'completed' && !deliveryMethodIsExpanded && !orderDetailsIsExpanded && (
+            {/* Afficher TOUJOURS si pas de commande active OU si la commande est terminée/annulée/refusée */}
+            {!isActiveOrder && !deliveryMethodIsExpanded && !orderDetailsIsExpanded && (
               <DeliveryBottomSheet
                 animatedHeight={animatedHeight}
                 panResponder={panResponder}
                 isExpanded={isExpanded}
-                onToggle={toggleBottomSheet}
+                onToggle={() => {
+                  // 🆕 Si l'utilisateur ferme manuellement (toggle), marquer le flag
+                  if (isExpanded) {
+                    userManuallyClosedRef.current = true;
+                    isProgrammaticCloseRef.current = false; // C'est une fermeture manuelle
+                  } else {
+                    // Si l'utilisateur ouvre le bottom sheet, réinitialiser le flag
+                    userManuallyClosedRef.current = false;
+                  }
+                  toggleBottomSheet();
+                }}
                 pickupLocation={pickupLocation}
                 deliveryLocation={deliveryLocation}
                 selectedMethod={selectedMethod}

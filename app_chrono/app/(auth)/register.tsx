@@ -25,14 +25,13 @@ export default function RegisterScreen() {
       return;
     }
 
-    // Validation email basique
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Erreur', 'Veuillez entrer un email valide');
       return;
     }
 
-    // Validation téléphone basique
+  
     if (phoneNumber.length < 10) {
       Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide');
       return;
@@ -40,10 +39,9 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
 
-    // Sauvegarder les données temporairement
     setTempData(email, phoneNumber);
     
-    // Naviguer vers l'écran de choix de méthode OTP
+  
     router.push('./otpMethod' as any);
     setIsLoading(false);
   };
@@ -53,23 +51,21 @@ export default function RegisterScreen() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Illustration */}
+    
       <View style={styles.illustrationContainer}>
         <View style={styles.illustrationPlaceholder}>
           <Ionicons name="mail-outline" size={80} color="#8B7CF6" />
         </View>
       </View>
 
-      {/* Titre et description */}
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Email OTP Verification</Text>
         <Text style={styles.subtitle}>
           Enter your email and phone number. We&apos;ll send a verification code to your email address.
         </Text>
 
-        {/* Formulaire */}
         <View style={styles.formContainer}>
-          {/* Email Input */}
+      
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -84,7 +80,7 @@ export default function RegisterScreen() {
             <Ionicons name="mail-outline" size={20} color="#8B7CF6" style={styles.inputIcon} />
           </View>
 
-          {/* Phone Number Input */}
+        
           <View style={styles.inputContainer}>
             <Text style={styles.phoneLabel}>Phone Number</Text>
             <TextInput
@@ -97,7 +93,7 @@ export default function RegisterScreen() {
             />
           </View>
 
-          {/* Continue Button */}
+          
                     <TouchableOpacity 
             style={[styles.continueButton, (!email || !phoneNumber || isLoading) && styles.buttonDisabled]}
             onPress={handleContinue}
@@ -108,7 +104,6 @@ export default function RegisterScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Lien vers la connexion OTP */}
           <View style={styles.loginLinkContainer}>
             <Text style={styles.loginLinkText}>Déjà un compte ? </Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/login' as any)}>

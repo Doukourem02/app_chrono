@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,14 +33,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [existingRating, setExistingRating] = useState<number | null>(null);
 
-  // Charger l'évaluation existante si elle existe
-  useEffect(() => {
-    if (visible && orderId) {
-      loadExistingRating();
-    }
-  }, [visible, orderId]);
-
-  const loadExistingRating = async () => {
+  const loadExistingRating = useCallback(async () => {
     setIsLoading(true);
     try {
       const result = await userApiService.getOrderRating(orderId);
@@ -61,7 +54,14 @@ export const RatingModal: React.FC<RatingModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [orderId]);
+
+  // Charger l'évaluation existante si elle existe
+  useEffect(() => {
+    if (visible && orderId) {
+      loadExistingRating();
+    }
+  }, [visible, orderId, loadExistingRating]);
 
   const handleStarPress = (starValue: number) => {
     setRating(starValue);

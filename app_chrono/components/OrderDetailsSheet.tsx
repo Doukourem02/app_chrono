@@ -76,7 +76,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
     photos: [],
   });
 
-  const [pickupSender, setPickupSender] = useState('Moi');
+  const [pickupSender] = useState('Moi');
 
   const updatePickupDetails = (field: keyof AddressDetails, value: string | string[]) => {
     setPickupDetails((prev) => ({ ...prev, [field]: value }));
@@ -275,7 +275,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_evt, gestureState) => {
         // Vérifier si le geste commence dans la zone du drag handle
-        const { locationX, locationY, moveX, moveY } = gestureState;
+        const { moveX, moveY } = gestureState;
         const { x, y, width, height } = dragHandleLayout;
         
         // Zone élargie autour du drag handle (60px verticalement)
@@ -407,7 +407,6 @@ const styles = StyleSheet.create({
   },
   dragIndicatorContainer: {
     alignItems: 'center',
-    paddingVertical: 10,
     // Zone élargie pour faciliter le drag
     paddingVertical: 20,
   },
