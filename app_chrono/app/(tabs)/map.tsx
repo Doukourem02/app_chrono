@@ -2,8 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import React, { useRef, useEffect, useMemo, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Animated, Dimensions } from 'react-native';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 import MapView from 'react-native-maps';
 import { useShipmentStore } from '../../store/useShipmentStore';
 import { useMapLogic } from '../../hooks/useMapLogic';
@@ -14,6 +16,8 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { DeliveryMapView } from '../../components/DeliveryMapView';
 import { DeliveryBottomSheet } from '../../components/DeliveryBottomSheet';
+import { DeliveryMethodBottomSheet } from '../../components/DeliveryMethodBottomSheet';
+import { OrderDetailsSheet } from '../../components/OrderDetailsSheet';
 // Explicit extension to help some editors/resolvers find the file reliably
 import TrackingBottomSheet from '../../components/TrackingBottomSheet.tsx';
 import RatingBottomSheet from '../../components/RatingBottomSheet';
@@ -21,6 +25,7 @@ import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useRatingStore } from '../../store/useRatingStore';
 import { logger } from '../../utils/logger';
+import { calculatePrice, estimateDurationMinutes, formatDurationLabel, getDistanceInKm } from '../../services/orderApi';
 
 type Coordinates = {
   latitude: number;
@@ -245,6 +250,7 @@ export default function MapPage() {
     panResponder,
     toggle: toggleBottomSheet,
     expand: expandBottomSheet, // 🆕 Exposer la fonction expand
+    collapse: collapseBottomSheet,
   } = useBottomSheet();
 
   // Bottom sheet séparé pour l'évaluation (ne pas interférer avec le bottom sheet principal)
@@ -259,6 +265,26 @@ export default function MapPage() {
 
   // État du rating bottom sheet
   const { showRatingBottomSheet, orderId: ratingOrderId, driverName: ratingDriverName, resetRatingBottomSheet } = useRatingStore();
+
+  // Bottom sheet pour la méthode de livraison
+  const {
+    animatedHeight: deliveryMethodAnimatedHeight,
+    isExpanded: deliveryMethodIsExpanded,
+    panResponder: deliveryMethodPanResponder,
+    expand: expandDeliveryMethodSheet,
+    collapse: collapseDeliveryMethodSheet,
+    toggle: toggleDeliveryMethodSheet,
+  } = useBottomSheet();
+
+  // Bottom sheet pour les détails de la commande
+  const {
+    animatedHeight: orderDetailsAnimatedHeight,
+    isExpanded: orderDetailsIsExpanded,
+    panResponder: orderDetailsPanResponder,
+    expand: expandOrderDetailsSheet,
+    collapse: collapseOrderDetailsSheet,
+    toggle: toggleOrderDetailsSheet,
+  } = useBottomSheet();
 
   // 🧹 Fonction utilitaire pour nettoyer complètement l'état
   const cleanupOrderState = useCallback(async () => {
@@ -488,12 +514,53 @@ export default function MapPage() {
     startMethodSelection(); // Déclencher le pulse violet sur "Ma position"
   };
 
-  const handleConfirm = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); // Feedback haptic confirmation
+  // Handler pour ouvrir le bottom sheet de méthode de livraison avec hauteur maximale
+  const handleShowDeliveryMethod = useCallback(() => {
+    collapseBottomSheet();
+    setTimeout(() => {
+      // Utiliser une hauteur maximale plus grande pour ce bottom sheet (85% de l'écran)
+      const { Dimensions } = require('react-native');
+      const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+      const MAX_HEIGHT = SCREEN_HEIGHT * 0.85;
+      
+      // Animer vers la hauteur maximale
+      Animated.spring(deliveryMethodAnimatedHeight, {
+        toValue: MAX_HEIGHT,
+        useNativeDriver: false,
+        tension: 65,
+        friction: 8,
+      }).start();
+      
+      expandDeliveryMethodSheet();
+    }, 300);
+  }, [collapseBottomSheet, expandDeliveryMethodSheet, deliveryMethodAnimatedHeight]);
+
+  // Handler pour revenir en arrière depuis le bottom sheet de méthode
+  const handleDeliveryMethodBack = useCallback(() => {
+    collapseDeliveryMethodSheet();
+    setTimeout(() => {
+      expandBottomSheet();
+    }, 300);
+  }, [collapseDeliveryMethodSheet, expandBottomSheet]);
+
+  // Calculer le prix et le temps estimé
+  const getPriceAndTime = useCallback(() => {
+    if (!pickupCoords || !dropoffCoords || !selectedMethod) {
+      return { price: 0, estimatedTime: '0 min.' };
+    }
+    const distance = getDistanceInKm(pickupCoords, dropoffCoords);
+    const price = calculatePrice(distance, selectedMethod as 'moto' | 'vehicule' | 'cargo');
+    const minutes = estimateDurationMinutes(distance, selectedMethod as 'moto' | 'vehicule' | 'cargo');
+    const estimatedTime = formatDurationLabel(minutes) || `${minutes} min.`;
+    return { price, estimatedTime };
+  }, [pickupCoords, dropoffCoords, selectedMethod]);
+
+  // Fonction pour créer la commande avec toutes les informations
+  const handleCreateOrder = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    // 📦 TEST: Envoyer une commande réelle via Socket.IO
-    if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user) {
-      console.log('📦 Envoi commande test...');
+    if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user && selectedMethod) {
+      console.log('📦 Envoi commande...');
       
       const orderData = {
         pickup: {
@@ -509,23 +576,18 @@ export default function MapPage() {
           name: user.email?.split('@')[0] || 'Client',
           rating: 4.5,
           phone: user.phone
-        }
+        },
       };
       
       const success = await userOrderSocketService.createOrder(orderData);
       if (success) {
-        // Démarrer la recherche de chauffeur avec animation/pulse (20s)
-        // Le radar/pulse sert désormais de feedback visuel pour l'utilisateur
+        collapseDeliveryMethodSheet();
         startDriverSearch();
       } else {
         Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
       }
-      // Ne pas return — continuer le flow si nécessaire (caméra/route)
     }
     
-    // Si la commande n'a pas été créée (par exemple utilisateur ne fournit
-    // pas toutes les infos), continuer le flow normal : préparer la route
-    // puis lancer la recherche locale de chauffeurs (pulse)
     try {
       if (pickupCoords && dropoffCoords) {
         await fetchRoute(pickupCoords, dropoffCoords);
@@ -534,16 +596,79 @@ export default function MapPage() {
       // Ignorer les erreurs de route
     }
 
-    // Animer la caméra vers la position de pickup avant de commencer la recherche
     if (pickupCoords) {
       animateToCoordinate(pickupCoords, 0.01);
     }
 
-    // Démarrer la recherche seulement si on ne l'a pas déjà démarrée via la création de commande
     if (!isSearchingDriver) {
       startDriverSearch();
     }
+  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, fetchRoute, animateToCoordinate, isSearchingDriver, startDriverSearch, collapseDeliveryMethodSheet]);
+
+  const handleConfirm = async () => {
+    // Ouvrir le bottom sheet de méthode de livraison
+    handleShowDeliveryMethod();
   };
+
+  // Handler pour confirmer depuis le bottom sheet de méthode - Ouvre OrderDetailsSheet
+  const handleDeliveryMethodConfirm = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    collapseDeliveryMethodSheet();
+    // Attendre un peu avant d'ouvrir OrderDetailsSheet
+    setTimeout(() => {
+      expandOrderDetailsSheet();
+      // Animer à la hauteur maximale (90% de l'écran)
+      Animated.spring(orderDetailsAnimatedHeight, {
+        toValue: SCREEN_HEIGHT * 0.9,
+        useNativeDriver: false,
+        tension: 65,
+        friction: 8,
+      }).start();
+    }, 300);
+  }, [collapseDeliveryMethodSheet, expandOrderDetailsSheet, orderDetailsAnimatedHeight]);
+
+  // Handler pour confirmer depuis OrderDetailsSheet - Crée la commande avec tous les détails
+  const handleOrderDetailsConfirm = useCallback(async (
+    pickupDetails: any,
+    dropoffDetails: any
+  ) => {
+    // Créer la commande avec toutes les informations détaillées
+    if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user && selectedMethod) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      console.log('📦 Envoi commande avec détails...');
+      
+      const orderData = {
+        pickup: {
+          address: pickupLocation,
+          coordinates: pickupCoords,
+          details: pickupDetails,
+        },
+        dropoff: {
+          address: deliveryLocation,
+          coordinates: dropoffCoords,
+          details: dropoffDetails,
+        },
+        deliveryMethod: selectedMethod as 'moto' | 'vehicule' | 'cargo',
+        userInfo: {
+          name: user.email?.split('@')[0] || 'Client',
+          rating: 4.5,
+          phone: user.phone
+        },
+        recipient: {
+          phone: dropoffDetails.phone,
+        },
+        packageImages: dropoffDetails.photos || [],
+      };
+      
+      const success = await userOrderSocketService.createOrder(orderData);
+      if (success) {
+        collapseOrderDetailsSheet();
+        startDriverSearch();
+      } else {
+        Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
+      }
+    }
+  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, startDriverSearch]);
 
   if (!region) {
     return (
@@ -639,7 +764,7 @@ export default function MapPage() {
           <>
             {/* Afficher le bottom sheet de création de commande SAUF si on a une commande active */}
             {/* Si status = 'completed', on n'affiche pas non plus le DeliveryBottomSheet - on attend le RatingBottomSheet */}
-            {!isActiveOrder && currentOrder?.status !== 'completed' && (
+            {!isActiveOrder && currentOrder?.status !== 'completed' && !deliveryMethodIsExpanded && !orderDetailsIsExpanded && (
               <DeliveryBottomSheet
                 animatedHeight={animatedHeight}
                 panResponder={panResponder}
@@ -654,6 +779,51 @@ export default function MapPage() {
                 onConfirm={handleConfirm}
               />
             )}
+
+            {/* Afficher le bottom sheet de méthode de livraison avec hauteur maximale */}
+            {deliveryMethodIsExpanded && (() => {
+              const { price, estimatedTime } = getPriceAndTime();
+              return (
+                <DeliveryMethodBottomSheet
+                  animatedHeight={deliveryMethodAnimatedHeight}
+                  panResponder={deliveryMethodPanResponder}
+                  isExpanded={deliveryMethodIsExpanded}
+                  onToggle={toggleDeliveryMethodSheet}
+                  selectedMethod={selectedMethod || 'moto'}
+                  pickupLocation={pickupLocation}
+                  deliveryLocation={deliveryLocation}
+                  price={price}
+                  estimatedTime={estimatedTime}
+                  pickupCoords={pickupCoords}
+                  dropoffCoords={dropoffCoords}
+                  onMethodSelected={handleMethodSelected}
+                  onConfirm={handleDeliveryMethodConfirm}
+                  onBack={handleDeliveryMethodBack}
+                />
+              );
+            })()}
+
+            {/* Afficher le bottom sheet de détails de la commande */}
+            {orderDetailsIsExpanded && (() => {
+              const { price } = getPriceAndTime();
+              return (
+                <OrderDetailsSheet
+                  animatedHeight={orderDetailsAnimatedHeight}
+                  panResponder={orderDetailsPanResponder}
+                  isExpanded={orderDetailsIsExpanded}
+                  onToggle={toggleOrderDetailsSheet}
+                  pickupLocation={pickupLocation}
+                  deliveryLocation={deliveryLocation}
+                  selectedMethod={selectedMethod || 'moto'}
+                  price={price}
+                  onBack={() => {
+                    collapseOrderDetailsSheet();
+                    expandDeliveryMethodSheet();
+                  }}
+                  onConfirm={handleOrderDetailsConfirm}
+                />
+              );
+            })()}
 
             {/* Afficher le tracking bottom sheet UNIQUEMENT quand on a une commande active */}
             {/* Si status = 'completed', on ne montre PAS le TrackingBottomSheet - on attend le RatingBottomSheet */}

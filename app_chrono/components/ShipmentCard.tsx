@@ -1,56 +1,44 @@
 import { Ionicons } from "@expo/vector-icons";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { OrderRequest } from "../store/useOrderStore";
 
 interface ShipmentCardProps {
-  id: string;
-  productName: string;
-  productIcon: any;
+  order: OrderRequest;
   backgroundColor: string;
-  transportIcon: any;
-  location: string;
-  deliveryTime: string;
   progressPercentage: number;
   progressColor: string;
   inactiveColor?: string;
 }
 
 export default function ShipmentCard({
-  id,
-  productName,
-  productIcon,
+  order,
   backgroundColor,
-  transportIcon,
-  location,
-  deliveryTime,
   progressPercentage,
   progressColor,
   inactiveColor = "rgba(0,0,0,0.15)",
 }: ShipmentCardProps) {
+  const dropoffAddress = order.dropoff?.address || 'Adresse non définie';
+  const location = dropoffAddress.split(',')[0] || dropoffAddress;
+  const deliveryTime = order.estimatedDuration || 'Non estimé';
+  
+  // Extraire le nom du produit depuis l'adresse ou utiliser un placeholder
+  const productName = order.dropoff?.address?.split(',')[0] || `Commande #${order.id.slice(0, 8)}`;
+  
   return (
     <View style={[styles.card, { backgroundColor }]}>
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.productInfo}>
           <View style={styles.productImageContainer}>
-            <Image
-              source={productIcon}
-              style={styles.productIconImage}
-              resizeMode="contain"
-            />
+            <Ionicons name="cube" size={24} color="#8B5CF6" />
           </View>
           <View style={styles.productDetails}>
-            <Text style={styles.productName}>{productName}</Text>
-            <Text style={styles.productId}>ID: {id}</Text>
+            <Text style={styles.productName} numberOfLines={1}>{productName}</Text>
+            <Text style={styles.productId}>ID: {order.id.slice(0, 12)}</Text>
           </View>
         </View>
-
-        <Image
-          source={transportIcon}
-          style={styles.transportImage}
-          resizeMode="contain"
-        />
       </View>
 
       {/* ==== BARRE DE PROGRESSION (comme l'image) ==== */}
@@ -162,11 +150,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginTop: 2,
-  },
-  transportImage: {
-    width: 110,
-    height: 90,
-    marginLeft: 10,
   },
 
   /* ==== Progression stylée ==== */

@@ -41,6 +41,14 @@ export interface OrderRequest {
     type?: 'photo' | 'signature' | string;
     meta?: Record<string, any>;
   };
+  // Informations sur le destinataire et le colis
+  recipient?: {
+    name?: string;
+    phone: string;
+    contactId?: string; // ID du contact sauvegardé si sélectionné depuis les contacts
+  };
+  packageImages?: string[]; // URLs ou URIs des images du colis
+  packageType?: 'standard' | 'fragile' | 'hot_sensitive'; // Type de colis
 }
 
 interface OrderStore {

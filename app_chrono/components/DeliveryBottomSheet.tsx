@@ -33,9 +33,9 @@ interface DeliveryBottomSheetProps {
 }
 
 const deliveryMethods = [
-  { id: 'moto', name: 'Livraison par moto', icon: require('../assets/images/motoo.png') },
-  { id: 'vehicule', name: 'Livraison par véhicule', icon: require('../assets/images/carrss.png') },
-  { id: 'cargo', name: 'Livraison par cargo', icon: require('../assets/images/ccargo.png') },
+  { id: 'moto', name: 'Moto', icon: require('../assets/images/motoo.png') },
+  { id: 'vehicule', name: 'Véhicule', icon: require('../assets/images/carrss.png') },
+  { id: 'cargo', name: 'Cargo', icon: require('../assets/images/ccargo.png') },
 ];
 
 export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
@@ -111,21 +111,32 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
             />
           </View>
 
-          {/* Options de livraison */}
-          <View style={styles.deliveryOptions}>
-            {deliveryMethods.map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                style={[
-                  styles.deliveryOption,
-                  selectedMethod === method.id && styles.selectedOption,
-                ]}
-                onPress={() => onMethodSelected(method.id as 'moto' | 'vehicule' | 'cargo')}
-              >
-                <Image source={method.icon} style={styles.methodIcon} />
-                <Text style={styles.methodName}>{method.name}</Text>
-              </TouchableOpacity>
-            ))}
+          {/* Options de méthodes de livraison */}
+          <View style={styles.deliveryMethodsContainer}>
+            <Text style={styles.deliveryMethodsTitle}>Méthode de livraison</Text>
+            <View style={styles.deliveryOptions}>
+              {deliveryMethods.map((method) => (
+                <TouchableOpacity
+                  key={method.id}
+                  style={[
+                    styles.deliveryOption,
+                    selectedMethod === method.id && styles.selectedOption,
+                  ]}
+                  onPress={() => onMethodSelected(method.id as 'moto' | 'vehicule' | 'cargo')}
+                  activeOpacity={0.7}
+                >
+                  <Image source={method.icon} style={styles.methodIcon} />
+                  <Text
+                    style={[
+                      styles.methodName,
+                      selectedMethod === method.id && styles.methodNameSelected,
+                    ]}
+                  >
+                    {method.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           {/* Bouton de validation */}
@@ -137,8 +148,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
             disabled={!pickupLocation || !deliveryLocation}
             onPress={handleConfirm}
           >
-            <Text style={styles.chooseButtonText}>Choix de la méthode</Text>
-            <Text style={styles.chooseButtonText}>de Livraison</Text>
+            <Text style={styles.chooseButtonText}>Choix de la méthode de livraison</Text>
           </TouchableOpacity>
         </ScrollView>
       ) : (
@@ -204,35 +214,49 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     marginHorizontal: 20,
   },
+  deliveryMethodsContainer: {
+    marginBottom: 25,
+  },
+  deliveryMethodsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 15,
+  },
   deliveryOptions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 25,
+    gap: 12,
   },
   deliveryOption: {
+    flex: 1,
     alignItems: 'center',
     backgroundColor: '#f8f8f8',
     borderRadius: 15,
     paddingVertical: 15,
     paddingHorizontal: 10,
-    width: '30%',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   selectedOption: {
-    backgroundColor: '#e8e0ff',
-    borderWidth: 2,
+    backgroundColor: '#F5F0FF',
     borderColor: '#8B5CF6',
   },
   methodIcon: {
-    width: 30,
-    height: 30,
+    width: 40,
+    height: 40,
     marginBottom: 8,
     resizeMode: 'contain',
   },
   methodName: {
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'center',
     color: '#666',
     fontWeight: '500',
+  },
+  methodNameSelected: {
+    color: '#8B5CF6',
+    fontWeight: '600',
   },
   chooseButton: {
     backgroundColor: '#8B5CF6',

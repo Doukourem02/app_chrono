@@ -345,10 +345,25 @@ class UserOrderSocketService {
     pickup: {
       address: string;
       coordinates: { latitude: number; longitude: number };
+      details?: {
+        entrance?: string;
+        apartment?: string;
+        floor?: string;
+        intercom?: string;
+        photos?: string[];
+      };
     };
     dropoff: {
       address: string;
       coordinates: { latitude: number; longitude: number };
+      details?: {
+        phone?: string;
+        entrance?: string;
+        apartment?: string;
+        floor?: string;
+        intercom?: string;
+        photos?: string[];
+      };
     };
     deliveryMethod: 'moto' | 'vehicule' | 'cargo';
     userInfo: {
@@ -357,6 +372,11 @@ class UserOrderSocketService {
       rating?: number;
       phone?: string;
     };
+    recipient?: {
+      phone: string;
+      contactId?: string;
+    };
+    packageImages?: string[];
   }) {
     return new Promise<boolean>(async (resolve) => {
       if (!this.socket || !this.userId) {

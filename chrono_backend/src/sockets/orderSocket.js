@@ -128,6 +128,8 @@ const setupOrderSocket = (io) => {
           price: providedPrice,
           distance: providedDistance,
           estimatedDuration: providedEta,
+          recipient,
+          packageImages,
         } = orderData;
 
         // Vérifications minimales
@@ -153,7 +155,7 @@ const setupOrderSocket = (io) => {
         const price = providedPrice ?? calculatePrice(distance, deliveryMethod);
         const estimatedDuration = providedEta ?? estimateDuration(distance, deliveryMethod);
 
-        // Créer la commande
+        // Créer la commande avec toutes les informations détaillées
         const order = {
           id: providedOrderId || uuidv4(),
           user: {
@@ -163,8 +165,10 @@ const setupOrderSocket = (io) => {
             rating: userInfo?.rating || 4.5,
             phone: userInfo?.phone
           },
-          pickup,
-          dropoff,
+          pickup, // Contient address, coordinates, et details (entrance, apartment, floor, intercom, photos)
+          dropoff, // Contient address, coordinates, phone (dans details), et details (entrance, apartment, floor, intercom, photos)
+          recipient: recipient || (dropoff?.details?.phone ? { phone: dropoff.details.phone } : null),
+          packageImages: packageImages || dropoff?.details?.photos || [],
           price,
           deliveryMethod,
           distance: Math.round(distance * 100) / 100,

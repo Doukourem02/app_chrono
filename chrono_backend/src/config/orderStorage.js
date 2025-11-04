@@ -181,7 +181,7 @@ export async function saveOrder(order) {
        WHERE table_schema = 'public'
          AND table_name = 'orders'
          AND column_name = ANY($1)`,
-      [['pickup', 'pickup_address', 'dropoff', 'dropoff_address', 'driver_id', 'price', 'price_cfa', 'distance', 'distance_km', 'accepted_at', 'completed_at', 'cancelled_at', 'updated_at']]
+      [['pickup', 'pickup_address', 'dropoff', 'dropoff_address', 'driver_id', 'price', 'price_cfa', 'distance', 'distance_km', 'accepted_at', 'completed_at', 'cancelled_at', 'updated_at', 'recipient', 'package_images']]
     );
 
     const columnSet = new Set(columnsInfo.rows.map((row) => row.column_name));
@@ -211,11 +211,29 @@ export async function saveOrder(order) {
       paramIndex++;
     }
 
-    // Colonnes pickup/dropoff (JSONB)
+    // Colonnes pickup/dropoff (JSONB) - Contiennent déjà les détails (entrance, apartment, floor, intercom, photos)
     columns.push(pickupColumn, dropoffColumn);
     values.push(JSON.stringify(order.pickup || null), JSON.stringify(order.dropoff || null));
     placeholders.push(`$${paramIndex}`, `$${paramIndex + 1}`);
     paramIndex += 2;
+
+    // Ajouter recipient (JSONB) si la colonne existe
+    if (columnSet.has('recipient')) {
+      columns.push('recipient');
+      values.push(order.recipient ? JSON.stringify(order.recipient) : null);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    // Ajouter package_images (TEXT[]) si la colonne existe
+    if (columnSet.has('package_images')) {
+      columns.push('package_images');
+      // Convertir packageImages en tableau PostgreSQL
+      const packageImages = order.packageImages || (order.dropoff?.details?.photos) || [];
+      values.push(packageImages.length > 0 ? packageImages : null);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
 
     // Colonnes méthode, prix, distance, ETA
     columns.push('delivery_method');
@@ -294,6 +312,14 @@ export async function saveOrder(order) {
       `${dropoffColumn} = EXCLUDED.${dropoffColumn}`,
       `delivery_method = EXCLUDED.delivery_method`
     );
+    
+    // Ajouter recipient et package_images aux clauses de mise à jour si les colonnes existent
+    if (columnSet.has('recipient')) {
+      updateClauses.push(`recipient = EXCLUDED.recipient`);
+    }
+    if (columnSet.has('package_images')) {
+      updateClauses.push(`package_images = EXCLUDED.package_images`);
+    }
     if (priceColumn) {
       updateClauses.push(`${priceColumn} = EXCLUDED.${priceColumn}`);
     }
