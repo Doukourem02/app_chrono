@@ -14,11 +14,31 @@ export interface OrderRequest {
   pickup: {
     address: string;
     coordinates: { latitude: number; longitude: number };
+    details?: {
+      entrance?: string;
+      apartment?: string;
+      floor?: string;
+      intercom?: string;
+      photos?: string[];
+    };
   };
   dropoff: {
     address: string;
     coordinates: { latitude: number; longitude: number };
+    details?: {
+      phone?: string;
+      entrance?: string;
+      apartment?: string;
+      floor?: string;
+      intercom?: string;
+      photos?: string[];
+    };
   };
+  recipient?: {
+    phone?: string;
+    contactId?: string;
+  };
+  packageImages?: string[];
   price: number;
   deliveryMethod: 'moto' | 'vehicule' | 'cargo';
   distance: number;

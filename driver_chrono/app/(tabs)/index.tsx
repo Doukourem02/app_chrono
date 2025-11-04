@@ -11,7 +11,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusToggle } from "../../components/StatusToggle";
 import { StatsCards } from "../../components/StatsCards";
 import { OrderRequestPopup } from "../../components/OrderRequestPopup";
+import { RecipientDetailsSheet } from "../../components/RecipientDetailsSheet";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
+import { useBottomSheet } from "../../hooks/useBottomSheet";
 import { useDriverStore } from "../../store/useDriverStore";
 import { useOrderStore } from "../../store/useOrderStore";
 import { apiService } from "../../services/apiService";
@@ -47,6 +49,20 @@ export default function Index() {
     setPendingOrder,
     currentOrder,
     } = useOrderStore();
+  
+  // Bottom sheet pour les détails du destinataire
+  const {
+    animatedHeight: recipientDetailsAnimatedHeight,
+    isExpanded: recipientDetailsIsExpanded,
+    panResponder: recipientDetailsPanResponder,
+    expand: expandRecipientDetailsSheet,
+    collapse: collapseRecipientDetailsSheet,
+    toggle: toggleRecipientDetailsSheet,
+  } = useBottomSheet();
+  
+  // Réf pour suivre si l'utilisateur a fermé manuellement le bottom sheet
+  const userClosedBottomSheetRef = useRef(false);
+  const lastOrderStatusRef = useRef<string | null>(null);
   
   // Utiliser directement le store pour la synchronisation avec profile.tsx
   const isOnline = storeIsOnline;
@@ -297,6 +313,52 @@ export default function Index() {
     }
   }, [currentOrder?.status, currentOrder, location, isOnline, centerOnDriver]);
 
+  // Ouvrir automatiquement le bottom sheet des détails du destinataire quand le colis est récupéré
+  useEffect(() => {
+    const status = String(currentOrder?.status || '');
+    const lastStatus = lastOrderStatusRef.current;
+    
+    // Détecter une transition vers "picked_up" ou "delivering" (pas juste si le statut est déjà à ce stade)
+    const isTransitioningToPickedUp = 
+      (status === 'picked_up' || status === 'delivering') && 
+      lastStatus !== status && 
+      lastStatus !== 'picked_up' && 
+      lastStatus !== 'delivering';
+    
+    // Mettre à jour la référence du statut
+    lastOrderStatusRef.current = status;
+    
+    // Ouvrir automatiquement UNIQUEMENT lors d'une transition vers "picked_up" ou "delivering"
+    // ET seulement si l'utilisateur ne l'a pas fermé manuellement
+    if (currentOrder && isTransitioningToPickedUp && !userClosedBottomSheetRef.current) {
+      // Réinitialiser le flag de fermeture manuelle
+      userClosedBottomSheetRef.current = false;
+      // Attendre un peu pour que l'animation soit fluide
+      setTimeout(() => {
+        expandRecipientDetailsSheet();
+      }, 500);
+    } else if (status === 'completed' || !currentOrder) {
+      // Fermer automatiquement quand la commande est terminée ou annulée
+      userClosedBottomSheetRef.current = false;
+      collapseRecipientDetailsSheet();
+    }
+  }, [currentOrder?.status, currentOrder, expandRecipientDetailsSheet, collapseRecipientDetailsSheet]);
+
+  // Détecter quand l'utilisateur ferme manuellement le bottom sheet
+  useEffect(() => {
+    if (!recipientDetailsIsExpanded && currentOrder) {
+      const status = String(currentOrder?.status || '');
+      // Si le statut est "picked_up" ou "delivering" et que le bottom sheet vient de se fermer,
+      // c'est probablement une fermeture manuelle
+      if (status === 'picked_up' || status === 'delivering') {
+        userClosedBottomSheetRef.current = true;
+      }
+    } else if (recipientDetailsIsExpanded) {
+      // Réinitialiser le flag quand le bottom sheet est ouvert
+      userClosedBottomSheetRef.current = false;
+    }
+  }, [recipientDetailsIsExpanded, currentOrder]);
+
   useEffect(() => {
     // Charger les stats depuis le serveur si utilisateur connecté (même si offline)
     const loadStats = async () => {
@@ -519,6 +581,15 @@ export default function Index() {
       {/* ACTIONS RAPIDES POUR LA COMMANDE (driver) */}
       {currentOrder && (
         <View style={styles.orderActionsContainer} pointerEvents="box-none">
+          {/* Bouton pour voir les détails du destinataire */}
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#6366F1', flexDirection: 'row', alignItems: 'center', gap: 6 }]}
+            onPress={expandRecipientDetailsSheet}
+          >
+            <Ionicons name="person-outline" size={18} color="#fff" />
+            <Text style={styles.actionText}>Destinataire</Text>
+          </TouchableOpacity>
+
           {String(currentOrder.status) === 'accepted' && (
             <TouchableOpacity
               style={styles.actionButton}
@@ -569,6 +640,17 @@ export default function Index() {
         onDecline={handleDeclineOrder}
         autoDeclineTimer={30}
       />
+
+      {/* 📋 BOTTOM SHEET DÉTAILS DESTINATAIRE */}
+      {currentOrder && recipientDetailsIsExpanded && (
+        <RecipientDetailsSheet
+          animatedHeight={recipientDetailsAnimatedHeight}
+          panResponder={recipientDetailsPanResponder}
+          isExpanded={recipientDetailsIsExpanded}
+          onToggle={toggleRecipientDetailsSheet}
+          order={currentOrder}
+        />
+      )}
     </View>
   );
 }
