@@ -4,23 +4,34 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/server.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
     "simulate": "node scripts/simulate_flow.js",
-    "simulate:ws": "SOCKET_URL=http://127.0.0.1:4000 node scripts/simulate_flow.js"
+    "simulate:ws": "SOCKET_URL=http://127.0.0.1:4000 node scripts/simulate_flow.js",
+    "backup:postgres": "tsx scripts/backup.ts postgres",
+    "backup:supabase": "tsx scripts/backup.ts supabase",
+    "backup:all": "tsx scripts/backup.ts all"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@sentry/node": "^10.23.0",
     "@supabase/supabase-js": "^2.77.0",
     "@vonage/server-sdk": "^3.25.1",
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "csurf": "^1.11.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.1",
     "nodemailer": "^7.0.10",
@@ -32,6 +43,18 @@
     "winston": "^3.18.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "@jest/globals": "^29.7.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.10.0",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }

@@ -79,7 +79,8 @@ export const useAuthStore = create<AuthState>()(
           }
 
           return 'not_found';
-        } catch (error) {
+        } catch {
+          // Ignorer les erreurs de validation
           return null;
         }
       },

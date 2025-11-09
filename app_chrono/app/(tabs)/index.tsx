@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import ActionCards from "../../components/ActionCards";
 import Header from "../../components/Header";
 import SearchBar from "../../components/SearchBar";

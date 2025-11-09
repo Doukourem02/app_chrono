@@ -7,6 +7,7 @@ export const config = {
                 (typeof __DEV__ !== 'undefined' && __DEV__ ? undefined : ''),
   apiUrl: Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
   socketUrl: Constants.expoConfig?.extra?.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
+  sentryDsn: Constants.expoConfig?.extra?.sentryDsn || process.env.EXPO_PUBLIC_SENTRY_DSN,
   
   // App Configuration
   app: {

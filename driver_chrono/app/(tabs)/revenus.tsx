@@ -53,33 +53,69 @@ export default function RevenusPage() {
 
   const loadRevenues = useCallback(async () => {
     if (!user?.id) {
-      console.log('⚠️ [Revenus] Pas de user.id, impossible de charger les revenus');
+      if (__DEV__) {
+        console.debug('⚠️ [Revenus] Pas de user.id, impossible de charger les revenus');
+      }
+      setLoading(false);
+      setRefreshing(false);
       return;
     }
 
     try {
-      console.log('🔍 [Revenus] Chargement revenus pour userId:', user.id, 'période:', selectedPeriod);
       setLoading(true);
       const result = await apiService.getDriverRevenues(user.id, {
         period: selectedPeriod,
       });
 
-      console.log('📊 [Revenus] Résultat API:', JSON.stringify(result, null, 2));
-
       if (result.success && result.data) {
-        console.log('✅ [Revenus] Données reçues:');
-        console.log('   - Livraisons:', result.data.totalDeliveries);
-        console.log('   - Gains:', result.data.totalEarnings, 'FCFA');
-        console.log('   - Distance:', result.data.totalDistance, 'km');
-        console.log('   - Commandes:', result.data.orders?.length || 0);
+        // Vérifier si les données sont vraiment vides (tous à 0)
+        const hasData = result.data.totalDeliveries > 0 || 
+                       result.data.totalEarnings > 0 || 
+                       (result.data.orders && result.data.orders.length > 0);
+        
+        if (__DEV__) {
+          if (hasData) {
+            console.debug('✅ [Revenus] Données reçues:', {
+              livraisons: result.data.totalDeliveries || 0,
+              distance: result.data.totalDistance || 0,
+              commandes: result.data.orders?.length || 0
+            });
+          } else {
+            console.debug('ℹ️ [Revenus] Données reçues mais vides (pas de livraisons pour cette période)');
+          }
+        }
         setRevenuesData(result.data);
       } else {
-        console.warn('⚠️ [Revenus] result.success=false ou pas de data:', result);
-        setRevenuesData(null);
+        // Si l'API retourne des données même en cas d'erreur (structure par défaut), les utiliser
+        if (result.data) {
+          if (__DEV__) {
+            console.warn('⚠️ [Revenus] API retourné des données par défaut. Message:', result.message || 'Aucun message');
+          }
+          setRevenuesData(result.data);
+        } else {
+          if (__DEV__) {
+            console.warn('⚠️ [Revenus] Pas de données reçues. Message:', result.message || 'Aucun message');
+          }
+          setRevenuesData(null);
+        }
       }
     } catch (error) {
-      console.error('❌ [Revenus] Erreur chargement revenus:', error);
-      setRevenuesData(null);
+      if (__DEV__) {
+        console.error('❌ [Revenus] Erreur chargement revenus:', error);
+      }
+      // En cas d'erreur, initialiser avec des données vides pour éviter les crashes
+      setRevenuesData({
+        period: selectedPeriod,
+        totalEarnings: 0,
+        totalDeliveries: 0,
+        totalDistance: 0,
+        averageEarningPerDelivery: 0,
+        averageDistance: 0,
+        earningsByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+        deliveriesByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+        earningsByDay: {},
+        orders: [],
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -306,7 +342,7 @@ export default function RevenusPage() {
               <View style={[styles.summaryIcon, { backgroundColor: '#E0F2FE' }]}>
                 <Ionicons name="speedometer-outline" size={20} color="#0369A1" />
               </View>
-              <Text style={styles.summaryLabel}>Distance moyenne</Text>
+              <Text style={styles.summaryLabel} numberOfLines={1} ellipsizeMode="tail">Distance moyenne</Text>
             </View>
             <Text style={styles.summaryValue}>
               {(revenuesData?.averageDistance ?? 0).toFixed(2)} km
@@ -523,6 +559,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    flexShrink: 0, // Empêcher l'icône de rétrécir
   },
   summaryIconPrimary: {
     backgroundColor: 'rgba(255,255,255,0.16)',
@@ -533,6 +570,8 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+    flex: 1, // Permettre au texte de prendre l'espace restant
+    flexShrink: 1, // Permettre au texte de rétrécir si nécessaire
   },
   summaryLabelPrimary: {
     color: '#E5E7EB',

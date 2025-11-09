@@ -201,8 +201,27 @@ export default function Index() {
     setPendingOrder(null); // Fermer le popup
   };
 
+  // Ref pour éviter les doubles clics
+  const isTogglingRef = useRef(false);
+  
   // Gestion du changement de statut
   const handleToggleOnline = async (value: boolean) => {
+    // Éviter les doubles clics
+    if (isTogglingRef.current) {
+      if (__DEV__) {
+        console.debug('⚠️ Toggle déjà en cours, ignoré');
+      }
+      return;
+    }
+    
+    // Si la valeur demandée est la même que l'état actuel, ne rien faire
+    if (value === isOnline) {
+      if (__DEV__) {
+        console.debug('⚠️ Statut déjà à', value, ', ignoré');
+      }
+      return;
+    }
+    
     if (value && error) {
       Alert.alert(
         "Erreur de localisation", 
@@ -211,8 +230,15 @@ export default function Index() {
       );
       return;
     }
-    // Ne pas marquer le driver en ligne localement avant que le backend confirme la mise à jour du statut.
-    // Cela évite une condition de course où le socket se connecte avant que le serveur ait le statut/coords du driver.
+    
+    // Marquer que le toggle est en cours
+    isTogglingRef.current = true;
+    
+    // Mettre à jour le statut local immédiatement (optimistic update) pour une meilleure UX
+    // L'utilisateur voit le changement immédiatement, même si l'API est lente ou échoue
+    setOnlineStatus(value);
+    
+    // Synchroniser avec le backend en arrière-plan
     if (user?.id) {
       const statusData: any = {
         is_online: value,
@@ -226,46 +252,95 @@ export default function Index() {
         setLocation(location);
       }
 
-      console.log('🔄 Synchronisation statut avec backend...');
-      const result = await apiService.updateDriverStatus(user.id, statusData);
-
-      if (!result.success) {
-        console.error('❌ Échec synchronisation:', result.message);
-        Alert.alert(
-          "Erreur de synchronisation",
-          "Impossible de synchroniser votre statut avec le serveur.",
-          [{ text: "OK" }]
-        );
-        // Ne pas changer le statut local si l'API échoue
-        return;
-      }
-
-      // Backend confirmé — mettre à jour le store (cela déclenchera la connexion socket)
-      // Le store sera automatiquement synchronisé avec profile.tsx
-      setOnlineStatus(value);
+      // Synchroniser en arrière-plan (ne pas bloquer l'UI)
+      apiService.updateDriverStatus(user.id, statusData).then((result) => {
+        // Libérer le verrou après la synchronisation
+        isTogglingRef.current = false;
+        
+        if (!result.success) {
+          if (__DEV__) {
+            console.warn('⚠️ Échec synchronisation:', result.message);
+          }
+          
+          // Si la session est expirée, marquer le ref pour éviter les appels futurs
+          if (result.message?.includes('Session expirée')) {
+            sessionExpiredRef.current = true;
+            // Ne pas afficher d'alerte - l'utilisateur peut continuer à utiliser l'app
+            // Le statut local est déjà mis à jour, la synchronisation se fera lors de la reconnexion
+            return;
+          }
+          
+          // Pour les autres erreurs critiques, rollback le statut local
+          if (result.message && !result.message.includes('réseau') && !result.message.includes('connexion')) {
+            // Rollback seulement si c'est une erreur critique (pas réseau)
+            setOnlineStatus(!value);
+            Alert.alert(
+              "Erreur de synchronisation",
+              result.message || "Impossible de synchroniser votre statut avec le serveur.",
+              [{ text: "OK" }]
+            );
+          }
+          // Pour les erreurs réseau, garder le statut local (l'utilisateur pourra réessayer plus tard)
+        } else {
+          // Réinitialiser le ref de session expirée si la synchronisation réussit
+          sessionExpiredRef.current = false;
+        }
+      }).catch((error) => {
+        // Libérer le verrou même en cas d'erreur
+        isTogglingRef.current = false;
+        
+        if (__DEV__) {
+          console.error('❌ Erreur updateDriverStatus:', error);
+        }
+        // En cas d'erreur réseau, garder le statut local (l'utilisateur pourra réessayer plus tard)
+      });
     } else {
-      // Si pas d'user id (ne devrait pas arriver), fallback
-      setOnlineStatus(value);
+      // Si pas d'user id, libérer le verrou immédiatement
+      isTogglingRef.current = false;
     }
   };
 
+  // Ref pour suivre si on a une erreur de session expirée (éviter les appels répétés)
+  const sessionExpiredRef = useRef(false);
+  
   // 📍 Effet pour synchroniser automatiquement la position quand elle change
   useEffect(() => {
+    // Si la session est expirée, ne pas essayer de synchroniser
+    if (sessionExpiredRef.current) {
+      return;
+    }
+
     const syncLocation = async () => {
-      if (isOnline && location && user?.id) {
+      if (isOnline && location && user?.id && !sessionExpiredRef.current) {
         try {
-          await apiService.updateDriverStatus(user.id, {
+          const result = await apiService.updateDriverStatus(user.id, {
             current_latitude: location.latitude,
             current_longitude: location.longitude
           });
+          
+          // Si la session est expirée, marquer le ref pour éviter les appels futurs
+          if (!result.success && result.message?.includes('Session expirée')) {
+            sessionExpiredRef.current = true;
+            if (__DEV__) {
+              console.debug('⚠️ Session expirée - arrêt de la synchronisation automatique de la position');
+            }
+            return;
+          }
+          
+          // Si l'appel réussit, réinitialiser le ref (au cas où la session serait rétablie)
+          if (result.success) {
+            sessionExpiredRef.current = false;
+          }
         } catch (error) {
-          console.log('⚠️ Erreur sync position:', error);
+          if (__DEV__) {
+            console.debug('⚠️ Erreur sync position:', error);
+          }
         }
       }
     };
 
-    // Débounce - attendre 2 secondes avant de sync
-    const timeoutId = setTimeout(syncLocation, 2000);
+    // Débounce - attendre 5 secondes avant de sync (réduire la fréquence des appels)
+    const timeoutId = setTimeout(syncLocation, 5000);
     return () => clearTimeout(timeoutId);
   }, [location, isOnline, user?.id]);
 
@@ -363,43 +438,57 @@ export default function Index() {
     // Charger les stats depuis le serveur si utilisateur connecté (même si offline)
     const loadStats = async () => {
       if (!user?.id) {
-        console.log('⚠️ [Index] Pas de user.id pour charger les stats');
+        if (__DEV__) {
+          console.debug('⚠️ [Index] Pas de user.id pour charger les stats');
+        }
         return;
       }
 
       try {
-        console.log('🔍 [Index] Chargement stats pour userId:', user.id);
-        
         // Charger les stats d'aujourd'hui
         const todayResult = await apiService.getTodayStats(user.id);
-        console.log('📊 [Index] Résultat getTodayStats:', todayResult);
         
         if (todayResult.success && todayResult.data) {
-          console.log('✅ [Index] Stats aujourd\'hui reçues:', todayResult.data);
+          if (__DEV__) {
+            console.debug('✅ [Index] getTodayStats réussi:', {
+              deliveries: todayResult.data.deliveries,
+              earnings: todayResult.data.earnings
+            });
+          }
           updateTodayStats(todayResult.data);
           setDriverStats(prev => ({
             ...prev,
             todayDeliveries: todayResult.data?.deliveries || 0,
           }));
         } else {
-          console.warn('⚠️ [Index] getTodayStats échoué ou pas de données');
+          if (__DEV__) {
+            console.warn('⚠️ [Index] getTodayStats échoué ou pas de données. Message:', todayResult?.message || 'Aucun message');
+          }
         }
         
         // Charger les statistiques totales (pour les revenus totaux)
         const statsResult = await apiService.getDriverStatistics(user.id);
-        console.log('📊 [Index] Résultat getDriverStatistics:', statsResult);
         
         if (statsResult.success && statsResult.data) {
-          console.log('✅ [Index] Stats totales reçues:', statsResult.data);
+          if (__DEV__) {
+            console.debug('✅ [Index] getDriverStatistics réussi:', {
+              completedDeliveries: statsResult.data.completedDeliveries,
+              totalEarnings: statsResult.data.totalEarnings
+            });
+          }
           setDriverStats(prev => ({
             ...prev,
             totalRevenue: statsResult.data?.totalEarnings || 0,
           }));
         } else {
-          console.warn('⚠️ [Index] getDriverStatistics échoué ou pas de données');
+          if (__DEV__) {
+            console.warn('⚠️ [Index] getDriverStatistics échoué ou pas de données. Message:', statsResult?.message || 'Aucun message');
+          }
         }
       } catch (err) {
-        console.error('❌ [Index] Erreur chargement stats:', err);
+        if (__DEV__) {
+          console.error('❌ [Index] Erreur chargement stats:', err);
+        }
       }
     };
 
@@ -410,7 +499,7 @@ export default function Index() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [user?.id, updateTodayStats, isOnline]);
+  }, [user?.id, isOnline]); // Retirer updateTodayStats des dépendances pour éviter la boucle infinie
 
   return (
     <View style={styles.container}>

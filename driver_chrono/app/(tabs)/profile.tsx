@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -39,26 +39,35 @@ export default function ProfilePage() {
     return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
   };
 
-  // Charger les statistiques depuis le backend
-  useEffect(() => {
-    const loadStatistics = async () => {
-      if (!user?.id) return;
+  // Charger les statistiques depuis le backend (note calculée dynamiquement)
+  const loadStatistics = useCallback(async () => {
+    if (!user?.id) return;
 
-      setIsLoadingStats(true);
-      try {
-        const result = await apiService.getDriverStatistics(user.id);
-        if (result.success && result.data) {
-          setStatistics(result.data);
+    setIsLoadingStats(true);
+    try {
+      const result = await apiService.getDriverStatistics(user.id);
+      if (result.success && result.data) {
+        // La note moyenne est calculée dynamiquement depuis la table ratings
+        // Elle est mise à jour automatiquement à chaque nouvelle évaluation
+        setStatistics(result.data);
+        if (__DEV__) {
+          console.debug('✅ [Profile] Statistiques chargées:', {
+            completedDeliveries: result.data.completedDeliveries,
+            averageRating: result.data.averageRating,
+            totalEarnings: result.data.totalEarnings
+          });
         }
-      } catch (error) {
-        console.error('Erreur chargement statistiques:', error);
-      } finally {
-        setIsLoadingStats(false);
       }
-    };
-
-    loadStatistics();
+    } catch (error) {
+      console.error('❌ [Profile] Erreur chargement statistiques:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
   }, [user?.id]);
+
+  useEffect(() => {
+    loadStatistics();
+  }, [loadStatistics]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -111,10 +120,14 @@ export default function ProfilePage() {
         Alert.alert(
           'Ma note moyenne',
           `Vous avez une note de ${statistics.averageRating.toFixed(1)}/5.0\n\n` +
-          `• Basée sur ${statistics.completedDeliveries} livraisons complétées\n` +
-          `• Cette note reflète la satisfaction de vos clients\n\n` +
+          `• Basée sur ${statistics.completedDeliveries} livraison${statistics.completedDeliveries > 1 ? 's' : ''} complétée${statistics.completedDeliveries > 1 ? 's' : ''}\n` +
+          `• Cette note est calculée dynamiquement à partir de toutes vos évaluations\n` +
+          `• Elle se met à jour automatiquement après chaque nouvelle évaluation\n\n` +
           `Continuez à offrir un excellent service pour maintenir une note élevée !`,
-          [{ text: 'OK' }]
+          [
+            { text: 'Rafraîchir', onPress: () => loadStatistics() },
+            { text: 'OK' }
+          ]
         );
       },
     },
@@ -175,8 +188,12 @@ export default function ProfilePage() {
             <Text style={styles.statNumber}>
               {isLoadingStats ? '...' : statistics.averageRating.toFixed(1)}
             </Text>
-            <Text style={styles.statLabel}>Note</Text>
-            <Text style={styles.statSubLabel}>Moyenne</Text>
+            <Text style={styles.statLabel}>Note moyenne</Text>
+            <Text style={styles.statSubLabel}>
+              {statistics.completedDeliveries > 0 
+                ? `${statistics.completedDeliveries} évaluation${statistics.completedDeliveries > 1 ? 's' : ''}` 
+                : 'Aucune évaluation'}
+            </Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>
@@ -390,6 +407,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#9CA3AF',
     marginTop: 2,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+  },
+  ratingMax: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginLeft: 2,
   },
   onlineToggleContainer: {
     backgroundColor: '#FFFFFF',

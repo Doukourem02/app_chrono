@@ -377,6 +377,14 @@ class UserOrderSocketService {
       contactId?: string;
     };
     packageImages?: string[];
+    // Informations de paiement
+    paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred';
+    paymentMethodId?: string | null; // ID de la méthode de paiement depuis payment_methods
+    paymentPayerType?: 'client' | 'recipient';
+    isPartialPayment?: boolean;
+    partialAmount?: number;
+    recipientUserId?: string;
+    recipientIsRegistered?: boolean;
   }) {
     return new Promise<boolean>(async (resolve) => {
       if (!this.socket || !this.userId) {

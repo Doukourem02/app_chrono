@@ -6,6 +6,7 @@ import { useShipmentStore } from '../store/useShipmentStore';
 import { logger } from '../utils/logger';
 import { useErrorHandler } from '../utils/errorHandler';
 import { config } from '../config';
+import { locationService } from '../services/locationService';
 
 type Coordinates = {
   latitude: number;
@@ -401,20 +402,16 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     
     (async () => {
       try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
+        // Utiliser le service centralisé de localisation
+        const coords = await locationService.getCurrentPosition();
+        
+        if (!coords || !isMounted) {
+          if (!isMounted) return;
           Alert.alert('Permission refusée', 'Activez la localisation pour utiliser la carte.');
           return;
         }
 
-        // Configuration plus précise pour la géolocalisation
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation, // Précision maximale
-        });
-        
-        if (!isMounted) return;
-        
-        const { latitude, longitude } = location.coords;
+        const { latitude, longitude } = coords;
 
         const newRegion: Region = {
           latitude,
@@ -426,12 +423,28 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         setRegion(newRegion);
         setPickupCoords({ latitude, longitude });
 
-        // Utiliser Google Geocoding API pour plus de précision
-        await getReverseGeocode(latitude, longitude);
+        // Utiliser le service centralisé de localisation pour le reverse geocoding
+        // Cela garantit la cohérence avec Google Maps
+        const address = await locationService.reverseGeocode({
+          latitude,
+          longitude,
+          timestamp: Date.now(),
+        }, GOOGLE_API_KEY);
         
-      } catch {
+        // Si le service centralisé n'a pas retourné d'adresse, utiliser la fonction locale
+        if (!address && GOOGLE_API_KEY && !GOOGLE_API_KEY.startsWith('<')) {
+          await getReverseGeocode(latitude, longitude);
+        } else if (address) {
+          // Mettre à jour l'adresse de pickup avec l'adresse du service
+          useShipmentStore.getState().setPickupLocation(address);
+        }
+        
+        // Démarrer le suivi continu de la position (optimisé pour la batterie)
+        await locationService.startWatching();
+        
+      } catch (error) {
         if (isMounted) {
-          logger.error('Location permission or access failed', 'useMapLogic');
+          logger.error('Location permission or access failed', 'useMapLogic', error);
           Alert.alert('Erreur', 'Impossible d\'accéder à votre position');
         }
       }
@@ -439,6 +452,8 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
 
     return () => {
       isMounted = false;
+      // Ne pas arrêter le watch ici car il peut être utilisé ailleurs
+      // Le service gère son propre cycle de vie
     };
   }, [GOOGLE_API_KEY]);
 

@@ -224,8 +224,8 @@ export default function ProfilePage() {
               <Text style={styles.statNumber}>
                 {isLoadingStats ? '...' : formatCurrency(statistics.totalSaved)}
               </Text>
-              <Text style={styles.statLabel}>Économies</Text>
-              <Text style={styles.statSubLabel}>Total</Text>
+              <Text style={styles.statLabel}>Reste à payer</Text>
+              <Text style={styles.statSubLabel}>Paiement différé</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>

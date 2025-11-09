@@ -86,18 +86,10 @@ export default function ShipmentList() {
       });
 
       if (result.success && result.data) {
-      
-        console.log('📦 Commandes reçues:', result.data.length);
-        result.data.forEach((order: any) => {
-          console.log(`  - Commande ${order.id}:`, {
-            status: order.status,
-            created_at: order.created_at,
-            pickup: order.pickup,
-            dropoff: order.dropoff,
-            estimated_duration: order.estimated_duration,
-            distance: order.distance,
-          });
-        });
+        // Log réduit pour éviter la pollution du terminal
+        if (__DEV__ && result.data.length > 0) {
+          console.debug('📦 Commandes reçues:', result.data.length);
+        }
 
         const formattedOrders = result.data.map((order: any) => {
           
@@ -138,16 +130,7 @@ export default function ShipmentList() {
           const pickupAddress = order.pickup_address_text || pickup?.address || '';
           const dropoffAddress = order.dropoff_address_text || dropoff?.address || '';
 
-         
-          console.log(`📋 Commande ${order.id} parsée:`, {
-            pickupAddress: pickupAddress,
-            dropoffAddress: dropoffAddress,
-            eta_minutes: order.eta_minutes,
-            estimated_duration: order.estimated_duration,
-            estimatedDuration: order.estimatedDuration,
-            dropoffRaw: dropoffData,
-            dropoffParsed: dropoff,
-          });
+          // Log supprimé pour réduire la pollution du terminal
 
           return {
             id: order.id,
@@ -323,12 +306,7 @@ export default function ShipmentList() {
         // Toujours afficher au minimum 2 commandes si elles existent
         // Limiter à maximum 2 commandes
         const finalOrders = displayOrders.slice(0, 2);
-        console.log('📋 Commandes finales à afficher:', finalOrders.length, finalOrders.map(o => ({ 
-          id: o.id, 
-          status: o.status,
-          progressColor: getProgressColor(o.status),
-          backgroundColor: getBackgroundColor(o.status)
-        })));
+        // Log supprimé pour réduire la pollution du terminal
 
         setOrders(finalOrders);
       } else {
@@ -361,7 +339,7 @@ export default function ShipmentList() {
         
         // Si le statut a changé (notamment vers "completed"), rafraîchir la liste
         if (previousStatus !== null && previousStatus !== newStatus) {
-          console.log('🔄 Changement de statut détecté:', previousStatus, '->', newStatus, 'Rafraîchissement de la liste...');
+          // Log supprimé pour réduire la pollution du terminal
           // Rafraîchir la liste après un court délai pour laisser le temps au serveur de mettre à jour
           setTimeout(() => {
             loadOrders();
@@ -372,7 +350,7 @@ export default function ShipmentList() {
       } else {
         // Si la commande actuelle est supprimée, rafraîchir aussi
         if (previousStatus !== null) {
-          console.log('🔄 Commande supprimée, rafraîchissement de la liste...');
+          // Log supprimé pour réduire la pollution du terminal
           setTimeout(() => {
             loadOrders();
           }, 500);
@@ -397,7 +375,7 @@ export default function ShipmentList() {
 
     if (hasInProgressOrders) {
       const interval = setInterval(() => {
-        console.log('🔄 Rafraîchissement automatique de la liste (commande en cours détectée)...');
+        // Log supprimé pour réduire la pollution du terminal
         loadOrders();
       }, 5000); // Rafraîchir toutes les 5 secondes
 

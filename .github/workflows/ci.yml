@@ -1,0 +1,153 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  # Job 1: Build & Test
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: chrono_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: chrono_backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./chrono_backend
+        run: npm ci
+
+      - name: Build TypeScript
+        working-directory: ./chrono_backend
+        run: npm run build
+
+      - name: Run tests
+        working-directory: ./chrono_backend
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/chrono_test
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL || 'postgresql://test:test@localhost:5432/chrono_test' }}
+          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-testing
+          SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL || 'https://test.supabase.co' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_KEY || 'test-service-role-key' }}
+          LOG_LEVEL: error
+        run: npm test
+
+      - name: Upload test coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage
+          path: chrono_backend/coverage/
+          retention-days: 7
+
+  # Job 2: Security Scan
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: chrono_backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./chrono_backend
+        run: npm ci
+
+      - name: Run npm audit
+        working-directory: ./chrono_backend
+        run: npm audit --audit-level=moderate || true
+        continue-on-error: true
+
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+
+  # Job 3: Dependencies Check
+  dependencies-check:
+    name: Dependencies Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: chrono_backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./chrono_backend
+        run: npm ci
+
+      - name: Check outdated packages
+        working-directory: ./chrono_backend
+        run: npm outdated || true
+        continue-on-error: true
+
+  # Job 4: Lint & Type Check (optional)
+  lint-and-type-check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: chrono_backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./chrono_backend
+        run: npm ci
+
+      - name: TypeScript type check
+        working-directory: ./chrono_backend
+        run: npx tsc --noEmit
+

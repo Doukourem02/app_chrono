@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import * as Location from 'expo-location';
 import { logger } from '../utils/logger';
 import { Alert } from 'react-native';
+import { locationService } from '../services/locationService';
 
 interface LocationState {
   coords: { latitude: number; longitude: number } | null;
@@ -28,81 +28,82 @@ export const useLocation = () => {
   } | null>(null);
 
   const reverseGeocodeWithCache = useCallback(async (coords: { latitude: number; longitude: number }) => {
-    const coordsKey = `${coords.latitude.toFixed(4)},${coords.longitude.toFixed(4)}`;
-    const now = Date.now();
-    const cacheExpiry = 5 * 60 * 1000; // 5 minutes
-
-    // Vérifier le cache
-    if (lastReverseGeocode && 
-        lastReverseGeocode.coords === coordsKey && 
-        now - lastReverseGeocode.timestamp < cacheExpiry) {
-      setState(prev => ({ ...prev, address: lastReverseGeocode.address }));
-      return;
-    }
-
+    // Utiliser le service centralisé de localisation pour le reverse geocoding
+    // Le service utilisera automatiquement Google Geocoding API si disponible
     try {
-      const geocoded = await Location.reverseGeocodeAsync(coords);
+      const address = await locationService.reverseGeocode({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        timestamp: Date.now(),
+      });
       
-      if (geocoded && geocoded.length > 0) {
-        const place = geocoded[0];
-        const addressParts = [place.name, place.street, place.city || place.region];
-        const address = addressParts.filter(Boolean).join(', ');
-        
-        if (address) {
-          setState(prev => ({ ...prev, address }));
-          setLastReverseGeocode({
-            coords: coordsKey,
-            address,
-            timestamp: now,
-          });
-        }
+      if (address) {
+        setState(prev => ({ ...prev, address }));
       }
     } catch (error: any) {
       // Ne pas faire échouer toute l'opération pour un échec de géocodage inverse
       logger.warn('Reverse geocoding failed', 'useLocation', {
         message: error.message,
-        coords: coordsKey,
+        coords: `${coords.latitude.toFixed(6)},${coords.longitude.toFixed(6)}`,
       });
       // Pas d'erreur utilisateur pour éviter le spam
     }
-  }, [lastReverseGeocode]);
+  }, []);
 
   const requestLocation = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Vérifier les permissions
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // Utiliser le service centralisé de localisation
+      const coords = await locationService.getCurrentPosition();
       
-      if (status !== 'granted') {
+      if (!coords) {
+        const hasPermission = await locationService.checkPermissions();
+        if (!hasPermission) {
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: 'Permission de localisation refusée',
+            hasPermission: false,
+          }));
+          Alert.alert('Permission refusée', 'Activez la localisation pour utiliser cette fonctionnalité.');
+          return null;
+        }
+        
+        // Réessayer après avoir demandé les permissions
+        const retryCoords = await locationService.getCurrentPosition(true);
+        if (!retryCoords) {
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: 'Erreur lors de la géolocalisation',
+            hasPermission: false,
+          }));
+          return null;
+        }
+        
+        const coordsToUse = retryCoords;
         setState(prev => ({
           ...prev,
+          coords: { latitude: coordsToUse.latitude, longitude: coordsToUse.longitude },
+          hasPermission: true,
           loading: false,
-          error: 'Permission de localisation refusée',
-          hasPermission: false,
         }));
-        Alert.alert('Permission refusée', 'Activez la localisation pour utiliser cette fonctionnalité.');
-        return null;
+        
+        await reverseGeocodeWithCache(coordsToUse);
+        return { latitude: coordsToUse.latitude, longitude: coordsToUse.longitude };
       }
 
-      setState(prev => ({ ...prev, hasPermission: true }));
-
-      // Obtenir la position actuelle
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced, // Balance entre précision et vitesse
-      });
-
-      const coords = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-
-      setState(prev => ({ ...prev, coords, loading: false }));
-
+      setState(prev => ({
+        ...prev,
+        coords: { latitude: coords.latitude, longitude: coords.longitude },
+        hasPermission: true,
+        loading: false,
+      }));
 
       await reverseGeocodeWithCache(coords);
       
-      return coords;
+      return { latitude: coords.latitude, longitude: coords.longitude };
 
     } catch (error: any) {
       logger.error('Location request failed', 'useLocation', error);

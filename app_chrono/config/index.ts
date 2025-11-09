@@ -5,6 +5,7 @@ export const config = {
   googleApiKey: Constants.expoConfig?.extra?.googleApiKey || process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
   apiUrl: Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
   socketUrl: Constants.expoConfig?.extra?.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
+  sentryDsn: Constants.expoConfig?.extra?.sentryDsn || process.env.EXPO_PUBLIC_SENTRY_DSN,
   
   // App Configuration
   app: {

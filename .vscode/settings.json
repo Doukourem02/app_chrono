@@ -1,0 +1,11 @@
+{
+  "typescript.tsdk": "chrono_backend/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "files.associations": {
+    "**/tests/**/*.ts": "typescript"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  }
+}
+

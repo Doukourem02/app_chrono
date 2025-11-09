@@ -13,13 +13,57 @@ class ApiService {
     return useDriverStore.getState().accessToken;
   }
 
+  private isTokenValid(token: string): boolean {
+    try {
+      // Décoder le payload du JWT (sans vérification de signature)
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        return false;
+      }
+
+      // Décoder le payload (base64url)
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+      // Vérifier l'expiration (exp est en secondes)
+      if (payload.exp) {
+        const expirationTime = payload.exp * 1000; // Convertir en millisecondes
+        const now = Date.now();
+        const isExpired = now >= expirationTime;
+        
+        if (isExpired) {
+          if (__DEV__) {
+            console.debug('⚠️ Token expiré, expiration:', new Date(expirationTime).toISOString());
+          }
+          return false;
+        }
+        
+        // Token valide si pas expiré
+        return true;
+      }
+
+      // Si pas d'expiration définie, considérer comme valide (mais ça ne devrait pas arriver)
+      if (__DEV__) {
+        console.warn('⚠️ Token sans expiration définie');
+      }
+      return true;
+    } catch (error) {
+      if (__DEV__) {
+        console.error('❌ Erreur vérification token:', error);
+      }
+      // En cas d'erreur de décodage, considérer comme invalide
+      return false;
+    }
+  }
+
   private async ensureAccessToken(): Promise<{ token: string | null; reason?: 'missing' | 'refresh_failed' }> {
     const { accessToken, refreshToken, setTokens, logout } = useDriverStore.getState();
 
-    if (accessToken) {
+    // Vérifier si le token existe et s'il n'est pas expiré
+    if (accessToken && this.isTokenValid(accessToken)) {
       return { token: accessToken };
     }
 
+    // Si le token est expiré ou absent, essayer de le rafraîchir
     if (!refreshToken) {
       return { token: null, reason: 'missing' };
     }
@@ -30,7 +74,7 @@ class ApiService {
       return { token: newAccessToken };
     }
 
-    logout();
+    // Ne pas déconnecter automatiquement, laisser l'appelant gérer l'erreur
     return { token: null, reason: 'refresh_failed' };
   }
 
@@ -88,21 +132,69 @@ class ApiService {
         Authorization: `Bearer ${tokenResult.token}`,
       };
       
-      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/status`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(statusData),
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/status`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(statusData),
+        });
+      } catch (fetchError: any) {
+        // Erreur réseau (backend inaccessible, timeout, etc.)
+        if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
+          if (__DEV__) {
+            console.warn('⚠️ Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+          }
+          return {
+            success: false,
+            message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+          };
+        }
+        throw fetchError;
+      }
       
-      const result = await response.json();
+      let result: any;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
+        if (__DEV__) {
+          console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
+        }
+        return {
+          success: false,
+          message: `Erreur serveur (${response.status}). Veuillez réessayer plus tard.`,
+        };
+      }
       
       if (!response.ok) {
-        throw new Error(result.message || 'Erreur mise à jour statut');
+        // Si l'erreur est 401 (non autorisé), c'est probablement un token expiré
+        if (response.status === 401) {
+          return {
+            success: false,
+            message: 'Session expirée. Veuillez vous reconnecter.',
+          };
+        }
+        return {
+          success: false,
+          message: result.message || `Erreur mise à jour statut (${response.status})`,
+        };
       }
       
       return result;
     } catch (error) {
-      console.error('❌ Erreur updateDriverStatus:', error);
+      if (__DEV__) {
+        console.error('❌ Erreur updateDriverStatus:', error);
+      }
+      
+      // Gérer spécifiquement les erreurs réseau
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        return {
+          success: false,
+          message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+        };
+      }
+      
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -206,27 +298,152 @@ class ApiService {
         Authorization: `Bearer ${tokenResult.token}`,
       };
       
-      console.log('🔍 [apiService.getDriverRevenues] Appel API:', url);
-      
-      const response = await fetch(url, {
+      let response: Response;
+      try {
+      if (__DEV__) {
+        console.debug('🔍 [apiService.getDriverRevenues] Appel API:', url);
+      }
+      response = await fetch(url, {
         method: 'GET',
         headers,
       });
       
-      console.log('📡 [apiService.getDriverRevenues] Status:', response.status, response.statusText);
+      if (__DEV__) {
+        console.debug('📡 [apiService.getDriverRevenues] Status:', response.status, response.statusText);
+      }
+      } catch (fetchError: any) {
+        // Erreur réseau (backend inaccessible, timeout, etc.)
+        if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
+          if (__DEV__) {
+            console.warn('⚠️ Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+          }
+          return {
+            success: false,
+            message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+            data: {
+              period,
+              totalEarnings: 0,
+              totalDeliveries: 0,
+              totalDistance: 0,
+              averageEarningPerDelivery: 0,
+              averageDistance: 0,
+              earningsByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+              deliveriesByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+              earningsByDay: {},
+              orders: [],
+            },
+          };
+        }
+        throw fetchError;
+      }
       
-      const result = await response.json();
-      
-      console.log('📦 [apiService.getDriverRevenues] Réponse:', JSON.stringify(result, null, 2));
+      let result: any;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
+        if (__DEV__) {
+          console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
+        }
+        return {
+          success: false,
+          message: `Erreur serveur (${response.status}). Veuillez réessayer plus tard.`,
+          data: {
+            period,
+            totalEarnings: 0,
+            totalDeliveries: 0,
+            totalDistance: 0,
+            averageEarningPerDelivery: 0,
+            averageDistance: 0,
+            earningsByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+            deliveriesByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+            earningsByDay: {},
+            orders: [],
+          },
+        };
+      }
       
       if (!response.ok) {
-        console.error('❌ [apiService.getDriverRevenues] Erreur HTTP:', result);
-        throw new Error(result.message || 'Erreur récupération revenus');
+        // Si l'erreur est 401 (non autorisé), c'est probablement un token expiré
+        if (response.status === 401) {
+          if (__DEV__) {
+            console.warn('⚠️ [apiService.getDriverRevenues] Session expirée (401)');
+          }
+          return {
+            success: false,
+            message: 'Session expirée. Veuillez vous reconnecter.',
+            data: {
+              period,
+              totalEarnings: 0,
+              totalDeliveries: 0,
+              totalDistance: 0,
+              averageEarningPerDelivery: 0,
+              averageDistance: 0,
+              earningsByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+              deliveriesByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+              earningsByDay: {},
+              orders: [],
+            },
+          };
+        }
+        
+        if (__DEV__) {
+          console.error('❌ [apiService.getDriverRevenues] Erreur HTTP:', response.status, result);
+        }
+        return {
+          success: false,
+          message: result.message || `Erreur récupération revenus (${response.status})`,
+          data: {
+            period,
+            totalEarnings: 0,
+            totalDeliveries: 0,
+            totalDistance: 0,
+            averageEarningPerDelivery: 0,
+            averageDistance: 0,
+            earningsByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+            deliveriesByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+            earningsByDay: {},
+            orders: [],
+          },
+        };
+      }
+      
+      // Vérifier si le résultat contient des données valides
+      if (__DEV__ && result.success && result.data) {
+        const hasData = result.data.totalDeliveries > 0 || 
+                       result.data.totalEarnings > 0 || 
+                       (result.data.orders && result.data.orders.length > 0);
+        if (!hasData) {
+          console.debug('ℹ️ [apiService.getDriverRevenues] Réponse OK mais données vides (pas de livraisons)');
+        }
       }
       
       return result;
     } catch (error) {
-      console.error('❌ Erreur getDriverRevenues:', error);
+      if (__DEV__) {
+        console.error('❌ Erreur getDriverRevenues:', error);
+      }
+      
+      // Gérer spécifiquement les erreurs réseau
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        return {
+          success: false,
+          message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+          data: {
+            period: options?.period || 'today',
+            totalEarnings: 0,
+            totalDeliveries: 0,
+            totalDistance: 0,
+            averageEarningPerDelivery: 0,
+            averageDistance: 0,
+            earningsByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+            deliveriesByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+            earningsByDay: {},
+            orders: [],
+          },
+        };
+      }
+      
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -294,11 +511,13 @@ class ApiService {
     };
   }> {
     try {
-      const accessToken = await this.ensureAccessToken();
-      if (!accessToken) {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
         return {
           success: false,
-          message: 'Session expirée. Veuillez vous reconnecter.',
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
           data: {
             completedDeliveries: 0,
             averageRating: 5.0,
@@ -309,18 +528,91 @@ class ApiService {
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${tokenResult.token}`,
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/statistics`, {
-        method: 'GET',
-        headers,
-      });
+      let response: Response;
+      try {
+        if (__DEV__) {
+          console.debug('🔍 [apiService.getDriverStatistics] Appel API:', `${API_BASE_URL}/api/drivers/${userId}/statistics`);
+        }
+        response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/statistics`, {
+          method: 'GET',
+          headers,
+        });
+        if (__DEV__) {
+          console.debug('📡 [apiService.getDriverStatistics] Status:', response.status, response.statusText);
+        }
+      } catch (fetchError: any) {
+        if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
+          if (__DEV__) {
+            console.warn('⚠️ Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+          }
+          return {
+            success: false,
+            message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+            data: {
+              completedDeliveries: 0,
+              averageRating: 5.0,
+              totalEarnings: 0
+            }
+          };
+        }
+        throw fetchError;
+      }
 
-      const result = await response.json();
+      let result: any;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        if (__DEV__) {
+          console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
+        }
+        return {
+          success: false,
+          message: `Erreur serveur (${response.status}). Veuillez réessayer plus tard.`,
+          data: {
+            completedDeliveries: 0,
+            averageRating: 5.0,
+            totalEarnings: 0
+          }
+        };
+      }
 
       if (!response.ok) {
-        throw new Error(result.message || 'Erreur récupération statistiques');
+        if (response.status === 401) {
+          if (__DEV__) {
+            console.warn('⚠️ [apiService.getDriverStatistics] Session expirée (401)');
+          }
+          return {
+            success: false,
+            message: 'Session expirée. Veuillez vous reconnecter.',
+            data: {
+              completedDeliveries: 0,
+              averageRating: 5.0,
+              totalEarnings: 0
+            }
+          };
+        }
+        if (__DEV__) {
+          console.error('❌ [apiService.getDriverStatistics] Erreur HTTP:', response.status, result);
+        }
+        return {
+          success: false,
+          message: result.message || `Erreur récupération statistiques (${response.status})`,
+          data: {
+            completedDeliveries: 0,
+            averageRating: 5.0,
+            totalEarnings: 0
+          }
+        };
+      }
+
+      if (__DEV__ && result.success && result.data) {
+        const hasData = result.data.completedDeliveries > 0 || result.data.totalEarnings > 0;
+        if (!hasData) {
+          console.debug('ℹ️ [apiService.getDriverStatistics] Réponse OK mais données vides (pas de livraisons)');
+        }
       }
 
       return result;

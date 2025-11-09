@@ -1,4 +1,6 @@
 // Service API pour l'application utilisateur
+import { useAuthStore } from '../store/useAuthStore';
+
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? 'http://localhost:4000' : 'https://votre-api.com');
 
 class UserApiService {
@@ -117,24 +119,77 @@ class UserApiService {
       
       const token = await this.ensureAccessToken();
       if (!token) {
-        throw new Error('Session expirée. Veuillez vous reconnecter.');
+        // Retourner une erreur gracieuse sans lancer d'exception
+        return {
+          success: false,
+          message: 'Session expirée. Veuillez vous reconnecter.',
+          data: []
+        };
       }
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
       
-      const result = await response.json();
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (fetchError: any) {
+        // Erreur réseau (backend inaccessible, timeout, etc.)
+        if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
+          console.warn('⚠️ Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+          return {
+            success: false,
+            message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+            data: []
+          };
+        }
+        throw fetchError;
+      }
+      
+      let result: any;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
+        console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
+        return {
+          success: false,
+          message: `Erreur serveur (${response.status}). Veuillez réessayer plus tard.`,
+          data: []
+        };
+      }
       
       if (!response.ok) {
-        throw new Error(result.message || 'Erreur récupération commandes');
+        // Si l'erreur est 401 (non autorisé), c'est probablement un token expiré
+        if (response.status === 401) {
+          return {
+            success: false,
+            message: 'Session expirée. Veuillez vous reconnecter.',
+            data: []
+          };
+        }
+        return {
+          success: false,
+          message: result.message || `Erreur récupération commandes (${response.status})`,
+          data: []
+        };
       }
       
       return result;
     } catch (error) {
       console.error('❌ Erreur getUserDeliveries:', error);
+      
+      // Gérer spécifiquement les erreurs réseau
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        return {
+          success: false,
+          message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+          data: []
+        };
+      }
+      
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -180,7 +235,6 @@ class UserApiService {
 
   private async ensureAccessToken(): Promise<string | null> {
     try {
-      const { useAuthStore } = require('../store/useAuthStore');
       const {
         accessToken,
         refreshToken,
@@ -195,7 +249,16 @@ class UserApiService {
 
       // Si le token est expiré ou absent, essayer de le rafraîchir
       if (!refreshToken) {
-        console.warn('⚠️ Pas de refreshToken disponible');
+        console.warn('⚠️ Pas de refreshToken disponible - session expirée');
+        // Ne pas déconnecter automatiquement, laisser l'appelant gérer l'erreur
+        // L'utilisateur pourra se reconnecter si nécessaire
+        return null;
+      }
+
+      // Vérifier si le refresh token est encore valide
+      if (!this.isTokenValid(refreshToken)) {
+        console.warn('⚠️ Refresh token expiré - session expirée');
+        // Ne pas déconnecter automatiquement, laisser l'appelant gérer l'erreur
         return null;
       }
 
@@ -203,13 +266,12 @@ class UserApiService {
       const newAccessToken = await this.refreshAccessToken(refreshToken);
       if (newAccessToken) {
         setTokens({ accessToken: newAccessToken, refreshToken });
-        console.log('✅ Token rafraîchi avec succès');
+        console.log('✅ Token rafraîchi et sauvegardé avec succès');
         return newAccessToken;
       }
 
-      // Impossible de rafraîchir => déconnexion propre
-      console.error('❌ Impossible de rafraîchir le token, déconnexion...');
-      logout();
+      // Impossible de rafraîchir => retourner null sans déconnecter
+      console.warn('⚠️ Impossible de rafraîchir le token - session expirée');
       return null;
     } catch (error) {
       console.error('❌ Erreur ensureAccessToken:', error);
@@ -260,6 +322,8 @@ class UserApiService {
 
   private async refreshAccessToken(refreshToken: string): Promise<string | null> {
     try {
+      console.log('🔄 Tentative de rafraîchissement du token...');
+      
       const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
         method: 'POST',
         headers: {
@@ -270,13 +334,28 @@ class UserApiService {
 
       const result = await response.json();
 
-      if (!response.ok || !result.success || !result.data?.accessToken) {
+      if (!response.ok) {
+        console.error('❌ Erreur HTTP lors du rafraîchissement:', response.status, result.message);
         return null;
       }
 
+      if (!result.success) {
+        console.error('❌ Échec du rafraîchissement:', result.message);
+        return null;
+      }
+
+      if (!result.data?.accessToken) {
+        console.error('❌ Pas de accessToken dans la réponse:', result);
+        return null;
+      }
+
+      console.log('✅ Token rafraîchi avec succès');
       return result.data.accessToken as string;
     } catch (error) {
-      console.error('❌ Erreur refreshAccessToken:', error);
+      console.error('❌ Erreur réseau lors du rafraîchissement:', error);
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        console.error('❌ Impossible de se connecter au serveur. Vérifiez que le backend est démarré sur', API_BASE_URL);
+      }
       return null;
     }
   }

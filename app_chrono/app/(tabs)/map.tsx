@@ -1,11 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as Location from 'expo-location';
-import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert, Animated, Dimensions } from 'react-native';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 import MapView from 'react-native-maps';
 import { useShipmentStore } from '../../store/useShipmentStore';
 import { useMapLogic } from '../../hooks/useMapLogic';
@@ -18,14 +15,19 @@ import { DeliveryMapView } from '../../components/DeliveryMapView';
 import { DeliveryBottomSheet } from '../../components/DeliveryBottomSheet';
 import { DeliveryMethodBottomSheet } from '../../components/DeliveryMethodBottomSheet';
 import { OrderDetailsSheet } from '../../components/OrderDetailsSheet';
-// Explicit extension to help some editors/resolvers find the file reliably
 import TrackingBottomSheet from '../../components/TrackingBottomSheet.tsx';
 import RatingBottomSheet from '../../components/RatingBottomSheet';
+import PaymentBottomSheet from '../../components/PaymentBottomSheet';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useRatingStore } from '../../store/useRatingStore';
+import { usePaymentStore } from '../../store/usePaymentStore';
 import { logger } from '../../utils/logger';
 import { calculatePrice, estimateDurationMinutes, formatDurationLabel, getDistanceInKm } from '../../services/orderApi';
+import { locationService } from '../../services/locationService';
+import { paymentApi } from '../../services/paymentApi';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type Coordinates = {
   latitude: number;
@@ -36,9 +38,24 @@ export default function MapPage() {
   const { requireAuth } = useRequireAuth();
   const { setSelectedMethod } = useShipmentStore();
   const { user } = useAuthStore();
+  const { loadPaymentMethods } = usePaymentStore();
   
   const mapRef = useRef<MapView | null>(null);
   const hasInitializedRef = useRef<boolean>(false);
+  
+  // État pour le paiement
+  const [showPaymentSheet, setShowPaymentSheet] = React.useState(false);
+  const [paymentPayerType, setPaymentPayerType] = React.useState<'client' | 'recipient'>('client');
+  const [selectedPaymentMethodType, setSelectedPaymentMethodType] = React.useState<'orange_money' | 'wave' | 'cash' | 'deferred' | null>(null);
+  const [recipientInfo, setRecipientInfo] = React.useState<{
+    userId?: string;
+    phone?: string;
+    isRegistered?: boolean;
+  }>({});
+  const [paymentPartialInfo, setPaymentPartialInfo] = React.useState<{
+    isPartial?: boolean;
+    partialAmount?: number;
+  }>({});
 
   // Vérifier l'authentification dès l'accès à la page
   useEffect(() => {
@@ -57,6 +74,24 @@ export default function MapPage() {
       userOrderSocketService.disconnect();
     };
   }, [user?.id]);
+
+  // 💳 Charger les méthodes de paiement au montage
+  useEffect(() => {
+    if (user?.id) {
+      loadPaymentMethods();
+    }
+  }, [user?.id, loadPaymentMethods]);
+
+  // 🗺️ Nettoyer le service de localisation quand on quitte la page
+  useEffect(() => {
+    // Démarrer le watch de localisation au montage
+    locationService.startWatching();
+    
+    return () => {
+      // Arrêter le watch quand on quitte la page (mais pas le nettoyer complètement car il peut être utilisé ailleurs)
+      // On laisse le service gérer son cycle de vie
+    };
+  }, []);
 
   // Hooks personnalisés pour séparer la logique
   const {
@@ -202,6 +237,47 @@ export default function MapPage() {
   const orderDriverCoords = useOrderStore((s) => s.driverCoords);
   const currentOrder = useOrderStore((s) => s.currentOrder);
   const pendingOrder = useOrderStore((s) => s.pendingOrder);
+  const deliveryStage = useOrderStore((s) => s.deliveryStage);
+  
+  // Écouter l'acceptation de la commande par le livreur pour gérer le paiement
+  // Le paiement se fait APRÈS l'acceptation, pas avant
+  useEffect(() => {
+    // Vérifier si la commande a été acceptée (status = 'accepted' ou deliveryStage = 'accepted')
+    const orderStatus = currentOrder?.status || pendingOrder?.status;
+    
+    // Gérer le paiement seulement si :
+    // 1. La commande est acceptée (status = 'accepted' ou deliveryStage = 'accepted')
+    // 2. Le bottom sheet de paiement n'est pas déjà affiché
+    // 3. On a une commande en cours
+    // 4. Le paiement n'a pas déjà été effectué (vérifier si la commande a déjà un payment_status = 'paid')
+    if ((orderStatus === 'accepted' || deliveryStage === 'accepted') && !showPaymentSheet && (currentOrder || pendingOrder)) {
+      // Vérifier si le paiement n'a pas déjà été effectué
+      const order = currentOrder || pendingOrder;
+      const paymentStatus = (order as any)?.payment_status;
+      
+      // Si le paiement n'est pas déjà effectué
+      if (paymentStatus !== 'paid') {
+        // Si c'est un paiement en espèces ou différé, on ne demande pas de paiement électronique
+        // On considère que le paiement sera effectué à la livraison
+        if (selectedPaymentMethodType === 'cash' || selectedPaymentMethodType === 'deferred') {
+          // Pour espèces ou différé, on ne demande pas de paiement électronique
+          // Le paiement sera confirmé à la livraison
+          console.log('✅ Paiement en espèces ou différé - pas de paiement électronique requis');
+          return;
+        }
+        
+        // Pour Orange Money, Wave, ou si aucune méthode n'est choisie, afficher le bottom sheet de paiement
+        if (selectedPaymentMethodType === 'orange_money' || selectedPaymentMethodType === 'wave' || !selectedPaymentMethodType) {
+          // Attendre un peu pour que la commande soit bien mise à jour
+          const timer = setTimeout(() => {
+            setShowPaymentSheet(true);
+          }, 500);
+          
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [currentOrder?.status, pendingOrder?.status, deliveryStage, showPaymentSheet, currentOrder, pendingOrder, selectedPaymentMethodType]);
 
   // Réinitialiser l'état si on revient sur la page avec une commande en attente bloquée
   // (par exemple après avoir quitté et réouvert l'app)
@@ -320,13 +396,11 @@ export default function MapPage() {
     
     // 🆕 Récupérer la position actuelle du client et recentrer la carte
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        
-        const { latitude, longitude } = currentLocation.coords;
+      // Utiliser le service centralisé de localisation
+      const coords = await locationService.getCurrentPosition();
+      
+      if (coords) {
+        const { latitude, longitude } = coords;
         
         // Mettre à jour les coordonnées de pickup avec la position actuelle
         setPickupCoords({ latitude, longitude });
@@ -336,7 +410,7 @@ export default function MapPage() {
           animateToCoordinate({ latitude, longitude }, 0.01);
         }, 100);
       } else {
-        // Fallback sur region si pas de permission
+        // Fallback sur region si pas de permission ou erreur
         if (region) {
           setTimeout(() => {
             animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
@@ -576,8 +650,6 @@ export default function MapPage() {
     collapseBottomSheet();
     setTimeout(() => {
       // Utiliser une hauteur maximale plus grande pour ce bottom sheet (85% de l'écran)
-      const { Dimensions } = require('react-native');
-      const { height: SCREEN_HEIGHT } = Dimensions.get('window');
       const MAX_HEIGHT = SCREEN_HEIGHT * 0.85;
       
       // Animer vers la hauteur maximale
@@ -612,56 +684,6 @@ export default function MapPage() {
     return { price, estimatedTime };
   }, [pickupCoords, dropoffCoords, selectedMethod]);
 
-  // Fonction pour créer la commande avec toutes les informations
-  const handleCreateOrder = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user && selectedMethod) {
-      console.log('📦 Envoi commande...');
-      
-      const orderData = {
-        pickup: {
-          address: pickupLocation,
-          coordinates: pickupCoords
-        },
-        dropoff: {
-          address: deliveryLocation,
-          coordinates: dropoffCoords
-        },
-        deliveryMethod: selectedMethod as 'moto' | 'vehicule' | 'cargo',
-        userInfo: {
-          name: user.email?.split('@')[0] || 'Client',
-          rating: 4.5,
-          phone: user.phone
-        },
-      };
-      
-      const success = await userOrderSocketService.createOrder(orderData);
-      if (success) {
-        collapseDeliveryMethodSheet();
-        startDriverSearch();
-      } else {
-        Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
-      }
-    }
-    
-    try {
-      if (pickupCoords && dropoffCoords) {
-        await fetchRoute(pickupCoords, dropoffCoords);
-      }
-    } catch {
-      // Ignorer les erreurs de route
-    }
-
-    if (pickupCoords) {
-      animateToCoordinate(pickupCoords, 0.01);
-    }
-
-    if (!isSearchingDriver) {
-      startDriverSearch();
-    }
-  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, fetchRoute, animateToCoordinate, isSearchingDriver, startDriverSearch, collapseDeliveryMethodSheet]);
-
   const handleConfirm = async () => {
     // Ouvrir le bottom sheet de méthode de livraison
     handleShowDeliveryMethod();
@@ -687,7 +709,11 @@ export default function MapPage() {
   // Handler pour confirmer depuis OrderDetailsSheet - Crée la commande avec tous les détails
   const handleOrderDetailsConfirm = useCallback(async (
     pickupDetails: any,
-    dropoffDetails: any
+    dropoffDetails: any,
+    payerType?: 'client' | 'recipient', // Qui paie (optionnel, par défaut client)
+    isPartialPayment?: boolean,
+    partialAmount?: number,
+    paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred' // Méthode de paiement choisie
   ) => {
     // Créer la commande avec toutes les informations détaillées
     if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user && selectedMethod) {
@@ -715,17 +741,62 @@ export default function MapPage() {
           phone: dropoffDetails.phone,
         },
         packageImages: dropoffDetails.photos || [],
+        // Informations de paiement à envoyer au backend
+        paymentMethodType: paymentMethodType,
+        paymentMethodId: paymentMethodId || null, // ID de la méthode de paiement depuis payment_methods
+        paymentPayerType: payerType,
+        isPartialPayment: isPartialPayment,
+        partialAmount: isPartialPayment && partialAmount ? partialAmount : undefined,
+        recipientUserId: recipientInfo.userId,
+        recipientIsRegistered: recipientInfo.isRegistered,
       };
       
       const success = await userOrderSocketService.createOrder(orderData);
       if (success) {
         collapseOrderDetailsSheet();
-        startDriverSearch();
+        
+        // Vérifier si le destinataire est enregistré (si le destinataire paie)
+        let recipientIsRegistered = false;
+        let recipientUserId: string | undefined;
+        
+        if (payerType === 'recipient' && dropoffDetails.phone) {
+          try {
+            // Vérifier si le destinataire est enregistré via son téléphone
+            // TODO: Implémenter une API pour vérifier si un utilisateur est enregistré via son téléphone
+            // Pour l'instant, on suppose qu'il n'est pas enregistré
+            recipientIsRegistered = false;
+          } catch (error) {
+            console.error('Erreur vérification destinataire:', error);
+            recipientIsRegistered = false;
+          }
+        }
+        
+        // Définir qui paie (stocké pour plus tard, après acceptation)
+        setPaymentPayerType(payerType || 'client');
+        setSelectedPaymentMethodType(paymentMethodType || null); // Stocker la méthode de paiement choisie
+        setRecipientInfo({
+          phone: dropoffDetails.phone,
+          userId: recipientUserId,
+          isRegistered: recipientIsRegistered,
+        });
+        
+        // Si paiement partiel, stocker les informations
+        if (isPartialPayment && partialAmount) {
+          setPaymentPartialInfo({
+            isPartial: true,
+            partialAmount: partialAmount,
+          });
+        } else {
+          setPaymentPartialInfo({});
+        }
+        
+        // NE PAS afficher le paiement maintenant - attendre l'acceptation par le livreur
+        // Le paiement sera déclenché automatiquement quand la commande sera acceptée (voir useEffect ci-dessus)
       } else {
         Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
       }
     }
-  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, startDriverSearch]);
+  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet]);
 
   if (!region) {
     return (
@@ -863,8 +934,8 @@ export default function MapPage() {
                   deliveryLocation={deliveryLocation}
                   price={price}
                   estimatedTime={estimatedTime}
-                  pickupCoords={pickupCoords}
-                  dropoffCoords={dropoffCoords}
+                  pickupCoords={pickupCoords ?? undefined}
+                  dropoffCoords={dropoffCoords ?? undefined}
                   onMethodSelected={handleMethodSelected}
                   onConfirm={handleDeliveryMethodConfirm}
                   onBack={handleDeliveryMethodBack}
@@ -905,6 +976,57 @@ export default function MapPage() {
                 onToggle={toggleBottomSheet}
               />
             )}
+
+            {/* Afficher le bottom sheet de paiement après création de commande */}
+            {showPaymentSheet && pendingOrder && (() => {
+              const { price } = getPriceAndTime();
+              const distance = pickupCoords && dropoffCoords 
+                ? getDistanceInKm(pickupCoords, dropoffCoords)
+                : 0;
+              
+              return (
+                <PaymentBottomSheet
+                  orderId={pendingOrder.id}
+                  distance={distance}
+                  deliveryMethod={selectedMethod || 'moto'}
+                  price={pendingOrder.price || price}
+                  isUrgent={false}
+                  visible={showPaymentSheet}
+                  payerType={paymentPayerType}
+                  recipientUserId={recipientInfo.userId}
+                  recipientPhone={recipientInfo.phone}
+                  recipientIsRegistered={recipientInfo.isRegistered || false}
+                  initialIsPartial={paymentPartialInfo.isPartial}
+                  initialPartialAmount={paymentPartialInfo.partialAmount}
+                  preselectedPaymentMethod={selectedPaymentMethodType || undefined} // Passer la méthode déjà choisie
+                  onClose={() => {
+                    setShowPaymentSheet(false);
+                    // Si l'utilisateur ferme sans payer, demander confirmation
+                    Alert.alert(
+                      'Paiement requis',
+                      'Le paiement est requis pour continuer. Voulez-vous payer maintenant ?',
+                      [
+                        { text: 'Annuler', style: 'cancel', onPress: () => {
+                          // Annuler la commande si l'utilisateur ne veut pas payer
+                          useOrderStore.getState().clear();
+                        }},
+                        { text: 'Payer', onPress: () => setShowPaymentSheet(true) }
+                      ]
+                    );
+                  }}
+                  onPaymentSuccess={(transactionId) => {
+                    console.log('✅ Paiement réussi:', transactionId);
+                    setShowPaymentSheet(false);
+                    // Le paiement est effectué après l'acceptation, donc pas besoin de démarrer la recherche
+                    // La commande est déjà acceptée et en cours de livraison
+                  }}
+                  onPaymentError={(error) => {
+                    console.error('❌ Erreur paiement:', error);
+                    Alert.alert('Erreur de paiement', error);
+                  }}
+                />
+              );
+            })()}
           </>
         );
       })()}

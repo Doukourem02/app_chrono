@@ -2,7 +2,7 @@ import { supabase } from '../utils/supabase';
 
 type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
 
-const BASE_PRICES: Record<DeliveryMethod, { base: number; perKm: number }> = {
+export const BASE_PRICES: Record<DeliveryMethod, { base: number; perKm: number }> = {
   moto: { base: 500, perKm: 200 },
   vehicule: { base: 800, perKm: 300 },
   cargo: { base: 1200, perKm: 450 },

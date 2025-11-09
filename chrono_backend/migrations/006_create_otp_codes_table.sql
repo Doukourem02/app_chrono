@@ -5,12 +5,16 @@ CREATE TABLE IF NOT EXISTS otp_codes (
   role TEXT NOT NULL,
   code TEXT NOT NULL,
   expires_at TIMESTAMP NOT NULL,
+  verified BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   PRIMARY KEY (email, phone, role)
 );
 
 -- Index pour nettoyer rapidement les codes expirés
 CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_codes(expires_at);
+
+-- Index pour la colonne verified
+CREATE INDEX IF NOT EXISTS idx_otp_verified ON otp_codes(verified);
 
 -- Fonction pour nettoyer automatiquement les codes expirés (optionnel)
 CREATE OR REPLACE FUNCTION cleanup_expired_otp()

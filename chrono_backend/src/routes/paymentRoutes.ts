@@ -1,0 +1,31 @@
+import express, { Router } from 'express';
+import {
+  createPaymentMethod,
+  getPaymentMethods,
+  calculatePrice,
+  initiatePayment,
+  checkPayment,
+  getTransactions,
+  createDispute,
+} from '../controllers/paymentController.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
+
+const router: Router = express.Router();
+
+// Méthodes de paiement
+router.post('/methods', authLimiter, createPaymentMethod);
+router.get('/methods', authLimiter, getPaymentMethods);
+
+// Calcul de prix
+router.post('/calculate-price', calculatePrice);
+
+// Transactions
+router.post('/initiate', authLimiter, initiatePayment);
+router.get('/transactions', authLimiter, getTransactions);
+router.get('/transactions/:transactionId', authLimiter, checkPayment);
+
+// Litiges
+router.post('/disputes', authLimiter, createDispute);
+
+export default router;
+

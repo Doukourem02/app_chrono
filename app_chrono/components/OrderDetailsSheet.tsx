@@ -11,10 +11,14 @@ import {
   Dimensions,
   Alert,
   PanResponder,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import PaymentMethodSelector from './PaymentMethodSelector';
+import { PaymentMethodType } from '../services/paymentApi';
+import { usePaymentStore } from '../store/usePaymentStore';
 
 
 interface AddressDetails {
@@ -37,7 +41,15 @@ interface OrderDetailsSheetProps {
   selectedMethod: string;
   price: number;
   onBack: () => void;
-  onConfirm: (pickupDetails: AddressDetails, dropoffDetails: AddressDetails) => void;
+  onConfirm: (
+    pickupDetails: AddressDetails,
+    dropoffDetails: AddressDetails,
+    payerType?: 'client' | 'recipient',
+    isPartialPayment?: boolean,
+    partialAmount?: number,
+    paymentMethodType?: PaymentMethodType, // Méthode de paiement choisie
+    paymentMethodId?: string | null // ID de la méthode de paiement depuis payment_methods
+  ) => void;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -77,6 +89,19 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
   });
 
   const [pickupSender] = useState('Moi');
+  
+  // État pour le paiement
+  const [payerType, setPayerType] = useState<'client' | 'recipient'>('client');
+  const [isPartialPayment, setIsPartialPayment] = useState(false);
+  const [partialAmount, setPartialAmount] = useState<string>('');
+  const [selectedPaymentMethodType, setSelectedPaymentMethodType] = useState<PaymentMethodType | null>(null);
+  
+  // Charger les méthodes de paiement au montage
+  const { loadPaymentMethods, paymentMethods, selectedPaymentMethod } = usePaymentStore();
+  
+  React.useEffect(() => {
+    loadPaymentMethods();
+  }, [loadPaymentMethods]);
 
   const updatePickupDetails = (field: keyof AddressDetails, value: string | string[]) => {
     setPickupDetails((prev) => ({ ...prev, [field]: value }));
@@ -121,8 +146,48 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       return;
     }
 
+    // Vérifier que la méthode de paiement est choisie (sauf si le destinataire paie)
+    if (payerType === 'client' && !selectedPaymentMethodType) {
+      Alert.alert('Méthode de paiement requise', 'Veuillez sélectionner une méthode de paiement');
+      return;
+    }
+
+    // Vérifier le paiement partiel
+    if (isPartialPayment && partialAmount) {
+      const partial = parseFloat(partialAmount);
+      if (isNaN(partial) || partial <= 0 || partial > price) {
+        Alert.alert('Erreur', 'Montant partiel invalide');
+        return;
+      }
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onConfirm(pickupDetails, dropoffDetails);
+    
+    // Récupérer l'ID de la méthode de paiement sélectionnée
+    // Si une méthode est sélectionnée dans le store, utiliser son ID
+    // Sinon, chercher la méthode correspondante au type sélectionné
+    let paymentMethodId: string | null = null;
+    if (selectedPaymentMethodType) {
+      if (selectedPaymentMethod && selectedPaymentMethod.method_type === selectedPaymentMethodType) {
+        paymentMethodId = selectedPaymentMethod.id;
+      } else {
+        // Chercher la méthode correspondante au type sélectionné
+        const method = paymentMethods.find((m) => m.method_type === selectedPaymentMethodType);
+        if (method) {
+          paymentMethodId = method.id;
+        }
+      }
+    }
+    
+    onConfirm(
+      pickupDetails,
+      dropoffDetails,
+      payerType,
+      isPartialPayment,
+      isPartialPayment && partialAmount ? parseFloat(partialAmount) : undefined,
+      selectedPaymentMethodType || undefined, // Passer la méthode de paiement choisie
+      paymentMethodId || null // Passer l'ID de la méthode de paiement
+    );
   };
 
   const [showPickupOptional, setShowPickupOptional] = useState(false);
@@ -368,6 +433,126 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
 
           {/* Dropoff section */}
           {renderAddressSection('Livraison', deliveryLocation, dropoffDetails, updateDropoffDetails, 'dropoff')}
+
+          {/* Section Paiement */}
+          <View style={styles.paymentSection}>
+            <Text style={styles.sectionTitle}>Paiement</Text>
+            
+            {/* Qui paie */}
+            <View style={styles.payerSelector}>
+              <Text style={styles.inputLabel}>Qui paie ?</Text>
+              <View style={styles.payerOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.payerOption,
+                    payerType === 'client' && styles.payerOptionSelected,
+                  ]}
+                  onPress={() => setPayerType('client')}
+                >
+                  <Ionicons
+                    name={payerType === 'client' ? 'radio-button-on' : 'radio-button-off'}
+                    size={20}
+                    color={payerType === 'client' ? '#8B5CF6' : '#999'}
+                  />
+                  <Text
+                    style={[
+                      styles.payerOptionText,
+                      payerType === 'client' && styles.payerOptionTextSelected,
+                    ]}
+                  >
+                    Moi (client)
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.payerOption,
+                    payerType === 'recipient' && styles.payerOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setPayerType('recipient');
+                    setIsPartialPayment(false); // Désactiver le paiement partiel si le destinataire paie
+                  }}
+                >
+                  <Ionicons
+                    name={payerType === 'recipient' ? 'radio-button-on' : 'radio-button-off'}
+                    size={20}
+                    color={payerType === 'recipient' ? '#8B5CF6' : '#999'}
+                  />
+                  <Text
+                    style={[
+                      styles.payerOptionText,
+                      payerType === 'recipient' && styles.payerOptionTextSelected,
+                    ]}
+                  >
+                    Destinataire
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Paiement partiel (uniquement si le client paie) */}
+            {payerType === 'client' && (
+              <View style={styles.partialPaymentSection}>
+                <View style={styles.partialPaymentHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inputLabel}>Paiement partiel</Text>
+                    <Text style={styles.partialPaymentHint}>
+                      Payer une partie maintenant, le reste plus tard
+                    </Text>
+                  </View>
+                  <Switch
+                    value={isPartialPayment}
+                    onValueChange={setIsPartialPayment}
+                    trackColor={{ false: '#CCC', true: '#8B5CF6' }}
+                    thumbColor="#FFF"
+                  />
+                </View>
+                {isPartialPayment && (
+                  <View style={styles.partialAmountContainer}>
+                    <Text style={styles.inputLabel}>Montant à payer maintenant</Text>
+                    <TextInput
+                      style={styles.partialAmountInput}
+                      value={partialAmount}
+                      onChangeText={setPartialAmount}
+                      placeholder="0"
+                      keyboardType="numeric"
+                      placeholderTextColor="#999"
+                    />
+                    <Text style={styles.partialAmountHint}>
+                      Montant restant:{' '}
+                      {partialAmount
+                        ? (price - parseFloat(partialAmount || '0')).toLocaleString()
+                        : price.toLocaleString()}{' '}
+                      XOF
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Information si le destinataire paie */}
+            {payerType === 'recipient' && (
+              <View style={styles.recipientPaymentInfo}>
+                <Ionicons name="information-circle" size={18} color="#8B5CF6" />
+                <Text style={styles.recipientPaymentInfoText}>
+                  Le destinataire paiera à la livraison. Si le destinataire est enregistré dans l'app, il pourra opter pour le paiement différé.
+                </Text>
+              </View>
+            )}
+
+            {/* Sélection de la méthode de paiement (uniquement si le client paie) */}
+            {payerType === 'client' && (
+              <View style={styles.paymentMethodSection}>
+                <Text style={styles.inputLabel}>Méthode de paiement *</Text>
+                <PaymentMethodSelector
+                  selectedMethod={selectedPaymentMethodType}
+                  onSelect={setSelectedPaymentMethodType}
+                  showAddNew={false}
+                />
+              </View>
+            )}
+          </View>
 
           {/* Confirm button */}
           <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
@@ -624,6 +809,101 @@ const styles = StyleSheet.create({
   peekText: {
     fontSize: 14,
     color: '#333',
+  },
+  paymentMethodSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  paymentSection: {
+    marginTop: 20,
+    marginBottom: 20,
+    padding: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+  },
+  payerSelector: {
+    marginBottom: 16,
+  },
+  payerOptions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  payerOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  payerOptionSelected: {
+    borderColor: '#8B5CF6',
+    backgroundColor: '#F5F0FF',
+  },
+  payerOptionText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  payerOptionTextSelected: {
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  partialPaymentSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  partialPaymentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  partialPaymentHint: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 4,
+    flex: 1,
+  },
+  partialAmountContainer: {
+    marginTop: 8,
+  },
+  partialAmountInput: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  partialAmountHint: {
+    fontSize: 12,
+    color: '#666',
+  },
+  recipientPaymentInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+  },
+  recipientPaymentInfoText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#1976D2',
+    lineHeight: 18,
   },
 });
 
