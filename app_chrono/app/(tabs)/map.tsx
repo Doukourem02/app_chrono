@@ -26,6 +26,7 @@ import { logger } from '../../utils/logger';
 import { calculatePrice, estimateDurationMinutes, formatDurationLabel, getDistanceInKm } from '../../services/orderApi';
 import { locationService } from '../../services/locationService';
 import { paymentApi } from '../../services/paymentApi';
+import { userApiService } from '../../services/userApiService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -295,9 +296,32 @@ export default function MapPage() {
         logger.info('🧹 Nettoyage commande bloquée en attente', 'map.tsx', { orderId: pendingOrder.id, orderAge });
         useOrderStore.getState().setPendingOrder(null);
         useOrderStore.getState().setDeliveryStage('idle');
+        // Nettoyer aussi la map
+        clearRoute();
+        setPickupCoords(null);
+        setDropoffCoords(null);
+        setPickupLocation('');
+        setDeliveryLocation('');
       }
     }
-  }, [pendingOrder, isSearchingDriver, currentOrder]);
+
+    // Vérifier si on a une commande acceptée mais sans driver connecté (driver a quitté l'app)
+    if (currentOrder && currentOrder.status === 'accepted' && !orderDriverCoords) {
+      const orderAge = currentOrder.createdAt
+        ? new Date().getTime() - new Date(currentOrder.createdAt).getTime()
+        : Infinity;
+      
+      // Si la commande est acceptée depuis plus de 60 secondes sans coordonnées du driver,
+      // c'est probablement que le driver a quitté l'app - proposer d'annuler
+      if (orderAge > 60000) {
+        logger.warn('⚠️ Commande acceptée sans driver connecté depuis trop longtemps', 'map.tsx', { 
+          orderId: currentOrder.id, 
+          orderAge 
+        });
+        // Ne pas nettoyer automatiquement, mais permettre à l'utilisateur d'annuler via le bouton
+      }
+    }
+  }, [pendingOrder, isSearchingDriver, currentOrder, orderDriverCoords, clearRoute]);
 
   // Arrêter la recherche de chauffeur si pendingOrder devient null (aucun chauffeur disponible)
   useEffect(() => {
@@ -713,7 +737,8 @@ export default function MapPage() {
     payerType?: 'client' | 'recipient', // Qui paie (optionnel, par défaut client)
     isPartialPayment?: boolean,
     partialAmount?: number,
-    paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred' // Méthode de paiement choisie
+    paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred', // Méthode de paiement choisie
+    paymentMethodId?: string | null // ID de la méthode de paiement depuis payment_methods
   ) => {
     // Créer la commande avec toutes les informations détaillées
     if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user && selectedMethod) {
@@ -797,6 +822,48 @@ export default function MapPage() {
       }
     }
   }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet]);
+
+  // Handler pour annuler une commande
+  const handleCancelOrder = useCallback(async (orderId: string) => {
+    Alert.alert(
+      'Annuler la commande',
+      'Êtes-vous sûr de vouloir annuler cette commande ?',
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Oui',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              logger.info('🔄 Annulation commande...', 'map.tsx', { orderId });
+              
+              const result = await userApiService.cancelOrder(orderId);
+              if (result.success) {
+                // Nettoyer l'état local
+                useOrderStore.getState().clear();
+                clearRoute();
+                setPickupCoords(null);
+                setDropoffCoords(null);
+                setPickupLocation('');
+                setDeliveryLocation('');
+                setSelectedMethod(null);
+                
+                logger.info('✅ Commande annulée avec succès', 'map.tsx', { orderId });
+                Alert.alert('Succès', 'Commande annulée avec succès');
+              } else {
+                logger.warn('❌ Erreur annulation commande', 'map.tsx', { message: result.message });
+                Alert.alert('Erreur', result.message || 'Impossible d\'annuler la commande');
+              }
+            } catch (error) {
+              logger.error('❌ Erreur annulation commande', 'map.tsx', error);
+              Alert.alert('Erreur', 'Impossible d\'annuler la commande');
+            }
+          },
+        },
+      ]
+    );
+  }, [clearRoute]);
 
   if (!region) {
     return (
@@ -974,6 +1041,7 @@ export default function MapPage() {
                 animatedHeight={animatedHeight}
                 isExpanded={isExpanded}
                 onToggle={toggleBottomSheet}
+                onCancel={() => currentOrder?.id && handleCancelOrder(currentOrder.id)}
               />
             )}
 

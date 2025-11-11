@@ -272,6 +272,27 @@ class UserOrderSocketService {
       }
     });
 
+    // ❌ Commande annulée
+    this.socket.on('order-cancelled', (data) => {
+      try {
+        logger.info('❌ Commande annulée reçue', 'userOrderSocketService', data);
+        const { orderId, reason } = data || {};
+        if (orderId) {
+          // Mettre à jour le store pour refléter l'annulation
+          const store = useOrderStore.getState();
+          if (store.currentOrder?.id === orderId) {
+            store.setCurrentOrder({ ...store.currentOrder, status: 'cancelled' } as any);
+          }
+          if (store.pendingOrder?.id === orderId) {
+            store.setPendingOrder(null);
+          }
+          // Le nettoyage complet sera fait par le useEffect dans map.tsx
+        }
+      } catch (err) {
+        logger.warn('Error handling order-cancelled', 'userOrderSocketService', err);
+      }
+    });
+
     // Proof uploaded notification
     this.socket.on('order:proof:uploaded', (data) => {
       logger.info('🧾 order:proof:uploaded', 'userOrderSocketService', data);

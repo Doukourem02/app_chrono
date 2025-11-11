@@ -16,6 +16,7 @@ interface TrackingBottomSheetProps {
   animatedHeight: Animated.Value;
   isExpanded: boolean;
   onToggle: () => void;
+  onCancel?: () => void;
 }
 
 const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
@@ -24,11 +25,13 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   animatedHeight,
   isExpanded,
   onToggle,
+  onCancel,
 }) => {
   const insets = useSafeAreaInsets();
 
   const status: string = currentOrder?.status || "accepted";
   const isCompleted = status === 'completed';
+  const canCancel = (status === 'pending' || status === 'accepted') && onCancel;
 
   // Harmoniser avec OrderStatus: 'accepted' | 'enroute' | 'picked_up' | 'completed'
   // Utiliser useMemo pour éviter la recréation à chaque render
@@ -239,10 +242,18 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
             </View>
           )}
 
-          {/* Barre d’action */}
+          {/* Barre d'action */}
           <View style={styles.actionBar}>
             <View style={styles.driverAvatar} />
             <View style={styles.actionButtons}>
+              {canCancel && (
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.cancelButton]} 
+                  onPress={onCancel}
+                >
+                  <Ionicons name="close-circle" size={20} color="#fff" />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.actionButton}>
                 <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
               </TouchableOpacity>
@@ -407,6 +418,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#EF4444",
   },
   proofRow: {
     flexDirection: 'row',

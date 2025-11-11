@@ -279,7 +279,7 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
                 <View style={styles.sectionIconContainer}>
                   <Ionicons name="information-circle-outline" size={20} color="#8B5CF6" />
                 </View>
-                <Text style={styles.sectionTitle}>Détails de l'adresse</Text>
+                <Text style={styles.sectionTitle}>Détails de l&apos;adresse</Text>
               </View>
               <View style={styles.detailsCard}>
                 {dropoffDetails.entrance && (

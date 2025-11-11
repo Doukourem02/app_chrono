@@ -88,6 +88,36 @@ class OrderSocketService {
       useOrderStore.getState().setPendingOrder(null);
     });
 
+    // 🔄 Resync order state after reconnect
+    this.socket.on('resync-order-state', (data) => {
+      try {
+        logger.info('🔄 Resync order state reçu', undefined, data);
+        const { pendingOrder, currentOrder } = data || {};
+        if (pendingOrder) {
+          useOrderStore.getState().setPendingOrder(pendingOrder as any);
+        }
+        if (currentOrder) {
+          useOrderStore.getState().setCurrentOrder(currentOrder as any);
+          logger.info('✅ Commande active restaurée après reconnexion', undefined, { orderId: currentOrder.id });
+        }
+      } catch (err) {
+        logger.warn('Error handling resync-order-state (driver)', undefined, err);
+      }
+    });
+
+    // ❌ Commande annulée
+    this.socket.on('order:cancelled', (data) => {
+      try {
+        logger.info('❌ Commande annulée reçue', undefined, data);
+        const { orderId } = data || {};
+        if (orderId) {
+          useOrderStore.getState().cancelOrder(orderId);
+        }
+      } catch (err) {
+        logger.warn('Error handling order:cancelled', undefined, err);
+      }
+    });
+
     this.socket.on('connect_error', (error) => {
           logger.error('❌ Erreur connexion socket:', undefined, error);
       this.isConnected = false;

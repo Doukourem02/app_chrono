@@ -135,7 +135,7 @@ export const useDriverStore = create<DriverStore>()(
           }
 
           return 'not_found';
-        } catch (error) {
+        } catch {
           // En cas d'erreur réseau, retourner null pour indiquer l'impossibilité de vérifier
           return null;
         }

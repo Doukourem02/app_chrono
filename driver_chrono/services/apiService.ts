@@ -56,7 +56,7 @@ class ApiService {
   }
 
   private async ensureAccessToken(): Promise<{ token: string | null; reason?: 'missing' | 'refresh_failed' }> {
-    const { accessToken, refreshToken, setTokens, logout } = useDriverStore.getState();
+    const { accessToken, refreshToken, setTokens } = useDriverStore.getState();
 
     // Vérifier si le token existe et s'il n'est pas expiré
     if (accessToken && this.isTokenValid(accessToken)) {
@@ -156,7 +156,7 @@ class ApiService {
       let result: any;
       try {
         result = await response.json();
-      } catch (jsonError) {
+      } catch {
         // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
         if (__DEV__) {
           console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
@@ -254,14 +254,14 @@ class ApiService {
         cargo: number;
       };
       earningsByDay: Record<string, number>;
-      orders: Array<{
+      orders: {
         id: string;
         price: number;
         distance: number;
         delivery_method: string;
         completed_at: string;
         created_at: string;
-      }>;
+      }[];
     };
   }> {
     try {
@@ -340,7 +340,7 @@ class ApiService {
       let result: any;
       try {
         result = await response.json();
-      } catch (jsonError) {
+      } catch {
         // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
         if (__DEV__) {
           console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
@@ -564,7 +564,7 @@ class ApiService {
       let result: any;
       try {
         result = await response.json();
-      } catch (jsonError) {
+      } catch {
         if (__DEV__) {
           console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
         }

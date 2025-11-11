@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
@@ -159,7 +159,7 @@ export const useRouteTracking = (
     // Debounce pour éviter trop de requêtes
     const timeoutId = setTimeout(calculateRoute, 500);
     return () => clearTimeout(timeoutId);
-  }, [currentLocation?.latitude, currentLocation?.longitude, destination?.latitude, destination?.longitude, enabled, fetchRoute]);
+  }, [currentLocation, destination, enabled, fetchRoute]);
 
   // Recalculer la route périodiquement (toutes les 30 secondes) pour prendre en compte le trafic
   useEffect(() => {

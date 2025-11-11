@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { MapView } from 'react-native-maps';
+import MapView from 'react-native-maps';
 import { logger } from '../utils/logger';
 
 interface Coordinates {
@@ -128,7 +128,7 @@ export const useMapCamera = (
     } catch (err) {
       logger.warn('Center on driver error', 'useMapCamera', err);
     }
-  }, [driverLocation]);
+  }, [driverLocation, mapRef]);
 
   return {
     fitToRoute,
