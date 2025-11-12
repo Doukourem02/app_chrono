@@ -568,13 +568,24 @@ export const getOnlineDrivers = async (req: Request, res: Response): Promise<voi
     }
 
     // � Combiner données de test + données réelles
-    const allDrivers = [];
+    const allDrivers: Array<{
+      user_id: string;
+      first_name: string;
+      last_name: string;
+      vehicle_type: string;
+      current_latitude: number;
+      current_longitude: number;
+      is_online: boolean;
+      is_available: boolean;
+      rating: number;
+      total_deliveries: number;
+    }> = [];
 
     // 1️⃣ Ajouter les chauffeurs de test (DÉSACTIVÉ pour voir seulement les vrais)
     // allDrivers.push(...mockDrivers);
 
     // 2️⃣ Nettoyer d'abord les chauffeurs offline de la Map avant de récupérer
-    const offlineDrivers = [];
+    const offlineDrivers: string[] = [];
     for (const [userId, driverData] of realDriverStatuses.entries()) {
       if (driverData.is_online === false) {
         offlineDrivers.push(userId);

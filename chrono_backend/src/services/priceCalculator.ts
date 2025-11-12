@@ -1,15 +1,15 @@
 export interface PriceCalculationParams {
-  distance: number; // Distance en km
+  distance: number; 
   deliveryMethod: 'moto' | 'vehicule' | 'cargo';
   isUrgent?: boolean;
-  customPricePerKm?: number; // Tarif personnalisé par km (optionnel)
+  customPricePerKm?: number; 
 }
 
 export interface PriceCalculationResult {
-  basePrice: number; // Prix de base (km × tarif_km)
-  urgencyFee: number; // Frais d'urgence
-  totalPrice: number; // Prix total
-  pricePerKm: number; // Tarif par km utilisé
+  basePrice: number; 
+  urgencyFee: number; 
+  totalPrice: number; 
+  pricePerKm: number; 
   breakdown: {
     distance: number;
     pricePerKm: number;
@@ -18,15 +18,13 @@ export interface PriceCalculationResult {
   };
 }
 
-// Tarifs par défaut par km selon le type de livraison (en XOF)
 const DEFAULT_PRICE_PER_KM: Record<string, number> = {
-  moto: 500, // 500 XOF/km pour moto
-  vehicule: 800, // 800 XOF/km pour véhicule
-  cargo: 1200, // 1200 XOF/km pour cargo
+  moto: 500, 
+  vehicule: 800, 
+  cargo: 1200, 
 };
 
-// Frais d'urgence (en pourcentage du prix de base)
-const URGENCY_FEE_PERCENTAGE = 0.3; // 30% de frais supplémentaires
+const URGENCY_FEE_PERCENTAGE = 0.3; 
 
 /**
  * Calcule le prix d'une livraison
@@ -34,16 +32,12 @@ const URGENCY_FEE_PERCENTAGE = 0.3; // 30% de frais supplémentaires
 export function calculateDeliveryPrice(params: PriceCalculationParams): PriceCalculationResult {
   const { distance, deliveryMethod, isUrgent = false, customPricePerKm } = params;
 
-  // Déterminer le tarif par km
   const pricePerKm = customPricePerKm || DEFAULT_PRICE_PER_KM[deliveryMethod] || DEFAULT_PRICE_PER_KM.moto;
 
-  // Calculer le prix de base
   const basePrice = Math.round(distance * pricePerKm);
 
-  // Calculer les frais d'urgence si applicable
   const urgencyFee = isUrgent ? Math.round(basePrice * URGENCY_FEE_PERCENTAGE) : 0;
 
-  // Calculer le prix total
   const totalPrice = basePrice + urgencyFee;
 
   return {

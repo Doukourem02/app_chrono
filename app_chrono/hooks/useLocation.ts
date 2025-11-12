@@ -20,13 +20,6 @@ export const useLocation = () => {
     hasPermission: false,
   });
 
-  // Cache pour éviter les appels répétitifs
-  const [lastReverseGeocode, setLastReverseGeocode] = useState<{
-    coords: string;
-    address: string;
-    timestamp: number;
-  } | null>(null);
-
   const reverseGeocodeWithCache = useCallback(async (coords: { latitude: number; longitude: number }) => {
     // Utiliser le service centralisé de localisation pour le reverse geocoding
     // Le service utilisera automatiquement Google Geocoding API si disponible

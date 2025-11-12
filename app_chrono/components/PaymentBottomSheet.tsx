@@ -1,7 +1,3 @@
-/**
- * Bottom Sheet pour gérer le paiement d'une commande
- */
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -60,9 +56,10 @@ export default function PaymentBottomSheet({
   initialPartialAmount,
   preselectedPaymentMethod, // Méthode de paiement déjà choisie
 }: PaymentBottomSheetProps) {
-  const { paymentMethods, selectedPaymentMethod, loadPaymentMethods, isLoading } = usePaymentStore();
+  const { paymentMethods, selectedPaymentMethod, loadPaymentMethods } = usePaymentStore();
   const [selectedMethodType, setSelectedMethodType] = useState<PaymentMethodType | null>(preselectedPaymentMethod || null);
   const [isProcessing, setIsProcessing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isPartial, setIsPartial] = useState(initialIsPartial);
   const [partialAmount, setPartialAmount] = useState<string>(

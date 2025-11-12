@@ -8,13 +8,11 @@ import logger from '../utils/logger.js';
 import { maskEmail, maskUserId } from '../utils/maskSensitiveData.js';
 import { createDefaultPaymentMethods } from '../utils/createDefaultPaymentMethods.js';
 
-// Interface for Request with brute force protection methods
 interface RequestWithBruteForce<B = any> extends Request<{}, {}, B> {
   recordFailedAttempt?: () => void;
   resetAttempts?: () => void;
 }
 
-// Interface for register request body
 interface RegisterBody {
   email: string;
   password?: string;
@@ -24,13 +22,11 @@ interface RegisterBody {
   lastName?: string;
 }
 
-// Interface for login request body
 interface LoginBody {
   email: string;
   password: string;
 }
 
-// Interface for send OTP request body
 interface SendOTPBody {
   email: string;
   phone?: string;
@@ -38,7 +34,6 @@ interface SendOTPBody {
   role?: string;
 }
 
-// Interface for verify OTP request body
 interface VerifyOTPBody {
   email: string;
   phone?: string;
@@ -47,7 +42,6 @@ interface VerifyOTPBody {
   role?: string;
 }
 
-// Interface for refresh token request body
 interface RefreshTokenBody {
   refreshToken: string;
 }
@@ -70,7 +64,6 @@ const createDriverProfile = async (
       .single();
     
     if (existingProfile) {
-      // 🔒 SÉCURITÉ: Masquer userId
       logger.info(`✅ Profil driver déjà existant pour user ${maskUserId(userId)}`);
       return existingProfile;
     }
@@ -94,17 +87,14 @@ const createDriverProfile = async (
       .single();
     
     if (insertError) {
-      // 🔒 SÉCURITÉ: Masquer userId
       logger.error(`❌ Erreur création profil driver pour ${maskUserId(userId)}:`, insertError);
     
       return null;
     }
     
-    // 🔒 SÉCURITÉ: Masquer userId
     logger.info(`✅ Profil driver créé avec succès pour user ${maskUserId(userId)}`);
     return driverProfile;
   } catch (error: any) {
-    // 🔒 SÉCURITÉ: Masquer userId
     logger.error(`❌ Erreur création profil driver pour ${maskUserId(userId)}:`, error);
     
     return null;
@@ -119,7 +109,6 @@ const registerUserWithPostgreSQL = async (
   try {
     const { email, password, phone, role = 'client', firstName, lastName } = req.body;
 
-    // 🔒 SÉCURITÉ: Masquer l'email dans les logs
     logger.info(`📝 Inscription utilisateur : ${maskEmail(email)} avec rôle ${role}`);
 
 
@@ -390,7 +379,6 @@ const loginUserWithPostgreSQL = async (
   try {
     const { email, password } = req.body;
 
-    // 🔒 SÉCURITÉ: Masquer l'email dans les logs
     logger.info(`🔐 Connexion utilisateur : ${maskEmail(email)}`);
 
 
@@ -410,7 +398,6 @@ const loginUserWithPostgreSQL = async (
     });
 
     if (authError) {
-      // 🔒 SÉCURITÉ: Enregistrer la tentative échouée (protection force brute)
       if (req.recordFailedAttempt) {
         req.recordFailedAttempt();
       }
@@ -446,12 +433,10 @@ const loginUserWithPostgreSQL = async (
       const user = userResult.rows[0];
       logger.info("✅ Utilisateur trouvé dans PostgreSQL !");
 
-      // 🔒 SÉCURITÉ: Réinitialiser les tentatives après succès
       if (req.resetAttempts) {
         req.resetAttempts();
       }
       
-      // Générer les tokens JWT (access + refresh)
       const { accessToken, refreshToken } = generateTokens(user);
 
       res.json({
@@ -488,18 +473,15 @@ const sendOTPCode = async (
   try {
     const { email, phone, otpMethod = 'email', role = 'client' } = req.body;
 
-    // 🔒 SÉCURITÉ: Masquer l'email dans les logs
     logger.info(`📲 Envoi OTP pour ${maskEmail(email)} via ${otpMethod} avec rôle ${role}`);
 
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Stocker le code OTP dans PostgreSQL (au lieu de Map)
     await storeOTP(email, phone || '', role, otpCode);
 
     if (otpMethod === 'email') {
   
-      // 🔒 SÉCURITÉ: Ne jamais logger le code OTP complet
       logger.info(`📧 Code OTP envoyé par email à ${maskEmail(email)}`);
       
       const emailResult = await sendOTPEmail(email, otpCode, role);
@@ -523,7 +505,6 @@ const sendOTPCode = async (
       }
       
     } else if (otpMethod === 'sms') {
-      // 📱 Envoi par SMS
       logger.info(`📱 Code OTP ${otpCode} envoyé par SMS au ${phone}`);
       
       const smsResult = await sendOTPSMS(phone || '', otpCode, role);
@@ -565,14 +546,11 @@ const verifyOTPCode = async (
   try {
     const { email, phone, otp, method, role = 'client' } = req.body;
 
-    // 🔒 SÉCURITÉ: Ne jamais logger le code OTP
     logger.info(`✅ Vérification OTP pour ${maskEmail(email)}`);
 
-    // Vérifier le code OTP dans PostgreSQL
     const isValid = await verifyOTP(email, phone || '', role, otp);
 
     if (!isValid) {
-      // 🔒 SÉCURITÉ: Enregistrer la tentative échouée (protection force brute)
       if (req.recordFailedAttempt) {
         req.recordFailedAttempt();
       }
@@ -584,14 +562,12 @@ const verifyOTPCode = async (
       return;
     }
     
-    // 🔒 SÉCURITÉ: Réinitialiser les tentatives après succès
     if (req.resetAttempts) {
       req.resetAttempts();
     }
 
     logger.info("✅ Code OTP valide !");
 
-    // Vérifier si l'utilisateur existe déjà dans PostgreSQL
     const { data: existingUsers, error: checkError } = await supabase
       .from('users')
       .select('*')
@@ -606,15 +582,11 @@ const verifyOTPCode = async (
     let isNewUser = false;
 
     if (existingUsers && existingUsers.length > 0) {
-      // 🔍 Utilisateur existant - connexion
       logger.info("👤 Utilisateur existant trouvé dans PostgreSQL !");
       userData = existingUsers[0];
     } else {
-      // 🆕 Nouvel utilisateur - vérifier d'abord dans Supabase Auth
       logger.info("🔍 Vérification dans Supabase Auth...");
       
-      // Essayer de récupérer l'utilisateur depuis Supabase Auth par email
-      // Ne fonctionne que si service role key est disponible
       let existingAuthUser: any = null;
       if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
         const { data: authUsers, error: authListError } = await supabase.auth.admin.listUsers();
@@ -628,11 +600,8 @@ const verifyOTPCode = async (
       }
       
       if (existingAuthUser) {
-        // L'utilisateur existe dans Supabase Auth mais pas dans PostgreSQL
         logger.info("👤 Utilisateur trouvé dans Supabase Auth, synchronisation vers PostgreSQL...");
         
-        // Créer dans PostgreSQL avec l'ID existant
-        // Utiliser supabaseAdmin si disponible pour bypasser RLS, sinon supabase
         const clientForInsert = supabaseAdmin || supabase;
         
         if (!supabaseAdmin) {
@@ -642,7 +611,7 @@ const verifyOTPCode = async (
         const { data: newUser, error: insertError } = await clientForInsert
           .from('users')
           .insert([{
-            id: existingAuthUser.id,  // ✅ Utiliser directement l'ID de Supabase Auth
+                      id: existingAuthUser.id, 
             email: email,
             phone: phone,
             role: role,
@@ -654,7 +623,6 @@ const verifyOTPCode = async (
         if (insertError) {
           logger.error("❌ Erreur synchronisation PostgreSQL:", insertError);
           
-          // Si l'erreur est due à RLS et qu'on n'a pas de service role key, utiliser les données Auth
           if (insertError.code === '42501' && !supabaseAdmin) {
             logger.warn('⚠️ Synchronisation users échouée à cause de RLS (SUPABASE_SERVICE_ROLE_KEY manquant), utilisation des données Auth');
             userData = {
@@ -676,7 +644,6 @@ const verifyOTPCode = async (
           userData = newUser;
         }
         
-        // Créer automatiquement un profil driver si le rôle est 'driver'
         if (role === 'driver' && userData && userData.id) {
           logger.info("🚗 Création automatique du profil driver pour utilisateur synchronisé...");
           const driverProfile = await createDriverProfile(
@@ -696,21 +663,17 @@ const verifyOTPCode = async (
         logger.info("✅ Utilisateur synchronisé avec succès !");
         
       } else {
-        // Vraiment nouvel utilisateur - créer dans Supabase Auth puis PostgreSQL
         logger.info("🆕 Création nouvel utilisateur complet...");
         isNewUser = true;
 
-        // Créer dans Supabase Auth d'abord
         const tempPassword = Math.random().toString(36).slice(-12);
         
-        // Essayer d'abord avec admin API si service role key disponible
         let authUser: any, authError: any;
         if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-          // Utiliser admin.createUser pour créer un utilisateur confirmé directement
           const result = await supabase.auth.admin.createUser({
             email: email,
             password: tempPassword,
-            email_confirm: true, // Confirmer l'email automatiquement
+            email_confirm: true, 
             user_metadata: {
               role: role,
               phone: phone
@@ -719,7 +682,6 @@ const verifyOTPCode = async (
           authUser = result.data;
           authError = result.error;
         } else {
-          // Fallback vers signUp si service role key non disponible
           logger.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY non défini, utilisation de signUp() (nécessite confirmation email)");
           const result = await supabase.auth.signUp({
             email: email,
@@ -738,7 +700,6 @@ const verifyOTPCode = async (
         if (authError) {
           logger.error("❌ Erreur création Supabase Auth:", authError);
           
-          // Messages d'erreur plus clairs
           let errorMessage = authError.message;
           if (authError.message.includes('not allowed') || authError.code === 'not_admin') {
             errorMessage = 'Création de compte non autorisée. Vérifiez la configuration Supabase (inscriptions activées et service role key configurée).';
@@ -754,7 +715,6 @@ const verifyOTPCode = async (
           return;
         }
 
-        // admin.createUser retourne { data: { user } } au lieu de { data: { user } }
         const userId = authUser?.user?.id || authUser?.id;
         if (!userId) {
           logger.error("❌ Erreur: utilisateur créé mais ID introuvable");
@@ -766,11 +726,8 @@ const verifyOTPCode = async (
           return;
         }
 
-        // 🔒 SÉCURITÉ: Masquer userId
         logger.info("✅ Utilisateur créé dans Supabase Auth avec ID:", maskUserId(userId));
         
-        // Créer dans PostgreSQL avec l'ID du nouvel utilisateur Auth
-        // Utiliser supabaseAdmin si disponible pour bypasser RLS, sinon supabase
         const clientForInsert = supabaseAdmin || supabase;
         
         if (!supabaseAdmin) {
@@ -791,14 +748,11 @@ const verifyOTPCode = async (
 
         if (insertError) {
           logger.error("❌ Erreur insertion PostgreSQL:", insertError);
-          
-          // Si l'erreur est due à RLS et qu'on n'a pas de service role key, continuer quand même
-          // L'utilisateur existe dans Auth, on pourra le synchroniser plus tard
+
           if (insertError.code === '42501' && !supabaseAdmin) {
             logger.warn('⚠️ Insertion users échouée à cause de RLS (SUPABASE_SERVICE_ROLE_KEY manquant), mais utilisateur créé dans Auth');
             logger.warn('💡 Solution: Ajouter SUPABASE_SERVICE_ROLE_KEY dans .env ou créer une politique RLS qui permet l\'insertion');
             
-            // Créer un utilisateur minimal pour continuer
             userData = {
               id: userId,
               email: email,
@@ -818,15 +772,14 @@ const verifyOTPCode = async (
           userData = newUser;
         }
 
-        // Créer automatiquement un profil driver si le rôle est 'driver'
         if (role === 'driver' && userData && userData.id) {
           logger.info("🚗 Création automatique du profil driver...");
           const driverProfile = await createDriverProfile(
             userData.id,
             email,
             phone,
-            null, // firstName non disponible dans verifyOTPCode
-            null  // lastName non disponible dans verifyOTPCode
+            null, 
+            null  
           );
           if (driverProfile) {
             logger.info("✅ Profil driver créé avec succès !");
@@ -835,13 +788,11 @@ const verifyOTPCode = async (
           }
         }
 
-        // Créer les méthodes de paiement par défaut (cash et deferred)
         if (userData && userData.id) {
           try {
             await createDefaultPaymentMethods(userData.id);
             logger.debug("✅ Méthodes de paiement par défaut créées");
           } catch (paymentMethodError: any) {
-            // Ne pas bloquer l'inscription si la création des méthodes de paiement échoue
             logger.warn("⚠️ Échec création méthodes de paiement par défaut (non bloquant):", paymentMethodError.message);
           }
         }
@@ -850,9 +801,6 @@ const verifyOTPCode = async (
       }
     }
 
-    // Note: Le code OTP est automatiquement supprimé lors de la vérification (dans verifyOTP)
-
-    // Vérifier que userData est défini avant de générer les tokens
     if (!userData || !userData.id) {
       logger.error("❌ Erreur: userData non défini ou invalide");
       res.status(500).json({
@@ -863,7 +811,6 @@ const verifyOTPCode = async (
       return;
     }
 
-    // Générer les tokens JWT
     const { accessToken, refreshToken } = generateTokens(userData);
 
     res.json({
@@ -889,9 +836,8 @@ const verifyOTPCode = async (
   }
 };
 
-/**
- * Rafraîchir un token d'accès à partir d'un refresh token
- */
+      /**
+       */
 const refreshToken = async (
   req: Request<{}, {}, RefreshTokenBody>,
   res: Response

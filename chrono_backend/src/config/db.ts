@@ -13,14 +13,14 @@ if (process.env.DATABASE_URL) {
     }) as Pool;
 
     pool.on('connect', () => {
-      logger.debug('✅ Connected to PostgreSQL'); // Changé en debug pour réduire le bruit
+      logger.debug('✅ Connected to PostgreSQL'); 
     });
 
     pool.on('error', (err: Error) => {
       logger.error('❌ Erreur de connexion PostgreSQL:', err.message);
     });
 
-    // Test de connexion
+    
     pool.query('SELECT 1', (err) => {
       if (err) {
         logger.warn('⚠️ Impossible de se connecter à PostgreSQL:', err.message);
@@ -34,7 +34,6 @@ if (process.env.DATABASE_URL) {
   logger.warn('⚠️ DATABASE_URL non configuré. Les fonctionnalités de base de données PostgreSQL seront désactivées.');
 }
 
-// Mock pool pour les cas où la DB n'est pas disponible
 const mockPool = {
   query: async (_text: string, _params?: any[]) => {
     return { rows: [], rowCount: 0 };

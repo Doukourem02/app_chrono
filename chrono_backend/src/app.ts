@@ -11,6 +11,7 @@ import syncRoutes from './routes/syncRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { setupSwagger } from './config/swagger.js';
 
 const app: Express = express();
 
@@ -75,6 +76,11 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.get('/', (_req, res) => res.send('Chrono Livraison API 🚚'));
+
+// 📚 Documentation API Swagger (disponible uniquement en développement ou si SWAGGER_ENABLED=true)
+if (process.env.NODE_ENV !== 'production' || process.env.SWAGGER_ENABLED === 'true') {
+  setupSwagger(app);
+}
 
 // Health check endpoints (avant les autres routes pour monitoring)
 app.use('/health', healthRoutes);

@@ -218,9 +218,9 @@ export default function ShipmentList() {
         // Séparer les commandes en cours et terminées
         const inProgressOrders = formattedOrders.filter((order) => {
           const isInProgress = order.status === 'pending' || 
-                             order.status === 'accepted' || 
-                             order.status === 'enroute' || 
-                             order.status === 'picked_up';
+                            order.status === 'accepted' || 
+                            order.status === 'enroute' || 
+                            order.status === 'picked_up';
           return isInProgress;
         });
 

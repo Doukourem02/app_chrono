@@ -1,5 +1,4 @@
 import { Stack } from "expo-router";
-import { useEffect } from "react";
 import { initSentry } from "../utils/sentry";
 
 // 🔍 SENTRY: Initialiser le monitoring d'erreurs

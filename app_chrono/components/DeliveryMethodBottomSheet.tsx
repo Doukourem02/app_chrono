@@ -172,7 +172,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
     }
   
     return price || selectedMethodData?.price || 0;
-  }, [pickupCoords, dropoffCoords, selectedMethod, selectedSpeed, selectedSpeedOption, price, selectedMethodData]);
+  }, [pickupCoords, dropoffCoords, selectedMethod, selectedSpeedOption, price, selectedMethodData]);
 
 
   const calculatedTime = useMemo(() => {

@@ -47,8 +47,8 @@ interface OrderDetailsSheetProps {
     payerType?: 'client' | 'recipient',
     isPartialPayment?: boolean,
     partialAmount?: number,
-    paymentMethodType?: PaymentMethodType, // Méthode de paiement choisie
-    paymentMethodId?: string | null // ID de la méthode de paiement depuis payment_methods
+    paymentMethodType?: PaymentMethodType, 
+    paymentMethodId?: string | null 
   ) => void;
 }
 
@@ -90,13 +90,11 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
 
   const [pickupSender] = useState('Moi');
   
-  // État pour le paiement
   const [payerType, setPayerType] = useState<'client' | 'recipient'>('client');
   const [isPartialPayment, setIsPartialPayment] = useState(false);
   const [partialAmount, setPartialAmount] = useState<string>('');
   const [selectedPaymentMethodType, setSelectedPaymentMethodType] = useState<PaymentMethodType | null>(null);
   
-  // Charger les méthodes de paiement au montage
   const { loadPaymentMethods, paymentMethods, selectedPaymentMethod } = usePaymentStore();
   
   React.useEffect(() => {
@@ -146,13 +144,12 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       return;
     }
 
-    // Vérifier que la méthode de paiement est choisie (sauf si le destinataire paie)
     if (payerType === 'client' && !selectedPaymentMethodType) {
       Alert.alert('Méthode de paiement requise', 'Veuillez sélectionner une méthode de paiement');
       return;
     }
 
-    // Vérifier le paiement partiel
+  
     if (isPartialPayment && partialAmount) {
       const partial = parseFloat(partialAmount);
       if (isNaN(partial) || partial <= 0 || partial > price) {
@@ -185,8 +182,8 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       payerType,
       isPartialPayment,
       isPartialPayment && partialAmount ? parseFloat(partialAmount) : undefined,
-      selectedPaymentMethodType || undefined, // Passer la méthode de paiement choisie
-      paymentMethodId || null // Passer l'ID de la méthode de paiement
+      selectedPaymentMethodType || undefined, 
+      paymentMethodId || null 
     );
   };
 
@@ -211,13 +208,12 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
         )}
       </View>
 
-      {/* Adresse principale */}
+  
       <View style={styles.addressDisplay}>
         <Ionicons name="location" size={18} color="#8B5CF6" />
         <Text style={styles.addressText} numberOfLines={2}>{address}</Text>
       </View>
 
-      {/* Pièce jointe - Important */}
       <TouchableOpacity
         style={styles.attachmentButton}
         onPress={() => pickImage(type)}
@@ -252,7 +248,6 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
         </ScrollView>
       )}
 
-      {/* Champs obligatoires pour dropoff */}
       {type === 'dropoff' && (
         <View style={styles.requiredField}>
           <Text style={styles.inputLabel}>Téléphone destinataire *</Text>
@@ -266,7 +261,6 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
         </View>
       )}
 
-      {/* Section optionnelle - Détails supplémentaires */}
       <TouchableOpacity
         style={styles.optionalToggle}
         onPress={() => type === 'pickup' ? setShowPickupOptional(!showPickupOptional) : setShowDropoffOptional(!showDropoffOptional)}
@@ -281,7 +275,6 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
         />
       </TouchableOpacity>
 
-      {/* Champs optionnels */}
       {(type === 'pickup' ? showPickupOptional : showDropoffOptional) && (
         <View style={styles.optionalFields}>
           <View style={styles.inputRow}>
@@ -331,7 +324,6 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
     </View>
   );
 
-  // PanResponder personnalisé qui ne réagit QUE sur le drag handle
   const dragHandleRef = useRef<View>(null);
   const [dragHandleLayout, setDragHandleLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -339,11 +331,9 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_evt, gestureState) => {
-        // Vérifier si le geste commence dans la zone du drag handle
         const { moveX, moveY } = gestureState;
         const { x, y, width, height } = dragHandleLayout;
         
-        // Zone élargie autour du drag handle (60px verticalement)
         const handleZone = {
           x: x - 20,
           y: y - 30,
@@ -357,7 +347,6 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
           moveY >= handleZone.y &&
           moveY <= handleZone.y + handleZone.height;
         
-        // Ne prendre le contrôle que si c'est un geste vertical dans la zone du drag handle
         const isVerticalSwipe = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
         return isInHandleZone && isVerticalSwipe && Math.abs(gestureState.dy) > 5;
       },
@@ -536,7 +525,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
               <View style={styles.recipientPaymentInfo}>
                 <Ionicons name="information-circle" size={18} color="#8B5CF6" />
                 <Text style={styles.recipientPaymentInfoText}>
-                  Le destinataire paiera à la livraison. Si le destinataire est enregistré dans l'app, il pourra opter pour le paiement différé.
+                  Le destinataire paiera à la livraison. Si le destinataire est enregistré dans l&apos;app, il pourra opter pour le paiement différé.
                 </Text>
               </View>
             )}

@@ -1,7 +1,3 @@
-/**
- * Composant pour afficher le calcul de prix d'une livraison
- */
-
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -104,7 +100,7 @@ export default function PriceCalculationCard({
 
         {calculation.urgencyFee > 0 && (
           <View style={styles.row}>
-            <Text style={styles.label}>Frais d'urgence</Text>
+            <Text style={styles.label}>Frais d&apos;urgence</Text>
             <Text style={[styles.value, styles.urgentValue]}>
               +{calculation.urgencyFee.toLocaleString()} XOF
             </Text>

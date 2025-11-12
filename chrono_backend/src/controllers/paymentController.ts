@@ -248,7 +248,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
     let amountToPay = totalPrice;
     let remainingAmount = 0;
     if (isPartial && partialAmount) {
-      amountToPay = parseFloat(partialAmount);
+      amountToPay = Number(partialAmount);
       remainingAmount = totalPrice - amountToPay;
       if (amountToPay > totalPrice) {
         res.status(400).json({
