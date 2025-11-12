@@ -15,37 +15,24 @@ interface OrderWithDB extends OrderRequest {
 
 
 const getBackgroundColor = (status: OrderStatus): string => {
-  // Commandes en pending (violet)
-  if (status === 'pending') {
-    return '#E5D5FF'; // Violet clair pour les commandes en attente
+  // Commandes en cours (violet) - UNIQUEMENT pending, accepted, enroute, picked_up
+  if (status === 'pending' || status === 'accepted' || status === 'enroute' || status === 'picked_up') {
+    return '#E5D5FF'; // Violet clair pour les commandes en cours
   }
-  // Autres commandes en cours (bleu)
-  if (status === 'accepted' || status === 'enroute' || status === 'picked_up') {
-    return '#E8F0F4'; // Bleu clair pour les commandes en cours (non pending)
-  }
-  // Commandes terminées
-  if (status === 'completed') {
-    return '#E8F0F4'; // Bleu clair pour les colis terminés
-  }
-
-  return '#E8F0F4';
+  // Commandes terminées, annulées ou refusées (bleu clair d'origine)
+  // completed, cancelled, declined → toutes en bleu clair
+  return '#E8F0F4'; // Bleu clair pour les commandes terminées/annulées/refusées
 };
 
 
 const getProgressColor = (status: OrderStatus): string => {
-  // Violet uniquement pour pending
-  if (status === 'pending') {
-    return '#8B5CF6'; // Violet pour les commandes en attente
+  // Commandes en cours (violet) - UNIQUEMENT pending, accepted, enroute, picked_up
+  if (status === 'pending' || status === 'accepted' || status === 'enroute' || status === 'picked_up') {
+    return '#8B5CF6'; // Violet pour les commandes en cours
   }
-  // Autres commandes en cours (bleu)
-  if (status === 'accepted' || status === 'enroute' || status === 'picked_up') {
-    return '#3B82F6'; // Bleu pour les commandes en cours (non pending)
-  }
-  // Commandes terminées
-  if (status === 'completed') {
-    return '#999'; // Gris pour les terminés
-  }
-  return '#999';
+  // Commandes terminées, annulées ou refusées (gris d'origine)
+  // completed, cancelled, declined → toutes en gris
+  return '#999'; // Gris pour les commandes terminées/annulées/refusées
 };
 
 
@@ -68,6 +55,8 @@ const getProgressPercentage = (status: OrderStatus): number => {
 
 export default function ShipmentList() {
   const { user } = useAuthStore();
+  // 🆕 Utiliser les commandes actives depuis le store en priorité
+  const activeOrdersFromStore = useOrderStore((s) => s.activeOrders);
   const [orders, setOrders] = useState<OrderWithDB[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -303,9 +292,39 @@ export default function ShipmentList() {
           }
         }
 
+        // 🆕 PRIORITÉ 0: Utiliser TOUTES les commandes depuis le store (actives ET terminées)
+        // Les commandes du store sont prioritaires car elles sont en temps réel
+        // On inclut toutes les commandes pour que les couleurs se mettent à jour dynamiquement
+        const storeActiveOrders: OrderWithDB[] = activeOrdersFromStore
+          .map(order => ({
+            ...order,
+            created_at: (order as any).createdAt || (order as any).created_at,
+            accepted_at: (order as any).acceptedAt || (order as any).accepted_at,
+            completed_at: (order as any).completedAt || (order as any).completed_at,
+            cancelled_at: (order as any).cancelledAt || (order as any).cancelled_at,
+          }));
+
+        // Combiner les commandes du store avec celles de l'API
+        // Les commandes du store sont prioritaires
+        const combinedOrders: OrderWithDB[] = [];
+        
+        // Ajouter toutes les commandes actives du store
+        storeActiveOrders.forEach(storeOrder => {
+          if (!combinedOrders.find(o => o.id === storeOrder.id)) {
+            combinedOrders.push(storeOrder);
+          }
+        });
+
+        // Ajouter les commandes de l'API qui ne sont pas déjà dans le store
+        displayOrders.forEach(apiOrder => {
+          if (!combinedOrders.find(o => o.id === apiOrder.id)) {
+            combinedOrders.push(apiOrder);
+          }
+        });
+
         // Toujours afficher au minimum 2 commandes si elles existent
         // Limiter à maximum 2 commandes
-        const finalOrders = displayOrders.slice(0, 2);
+        const finalOrders = combinedOrders.slice(0, 2);
         // Log supprimé pour réduire la pollution du terminal
 
         setOrders(finalOrders);
@@ -325,44 +344,77 @@ export default function ShipmentList() {
     loadOrders();
   }, [loadOrders]);
 
-  // 🆕 Écouter les mises à jour de statut depuis le store pour rafraîchir automatiquement
+  // 🆕 Synchroniser automatiquement les commandes du store avec l'affichage
+  // Mettre à jour les couleurs dynamiquement quand le statut change
+  const lastActiveOrdersHashRef = React.useRef<string>('');
+  
   useEffect(() => {
-    let previousStatus: OrderStatus | null = null;
-    
-    // Écouter les changements dans le store
+    // Écouter les changements dans le store pour mettre à jour immédiatement les couleurs
     const unsubscribe = useOrderStore.subscribe((state) => {
-      const currentOrder = state.currentOrder;
+      const storeActiveOrders = state.activeOrders;
       
-      // Si on a une commande actuelle et que son statut a changé
-      if (currentOrder) {
-        const newStatus = currentOrder.status;
-        
-        // Si le statut a changé (notamment vers "completed"), rafraîchir la liste
-        if (previousStatus !== null && previousStatus !== newStatus) {
-          // Log supprimé pour réduire la pollution du terminal
-          // Rafraîchir la liste après un court délai pour laisser le temps au serveur de mettre à jour
-          setTimeout(() => {
-            loadOrders();
-          }, 1000);
-        }
-        
-        previousStatus = newStatus;
-      } else {
-        // Si la commande actuelle est supprimée, rafraîchir aussi
-        if (previousStatus !== null) {
-          // Log supprimé pour réduire la pollution du terminal
-          setTimeout(() => {
-            loadOrders();
-          }, 500);
-        }
-        previousStatus = null;
+      // 🛡️ Protection contre les boucles infinies : créer un hash des commandes pour détecter les vrais changements
+      const ordersHash = storeActiveOrders.map(o => `${o.id}:${o.status}`).join('|');
+      
+      // Ne mettre à jour que si les commandes ou leurs statuts ont vraiment changé
+      // Ignorer les changements de selectedOrderId qui ne concernent pas les commandes elles-mêmes
+      if (ordersHash === lastActiveOrdersHashRef.current) {
+        return; // Pas de changement réel, ignorer
       }
+      
+      lastActiveOrdersHashRef.current = ordersHash;
+      
+      // Mettre à jour les commandes dans l'état local avec les statuts du store
+      setOrders((currentOrders) => {
+        const updatedOrders = currentOrders.map((order) => {
+          // Trouver la commande correspondante dans le store
+          const storeOrder = storeActiveOrders.find((so) => so.id === order.id);
+          
+          // Si la commande existe dans le store, utiliser son statut à jour
+          // Cela permet de mettre à jour les couleurs dynamiquement
+          if (storeOrder) {
+            // Ne mettre à jour que si le statut a vraiment changé
+            if (order.status !== storeOrder.status) {
+              return {
+                ...order,
+                status: storeOrder.status, // Mettre à jour le statut (et donc la couleur)
+              };
+            }
+            return order; // Pas de changement, retourner l'ordre tel quel
+          }
+          
+          return order;
+        });
+        
+        // Ajouter les nouvelles commandes du store qui ne sont pas encore dans la liste
+        storeActiveOrders.forEach((storeOrder) => {
+          if (!updatedOrders.find((o) => o.id === storeOrder.id)) {
+            updatedOrders.push({
+              ...storeOrder,
+              created_at: (storeOrder as any).createdAt || (storeOrder as any).created_at,
+              accepted_at: (storeOrder as any).acceptedAt || (storeOrder as any).accepted_at,
+              completed_at: (storeOrder as any).completedAt || (storeOrder as any).completed_at,
+              cancelled_at: (storeOrder as any).cancelledAt || (storeOrder as any).cancelled_at,
+            } as OrderWithDB);
+          }
+        });
+        
+        return updatedOrders;
+      });
     });
 
     return () => {
       unsubscribe();
     };
-  }, [loadOrders]);
+  }, []);
+
+  // 🆕 Rafraîchir depuis l'API quand le nombre de commandes actives change
+  useEffect(() => {
+    if (activeOrdersFromStore.length > 0) {
+      // Rafraîchir la liste pour inclure les nouvelles commandes actives
+      loadOrders();
+    }
+  }, [activeOrdersFromStore.length, loadOrders]);
 
   // 🆕 Rafraîchir automatiquement la liste toutes les 5 secondes si on a des commandes en cours
   useEffect(() => {

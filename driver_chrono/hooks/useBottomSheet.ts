@@ -8,6 +8,8 @@ const BOTTOM_SHEET_MIN_HEIGHT = 100;
 export const useBottomSheet = () => {
   const animatedHeight = useRef(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT)).current;
   const [isExpanded, setIsExpanded] = useState(false);
+  const currentAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const startHeightRef = useRef<number>(BOTTOM_SHEET_MIN_HEIGHT);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -16,9 +18,27 @@ export const useBottomSheet = () => {
         const { dx, dy } = gestureState;
         return Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 4;
       },
+      onPanResponderGrant: () => {
+        // 🛡️ Arrêter toute animation en cours avant de commencer le drag
+        if (currentAnimationRef.current) {
+          currentAnimationRef.current.stop();
+          currentAnimationRef.current = null;
+        }
+        // Stocker la valeur de départ de manière sécurisée
+        animatedHeight.stopAnimation((currentValue) => {
+          startHeightRef.current = currentValue || BOTTOM_SHEET_MIN_HEIGHT;
+        });
+      },
       onPanResponderMove: (_event, gestureState) => {
+        // 🛡️ S'assurer qu'aucune animation n'est en cours avant de modifier la valeur
+        if (currentAnimationRef.current) {
+          currentAnimationRef.current.stop();
+          currentAnimationRef.current = null;
+        }
         const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-        const newHeight = clamp(BOTTOM_SHEET_MAX_HEIGHT - gestureState.dy, BOTTOM_SHEET_MIN_HEIGHT, BOTTOM_SHEET_MAX_HEIGHT);
+        // Calculer la nouvelle hauteur basée sur la valeur de départ stockée
+        const newHeight = clamp(startHeightRef.current - gestureState.dy, BOTTOM_SHEET_MIN_HEIGHT, BOTTOM_SHEET_MAX_HEIGHT);
+        // Utiliser setValue maintenant que l'animation est arrêtée
         animatedHeight.setValue(newHeight);
       },
       onPanResponderRelease: (_event, gestureState) => {
@@ -27,10 +47,14 @@ export const useBottomSheet = () => {
         } else if (gestureState.vy < -0.8 || gestureState.dy < -100) {
           expand();
         } else {
-          Animated.spring(animatedHeight, {
+          const animation = Animated.spring(animatedHeight, {
             toValue: isExpanded ? BOTTOM_SHEET_MAX_HEIGHT : BOTTOM_SHEET_MIN_HEIGHT,
             useNativeDriver: false,
-          }).start();
+          });
+          currentAnimationRef.current = animation;
+          animation.start(() => {
+            currentAnimationRef.current = null;
+          });
         }
       },
     })
@@ -38,22 +62,40 @@ export const useBottomSheet = () => {
 
   const expand = () => {
     setIsExpanded(true);
-    Animated.spring(animatedHeight, {
+    // 🛡️ Arrêter toute animation en cours avant de démarrer une nouvelle
+    if (currentAnimationRef.current) {
+      currentAnimationRef.current.stop();
+      currentAnimationRef.current = null;
+    }
+    const animation = Animated.spring(animatedHeight, {
       toValue: BOTTOM_SHEET_MAX_HEIGHT,
       useNativeDriver: false,
       tension: 65,
       friction: 8,
-    }).start();
+    });
+    currentAnimationRef.current = animation;
+    animation.start(() => {
+      currentAnimationRef.current = null;
+    });
   };
 
   const collapse = () => {
     setIsExpanded(false);
-    Animated.spring(animatedHeight, {
+    // 🛡️ Arrêter toute animation en cours avant de démarrer une nouvelle
+    if (currentAnimationRef.current) {
+      currentAnimationRef.current.stop();
+      currentAnimationRef.current = null;
+    }
+    const animation = Animated.spring(animatedHeight, {
       toValue: BOTTOM_SHEET_MIN_HEIGHT,
       useNativeDriver: false,
       tension: 65,
       friction: 8,
-    }).start();
+    });
+    currentAnimationRef.current = animation;
+    animation.start(() => {
+      currentAnimationRef.current = null;
+    });
   };
 
   const toggle = () => {

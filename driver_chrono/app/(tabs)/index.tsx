@@ -12,6 +12,7 @@ import { StatusToggle } from "../../components/StatusToggle";
 import { StatsCards } from "../../components/StatsCards";
 import { OrderRequestPopup } from "../../components/OrderRequestPopup";
 import { RecipientDetailsSheet } from "../../components/RecipientDetailsSheet";
+import { OrdersListBottomSheet } from "../../components/OrdersListBottomSheet";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
 import { useBottomSheet } from "../../hooks/useBottomSheet";
 import { useDriverStore } from "../../store/useDriverStore";
@@ -43,12 +44,95 @@ export default function Index() {
     totalRevenue: 0,
   });
   
-  // Store des commandes
-  const { 
-    pendingOrder, 
-    setPendingOrder,
-    currentOrder,
-    } = useOrderStore();
+  // Store des commandes - utiliser les hooks Zustand pour la réactivité
+  const pendingOrders = useOrderStore((s) => s.pendingOrders);
+  const activeOrders = useOrderStore((s) => s.activeOrders);
+  const selectedOrderId = useOrderStore((s) => s.selectedOrderId);
+  const setSelectedOrder = useOrderStore((s) => s.setSelectedOrder);
+  
+  // Récupérer la première commande en attente pour le popup
+  const pendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null;
+  
+  // 🆕 Fonction pour calculer la distance entre la position du livreur et le point de pickup d'une commande
+  const calculateDistanceToPickup = React.useCallback((order: typeof activeOrders[0]): number | null => {
+    if (!location || !order?.pickup) return null;
+    const pickupCoord = resolveCoords(order.pickup);
+    if (!pickupCoord) return null;
+
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (pickupCoord.latitude - location.latitude) * Math.PI / 180;
+    const dLon = (pickupCoord.longitude - location.longitude) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(location.latitude * Math.PI / 180) * Math.cos(pickupCoord.latitude * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    
+    return Math.round(R * c * 10) / 10; // Distance en km arrondie à 1 décimale
+  }, [location]);
+
+  // 🆕 Trier les commandes par distance depuis la position actuelle du livreur
+  const sortedActiveOrdersByDistance = React.useMemo(() => {
+    if (!location || activeOrders.length === 0) return activeOrders;
+    
+    return [...activeOrders].sort((a, b) => {
+      const distA = calculateDistanceToPickup(a);
+      const distB = calculateDistanceToPickup(b);
+      
+      // Si une distance est null, mettre cette commande en dernier
+      if (distA === null && distB === null) return 0;
+      if (distA === null) return 1;
+      if (distB === null) return -1;
+      
+      // Trier par distance (plus proche en premier)
+      return distA - distB;
+    });
+  }, [activeOrders, location, calculateDistanceToPickup]);
+
+  // Récupérer la commande active actuelle
+  // 🆕 Utiliser la distance pour déterminer la commande à afficher si aucune n'est sélectionnée
+  const currentOrder = useOrderStore((s) => {
+    if (s.selectedOrderId) {
+      return s.activeOrders.find(o => o.id === s.selectedOrderId) || null;
+    }
+    
+    // Si aucune commande n'est sélectionnée, sélectionner automatiquement selon la distance
+    // Priorité : commande en cours (picked_up, enroute) > distance depuis position actuelle
+    if (location && sortedActiveOrdersByDistance.length > 0) {
+      // D'abord chercher une commande en cours
+      const inProgressOrder = sortedActiveOrdersByDistance.find(o => 
+        o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
+      );
+      
+      const orderToSelect = inProgressOrder || sortedActiveOrdersByDistance[0];
+      if (orderToSelect) {
+        // Sélectionner automatiquement cette commande (la plus proche ou en cours)
+        setTimeout(() => {
+          s.setSelectedOrder(orderToSelect.id);
+        }, 100);
+        return orderToSelect;
+      }
+    }
+    
+    // Fallback sur l'ancienne logique si pas de position
+    const priorityOrder = s.activeOrders.find(o => 
+      o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
+    );
+    if (priorityOrder) {
+      setTimeout(() => {
+        s.setSelectedOrder(priorityOrder.id);
+      }, 100);
+      return priorityOrder;
+    }
+    const firstOrder = s.activeOrders[0];
+    if (firstOrder) {
+      setTimeout(() => {
+        s.setSelectedOrder(firstOrder.id);
+      }, 100);
+      return firstOrder;
+    }
+    return null;
+  });
   
   // Bottom sheet pour les détails du destinataire
   const {
@@ -58,6 +142,16 @@ export default function Index() {
     expand: expandRecipientDetailsSheet,
     collapse: collapseRecipientDetailsSheet,
     toggle: toggleRecipientDetailsSheet,
+  } = useBottomSheet();
+
+  // Bottom sheet pour la liste des commandes actives
+  const {
+    animatedHeight: ordersListAnimatedHeight,
+    isExpanded: ordersListIsExpanded,
+    panResponder: ordersListPanResponder,
+    expand: expandOrdersListSheet,
+    collapse: collapseOrdersListSheet,
+    toggle: toggleOrdersListSheet,
   } = useBottomSheet();
   
   // Réf pour suivre si l'utilisateur a fermé manuellement le bottom sheet
@@ -108,12 +202,42 @@ export default function Index() {
   };
 
   // Hook pour récupérer la route réelle depuis Google Directions
+  // Utiliser la commande sélectionnée (currentOrder) pour calculer la destination
   const destination = getCurrentDestination();
   const { route: routeToDestination, isLoading: isRouteLoading, refetch: refetchRoute } = useRouteTracking(
     location,
     destination,
     isOnline && !!currentOrder && !!destination
   );
+
+  // 🆕 Recentrer la map sur la commande sélectionnée quand elle change
+  useEffect(() => {
+    if (currentOrder && location) {
+      const pickupCoord = resolveCoords(currentOrder.pickup);
+      const dropoffCoord = resolveCoords(currentOrder.dropoff);
+      const status = String(currentOrder.status || '');
+      
+      // Déterminer quelle coordonnée utiliser pour centrer
+      let targetCoord = null;
+      if ((status === 'accepted' || status === 'enroute' || status === 'in_progress') && pickupCoord) {
+        targetCoord = pickupCoord;
+      } else if ((status === 'picked_up' || status === 'delivering') && dropoffCoord) {
+        targetCoord = dropoffCoord;
+      }
+      
+      // Recentrer la map sur la commande sélectionnée
+      if (targetCoord && mapRef.current) {
+        setTimeout(() => {
+          mapRef.current?.animateToRegion({
+            latitude: targetCoord!.latitude,
+            longitude: targetCoord!.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+          }, 500);
+        }, 300);
+      }
+    }
+  }, [selectedOrderId, currentOrder?.id]); // Se déclencher quand la sélection change
 
   // Hook pour la caméra qui suit automatiquement
   const { fitToRoute, centerOnDriver } = useMapCamera(
@@ -193,12 +317,12 @@ export default function Index() {
   // Gestion des commandes
   const handleAcceptOrder = (orderId: string) => {
     orderSocketService.acceptOrder(orderId);
-    setPendingOrder(null); // Fermer le popup
+    // Le store sera mis à jour automatiquement via order-accepted-confirmation
   };
 
   const handleDeclineOrder = (orderId: string) => {
     orderSocketService.declineOrder(orderId);
-    setPendingOrder(null); // Fermer le popup
+    // Le store sera mis à jour automatiquement via order-declined-confirmation
   };
 
   // Ref pour éviter les doubles clics
@@ -378,15 +502,56 @@ export default function Index() {
       animationTimeoutsRef.current.forEach(id => clearTimeout(id));
       animationTimeoutsRef.current = [];
 
-      // Recentrer sur la position du livreur après une course
-      if (isOnline && location) {
-        // Utiliser la fonction du hook pour recentrer proprement
-        setTimeout(() => {
-          centerOnDriver();
-        }, 300);
+      // 🆕 Si une commande est terminée mais qu'il y a d'autres commandes actives, sélectionner la plus proche
+      const remainingActiveOrders = useOrderStore.getState().activeOrders;
+      if (remainingActiveOrders.length === 0) {
+        // Seulement recentrer si plus aucune commande active
+        if (isOnline && location) {
+          setTimeout(() => {
+            centerOnDriver();
+          }, 300);
+        }
+      } else {
+        // Il y a d'autres commandes actives, sélectionner automatiquement la plus proche selon la distance
+        if (location) {
+          // Trier les commandes restantes par distance
+          const sortedRemaining = [...remainingActiveOrders].sort((a, b) => {
+            const distA = calculateDistanceToPickup(a);
+            const distB = calculateDistanceToPickup(b);
+            
+            if (distA === null && distB === null) return 0;
+            if (distA === null) return 1;
+            if (distB === null) return -1;
+            
+            return distA - distB;
+          });
+          
+          // Priorité : commande en cours > plus proche selon distance
+          const inProgressOrder = sortedRemaining.find(o => 
+            o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
+          );
+          
+          const nextOrder = inProgressOrder || sortedRemaining[0];
+          if (nextOrder) {
+            setTimeout(() => {
+              useOrderStore.getState().setSelectedOrder(nextOrder.id);
+              logger.info('📦 Commande terminée, sélection automatique de la prochaine', 'driver-index', {
+                nextOrderId: nextOrder.id,
+                distance: calculateDistanceToPickup(nextOrder),
+                remainingCount: remainingActiveOrders.length,
+              });
+            }, 500);
+          }
+        } else {
+          // Pas de position disponible, utiliser la logique du store
+          logger.info('📦 Commande terminée, autres commandes actives disponibles', 'driver-index', {
+            remainingCount: remainingActiveOrders.length,
+            nextSelectedId: useOrderStore.getState().selectedOrderId,
+          });
+        }
       }
     }
-  }, [currentOrder?.status, currentOrder, location, isOnline, centerOnDriver]);
+  }, [currentOrder?.status, currentOrder, location, isOnline, centerOnDriver, calculateDistanceToPickup]);
 
   // Ouvrir automatiquement le bottom sheet des détails du destinataire quand le colis est récupéré
   useEffect(() => {
@@ -593,53 +758,89 @@ export default function Index() {
           return null;
         })()}
 
-        {/* Markers pour pickup / dropoff (si commande active) - labels clarifiés */}
-        {currentOrder && (() => {
-          const pickupCoord = resolveCoords(currentOrder.pickup);
-          const dropoffCoord = resolveCoords(currentOrder.dropoff);
+        {/* 🆕 Markers pour TOUTES les commandes actives ET en attente */}
+        {[...activeOrders, ...pendingOrders].map((order) => {
+          const pickupCoord = resolveCoords(order.pickup);
+          const dropoffCoord = resolveCoords(order.dropoff);
+          const isSelected = selectedOrderId === order.id;
+          const status = String(order.status || '');
+          const isPending = status === 'pending';
+          const distance = calculateDistanceToPickup(order);
 
           return (
-            <>
+            <React.Fragment key={order.id}>
+              {/* Marqueur pickup pour chaque commande */}
               {pickupCoord && (
                 <Marker
                   coordinate={pickupCoord}
-                  title={currentOrder.user?.name ? `Récupérer : ${currentOrder.user.name}` : 'Récupérer (client)'}
-                  description={currentOrder.pickup?.address}
+                  title={order.user?.name ? `Récupérer : ${order.user.name}` : `Récupérer #${order.id.slice(0, 8)}`}
+                  description={
+                    distance !== null 
+                      ? `${order.pickup?.address} • ${distance} km`
+                      : order.pickup?.address
+                  }
+                  onPress={() => {
+                    // Sélectionner cette commande quand on clique sur le marqueur
+                    setSelectedOrder(order.id);
+                    logger.info('📍 Commande sélectionnée depuis marqueur pickup', 'driver-index', { orderId: order.id });
+                  }}
                 >
                   <View style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 14,
-                    backgroundColor: '#fff',
+                    width: isSelected ? 32 : 28,
+                    height: isSelected ? 32 : 28,
+                    borderRadius: isSelected ? 16 : 14,
+                    backgroundColor: isPending 
+                      ? '#F59E0B' // Orange pour pending
+                      : (isSelected ? '#8B5CF6' : '#A78BFA'), // Violet pour actives
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderWidth: 3,
-                    borderColor: '#8B5CF6'
-                  }} />
+                    borderWidth: isSelected ? 3 : 2,
+                    borderColor: '#fff',
+                    shadowColor: isPending ? '#F59E0B' : (isSelected ? '#8B5CF6' : '#000'),
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isSelected ? 0.5 : 0.2,
+                    shadowRadius: isSelected ? 4 : 2,
+                    elevation: isSelected ? 5 : 2,
+                  }}>
+                    <Ionicons name={isPending ? "time" : "cube"} size={isSelected ? 18 : 16} color="#fff" />
+                  </View>
                 </Marker>
               )}
 
-              {dropoffCoord && (
+              {/* Marqueur dropoff pour chaque commande active (pas pour pending) */}
+              {dropoffCoord && !isPending && (
                 <Marker
                   coordinate={dropoffCoord}
-                  title={'Livrer : Destinataire'}
-                  description={currentOrder.dropoff?.address}
+                  title={`Livrer #${order.id.slice(0, 8)}`}
+                  description={order.dropoff?.address}
+                  onPress={() => {
+                    // Sélectionner cette commande quand on clique sur le marqueur
+                    setSelectedOrder(order.id);
+                    logger.info('📍 Commande sélectionnée depuis marqueur dropoff', 'driver-index', { orderId: order.id });
+                  }}
                 >
                   <View style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 12,
-                    backgroundColor: '#fff',
+                    width: isSelected ? 28 : 24,
+                    height: isSelected ? 28 : 24,
+                    borderRadius: isSelected ? 14 : 12,
+                    backgroundColor: (status === 'picked_up' || status === 'delivering') ? '#10B981' : '#34D399',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderWidth: 2,
-                    borderColor: '#94A3B8'
-                  }} />
+                    borderWidth: isSelected ? 3 : 2,
+                    borderColor: '#fff',
+                    shadowColor: isSelected ? '#10B981' : '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isSelected ? 0.5 : 0.2,
+                    shadowRadius: isSelected ? 4 : 2,
+                    elevation: isSelected ? 5 : 2,
+                  }}>
+                    <Ionicons name="location" size={isSelected ? 16 : 14} color="#fff" />
+                  </View>
                 </Marker>
               )}
-            </>
+            </React.Fragment>
           );
-        })()}
+        })}
       </MapView>
 
       {/* SWITCH ONLINE/OFFLINE */}
@@ -656,14 +857,47 @@ export default function Index() {
         isOnline={isOnline}
       />
 
+      {/* 🆕 Indicateur visuel des commandes multiples */}
+      {activeOrders.length > 1 && !ordersListIsExpanded && (
+        <View style={styles.multipleOrdersIndicator}>
+          <TouchableOpacity 
+            style={styles.multipleOrdersButton}
+            onPress={toggleOrdersListSheet}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="cube" size={16} color="#8B5CF6" />
+            <Text style={styles.multipleOrdersText}>
+              {activeOrders.length} commande{activeOrders.length > 1 ? 's' : ''} active{activeOrders.length > 1 ? 's' : ''}
+            </Text>
+            <Ionicons name="chevron-up" size={16} color="#8B5CF6" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* FLOATING MENU */}
       <View style={styles.floatingMenu}>
-        <TouchableOpacity style={[styles.menuButton, styles.activeButton]}>
-          <Ionicons name="map" size={22} color="#fff" />
+        <TouchableOpacity 
+          style={[styles.menuButton, !ordersListIsExpanded && styles.activeButton]}
+          onPress={() => {
+            if (ordersListIsExpanded) {
+              collapseOrdersListSheet();
+            }
+          }}
+        >
+          <Ionicons name="map" size={22} color={ordersListIsExpanded ? "#8B5CF6" : "#fff"} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuButton}>
-          <Ionicons name="list" size={22} color="#8B5CF6" />
+        <TouchableOpacity 
+          style={[styles.menuButton, ordersListIsExpanded && styles.activeButton]}
+          onPress={toggleOrdersListSheet}
+        >
+          <Ionicons name="list" size={22} color={ordersListIsExpanded ? "#fff" : "#8B5CF6"} />
+          {/* Badge pour afficher le nombre de commandes actives */}
+          {activeOrders.length > 0 && (
+            <View style={styles.menuBadge}>
+              <Text style={styles.menuBadgeText}>{activeOrders.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -740,6 +974,21 @@ export default function Index() {
           order={currentOrder}
         />
       )}
+
+      {/* 📦 BOTTOM SHEET LISTE DES COMMANDES ACTIVES */}
+      {ordersListIsExpanded && (
+        <OrdersListBottomSheet
+          animatedHeight={ordersListAnimatedHeight}
+          panResponder={ordersListPanResponder}
+          isExpanded={ordersListIsExpanded}
+          onToggle={toggleOrdersListSheet}
+          onOrderSelect={(orderId) => {
+            // La sélection est gérée dans OrdersListBottomSheet
+            // Ici on peut ajouter une logique supplémentaire si nécessaire
+            logger.info('📦 Commande sélectionnée', 'driver-index', { orderId });
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -784,9 +1033,56 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignItems: "center",
     justifyContent: "center",
+    position: 'relative',
   },
   activeButton: {
     backgroundColor: "#8B5CF6",
+  },
+  menuBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  menuBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  multipleOrdersIndicator: {
+    position: 'absolute',
+    top: 120,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  multipleOrdersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: 8,
+  },
+  multipleOrdersText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B5CF6',
   },
   orderActionsContainer: {
     position: 'absolute',

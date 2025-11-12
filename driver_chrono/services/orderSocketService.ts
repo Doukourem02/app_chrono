@@ -48,7 +48,9 @@ class OrderSocketService {
     // 📦 Nouvelle commande reçue
     this.socket.on('new-order-request', (order: OrderRequest) => {
           logger.info('📦 Nouvelle commande reçue', undefined, order);
-      useOrderStore.getState().setPendingOrder(order);
+      if (order && order.id) {
+        useOrderStore.getState().addPendingOrder(order);
+      }
     });
 
     // ✅ Confirmation acceptation
@@ -56,9 +58,9 @@ class OrderSocketService {
           logger.info('✅ Commande acceptée confirmée', undefined, data);
       try {
         const { order } = data || {};
-        if (order) {
-          useOrderStore.getState().setCurrentOrder(order as any);
-          useOrderStore.getState().setPendingOrder(null);
+        if (order && order.id) {
+          const store = useOrderStore.getState();
+          store.acceptOrder(order.id, this.driverId || '');
         }
       } catch (err) {
             logger.warn('Error handling order-accepted-confirmation', undefined, err);
@@ -69,8 +71,10 @@ class OrderSocketService {
     this.socket.on('order-declined-confirmation', (data) => {
           logger.info('❌ Commande déclinée confirmée', undefined, data);
       try {
-        // Clear local pending order if server confirmed our decline
-        useOrderStore.getState().setPendingOrder(null);
+        const { orderId } = data || {};
+        if (orderId) {
+          useOrderStore.getState().declineOrder(orderId);
+        }
       } catch (err) {
             logger.warn('Error handling order-declined-confirmation', undefined, err);
       }
@@ -79,25 +83,57 @@ class OrderSocketService {
     // ❌ Commande non trouvée
     this.socket.on('order-not-found', (data) => {
           logger.info('❌ Commande non trouvée', undefined, data);
-      useOrderStore.getState().setPendingOrder(null);
+      const { orderId } = data || {};
+      if (orderId) {
+        useOrderStore.getState().removeOrder(orderId);
+      }
     });
 
     // ⚠️ Commande déjà prise
     this.socket.on('order-already-taken', (data) => {
           logger.info('⚠️ Commande déjà prise', undefined, data);
-      useOrderStore.getState().setPendingOrder(null);
+      const { orderId } = data || {};
+      if (orderId) {
+        useOrderStore.getState().removeOrder(orderId);
+      }
+    });
+
+    // ⚠️ Erreur acceptation (limite atteinte)
+    this.socket.on('order-accept-error', (data) => {
+      logger.warn('⚠️ Erreur acceptation commande', undefined, data);
+      // La commande reste dans pendingOrders pour que le livreur puisse la voir
     });
 
     // 🔄 Resync order state after reconnect
     this.socket.on('resync-order-state', (data) => {
       try {
         logger.info('🔄 Resync order state reçu', undefined, data);
-        const { pendingOrder, currentOrder } = data || {};
-        if (pendingOrder) {
-          useOrderStore.getState().setPendingOrder(pendingOrder as any);
+        const { pendingOrders, activeOrders, pendingOrder, currentOrder } = data || {};
+        const store = useOrderStore.getState();
+        
+        // Ajouter toutes les commandes en attente (nouveau format avec tableaux)
+        if (Array.isArray(pendingOrders)) {
+          pendingOrders.forEach((order: any) => {
+            if (order && order.id) {
+              store.addPendingOrder(order);
+            }
+          });
+        } else if (pendingOrder && pendingOrder.id) {
+          // Compatibilité avec l'ancien format
+          store.addPendingOrder(pendingOrder as any);
         }
-        if (currentOrder) {
-          useOrderStore.getState().setCurrentOrder(currentOrder as any);
+        
+        // Ajouter toutes les commandes actives
+        if (Array.isArray(activeOrders)) {
+          activeOrders.forEach((order: any) => {
+            if (order && order.id) {
+              store.addOrder(order);
+            }
+          });
+          logger.info(`✅ ${activeOrders.length} commande(s) active(s) restaurée(s) après reconnexion`, undefined);
+        } else if (currentOrder && currentOrder.id) {
+          // Compatibilité avec l'ancien format
+          store.addOrder(currentOrder as any);
           logger.info('✅ Commande active restaurée après reconnexion', undefined, { orderId: currentOrder.id });
         }
       } catch (err) {

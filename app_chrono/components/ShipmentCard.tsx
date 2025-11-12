@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { router } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { OrderRequest } from "../store/useOrderStore";
 import { formatDurationLabel } from "../services/orderApi";
 
@@ -61,8 +62,27 @@ export default function ShipmentCard({
     ? (dropoffAddress.split(',')[0] || dropoffAddress.substring(0, 30))
     : `Commande #${order.id.slice(0, 8)}`;
   
+  // Naviguer vers la page dédiée au tracking de cette commande
+  const handleCardPress = () => {
+    // Seulement pour les commandes en cours (pas terminées)
+    if (order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined') {
+      router.push({
+        pathname: '/order-tracking/[orderId]',
+        params: { orderId: order.id }
+      });
+    }
+  };
+  
+  // Rendre la carte cliquable seulement si c'est une commande en cours
+  const isClickable = order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined';
+  const CardComponent = isClickable ? TouchableOpacity : View;
+  
   return (
-    <View style={[styles.card, { backgroundColor }]}>
+    <CardComponent 
+      style={[styles.card, { backgroundColor }]} 
+      onPress={isClickable ? handleCardPress : undefined}
+      activeOpacity={isClickable ? 0.7 : 1}
+    >
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.productInfo}>
@@ -146,7 +166,7 @@ export default function ShipmentCard({
           </View>
         </View>
       </View>
-    </View>
+    </CardComponent>
   );
 }
 

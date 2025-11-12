@@ -52,15 +52,19 @@ export interface OrderRequest {
 }
 
 interface OrderStore {
-  // États
-  currentOrder: OrderRequest | null;
-  pendingOrder: OrderRequest | null; // Commande en attente de réponse du driver
+  // États - Support pour plusieurs commandes actives
+  activeOrders: OrderRequest[]; // Toutes les commandes actives (accepted, in_progress)
+  pendingOrders: OrderRequest[]; // Commandes en attente de réponse du driver
+  selectedOrderId: string | null; // ID de la commande actuellement sélectionnée/affichée
   orderHistory: OrderRequest[];
   isReceivingOrders: boolean;
   
   // Actions
-  setCurrentOrder: (order: OrderRequest | null) => void;
-  setPendingOrder: (order: OrderRequest | null) => void;
+  addOrder: (order: OrderRequest) => void;
+  addPendingOrder: (order: OrderRequest) => void;
+  updateOrder: (orderId: string, updates: Partial<OrderRequest>) => void;
+  removeOrder: (orderId: string) => void;
+  setSelectedOrder: (orderId: string | null) => void;
   addToHistory: (order: OrderRequest) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   acceptOrder: (orderId: string, driverId: string) => void;
@@ -73,24 +77,76 @@ interface OrderStore {
   // Getters
   getOrderById: (orderId: string) => OrderRequest | undefined;
   getActiveOrder: () => OrderRequest | null;
+  getActiveOrdersCount: () => number;
+  getPendingOrdersCount: () => number;
   getTodayOrders: () => OrderRequest[];
   getTotalEarnings: (date?: Date) => number;
+  
+  // Compatibilité avec l'ancien code
+  setCurrentOrder: (order: OrderRequest | null) => void;
+  setPendingOrder: (order: OrderRequest | null) => void;
 }
 
 export const useOrderStore = create<OrderStore>((set, get) => ({
   // États initiaux
-  currentOrder: null,
-  pendingOrder: null,
+  activeOrders: [],
+  pendingOrders: [],
+  selectedOrderId: null,
   orderHistory: [],
   isReceivingOrders: true,
   
-  // Actions
-  setCurrentOrder: (order) => set({ currentOrder: order }),
-  
-  setPendingOrder: (order) => set({ pendingOrder: order }),
-  
+  // Actions principales
+  addOrder: (order) => set((state) => {
+    const exists = state.activeOrders.some(o => o.id === order.id);
+    if (exists) return state;
+    const newOrders = [...state.activeOrders, order];
+    return {
+      activeOrders: newOrders,
+      selectedOrderId: state.selectedOrderId || order.id,
+    };
+  }),
+
+  addPendingOrder: (order) => set((state) => {
+    const exists = state.pendingOrders.some(o => o.id === order.id);
+    if (exists) return state;
+    return {
+      pendingOrders: [...state.pendingOrders, order],
+    };
+  }),
+
+  updateOrder: (orderId, updates) => set((state) => {
+    const updatedActive = state.activeOrders.map(order =>
+      order.id === orderId ? { ...order, ...updates } : order
+    );
+    const updatedPending = state.pendingOrders.map(order =>
+      order.id === orderId ? { ...order, ...updates } : order
+    );
+    return {
+      activeOrders: updatedActive,
+      pendingOrders: updatedPending,
+    };
+  }),
+
+  removeOrder: (orderId) => set((state) => {
+    const filteredActive = state.activeOrders.filter(order => order.id !== orderId);
+    const filteredPending = state.pendingOrders.filter(order => order.id !== orderId);
+    
+    let newSelectedId = state.selectedOrderId;
+    if (state.selectedOrderId === orderId) {
+      newSelectedId = filteredActive.length > 0 ? filteredActive[0].id : null;
+    }
+    
+    return {
+      activeOrders: filteredActive,
+      pendingOrders: filteredPending,
+      selectedOrderId: newSelectedId,
+    };
+  }),
+
+  setSelectedOrder: (orderId) => set({ selectedOrderId: orderId }),
+
   addToHistory: (order) => set((state) => ({
-    orderHistory: [order, ...state.orderHistory].slice(0, 100) // Garder max 100 commandes
+    orderHistory: [order, ...state.orderHistory].slice(0, 100)
   })),
   
   updateOrderStatus: (orderId, status) => set((state) => {
@@ -98,54 +154,64 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       order.id === orderId ? { ...order, status } : order
     );
     
-    let updatedCurrent = state.currentOrder;
-    if (state.currentOrder?.id === orderId) {
-      updatedCurrent = { ...state.currentOrder, status };
-    }
+    const updatedActive = state.activeOrders.map(order =>
+      order.id === orderId ? { ...order, status } : order
+    );
     
-    let updatedPending = state.pendingOrder;
-    if (state.pendingOrder?.id === orderId) {
-      updatedPending = { ...state.pendingOrder, status };
-    }
+    const updatedPending = state.pendingOrders.map(order =>
+      order.id === orderId ? { ...order, status } : order
+    );
+    
+    // Retirer les commandes terminées/annulées des listes actives
+    const filteredActive = updatedActive.filter(o => 
+      o.id !== orderId || (status !== 'completed' && status !== 'cancelled' && status !== 'declined')
+    );
+    
+    const filteredPending = updatedPending.filter(o => 
+      o.id !== orderId || (status !== 'pending')
+    );
     
     return {
       orderHistory: updatedHistory,
-      currentOrder: updatedCurrent,
-      pendingOrder: updatedPending,
+      activeOrders: filteredActive,
+      pendingOrders: filteredPending,
     };
   }),
   
   acceptOrder: (orderId, driverId) => set((state) => {
     const now = new Date();
     
-    // Mettre à jour la commande en attente
-    let updatedOrder = state.pendingOrder;
-    if (updatedOrder && updatedOrder.id === orderId) {
-      updatedOrder = {
-        ...updatedOrder,
+    // Chercher dans pendingOrders
+    const pendingOrder = state.pendingOrders.find(o => o.id === orderId);
+    if (pendingOrder) {
+      const acceptedOrder = {
+        ...pendingOrder,
         status: 'accepted' as OrderStatus,
         driverId,
         acceptedAt: now,
       };
+      
+      return {
+        activeOrders: [...state.activeOrders, acceptedOrder],
+        pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
+        selectedOrderId: state.selectedOrderId || acceptedOrder.id,
+        orderHistory: [acceptedOrder, ...state.orderHistory],
+      };
     }
     
-    return {
-      currentOrder: updatedOrder,
-      pendingOrder: null, // Plus de commande en attente
-      orderHistory: updatedOrder ? [updatedOrder, ...state.orderHistory] : state.orderHistory,
-    };
+    return state;
   }),
   
   declineOrder: (orderId) => set((state) => {
-    const declinedOrder = state.pendingOrder;
-    if (declinedOrder && declinedOrder.id === orderId) {
+    const declinedOrder = state.pendingOrders.find(o => o.id === orderId);
+    if (declinedOrder) {
       const updatedOrder = {
         ...declinedOrder,
         status: 'declined' as OrderStatus,
       };
       
       return {
-        pendingOrder: null,
+        pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
         orderHistory: [updatedOrder, ...state.orderHistory],
       };
     }
@@ -154,22 +220,39 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   
   completeOrder: (orderId) => set((state) => {
     const now = new Date();
-    let updatedCurrent = state.currentOrder;
+    const activeOrder = state.activeOrders.find(o => o.id === orderId);
     
-    if (updatedCurrent && updatedCurrent.id === orderId) {
-      updatedCurrent = {
-        ...updatedCurrent,
+    if (activeOrder) {
+      const completedOrder = {
+        ...activeOrder,
         status: 'completed' as OrderStatus,
         completedAt: now,
       };
       
+      // 🆕 Filtrer les commandes actives pour obtenir les commandes restantes
+      const remainingActiveOrders = state.activeOrders.filter(o => o.id !== orderId);
+      
+      // 🆕 Déterminer la nouvelle commande sélectionnée :
+      // - Si la commande terminée était sélectionnée, sélectionner la première commande restante
+      // - Sinon, garder la sélection actuelle
+      let newSelectedId = state.selectedOrderId;
+      if (state.selectedOrderId === orderId) {
+        // Sélectionner automatiquement la prochaine commande active
+        // Priorité : commande en cours (picked_up, enroute) > première commande disponible
+        const nextOrder = remainingActiveOrders.find(o => 
+          o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
+        ) || remainingActiveOrders[0] || null;
+        newSelectedId = nextOrder?.id || null;
+      }
+      
       const updatedHistory = state.orderHistory.map(order => 
-        order.id === orderId ? updatedCurrent! : order
+        order.id === orderId ? completedOrder : order
       );
       
       return {
-        currentOrder: null, // Plus de commande active
-        orderHistory: updatedHistory.length > 0 ? updatedHistory : [updatedCurrent, ...state.orderHistory],
+        activeOrders: remainingActiveOrders,
+        selectedOrderId: newSelectedId,
+        orderHistory: updatedHistory.length > 0 ? updatedHistory : [completedOrder, ...state.orderHistory],
       };
     }
     
@@ -181,22 +264,19 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       order.id === orderId ? { ...order, status: 'cancelled' as OrderStatus } : order
     );
     
-    let updatedCurrent = state.currentOrder;
-    if (state.currentOrder?.id === orderId) {
-      updatedCurrent = null; // Annuler la commande active
-    }
-    
     return {
+      activeOrders: state.activeOrders.filter(o => o.id !== orderId),
+      pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
       orderHistory: updatedHistory,
-      currentOrder: updatedCurrent,
     };
   }),
   
   setReceivingOrders: (receiving) => set({ isReceivingOrders: receiving }),
   
   clearAllOrders: () => set({
-    currentOrder: null,
-    pendingOrder: null,
+    activeOrders: [],
+    pendingOrders: [],
+    selectedOrderId: null,
     orderHistory: [],
   }),
   
@@ -204,13 +284,45 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   getOrderById: (orderId) => {
     const state = get();
     return state.orderHistory.find(order => order.id === orderId) || 
-           (state.currentOrder?.id === orderId ? state.currentOrder : undefined) ||
-           (state.pendingOrder?.id === orderId ? state.pendingOrder : undefined);
+           state.activeOrders.find(order => order.id === orderId) ||
+           state.pendingOrders.find(order => order.id === orderId);
   },
   
   getActiveOrder: () => {
     const state = get();
-    return state.currentOrder?.status === 'in_progress' ? state.currentOrder : null;
+    if (state.selectedOrderId) {
+      return state.activeOrders.find(o => o.id === state.selectedOrderId) || null;
+    }
+    return state.activeOrders.find(o => o.status === 'in_progress') || state.activeOrders[0] || null;
+  },
+
+  getActiveOrdersCount: () => {
+    return get().activeOrders.length;
+  },
+
+  getPendingOrdersCount: () => {
+    return get().pendingOrders.length;
+  },
+
+  getPendingOrder: () => {
+    const state = get();
+    return state.pendingOrders.length > 0 ? state.pendingOrders[0] : null;
+  },
+  
+  // Compatibilité avec l'ancien code
+  setCurrentOrder: (order) => {
+    if (order) {
+      get().addOrder(order);
+      get().setSelectedOrder(order.id);
+    } else {
+      get().setSelectedOrder(null);
+    }
+  },
+  
+  setPendingOrder: (order) => {
+    if (order) {
+      get().addPendingOrder(order);
+    }
   },
   
   getTodayOrders: () => {

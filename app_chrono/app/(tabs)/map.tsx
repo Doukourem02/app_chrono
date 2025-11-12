@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert, Animated, Dimensions } from 'react-native';
@@ -37,12 +37,18 @@ type Coordinates = {
 
 export default function MapPage() {
   const { requireAuth } = useRequireAuth();
+  
+  // État pour forcer l'affichage du formulaire de création même avec des commandes actives
+  const [isCreatingNewOrder, setIsCreatingNewOrder] = React.useState(false);
   const { setSelectedMethod } = useShipmentStore();
   const { user } = useAuthStore();
   const { loadPaymentMethods } = usePaymentStore();
   
   const mapRef = useRef<MapView | null>(null);
   const hasInitializedRef = useRef<boolean>(false);
+  const isResettingRef = useRef<boolean>(false); // 🆕 Protection contre les boucles infinies
+  const isUserTypingRef = useRef<boolean>(false); // 🆕 Protection contre la réinitialisation pendant la saisie
+  const lastFocusTimeRef = useRef<number>(0); // 🆕 Suivre le moment du dernier focus
   
   // État pour le paiement
   const [showPaymentSheet, setShowPaymentSheet] = React.useState(false);
@@ -129,13 +135,16 @@ export default function MapPage() {
     const store = useOrderStore.getState();
     const ratingStore = useRatingStore.getState();
     
+    const currentOrder = store.getCurrentOrder();
+    const pendingOrder = store.getPendingOrder();
+    
     // Si on a un currentOrder terminé/annulé/refusé, le nettoyer immédiatement
     // MAIS seulement si c'est vraiment ancien (pas une commande qui vient juste d'être complétée)
-    if (store.currentOrder && (
-      store.currentOrder.status === 'cancelled' || 
-      store.currentOrder.status === 'declined'
+    if (currentOrder && (
+      currentOrder.status === 'cancelled' || 
+      currentOrder.status === 'declined'
     )) {
-      logger.info('🧹 Nettoyage commande terminée/annulée/refusée au montage initial', 'map.tsx', { status: store.currentOrder.status });
+      logger.info('🧹 Nettoyage commande terminée/annulée/refusée au montage initial', 'map.tsx', { status: currentOrder.status });
       
       // Nettoyer aussi le RatingBottomSheet s'il est ouvert
       if (ratingStore.showRatingBottomSheet) {
@@ -144,7 +153,7 @@ export default function MapPage() {
       }
       
       // Nettoyer complètement l'état de la commande
-      store.clear();
+      store.removeOrder(currentOrder.id);
       
       // Nettoyer aussi les routes et coordonnées
       try {
@@ -154,7 +163,7 @@ export default function MapPage() {
       setDropoffCoords(null);
       setPickupLocation('');
       setDeliveryLocation('');
-    } else if (store.currentOrder && store.currentOrder.status === 'completed') {
+    } else if (currentOrder && currentOrder.status === 'completed') {
       // Pour les commandes complétées, ne pas nettoyer immédiatement si le RatingBottomSheet n'a pas encore été ouvert
       // On attend que le RatingBottomSheet s'ouvre, puis on nettoiera après sa fermeture
       logger.info('✅ Commande complétée au montage initial - attente du RatingBottomSheet', 'map.tsx', { 
@@ -163,14 +172,14 @@ export default function MapPage() {
       
       // Si le RatingBottomSheet n'a pas été ouvert et que la commande est ancienne (plus de 1 minute), nettoyer
       // Utiliser completed_at si disponible, sinon calculer depuis createdAt
-      const completedAt = (store.currentOrder as any)?.completed_at || (store.currentOrder as any)?.completedAt;
+      const completedAt = (currentOrder as any)?.completed_at || (currentOrder as any)?.completedAt;
       const orderAge = completedAt 
         ? new Date().getTime() - new Date(completedAt).getTime()
         : Infinity;
       
       if (!ratingStore.showRatingBottomSheet && orderAge > 60000) {
         logger.info('🧹 Nettoyage commande complétée ancienne au montage initial', 'map.tsx', { orderAge });
-        store.clear();
+        store.removeOrder(currentOrder.id);
         try {
           clearRoute();
         } catch {}
@@ -183,26 +192,20 @@ export default function MapPage() {
     
     // Si on a un pendingOrder, vérifier s'il est trop ancien (plus de 10 secondes)
     // et le nettoyer pour permettre une nouvelle commande
-    if (store.pendingOrder) {
-      const orderAge = store.pendingOrder.createdAt 
-        ? new Date().getTime() - new Date(store.pendingOrder.createdAt).getTime()
+    if (pendingOrder) {
+      const orderAge = pendingOrder.createdAt 
+        ? new Date().getTime() - new Date(pendingOrder.createdAt).getTime()
         : Infinity;
       
       // Nettoyer les pendingOrders anciens (plus de 10 secondes) pour forcer l'affichage du bottom sheet
       if (orderAge > 10000) {
-        logger.info('🧹 Nettoyage pendingOrder bloqué au montage initial', 'map.tsx', { orderId: store.pendingOrder.id, orderAge });
-        store.setPendingOrder(null);
-        store.setDeliveryStage('idle');
+        logger.info('🧹 Nettoyage pendingOrder bloqué au montage initial', 'map.tsx', { orderId: pendingOrder.id, orderAge });
+        store.removeOrder(pendingOrder.id);
       }
     }
     
-    // S'assurer que le deliveryStage est 'idle' si aucune commande active
-    if (!store.currentOrder && !store.pendingOrder) {
-      store.setDeliveryStage('idle');
-    }
-    
     // Nettoyer aussi le RatingBottomSheet s'il reste ouvert sans raison valide (sauf si c'est une commande récente complétée)
-    if (ratingStore.showRatingBottomSheet && !store.currentOrder) {
+    if (ratingStore.showRatingBottomSheet && !currentOrder) {
       logger.info('🧹 Fermeture RatingBottomSheet au montage initial (pas de commande active)', 'map.tsx');
       ratingStore.resetRatingBottomSheet();
     }
@@ -229,29 +232,156 @@ export default function MapPage() {
   const {
     isSearchingDriver,
     searchSeconds,
-    driverCoords,
+    driverCoords: searchDriverCoords,
     pulseAnim,
     startDriverSearch,
     stopDriverSearch,
   } = useDriverSearch(resetAfterDriverSearch);
 
-  const orderDriverCoords = useOrderStore((s) => s.driverCoords);
-  const currentOrder = useOrderStore((s) => s.currentOrder);
-  const pendingOrder = useOrderStore((s) => s.pendingOrder);
-  const deliveryStage = useOrderStore((s) => s.deliveryStage);
+  const { activeOrders, selectedOrderId, driverCoords: orderDriverCoordsMap, setSelectedOrder } = useOrderStore();
   
+  // 🆕 Réinitialiser complètement la map quand on arrive sur la page (depuis n'importe où)
+  // Utiliser useFocusEffect pour détecter chaque fois qu'on arrive sur la page
+  // TOUJOURS nettoyer pour permettre la création d'une nouvelle commande, même avec des commandes actives
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      const timeSinceLastFocus = now - lastFocusTimeRef.current;
+      
+      // 🛡️ Protection contre les boucles infinies : ne pas réinitialiser si déjà en cours
+      if (isResettingRef.current) {
+        return;
+      }
+      
+      // 🛡️ Protection contre la réinitialisation pendant la saisie :
+      // Ne pas réinitialiser si l'utilisateur est en train de taper
+      if (isUserTypingRef.current) {
+        logger.info('📍 Réinitialisation ignorée - utilisateur en train de saisir', 'map.tsx');
+        return;
+      }
+      
+      // 🛡️ Ne réinitialiser les champs que s'ils sont vides OU si l'utilisateur vient vraiment d'arriver
+      // Vérifier l'état actuel des champs
+      const currentPickup = pickupLocation;
+      const currentDelivery = deliveryLocation;
+      const hasFilledFields = currentPickup.trim().length > 0 || currentDelivery.trim().length > 0;
+      
+      // Si les champs sont remplis, ne pas les vider (l'utilisateur est en train de créer une commande)
+      if (hasFilledFields) {
+        logger.info('📍 Réinitialisation partielle - champs déjà remplis, conservation des données', 'map.tsx', {
+          pickup: currentPickup.substring(0, 30),
+          delivery: currentDelivery.substring(0, 30),
+        });
+        // Réinitialiser seulement selectedOrderId et isCreatingNewOrder, mais CONSERVER les champs
+        const currentSelectedId = useOrderStore.getState().selectedOrderId;
+        if (currentSelectedId !== null) {
+          setSelectedOrder(null);
+        }
+        setIsCreatingNewOrder(true);
+        // Ne pas vider les champs, ne pas nettoyer les coordonnées, ne pas recentrer la map
+        // Juste s'assurer que le mode création est activé
+        return;
+      }
+      
+      isResettingRef.current = true;
+      lastFocusTimeRef.current = now;
+      logger.info('📍 Arrivée sur map - réinitialisation complète pour nouvelle commande', 'map.tsx');
+      
+      // Vérifier si selectedOrderId est déjà null pour éviter les modifications inutiles du store
+      const currentSelectedId = useOrderStore.getState().selectedOrderId;
+      if (currentSelectedId !== null) {
+        setSelectedOrder(null);
+      }
+      
+      // Réinitialiser le mode création (TOUJOURS permettre de créer une nouvelle commande)
+      setIsCreatingNewOrder(true);
+      
+      // Réinitialiser les flags
+      hasAutoOpenedRef.current = false;
+      userManuallyClosedRef.current = false;
+      
+      // 🆕 Nettoyer les coordonnées et routes pour que la map revienne à l'état initial
+      // Cela permet de créer une nouvelle commande même avec des commandes actives
+      try {
+        clearRoute();
+      } catch {}
+      setPickupCoords(null);
+      setDropoffCoords(null);
+      setPickupLocation('');
+      setDeliveryLocation('');
+      setSelectedMethod(null);
+      
+      // Recentrer la map sur la position actuelle de l'utilisateur
+      // Utiliser un timeout pour s'assurer que region est disponible
+      setTimeout(() => {
+        locationService.getCurrentPosition().then((coords) => {
+          if (coords) {
+            animateToCoordinate({ latitude: coords.latitude, longitude: coords.longitude }, 0.01);
+          } else if (region) {
+            animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
+          }
+        }).catch(() => {
+          // Fallback sur region en cas d'erreur
+          if (region) {
+            animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
+          }
+        });
+      }, 200);
+      
+      // Réouvrir le bottom sheet après un court délai pour permettre la création
+      setTimeout(() => {
+        expandBottomSheet();
+        // Réinitialiser le flag après un délai pour permettre une nouvelle réinitialisation si nécessaire
+        setTimeout(() => {
+          isResettingRef.current = false;
+        }, 1000);
+      }, 400);
+    }, [setSelectedOrder, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, pickupLocation, deliveryLocation, setSelectedMethod, animateToCoordinate, region, expandBottomSheet])
+  );
+
+  // 🆕 Détecter quand l'utilisateur commence à remplir les champs pour éviter la réinitialisation
+  useEffect(() => {
+    // Si les champs contiennent du texte, marquer que l'utilisateur est en train de créer une commande
+    // Le flag reste actif tant que les champs sont remplis pour éviter qu'ils soient vidés
+    const hasFilledFields = pickupLocation.trim().length > 0 || deliveryLocation.trim().length > 0;
+    isUserTypingRef.current = hasFilledFields;
+    
+    if (hasFilledFields) {
+      logger.debug('📍 Champs remplis détectés - protection activée', 'map.tsx', {
+        pickup: pickupLocation.substring(0, 20),
+        delivery: deliveryLocation.substring(0, 20),
+      });
+    }
+  }, [pickupLocation, deliveryLocation]);
+  
+  // Utiliser les getters pour obtenir les commandes actuelles
+  const currentOrder = useOrderStore((s) => {
+    if (s.selectedOrderId) {
+      return s.activeOrders.find(o => o.id === s.selectedOrderId) || null;
+    }
+    return s.activeOrders.find(o => o.status !== 'pending') || s.activeOrders[0] || null;
+  });
+  const pendingOrder = useOrderStore((s) => s.activeOrders.find(o => o.status === 'pending') || null);
+  // Récupérer les coordonnées du driver pour la commande sélectionnée
+  const orderDriverCoords = selectedOrderId ? orderDriverCoordsMap.get(selectedOrderId) || null : null;
+  
+  // 🆕 Ne PAS réinitialiser isCreatingNewOrder à false quand une commande est créée
+  // On veut permettre de créer plusieurs commandes simultanément
+  // Le mode création reste actif même avec des commandes actives
+  // (isCreatingNewOrder sera réinitialisé à true par useFocusEffect quand on arrive sur la page)
+
   // Écouter l'acceptation de la commande par le livreur pour gérer le paiement
   // Le paiement se fait APRÈS l'acceptation, pas avant
   useEffect(() => {
-    // Vérifier si la commande a été acceptée (status = 'accepted' ou deliveryStage = 'accepted')
+    // Vérifier si la commande a été acceptée (status = 'accepted')
     const orderStatus = currentOrder?.status || pendingOrder?.status;
     
     // Gérer le paiement seulement si :
-    // 1. La commande est acceptée (status = 'accepted' ou deliveryStage = 'accepted')
+    // 1. La commande est acceptée (status = 'accepted')
     // 2. Le bottom sheet de paiement n'est pas déjà affiché
     // 3. On a une commande en cours
     // 4. Le paiement n'a pas déjà été effectué (vérifier si la commande a déjà un payment_status = 'paid')
-    if ((orderStatus === 'accepted' || deliveryStage === 'accepted') && !showPaymentSheet && (currentOrder || pendingOrder)) {
+    if (orderStatus === 'accepted' && !showPaymentSheet && (currentOrder || pendingOrder)) {
       // Vérifier si le paiement n'a pas déjà été effectué
       const order = currentOrder || pendingOrder;
       const paymentStatus = (order as any)?.payment_status;
@@ -278,7 +408,7 @@ export default function MapPage() {
         }
       }
     }
-  }, [currentOrder?.status, pendingOrder?.status, deliveryStage, showPaymentSheet, currentOrder, pendingOrder, selectedPaymentMethodType]);
+  }, [currentOrder?.status, pendingOrder?.status, showPaymentSheet, currentOrder, pendingOrder, selectedPaymentMethodType]);
 
   // Réinitialiser l'état si on revient sur la page avec une commande en attente bloquée
   // (par exemple après avoir quitté et réouvert l'app)
@@ -294,8 +424,7 @@ export default function MapPage() {
       // Si la commande est en attente depuis plus de 30 secondes sans action, la nettoyer
       if (orderAge > 30000) {
         logger.info('🧹 Nettoyage commande bloquée en attente', 'map.tsx', { orderId: pendingOrder.id, orderAge });
-        useOrderStore.getState().setPendingOrder(null);
-        useOrderStore.getState().setDeliveryStage('idle');
+        useOrderStore.getState().removeOrder(pendingOrder.id);
         // Nettoyer aussi la map
         clearRoute();
         setPickupCoords(null);
@@ -306,22 +435,25 @@ export default function MapPage() {
     }
 
     // Vérifier si on a une commande acceptée mais sans driver connecté (driver a quitté l'app)
-    if (currentOrder && currentOrder.status === 'accepted' && !orderDriverCoords) {
-      const orderAge = currentOrder.createdAt
-        ? new Date().getTime() - new Date(currentOrder.createdAt).getTime()
-        : Infinity;
-      
-      // Si la commande est acceptée depuis plus de 60 secondes sans coordonnées du driver,
-      // c'est probablement que le driver a quitté l'app - proposer d'annuler
-      if (orderAge > 60000) {
-        logger.warn('⚠️ Commande acceptée sans driver connecté depuis trop longtemps', 'map.tsx', { 
-          orderId: currentOrder.id, 
-          orderAge 
-        });
-        // Ne pas nettoyer automatiquement, mais permettre à l'utilisateur d'annuler via le bouton
+    if (currentOrder && currentOrder.status === 'accepted') {
+      const driverCoordsForOrder = selectedOrderId ? orderDriverCoordsMap.get(selectedOrderId) : null;
+      if (!driverCoordsForOrder) {
+        const orderAge = currentOrder.createdAt
+          ? new Date().getTime() - new Date(currentOrder.createdAt).getTime()
+          : Infinity;
+        
+        // Si la commande est acceptée depuis plus de 60 secondes sans coordonnées du driver,
+        // c'est probablement que le driver a quitté l'app - proposer d'annuler
+        if (orderAge > 60000) {
+          logger.warn('⚠️ Commande acceptée sans driver connecté depuis trop longtemps', 'map.tsx', { 
+            orderId: currentOrder.id, 
+            orderAge 
+          });
+          // Ne pas nettoyer automatiquement, mais permettre à l'utilisateur d'annuler via le bouton
+        }
       }
     }
-  }, [pendingOrder, isSearchingDriver, currentOrder, orderDriverCoords, clearRoute]);
+  }, [pendingOrder, isSearchingDriver, currentOrder, selectedOrderId, orderDriverCoordsMap, clearRoute]);
 
   // Arrêter la recherche de chauffeur si pendingOrder devient null (aucun chauffeur disponible)
   useEffect(() => {
@@ -596,19 +728,22 @@ export default function MapPage() {
   }, [isExpanded]);
 
   // 🆕 Ouvrir automatiquement le bottom sheet à chaque fois qu'on arrive sur la page
-  // (si aucune commande active n'est en cours)
+  // (si aucune commande active n'est en cours OU si on est en mode création)
   useEffect(() => {
     const store = useOrderStore.getState();
-    const isActiveOrder = store.currentOrder && 
-      store.currentOrder.status !== 'completed' && 
-      store.currentOrder.status !== 'cancelled' && 
-      store.currentOrder.status !== 'declined';
+    const currentOrder = store.getCurrentOrder();
+    const isActiveOrder = currentOrder && 
+      currentOrder.status !== 'completed' && 
+      currentOrder.status !== 'cancelled' && 
+      currentOrder.status !== 'declined';
     
-    // Ouvrir automatiquement si pas de commande active et que le bottom sheet n'est pas déjà ouvert
-    // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
-    // Cela se déclenchera à chaque montage du composant (chaque fois qu'on arrive sur la page)
-    // OU après le nettoyage d'une commande terminée
-    if (!isActiveOrder && !isExpanded && !showRatingBottomSheet && !userManuallyClosedRef.current) {
+    // Ouvrir automatiquement le formulaire de création si :
+    // 1. Pas de commande active OU on est en mode création
+    // 2. Le bottom sheet n'est pas déjà ouvert
+    // 3. L'utilisateur ne l'a pas fermé manuellement
+    const shouldShowCreationForm = !isActiveOrder || isCreatingNewOrder;
+    
+    if (shouldShowCreationForm && !isExpanded && !showRatingBottomSheet && !userManuallyClosedRef.current) {
       if (!hasAutoOpenedRef.current) {
         hasAutoOpenedRef.current = true;
         const timer = setTimeout(() => {
@@ -618,16 +753,17 @@ export default function MapPage() {
         return () => clearTimeout(timer);
       }
     }
-  }, [expandBottomSheet, isExpanded, currentOrder, showRatingBottomSheet]);
+  }, [expandBottomSheet, isExpanded, currentOrder, showRatingBottomSheet, isCreatingNewOrder]);
 
   // 🆕 Réouvrir automatiquement le bottom sheet après le nettoyage d'une commande
   // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
   useEffect(() => {
     const store = useOrderStore.getState();
-    const isActiveOrder = store.currentOrder && 
-      store.currentOrder.status !== 'completed' && 
-      store.currentOrder.status !== 'cancelled' && 
-      store.currentOrder.status !== 'declined';
+    const currentOrder = store.getCurrentOrder();
+    const isActiveOrder = currentOrder && 
+      currentOrder.status !== 'completed' && 
+      currentOrder.status !== 'cancelled' && 
+      currentOrder.status !== 'declined';
     
     // Si on n'a pas de commande active et que le bottom sheet n'est pas ouvert, le réouvrir
     // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
@@ -648,19 +784,31 @@ export default function MapPage() {
   // NOTE: Bouton de test retiré en production — la création de commande
   // est maintenant déclenchée via le flow utilisateur (handleConfirm)
   const handlePickupSelected = ({ description, coords }: { description: string; coords?: Coordinates }) => {
+    // 🆕 Marquer que l'utilisateur est en train de saisir pour éviter la réinitialisation
+    isUserTypingRef.current = true;
     setPickupLocation(description);
     if (coords) {
       setPickupCoords(coords);
       if (dropoffCoords) fetchRoute(coords, dropoffCoords);
     }
+    // Réinitialiser le flag après un délai pour permettre la réinitialisation si nécessaire
+    setTimeout(() => {
+      isUserTypingRef.current = false;
+    }, 2000);
   };
 
   const handleDeliverySelected = ({ description, coords }: { description: string; coords?: Coordinates }) => {
+    // 🆕 Marquer que l'utilisateur est en train de saisir pour éviter la réinitialisation
+    isUserTypingRef.current = true;
     setDeliveryLocation(description);
     if (coords) {
       setDropoffCoords(coords);
       if (pickupCoords) fetchRoute(pickupCoords, coords);
     }
+    // Réinitialiser le flag après un délai pour permettre la réinitialisation si nécessaire
+    setTimeout(() => {
+      isUserTypingRef.current = false;
+    }, 2000);
   };
 
   const handleMethodSelected = (method: 'moto' | 'vehicule' | 'cargo') => {
@@ -717,6 +865,7 @@ export default function MapPage() {
   const handleDeliveryMethodConfirm = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     collapseDeliveryMethodSheet();
+    setIsCreatingNewOrder(false); // Réinitialiser l'état après confirmation
     // Attendre un peu avant d'ouvrir OrderDetailsSheet
     setTimeout(() => {
       expandOrderDetailsSheet();
@@ -815,13 +964,56 @@ export default function MapPage() {
           setPaymentPartialInfo({});
         }
         
+        // 🆕 Réinitialiser la map pour permettre une nouvelle commande
+        // Nettoyer les routes et coordonnées pour que la map revienne à l'état initial
+        setTimeout(() => {
+          try {
+            clearRoute();
+          } catch {}
+          setPickupCoords(null);
+          setDropoffCoords(null);
+          setPickupLocation('');
+          setDeliveryLocation('');
+          setSelectedMethod(null);
+          
+          // Réinitialiser le mode création pour permettre une nouvelle commande
+          setIsCreatingNewOrder(true);
+          
+          // Recentrer la map sur la position actuelle de l'utilisateur
+          locationService.getCurrentPosition().then((coords) => {
+            if (coords && region) {
+              setTimeout(() => {
+                animateToCoordinate({ latitude: coords.latitude, longitude: coords.longitude }, 0.01);
+              }, 100);
+            } else if (region) {
+              setTimeout(() => {
+                animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
+              }, 100);
+            }
+          }).catch(() => {
+            // Fallback sur region en cas d'erreur
+            if (region) {
+              setTimeout(() => {
+                animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
+              }, 100);
+            }
+          });
+          
+          // Réouvrir le bottom sheet de création après un court délai
+          setTimeout(() => {
+            userManuallyClosedRef.current = false;
+            hasAutoOpenedRef.current = false;
+            expandBottomSheet();
+          }, 500);
+        }, 300);
+        
         // NE PAS afficher le paiement maintenant - attendre l'acceptation par le livreur
         // Le paiement sera déclenché automatiquement quand la commande sera acceptée (voir useEffect ci-dessus)
       } else {
         Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
       }
     }
-  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet]);
+  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod, setIsCreatingNewOrder, animateToCoordinate, region, expandBottomSheet]);
 
   // Handler pour annuler une commande
   const handleCancelOrder = useCallback(async (orderId: string) => {
@@ -890,7 +1082,7 @@ export default function MapPage() {
         pickupCoords={pickupCoords}
         dropoffCoords={dropoffCoords}
         displayedRouteCoords={displayedRouteCoords}
-        driverCoords={driverCoords}
+        driverCoords={searchDriverCoords}
         orderDriverCoords={orderDriverCoords}
         orderStatus={currentOrder?.status}
         onlineDrivers={onlineDrivers} // 🚗 NOUVEAU
@@ -959,9 +1151,10 @@ export default function MapPage() {
 
         return (
           <>
-            {/* Afficher le bottom sheet de création de commande SAUF si on a une commande active */}
-            {/* Afficher TOUJOURS si pas de commande active OU si la commande est terminée/annulée/refusée */}
-            {!isActiveOrder && !deliveryMethodIsExpanded && !orderDetailsIsExpanded && (
+            {/* Afficher le bottom sheet de création de commande - TOUJOURS disponible même avec des commandes actives */}
+            {/* Seulement si on n'est pas en train de sélectionner une méthode ou de voir les détails */}
+            {/* TOUJOURS afficher si on est en mode création (permet plusieurs commandes simultanées) */}
+            {!deliveryMethodIsExpanded && !orderDetailsIsExpanded && isCreatingNewOrder && (
               <DeliveryBottomSheet
                 animatedHeight={animatedHeight}
                 panResponder={panResponder}
@@ -1032,18 +1225,8 @@ export default function MapPage() {
               );
             })()}
 
-            {/* Afficher le tracking bottom sheet UNIQUEMENT quand on a une commande active */}
-            {/* Si status = 'completed', on ne montre PAS le TrackingBottomSheet - on attend le RatingBottomSheet */}
-            {isActiveOrder && (
-              <TrackingBottomSheet
-                currentOrder={currentOrder}
-                panResponder={panResponder}
-                animatedHeight={animatedHeight}
-                isExpanded={isExpanded}
-                onToggle={toggleBottomSheet}
-                onCancel={() => currentOrder?.id && handleCancelOrder(currentOrder.id)}
-              />
-            )}
+            {/* Le tracking est maintenant géré dans une page dédiée (/order-tracking/[orderId]) */}
+            {/* On n'affiche plus le TrackingBottomSheet ici - la map est uniquement pour créer des commandes */}
 
             {/* Afficher le bottom sheet de paiement après création de commande */}
             {showPaymentSheet && pendingOrder && (() => {

@@ -17,6 +17,8 @@ interface TrackingBottomSheetProps {
   isExpanded: boolean;
   onToggle: () => void;
   onCancel?: () => void;
+  onNewOrder?: () => void; // Callback pour créer une nouvelle commande
+  activeOrdersCount?: number; // Nombre de commandes actives
 }
 
 const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
@@ -26,6 +28,8 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   isExpanded,
   onToggle,
   onCancel,
+  onNewOrder,
+  activeOrdersCount = 0,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -262,6 +266,19 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Bouton "Nouvelle commande" - Permet de créer une autre commande même avec des commandes actives */}
+          {onNewOrder && (
+            <TouchableOpacity 
+              style={styles.newOrderButton}
+              onPress={onNewOrder}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#7C3AED" />
+              <Text style={styles.newOrderButtonText}>
+                Nouvelle commande{activeOrdersCount > 1 ? ` (${activeOrdersCount} actives)` : ''}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </Animated.View>
@@ -462,5 +479,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
     fontSize: 15,
+  },
+  newOrderButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderColor: "#7C3AED",
+    borderStyle: "dashed",
+  },
+  newOrderButtonText: {
+    color: "#7C3AED",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
   },
 });

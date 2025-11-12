@@ -100,6 +100,38 @@ const activeOrders = new Map<string, Order>();
 const connectedDrivers = new Map<string, string>(); // driverId -> socketId
 const connectedUsers = new Map<string, string>(); // userId -> socketId
 
+// Limites configurable pour les commandes multiples
+const MAX_ACTIVE_ORDERS_PER_CLIENT = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_CLIENT || '5');
+const MAX_ACTIVE_ORDERS_PER_DRIVER = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_DRIVER || '3');
+
+// Fonction pour compter les commandes actives d'un client
+function getActiveOrdersCountByUser(userId: string): number {
+  let count = 0;
+  for (const [, order] of activeOrders.entries()) {
+    if (order.user.id === userId && 
+        order.status !== 'completed' && 
+        order.status !== 'cancelled' && 
+        order.status !== 'declined') {
+      count++;
+    }
+  }
+  return count;
+}
+
+// Fonction pour compter les commandes actives d'un livreur
+function getActiveOrdersCountByDriver(driverId: string): number {
+  let count = 0;
+  for (const [, order] of activeOrders.entries()) {
+    if (order.driverId === driverId && 
+        order.status !== 'completed' && 
+        order.status !== 'cancelled' && 
+        order.status !== 'declined') {
+      count++;
+    }
+  }
+  return count;
+}
+
 // Extended Socket interface for custom properties
 interface ExtendedSocket extends Socket {
   driverId?: string;
@@ -230,7 +262,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
     socket.on('driver-connect', (driverId: string) => {
       connectedDrivers.set(driverId, socket.id);
       socket.driverId = driverId;
-      if (DEBUG) console.log(`🚗 Driver connecté: ${driverId}`);
+      console.log(`🚗 [DIAGNOSTIC] Driver connecté: ${maskUserId(driverId)} (socket: ${socket.id})`);
+      console.log(`  - Total drivers connectés: ${connectedDrivers.size}`);
     });
     
     // 👤 Enregistrement d'un user
@@ -274,6 +307,16 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         // Vérifications minimales
         if (!pickup || !dropoff || !pickup.coordinates || !dropoff.coordinates) {
           socket.emit('order-error', { success: false, message: 'Coordinates manquantes' });
+          if (typeof ack === 'function') ack({ success: false, message: 'Coordinates manquantes' });
+          return;
+        }
+
+        // Vérifier la limite de commandes actives par client
+        const activeOrdersCount = getActiveOrdersCountByUser(userId);
+        if (activeOrdersCount >= MAX_ACTIVE_ORDERS_PER_CLIENT) {
+          const errorMsg = `Vous avez déjà ${activeOrdersCount} commande(s) active(s). Limite: ${MAX_ACTIVE_ORDERS_PER_CLIENT}`;
+          socket.emit('order-error', { success: false, message: errorMsg });
+          if (typeof ack === 'function') ack({ success: false, message: errorMsg });
           return;
         }
 
@@ -411,17 +454,30 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         // Chercher des chauffeurs proches
         const nearbyDrivers = await findNearbyDrivers(pickup.coordinates, deliveryMethod);
 
+        // 🔍 DIAGNOSTIC : Toujours logger pour debug
+        const { realDriverStatuses } = await import('../controllers/driverController.js');
+        console.log(`📊 [DIAGNOSTIC] Recherche livreurs pour commande ${maskOrderId(order.id)}:`);
+        console.log(`  - Livreurs en mémoire: ${realDriverStatuses.size}`);
+        console.log(`  - Livreurs connectés (socket): ${connectedDrivers.size}`);
+        console.log(`  - Livreurs proches trouvés: ${nearbyDrivers.length}`);
+        
+        // Logger tous les livreurs en mémoire
+        for (const [driverId, driverData] of realDriverStatuses.entries()) {
+          const isConnected = connectedDrivers.has(driverId);
+          const hasPosition = !!(driverData.current_latitude && driverData.current_longitude);
+          const distance = hasPosition ? getDistanceInKm(
+            pickup.coordinates.latitude,
+            pickup.coordinates.longitude,
+            driverData.current_latitude!,
+            driverData.current_longitude!
+          ) : null;
+          
+          console.log(`  - ${maskUserId(driverId)}: online=${driverData.is_online}, available=${driverData.is_available}, connected=${isConnected}, has_position=${hasPosition}${distance !== null ? `, distance=${distance.toFixed(2)}km` : ''}`);
+        }
+
         if (nearbyDrivers.length === 0) {
           // 🔒 SÉCURITÉ: Masquer orderId
-          if (DEBUG) {
-            console.log(`❌ Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`);
-            // Importer pour diagnostic
-            const { realDriverStatuses } = await import('../controllers/driverController.js');
-            console.log(`📊 Diagnostic: ${realDriverStatuses.size} livreurs en mémoire`);
-            for (const [driverId, driverData] of realDriverStatuses.entries()) {
-              console.log(`  - ${driverId.slice(0, 8)}: online=${driverData.is_online}, available=${driverData.is_available}, has_position=${!!(driverData.current_latitude && driverData.current_longitude)}`);
-            }
-          }
+          console.log(`❌ Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`);
           io.to(socket.id).emit('no-drivers-available', {
             orderId: order.id,
             message: 'Aucun chauffeur disponible dans votre zone'
@@ -477,15 +533,20 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           const driver = nearbyDrivers[driverIndex];
           const driverSocketId = connectedDrivers.get(driver.driverId);
 
+          console.log(`🔍 [DIAGNOSTIC] Tentative envoi à livreur ${maskUserId(driver.driverId)}:`);
+          console.log(`  - Socket ID: ${driverSocketId || 'NON CONNECTÉ'}`);
+          console.log(`  - Distance: ${driver.distance.toFixed(2)}km`);
+
           if (driverSocketId) {
             const assignedAt = new Date();
             order.assignedAt = assignedAt;
-            if (DEBUG) console.log(`📤 Envoi commande à driver ${driver.driverId} (socket: ${driverSocketId})`);
+            console.log(`📤 Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`);
 
             // Persister l'affectation tentative
             await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => {});
 
             io.to(driverSocketId).emit('new-order-request', order);
+            console.log(`✅ Événement 'new-order-request' émis vers socket ${driverSocketId}`);
 
             // Timer d'attente (20 secondes) pour passer au suivant
             setTimeout(async () => {
@@ -529,6 +590,14 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 
       if (order.status !== 'pending') {
         socket.emit('order-already-taken', { orderId });
+        return;
+      }
+
+      // Vérifier la limite de commandes actives par livreur
+      const activeOrdersCount = getActiveOrdersCountByDriver(driverId);
+      if (activeOrdersCount >= MAX_ACTIVE_ORDERS_PER_DRIVER) {
+        const errorMsg = `Vous avez déjà ${activeOrdersCount} commande(s) active(s). Limite: ${MAX_ACTIVE_ORDERS_PER_DRIVER}`;
+        socket.emit('order-accept-error', { orderId, message: errorMsg });
         return;
       }
 
@@ -827,11 +896,18 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         const current: Order[] = [];
         for (const [, o] of activeOrders.entries()) {
           if (o.user && o.user.id === userId) {
-            if (o.status === 'pending') pending.push(o);
-            else current.push(o);
+            if (o.status === 'pending') {
+              pending.push(o);
+            } else if (o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined') {
+              current.push(o);
+            }
           }
         }
+        // Envoyer toutes les commandes actives (support pour plusieurs commandes)
         io.to(socket.id).emit('resync-order-state', {
+          pendingOrders: pending, // Tableau de commandes en attente
+          activeOrders: current, // Tableau de commandes actives
+          // Compatibilité avec l'ancien code
           pendingOrder: pending.length ? pending[0] : null,
           currentOrder: current.length ? current[0] : null,
         });
@@ -843,13 +919,24 @@ const setupOrderSocket = (io: SocketIOServer): void => {
     socket.on('driver-reconnect', ({ driverId }: { driverId?: string } = {}) => {
       try {
         if (!driverId) return;
-        const assigned: Order[] = [];
+        const pending: Order[] = [];
+        const active: Order[] = [];
         for (const [, o] of activeOrders.entries()) {
-          if (o.driverId === driverId) assigned.push(o);
+          if (o.driverId === driverId && o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined') {
+            if (o.status === 'pending') {
+              pending.push(o);
+            } else {
+              active.push(o);
+            }
+          }
         }
+        // Envoyer toutes les commandes actives (support pour plusieurs commandes)
         io.to(socket.id).emit('resync-order-state', {
-          pendingOrder: null,
-          currentOrder: assigned.length ? assigned[0] : null,
+          pendingOrders: pending, // Tableau de commandes en attente
+          activeOrders: active, // Tableau de commandes actives
+          // Compatibilité avec l'ancien code
+          pendingOrder: pending.length ? pending[0] : null,
+          currentOrder: active.length ? active[0] : null,
         });
       } catch (err: any) {
         if (DEBUG) console.warn('Error handling driver-reconnect', err);

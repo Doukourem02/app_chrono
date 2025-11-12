@@ -39,6 +39,8 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
   const dragHandleRef = useRef<View>(null);
   const [dragHandleLayout, setDragHandleLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const startHeightRef = useRef<number>(RECIPIENT_DETAILS_MAX_HEIGHT);
+  const currentAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Récupérer le numéro de téléphone du destinataire
   const recipientPhone = order?.recipient?.phone || order?.dropoff?.details?.phone || null;
@@ -87,10 +89,28 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
         const isVerticalSwipeDown = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && gestureState.dy > 5;
         return isInHandleZone && isVerticalSwipeDown;
       },
+      onPanResponderGrant: () => {
+        // 🛡️ Arrêter toute animation en cours avant de commencer le drag
+        if (currentAnimationRef.current) {
+          currentAnimationRef.current.stop();
+          currentAnimationRef.current = null;
+        }
+        // Stocker la valeur de départ de manière sécurisée
+        animatedHeight.stopAnimation((currentValue) => {
+          startHeightRef.current = currentValue || RECIPIENT_DETAILS_MAX_HEIGHT;
+        });
+      },
       onPanResponderMove: (_event, gestureState) => {
         if (!isExpanded) return;
+        // 🛡️ S'assurer qu'aucune animation n'est en cours avant de modifier la valeur
+        if (currentAnimationRef.current) {
+          currentAnimationRef.current.stop();
+          currentAnimationRef.current = null;
+        }
         const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-        const newHeight = clamp(RECIPIENT_DETAILS_MAX_HEIGHT - gestureState.dy, RECIPIENT_DETAILS_MIN_HEIGHT, RECIPIENT_DETAILS_MAX_HEIGHT);
+        // Calculer la nouvelle hauteur basée sur la valeur de départ stockée
+        const newHeight = clamp(startHeightRef.current - gestureState.dy, RECIPIENT_DETAILS_MIN_HEIGHT, RECIPIENT_DETAILS_MAX_HEIGHT);
+        // Utiliser setValue maintenant que l'animation est arrêtée
         animatedHeight.setValue(newHeight);
       },
       onPanResponderRelease: (_event, gestureState) => {
@@ -100,12 +120,16 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
           onToggle();
         } else {
           // Retour à la hauteur maximale
-          Animated.spring(animatedHeight, {
+          const animation = Animated.spring(animatedHeight, {
             toValue: RECIPIENT_DETAILS_MAX_HEIGHT,
             useNativeDriver: false,
             tension: 65,
             friction: 8,
-          }).start();
+          });
+          currentAnimationRef.current = animation;
+          animation.start(() => {
+            currentAnimationRef.current = null;
+          });
         }
       },
     })
@@ -114,12 +138,21 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
   // S'assurer que le bottom sheet s'ouvre à la hauteur maximale
   useEffect(() => {
     if (isExpanded) {
-      Animated.spring(animatedHeight, {
+      // 🛡️ Arrêter toute animation en cours avant de démarrer une nouvelle
+      if (currentAnimationRef.current) {
+        currentAnimationRef.current.stop();
+        currentAnimationRef.current = null;
+      }
+      const animation = Animated.spring(animatedHeight, {
         toValue: RECIPIENT_DETAILS_MAX_HEIGHT,
         useNativeDriver: false,
         tension: 65,
         friction: 8,
-      }).start();
+      });
+      currentAnimationRef.current = animation;
+      animation.start(() => {
+        currentAnimationRef.current = null;
+      });
     }
   }, [isExpanded, animatedHeight]);
 

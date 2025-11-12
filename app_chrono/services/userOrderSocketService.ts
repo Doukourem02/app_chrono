@@ -54,11 +54,11 @@ class UserOrderSocketService {
     // 📦 Confirmation création commande
     this.socket.on('order-created', (data) => {
       logger.info('📦 Commande créée', 'userOrderSocketService', data);
-      // Stocker comme pendingOrder
+      // Stocker comme commande active
       try {
         const order = data?.order;
-        if (order) {
-          useOrderStore.getState().setPendingOrder(order as any);
+        if (order && order.id) {
+          useOrderStore.getState().addOrder(order as any);
         }
         // If backend reported persistence failure, inform the user
         if (data && data.dbSaved === false) {
@@ -113,15 +113,20 @@ class UserOrderSocketService {
       logger.info('✅ Commande acceptée par driver', 'userOrderSocketService', data);
       try {
         const { order, driverInfo } = data || {};
-        if (order) {
-          // Stocker l'ordre comme currentOrder (on l'enrichira avec driver si possible)
-          useOrderStore.getState().setCurrentOrder({ ...order } as any);
-          useOrderStore.getState().setPendingOrder(null);
+        if (order && order.id) {
+          // Ajouter ou mettre à jour la commande dans le store
+          const store = useOrderStore.getState();
+          const existingOrder = store.activeOrders.find(o => o.id === order.id);
+          if (existingOrder) {
+            store.updateOrder(order.id, { ...order, driver: driverInfo } as any);
+          } else {
+            store.addOrder({ ...order, driver: driverInfo } as any);
+          }
         }
 
         // Si backend fournit position dans driverInfo, l'utiliser
-        if (driverInfo && driverInfo.current_latitude && driverInfo.current_longitude) {
-          useOrderStore.getState().setDriverCoords({
+        if (driverInfo && driverInfo.current_latitude && driverInfo.current_longitude && order?.id) {
+          useOrderStore.getState().setDriverCoordsForOrder(order.id, {
             latitude: driverInfo.current_latitude,
             longitude: driverInfo.current_longitude,
           });
@@ -129,28 +134,32 @@ class UserOrderSocketService {
 
         // Si driverInfo contient déjà des informations exploitables (transmises
         // par le socket), on les utilise directement sans appeler l'API.
-        if (driverInfo) {
+        if (driverInfo && order?.id) {
           const hasUsefulInfo = !!(driverInfo.current_latitude || driverInfo.phone || driverInfo.profile_image_url || driverInfo.first_name);
           if (hasUsefulInfo) {
-            const current = useOrderStore.getState().currentOrder;
-            if (current) {
-              useOrderStore.getState().setCurrentOrder({ ...current, driver: {
-                id: driverInfo.id,
-                name: driverInfo.first_name ? `${driverInfo.first_name} ${driverInfo.last_name || ''}`.trim() : undefined,
-                phone: driverInfo.phone || undefined,
-                avatar: driverInfo.profile_image_url || undefined,
-                rating: driverInfo.rating || undefined,
-              } } as any);
+            const store = useOrderStore.getState();
+            const existingOrder = store.activeOrders.find(o => o.id === order.id);
+            if (existingOrder) {
+              store.updateOrder(order.id, {
+                driver: {
+                  id: driverInfo.id,
+                  name: driverInfo.first_name ? `${driverInfo.first_name} ${driverInfo.last_name || ''}`.trim() : undefined,
+                  phone: driverInfo.phone || undefined,
+                  avatar: driverInfo.profile_image_url || undefined,
+                  rating: driverInfo.rating || undefined,
+                }
+              } as any);
             }
           } else if (driverInfo.id) {
             // Fallback : si le socket n'a fourni que l'id, tenter de récupérer les détails via l'API
             (async () => {
               try {
                 const res = await userApiService.getDriverDetails(driverInfo.id);
-                if (res && res.success && res.data) {
-                  const current = useOrderStore.getState().currentOrder;
-                  if (current) {
-                    useOrderStore.getState().setCurrentOrder({ ...current, driver: res.data } as any);
+                if (res && res.success && res.data && order?.id) {
+                  const store = useOrderStore.getState();
+                  const existingOrder = store.activeOrders.find(o => o.id === order.id);
+                  if (existingOrder) {
+                    store.updateOrder(order.id, { driver: res.data } as any);
                   }
                 }
               } catch (err) {
@@ -172,18 +181,42 @@ class UserOrderSocketService {
     // Server may send a resync containing pending/current order after reconnect
     this.socket.on('resync-order-state', (data) => {
       try {
-        const { pendingOrder, currentOrder, driverCoords } = data || {};
-        if (pendingOrder) {
-          useOrderStore.getState().setPendingOrder(pendingOrder as any);
-        }
-        if (currentOrder) {
-          useOrderStore.getState().setCurrentOrder(currentOrder as any);
-        }
-        if (driverCoords && driverCoords.latitude && driverCoords.longitude) {
-          useOrderStore.getState().setDriverCoords({
-            latitude: driverCoords.latitude,
-            longitude: driverCoords.longitude,
+        const { pendingOrders, activeOrders, pendingOrder, currentOrder, driverCoords } = data || {};
+        const store = useOrderStore.getState();
+        
+        // Ajouter toutes les commandes actives (nouveau format avec tableaux)
+        if (Array.isArray(activeOrders)) {
+          activeOrders.forEach((order: any) => {
+            if (order && order.id) {
+              store.addOrder(order);
+            }
           });
+        } else if (currentOrder && currentOrder.id) {
+          // Compatibilité avec l'ancien format
+          store.addOrder(currentOrder as any);
+        }
+        
+        // Ajouter toutes les commandes en attente
+        if (Array.isArray(pendingOrders)) {
+          pendingOrders.forEach((order: any) => {
+            if (order && order.id) {
+              store.addOrder(order);
+            }
+          });
+        } else if (pendingOrder && pendingOrder.id) {
+          // Compatibilité avec l'ancien format
+          store.addOrder(pendingOrder as any);
+        }
+        
+        // Mettre à jour les coordonnées du livreur si disponibles
+        if (driverCoords && driverCoords.latitude && driverCoords.longitude) {
+          const orderId = currentOrder?.id || pendingOrder?.id;
+          if (orderId) {
+            store.setDriverCoordsForOrder(orderId, {
+              latitude: driverCoords.latitude,
+              longitude: driverCoords.longitude,
+            });
+          }
         }
       } catch (err) {
         logger.warn('Error handling resync-order-state', 'userOrderSocketService', err);
@@ -200,12 +233,12 @@ class UserOrderSocketService {
         // 🆕 Mettre à jour immédiatement les coordonnées du livreur si elles sont fournies
         // Cela évite que le polyline se dessine avec des coordonnées obsolètes
         // Cela corrige le problème où le polyline rouge est "n'importe quoi au départ"
-        if (location && (location.latitude || location.lat || location.y) && (location.longitude || location.lng || location.x)) {
+        if (location && (location.latitude || location.lat || location.y) && (location.longitude || location.lng || location.x) && order?.id) {
           const normLocation = {
             latitude: location.latitude ?? location.lat ?? location.y,
             longitude: location.longitude ?? location.lng ?? location.x,
           };
-          useOrderStore.getState().setDriverCoords(normLocation);
+          useOrderStore.getState().setDriverCoordsForOrder(order.id, normLocation);
         }
         
         // Normalize location keys to { latitude, longitude }
@@ -220,15 +253,16 @@ class UserOrderSocketService {
         // Si la commande est complétée, afficher le bottom sheet d'évaluation
         if (order && order.status === 'completed' && order.id) {
           try {
-            // Récupérer le driver_id depuis l'order ou depuis currentOrder dans le store
-            const currentOrder = useOrderStore.getState().currentOrder;
-            const driverId = order.driver?.id || order.driverId || currentOrder?.driver?.id || currentOrder?.driverId;
+            // Récupérer le driver_id depuis l'order ou depuis le store
+            const store = useOrderStore.getState();
+            const orderInStore = store.activeOrders.find(o => o.id === order.id);
+            const driverId = order.driver?.id || order.driverId || orderInStore?.driver?.id || orderInStore?.driverId;
             
             if (driverId) {
               // Récupérer le nom du livreur
               const driverName = order.driver?.name || 
                                 (order.driver?.first_name ? `${order.driver.first_name || ''} ${order.driver.last_name || ''}`.trim() : null) ||
-                                currentOrder?.driver?.name ||
+                                orderInStore?.driver?.name ||
                                 'Votre livreur';
               
               logger.info('⭐ Déclenchement RatingBottomSheet pour commande complétée', 'userOrderSocketService', { 
@@ -236,7 +270,7 @@ class UserOrderSocketService {
                 driverId,
                 driverName,
                 orderHasDriver: !!order.driver?.id,
-                currentOrderHasDriver: !!currentOrder?.driver?.id
+                orderInStoreHasDriver: !!orderInStore?.driver?.id
               });
               
               useRatingStore.getState().setRatingBottomSheet(
@@ -252,8 +286,8 @@ class UserOrderSocketService {
                 orderId: order.id,
                 orderDriver: order.driver,
                 orderDriverId: order.driverId,
-                currentOrderDriver: currentOrder?.driver,
-                currentOrderDriverId: currentOrder?.driverId
+                orderInStoreDriver: orderInStore?.driver,
+                orderInStoreDriverId: orderInStore?.driverId
               });
             }
           } catch (err) {
@@ -280,13 +314,8 @@ class UserOrderSocketService {
         if (orderId) {
           // Mettre à jour le store pour refléter l'annulation
           const store = useOrderStore.getState();
-          if (store.currentOrder?.id === orderId) {
-            store.setCurrentOrder({ ...store.currentOrder, status: 'cancelled' } as any);
-          }
-          if (store.pendingOrder?.id === orderId) {
-            store.setPendingOrder(null);
-          }
-          // Le nettoyage complet sera fait par le useEffect dans map.tsx
+          store.updateOrderStatus(orderId, 'cancelled');
+          // Le nettoyage complet sera fait automatiquement après 2 secondes
         }
       } catch (err) {
         logger.warn('Error handling order-cancelled', 'userOrderSocketService', err);

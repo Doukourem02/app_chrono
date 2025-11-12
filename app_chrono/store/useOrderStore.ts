@@ -52,116 +52,170 @@ export interface OrderRequest {
 }
 
 interface OrderStore {
-  currentOrder: OrderRequest | null;
-  pendingOrder: OrderRequest | null;
-  driverCoords: { latitude: number; longitude: number } | null;
-  deliveryStage: 'idle' | 'searching' | 'accepted' | 'enroute' | 'picked_up' | 'completed' | 'cancelled';
-
-  setCurrentOrder: (order: OrderRequest | null) => void;
-  setPendingOrder: (order: OrderRequest | null) => void;
-  setDriverCoords: (coords: { latitude: number; longitude: number } | null) => void;
+  // Support pour plusieurs commandes actives
+  activeOrders: OrderRequest[]; // Toutes les commandes actives (pending, accepted, enroute, picked_up)
+  selectedOrderId: string | null; // ID de la commande actuellement sélectionnée/affichée
+  driverCoords: Map<string, { latitude: number; longitude: number }>; // Coordonnées par orderId
+  
+  // Méthodes pour gérer plusieurs commandes
+  addOrder: (order: OrderRequest) => void;
+  updateOrder: (orderId: string, updates: Partial<OrderRequest>) => void;
+  removeOrder: (orderId: string) => void;
+  setSelectedOrder: (orderId: string | null) => void;
+  setDriverCoordsForOrder: (orderId: string, coords: { latitude: number; longitude: number } | null) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
-  setDeliveryStage: (stage: OrderStore['deliveryStage']) => void;
   updateFromSocket: (payload: { order?: Partial<OrderRequest> | null; location?: { latitude?: number; longitude?: number } | null; proof?: any }) => void;
   clear: () => void;
+  
+  // Getters pour compatibilité avec l'ancien code
+  getCurrentOrder: () => OrderRequest | null;
+  getPendingOrder: () => OrderRequest | null;
+  getActiveOrdersCount: () => number;
 }
 
 export const useOrderStore = create<OrderStore>((set, get) => ({
-  currentOrder: null,
-  pendingOrder: null,
-  driverCoords: null,
-  deliveryStage: 'idle',
+  activeOrders: [],
+  selectedOrderId: null,
+  driverCoords: new Map(),
 
-  setCurrentOrder: (order) => set({ currentOrder: order }),
-  setPendingOrder: (order) => set({ pendingOrder: order }),
-  setDriverCoords: (coords) => set({ driverCoords: coords }),
-  updateOrderStatus: (orderId, status) => set((state) => {
-    if (state.currentOrder && state.currentOrder.id === orderId) {
-      return { currentOrder: { ...state.currentOrder, status } };
+  addOrder: (order) => set((state) => {
+    // Vérifier si la commande existe déjà
+    const exists = state.activeOrders.some(o => o.id === order.id);
+    if (exists) {
+      return state;
     }
-    if (state.pendingOrder && state.pendingOrder.id === orderId) {
-      return { pendingOrder: { ...state.pendingOrder, status } };
-    }
-    return {} as any;
+    // Ajouter la commande et la sélectionner si c'est la première
+    const newOrders = [...state.activeOrders, order];
+    return {
+      activeOrders: newOrders,
+      selectedOrderId: state.selectedOrderId || order.id,
+    };
   }),
-  setDeliveryStage: (stage) => set({ deliveryStage: stage }),
+
+  updateOrder: (orderId, updates) => set((state) => {
+    const updatedOrders = state.activeOrders.map(order =>
+      order.id === orderId ? { ...order, ...updates } : order
+    );
+    return { activeOrders: updatedOrders };
+  }),
+
+  removeOrder: (orderId) => set((state) => {
+    const filteredOrders = state.activeOrders.filter(order => order.id !== orderId);
+    const newCoords = new Map(state.driverCoords);
+    newCoords.delete(orderId);
+    
+    // Si la commande supprimée était sélectionnée, sélectionner une autre ou null
+    let newSelectedId = state.selectedOrderId;
+    if (state.selectedOrderId === orderId) {
+      newSelectedId = filteredOrders.length > 0 ? filteredOrders[0].id : null;
+    }
+    
+    return {
+      activeOrders: filteredOrders,
+      selectedOrderId: newSelectedId,
+      driverCoords: newCoords,
+    };
+  }),
+
+  setSelectedOrder: (orderId) => set({ selectedOrderId: orderId }),
+
+  setDriverCoordsForOrder: (orderId, coords) => set((state) => {
+    const newCoords = new Map(state.driverCoords);
+    if (coords) {
+      newCoords.set(orderId, coords);
+    } else {
+      newCoords.delete(orderId);
+    }
+    return { driverCoords: newCoords };
+  }),
+
+  updateOrderStatus: (orderId, status) => set((state) => {
+    const updatedOrders = state.activeOrders.map(order =>
+      order.id === orderId ? { ...order, status } : order
+    );
+    
+    // Retirer les commandes terminées/annulées après un délai
+    const completedOrders = updatedOrders.filter(o => 
+      o.id === orderId && (status === 'completed' || status === 'cancelled' || status === 'declined')
+    );
+    
+    if (completedOrders.length > 0) {
+      setTimeout(() => {
+        get().removeOrder(orderId);
+      }, 2000);
+    }
+    
+    return { activeOrders: updatedOrders };
+  }),
 
   // Update store from a socket payload (canonical handler for order:status:update and proof uploads)
   updateFromSocket: (payload) => {
     try {
       const { order, location, proof } = payload || {};
-      if (order) {
-        // Merge incoming order state into existing state by id
-        set((state) => {
-          const merge = (existing: OrderRequest | null): OrderRequest | null => {
-            if (!existing) return (order as OrderRequest) ?? null;
-            if (order?.id && existing.id !== order.id) return existing; // different order, ignore
-            return { ...existing, ...order } as OrderRequest;
-          };
-
-          const nextPending = order.status === 'pending' ? merge(state.pendingOrder) : (state.pendingOrder && state.pendingOrder.id === order.id ? null : state.pendingOrder);
-          const nextCurrent = order.status && order.status !== 'pending' ? merge(state.currentOrder) : state.currentOrder;
-
-          return { currentOrder: nextCurrent, pendingOrder: nextPending } as any;
-        });
-
-        // Map status to deliveryStage
-        const status: OrderStatus = (order.status as OrderStatus) || 'pending';
-        const mapping: Record<OrderStatus, OrderStore['deliveryStage']> = {
-          pending: 'searching',
-          accepted: 'accepted',
-          enroute: 'enroute',
-          picked_up: 'picked_up',
-          completed: 'idle', // Completed -> revenir à idle immédiatement
-          declined: 'idle', // Declined -> revenir à idle immédiatement
-          cancelled: 'idle' // Cancelled -> revenir à idle immédiatement
-        };
-
-        const stage = mapping[status] || 'idle';
-        set({ deliveryStage: stage });
+      if (order && order.id) {
+        const state = get();
+        const existingOrder = state.activeOrders.find(o => o.id === order.id);
         
-        // Si la commande est annulée/refusée, nettoyer immédiatement
-        // Pour 'completed', on ne nettoie PAS automatiquement - on attend que le RatingBottomSheet soit fermé
-        // Le nettoyage sera géré par map.tsx après soumission/fermeture du RatingBottomSheet
-        if (status === 'cancelled' || status === 'declined') {
-          // Nettoyer les commandes annulées/refusées après un court délai pour permettre l'affichage du tracking
-          setTimeout(() => {
-            const currentState = get();
-            // Vérifier que c'est toujours la même commande avant de nettoyer
-            if ((currentState.currentOrder?.id === order.id && currentState.currentOrder?.status === status) ||
-                (currentState.pendingOrder?.id === order.id && currentState.pendingOrder?.status === status)) {
-              set({ 
-                currentOrder: null, 
-                pendingOrder: null, 
-                driverCoords: null,
-                deliveryStage: 'idle' 
-              });
-            }
-          }, 2000); // 2 secondes de délai pour permettre l'affichage du message de confirmation
+        if (existingOrder) {
+          // Mettre à jour la commande existante
+          get().updateOrder(order.id, order as Partial<OrderRequest>);
+        } else {
+          // Ajouter une nouvelle commande si elle n'existe pas
+          get().addOrder(order as OrderRequest);
         }
-        // Pour 'completed', on ne nettoie PAS ici - on conserve currentOrder jusqu'à ce que le RatingBottomSheet soit fermé
+        
+        // Retirer les commandes terminées/annulées après un délai
+        const status: OrderStatus = (order.status as OrderStatus) || 'pending';
+        if (status === 'completed' || status === 'cancelled' || status === 'declined') {
+          setTimeout(() => {
+            get().removeOrder(order.id);
+          }, 2000);
+        }
       }
 
-      if (location && location.latitude && location.longitude) {
-        set({ driverCoords: { latitude: location.latitude, longitude: location.longitude } });
-      }
-
-      if (proof && proof.uploadedAt) {
-        // attach proof meta to currentOrder if present
-        set((state) => {
-          if (!state.currentOrder) return {} as any;
-          return { currentOrder: { ...state.currentOrder, proof: { ...state.currentOrder.proof, ...proof } } } as any;
+      if (location && location.latitude && location.longitude && order?.id) {
+        get().setDriverCoordsForOrder(order.id, {
+          latitude: location.latitude,
+          longitude: location.longitude,
         });
+      }
+
+      if (proof && proof.uploadedAt && order?.id) {
+        const state = get();
+        const existingOrder = state.activeOrders.find(o => o.id === order.id);
+        if (existingOrder) {
+          get().updateOrder(order.id, {
+            proof: { ...existingOrder.proof, ...proof },
+          });
+        }
       }
     } catch (err) {
-      // swallow errors in sync handler
       console.warn('useOrderStore.updateFromSocket error', err);
     }
   },
+
   clear: () => set({ 
-    currentOrder: null, 
-    pendingOrder: null, 
-    driverCoords: null,
-    deliveryStage: 'idle' // Toujours remettre à idle lors du clear
+    activeOrders: [],
+    selectedOrderId: null,
+    driverCoords: new Map(),
   }),
+
+  // Getters pour compatibilité avec l'ancien code
+  getCurrentOrder: () => {
+    const state = get();
+    if (state.selectedOrderId) {
+      return state.activeOrders.find(o => o.id === state.selectedOrderId) || null;
+    }
+    // Retourner la première commande active (non pending) ou la première en général
+    return state.activeOrders.find(o => o.status !== 'pending') || state.activeOrders[0] || null;
+  },
+
+  getPendingOrder: () => {
+    const state = get();
+    return state.activeOrders.find(o => o.status === 'pending') || null;
+  },
+
+  getActiveOrdersCount: () => {
+    return get().activeOrders.length;
+  },
 }));
