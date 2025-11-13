@@ -3,12 +3,12 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTempAuthStore } from '../../store/useTempAuthStore';
+import { AnimatedButton, ScreenTransition } from '../../components/animations';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -70,64 +70,71 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.contentContainer}>
-        <Text style={styles.title}>Bon retour !</Text>
-        <Text style={styles.subtitle}>
-          Entrez votre email pour recevoir un code de vérification
-        </Text>
-
-        {/* Email Input */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="votre@email.com"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor="#9CA3AF"
-          />
-        </View>
-
-        {/* Phone Input */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Téléphone</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="+225 XX XX XX XX XX"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            placeholderTextColor="#9CA3AF"
-          />
-        </View>
-
-        {/* Send OTP Button */}
-        <TouchableOpacity
-          style={[styles.sendButton, isLoading && styles.buttonDisabled]}
-          onPress={handleSendOTP}
-          disabled={isLoading}
-        >
-          <Text style={styles.sendButtonText}>
-            {isLoading ? 'Envoi...' : 'Envoyer le code'}
+    <ScreenTransition direction="fade" duration={400}>
+      <View style={styles.container}>
+        <View style={styles.contentContainer}>
+          <Text style={styles.title}>Bon retour !</Text>
+          <Text style={styles.subtitle}>
+            Entrez votre email pour recevoir un code de vérification
           </Text>
-        </TouchableOpacity>
 
-        {/* Divider */}
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>ou</Text>
-          <View style={styles.dividerLine} />
+          {/* Email Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="votre@email.com"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
+          {/* Phone Input */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Téléphone</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="+225 XX XX XX XX XX"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
+          {/* Send OTP Button */}
+          <AnimatedButton
+            style={[styles.sendButton, isLoading && styles.buttonDisabled]}
+            onPress={handleSendOTP}
+            disabled={isLoading}
+            variant="primary"
+          >
+            <Text style={styles.sendButtonText}>
+              {isLoading ? 'Envoi...' : 'Envoyer le code'}
+            </Text>
+          </AnimatedButton>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Register Link */}
+          <AnimatedButton
+            style={styles.registerButton}
+            onPress={handleGoToRegister}
+            variant="outline"
+          >
+            <Text style={styles.registerButtonText}>Créer un compte</Text>
+          </AnimatedButton>
         </View>
-
-        {/* Register Link */}
-        <TouchableOpacity style={styles.registerButton} onPress={handleGoToRegister}>
-          <Text style={styles.registerButtonText}>Créer un compte</Text>
-        </TouchableOpacity>
       </View>
-    </View>
+    </ScreenTransition>
   );
 }
 

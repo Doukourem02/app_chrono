@@ -1,6 +1,7 @@
 import React from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { useRequireAuth } from "../hooks/useRequireAuth";
+import { AnimatedCard } from "./animations";
 
 export default function ActionCards() {
   const { requireAuth } = useRequireAuth();
@@ -23,7 +24,9 @@ export default function ActionCards() {
 
   return (
     <View style={styles.actionRow}>
-      <TouchableOpacity 
+      <AnimatedCard
+        index={0}
+        delay={0}
         style={[styles.actionCard, { backgroundColor: "#F5E8FF" }]}
         onPress={handleNewDelivery}
       >
@@ -32,9 +35,11 @@ export default function ActionCards() {
           source={require("../assets/images/delivery.png")}
           style={styles.cardImage}
         />
-      </TouchableOpacity>
+      </AnimatedCard>
 
-      <TouchableOpacity 
+      <AnimatedCard
+        index={1}
+        delay={0}
         style={[styles.actionCard, { backgroundColor: "#eeeeeeff" }]}
         onPress={handleTrackPackage}
       >
@@ -43,7 +48,7 @@ export default function ActionCards() {
           source={require("../assets/images/colis.png")}
           style={styles.cardImage}
         />
-      </TouchableOpacity>
+      </AnimatedCard>
     </View>
   );
 }

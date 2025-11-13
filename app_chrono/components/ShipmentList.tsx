@@ -5,6 +5,7 @@ import { userApiService } from "../services/userApiService";
 import { useAuthStore } from "../store/useAuthStore";
 import { OrderRequest, OrderStatus, useOrderStore } from "../store/useOrderStore";
 import { formatDurationLabel, estimateDurationMinutes } from "../services/orderApi";
+import { AnimatedCard, SkeletonLoader } from "./animations";
 
 interface OrderWithDB extends OrderRequest {
   created_at?: string;
@@ -443,8 +444,11 @@ export default function ShipmentList() {
   if (loading && orders.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
-        <Text style={styles.loadingText}>Chargement de vos commandes...</Text>
+        <View style={styles.skeletonContainer}>
+          <SkeletonLoader width="100%" height={180} borderRadius={22} />
+          <View style={{ height: 18 }} />
+          <SkeletonLoader width="100%" height={180} borderRadius={22} />
+        </View>
       </View>
     );
   }
@@ -464,14 +468,15 @@ export default function ShipmentList() {
       }
     >
       <View>
-        {orders.map((order) => (
-          <ShipmentCard
-            key={order.id}
-            order={order}
-            backgroundColor={getBackgroundColor(order.status)}
-            progressPercentage={getProgressPercentage(order.status)}
-            progressColor={getProgressColor(order.status)}
-          />
+        {orders.map((order, index) => (
+          <AnimatedCard key={order.id} index={index} delay={0}>
+            <ShipmentCard
+              order={order}
+              backgroundColor={getBackgroundColor(order.status)}
+              progressPercentage={getProgressPercentage(order.status)}
+              progressColor={getProgressColor(order.status)}
+            />
+          </AnimatedCard>
         ))}
       </View>
     </ScrollView>
@@ -480,9 +485,10 @@ export default function ShipmentList() {
 
 const styles = StyleSheet.create({
   loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 20,
+  },
+  skeletonContainer: {
+    paddingHorizontal: 0,
   },
   loadingText: {
     marginTop: 12,
