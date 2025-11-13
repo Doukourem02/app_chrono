@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useRef, useEffect, useMemo, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert, Animated, Dimensions } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Animated } from 'react-native';
 import MapView from 'react-native-maps';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -16,14 +16,12 @@ import { useBottomSheet } from '../../hooks/useBottomSheet';
 import { logger } from '../../utils/logger';
 import { locationService } from '../../services/locationService';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 export default function OrderTrackingPage() {
   const { requireAuth } = useRequireAuth();
   const params = useLocalSearchParams<{ orderId: string }>();
   const { user } = useAuthStore();
   const { activeOrders, driverCoords: orderDriverCoordsMap, setSelectedOrder } = useOrderStore();
-  const { showRatingBottomSheet, ratingOrderId, resetRatingBottomSheet } = useRatingStore();
+  const { showRatingBottomSheet, orderId: ratingOrderId, driverName: ratingDriverName, resetRatingBottomSheet } = useRatingStore();
   
   const mapRef = useRef<MapView | null>(null);
   const orderId = params.orderId;
@@ -72,9 +70,17 @@ export default function OrderTrackingPage() {
     animatedHeight,
     isExpanded,
     expand: expandBottomSheet,
-    collapse: collapseBottomSheet,
     toggle: toggleBottomSheet,
     panResponder,
+  } = useBottomSheet();
+
+  // Bottom sheet séparé pour l'évaluation
+  const {
+    animatedHeight: ratingAnimatedHeight,
+    isExpanded: ratingIsExpanded,
+    panResponder: ratingPanResponder,
+    toggle: toggleRatingBottomSheet,
+    expand: expandRatingBottomSheet,
   } = useBottomSheet();
 
   // Ouvrir automatiquement le bottom sheet au montage
@@ -86,10 +92,16 @@ export default function OrderTrackingPage() {
     }
   }, [currentOrder, isExpanded, expandBottomSheet]);
 
-  // États pour la map
-  const [pickupCoords, setPickupCoords] = React.useState<{ latitude: number; longitude: number } | null>(null);
-  const [dropoffCoords, setDropoffCoords] = React.useState<{ latitude: number; longitude: number } | null>(null);
-  const [displayedRouteCoords, setDisplayedRouteCoords] = React.useState<{ latitude: number; longitude: number }[]>([]);
+  // Ouvrir automatiquement le rating bottom sheet quand il doit être affiché
+  useEffect(() => {
+    if (showRatingBottomSheet && ratingOrderId === orderId && !ratingIsExpanded) {
+      setTimeout(() => {
+        expandRatingBottomSheet();
+      }, 300);
+    }
+  }, [showRatingBottomSheet, ratingOrderId, orderId, ratingIsExpanded, expandRatingBottomSheet]);
+
+  // État pour la région de la map
   const [region, setRegion] = React.useState<any>(null);
 
   // Charger la commande depuis l'API si elle n'est pas dans le store
@@ -140,16 +152,13 @@ export default function OrderTrackingPage() {
     loadOrder();
   }, [orderId, currentOrder, user?.id]);
 
-  // Mettre à jour les coordonnées pickup/dropoff depuis la commande
+  // Mettre à jour la région de la map depuis la commande
   useEffect(() => {
     if (currentOrder) {
       const pickup = currentOrder.pickup?.coordinates;
       const dropoff = currentOrder.dropoff?.coordinates;
       
       if (pickup && dropoff) {
-        setPickupCoords(pickup);
-        setDropoffCoords(dropoff);
-        
         // Calculer la région de la map
         const minLat = Math.min(pickup.latitude, dropoff.latitude);
         const maxLat = Math.max(pickup.latitude, dropoff.latitude);
@@ -270,7 +279,7 @@ export default function OrderTrackingPage() {
         region={mapRegion}
         pickupCoords={currentOrder?.pickup?.coordinates || null}
         dropoffCoords={currentOrder?.dropoff?.coordinates || null}
-        displayedRouteCoords={displayedRouteCoords}
+        displayedRouteCoords={[]}
         driverCoords={null} // Pas de recherche de driver ici
         orderDriverCoords={orderDriverCoords} // Coordonnées du driver assigné
         orderStatus={currentOrder?.status}
@@ -294,6 +303,11 @@ export default function OrderTrackingPage() {
       {showRatingBottomSheet && ratingOrderId === orderId && (
         <RatingBottomSheet
           orderId={ratingOrderId}
+          driverName={ratingDriverName}
+          panResponder={ratingPanResponder}
+          animatedHeight={ratingAnimatedHeight}
+          isExpanded={ratingIsExpanded}
+          onToggle={toggleRatingBottomSheet}
           onRatingSubmitted={handleRatingSubmitted}
           onClose={handleRatingClose}
         />

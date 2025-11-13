@@ -6,8 +6,6 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
-  interpolate,
-  Extrapolate,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -53,6 +51,7 @@ export const TrackingMarker: React.FC<TrackingMarkerProps> = ({
       -1,
       true
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pulseStyle = useAnimatedStyle(() => {

@@ -6,7 +6,7 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
-  interpolate,
+  withDelay,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -52,6 +52,7 @@ export const SuccessAnimation: React.FC<SuccessAnimationProps> = ({
         onAnimationComplete();
       }, 2000);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const circleStyle = useAnimatedStyle(() => {

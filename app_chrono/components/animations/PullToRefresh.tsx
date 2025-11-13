@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -51,6 +51,7 @@ export const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
         Extrapolate.CLAMP
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshing, progress]);
 
   const animatedStyle = useAnimatedStyle(() => {

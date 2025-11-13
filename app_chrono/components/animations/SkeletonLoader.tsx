@@ -29,6 +29,7 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
       -1,
       false
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -47,7 +48,7 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
     <Animated.View
       style={[
         {
-          width,
+          width: width as number,
           height,
           borderRadius,
           backgroundColor: '#E5E7EB',

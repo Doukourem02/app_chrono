@@ -5,8 +5,6 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
-  interpolate,
-  Extrapolate,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
@@ -42,6 +40,7 @@ export const AnimatedBottomSheet: React.FC<AnimatedBottomSheetProps> = ({
       });
       opacity.value = withTiming(0, { duration: 200 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, height]);
 
   const panGesture = Gesture.Pan()

@@ -9,7 +9,7 @@ import Animated, {
 
 interface AnimatedCardProps {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: ViewStyle | ViewStyle[];
   index?: number;
   delay?: number;
   onPress?: () => void;
@@ -52,6 +52,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
         stiffness: 100,
       })
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [delay, index]);
 
   const animatedStyle = useAnimatedStyle(() => {

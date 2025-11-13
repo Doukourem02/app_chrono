@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useOrderStore, OrderRequest } from '../store/useOrderStore';
+import { useOrderStore } from '../store/useOrderStore';
 
 interface ActiveOrdersListProps {
   onOrderSelect?: (orderId: string) => void;

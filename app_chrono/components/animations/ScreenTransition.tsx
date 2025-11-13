@@ -5,8 +5,6 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withSpring,
-  interpolate,
-  Extrapolate,
 } from 'react-native-reanimated';
 
 interface ScreenTransitionProps {
@@ -61,6 +59,7 @@ export const ScreenTransition: React.FC<ScreenTransitionProps> = ({
       default:
         break;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [direction, duration]);
 
   const animatedStyle = useAnimatedStyle(() => {

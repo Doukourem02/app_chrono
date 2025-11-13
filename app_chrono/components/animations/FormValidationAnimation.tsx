@@ -40,6 +40,7 @@ export const FormValidationAnimation: React.FC<FormValidationAnimationProps> = (
       opacity.value = withTiming(0, { duration: 200 });
       scale.value = withTiming(0, { duration: 200 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show]);
 
   const animatedStyle = useAnimatedStyle(() => {
