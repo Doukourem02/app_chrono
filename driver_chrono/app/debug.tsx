@@ -11,9 +11,9 @@ export default function DebugScreen() {
     try {
       await AsyncStorage.clear();
       logout();
-      Alert.alert('✅ Succès', 'Toutes les données ont été supprimées');
+      Alert.alert('Succès', 'Toutes les données ont été supprimées');
     } catch {
-      Alert.alert('❌ Erreur', 'Impossible de vider le cache');
+      Alert.alert('Erreur', 'Impossible de vider le cache');
     }
   };
 
@@ -21,22 +21,22 @@ export default function DebugScreen() {
     try {
       const isValid = await validateUserExists();
       Alert.alert(
-        '🔍 Statut Utilisateur', 
-        isValid ? '✅ Utilisateur existe dans la base' : '❌ Utilisateur supprimé de la base'
+        'Statut Utilisateur', 
+        isValid ? 'Utilisateur existe dans la base' : 'Utilisateur supprimé de la base'
       );
     } catch {
-      Alert.alert('❌ Erreur', 'Impossible de vérifier le statut');
+      Alert.alert('Erreur', 'Impossible de vérifier le statut');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🛠️ Debug Driver</Text>
+      <Text style={styles.title}>Debug Driver</Text>
       
       <View style={styles.section}>
         <Text style={styles.subtitle}>Utilisateur Actuel:</Text>
         <Text style={styles.info}>
-          {user ? `📧 ${user.email}` : '❌ Aucun utilisateur connecté'}
+          {user ? user.email : 'Aucun utilisateur connecté'}
         </Text>
       </View>
 
@@ -52,7 +52,7 @@ export default function DebugScreen() {
 
       <View style={styles.note}>
         <Text style={styles.noteText}>
-          💡 Si vous avez supprimé ce driver de Supabase, 
+          Si vous avez supprimé ce driver de Supabase, 
           la vérification devrait automatiquement le déconnecter.
         </Text>
       </View>

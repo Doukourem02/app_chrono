@@ -1,8 +1,9 @@
 // Service API pour communiquer avec le backend Chrono
 import { useDriverStore } from '../store/useDriverStore';
+import { config } from '../config/index';
 
 // Configuration de l'API
-const API_BASE_URL = __DEV__ ? 'http://localhost:4000' : 'https://votre-api.com';
+const API_BASE_URL = config.apiUrl;
 
 class ApiService {
   
@@ -32,7 +33,7 @@ class ApiService {
         
         if (isExpired) {
           if (__DEV__) {
-            console.debug('⚠️ Token expiré, expiration:', new Date(expirationTime).toISOString());
+            console.debug(' Token expiré, expiration:', new Date(expirationTime).toISOString());
           }
           return false;
         }
@@ -43,12 +44,12 @@ class ApiService {
 
       // Si pas d'expiration définie, considérer comme valide (mais ça ne devrait pas arriver)
       if (__DEV__) {
-        console.warn('⚠️ Token sans expiration définie');
+        console.warn('Token sans expiration définie');
       }
       return true;
     } catch (error) {
       if (__DEV__) {
-        console.error('❌ Erreur vérification token:', error);
+        console.error(' Erreur vérification token:', error);
       }
       // En cas d'erreur de décodage, considérer comme invalide
       return false;
@@ -91,20 +92,17 @@ class ApiService {
       const result = await response.json();
 
       if (!response.ok || !result.success || !result.data?.accessToken) {
-        console.warn('⚠️ Refresh token échoué (driver):', result);
+        console.warn(' Refresh token échoué (driver):', result);
         return null;
       }
 
       return result.data.accessToken as string;
     } catch (error) {
-      console.error('❌ Erreur refreshAccessToken (driver):', error);
+      console.error('Erreur refreshAccessToken (driver):', error);
       return null;
     }
   }
   
-  /**
-   * 📍 GÉOLOCALISATION & STATUT CHAUFFEUR
-   */
   
   // Mettre à jour le statut online/offline et optionnellement la position
   async updateDriverStatus(userId: string, statusData: {
@@ -143,7 +141,7 @@ class ApiService {
         // Erreur réseau (backend inaccessible, timeout, etc.)
         if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
           if (__DEV__) {
-            console.warn('⚠️ Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+            console.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
@@ -159,7 +157,7 @@ class ApiService {
       } catch {
         // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
         if (__DEV__) {
-          console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
+          console.error(' Réponse non-JSON reçue:', response.status, response.statusText);
         }
         return {
           success: false,
@@ -184,7 +182,7 @@ class ApiService {
       return result;
     } catch (error) {
       if (__DEV__) {
-        console.error('❌ Erreur updateDriverStatus:', error);
+        console.error(' Erreur updateDriverStatus:', error);
       }
       
       // Gérer spécifiquement les erreurs réseau
@@ -213,7 +211,7 @@ class ApiService {
         current_longitude: longitude
       });
     } catch (error) {
-      console.error('❌ Erreur updateDriverLocation:', error);
+      console.error(' Erreur updateDriverLocation:', error);
       return {
         success: false,
         message: 'Erreur mise à jour position'
@@ -221,10 +219,6 @@ class ApiService {
     }
   }
 
-  /**
-   * 📊 STATISTIQUES
-   */
-  
   // Récupérer les revenus du chauffeur
   async getDriverRevenues(
     userId: string,
@@ -309,13 +303,13 @@ class ApiService {
       });
       
       if (__DEV__) {
-        console.debug('📡 [apiService.getDriverRevenues] Status:', response.status, response.statusText);
+        console.debug(' [apiService.getDriverRevenues] Status:', response.status, response.statusText);
       }
       } catch (fetchError: any) {
         // Erreur réseau (backend inaccessible, timeout, etc.)
         if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
           if (__DEV__) {
-            console.warn('⚠️ Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+            console.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
@@ -343,7 +337,7 @@ class ApiService {
       } catch {
         // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
         if (__DEV__) {
-          console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
+          console.error(' Réponse non-JSON reçue:', response.status, response.statusText);
         }
         return {
           success: false,
@@ -367,7 +361,7 @@ class ApiService {
         // Si l'erreur est 401 (non autorisé), c'est probablement un token expiré
         if (response.status === 401) {
           if (__DEV__) {
-            console.warn('⚠️ [apiService.getDriverRevenues] Session expirée (401)');
+            console.warn(' [apiService.getDriverRevenues] Session expirée (401)');
           }
           return {
             success: false,
@@ -388,7 +382,7 @@ class ApiService {
         }
         
         if (__DEV__) {
-          console.error('❌ [apiService.getDriverRevenues] Erreur HTTP:', response.status, result);
+          console.error(' [apiService.getDriverRevenues] Erreur HTTP:', response.status, result);
         }
         return {
           success: false,
@@ -411,17 +405,17 @@ class ApiService {
       // Vérifier si le résultat contient des données valides
       if (__DEV__ && result.success && result.data) {
         const hasData = result.data.totalDeliveries > 0 || 
-                       result.data.totalEarnings > 0 || 
-                       (result.data.orders && result.data.orders.length > 0);
+                      result.data.totalEarnings > 0 || 
+                      (result.data.orders && result.data.orders.length > 0);
         if (!hasData) {
-          console.debug('ℹ️ [apiService.getDriverRevenues] Réponse OK mais données vides (pas de livraisons)');
+          console.debug('ℹ [apiService.getDriverRevenues] Réponse OK mais données vides (pas de livraisons)');
         }
       }
       
       return result;
     } catch (error) {
       if (__DEV__) {
-        console.error('❌ Erreur getDriverRevenues:', error);
+        console.error(' Erreur getDriverRevenues:', error);
       }
       
       // Gérer spécifiquement les erreurs réseau
@@ -497,10 +491,9 @@ class ApiService {
     }
   }
 
-  /**
-   * 📊 Récupérer les statistiques du livreur
-   * Retourne : nombre de livraisons complétées, note moyenne
-   */
+  
+    //Retourne : nombre de livraisons complétées, note moyenne
+  
   async getDriverStatistics(userId: string): Promise<{
     success: boolean;
     message?: string;
@@ -534,19 +527,19 @@ class ApiService {
       let response: Response;
       try {
         if (__DEV__) {
-          console.debug('🔍 [apiService.getDriverStatistics] Appel API:', `${API_BASE_URL}/api/drivers/${userId}/statistics`);
+          console.debug(' [apiService.getDriverStatistics] Appel API:', `${API_BASE_URL}/api/drivers/${userId}/statistics`);
         }
         response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/statistics`, {
           method: 'GET',
           headers,
         });
         if (__DEV__) {
-          console.debug('📡 [apiService.getDriverStatistics] Status:', response.status, response.statusText);
+          console.debug(' [apiService.getDriverStatistics] Status:', response.status, response.statusText);
         }
       } catch (fetchError: any) {
         if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
           if (__DEV__) {
-            console.warn('⚠️ Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+            console.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
@@ -566,7 +559,7 @@ class ApiService {
         result = await response.json();
       } catch {
         if (__DEV__) {
-          console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
+          console.error(' Réponse non-JSON reçue:', response.status, response.statusText);
         }
         return {
           success: false,
@@ -582,7 +575,7 @@ class ApiService {
       if (!response.ok) {
         if (response.status === 401) {
           if (__DEV__) {
-            console.warn('⚠️ [apiService.getDriverStatistics] Session expirée (401)');
+            console.warn(' [apiService.getDriverStatistics] Session expirée (401)');
           }
           return {
             success: false,
@@ -595,7 +588,7 @@ class ApiService {
           };
         }
         if (__DEV__) {
-          console.error('❌ [apiService.getDriverStatistics] Erreur HTTP:', response.status, result);
+          console.error(' [apiService.getDriverStatistics] Erreur HTTP:', response.status, result);
         }
         return {
           success: false,
@@ -611,13 +604,13 @@ class ApiService {
       if (__DEV__ && result.success && result.data) {
         const hasData = result.data.completedDeliveries > 0 || result.data.totalEarnings > 0;
         if (!hasData) {
-          console.debug('ℹ️ [apiService.getDriverStatistics] Réponse OK mais données vides (pas de livraisons)');
+          console.debug('ℹ [apiService.getDriverStatistics] Réponse OK mais données vides (pas de livraisons)');
         }
       }
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur getDriverStatistics:', error);
+      console.error(' Erreur getDriverStatistics:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -631,6 +624,6 @@ class ApiService {
   }
 }
 
-// Export singleton
+
 export const apiService = new ApiService();
 export default apiService;

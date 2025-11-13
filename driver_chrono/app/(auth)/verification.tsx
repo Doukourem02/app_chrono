@@ -1,12 +1,5 @@
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useDriverStore } from '../../store/useDriverStore';
@@ -24,14 +17,12 @@ export default function VerificationScreen() {
     newCode[index] = text;
     setCode(newCode);
 
-    // Auto-focus next input
     if (text && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
   const handleKeyPress = (key: string, index: number) => {
-    // Auto-focus previous input on backspace
     if (key === 'Backspace' && !code[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -48,7 +39,6 @@ export default function VerificationScreen() {
     setIsLoading(true);
     
     try {
-      // Appeler l'API backend pour vérifier l'OTP (email ou SMS)
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/verify-otp`, {
         method: 'POST',
         headers: {
@@ -71,10 +61,8 @@ export default function VerificationScreen() {
 
       console.log(`${otpMethod} OTP vérifié avec succès pour driver:`, data);
 
-      // Sauvegarder le statut nouveau/existant
       setIsNewUser(data.data.isNewUser || false);
 
-      // Sauvegarder l'utilisateur driver dans le store
       if (data.data.user) {
         setUser({
           id: data.data.user.id,
@@ -85,7 +73,6 @@ export default function VerificationScreen() {
         });
       }
 
-      // Sauvegarder les tokens JWT s'ils sont fournis
       if (data.data.tokens && data.data.tokens.accessToken && data.data.tokens.refreshToken) {
         setTokens({
           accessToken: data.data.tokens.accessToken,
@@ -93,14 +80,10 @@ export default function VerificationScreen() {
         });
       }
 
-      // Sauvegarder le profil driver s'il existe
       if (data.data.profile) {
         setProfile(data.data.profile);
       }
       
-      // NOTE: Ne pas nettoyer clearTempData() maintenant pour garder isNewUser
-      
-      // Naviguer vers l'écran de succès
       router.push('./success' as any);
     } catch (error) {
       console.error('Erreur lors de la vérification:', error);
@@ -118,21 +101,18 @@ export default function VerificationScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header avec bouton retour */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
       </View>
 
-      {/* Contenu */}
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Code de vérification</Text>
         <Text style={styles.subtitle}>
           Nous avons envoyé le code de vérification à votre {otpMethod === 'email' ? 'adresse email' : 'numéro de téléphone'}
         </Text>
 
-        {/* Code Inputs */}
         <View style={styles.codeContainer}>
           {code.map((digit, index) => (
             <TextInput
@@ -152,7 +132,6 @@ export default function VerificationScreen() {
           ))}
         </View>
 
-        {/* Confirm Button */}
         <TouchableOpacity 
           style={[styles.confirmButton, isLoading && styles.buttonDisabled]}
           onPress={handleConfirm}
@@ -163,7 +142,6 @@ export default function VerificationScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Resend Code */}
         <View style={styles.resendContainer}>
           <Text style={styles.resendText}>Vous n&apos;avez pas reçu le code ? </Text>
           <TouchableOpacity>

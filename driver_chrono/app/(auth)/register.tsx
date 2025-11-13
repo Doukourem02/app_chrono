@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
@@ -25,14 +16,12 @@ export default function Register() {
       return;
     }
 
-    // Validation email basique
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Erreur', 'Veuillez entrer un email valide');
       return;
     }
 
-    // Validation téléphone basique
     if (phoneNumber.length < 10) {
       Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide');
       return;
@@ -40,10 +29,7 @@ export default function Register() {
 
     setIsLoading(true);
 
-    // Sauvegarder les données temporairement
     setTempData(email, phoneNumber);
-    
-    // Naviguer vers l'écran de choix de méthode OTP
     router.push('./otpMethod' as any);
     setIsLoading(false);
   };
@@ -53,23 +39,19 @@ export default function Register() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Illustration */}
       <View style={styles.illustrationContainer}>
         <View style={styles.illustrationPlaceholder}>
           <Ionicons name="car-sport" size={80} color="#8B5CF6" />
         </View>
       </View>
 
-      {/* Titre et description */}
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Connexion Chauffeur</Text>
         <Text style={styles.subtitle}>
           Entrez votre email et numéro de téléphone. Nous vous enverrons un code de vérification.
         </Text>
 
-        {/* Formulaire */}
         <View style={styles.formContainer}>
-          {/* Email Input */}
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -84,7 +66,6 @@ export default function Register() {
             <Ionicons name="mail-outline" size={20} color="#8B5CF6" style={styles.inputIcon} />
           </View>
 
-          {/* Phone Number Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.phoneLabel}>Numéro de téléphone</Text>
             <TextInput
@@ -97,7 +78,6 @@ export default function Register() {
             />
           </View>
 
-          {/* Continue Button */}
           <TouchableOpacity 
             style={[styles.continueButton, (!email || !phoneNumber || isLoading) && styles.buttonDisabled]}
             onPress={handleContinue}
@@ -107,8 +87,6 @@ export default function Register() {
               Continuer
             </Text>
           </TouchableOpacity>
-
-          {/* Lien vers la connexion OTP - SUPPRIME car flux unifié */}
         </View>
       </View>
     </KeyboardAvoidingView>

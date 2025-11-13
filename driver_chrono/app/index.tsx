@@ -48,5 +48,5 @@ export default function RootIndex() {
     );
   }
 
-  return null; // Le router.replace gérera la navigation
+  return null;  
 }

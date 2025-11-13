@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
@@ -25,7 +16,6 @@ export default function Login() {
       return;
     }
 
-    // Validation email basique
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Erreur', 'Veuillez entrer un email valide');
@@ -35,7 +25,6 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Pour un utilisateur existant, envoyer OTP directement
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/send-otp`, {
         method: 'POST',
         headers: {
@@ -55,10 +44,7 @@ export default function Login() {
         throw new Error(data.error || 'Erreur lors de l\'envoi de l\'OTP');
       }
 
-      // Sauvegarder temporairement pour la vérification
       setTempData(email, phone, 'email');
-      
-      // Naviguer vers la vérification
       router.push('/(auth)/verification' as any);
       
     } catch (error) {
@@ -74,7 +60,6 @@ export default function Login() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.iconContainer}>
           <Ionicons name="car-sport" size={40} color="#8B5CF6" />
@@ -83,7 +68,6 @@ export default function Login() {
         <Text style={styles.subtitle}>Entrez vos informations pour recevoir un code</Text>
       </View>
 
-      {/* Form */}
       <View style={styles.form}>
         <View style={styles.inputContainer}>
           <Ionicons name="mail" size={20} color="#666" style={styles.inputIcon} />
@@ -121,7 +105,6 @@ export default function Login() {
         </TouchableOpacity>
       </View>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.registerText}>Nouveau chauffeur ?</Text>
         <TouchableOpacity onPress={() => router.push('/(auth)/register' as any)}>

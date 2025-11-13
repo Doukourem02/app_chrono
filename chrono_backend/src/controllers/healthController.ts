@@ -28,10 +28,6 @@ interface HealthStatus {
   };
 }
 
-/**
- * Health check endpoint pour la supervision automatique
- * Vérifie la connexion à PostgreSQL, Supabase, et l'état général de l'application
- */
 export const healthCheck = async (req: Request, res: Response): Promise<void> => {
   const startTime = Date.now();
   const healthStatus: HealthStatus = {
@@ -51,7 +47,6 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
     },
   };
 
-  // Vérification de la mémoire
   const memUsage = process.memoryUsage();
   const totalMemory = memUsage.heapTotal;
   const usedMemory = memUsage.heapUsed;
@@ -59,12 +54,11 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
 
   healthStatus.checks.memory = {
     status: memoryPercentage > 90 ? 'warning' : 'ok',
-    used: Math.round(usedMemory / 1024 / 1024), // MB
-    total: Math.round(totalMemory / 1024 / 1024), // MB
+    used: Math.round(usedMemory / 1024 / 1024),
+    total: Math.round(totalMemory / 1024 / 1024),
     percentage: Math.round(memoryPercentage * 100) / 100,
   };
 
-  // Vérification PostgreSQL
   if (process.env.DATABASE_URL && pool && typeof pool.query === 'function') {
     try {
       const dbStartTime = Date.now();
@@ -77,10 +71,10 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
     } catch (error: any) {
       healthStatus.checks.database = {
         status: 'error',
-        error: error.message || 'Database connection failed',
+        error: error?.message || 'Database connection failed',
       };
       healthStatus.status = 'degraded';
-      logger.error('❌ Health check: Database error', { error: error.message });
+      logger.error('Health check: Database error', { error: error?.message });
     }
   } else {
     healthStatus.checks.database = {
@@ -90,13 +84,12 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
     healthStatus.status = 'degraded';
   }
 
-  // Vérification Supabase
   try {
     const supabaseStartTime = Date.now();
     const { error } = await supabase.from('users').select('id').limit(1);
     const supabaseResponseTime = Date.now() - supabaseStartTime;
     
-    if (error && error.code !== 'PGRST116') { // PGRST116 = table not found (acceptable pour health check)
+    if (error && error.code !== 'PGRST116') {
       throw error;
     }
     
@@ -107,16 +100,13 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
   } catch (error: any) {
     healthStatus.checks.supabase = {
       status: 'error',
-      error: error.message || 'Supabase connection failed',
+      error: error?.message || 'Supabase connection failed',
     };
     healthStatus.status = 'degraded';
-    logger.error('❌ Health check: Supabase error', { error: error.message });
+    logger.error('Health check: Supabase error', { error: error?.message });
   }
 
-  // Déterminer le statut global
-  const hasErrors = 
-    healthStatus.checks.database.status === 'error' &&
-    healthStatus.checks.supabase.status === 'error';
+  const hasErrors = healthStatus.checks.database.status === 'error' && healthStatus.checks.supabase.status === 'error';
   
   if (hasErrors) {
     healthStatus.status = 'unhealthy';
@@ -128,15 +118,11 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
     healthStatus.status = 'degraded';
   }
 
-  // Code HTTP approprié
-  const statusCode = healthStatus.status === 'healthy' ? 200 : 
-                     healthStatus.status === 'degraded' ? 200 : 503;
-
+  const statusCode = healthStatus.status === 'healthy' ? 200 : healthStatus.status === 'degraded' ? 200 : 503;
   const responseTime = Date.now() - startTime;
-  
-  // Log pour monitoring
+
   if (healthStatus.status !== 'healthy') {
-    logger.warn('⚠️ Health check: System degraded or unhealthy', {
+    logger.warn('Health check: System degraded or unhealthy', {
       status: healthStatus.status,
       checks: healthStatus.checks,
       responseTime,
@@ -149,10 +135,6 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
   });
 };
 
-/**
- * Health check simple (liveness probe)
- * Utilisé par Kubernetes/Docker pour vérifier que l'app est vivante
- */
 export const livenessCheck = (_req: Request, res: Response): void => {
   res.status(200).json({
     status: 'alive',
@@ -161,14 +143,9 @@ export const livenessCheck = (_req: Request, res: Response): void => {
   });
 };
 
-/**
- * Health check de readiness (readiness probe)
- * Vérifie que l'app est prête à recevoir du trafic
- */
 export const readinessCheck = async (req: Request, res: Response): Promise<void> => {
   const checks: { [key: string]: boolean } = {};
 
-  // Vérification PostgreSQL
   if (process.env.DATABASE_URL && pool && typeof pool.query === 'function') {
     try {
       await pool.query('SELECT 1');
@@ -180,7 +157,6 @@ export const readinessCheck = async (req: Request, res: Response): Promise<void>
     checks.database = false;
   }
 
-  // Vérification Supabase
   try {
     const { error } = await supabase.from('users').select('id').limit(1);
     checks.supabase = !error || error.code === 'PGRST116';
@@ -204,4 +180,3 @@ export const readinessCheck = async (req: Request, res: Response): Promise<void>
     });
   }
 };
-

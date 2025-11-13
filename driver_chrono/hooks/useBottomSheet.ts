@@ -19,18 +19,18 @@ export const useBottomSheet = () => {
         return Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 4;
       },
       onPanResponderGrant: () => {
-        // 🛡️ Arrêter toute animation en cours avant de commencer le drag
+        
         if (currentAnimationRef.current) {
           currentAnimationRef.current.stop();
           currentAnimationRef.current = null;
         }
-        // Stocker la valeur de départ de manière sécurisée
+      
         animatedHeight.stopAnimation((currentValue) => {
           startHeightRef.current = currentValue || BOTTOM_SHEET_MIN_HEIGHT;
         });
       },
       onPanResponderMove: (_event, gestureState) => {
-        // 🛡️ S'assurer qu'aucune animation n'est en cours avant de modifier la valeur
+      
         if (currentAnimationRef.current) {
           currentAnimationRef.current.stop();
           currentAnimationRef.current = null;
@@ -62,7 +62,7 @@ export const useBottomSheet = () => {
 
   const expand = () => {
     setIsExpanded(true);
-    // 🛡️ Arrêter toute animation en cours avant de démarrer une nouvelle
+    
     if (currentAnimationRef.current) {
       currentAnimationRef.current.stop();
       currentAnimationRef.current = null;
@@ -81,7 +81,7 @@ export const useBottomSheet = () => {
 
   const collapse = () => {
     setIsExpanded(false);
-    // 🛡️ Arrêter toute animation en cours avant de démarrer une nouvelle
+  
     if (currentAnimationRef.current) {
       currentAnimationRef.current.stop();
       currentAnimationRef.current = null;

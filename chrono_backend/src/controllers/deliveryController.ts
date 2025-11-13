@@ -30,7 +30,10 @@ interface UploadProofBody {
   proofType?: string;
 }
 
-export const createDelivery = async (req: RequestWithApp, res: Response): Promise<void> => {
+export const createDelivery = async (
+  req: RequestWithApp,
+  res: Response
+): Promise<void> => {
   try {
     const { userId, pickup, delivery, method } = req.body as CreateDeliveryBody;
 
@@ -41,7 +44,6 @@ export const createDelivery = async (req: RequestWithApp, res: Response): Promis
 
     const io = req.app.get('io');
     io.emit('new_delivery', result.rows[0]);
-
     res.json(result.rows[0]);
   } catch (error: any) {
     logger.error(error);
@@ -49,16 +51,19 @@ export const createDelivery = async (req: RequestWithApp, res: Response): Promis
   }
 };
 
-export const getUserDeliveries = async (req: Request, res: Response): Promise<void> => {
+export const getUserDeliveries = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { userId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
-    
+
     if (!process.env.DATABASE_URL) {
-      logger.warn('⚠️ DATABASE_URL non configuré pour getUserDeliveries');
+      logger.warn('DATABASE_URL non configuré pour getUserDeliveries');
       res.json({
         success: true,
         data: [],
@@ -66,8 +71,8 @@ export const getUserDeliveries = async (req: Request, res: Response): Promise<vo
           page,
           limit,
           total: 0,
-          totalPages: 0
-        }
+          totalPages: 0,
+        },
       });
       return;
     }
@@ -75,80 +80,77 @@ export const getUserDeliveries = async (req: Request, res: Response): Promise<vo
     let query = `SELECT * FROM orders WHERE user_id = $1`;
     let countQuery = 'SELECT COUNT(*) FROM orders WHERE user_id = $1';
     const queryParams: any[] = [userId];
-    
+
     if (status && status !== 'all') {
       query += ` AND status = $2`;
       countQuery += ` AND status = $2`;
       queryParams.push(status);
     }
-    
+
     query += ` ORDER BY created_at DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
     queryParams.push(limit, offset);
-    
+
     const result = await (pool as any).query(query, queryParams);
-    
-    // Compter le total avec le même filtre
+
     const countParams = status && status !== 'all' ? [userId, status] : [userId];
     const countResult = await (pool as any).query(countQuery, countParams);
-    
     const total = parseInt(countResult.rows[0]?.count || '0');
-    
+
     res.json({
       success: true,
       data: (result.rows || []).map((order: any) => {
-        // Parser pickup et dropoff (peuvent être pickup/dropoff ou pickup_address/dropoff_address)
         let pickup = order.pickup_address || order.pickup;
         let dropoff = order.dropoff_address || order.dropoff;
-        
-        // Parser si c'est une string JSON
+
         if (typeof pickup === 'string') {
           try {
             pickup = JSON.parse(pickup);
           } catch (e) {
-            logger.warn('⚠️ Erreur parsing pickup:', e);
+            logger.warn('Erreur parsing pickup:', e);
           }
         }
-        
+
         if (typeof dropoff === 'string') {
           try {
             dropoff = JSON.parse(dropoff);
           } catch (e) {
-            logger.warn('⚠️ Erreur parsing dropoff:', e);
+            logger.warn('Erreur parsing dropoff:', e);
           }
         }
-        
-        // Parser proof si présent
+
         let proof = order.proof;
         if (proof && typeof proof === 'string') {
           try {
             proof = JSON.parse(proof);
           } catch (e) {
-            logger.warn('⚠️ Erreur parsing proof:', e);
+            logger.warn('Erreur parsing proof:', e);
             proof = null;
           }
         }
-        
+
         return {
           ...order,
           pickup: pickup || order.pickup,
           dropoff: dropoff || order.dropoff,
-          pickup_address: pickup, 
-          dropoff_address: dropoff, 
-          proof: proof || null
+          pickup_address: pickup,
+          dropoff_address: dropoff,
+          proof: proof || null,
         };
       }),
       pagination: {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error: any) {
-    logger.error('❌ Erreur getUserDeliveries:', error);
-    
-    if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
-      logger.warn('⚠️ Erreur de connexion DB (peut-être non configurée), retour de données vides');
+    logger.error('Erreur getUserDeliveries:', error);
+    if (
+      error.message &&
+      (error.message.includes('SASL') || error.message.includes('password'))
+    ) {
+      logger.warn('Erreur de connexion DB (peut-être non configurée), retour de données vides');
       res.json({
         success: true,
         data: [],
@@ -156,21 +158,24 @@ export const getUserDeliveries = async (req: Request, res: Response): Promise<vo
           page: parseInt(req.query.page as string) || 1,
           limit: parseInt(req.query.limit as string) || 20,
           total: 0,
-          totalPages: 0
-        }
+          totalPages: 0,
+        },
       });
       return;
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
       message: 'Erreur serveur',
-      error: error.message 
+      error: error.message,
     });
   }
 };
 
-export const updateDeliveryStatus = async (req: RequestWithApp, res: Response): Promise<void> => {
+export const updateDeliveryStatus = async (
+  req: RequestWithApp,
+  res: Response
+): Promise<void> => {
   try {
     const { orderId } = req.params;
     const { status, location } = req.body as UpdateDeliveryStatusBody;
@@ -191,6 +196,7 @@ export const updateDeliveryStatus = async (req: RequestWithApp, res: Response): 
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
+
     if (order.driverId && order.driverId !== driverId) {
       res.status(403).json({ message: 'Driver not assigned to this order' });
       return;
@@ -202,7 +208,7 @@ export const updateDeliveryStatus = async (req: RequestWithApp, res: Response): 
       enroute: ['picked_up', 'cancelled'],
       picked_up: ['completed', 'cancelled'],
       completed: [],
-      cancelled: []
+      cancelled: [],
     };
 
     const current = order.status || 'pending';
@@ -212,7 +218,9 @@ export const updateDeliveryStatus = async (req: RequestWithApp, res: Response): 
     }
 
     if (!allowed[current] || !allowed[current].includes(status)) {
-      res.status(400).json({ message: `Invalid status transition from ${current} to ${status}` });
+      res.status(400).json({
+        message: `Invalid status transition from ${current} to ${status}`,
+      });
       return;
     }
 
@@ -228,7 +236,10 @@ export const updateDeliveryStatus = async (req: RequestWithApp, res: Response): 
     }
 
     try {
-      await (pool as any).query('UPDATE deliveries SET status=$1 WHERE id=$2', [order.status, orderId]);
+      await (pool as any).query('UPDATE deliveries SET status=$1 WHERE id=$2', [
+        order.status,
+        orderId,
+      ]);
     } catch (err: any) {
       logger.warn('Warning: failed to persist delivery status to DB', err.message || err);
     }
@@ -244,7 +255,10 @@ export const updateDeliveryStatus = async (req: RequestWithApp, res: Response): 
   }
 };
 
-export const cancelOrder = async (req: RequestWithApp, res: Response): Promise<void> => {
+export const cancelOrder = async (
+  req: RequestWithApp,
+  res: Response
+): Promise<void> => {
   try {
     const { orderId } = req.params;
     const userId = req.user?.id;
@@ -253,6 +267,7 @@ export const cancelOrder = async (req: RequestWithApp, res: Response): Promise<v
       res.status(400).json({ message: 'orderId is required' });
       return;
     }
+
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
@@ -260,64 +275,66 @@ export const cancelOrder = async (req: RequestWithApp, res: Response): Promise<v
 
     const order = activeOrders.get(orderId);
     if (!order) {
-      const dbResult = await (pool as any).query('SELECT * FROM orders WHERE id = $1 AND user_id = $2', [orderId, userId]);
+      const dbResult = await (pool as any).query(
+        'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
+        [orderId, userId]
+      );
+
       if (!dbResult.rows || dbResult.rows.length === 0) {
         res.status(404).json({ message: 'Order not found or not authorized' });
         return;
       }
-      const dbOrder = dbResult.rows[0];
-      
-      const currentStatus = dbOrder.status;
-      if (currentStatus !== 'pending' && currentStatus !== 'accepted') {
-        res.status(400).json({ 
-          message: `Cannot cancel order with status: ${currentStatus}` 
-        });
-        return;
-      }
 
-      // Mettre à jour dans la DB
-      await (pool as any).query(
-        'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
-        ['cancelled', orderId]
-      );
+    const dbOrder = dbResult.rows[0];
+    const currentStatus = dbOrder.status;
 
-      // Émettre un événement socket si le livreur est connecté
-      const io = req.app.get('io');
-      if (dbOrder.driver_id) {
-        const driverSocketId = connectedUsers.get(dbOrder.driver_id);
-        if (driverSocketId) {
-          io.to(driverSocketId).emit('order:cancelled', { orderId, reason: 'user_cancelled' });
-        }
-      }
-
-      res.json({ 
-        success: true, 
-        message: 'Order cancelled successfully',
-        order: { ...dbOrder, status: 'cancelled' }
+    if (currentStatus !== 'pending' && currentStatus !== 'accepted') {
+      res.status(400).json({
+        message: `Cannot cancel order with status: ${currentStatus}`,
       });
       return;
     }
 
-    // Si la commande est en mémoire (active)
+    await (pool as any).query(
+      'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
+      ['cancelled', orderId]
+    );
+
+    const io = req.app.get('io');
+    if (dbOrder.driver_id) {
+      const driverSocketId = connectedUsers.get(dbOrder.driver_id);
+      if (driverSocketId) {
+        io.to(driverSocketId).emit('order:cancelled', {
+          orderId,
+          reason: 'user_cancelled',
+        });
+      }
+    }
+
+      res.json({
+        success: true,
+        message: 'Order cancelled successfully',
+        order: { ...dbOrder, status: 'cancelled' },
+      });
+      return;
+    }
+
     if (order.user.id !== userId) {
       res.status(403).json({ message: 'Not authorized to cancel this order' });
       return;
     }
 
-    // Vérifier que la commande peut être annulée
     const currentStatus = order.status;
     if (currentStatus !== 'pending' && currentStatus !== 'accepted') {
-      res.status(400).json({ 
-        message: `Cannot cancel order with status: ${currentStatus}` 
+      res.status(400).json({
+        message: `Cannot cancel order with status: ${currentStatus}`,
       });
       return;
     }
 
-    // Mettre à jour le statut
     order.status = 'cancelled';
     (order as any).cancelledAt = new Date();
 
-    // Mettre à jour dans la DB
     try {
       await (pool as any).query(
         'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
@@ -327,22 +344,22 @@ export const cancelOrder = async (req: RequestWithApp, res: Response): Promise<v
       logger.warn('Warning: failed to persist cancellation to DB', err.message || err);
     }
 
-    // Émettre un événement socket au livreur si connecté
     const io = req.app.get('io');
     if (order.driverId) {
       const driverSocketId = connectedUsers.get(order.driverId);
       if (driverSocketId) {
-        io.to(driverSocketId).emit('order:cancelled', { orderId, reason: 'user_cancelled' });
+        io.to(driverSocketId).emit('order:cancelled', {
+          orderId,
+          reason: 'user_cancelled',
+        });
       }
     }
 
-    // Notifier l'utilisateur
     const userSocketId = connectedUsers.get(order.user.id);
     if (userSocketId) {
       io.to(userSocketId).emit('order:cancelled', { orderId });
     }
 
-    // Retirer de la Map activeOrders après un délai
     setTimeout(() => activeOrders.delete(orderId), 5000);
 
     res.json({ success: true, message: 'Order cancelled successfully', order });
@@ -352,8 +369,10 @@ export const cancelOrder = async (req: RequestWithApp, res: Response): Promise<v
   }
 };
 
-// Upload proof (image/base64) - development helper
-export const uploadDeliveryProof = async (req: RequestWithApp, res: Response): Promise<void> => {
+export const uploadDeliveryProof = async (
+  req: RequestWithApp,
+  res: Response
+): Promise<void> => {
   try {
     const { orderId } = req.params;
     const { proofBase64, proofType = 'image' } = req.body as UploadProofBody;
@@ -375,26 +394,30 @@ export const uploadDeliveryProof = async (req: RequestWithApp, res: Response): P
       return;
     }
 
-    // Write base64 to /tmp as a file for dev purposes
     const buffer = Buffer.from(proofBase64, 'base64');
     const proofsDir = path.join(process.cwd(), 'tmp_proofs');
     if (!fs.existsSync(proofsDir)) {
       fs.mkdirSync(proofsDir);
     }
+
     const filename = `${orderId}_${Date.now()}.${proofType === 'image' ? 'jpg' : 'bin'}`;
     const filepath = path.join(proofsDir, filename);
     fs.writeFileSync(filepath, buffer);
 
-    // Attach proof metadata to order in-memory (dev)
-    (order as any).proof = { path: filepath, uploadedAt: new Date(), driverId };
+    (order as any).proof = {
+      path: filepath,
+      uploadedAt: new Date(),
+      driverId,
+    };
 
-    // Notify user via socket
     const io = req.app.get('io');
     const userSocketId = connectedUsers.get(order.user.id);
     if (userSocketId) {
-      io.to(userSocketId).emit('order:proof:uploaded', { 
-        orderId, 
-        proof: { uploadedAt: (order as any).proof.uploadedAt } 
+      io.to(userSocketId).emit('order:proof:uploaded', {
+        orderId,
+        proof: {
+          uploadedAt: (order as any).proof.uploadedAt,
+        },
       });
     }
 
@@ -405,53 +428,45 @@ export const uploadDeliveryProof = async (req: RequestWithApp, res: Response): P
   }
 };
 
-/**
- * 📊 Récupérer les statistiques d'un client
- * Retourne : nombre de commandes complétées, points de fidélité, économies totales
- */
-export const getUserStatistics = async (req: Request, res: Response): Promise<void> => {
+export const getUserStatistics = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { userId } = req.params;
 
     if (!userId) {
       res.status(400).json({
         success: false,
-        message: 'userId est requis'
+        message: 'userId est requis',
       });
       return;
     }
 
-    // Vérifier que la connexion DB est configurée
     if (!process.env.DATABASE_URL) {
-      logger.warn('⚠️ DATABASE_URL non configuré pour getUserStatistics');
+      logger.warn('DATABASE_URL non configuré pour getUserStatistics');
       res.json({
         success: true,
         data: {
           completedOrders: 0,
           loyaltyPoints: 0,
-          totalSaved: 0 // Montant restant à payer
-        }
+          totalSaved: 0,
+        },
       });
       return;
     }
 
     try {
-      // Compter les commandes complétées (status = 'completed')
       const completedOrdersResult = await (pool as any).query(
-        `SELECT COUNT(*) as count FROM orders 
-        WHERE user_id = $1 AND status = 'completed'`,
+        `SELECT COUNT(*) as count FROM orders WHERE user_id = $1 AND status = 'completed'`,
         [userId]
       );
       const completedOrders = parseInt(completedOrdersResult.rows[0]?.count || '0');
 
-      // Calculer les points de fidélité : 1 point par commande complétée
-      // + bonus : 5 points supplémentaires toutes les 10 commandes
-      const basePoints = completedOrders; // 1 point par commande
-      const bonusPoints = Math.floor(completedOrders / 10) * 5; // 5 points bonus toutes les 10 commandes
+      const basePoints = completedOrders;
+      const bonusPoints = Math.floor(completedOrders / 10) * 5;
       const loyaltyPoints = basePoints + bonusPoints;
 
-      // Calculer le montant restant à payer (somme des remaining_amount des paiements partiels)
-      // On récupère tous les remaining_amount où is_partial = true et où le statut n'est pas 'paid' ou 'refunded'
       let remainingAmount = 0;
       try {
         const remainingAmountResult = await (pool as any).query(
@@ -465,7 +480,7 @@ export const getUserStatistics = async (req: Request, res: Response): Promise<vo
         );
         remainingAmount = parseFloat(remainingAmountResult.rows[0]?.total || '0');
       } catch (remainingError: any) {
-        logger.warn('⚠️ Erreur calcul montant restant:', remainingError.message);
+        logger.warn('Erreur calcul montant restant:', remainingError.message);
         remainingAmount = 0;
       }
 
@@ -474,32 +489,29 @@ export const getUserStatistics = async (req: Request, res: Response): Promise<vo
         data: {
           completedOrders,
           loyaltyPoints,
-          totalSaved: remainingAmount // Utiliser remainingAmount au lieu de totalSaved
-        }
+          totalSaved: remainingAmount,
+        },
       });
     } catch (queryError: any) {
-      logger.error('❌ Erreur requête getUserStatistics:', queryError);
-      // En cas d'erreur SQL, retourner un résultat vide plutôt que planter
+      logger.error('Erreur requête getUserStatistics:', queryError);
       res.json({
         success: true,
         data: {
           completedOrders: 0,
           loyaltyPoints: 0,
-          totalSaved: 0 // Montant restant à payer
-        }
+          totalSaved: 0,
+        },
       });
     }
   } catch (error: any) {
-    logger.error('❌ Erreur getUserStatistics:', error);
-    // Retourner un résultat vide en cas d'erreur pour éviter de crasher l'app
+    logger.error('Erreur getUserStatistics:', error);
     res.json({
       success: true,
       data: {
         completedOrders: 0,
         loyaltyPoints: 0,
-        totalSaved: 0 // Montant restant à payer
-      }
+        totalSaved: 0,
+      },
     });
   }
 };
-

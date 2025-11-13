@@ -1,26 +1,20 @@
 import { Vonage } from '@vonage/server-sdk';
 import { sendOTPEmail } from './emailService.js';
 
-// Configuration Vonage (variables d'environnement)
-const vonage = process.env.VONAGE_API_KEY && process.env.VONAGE_API_SECRET
-  ? new Vonage({
-      apiKey: process.env.VONAGE_API_KEY,
-      apiSecret: process.env.VONAGE_API_SECRET
-    })
-  : null;
+const vonage =
+  process.env.VONAGE_API_KEY && process.env.VONAGE_API_SECRET
+    ? new Vonage({
+        apiKey: process.env.VONAGE_API_KEY,
+        apiSecret: process.env.VONAGE_API_SECRET,
+      })
+    : null;
 
-/**
- * Génère un code OTP aléatoire
- */
 export function generateOTP(length: number = 6): string {
   const min = Math.pow(10, length - 1);
   const max = Math.pow(10, length) - 1;
   return Math.floor(Math.random() * (max - min + 1) + min).toString();
 }
 
-/**
- * Envoie un OTP par email via notre service personnalisé
- */
 export async function sendEmailOTP(
   email: string,
   phone?: string
@@ -32,23 +26,22 @@ export async function sendEmailOTP(
   message: string;
 }> {
   try {
-    // Générer le code OTP
     const otpCode = generateOTP(6);
-    
-    // Envoyer via notre service email personnalisé
+
     const result = await sendOTPEmail(email, otpCode, 'CHRONO');
-    
-    console.log(`📧 Email OTP personnalisé envoyé à: ${email}`);
+
+    console.log(`Email OTP personnalisé envoyé à: ${email}`);
+
     if (phone) {
-      console.log(`📱 Téléphone associé: ${phone}`);
+      console.log(`Téléphone associé: ${phone}`);
     }
-    
+
     return {
       success: true,
       method: 'email',
-      otpCode: otpCode, // Retourner le code pour stockage temporaire
+      otpCode: otpCode,
       messageId: result.messageId,
-      message: 'Code OTP envoyé par email avec succès'
+      message: 'Code OTP envoyé par email avec succès',
     };
   } catch (error: any) {
     console.error('Erreur sendEmailOTP:', error);
@@ -56,9 +49,6 @@ export async function sendEmailOTP(
   }
 }
 
-/**
- * Envoie un OTP par SMS via Vonage
- */
 export async function sendSMSOTP(
   phone: string,
   brandName: string = 'CHRONO'
@@ -74,29 +64,25 @@ export async function sendSMSOTP(
       throw new Error('Clés API Vonage non configurées');
     }
 
-    // Générer le code OTP
     const otpCode = generateOTP(6);
-    
-    // Message SMS
+
     const message = `Votre code de vérification ${brandName}: ${otpCode}. Ne le partagez avec personne.`;
 
-    // Envoyer le SMS
     const response = await vonage.sms.send({
       to: phone,
       from: brandName,
-      text: message
+      text: message,
     });
 
     if (response.messages[0].status === '0') {
-      console.log(`📱 SMS OTP envoyé à ${phone}: ${otpCode}`);
-      
-      // Retourner le code pour validation (à stocker temporairement)
+      console.log(`SMS OTP envoyé à ${phone}: ${otpCode}`);
+
       return {
         success: true,
         method: 'sms',
         otpCode: otpCode,
         messageId: response.messages[0]['message-id'],
-        message: 'Code OTP envoyé par SMS avec succès'
+        message: 'Code OTP envoyé par SMS avec succès',
       };
     } else {
       throw new Error(`Erreur SMS: ${response.messages[0]['error-text']}`);
@@ -107,9 +93,6 @@ export async function sendSMSOTP(
   }
 }
 
-/**
- * Vérifie un OTP email personnalisé (pas Supabase)
- */
 export async function verifyEmailOTP(
   email: string,
   otp: string,
@@ -134,15 +117,14 @@ export async function verifyEmailOTP(
       throw new Error('Code OTP invalide');
     }
 
-    console.log(`✅ Email OTP vérifié pour: ${email}`);
-    
-    // Créer un utilisateur simulé (sans Supabase Auth pour l'email)
+    console.log(`Email OTP vérifié pour: ${email}`);
+
     const user = {
       id: `email_user_${Date.now()}`,
       email: email,
       isVerified: true,
       createdAt: new Date().toISOString(),
-      supabaseUser: false
+      supabaseUser: false,
     };
 
     return {
@@ -151,8 +133,8 @@ export async function verifyEmailOTP(
       session: {
         access_token: `email_token_${user.id}`,
         refresh_token: `email_refresh_${user.id}`,
-        expires_in: 3600
-      }
+        expires_in: 3600,
+      },
     };
   } catch (error: any) {
     console.error('Erreur verifyEmailOTP:', error);
@@ -160,9 +142,6 @@ export async function verifyEmailOTP(
   }
 }
 
-/**
- * Fonction principale pour envoyer un OTP (email ou SMS)
- */
 export async function sendOTP(options: {
   email: string;
   phone?: string;
@@ -176,19 +155,16 @@ export async function sendOTP(options: {
   message: string;
 }> {
   const { email, phone, method = 'email', brandName = 'CHRONO' } = options;
-  
+
   switch (method) {
     case 'email':
       return await sendEmailOTP(email, phone);
-    
     case 'sms':
       if (!phone) {
-        throw new Error('Numéro de téléphone requis pour l\'envoi SMS');
+        throw new Error("Numéro de téléphone requis pour l'envoi SMS");
       }
       return await sendSMSOTP(phone, brandName);
-    
     default:
       throw new Error(`Méthode OTP non supportée: ${method}`);
   }
 }
-

@@ -20,7 +20,6 @@ export function initSentry() {
   Sentry.init({
     dsn: sentryDsn,
     environment: config.app.environment,
-    enableInExpoDevelopment: false, // Ne pas capturer les erreurs en dev
     tracesSampleRate: config.app.environment === 'production' ? 0.1 : 1.0, // 10% en prod, 100% en dev
     beforeSend(event, hint) {
       // Filtrer les erreurs de développement

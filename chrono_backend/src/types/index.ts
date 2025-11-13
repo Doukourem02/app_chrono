@@ -7,12 +7,8 @@ export interface User {
   id: string;
   email: string;
   phone?: string;
-  role: 'client' | 'driver' | 'admin';
-  created_at?: Date;
-  updated_at?: Date;
-}
-
-export interface UserProfile {
+  role: 'client' | 'driver' | 'admin'; created_at?: Date; updated_at?: Date;
+} export interface UserProfile {
   id: string;
   user_id: string;
   first_name?: string;
@@ -31,10 +27,7 @@ export interface DriverProfile {
   last_name?: string;
   email: string;
   phone?: string;
-  vehicle_type: 'moto' | 'vehicule' | 'cargo';
-  license_number?: string;
-  is_online: boolean;
-  is_available: boolean;
+ vehicle_type: 'moto' | 'vehicule' | 'cargo'; license_number?: string; is_online: boolean; is_available: boolean;
   current_latitude?: number;
   current_longitude?: number;
   last_location_update?: Date;
@@ -42,16 +35,8 @@ export interface DriverProfile {
   total_deliveries: number;
   created_at?: Date;
   updated_at?: Date;
-}
-
-// Types pour les commandes
-export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'completed' | 'declined' | 'cancelled';
-
-export type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
-
-export interface Coordinates {
-  latitude: number;
-  longitude: number;
+} // Types pour les commandes
+export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'completed' | 'declined' | 'cancelled'; export type DeliveryMethod = 'moto' | 'vehicule' | 'cargo'; export interface Coordinates { latitude: number; longitude: number;
 }
 
 export interface Address {
@@ -82,14 +67,8 @@ export interface Order {
     contactId?: string;
   };
   package_images?: string[];
-  package_type?: 'standard' | 'fragile' | 'hot_sensitive';
-  proof?: {
-    uploaded_at?: Date;
-    url?: string;
-    type?: 'photo' | 'signature' | string;
-    meta?: Record<string, any>;
-  };
-  created_at?: Date;
+ package_type?: 'standard' | 'fragile' | 'hot_sensitive'; proof?: { uploaded_at?: Date; url?: string;
+   type?: 'photo' | 'signature' | string; meta?: Record<string, any>; }; created_at?: Date;
   updated_at?: Date;
   assigned_at?: Date;
 }
@@ -103,18 +82,11 @@ export interface Rating {
   rating: number;
   comment?: string;
   created_at?: Date;
-}
-
-// Types pour l'authentification
+} // Types pour l'authentification
 export interface JWTPayload {
   id: string;
-  role: 'client' | 'driver' | 'admin';
-  type: 'access' | 'refresh';
-  iat?: number;
-  exp?: number;
-}
-
-export interface OTPCode {
+  role: 'client' | 'driver' | 'admin'; type: 'access' | 'refresh'; iat?: number; exp?: number;
+} export interface OTPCode {
   email: string;
   phone: string;
   role: string;
@@ -130,23 +102,10 @@ export interface ApiResponse<T = any> {
   message?: string;
   data?: T;
   error?: string;
-}
-
-// Types pour les requêtes Express
-import { Request, Response, NextFunction } from 'express';
-
-export interface AuthenticatedRequest extends Request {
-  user?: JWTPayload;
-}
-
-export type RequestHandler = (req: Request | AuthenticatedRequest, res: Response, next: NextFunction) => void | Promise<void>;
-
-// Types pour Socket.IO
-import { Socket } from 'socket.io';
-
-export interface SocketWithUser extends Socket {
-  userId?: string;
-  userRole?: 'client' | 'driver' | 'admin';
+} // Types pour les requêtes Express
+import { Request, Response, NextFunction } from 'express'; export interface AuthenticatedRequest extends Request { user?: JWTPayload;
+} export type RequestHandler = (req: Request | AuthenticatedRequest, res: Response, next: NextFunction) => void | Promise<void>; // Types pour Socket.IO
+import { Socket } from 'socket.io'; export interface SocketWithUser extends Socket { userId?: string; userRole?: 'client' | 'driver' | 'admin';
 }
 
 // Types pour les erreurs

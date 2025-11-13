@@ -53,13 +53,19 @@ class AnalyticsService {
     this.userProperties = options?.userProperties ?? {};
 
     // Récupérer l'utilisateur depuis le store si disponible
-    const { user } = useDriverStore.getState();
+    const { user, profile } = useDriverStore.getState();
     if (user) {
-      this.setUser(user.id, {
+      const userProperties: Record<string, any> = {
         email: user.email,
-        name: user.name,
         role: 'driver',
-      });
+      };
+      
+      // Ajouter le nom si le profil est disponible
+      if (profile?.first_name || profile?.last_name) {
+        userProperties.name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+      }
+      
+      this.setUser(user.id, userProperties);
     }
 
     if (__DEV__) {
@@ -148,7 +154,7 @@ class AnalyticsService {
       }).catch(() => {
         // Ignorer les erreurs silencieusement
       });
-    } catch (error) {
+    } catch {
       // Ignorer les erreurs silencieusement
     }
   }

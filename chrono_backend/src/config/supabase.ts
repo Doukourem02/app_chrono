@@ -13,11 +13,15 @@ if (!supabaseUrl) {
 }
 
 if (!serviceRoleKey && !anonKey) {
-  throw new Error('Missing Supabase environment variables: provide SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY');
+  throw new Error(
+    'Missing Supabase environment variables: provide SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY'
+  );
 }
 
 if (!serviceRoleKey) {
-  logger.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY not set. Falling back to SUPABASE_ANON_KEY; some operations may fail due to RLS policies.');
+  logger.warn(
+    'SUPABASE_SERVICE_ROLE_KEY not set. Falling back to SUPABASE_ANON_KEY; some operations may fail due to RLS policies.'
+  );
 }
 
 // Client principal (utilise service role key si disponible, sinon anon key)
@@ -30,7 +34,7 @@ const supabase: SupabaseClient = createClient(supabaseUrl, serviceRoleKey || ano
 
 // Client admin séparé pour les opérations qui nécessitent la service role key (bypass RLS)
 // Utilisé uniquement pour les insertions dans les tables qui ont RLS activé
-export const supabaseAdmin: SupabaseClient | null = serviceRoleKey 
+export const supabaseAdmin: SupabaseClient | null = serviceRoleKey
   ? createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         persistSession: false,
@@ -41,4 +45,3 @@ export const supabaseAdmin: SupabaseClient | null = serviceRoleKey
 
 export { supabase };
 export default supabase;
-

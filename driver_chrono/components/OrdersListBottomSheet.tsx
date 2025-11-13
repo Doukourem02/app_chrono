@@ -1,13 +1,7 @@
-/**
- * Bottom Sheet pour afficher et gérer toutes les commandes actives du livreur
- * Permet de basculer entre plusieurs livraisons en cours
- */
-
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useOrderStore, OrderRequest } from '../store/useOrderStore';
-import ActiveOrdersList from './ActiveOrdersList';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { useOrderStore } from '../store/useOrderStore';
+import { ActiveOrdersList } from './ActiveOrdersList';
 
 interface OrdersListBottomSheetProps {
   animatedHeight: any;
@@ -24,7 +18,7 @@ export const OrdersListBottomSheet: React.FC<OrdersListBottomSheetProps> = ({
   onToggle,
   onOrderSelect,
 }) => {
-  const { activeOrders, pendingOrders, selectedOrderId, setSelectedOrder } = useOrderStore();
+  const { activeOrders, pendingOrders, setSelectedOrder } = useOrderStore();
   const totalOrders = activeOrders.length + pendingOrders.length;
 
   const handleOrderSelect = (orderId: string) => {

@@ -1,9 +1,6 @@
 export interface PriceCalculationParams {
   distance: number; 
-  deliveryMethod: 'moto' | 'vehicule' | 'cargo';
-  isUrgent?: boolean;
-  customPricePerKm?: number; 
-}
+  deliveryMethod: 'moto' | 'vehicule' | 'cargo'; isUrgent?: boolean; customPricePerKm?: number; }
 
 export interface PriceCalculationResult {
   basePrice: number; 
@@ -26,8 +23,7 @@ const DEFAULT_PRICE_PER_KM: Record<string, number> = {
 
 const URGENCY_FEE_PERCENTAGE = 0.3; 
 
-/**
- * Calcule le prix d'une livraison
+/** * Calcule le prix d'une livraison
  */
 export function calculateDeliveryPrice(params: PriceCalculationParams): PriceCalculationResult {
   const { distance, deliveryMethod, isUrgent = false, customPricePerKm } = params;
@@ -46,7 +42,7 @@ export function calculateDeliveryPrice(params: PriceCalculationParams): PriceCal
     totalPrice,
     pricePerKm,
     breakdown: {
-      distance: Math.round(distance * 100) / 100, // Arrondir à 2 décimales
+      distance: Math.round(distance * 100) / 100, // Arrondir à décimales
       pricePerKm,
       urgencyFee,
       total: totalPrice,
@@ -57,24 +53,12 @@ export function calculateDeliveryPrice(params: PriceCalculationParams): PriceCal
 /**
  * Obtient le tarif par km pour un type de livraison
  */
-export function getPricePerKm(deliveryMethod: 'moto' | 'vehicule' | 'cargo'): number {
-  return DEFAULT_PRICE_PER_KM[deliveryMethod] || DEFAULT_PRICE_PER_KM.moto;
-}
-
-/**
- * Valide les paramètres de calcul de prix
+export function getPricePerKm(deliveryMethod: 'moto' | 'vehicule' | 'cargo'): number { return DEFAULT_PRICE_PER_KM[deliveryMethod] || DEFAULT_PRICE_PER_KM.moto;
+} /** * Valide les paramètres de calcul de prix
  */
 export function validatePriceParams(params: PriceCalculationParams): { valid: boolean; error?: string } {
   if (!params.distance || params.distance <= 0) {
-    return { valid: false, error: 'La distance doit être supérieure à 0' };
-  }
-
-  if (!params.deliveryMethod || !['moto', 'vehicule', 'cargo'].includes(params.deliveryMethod)) {
-    return { valid: false, error: 'Méthode de livraison invalide' };
-  }
-
-  if (params.customPricePerKm !== undefined && params.customPricePerKm <= 0) {
-    return { valid: false, error: 'Le tarif personnalisé par km doit être supérieur à 0' };
+   return { valid: false, error: 'La distance doit être supérieure à 0' }; } if (!params.deliveryMethod || !['moto', 'vehicule', 'cargo'].includes(params.deliveryMethod)) { return { valid: false, error: 'Méthode de livraison invalide' }; } if (params.customPricePerKm !== undefined && params.customPricePerKm <= 0) { return { valid: false, error: 'Le tarif personnalisé par km doit être supérieur à 0' };
   }
 
   return { valid: true };

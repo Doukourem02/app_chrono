@@ -1,14 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Alert,
-  Switch,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
@@ -51,7 +42,7 @@ export default function ProfilePage() {
         // Elle est mise à jour automatiquement à chaque nouvelle évaluation
         setStatistics(result.data);
         if (__DEV__) {
-          console.debug('✅ [Profile] Statistiques chargées:', {
+          console.debug('[Profile] Statistiques chargées:', {
             completedDeliveries: result.data.completedDeliveries,
             averageRating: result.data.averageRating,
             totalEarnings: result.data.totalEarnings
@@ -59,7 +50,7 @@ export default function ProfilePage() {
         }
       }
     } catch (error) {
-      console.error('❌ [Profile] Erreur chargement statistiques:', error);
+      console.error('[Profile] Erreur chargement statistiques:', error);
     } finally {
       setIsLoadingStats(false);
     }

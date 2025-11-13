@@ -36,7 +36,6 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
       return;
     }
 
-    // Valider que la note est entre 1 et 5
     if (rating < 1 || rating > 5) {
       res.status(400).json({
         success: false,
@@ -45,21 +44,20 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
       return;
     }
 
-    // Vérifier que la commande existe, appartient au client et est complétée
     try {
-      // Détecter dynamiquement si driver_id existe dans orders
       const driverColumnCheck = await (pool as any).query(
-        `SELECT column_name FROM information_schema.columns
-         WHERE table_schema = 'public'
-           AND table_name = 'orders'
-           AND column_name = 'driver_id'`
+        `SELECT column_name FROM information_schema.columns 
+         WHERE table_schema = 'public' 
+         AND table_name = 'orders' 
+         AND column_name = 'driver_id'`
       );
       const hasDriverColumn = driverColumnCheck.rows.length > 0;
 
-      // Construire la requête en fonction des colonnes disponibles
       const driverSelect = hasDriverColumn ? 'driver_id' : 'NULL as driver_id';
       const orderResult = await (pool as any).query(
-        `SELECT id, user_id, ${driverSelect}, status FROM orders WHERE id = $1`,
+        `SELECT id, user_id, ${driverSelect}, status 
+         FROM orders 
+         WHERE id = $1`,
         [orderId]
       );
 
@@ -73,7 +71,6 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
 
       const order = orderResult.rows[0];
 
-      // Vérifier que la commande appartient au client
       if (order.user_id !== userId) {
         res.status(403).json({
           success: false,
@@ -82,7 +79,6 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
         return;
       }
 
-      // Vérifier que la commande est complétée
       if (order.status !== 'completed') {
         res.status(400).json({
           success: false,
@@ -91,24 +87,23 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
         return;
       }
 
-      // Récupérer le driver_id (depuis orders ou order_assignments)
       let driverId: string | null = hasDriverColumn ? order.driver_id : null;
       
-      // Si driver_id n'existe pas dans orders, chercher dans order_assignments
       if (!driverId) {
         try {
           const assignmentCheck = await (pool as any).query(
             `SELECT EXISTS (
-              SELECT FROM information_schema.tables
-              WHERE table_schema = 'public'
-              AND table_name = 'order_assignments'
-            )`
+               SELECT FROM information_schema.tables
+               WHERE table_schema = 'public' AND table_name = 'order_assignments'
+             )`
           );
           const hasOrderAssignments = assignmentCheck.rows[0]?.exists === true;
 
           if (hasOrderAssignments) {
             const assignmentResult = await (pool as any).query(
-              `SELECT driver_id FROM order_assignments WHERE order_id = $1 LIMIT 1`,
+              `SELECT driver_id FROM order_assignments 
+               WHERE order_id = $1 
+               LIMIT 1`,
               [orderId]
             );
             if (assignmentResult.rows && assignmentResult.rows.length > 0) {
@@ -116,11 +111,10 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
             }
           }
         } catch (err: any) {
-          logger.warn('⚠️ Erreur vérification order_assignments pour rating:', err.message);
+          logger.warn('Erreur vérification order_assignments pour rating:', err.message);
         }
       }
 
-      // Vérifier que la commande a un livreur assigné
       if (!driverId) {
         res.status(400).json({
           success: false,
@@ -129,19 +123,17 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
         return;
       }
 
-      // Vérifier que la table ratings existe
       try {
         const tableCheck = await (pool as any).query(
           `SELECT EXISTS (
-            SELECT FROM information_schema.tables
-            WHERE table_schema = 'public'
-            AND table_name = 'ratings'
-          )`
+             SELECT FROM information_schema.tables
+             WHERE table_schema = 'public' AND table_name = 'ratings'
+           )`
         );
         const tableExists = tableCheck.rows[0]?.exists === true;
-        
+
         if (!tableExists) {
-          logger.error('❌ Table ratings n\'existe pas');
+          logger.error('Table ratings n\'existe pas');
           res.status(500).json({
             success: false,
             message: 'Table ratings n\'existe pas. Veuillez exécuter la migration 010_create_ratings_table.sql'
@@ -149,19 +141,18 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
           return;
         }
 
-        // Vérifier que la colonne comment existe
         const columnCheck = await (pool as any).query(
           `SELECT EXISTS (
-            SELECT FROM information_schema.columns
-            WHERE table_schema = 'public'
-            AND table_name = 'ratings'
-            AND column_name = 'comment'
-          )`
+             SELECT FROM information_schema.columns
+             WHERE table_schema = 'public' 
+             AND table_name = 'ratings' 
+             AND column_name = 'comment'
+           )`
         );
         const columnExists = columnCheck.rows[0]?.exists === true;
-        
+
         if (!columnExists) {
-          logger.error('❌ Colonne comment n\'existe pas dans ratings');
+          logger.error('Colonne comment n\'existe pas dans ratings');
           res.status(500).json({
             success: false,
             message: 'Colonne comment n\'existe pas dans ratings. Veuillez exécuter la migration 010_create_ratings_table.sql'
@@ -169,21 +160,20 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
           return;
         }
       } catch (checkError: any) {
-        logger.error('❌ Erreur vérification table ratings:', checkError);
-        // Continuer quand même - peut-être que c'est juste un problème de permissions
+        logger.error('Erreur vérification table ratings:', checkError);
       }
 
-      // Vérifier si l'utilisateur a déjà évalué cette commande
       const existingRatingResult = await (pool as any).query(
-        `SELECT id FROM ratings WHERE order_id = $1 AND user_id = $2`,
+        `SELECT id FROM ratings 
+         WHERE order_id = $1 AND user_id = $2`,
         [orderId, userId]
       );
 
       let ratingId: string;
+
       if (existingRatingResult.rows && existingRatingResult.rows.length > 0) {
-        // Mettre à jour l'évaluation existante
         ratingId = existingRatingResult.rows[0].id;
-        logger.info(`📝 Mise à jour évaluation existante : ${maskOrderId(ratingId)} pour commande ${maskOrderId(orderId)}`, {
+        logger.info(`Mise à jour évaluation existante : ${maskOrderId(ratingId)} pour commande ${maskOrderId(orderId)}`, {
           rating,
           hasComment: !!comment,
           commentLength: comment?.length || 0
@@ -196,10 +186,10 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
              WHERE id = $3`,
             [rating, comment || null, ratingId]
           );
-          logger.info(`✅ Évaluation mise à jour : ${maskOrderId(ratingId)} pour commande ${maskOrderId(orderId)}`);
+          logger.info(`Évaluation mise à jour : ${maskOrderId(ratingId)} pour commande ${maskOrderId(orderId)}`);
         } catch (updateError: any) {
-          logger.error('❌ Erreur UPDATE ratings:', updateError);
-          logger.error('❌ Détails UPDATE:', {
+          logger.error('Erreur UPDATE ratings:', updateError);
+          logger.error('Détails UPDATE:', {
             ratingId,
             rating,
             comment: comment ? comment.substring(0, 50) : null,
@@ -210,8 +200,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
           throw updateError;
         }
       } else {
-        // Créer une nouvelle évaluation
-        logger.info(`📝 Création nouvelle évaluation pour commande ${maskOrderId(orderId)}`, {
+        logger.info(`Création nouvelle évaluation pour commande ${maskOrderId(orderId)}`, {
           userId: maskUserId(userId),
           driverId: maskUserId(driverId),
           rating,
@@ -227,10 +216,10 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
             [orderId, userId, driverId, rating, comment || null]
           );
           ratingId = insertResult.rows[0].id;
-          logger.info(`✅ Nouvelle évaluation créée : ${maskOrderId(ratingId)} pour commande ${maskOrderId(orderId)}`);
+          logger.info(`Nouvelle évaluation créée : ${maskOrderId(ratingId)} pour commande ${maskOrderId(orderId)}`);
         } catch (insertError: any) {
-          logger.error('❌ Erreur INSERT ratings:', insertError);
-          logger.error('❌ Détails INSERT:', {
+          logger.error('Erreur INSERT ratings:', insertError);
+          logger.error('Détails INSERT:', {
             orderId,
             userId,
             driverId,
@@ -244,8 +233,6 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
         }
       }
 
-      // La fonction trigger_update_driver_rating() mettra à jour automatiquement la note moyenne du livreur
-
       res.json({
         success: true,
         message: 'Évaluation enregistrée avec succès',
@@ -258,7 +245,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
         }
       });
     } catch (queryError: any) {
-      logger.error('❌ Erreur requête submitRating:', queryError);
+      logger.error('Erreur requête submitRating:', queryError);
       res.status(500).json({
         success: false,
         message: 'Erreur serveur lors de l\'enregistrement de l\'évaluation',
@@ -266,7 +253,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
       });
     }
   } catch (error: any) {
-    logger.error('❌ Erreur submitRating:', error);
+    logger.error('Erreur submitRating:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',
@@ -275,10 +262,6 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
   }
 };
 
-/**
- * 📊 Récupérer les évaluations d'un livreur
- * GET /api/ratings/driver/:driverId
- */
 export const getDriverRatings = async (req: Request, res: Response): Promise<void> => {
   try {
     const { driverId } = req.params;
@@ -294,9 +277,8 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    // Vérifier que la connexion DB est configurée
     if (!process.env.DATABASE_URL) {
-      logger.warn('⚠️ DATABASE_URL non configuré pour getDriverRatings');
+      logger.warn('DATABASE_URL non configuré pour getDriverRatings');
       res.json({
         success: true,
         data: [],
@@ -311,7 +293,6 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
     }
 
     try {
-      // Récupérer les évaluations avec pagination
       const ratingsResult = await (pool as any).query(
         `SELECT 
           r.id,
@@ -330,12 +311,10 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
         [driverId, limit, offset]
       );
 
-      // Compter le total
       const countResult = await (pool as any).query(
         `SELECT COUNT(*) as count FROM ratings WHERE driver_id = $1`,
         [driverId]
       );
-
       const total = parseInt(countResult.rows[0]?.count || '0');
 
       res.json({
@@ -358,7 +337,7 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
         }
       });
     } catch (queryError: any) {
-      logger.error('❌ Erreur requête getDriverRatings:', queryError);
+      logger.error('Erreur requête getDriverRatings:', queryError);
       res.json({
         success: true,
         data: [],
@@ -371,7 +350,7 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
       });
     }
   } catch (error: any) {
-    logger.error('❌ Erreur getDriverRatings:', error);
+    logger.error('Erreur getDriverRatings:', error);
     res.json({
       success: true,
       data: [],
@@ -385,10 +364,6 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
   }
 };
 
-/**
- * 🔍 Vérifier si une commande a déjà été évaluée
- * GET /api/ratings/order/:orderId
- */
 export const getOrderRating = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -410,7 +385,6 @@ export const getOrderRating = async (req: RequestWithUser, res: Response): Promi
       return;
     }
 
-    // Vérifier que la connexion DB est configurée
     if (!process.env.DATABASE_URL) {
       res.json({
         success: true,
@@ -447,18 +421,17 @@ export const getOrderRating = async (req: RequestWithUser, res: Response): Promi
         }
       });
     } catch (queryError: any) {
-      logger.error('❌ Erreur requête getOrderRating:', queryError);
+      logger.error('Erreur requête getOrderRating:', queryError);
       res.json({
         success: true,
         data: null
       });
     }
   } catch (error: any) {
-    logger.error('❌ Erreur getOrderRating:', error);
+    logger.error('Erreur getOrderRating:', error);
     res.json({
       success: true,
       data: null
     });
   }
 };
-

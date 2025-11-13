@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
@@ -25,7 +19,6 @@ export default function OTPMethodScreen() {
     setIsLoading(true);
 
     try {
-      // Appeler l'API backend pour envoyer l'OTP
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/send-otp`, {
         method: 'POST',
         headers: {
@@ -35,7 +28,7 @@ export default function OTPMethodScreen() {
           phone: phoneNumber,
           email: email,
           otpMethod: selectedMethod,
-          role: 'driver', // Toujours driver pour cette app
+          role: 'driver',
         }),
       });
 
@@ -47,10 +40,7 @@ export default function OTPMethodScreen() {
 
       console.log('OTP envoyé avec succès:', data);
       
-      // Sauvegarder la méthode choisie pour la vérification
       setTempData(email, phoneNumber, selectedMethod);
-      
-      // Naviguer vers l'écran de vérification
       router.push('./verification' as any);
     } catch (error) {
       console.error('Erreur lors de l\'envoi OTP:', error);
@@ -66,23 +56,19 @@ export default function OTPMethodScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header avec bouton retour */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
       </View>
 
-      {/* Contenu */}
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Méthode de vérification</Text>
         <Text style={styles.subtitle}>
           Comment souhaitez-vous recevoir votre code de vérification chauffeur ?
         </Text>
 
-        {/* Options de méthode */}
         <View style={styles.methodsContainer}>
-          {/* Email Option */}
           <TouchableOpacity
             style={[
               styles.methodOption,
@@ -119,7 +105,6 @@ export default function OTPMethodScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* SMS Option */}
           <TouchableOpacity
             style={[
               styles.methodOption,
@@ -157,7 +142,6 @@ export default function OTPMethodScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Continue Button */}
         <TouchableOpacity 
           style={[styles.continueButton, isLoading && styles.buttonDisabled]}
           onPress={handleContinue}

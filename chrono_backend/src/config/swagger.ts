@@ -19,7 +19,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: process.env.API_URL || 'http://localhost:4000',
+        url: process.env.API_URL || 'http://localhost:3000',
         description: 'Serveur de développement',
       },
       {
@@ -33,7 +33,8 @@ const options: swaggerJsdoc.Options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Token JWT obtenu via /api/auth-simple/verify-otp ou /api/auth-simple/login',
+          description:
+            'Token JWT obtenu via /api/auth-simple/verify-otp ou /api/auth-simple/login',
         },
       },
       schemas: {
@@ -142,7 +143,15 @@ const options: swaggerJsdoc.Options = {
             },
             status: {
               type: 'string',
-              enum: ['pending', 'accepted', 'enroute', 'picked_up', 'completed', 'cancelled', 'declined'],
+              enum: [
+                'pending',
+                'accepted',
+                'enroute',
+                'picked_up',
+                'completed',
+                'cancelled',
+                'declined',
+              ],
             },
             price: {
               type: 'number',
@@ -210,11 +219,14 @@ const options: swaggerJsdoc.Options = {
 const swaggerSpec = swaggerJsdoc(options);
 
 export const setupSwagger = (app: Express): void => {
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Chrono Livraison API Documentation',
-  }));
+  app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'Chrono Livraison API Documentation',
+    })
+  );
 };
 
 export default swaggerSpec;
-

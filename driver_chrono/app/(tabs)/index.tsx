@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Text,
-} from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert, Text } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusToggle } from "../../components/StatusToggle";
@@ -24,7 +18,6 @@ import { useRouteTracking } from '../../hooks/useRouteTracking';
 import { useMapCamera } from '../../hooks/useMapCamera';
 
 export default function Index() {
-  // Store du chauffeur
   const { 
     isOnline: storeIsOnline, 
     setOnlineStatus, 
@@ -35,7 +28,6 @@ export default function Index() {
     profile 
   } = useDriverStore();
   
-  // État pour les statistiques réelles depuis le backend
   const [driverStats, setDriverStats] = useState<{
     todayDeliveries: number;
     totalRevenue: number;
@@ -44,22 +36,35 @@ export default function Index() {
     totalRevenue: 0,
   });
   
-  // Store des commandes - utiliser les hooks Zustand pour la réactivité
   const pendingOrders = useOrderStore((s) => s.pendingOrders);
   const activeOrders = useOrderStore((s) => s.activeOrders);
   const selectedOrderId = useOrderStore((s) => s.selectedOrderId);
   const setSelectedOrder = useOrderStore((s) => s.setSelectedOrder);
   
-  // Récupérer la première commande en attente pour le popup
   const pendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null;
   
-  // 🆕 Fonction pour calculer la distance entre la position du livreur et le point de pickup d'une commande
+  const isOnline = storeIsOnline;
+  
+  const { location, error } = useDriverLocation(isOnline);
+  const mapRef = useRef<MapView | null>(null);
+
+  const resolveCoords = (candidate?: any) => {
+    if (!candidate) return null;
+
+    const c = candidate.coordinates || candidate.coords || candidate.location || candidate;
+    const lat = c?.latitude ?? c?.lat ?? c?.latitude ?? c?.Lat ?? c?.y;
+    const lng = c?.longitude ?? c?.lng ?? c?.longitude ?? c?.Lng ?? c?.x;
+    
+    if (lat == null || lng == null) return null;
+    return { latitude: Number(lat), longitude: Number(lng) };
+  };
+  
   const calculateDistanceToPickup = React.useCallback((order: typeof activeOrders[0]): number | null => {
     if (!location || !order?.pickup) return null;
     const pickupCoord = resolveCoords(order.pickup);
     if (!pickupCoord) return null;
 
-    const R = 6371; // Rayon de la Terre en km
+    const R = 6371;
     const dLat = (pickupCoord.latitude - location.latitude) * Math.PI / 180;
     const dLon = (pickupCoord.longitude - location.longitude) * Math.PI / 180;
     const a = 
@@ -68,10 +73,9 @@ export default function Index() {
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     
-    return Math.round(R * c * 10) / 10; // Distance en km arrondie à 1 décimale
+    return Math.round(R * c * 10) / 10;
   }, [location]);
 
-  // 🆕 Trier les commandes par distance depuis la position actuelle du livreur
   const sortedActiveOrdersByDistance = React.useMemo(() => {
     if (!location || activeOrders.length === 0) return activeOrders;
     
@@ -79,34 +83,26 @@ export default function Index() {
       const distA = calculateDistanceToPickup(a);
       const distB = calculateDistanceToPickup(b);
       
-      // Si une distance est null, mettre cette commande en dernier
       if (distA === null && distB === null) return 0;
       if (distA === null) return 1;
       if (distB === null) return -1;
       
-      // Trier par distance (plus proche en premier)
       return distA - distB;
     });
   }, [activeOrders, location, calculateDistanceToPickup]);
 
-  // Récupérer la commande active actuelle
-  // 🆕 Utiliser la distance pour déterminer la commande à afficher si aucune n'est sélectionnée
   const currentOrder = useOrderStore((s) => {
     if (s.selectedOrderId) {
       return s.activeOrders.find(o => o.id === s.selectedOrderId) || null;
     }
     
-    // Si aucune commande n'est sélectionnée, sélectionner automatiquement selon la distance
-    // Priorité : commande en cours (picked_up, enroute) > distance depuis position actuelle
     if (location && sortedActiveOrdersByDistance.length > 0) {
-      // D'abord chercher une commande en cours
       const inProgressOrder = sortedActiveOrdersByDistance.find(o => 
         o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
       );
       
       const orderToSelect = inProgressOrder || sortedActiveOrdersByDistance[0];
       if (orderToSelect) {
-        // Sélectionner automatiquement cette commande (la plus proche ou en cours)
         setTimeout(() => {
           s.setSelectedOrder(orderToSelect.id);
         }, 100);
@@ -114,7 +110,6 @@ export default function Index() {
       }
     }
     
-    // Fallback sur l'ancienne logique si pas de position
     const priorityOrder = s.activeOrders.find(o => 
       o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
     );
@@ -134,7 +129,6 @@ export default function Index() {
     return null;
   });
   
-  // Bottom sheet pour les détails du destinataire
   const {
     animatedHeight: recipientDetailsAnimatedHeight,
     isExpanded: recipientDetailsIsExpanded,
@@ -144,56 +138,27 @@ export default function Index() {
     toggle: toggleRecipientDetailsSheet,
   } = useBottomSheet();
 
-  // Bottom sheet pour la liste des commandes actives
   const {
     animatedHeight: ordersListAnimatedHeight,
     isExpanded: ordersListIsExpanded,
     panResponder: ordersListPanResponder,
-    expand: expandOrdersListSheet,
     collapse: collapseOrdersListSheet,
     toggle: toggleOrdersListSheet,
   } = useBottomSheet();
   
-  // Réf pour suivre si l'utilisateur a fermé manuellement le bottom sheet
   const userClosedBottomSheetRef = useRef(false);
   const lastOrderStatusRef = useRef<string | null>(null);
-  
-  // Utiliser directement le store pour la synchronisation avec profile.tsx
-  const isOnline = storeIsOnline;
-  
-  // Hook de géolocalisation
-  const { location, error } = useDriverLocation(isOnline);
-  const mapRef = useRef<MapView | null>(null);
 
-  // Normaliser plusieurs formats de coordonnées possibles (latitude/longitude ou lat/lng)
-  const resolveCoords = (candidate?: any) => {
-    if (!candidate) return null;
-
-    // candidate may be: { coordinates: { latitude, longitude } } OR { coords: { lat, lng } } OR direct { latitude, longitude }
-    const c = candidate.coordinates || candidate.coords || candidate.location || candidate;
-    const lat = c?.latitude ?? c?.lat ?? c?.latitude ?? c?.Lat ?? c?.y;
-    const lng = c?.longitude ?? c?.lng ?? c?.lon ?? c?.long ?? c?.Longitude ?? c?.x;
-
-    if (lat == null || lng == null) return null;
-    const latN = Number(lat);
-    const lngN = Number(lng);
-    if (Number.isNaN(latN) || Number.isNaN(lngN)) return null;
-    return { latitude: latN, longitude: lngN };
-  };
-
-  // Déterminer la destination actuelle selon le statut de la commande
   const getCurrentDestination = () => {
     if (!currentOrder || !location) return null;
     const status = String(currentOrder.status || '');
     const pickupCoord = resolveCoords(currentOrder.pickup);
     const dropoffCoord = resolveCoords(currentOrder.dropoff);
 
-    // Si commande acceptée/en route -> destination = pickup
     if ((status === 'accepted' || status === 'enroute' || status === 'in_progress') && pickupCoord) {
       return pickupCoord;
     }
     
-    // Si colis récupéré -> destination = dropoff
     if ((status === 'picked_up' || status === 'delivering') && dropoffCoord) {
       return dropoffCoord;
     }
@@ -201,8 +166,6 @@ export default function Index() {
     return null;
   };
 
-  // Hook pour récupérer la route réelle depuis Google Directions
-  // Utiliser la commande sélectionnée (currentOrder) pour calculer la destination
   const destination = getCurrentDestination();
   const { route: routeToDestination, isLoading: isRouteLoading, refetch: refetchRoute } = useRouteTracking(
     location,
@@ -210,14 +173,12 @@ export default function Index() {
     isOnline && !!currentOrder && !!destination
   );
 
-  // 🆕 Recentrer la map sur la commande sélectionnée quand elle change
   useEffect(() => {
     if (currentOrder && location) {
       const pickupCoord = resolveCoords(currentOrder.pickup);
       const dropoffCoord = resolveCoords(currentOrder.dropoff);
       const status = String(currentOrder.status || '');
       
-      // Déterminer quelle coordonnée utiliser pour centrer
       let targetCoord = null;
       if ((status === 'accepted' || status === 'enroute' || status === 'in_progress') && pickupCoord) {
         targetCoord = pickupCoord;
@@ -225,7 +186,6 @@ export default function Index() {
         targetCoord = dropoffCoord;
       }
       
-      // Recentrer la map sur la commande sélectionnée
       if (targetCoord && mapRef.current) {
         setTimeout(() => {
           mapRef.current?.animateToRegion({
@@ -237,24 +197,20 @@ export default function Index() {
         }, 300);
       }
     }
-  }, [selectedOrderId, currentOrder?.id]); // Se déclencher quand la sélection change
+  }, [selectedOrderId, currentOrder?.id, currentOrder, location]);
 
-  // Hook pour la caméra qui suit automatiquement
   const { fitToRoute, centerOnDriver } = useMapCamera(
-    mapRef,
+    mapRef as React.RefObject<MapView>,
     location,
     routeToDestination ? { coordinates: routeToDestination.coordinates } : null,
     currentOrder,
-    isOnline // Suivre le driver même quand il n'y a pas de commande active
+    isOnline
   );
 
-  // Animated driver position for simple delivery animation
   const [animatedDriverPos, setAnimatedDriverPos] = useState<{ latitude: number; longitude: number } | null>(null);
-  const polyPulseRef = useRef<boolean>(false);
   const polyPulseIntervalRef = useRef<number | null>(null);
   const animationTimeoutsRef = useRef<number[]>([]);
 
-  // Cleanup timeouts/intervals on unmount
   useEffect(() => {
     return () => {
       if (polyPulseIntervalRef.current) clearInterval(polyPulseIntervalRef.current);
@@ -262,46 +218,6 @@ export default function Index() {
     };
   }, []);
 
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-  const startDeliveryAnimation = (from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) => {
-    // clear previous timeouts
-    animationTimeoutsRef.current.forEach(id => clearTimeout(id));
-    animationTimeoutsRef.current = [];
-
-    const steps = 16;
-    const duration = 1600;
-    const stepMs = Math.round(duration / steps);
-
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      const lat = lerp(from.latitude, to.latitude, t);
-      const lng = lerp(from.longitude, to.longitude, t);
-      const timeoutId = window.setTimeout(() => setAnimatedDriverPos({ latitude: lat, longitude: lng }), i * stepMs) as unknown as number;
-      animationTimeoutsRef.current.push(timeoutId);
-    }
-
-    // animate camera to fit
-    const center = { latitude: (from.latitude + to.latitude) / 2, longitude: (from.longitude + to.longitude) / 2 };
-    try {
-      mapRef.current?.animateToRegion({ latitude: center.latitude, longitude: center.longitude, latitudeDelta: Math.abs(from.latitude - to.latitude) * 2.5 + 0.01, longitudeDelta: Math.abs(from.longitude - to.longitude) * 2.5 + 0.01 }, 600);
-    } catch {}
-
-    // polyline pulse
-    let pulses = 0;
-    polyPulseRef.current = true;
-    polyPulseIntervalRef.current = window.setInterval(() => {
-      polyPulseRef.current = !polyPulseRef.current;
-      pulses++;
-      if (pulses >= 6 && polyPulseIntervalRef.current) {
-        clearInterval(polyPulseIntervalRef.current);
-        polyPulseIntervalRef.current = null;
-        polyPulseRef.current = false;
-      }
-    }, 200) as unknown as number;
-  };
-
-  // 🔌 Connexion Socket pour les commandes
   useEffect(() => {
     if (isOnline && user?.id) {
       orderSocketService.connect(user.id);
@@ -314,34 +230,27 @@ export default function Index() {
     };
   }, [isOnline, user?.id]);
 
-  // Gestion des commandes
   const handleAcceptOrder = (orderId: string) => {
     orderSocketService.acceptOrder(orderId);
-    // Le store sera mis à jour automatiquement via order-accepted-confirmation
   };
 
   const handleDeclineOrder = (orderId: string) => {
     orderSocketService.declineOrder(orderId);
-    // Le store sera mis à jour automatiquement via order-declined-confirmation
   };
 
-  // Ref pour éviter les doubles clics
   const isTogglingRef = useRef(false);
   
-  // Gestion du changement de statut
   const handleToggleOnline = async (value: boolean) => {
-    // Éviter les doubles clics
     if (isTogglingRef.current) {
       if (__DEV__) {
-        console.debug('⚠️ Toggle déjà en cours, ignoré');
+        console.debug('Toggle déjà en cours, ignoré');
       }
       return;
     }
     
-    // Si la valeur demandée est la même que l'état actuel, ne rien faire
     if (value === isOnline) {
       if (__DEV__) {
-        console.debug('⚠️ Statut déjà à', value, ', ignoré');
+        console.debug('Statut déjà à', value, ', ignoré');
       }
       return;
     }
@@ -355,48 +264,37 @@ export default function Index() {
       return;
     }
     
-    // Marquer que le toggle est en cours
     isTogglingRef.current = true;
     
-    // Mettre à jour le statut local immédiatement (optimistic update) pour une meilleure UX
-    // L'utilisateur voit le changement immédiatement, même si l'API est lente ou échoue
     setOnlineStatus(value);
     
-    // Synchroniser avec le backend en arrière-plan
     if (user?.id) {
       const statusData: any = {
         is_online: value,
-        is_available: value // Si online, disponible aussi
+        is_available: value
       };
 
-      // Ajouter la position si disponible et en ligne
       if (value && location) {
         statusData.current_latitude = location.latitude;
         statusData.current_longitude = location.longitude;
         setLocation(location);
       }
 
-      // Synchroniser en arrière-plan (ne pas bloquer l'UI)
       apiService.updateDriverStatus(user.id, statusData).then((result) => {
-        // Libérer le verrou après la synchronisation
         isTogglingRef.current = false;
         
         if (!result.success) {
           if (__DEV__) {
-            console.warn('⚠️ Échec synchronisation:', result.message);
+            console.warn('Échec synchronisation:', result.message);
           }
           
           // Si la session est expirée, marquer le ref pour éviter les appels futurs
           if (result.message?.includes('Session expirée')) {
             sessionExpiredRef.current = true;
-            // Ne pas afficher d'alerte - l'utilisateur peut continuer à utiliser l'app
-            // Le statut local est déjà mis à jour, la synchronisation se fera lors de la reconnexion
             return;
           }
           
-          // Pour les autres erreurs critiques, rollback le statut local
           if (result.message && !result.message.includes('réseau') && !result.message.includes('connexion')) {
-            // Rollback seulement si c'est une erreur critique (pas réseau)
             setOnlineStatus(!value);
             Alert.alert(
               "Erreur de synchronisation",
@@ -404,32 +302,24 @@ export default function Index() {
               [{ text: "OK" }]
             );
           }
-          // Pour les erreurs réseau, garder le statut local (l'utilisateur pourra réessayer plus tard)
         } else {
-          // Réinitialiser le ref de session expirée si la synchronisation réussit
           sessionExpiredRef.current = false;
         }
       }).catch((error) => {
-        // Libérer le verrou même en cas d'erreur
         isTogglingRef.current = false;
         
         if (__DEV__) {
-          console.error('❌ Erreur updateDriverStatus:', error);
+          console.error('Erreur updateDriverStatus:', error);
         }
-        // En cas d'erreur réseau, garder le statut local (l'utilisateur pourra réessayer plus tard)
       });
     } else {
-      // Si pas d'user id, libérer le verrou immédiatement
       isTogglingRef.current = false;
     }
   };
 
-  // Ref pour suivre si on a une erreur de session expirée (éviter les appels répétés)
   const sessionExpiredRef = useRef(false);
   
-  // 📍 Effet pour synchroniser automatiquement la position quand elle change
   useEffect(() => {
-    // Si la session est expirée, ne pas essayer de synchroniser
     if (sessionExpiredRef.current) {
       return;
     }
@@ -446,32 +336,26 @@ export default function Index() {
           if (!result.success && result.message?.includes('Session expirée')) {
             sessionExpiredRef.current = true;
             if (__DEV__) {
-              console.debug('⚠️ Session expirée - arrêt de la synchronisation automatique de la position');
+              console.debug('Session expirée - arrêt de la synchronisation automatique de la position');
             }
             return;
           }
           
-          // Si l'appel réussit, réinitialiser le ref (au cas où la session serait rétablie)
           if (result.success) {
             sessionExpiredRef.current = false;
           }
         } catch (error) {
           if (__DEV__) {
-            console.debug('⚠️ Erreur sync position:', error);
+            console.debug('Erreur sync position:', error);
           }
         }
       }
     };
 
-    // Débounce - attendre 5 secondes avant de sync (réduire la fréquence des appels)
     const timeoutId = setTimeout(syncLocation, 5000);
     return () => clearTimeout(timeoutId);
   }, [location, isOnline, user?.id]);
 
-  // distanceMeters removed — no longer used (polyline always points to pickup after accept)
-
-  // Debug: vérifier que currentOrder est bien reçu (seulement quand il change)
-  // Note: Ne pas logger location car il change trop souvent (géolocalisation en temps réel)
   useEffect(() => {
     if (currentOrder) {
       logger.debug('DEBUG currentOrder', 'driverIndex', {
@@ -481,17 +365,11 @@ export default function Index() {
         dropoff_resolved: resolveCoords(currentOrder.dropoff),
       });
     }
-    // Ne pas logger quand currentOrder est null pour éviter le spam
-  }, [currentOrder]); // Seulement dépendre de currentOrder, pas de location
-
-  // NOTE: removed automatic fitToCoordinates to avoid abrupt map zooming; map remains centered on driver's region.
-
-  // When the order completes (or is cleared), reset any temporary map animations/lines
+  }, [currentOrder]);
   useEffect(() => {
     const status = String(currentOrder?.status || '');
 
     if (!currentOrder || status === 'completed') {
-      // clear animated driver position and any running timeouts/intervals
       setAnimatedDriverPos(null);
 
       if (polyPulseIntervalRef.current) {
@@ -502,19 +380,15 @@ export default function Index() {
       animationTimeoutsRef.current.forEach(id => clearTimeout(id));
       animationTimeoutsRef.current = [];
 
-      // 🆕 Si une commande est terminée mais qu'il y a d'autres commandes actives, sélectionner la plus proche
       const remainingActiveOrders = useOrderStore.getState().activeOrders;
       if (remainingActiveOrders.length === 0) {
-        // Seulement recentrer si plus aucune commande active
         if (isOnline && location) {
           setTimeout(() => {
             centerOnDriver();
           }, 300);
         }
       } else {
-        // Il y a d'autres commandes actives, sélectionner automatiquement la plus proche selon la distance
         if (location) {
-          // Trier les commandes restantes par distance
           const sortedRemaining = [...remainingActiveOrders].sort((a, b) => {
             const distA = calculateDistanceToPickup(a);
             const distB = calculateDistanceToPickup(b);
@@ -526,7 +400,6 @@ export default function Index() {
             return distA - distB;
           });
           
-          // Priorité : commande en cours > plus proche selon distance
           const inProgressOrder = sortedRemaining.find(o => 
             o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
           );
@@ -535,7 +408,7 @@ export default function Index() {
           if (nextOrder) {
             setTimeout(() => {
               useOrderStore.getState().setSelectedOrder(nextOrder.id);
-              logger.info('📦 Commande terminée, sélection automatique de la prochaine', 'driver-index', {
+              logger.info('Commande terminée, sélection automatique de la prochaine', 'driver-index', {
                 nextOrderId: nextOrder.id,
                 distance: calculateDistanceToPickup(nextOrder),
                 remainingCount: remainingActiveOrders.length,
@@ -543,8 +416,7 @@ export default function Index() {
             }, 500);
           }
         } else {
-          // Pas de position disponible, utiliser la logique du store
-          logger.info('📦 Commande terminée, autres commandes actives disponibles', 'driver-index', {
+          logger.info('Commande terminée, autres commandes actives disponibles', 'driver-index', {
             remainingCount: remainingActiveOrders.length,
             nextSelectedId: useOrderStore.getState().selectedOrderId,
           });
@@ -553,69 +425,53 @@ export default function Index() {
     }
   }, [currentOrder?.status, currentOrder, location, isOnline, centerOnDriver, calculateDistanceToPickup]);
 
-  // Ouvrir automatiquement le bottom sheet des détails du destinataire quand le colis est récupéré
   useEffect(() => {
     const status = String(currentOrder?.status || '');
     const lastStatus = lastOrderStatusRef.current;
-    
-    // Détecter une transition vers "picked_up" ou "delivering" (pas juste si le statut est déjà à ce stade)
     const isTransitioningToPickedUp = 
       (status === 'picked_up' || status === 'delivering') && 
       lastStatus !== status && 
       lastStatus !== 'picked_up' && 
       lastStatus !== 'delivering';
     
-    // Mettre à jour la référence du statut
     lastOrderStatusRef.current = status;
-    
-    // Ouvrir automatiquement UNIQUEMENT lors d'une transition vers "picked_up" ou "delivering"
-    // ET seulement si l'utilisateur ne l'a pas fermé manuellement
     if (currentOrder && isTransitioningToPickedUp && !userClosedBottomSheetRef.current) {
-      // Réinitialiser le flag de fermeture manuelle
       userClosedBottomSheetRef.current = false;
-      // Attendre un peu pour que l'animation soit fluide
       setTimeout(() => {
         expandRecipientDetailsSheet();
       }, 500);
     } else if (status === 'completed' || !currentOrder) {
-      // Fermer automatiquement quand la commande est terminée ou annulée
       userClosedBottomSheetRef.current = false;
       collapseRecipientDetailsSheet();
     }
   }, [currentOrder?.status, currentOrder, expandRecipientDetailsSheet, collapseRecipientDetailsSheet]);
 
-  // Détecter quand l'utilisateur ferme manuellement le bottom sheet
   useEffect(() => {
     if (!recipientDetailsIsExpanded && currentOrder) {
       const status = String(currentOrder?.status || '');
-      // Si le statut est "picked_up" ou "delivering" et que le bottom sheet vient de se fermer,
-      // c'est probablement une fermeture manuelle
       if (status === 'picked_up' || status === 'delivering') {
         userClosedBottomSheetRef.current = true;
       }
     } else if (recipientDetailsIsExpanded) {
-      // Réinitialiser le flag quand le bottom sheet est ouvert
       userClosedBottomSheetRef.current = false;
     }
   }, [recipientDetailsIsExpanded, currentOrder]);
 
   useEffect(() => {
-    // Charger les stats depuis le serveur si utilisateur connecté (même si offline)
     const loadStats = async () => {
       if (!user?.id) {
         if (__DEV__) {
-          console.debug('⚠️ [Index] Pas de user.id pour charger les stats');
+          console.debug('[Index] Pas de user.id pour charger les stats');
         }
         return;
       }
 
       try {
-        // Charger les stats d'aujourd'hui
         const todayResult = await apiService.getTodayStats(user.id);
         
         if (todayResult.success && todayResult.data) {
           if (__DEV__) {
-            console.debug('✅ [Index] getTodayStats réussi:', {
+            console.debug('[Index] getTodayStats réussi:', {
               deliveries: todayResult.data.deliveries,
               earnings: todayResult.data.earnings
             });
@@ -627,16 +483,14 @@ export default function Index() {
           }));
         } else {
           if (__DEV__) {
-            console.warn('⚠️ [Index] getTodayStats échoué ou pas de données. Message:', todayResult?.message || 'Aucun message');
+            console.warn('[Index] getTodayStats échoué ou pas de données');
           }
         }
-        
-        // Charger les statistiques totales (pour les revenus totaux)
         const statsResult = await apiService.getDriverStatistics(user.id);
         
         if (statsResult.success && statsResult.data) {
           if (__DEV__) {
-            console.debug('✅ [Index] getDriverStatistics réussi:', {
+            console.debug('[Index] getDriverStatistics réussi:', {
               completedDeliveries: statsResult.data.completedDeliveries,
               totalEarnings: statsResult.data.totalEarnings
             });
@@ -647,28 +501,25 @@ export default function Index() {
           }));
         } else {
           if (__DEV__) {
-            console.warn('⚠️ [Index] getDriverStatistics échoué ou pas de données. Message:', statsResult?.message || 'Aucun message');
+            console.warn('[Index] getDriverStatistics échoué ou pas de données');
           }
         }
       } catch (err) {
         if (__DEV__) {
-          console.error('❌ [Index] Erreur chargement stats:', err);
+          console.error('[Index] Erreur chargement stats:', err);
         }
       }
     };
 
     loadStats();
-    
-    // Recharger les stats toutes les 30 secondes quand online, sinon toutes les 60 secondes
     const interval = setInterval(loadStats, isOnline ? 30000 : 60000);
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [user?.id, isOnline]); // Retirer updateTodayStats des dépendances pour éviter la boucle infinie
+  }, [user?.id, isOnline, updateTodayStats]);
 
   return (
     <View style={styles.container}>
-      {/* MAP */}
       <MapView
         style={StyleSheet.absoluteFillObject}
         ref={mapRef}
@@ -688,7 +539,6 @@ export default function Index() {
         showsMyLocationButton={false}
         followsUserLocation={false}
       >
-        {/* Marqueur du chauffeur quand en ligne (use animated pos if animating) */}
         {isOnline && (animatedDriverPos || location) && (
           <Marker
             coordinate={{
@@ -704,7 +554,6 @@ export default function Index() {
           </Marker>
         )}
 
-        {/* Polyline pour la commande active avec route réelle depuis Google Directions */}
         {isOnline && location && currentOrder && routeToDestination && routeToDestination.coordinates.length > 0 && (
           <Polyline
             coordinates={routeToDestination.coordinates}
@@ -719,7 +568,6 @@ export default function Index() {
           />
         )}
 
-        {/* Fallback: ligne droite si pas de route Google disponible */}
         {isOnline && location && currentOrder && (!routeToDestination || routeToDestination.coordinates.length === 0) && !isRouteLoading && (() => {
           const pickupCoord = resolveCoords(currentOrder.pickup);
           const dropoffCoord = resolveCoords(currentOrder.dropoff);
@@ -758,7 +606,6 @@ export default function Index() {
           return null;
         })()}
 
-        {/* 🆕 Markers pour TOUTES les commandes actives ET en attente */}
         {[...activeOrders, ...pendingOrders].map((order) => {
           const pickupCoord = resolveCoords(order.pickup);
           const dropoffCoord = resolveCoords(order.dropoff);
@@ -769,7 +616,6 @@ export default function Index() {
 
           return (
             <React.Fragment key={order.id}>
-              {/* Marqueur pickup pour chaque commande */}
               {pickupCoord && (
                 <Marker
                   coordinate={pickupCoord}
@@ -780,9 +626,8 @@ export default function Index() {
                       : order.pickup?.address
                   }
                   onPress={() => {
-                    // Sélectionner cette commande quand on clique sur le marqueur
                     setSelectedOrder(order.id);
-                    logger.info('📍 Commande sélectionnée depuis marqueur pickup', 'driver-index', { orderId: order.id });
+                    logger.info('Commande sélectionnée depuis marqueur pickup', 'driver-index', { orderId: order.id });
                   }}
                 >
                   <View style={{
@@ -807,16 +652,14 @@ export default function Index() {
                 </Marker>
               )}
 
-              {/* Marqueur dropoff pour chaque commande active (pas pour pending) */}
               {dropoffCoord && !isPending && (
                 <Marker
                   coordinate={dropoffCoord}
                   title={`Livrer #${order.id.slice(0, 8)}`}
                   description={order.dropoff?.address}
                   onPress={() => {
-                    // Sélectionner cette commande quand on clique sur le marqueur
                     setSelectedOrder(order.id);
-                    logger.info('📍 Commande sélectionnée depuis marqueur dropoff', 'driver-index', { orderId: order.id });
+                    logger.info('Commande sélectionnée depuis marqueur dropoff', 'driver-index', { orderId: order.id });
                   }}
                 >
                   <View style={{
@@ -843,21 +686,18 @@ export default function Index() {
         })}
       </MapView>
 
-      {/* SWITCH ONLINE/OFFLINE */}
       <StatusToggle 
         isOnline={isOnline} 
         onToggle={handleToggleOnline}
         hasLocationError={!!error}
       />
 
-      {/* STATS CARDS */}
       <StatsCards 
         todayDeliveries={driverStats.todayDeliveries || todayStats.deliveries}
         totalRevenue={driverStats.totalRevenue || profile?.total_earnings || 0}
         isOnline={isOnline}
       />
 
-      {/* 🆕 Indicateur visuel des commandes multiples */}
       {activeOrders.length > 1 && !ordersListIsExpanded && (
         <View style={styles.multipleOrdersIndicator}>
           <TouchableOpacity 
@@ -874,7 +714,6 @@ export default function Index() {
         </View>
       )}
 
-      {/* FLOATING MENU */}
       <View style={styles.floatingMenu}>
         <TouchableOpacity 
           style={[styles.menuButton, !ordersListIsExpanded && styles.activeButton]}
@@ -892,7 +731,6 @@ export default function Index() {
           onPress={toggleOrdersListSheet}
         >
           <Ionicons name="list" size={22} color={ordersListIsExpanded ? "#fff" : "#8B5CF6"} />
-          {/* Badge pour afficher le nombre de commandes actives */}
           {activeOrders.length > 0 && (
             <View style={styles.menuBadge}>
               <Text style={styles.menuBadgeText}>{activeOrders.length}</Text>
@@ -901,10 +739,8 @@ export default function Index() {
         </TouchableOpacity>
       </View>
 
-      {/* ACTIONS RAPIDES POUR LA COMMANDE (driver) */}
       {currentOrder && (
         <View style={styles.orderActionsContainer} pointerEvents="box-none">
-          {/* Bouton pour voir les détails du destinataire */}
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: '#6366F1', flexDirection: 'row', alignItems: 'center', gap: 6 }]}
             onPress={expandRecipientDetailsSheet}
@@ -926,13 +762,10 @@ export default function Index() {
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: '#F59E0B' }]}
               onPress={async () => {
-                // send status to server then recalculate route to dropoff
                 const dropoffCoord = resolveCoords(currentOrder.dropoff);
                 await orderSocketService.updateDeliveryStatus(currentOrder.id, 'picked_up', location);
                 if (location && dropoffCoord) {
-                  // Reset animated position to real location
                   setAnimatedDriverPos(null);
-                  // Recalculate route to dropoff (will be triggered automatically by useEffect)
                   setTimeout(() => {
                     refetchRoute();
                     fitToRoute();
@@ -955,7 +788,6 @@ export default function Index() {
         </View>
       )}
 
-      {/* 📦 POPUP COMMANDE */}
       <OrderRequestPopup
         order={pendingOrder}
         visible={!!pendingOrder}
@@ -964,7 +796,6 @@ export default function Index() {
         autoDeclineTimer={30}
       />
 
-      {/* 📋 BOTTOM SHEET DÉTAILS DESTINATAIRE */}
       {currentOrder && recipientDetailsIsExpanded && (
         <RecipientDetailsSheet
           animatedHeight={recipientDetailsAnimatedHeight}
@@ -975,7 +806,6 @@ export default function Index() {
         />
       )}
 
-      {/* 📦 BOTTOM SHEET LISTE DES COMMANDES ACTIVES */}
       {ordersListIsExpanded && (
         <OrdersListBottomSheet
           animatedHeight={ordersListAnimatedHeight}
@@ -983,9 +813,7 @@ export default function Index() {
           isExpanded={ordersListIsExpanded}
           onToggle={toggleOrdersListSheet}
           onOrderSelect={(orderId) => {
-            // La sélection est gérée dans OrdersListBottomSheet
-            // Ici on peut ajouter une logique supplémentaire si nécessaire
-            logger.info('📦 Commande sélectionnée', 'driver-index', { orderId });
+            logger.info('Commande sélectionnée', 'driver-index', { orderId });
           }}
         />
       )}
@@ -1106,7 +934,6 @@ const styles = StyleSheet.create({
   },
 });
 
-/* 🗺️ STYLE GRIS PERSONNALISÉ POUR LA MAP */
 const grayMapStyle = [
   {
     elementType: "geometry",

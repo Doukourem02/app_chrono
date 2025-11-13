@@ -1,11 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
@@ -16,7 +10,6 @@ export default function SuccessScreen() {
   const { isNewUser, clearTempData } = useTempDriverStore();
 
   useEffect(() => {
-    // Animation d'entrée
     Animated.sequence([
       Animated.timing(scaleAnim, {
         toValue: 1,
@@ -32,18 +25,13 @@ export default function SuccessScreen() {
   });
 
   const handleContinue = () => {
-    // Nettoyer les données temporaires
     clearTempData();
-    
-    // L'utilisateur driver a déjà été défini dans l'écran de vérification
-    // Naviguer vers le dashboard driver
     router.replace('/(tabs)' as any);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
-        {/* Animation de succès */}
         <Animated.View 
           style={[
             styles.successIconContainer,
@@ -59,7 +47,6 @@ export default function SuccessScreen() {
           </View>
         </Animated.View>
 
-        {/* Texte de succès dynamique */}
         <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
           <Text style={styles.title}>
             {isNewUser ? "Bienvenue Chauffeur!" : "Connexion réussie!"}
@@ -72,7 +59,6 @@ export default function SuccessScreen() {
           </Text>
         </Animated.View>
 
-        {/* Bouton Continue */}
         <Animated.View style={[styles.buttonContainer, { opacity: fadeAnim }]}>
           <TouchableOpacity 
             style={styles.continueButton}

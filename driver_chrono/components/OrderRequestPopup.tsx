@@ -1,14 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Dimensions,
-  Image,
-  StatusBar,
-} from 'react-native';
+import {View,Text,TouchableOpacity,StyleSheet,Animated,Dimensions,Image,StatusBar,} from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 interface OrderRequest {
@@ -191,10 +182,10 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
 
   const getVehicleIcon = (method: string) => {
     switch (method) {
-      case 'moto': return '🏍️';
-      case 'vehicule': return '🚗';
-      case 'cargo': return '🚛';
-      default: return '🚗';
+      case 'moto': return require('../assets/images/motoo.png');
+      case 'vehicule': return require('../assets/images/carrss.png');
+      case 'cargo': return require('../assets/images/ccargo.png');
+      default: return require('../assets/images/carrss.png');
     }
   };
 
@@ -291,7 +282,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
           {/* Info de livraison */}
           <View style={styles.deliveryInfo}>
             <View style={styles.methodContainer}>
-              <Text style={styles.vehicleIcon}>{getVehicleIcon(order.deliveryMethod)}</Text>
+              <Image source={getVehicleIcon(order.deliveryMethod)} style={styles.vehicleIcon} />
               <Text style={styles.methodText}>{getMethodLabel(order.deliveryMethod)}</Text>
             </View>
             
@@ -492,8 +483,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   vehicleIcon: {
-    fontSize: 24,
+    width: 24,
+    height: 24,
     marginRight: 8,
+    resizeMode: 'contain',
   },
   methodText: {
     fontSize: 16,

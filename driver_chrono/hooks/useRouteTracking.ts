@@ -13,10 +13,6 @@ interface RouteResult {
   distance: number; // en mètres
 }
 
-/**
- * Hook pour récupérer et tracker une route en temps réel
- * Inspiré de Yango pour une expérience fluide
- */
 export const useRouteTracking = (
   currentLocation: Coordinates | null,
   destination: Coordinates | null,
@@ -27,7 +23,6 @@ export const useRouteTracking = (
   const [error, setError] = useState<string | null>(null);
   const GOOGLE_API_KEY = config.googleApiKey;
 
-  // Décoder polyline Google
   const decodePolyline = useCallback((encoded: string): Coordinates[] => {
     const points: Coordinates[] = [];
     let index = 0;
@@ -70,7 +65,6 @@ export const useRouteTracking = (
     return points;
   }, []);
 
-  // Récupérer la route depuis Google Directions API
   const fetchRoute = useCallback(async (origin: Coordinates, dest: Coordinates): Promise<RouteResult | null> => {
     if (!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('<')) {
       logger.warn('Google API key not configured', 'useRouteTracking');
@@ -94,17 +88,13 @@ export const useRouteTracking = (
         const route = data.routes[0];
         const leg = route.legs[0];
 
-        // Décoder la polyline
         const coordinates = decodePolyline(route.overview_polyline.points);
-
-        // S'assurer que les points de départ et d'arrivée sont inclus
         const startPoint = { latitude: origin.latitude, longitude: origin.longitude };
         const endPoint = { latitude: dest.latitude, longitude: dest.longitude };
 
-        // Vérifier si le premier point est proche de l'origine
         const isClose = (a: Coordinates, b: Coordinates, threshold = 0.001) => {
           return Math.abs(a.latitude - b.latitude) < threshold &&
-                 Math.abs(a.longitude - b.longitude) < threshold;
+                Math.abs(a.longitude - b.longitude) < threshold;
         };
 
         if (coordinates.length > 0 && !isClose(coordinates[0], startPoint)) {
@@ -130,7 +120,6 @@ export const useRouteTracking = (
     }
   }, [GOOGLE_API_KEY, decodePolyline]);
 
-  // Recalculer la route quand la position ou la destination change
   useEffect(() => {
     if (!enabled || !currentLocation || !destination) {
       setRoute(null);
@@ -156,12 +145,10 @@ export const useRouteTracking = (
       }
     };
 
-    // Debounce pour éviter trop de requêtes
-    const timeoutId = setTimeout(calculateRoute, 500);
+    const timeoutId = setTimeout(calculateRoute, 500); // Debounce pour éviter trop de requêtes
     return () => clearTimeout(timeoutId);
   }, [currentLocation, destination, enabled, fetchRoute]);
 
-  // Recalculer la route périodiquement (toutes les 30 secondes) pour prendre en compte le trafic
   useEffect(() => {
     if (!enabled || !currentLocation || !destination || !route) return;
 
@@ -174,7 +161,7 @@ export const useRouteTracking = (
       } catch (err) {
         logger.warn('Periodic route update failed', 'useRouteTracking', err);
       }
-    }, 30000); // 30 secondes
+    }, 30000); // Recalcul périodique pour prendre en compte le trafic
 
     return () => clearInterval(interval);
   }, [currentLocation, destination, enabled, route, fetchRoute]);

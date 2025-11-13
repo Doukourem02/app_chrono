@@ -1,9 +1,6 @@
 import Joi from 'joi';
 import { Request, Response, NextFunction } from 'express';
 
-/**
- * Validation pour la création d'une commande
- */
 export const validateCreateOrder = (req: Request, res: Response, next: NextFunction): void => {
   const schema = Joi.object({
     pickup: Joi.object({
@@ -17,7 +14,6 @@ export const validateCreateOrder = (req: Request, res: Response, next: NextFunct
           .max(90)
           .required()
           .custom((value, helpers) => {
-            // Vérifier que ce n'est pas NaN ou Infinity
             if (!Number.isFinite(value)) {
               return helpers.error('number.base');
             }
@@ -34,7 +30,6 @@ export const validateCreateOrder = (req: Request, res: Response, next: NextFunct
           .max(180)
           .required()
           .custom((value, helpers) => {
-            // Vérifier que ce n'est pas NaN ou Infinity
             if (!Number.isFinite(value)) {
               return helpers.error('number.base');
             }
@@ -59,7 +54,6 @@ export const validateCreateOrder = (req: Request, res: Response, next: NextFunct
           .max(90)
           .required()
           .custom((value, helpers) => {
-            // Vérifier que ce n'est pas NaN ou Infinity
             if (!Number.isFinite(value)) {
               return helpers.error('number.base');
             }
@@ -76,7 +70,6 @@ export const validateCreateOrder = (req: Request, res: Response, next: NextFunct
           .max(180)
           .required()
           .custom((value, helpers) => {
-            // Vérifier que ce n'est pas NaN ou Infinity
             if (!Number.isFinite(value)) {
               return helpers.error('number.base');
             }
@@ -114,9 +107,6 @@ export const validateCreateOrder = (req: Request, res: Response, next: NextFunct
   next();
 };
 
-/**
- * Validation pour l'inscription
- */
 export const validateRegister = (req: Request, res: Response, next: NextFunction): void => {
   const schema = Joi.object({
     email: Joi.string().email().required().messages({
@@ -148,9 +138,6 @@ export const validateRegister = (req: Request, res: Response, next: NextFunction
   next();
 };
 
-/**
- * Validation pour la connexion
- */
 export const validateLogin = (req: Request, res: Response, next: NextFunction): void => {
   const schema = Joi.object({
     email: Joi.string().email().required().messages({
@@ -174,9 +161,6 @@ export const validateLogin = (req: Request, res: Response, next: NextFunction): 
   next();
 };
 
-/**
- * Validation pour l'envoi d'OTP
- */
 const phoneSchema = Joi.string()
   .trim()
   .pattern(/^\+?[0-9][0-9\s().-]{6,}$/)
@@ -211,9 +195,6 @@ export const validateSendOTP = (req: Request, res: Response, next: NextFunction)
   next();
 };
 
-/**
- * Validation pour la vérification d'OTP
- */
 export const validateVerifyOTP = (req: Request, res: Response, next: NextFunction): void => {
   const schema = Joi.object({
     email: Joi.string().email().required().messages({
@@ -244,9 +225,6 @@ export const validateVerifyOTP = (req: Request, res: Response, next: NextFunctio
   next();
 };
 
-/**
- * Validation pour la mise à jour du statut du chauffeur
- */
 export const validateDriverStatus = (req: Request, res: Response, next: NextFunction): void => {
   const schema = Joi.object({
     is_online: Joi.boolean().optional(),
@@ -275,9 +253,6 @@ export const validateDriverStatus = (req: Request, res: Response, next: NextFunc
   next();
 };
 
-/**
- * Validation pour la mise à jour du statut de livraison
- */
 export const validateDeliveryStatus = (req: Request, res: Response, next: NextFunction): void => {
   const schema = Joi.object({
     status: Joi.string().valid('accepted', 'enroute', 'picked_up', 'completed', 'cancelled').required().messages({
@@ -302,9 +277,6 @@ export const validateDeliveryStatus = (req: Request, res: Response, next: NextFu
   next();
 };
 
-/**
- * Validation pour le refresh token
- */
 export const validateRefreshToken = (req: Request, res: Response, next: NextFunction): void => {
   const schema = Joi.object({
     refreshToken: Joi.string().required().messages({
@@ -323,4 +295,3 @@ export const validateRefreshToken = (req: Request, res: Response, next: NextFunc
   }
   next();
 };
-

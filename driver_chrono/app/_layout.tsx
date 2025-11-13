@@ -4,7 +4,7 @@ import { AppState } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 import { initSentry } from "../utils/sentry";
 
-// 🔍 SENTRY: Initialiser le monitoring d'erreurs
+//  SENTRY: Initialiser le monitoring d'erreurs
 initSentry();
 
 export default function RootLayout() {

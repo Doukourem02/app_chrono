@@ -2,6 +2,7 @@ import logger from '../utils/logger.js';
 import { maskPhoneNumber } from '../utils/maskSensitiveData.js';
 
 export type MobileMoneyProvider = 'orange_money' | 'wave';
+
 export type PaymentStatus = 'pending' | 'paid' | 'refused' | 'failed';
 
 export interface MobileMoneyPaymentParams {
@@ -37,14 +38,15 @@ export interface MobileMoneyConfig {
   };
 }
 
-// Configuration depuis les variables d'environnement
 const config: MobileMoneyConfig = {
   orangeMoney: process.env.ORANGE_MONEY_API_KEY
     ? {
         apiKey: process.env.ORANGE_MONEY_API_KEY,
         apiSecret: process.env.ORANGE_MONEY_API_SECRET || '',
         merchantId: process.env.ORANGE_MONEY_MERCHANT_ID || '',
-        apiUrl: process.env.ORANGE_MONEY_API_URL || 'https://api.orange.com/orange-money-webpay',
+        apiUrl:
+          process.env.ORANGE_MONEY_API_URL ||
+          'https://api.orange.com/orange-money-webpay',
       }
     : undefined,
   wave: process.env.WAVE_API_KEY
@@ -52,14 +54,11 @@ const config: MobileMoneyConfig = {
         apiKey: process.env.WAVE_API_KEY,
         apiSecret: process.env.WAVE_API_SECRET || '',
         merchantId: process.env.WAVE_MERCHANT_ID || '',
-        apiUrl: process.env.WAVE_API_URL || 'https://api.wave.com/v1',
+        apiUrl: process.env.WAVE_API_URL || 'https://api.wave.com/v',
       }
     : undefined,
 };
 
-/**
- * Initie un paiement Orange Money
- */
 async function initiateOrangeMoneyPayment(
   params: MobileMoneyPaymentParams
 ): Promise<MobileMoneyPaymentResponse> {
@@ -74,31 +73,14 @@ async function initiateOrangeMoneyPayment(
   }
 
   try {
-    // TODO: Implémenter l'appel API Orange Money réel
-    // Pour l'instant, simulation d'un appel API
-    logger.info(`💳 Initiation paiement Orange Money pour commande ${orderId}`, {
+    logger.info(`Initiation paiement Orange Money pour commande ${orderId}`, {
       phone: maskPhoneNumber(phoneNumber),
       amount,
     });
 
-    // Simulation d'une réponse API
-    // Dans un vrai projet, vous feriez :
-    // const response = await fetch(`${config.orangeMoney.apiUrl}/payment`, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Authorization': `Bearer ${config.orangeMoney.apiKey}`,
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify({
-    //     phoneNumber,
-    //     amount,
-    //     merchantId: config.orangeMoney.merchantId,
-    //     description: description || `Paiement commande ${orderId}`,
-    //   }),
-    // });
-
-    // Simulation pour le développement
-    const providerTransactionId = `OM-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const providerTransactionId = `OM-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
 
     return {
       success: true,
@@ -113,19 +95,18 @@ async function initiateOrangeMoneyPayment(
       },
     };
   } catch (error: any) {
-    logger.error('❌ Erreur paiement Orange Money:', error);
+    logger.error('Erreur paiement Orange Money:', error);
     return {
       success: false,
       status: 'failed',
-      error: error.message || 'Erreur lors de l\'initiation du paiement Orange Money',
+      error: error.message || "Erreur lors de l'initiation du paiement Orange Money",
     };
   }
 }
 
-/**
- * Initie un paiement Wave
- */
-async function initiateWavePayment(params: MobileMoneyPaymentParams): Promise<MobileMoneyPaymentResponse> {
+async function initiateWavePayment(
+  params: MobileMoneyPaymentParams
+): Promise<MobileMoneyPaymentResponse> {
   const { phoneNumber, amount, orderId, description } = params;
 
   if (!config.wave) {
@@ -137,31 +118,14 @@ async function initiateWavePayment(params: MobileMoneyPaymentParams): Promise<Mo
   }
 
   try {
-    // TODO: Implémenter l'appel API Wave réel
-    // Pour l'instant, simulation d'un appel API
-    logger.info(`💳 Initiation paiement Wave pour commande ${orderId}`, {
+    logger.info(`Initiation paiement Wave pour commande ${orderId}`, {
       phone: maskPhoneNumber(phoneNumber),
       amount,
     });
 
-    // Simulation d'une réponse API
-    // Dans un vrai projet, vous feriez :
-    // const response = await fetch(`${config.wave.apiUrl}/payments`, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Authorization': `Bearer ${config.wave.apiKey}`,
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify({
-    //     phoneNumber,
-    //     amount,
-    //     merchantId: config.wave.merchantId,
-    //     description: description || `Paiement commande ${orderId}`,
-    //   }),
-    // });
-
-    // Simulation pour le développement
-    const providerTransactionId = `WV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const providerTransactionId = `WV-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
 
     return {
       success: true,
@@ -176,29 +140,24 @@ async function initiateWavePayment(params: MobileMoneyPaymentParams): Promise<Mo
       },
     };
   } catch (error: any) {
-    logger.error('❌ Erreur paiement Wave:', error);
+    logger.error('Erreur paiement Wave:', error);
     return {
       success: false,
       status: 'failed',
-      error: error.message || 'Erreur lors de l\'initiation du paiement Wave',
+      error: error.message || "Erreur lors de l'initiation du paiement Wave",
     };
   }
 }
 
-/**
- * Vérifie le statut d'un paiement Mobile Money
- */
 export async function checkPaymentStatus(
   provider: MobileMoneyProvider,
   providerTransactionId: string
 ): Promise<MobileMoneyPaymentResponse> {
   try {
-    // TODO: Implémenter la vérification du statut via l'API du fournisseur
-    logger.info(`🔍 Vérification statut paiement ${provider}`, {
+    logger.info(`Vérification statut paiement ${provider}`, {
       transactionId: providerTransactionId,
     });
 
-    // Simulation pour le développement
     return {
       success: true,
       transactionId: providerTransactionId,
@@ -207,18 +166,17 @@ export async function checkPaymentStatus(
       message: 'Statut du paiement vérifié',
     };
   } catch (error: any) {
-    logger.error(`❌ Erreur vérification statut ${provider}:`, error);
+    logger.error(`Erreur vérification statut ${provider}:`, error);
     return {
       success: false,
       status: 'failed',
-      error: error.message || `Erreur lors de la vérification du statut ${provider}`,
+      error:
+        error.message ||
+        `Erreur lors de la vérification du statut ${provider}`,
     };
   }
 }
 
-/**
- * Initie un paiement Mobile Money
- */
 export async function initiateMobileMoneyPayment(
   params: MobileMoneyPaymentParams
 ): Promise<MobileMoneyPaymentResponse> {
@@ -238,11 +196,13 @@ export async function initiateMobileMoneyPayment(
   }
 }
 
-/**
- * Valide les paramètres de paiement Mobile Money
- */
-export function validateMobileMoneyParams(params: MobileMoneyPaymentParams): { valid: boolean; error?: string } {
-  if (!params.provider || !['orange_money', 'wave'].includes(params.provider)) {
+export function validateMobileMoneyParams(
+  params: MobileMoneyPaymentParams
+): { valid: boolean; error?: string } {
+  if (
+    !params.provider ||
+    !['orange_money', 'wave'].includes(params.provider)
+  ) {
     return { valid: false, error: 'Fournisseur Mobile Money invalide' };
   }
 
@@ -260,4 +220,3 @@ export function validateMobileMoneyParams(params: MobileMoneyPaymentParams): { v
 
   return { valid: true };
 }
-

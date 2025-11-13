@@ -1,8 +1,3 @@
-/**
- * Composant pour afficher la liste des commandes actives pour le livreur
- * Permet de gérer plusieurs commandes simultanées avec priorités
- */
-
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,19 +11,19 @@ interface ActiveOrdersListProps {
 const getStatusColor = (status: string): string => {
   switch (status) {
     case 'pending':
-      return '#F59E0B'; // Orange
+      return '#F59E0B'; 
     case 'accepted':
-      return '#3B82F6'; // Bleu
+      return '#3B82F6'; 
     case 'in_progress':
     case 'enroute':
-      return '#8B5CF6'; // Violet
+      return '#8B5CF6'; 
     case 'picked_up':
-      return '#10B981'; // Vert
+      return '#10B981'; 
     case 'completed':
-      return '#6B7280'; // Gris
+      return '#6B7280'; 
     case 'cancelled':
     case 'declined':
-      return '#EF4444'; // Rouge
+      return '#EF4444'; 
     default:
       return '#6B7280';
   }

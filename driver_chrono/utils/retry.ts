@@ -39,7 +39,7 @@ function calculateDelay(attempt: number, options: Required<Omit<RetryOptions, 's
 /**
  * Détermine si une erreur est retryable
  */
-function isRetryableError(error: any, response?: Response, options: RetryOptions): boolean {
+function isRetryableError(error: any, response: Response | undefined, options: RetryOptions): boolean {
   // Erreur réseau (timeout, connexion refusée, etc.)
   if (error instanceof TypeError && error.message.includes('Network request failed')) {
     return true;

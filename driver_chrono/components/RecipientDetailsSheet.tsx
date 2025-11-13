@@ -1,17 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Animated,
-  Dimensions,
-  PanResponder,
-  Linking,
-  Alert,
-} from 'react-native';
+import {StyleSheet,View,Text,TouchableOpacity,ScrollView,Image,Animated,Dimensions,PanResponder,Linking,Alert,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { OrderRequest } from '../store/useOrderStore';
 import * as Haptics from 'expo-haptics';
@@ -42,14 +30,10 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
   const startHeightRef = useRef<number>(RECIPIENT_DETAILS_MAX_HEIGHT);
   const currentAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // Récupérer le numéro de téléphone du destinataire
   const recipientPhone = order?.recipient?.phone || order?.dropoff?.details?.phone || null;
-  
-  // Récupérer les détails de l'adresse
   const dropoffDetails = order?.dropoff?.details || {};
   const packageImages = order?.packageImages || order?.dropoff?.details?.photos || [];
 
-  // Animation d'apparition
   useEffect(() => {
     if (isExpanded) {
       Animated.timing(fadeAnim, {
@@ -62,16 +46,13 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
     }
   }, [isExpanded, fadeAnim]);
 
-  // PanResponder amélioré qui fonctionne mieux
   const customPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_evt, gestureState) => {
-        // Utiliser moveX et moveY qui sont plus fiables
         const { moveX, moveY } = gestureState;
         const { x, y, width, height } = dragHandleLayout;
         
-        // Zone élargie autour du drag handle (80px verticalement, plus large horizontalement)
         const handleZone = {
           x: x - 50,
           y: y - 40,
@@ -85,41 +66,32 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
           moveY >= handleZone.y &&
           moveY <= handleZone.y + handleZone.height;
         
-        // Ne prendre le contrôle que si c'est un geste vertical vers le bas dans la zone du drag handle
         const isVerticalSwipeDown = Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && gestureState.dy > 5;
         return isInHandleZone && isVerticalSwipeDown;
       },
       onPanResponderGrant: () => {
-        // 🛡️ Arrêter toute animation en cours avant de commencer le drag
         if (currentAnimationRef.current) {
           currentAnimationRef.current.stop();
           currentAnimationRef.current = null;
         }
-        // Stocker la valeur de départ de manière sécurisée
         animatedHeight.stopAnimation((currentValue) => {
           startHeightRef.current = currentValue || RECIPIENT_DETAILS_MAX_HEIGHT;
         });
       },
       onPanResponderMove: (_event, gestureState) => {
         if (!isExpanded) return;
-        // 🛡️ S'assurer qu'aucune animation n'est en cours avant de modifier la valeur
         if (currentAnimationRef.current) {
           currentAnimationRef.current.stop();
           currentAnimationRef.current = null;
         }
         const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-        // Calculer la nouvelle hauteur basée sur la valeur de départ stockée
         const newHeight = clamp(startHeightRef.current - gestureState.dy, RECIPIENT_DETAILS_MIN_HEIGHT, RECIPIENT_DETAILS_MAX_HEIGHT);
-        // Utiliser setValue maintenant que l'animation est arrêtée
         animatedHeight.setValue(newHeight);
       },
       onPanResponderRelease: (_event, gestureState) => {
-        // Seuil plus bas pour faciliter la fermeture
         if (gestureState.vy > 0.5 || gestureState.dy > 50) {
-          // Swipe down -> collapse
           onToggle();
         } else {
-          // Retour à la hauteur maximale
           const animation = Animated.spring(animatedHeight, {
             toValue: RECIPIENT_DETAILS_MAX_HEIGHT,
             useNativeDriver: false,
@@ -135,10 +107,8 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
     })
   ).current;
 
-  // S'assurer que le bottom sheet s'ouvre à la hauteur maximale
   useEffect(() => {
     if (isExpanded) {
-      // 🛡️ Arrêter toute animation en cours avant de démarrer une nouvelle
       if (currentAnimationRef.current) {
         currentAnimationRef.current.stop();
         currentAnimationRef.current = null;
@@ -156,7 +126,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
     }
   }, [isExpanded, animatedHeight]);
 
-  // Ouvrir l'appel téléphonique
   const handleCall = () => {
     if (!recipientPhone) {
       Alert.alert('Information', 'Numéro de téléphone non disponible');
@@ -170,7 +139,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
     });
   };
 
-  // Ouvrir la navigation vers l'adresse
   const handleNavigate = () => {
     if (!order?.dropoff?.coordinates) {
       Alert.alert('Information', 'Coordonnées non disponibles');
@@ -191,7 +159,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
     <Animated.View
       style={[styles.bottomSheet, { height: animatedHeight }]}
     >
-      {/* Indicateur de glissement */}
       <View
         ref={dragHandleRef}
         style={styles.dragIndicatorContainer}
@@ -214,7 +181,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
           nestedScrollEnabled={true}
           bounces={false}
         >
-          {/* Header amélioré avec bouton de fermeture */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.headerIconContainer}>
@@ -237,7 +203,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Adresse de livraison améliorée */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionIconContainer}>
@@ -252,7 +217,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
               <Text style={styles.addressText}>{order.dropoff.address}</Text>
             </View>
 
-            {/* Bouton navigation amélioré */}
             <TouchableOpacity 
               style={styles.actionButton} 
               onPress={handleNavigate}
@@ -270,7 +234,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Téléphone du destinataire amélioré */}
           {recipientPhone && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -286,7 +249,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
                 <Text style={styles.phoneText}>{recipientPhone}</Text>
               </View>
 
-              {/* Bouton appeler amélioré */}
               <TouchableOpacity 
                 style={[styles.actionButton, styles.callButton]} 
                 onPress={handleCall}
@@ -305,7 +267,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
             </View>
           )}
 
-          {/* Détails de l'adresse améliorés */}
           {(dropoffDetails.entrance || dropoffDetails.apartment || dropoffDetails.floor || dropoffDetails.intercom) && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -355,7 +316,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
             </View>
           )}
 
-          {/* Photos du colis améliorées */}
           {packageImages.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -382,7 +342,6 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
             </View>
           )}
 
-          {/* Message si aucune information supplémentaire */}
           {!recipientPhone && packageImages.length === 0 && !dropoffDetails.entrance && !dropoffDetails.apartment && !dropoffDetails.floor && !dropoffDetails.intercom && (
             <View style={styles.emptyState}>
               <Ionicons name="information-circle-outline" size={48} color="#9CA3AF" />

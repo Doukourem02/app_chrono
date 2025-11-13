@@ -35,7 +35,7 @@ export const config = {
 
 // Validation des variables critiques
 if (!config.googleApiKey) {
-  console.warn('⚠️ Google API Key not configured. Route features may not work properly.');
+  console.warn(' Google API Key not configured. Route features may not work properly.');
 }
 
 export default config;

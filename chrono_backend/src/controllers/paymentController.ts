@@ -1,8 +1,3 @@
-/**
- * Controller pour la gestion des paiements
- * Gère les transactions, factures, méthodes de paiement et litiges
- */
-
 import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
@@ -32,14 +27,12 @@ interface InitiatePaymentBody {
   orderId: string;
   paymentMethodId?: string;
   paymentMethodType: 'orange_money' | 'wave' | 'cash' | 'deferred';
-  phoneNumber?: string; // Pour Mobile Money
-  // Paiement partiel
+  phoneNumber?: string;
   isPartial?: boolean;
-  partialAmount?: number; // Montant payé par le client (si paiement partiel)
-  // Paiement par destinataire
+  partialAmount?: number;
   payerType?: 'client' | 'recipient';
-  recipientUserId?: string; // Si le destinataire est enregistré
-  recipientPhone?: string; // Téléphone du destinataire
+  recipientUserId?: string;
+  recipientPhone?: string;
 }
 
 interface UpdateTransactionStatusBody {
@@ -55,9 +48,6 @@ interface CreateDisputeBody {
   attachments?: any;
 }
 
-/**
- * Créer une méthode de paiement
- */
 export const createPaymentMethod = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -69,9 +59,11 @@ export const createPaymentMethod = async (req: RequestWithUser, res: Response): 
     const { methodType, providerAccount, providerName, isDefault = false, metadata } =
       req.body as CreatePaymentMethodBody;
 
-    // Validation
     if (!['orange_money', 'wave', 'cash', 'deferred'].includes(methodType)) {
-      res.status(400).json({ success: false, message: 'Type de méthode de paiement invalide' });
+      res.status(400).json({
+        success: false,
+        message: 'Type de méthode de paiement invalide'
+      });
       return;
     }
 
@@ -83,7 +75,6 @@ export const createPaymentMethod = async (req: RequestWithUser, res: Response): 
       return;
     }
 
-    // Si c'est la méthode par défaut, désactiver les autres
     if (isDefault) {
       await (pool as any).query(
         'UPDATE payment_methods SET is_default = false WHERE user_id = $1',
@@ -91,15 +82,14 @@ export const createPaymentMethod = async (req: RequestWithUser, res: Response): 
       );
     }
 
-    // Créer la méthode de paiement
     const result = await (pool as any).query(
-      `INSERT INTO payment_methods (user_id, method_type, provider_account, provider_name, is_default, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO payment_methods (user_id, method_type, provider_account, provider_name, is_default, metadata) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
       [userId, methodType, providerAccount || null, providerName || null, isDefault, metadata || null]
     );
 
-    logger.info(`✅ Méthode de paiement créée pour utilisateur ${maskUserId(userId)}`, {
+    logger.info(`Méthode de paiement créée pour utilisateur ${maskUserId(userId)}`, {
       methodType,
       isDefault,
     });
@@ -109,14 +99,11 @@ export const createPaymentMethod = async (req: RequestWithUser, res: Response): 
       data: result.rows[0],
     });
   } catch (error: any) {
-    logger.error('❌ Erreur création méthode de paiement:', error);
+    logger.error('Erreur création méthode de paiement:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };
 
-/**
- * Obtenir les méthodes de paiement d'un utilisateur
- */
 export const getPaymentMethods = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -135,14 +122,11 @@ export const getPaymentMethods = async (req: RequestWithUser, res: Response): Pr
       data: result.rows || [],
     });
   } catch (error: any) {
-    logger.error('❌ Erreur récupération méthodes de paiement:', error);
+    logger.error('Erreur récupération méthodes de paiement:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };
 
-/**
- * Calculer le prix d'une commande
- */
 export const calculatePrice = async (req: Request, res: Response): Promise<void> => {
   try {
     const { distance, deliveryMethod, isUrgent, customPricePerKm } = req.body;
@@ -167,14 +151,11 @@ export const calculatePrice = async (req: Request, res: Response): Promise<void>
       data: calculation,
     });
   } catch (error: any) {
-    logger.error('❌ Erreur calcul prix:', error);
+    logger.error('Erreur calcul prix:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };
 
-/**
- * Initier un paiement
- */
 export const initiatePayment = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -195,8 +176,11 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       recipientPhone,
     } = req.body as InitiatePaymentBody;
 
-    // Récupérer la commande
-    const orderResult = await (pool as any).query('SELECT * FROM orders WHERE id = $1', [orderId]);
+    const orderResult = await (pool as any).query(
+      'SELECT * FROM orders WHERE id = $1',
+      [orderId]
+    );
+
     if (orderResult.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Commande non trouvée' });
       return;
@@ -205,22 +189,18 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
     const order = orderResult.rows[0];
     const totalPrice = parseFloat(order.price || order.calculated_price || 0);
 
-    // Vérifier les permissions selon le type de payeur
     if (payerType === 'client' && order.user_id !== userId) {
       res.status(403).json({ success: false, message: 'Accès refusé' });
       return;
     }
 
     if (payerType === 'recipient') {
-      // Vérifier que le destinataire est bien lié à la commande
-      // Le destinataire peut payer via son user_id ou son téléphone
       if (recipientUserId && order.recipient_user_id !== recipientUserId) {
         res.status(403).json({ success: false, message: 'Destinataire non autorisé' });
         return;
       }
     }
 
-    // Récupérer la méthode de paiement si fournie
     let paymentMethod: any = null;
     if (paymentMethodId) {
       const methodResult = await (pool as any).query(
@@ -232,21 +212,19 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       }
     }
 
-    // Déterminer le numéro de téléphone pour Mobile Money
     let phone = phoneNumber;
     if (!phone && paymentMethod && paymentMethod.provider_account) {
       phone = paymentMethod.provider_account;
     }
 
-    // Gérer le paiement selon le type
     let transactionId: string | null = null;
     let providerTransactionId: string | null = null;
     let providerResponse: any = null;
     let status: string = 'pending';
 
-    // Calculer le montant à payer (pour tous les types de paiement)
     let amountToPay = totalPrice;
     let remainingAmount = 0;
+
     if (isPartial && partialAmount) {
       amountToPay = Number(partialAmount);
       remainingAmount = totalPrice - amountToPay;
@@ -296,17 +274,13 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       providerResponse = paymentResult.providerResponse || null;
       status = paymentResult.status === 'paid' ? 'paid' : 'pending';
     } else if (paymentMethodType === 'cash') {
-      // Paiement cash : transaction créée mais reste en pending jusqu'à confirmation
       status = 'pending';
     } else if (paymentMethodType === 'deferred') {
-      // Paiement différé : transaction créée avec deadline
       status = 'delayed';
     }
 
-    // Déterminer l'utilisateur qui paie
     const payerUserId = payerType === 'client' ? userId : recipientUserId || userId;
 
-    // Créer la transaction
     const transactionResult = await (pool as any).query(
       `INSERT INTO transactions (
         order_id, user_id, payment_method_id, payment_method_type,
@@ -332,30 +306,25 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
 
     const transaction = transactionResult.rows[0];
 
-    // Mettre à jour la commande selon le type de payeur
     if (payerType === 'client') {
       if (isPartial && partialAmount) {
-        // Paiement partiel par le client
         await (pool as any).query(
           `UPDATE orders 
            SET payment_method_type = $1, payment_status = $2,
-               client_paid_amount = $3, payment_payer = 'client'
+              client_paid_amount = $3, payment_payer = 'client' 
            WHERE id = $4`,
           [paymentMethodType, 'pending', amountToPay, orderId]
         );
       } else {
-        // Paiement complet par le client
         await (pool as any).query(
           `UPDATE orders 
            SET payment_method_type = $1, payment_status = $2,
-               payment_payer = 'client'
+              payment_payer = 'client' 
            WHERE id = $3`,
           [paymentMethodType, status, orderId]
         );
       }
     } else if (payerType === 'recipient') {
-      // Paiement par le destinataire
-      // Vérifier si le destinataire est enregistré
       let recipientIsRegistered = false;
       if (recipientUserId) {
         const recipientCheck = await (pool as any).query(
@@ -365,28 +334,23 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
         recipientIsRegistered = recipientCheck.rows.length > 0;
       }
 
-      // Si le destinataire est enregistré, il peut opter pour le paiement différé
-      // Sinon, il doit payer en un coup (cash ou mobile money immédiat)
       if (recipientIsRegistered && paymentMethodType === 'deferred') {
-        // Paiement différé pour destinataire enregistré
         const deadline = new Date();
-        deadline.setDate(deadline.getDate() + 7); // 7 jours par défaut
-
+        deadline.setDate(deadline.getDate() + 7);
         await (pool as any).query(
           `UPDATE orders 
            SET recipient_user_id = $1, recipient_is_registered = true,
-               recipient_payment_method_type = $2, recipient_payment_status = 'delayed',
-               recipient_payment_deadline = $3, payment_payer = 'recipient'
+              recipient_payment_method_type = $2, recipient_payment_status = 'delayed', 
+              recipient_payment_deadline = $3, payment_payer = 'recipient' 
            WHERE id = $4`,
           [recipientUserId, paymentMethodType, deadline, orderId]
         );
       } else {
-        // Paiement immédiat pour destinataire non enregistré
         await (pool as any).query(
           `UPDATE orders 
            SET recipient_payment_method_type = $1, recipient_payment_status = $2,
-               recipient_paid_amount = $3, payment_payer = 'recipient',
-               recipient_is_registered = $4
+              recipient_paid_amount = $3, payment_payer = 'recipient', 
+              recipient_is_registered = $4 
            WHERE id = $5`,
           [
             paymentMethodType,
@@ -399,7 +363,6 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       }
     }
 
-    // Créer la facture
     const invoiceResult = await (pool as any).query(
       `INSERT INTO invoices (
         order_id, transaction_id, user_id, driver_id,
@@ -419,7 +382,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       ]
     );
 
-    logger.info(`✅ Paiement initié pour commande ${maskOrderId(orderId)}`, {
+    logger.info(`Paiement initié pour commande ${maskOrderId(orderId)}`, {
       userId: maskUserId(userId),
       paymentMethodType,
       status,
@@ -433,14 +396,11 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       },
     });
   } catch (error: any) {
-    logger.error('❌ Erreur initiation paiement:', error);
+    logger.error('Erreur initiation paiement:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };
 
-/**
- * Vérifier le statut d'un paiement
- */
 export const checkPayment = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -451,7 +411,6 @@ export const checkPayment = async (req: RequestWithUser, res: Response): Promise
 
     const { transactionId } = req.params;
 
-    // Récupérer la transaction
     const transactionResult = await (pool as any).query(
       'SELECT * FROM transactions WHERE id = $1 AND user_id = $2',
       [transactionId, userId]
@@ -464,7 +423,6 @@ export const checkPayment = async (req: RequestWithUser, res: Response): Promise
 
     const transaction = transactionResult.rows[0];
 
-    // Si c'est un paiement Mobile Money, vérifier le statut auprès du fournisseur
     if (
       transaction.payment_method_type === 'orange_money' ||
       transaction.payment_method_type === 'wave'
@@ -475,14 +433,12 @@ export const checkPayment = async (req: RequestWithUser, res: Response): Promise
           transaction.provider_transaction_id
         );
 
-        // Mettre à jour le statut si nécessaire
         if (statusCheck.status !== transaction.status) {
           await (pool as any).query(
             'UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2',
             [statusCheck.status, transactionId]
           );
 
-          // Mettre à jour la commande
           await (pool as any).query(
             'UPDATE orders SET payment_status = $1 WHERE id = $2',
             [statusCheck.status, transaction.order_id]
@@ -498,14 +454,11 @@ export const checkPayment = async (req: RequestWithUser, res: Response): Promise
       data: transaction,
     });
   } catch (error: any) {
-    logger.error('❌ Erreur vérification paiement:', error);
+    logger.error('Erreur vérification paiement:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };
 
-/**
- * Obtenir les transactions d'un utilisateur
- */
 export const getTransactions = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -519,7 +472,6 @@ export const getTransactions = async (req: RequestWithUser, res: Response): Prom
     const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
 
-    // Récupérer les transactions avec les détails de la méthode de paiement (si disponible)
     let query = `
       SELECT 
         t.*,
@@ -531,6 +483,7 @@ export const getTransactions = async (req: RequestWithUser, res: Response): Prom
       LEFT JOIN payment_methods pm ON t.payment_method_id = pm.id
       WHERE t.user_id = $1
     `;
+
     const params: any[] = [userId];
 
     if (status) {
@@ -538,18 +491,19 @@ export const getTransactions = async (req: RequestWithUser, res: Response): Prom
       params.push(status);
     }
 
-    query += ' ORDER BY t.created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    query += ` ORDER BY t.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
     const result = await (pool as any).query(query, params);
 
-    // Compter le total
     let countQuery = 'SELECT COUNT(*) FROM transactions WHERE user_id = $1';
     const countParams: any[] = [userId];
+
     if (status) {
       countQuery += ' AND status = $2';
       countParams.push(status);
     }
+
     const countResult = await (pool as any).query(countQuery, countParams);
     const total = parseInt(countResult.rows[0]?.count || '0');
 
@@ -564,14 +518,11 @@ export const getTransactions = async (req: RequestWithUser, res: Response): Prom
       },
     });
   } catch (error: any) {
-    logger.error('❌ Erreur récupération transactions:', error);
+    logger.error('Erreur récupération transactions:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };
 
-/**
- * Créer un litige de paiement
- */
 export const createDispute = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -582,7 +533,6 @@ export const createDispute = async (req: RequestWithUser, res: Response): Promis
 
     const { transactionId, disputeType, reason, description, attachments } = req.body as CreateDisputeBody;
 
-    // Vérifier que la transaction appartient à l'utilisateur
     const transactionResult = await (pool as any).query(
       'SELECT * FROM transactions WHERE id = $1 AND user_id = $2',
       [transactionId, userId]
@@ -595,7 +545,6 @@ export const createDispute = async (req: RequestWithUser, res: Response): Promis
 
     const transaction = transactionResult.rows[0];
 
-    // Créer le litige
     const disputeResult = await (pool as any).query(
       `INSERT INTO payment_disputes (
         transaction_id, order_id, user_id, dispute_type, reason, description, attachments
@@ -612,7 +561,7 @@ export const createDispute = async (req: RequestWithUser, res: Response): Promis
       ]
     );
 
-    logger.info(`✅ Litige créé pour transaction ${transactionId}`, {
+    logger.info(`Litige créé pour transaction ${transactionId}`, {
       userId: maskUserId(userId),
       disputeType,
     });
@@ -622,8 +571,7 @@ export const createDispute = async (req: RequestWithUser, res: Response): Promis
       data: disputeResult.rows[0],
     });
   } catch (error: any) {
-    logger.error('❌ Erreur création litige:', error);
+    logger.error('Erreur création litige:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };
-

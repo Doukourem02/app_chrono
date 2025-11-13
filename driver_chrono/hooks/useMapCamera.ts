@@ -11,12 +11,6 @@ interface RouteCoordinates {
   coordinates: Coordinates[];
 }
 
-/**
- * Hook pour gérer la caméra de la map de manière fluide
- * - Suit automatiquement le driver
- * - Auto-fit pour inclure driver + destination
- * - Animations smooth comme Yango
- */
 export const useMapCamera = (
   mapRef: React.RefObject<MapView>,
   driverLocation: Coordinates | null,
@@ -25,13 +19,12 @@ export const useMapCamera = (
   isTracking: boolean = true
 ) => {
   const lastCameraUpdate = useRef<number>(0);
-  const CAMERA_UPDATE_INTERVAL = 3000; // Mise à jour caméra toutes les 3 secondes max
+  const CAMERA_UPDATE_INTERVAL = 3000; // Limite les mises à jour pour éviter les animations excessives
 
-  // Suivre automatiquement le driver avec la route visible
   useEffect(() => {
     if (!isTracking || !driverLocation || !mapRef.current) return;
+    
     if (!currentOrder) {
-      // Si pas de commande, centrer sur le driver
       const now = Date.now();
       if (now - lastCameraUpdate.current > CAMERA_UPDATE_INTERVAL) {
         try {
@@ -49,16 +42,14 @@ export const useMapCamera = (
       return;
     }
 
-    // Si on a une route, fit la map pour inclure driver + route
     if (route && route.coordinates.length > 0) {
       const now = Date.now();
       if (now - lastCameraUpdate.current > CAMERA_UPDATE_INTERVAL) {
         try {
-          // Créer une liste de points à inclure : driver + quelques points de la route
           const pointsToFit = [
             driverLocation,
-            ...route.coordinates.slice(0, Math.floor(route.coordinates.length / 3)), // Premier tiers de la route
-            route.coordinates[route.coordinates.length - 1], // Destination
+            ...route.coordinates.slice(0, Math.floor(route.coordinates.length / 3)),
+            route.coordinates[route.coordinates.length - 1],
           ].filter((point): point is Coordinates => point !== null);
 
           mapRef.current.fitToCoordinates(pointsToFit, {
@@ -77,7 +68,6 @@ export const useMapCamera = (
         }
       }
     } else {
-      // Pas de route, juste suivre le driver
       const now = Date.now();
       if (now - lastCameraUpdate.current > CAMERA_UPDATE_INTERVAL) {
         try {
@@ -95,7 +85,6 @@ export const useMapCamera = (
     }
   }, [driverLocation, route, currentOrder, isTracking, mapRef]);
 
-  // Fonction pour fit sur la route complète (appelée manuellement si besoin)
   const fitToRoute = () => {
     if (!route || !mapRef.current) return;
 
@@ -114,7 +103,6 @@ export const useMapCamera = (
     }
   };
 
-  // Fonction pour centrer sur le driver
   const centerOnDriver = useCallback(() => {
     if (!driverLocation || !mapRef.current) return;
 
