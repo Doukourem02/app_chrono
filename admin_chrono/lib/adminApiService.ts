@@ -450,6 +450,122 @@ class AdminApiService {
       }
     }
   }
+
+  /**
+   * Récupère tous les utilisateurs
+   */
+  async getUsers(): Promise<{
+    success: boolean
+    data?: any[]
+    counts?: {
+      client: number
+      driver: number
+      admin: number
+      total: number
+    }
+  }> {
+    try {
+      const url = `${API_BASE_URL}/api/admin/users`
+      console.debug('🔍 [adminApiService] Fetching users from:', url)
+      
+      let response: Response
+      try {
+        response = await this.fetchWithAuth(url)
+      } catch (authError: any) {
+        console.warn('⚠️ [adminApiService] Authentication error:', authError?.message || authError)
+        return {
+          success: false,
+          data: [],
+          counts: {
+            client: 0,
+            driver: 0,
+            admin: 0,
+            total: 0,
+          },
+        }
+      }
+      
+      console.debug('🔍 [adminApiService] Response status:', response.status, response.statusText)
+      
+      if (!response.ok) {
+        let errorMessage = 'Network error'
+        try {
+          const error = await response.json()
+          errorMessage = error.message || errorMessage
+        } catch {
+          // Si on ne peut pas parser l'erreur, utiliser le message par défaut
+        }
+        console.warn('⚠️ [adminApiService] Error fetching users:', errorMessage)
+        return {
+          success: false,
+          data: [],
+          counts: {
+            client: 0,
+            driver: 0,
+            admin: 0,
+            total: 0,
+          },
+        }
+      }
+
+      let result: any
+      try {
+        result = await response.json()
+      } catch (parseError) {
+        console.error('❌ [adminApiService] Error parsing JSON response:', parseError)
+        return {
+          success: false,
+          data: [],
+          counts: {
+            client: 0,
+            driver: 0,
+            admin: 0,
+            total: 0,
+          },
+        }
+      }
+      
+      console.debug('🔍 [adminApiService] Response data:', result)
+      
+      if (result.success && result.data && Array.isArray(result.data)) {
+        console.debug(`✅ [adminApiService] Received ${result.data.length} users`)
+        return {
+          success: true,
+          data: result.data,
+          counts: result.counts || {
+            client: 0,
+            driver: 0,
+            admin: 0,
+            total: 0,
+          },
+        }
+      }
+
+      console.warn('⚠️ [adminApiService] API returned no data or success=false')
+      return {
+        success: false,
+        data: [],
+        counts: {
+          client: 0,
+          driver: 0,
+          admin: 0,
+          total: 0,
+        },
+      }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Unexpected error in getUsers:', error?.message || error)
+      return {
+        success: false,
+        data: [],
+        counts: {
+          client: 0,
+          driver: 0,
+          admin: 0,
+          total: 0,
+        },
+      }
+    }
+  }
 }
 
 // Export singleton

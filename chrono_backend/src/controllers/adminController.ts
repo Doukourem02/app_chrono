@@ -675,3 +675,99 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
   }
 };
 
+/**
+ * Récupère tous les utilisateurs pour la page Users
+ */
+export const getAdminUsers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    logger.info('🚀 [getAdminUsers] DÉBUT');
+
+    if (!process.env.DATABASE_URL) {
+      logger.warn('DATABASE_URL non configuré pour getAdminUsers');
+      res.json({
+        success: true,
+        data: [],
+        counts: {
+          client: 0,
+          driver: 0,
+          admin: 0,
+          total: 0,
+        },
+      });
+      return;
+    }
+
+    // Récupérer tous les utilisateurs avec leurs informations
+    const query = `SELECT id, email, phone, role, created_at FROM users ORDER BY created_at DESC`;
+
+    logger.info('📝 [getAdminUsers] Requête SQL:', query);
+
+    let result;
+    try {
+      result = await (pool as any).query(query);
+      logger.info(`✅ [getAdminUsers] Requête réussie: ${result.rows.length} utilisateurs récupérés`);
+    } catch (queryError: any) {
+      logger.error('❌ [getAdminUsers] Erreur lors de la requête SQL:', queryError);
+      throw queryError;
+    }
+
+    // Compter les utilisateurs par rôle
+    const roleCounts = {
+      client: 0,
+      driver: 0,
+      admin: 0,
+      total: result.rows.length,
+    };
+
+    const formatted = result.rows.map((user: any) => {
+      // Compter les rôles
+      if (user.role === 'client') roleCounts.client++;
+      else if (user.role === 'driver') roleCounts.driver++;
+      else if (user.role === 'admin' || user.role === 'super_admin') roleCounts.admin++;
+
+      return {
+        id: user.id,
+        email: user.email,
+        phone: user.phone || 'N/A',
+        role: user.role,
+        createdAt: new Date(user.created_at).toLocaleDateString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }),
+      };
+    });
+
+    logger.info(`✅ [getAdminUsers] Données formatées: ${formatted.length} utilisateurs`);
+
+    res.json({
+      success: true,
+      data: formatted,
+      counts: roleCounts,
+    });
+  } catch (error: any) {
+    logger.error('Erreur getAdminUsers:', error);
+    
+    if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
+      logger.warn('Erreur de connexion DB, retour de données vides');
+      res.json({
+        success: true,
+        data: [],
+        counts: {
+          client: 0,
+          driver: 0,
+          admin: 0,
+          total: 0,
+        },
+      });
+      return;
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: error.message,
+    });
+  }
+};
+
