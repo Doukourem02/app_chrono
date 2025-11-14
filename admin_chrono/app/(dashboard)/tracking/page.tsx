@@ -1,11 +1,10 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Search, Filter } from 'lucide-react'
-import { GoogleMap, useLoadScript, Marker, Polyline } from '@react-google-maps/api'
-import { adminApiService } from '@/lib/adminApiService'
+import { GoogleMap, Marker, Polyline, InfoWindow } from '@react-google-maps/api'
 import DeliveryCard from '@/components/tracking/DeliveryCard'
+import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
 
 // Type pour l'API Google Maps dans window
 interface GoogleMapsWindow extends Window {
@@ -58,14 +57,31 @@ interface Delivery {
   }
   driverId?: string
   userId?: string
+  client?: {
+    id: string
+    email: string
+    full_name?: string
+    phone?: string
+    avatar_url?: string
+  } | null
+  driver?: {
+    id: string
+    email: string
+    full_name?: string
+    phone?: string
+    avatar_url?: string
+  } | null
 }
 
-function TrackingMap({ selectedDelivery }: { selectedDelivery: Delivery | null }) {
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
-
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: googleMapsApiKey || '',
-  })
+function TrackingMap({ 
+  selectedDelivery, 
+  isLoaded, 
+  loadError 
+}: { 
+  selectedDelivery: Delivery | null
+  isLoaded: boolean
+  loadError: Error | undefined
+}) {
 
   const mapOptions = useMemo(
     () => ({
@@ -105,6 +121,18 @@ function TrackingMap({ selectedDelivery }: { selectedDelivery: Delivery | null }
     return []
   }, [selectedDelivery])
 
+  // Calculer la position actuelle du véhicule (milieu de la route pour l'instant)
+  const currentVehiclePosition = useMemo(() => {
+    if (routePath.length >= 2) {
+      // Position au milieu de la route (approximation)
+      return {
+        lat: (routePath[0].lat + routePath[1].lat) / 2,
+        lng: (routePath[0].lng + routePath[1].lng) / 2,
+      }
+    }
+    return null
+  }, [routePath])
+
   const mapPlaceholderStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -120,14 +148,12 @@ function TrackingMap({ selectedDelivery }: { selectedDelivery: Delivery | null }
     color: '#6B7280',
   }
 
-  if (!googleMapsApiKey) {
-    return (
-      <div style={mapPlaceholderStyle}>
-        <p style={mapPlaceholderTextStyle}>Carte non disponible</p>
-      </div>
-    )
-  }
+  // Créer une clé unique pour forcer le re-render complet quand on change de livraison
+  const mapKey = useMemo(() => {
+    return selectedDelivery ? `map-${selectedDelivery.id}` : 'map-default'
+  }, [selectedDelivery])
 
+  // Gérer les états de chargement et d'erreur
   if (loadError) {
     return (
       <div style={mapPlaceholderStyle}>
@@ -146,14 +172,18 @@ function TrackingMap({ selectedDelivery }: { selectedDelivery: Delivery | null }
 
   return (
     <GoogleMap
+      key={mapKey}
       mapContainerStyle={mapContainerStyle}
       center={center}
       zoom={routePath.length > 0 ? 12 : 10}
       options={mapOptions}
     >
-      {routePath.length > 0 && (
+      {/* Afficher uniquement le polyline et les marqueurs de la livraison sélectionnée */}
+      {selectedDelivery && routePath.length >= 2 && (
         <>
+          {/* Polyline entre le point de départ et d'arrivée - UN SEUL à la fois */}
           <Polyline
+            key={`polyline-${selectedDelivery.id}`}
             path={routePath}
             options={{
               strokeColor: '#8B5CF6',
@@ -161,38 +191,186 @@ function TrackingMap({ selectedDelivery }: { selectedDelivery: Delivery | null }
               strokeOpacity: 0.8,
             }}
           />
+          
+          {/* Marqueur de départ (vert) */}
           <Marker
+            key={`marker-pickup-${selectedDelivery.id}`}
             position={routePath[0]}
             icon={{
               url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
               scaledSize: createGoogleMapsSize(32, 32),
             }}
           />
+          <InfoWindow position={routePath[0]}>
+            <div style={{ padding: '4px' }}>
+              <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
+                {selectedDelivery.pickup?.name || 'Point de départ'}
+              </div>
+              <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                {selectedDelivery.pickup?.address || ''}
+              </div>
+            </div>
+          </InfoWindow>
+          
+          {/* Marqueur d'arrivée (violet) */}
           <Marker
+            key={`marker-dropoff-${selectedDelivery.id}`}
             position={routePath[1]}
             icon={{
               url: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png',
               scaledSize: createGoogleMapsSize(32, 32),
             }}
           />
+          <InfoWindow position={routePath[1]}>
+            <div style={{ padding: '4px' }}>
+              <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
+                {selectedDelivery.dropoff?.name || 'Point d\'arrivée'}
+              </div>
+              <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                {selectedDelivery.dropoff?.address || ''}
+              </div>
+            </div>
+          </InfoWindow>
+          
+          {/* Position actuelle du véhicule (cercle pulsant violet) */}
+          {currentVehiclePosition && (
+            <>
+              {/* Cercle pulsant pour la position actuelle du véhicule */}
+              <Marker
+                key={`vehicle-inner-${selectedDelivery.id}`}
+                position={currentVehiclePosition}
+                icon={{
+                  path: window.google?.maps?.SymbolPath?.CIRCLE || 0,
+                  scale: 12,
+                  fillColor: '#8B5CF6',
+                  fillOpacity: 0.6,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 3,
+                }}
+              />
+              {/* Cercle extérieur pulsant */}
+              <Marker
+                key={`vehicle-outer-${selectedDelivery.id}`}
+                position={currentVehiclePosition}
+                icon={{
+                  path: window.google?.maps?.SymbolPath?.CIRCLE || 0,
+                  scale: 20,
+                  fillColor: '#8B5CF6',
+                  fillOpacity: 0.2,
+                  strokeColor: '#8B5CF6',
+                  strokeWeight: 2,
+                }}
+              />
+            </>
+          )}
         </>
       )}
     </GoogleMap>
   )
 }
 
+// Données fictives pour les livraisons en cours
+const mockDeliveries: Delivery[] = [
+  {
+    id: '1',
+    shipmentNumber: 'EV-2017002346',
+    type: 'Orders',
+    status: 'enroute',
+    pickup: {
+      name: 'Cocody',
+      address: 'Carrefour Saint Jean',
+      coordinates: { lat: 5.3600, lng: -4.0083 },
+    },
+    dropoff: {
+      name: 'Marcory',
+      address: 'Zone 4',
+      coordinates: { lat: 5.3204, lng: -4.0267 },
+    },
+    driverId: 'driver-1',
+    userId: 'user-1',
+    client: {
+      id: 'user-1',
+      email: 'entreprise@example.com',
+      full_name: 'Entreprise un tel',
+      phone: '+225 01 23 45 67 89',
+      avatar_url: undefined,
+    },
+    driver: null,
+  },
+  {
+    id: '2',
+    shipmentNumber: 'EV-2017003323',
+    type: 'Orders',
+    status: 'enroute',
+    pickup: {
+      name: 'Plateaux',
+      address: 'Vers Felicia',
+      coordinates: { lat: 5.3300, lng: -4.0200 },
+    },
+    dropoff: {
+      name: 'Abobo Dokui',
+      address: 'Route du Zoo',
+      coordinates: { lat: 5.4000, lng: -4.0500 },
+    },
+    driverId: 'driver-2',
+    userId: 'user-2',
+    client: {
+      id: 'user-2',
+      email: 'jayson@example.com',
+      full_name: 'Jayson Tatum',
+      phone: '+225 07 89 12 34 56',
+      avatar_url: undefined,
+    },
+    driver: null,
+  },
+  {
+    id: '3',
+    shipmentNumber: 'EV-2017003323',
+    type: 'Orders',
+    status: 'picked_up',
+    pickup: {
+      name: 'Yopougon',
+      address: 'Siporex',
+      coordinates: { lat: 5.3500, lng: -4.0300 },
+    },
+    dropoff: {
+      name: 'Cocody',
+      address: 'Angré 7ème Tranche',
+      coordinates: { lat: 5.3700, lng: -4.0100 },
+    },
+    driverId: 'driver-3',
+    userId: 'user-3',
+    client: {
+      id: 'user-3',
+      email: 'client@example.com',
+      full_name: 'Client Test',
+      phone: '+225 05 67 89 01 23',
+      avatar_url: undefined,
+    },
+    driver: null,
+  },
+]
+
 export default function TrackingPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null)
 
-  const { data: deliveries, isLoading } = useQuery<Delivery[]>({
-    queryKey: ['ongoing-deliveries'],
-    queryFn: async () => {
-      const result = await adminApiService.getOngoingDeliveries()
-      return (result.data || []) as Delivery[]
-    },
-    refetchInterval: 30000,
-  })
+  // Utiliser le contexte Google Maps partagé
+  const { isLoaded, loadError } = useGoogleMaps()
+
+  // Utiliser les données fictives pour l'instant
+  const deliveries = mockDeliveries
+  const isLoading = false
+
+  // Code commenté pour récupérer les vraies données plus tard
+  // const { data: deliveries, isLoading } = useQuery<Delivery[]>({
+  //   queryKey: ['ongoing-deliveries'],
+  //   queryFn: async () => {
+  //     const result = await adminApiService.getOngoingDeliveries()
+  //     return (result.data || []) as Delivery[]
+  //   },
+  //   refetchInterval: 30000,
+  // })
 
   const filteredDeliveries = useMemo(() => {
     if (!deliveries) return []
@@ -210,6 +388,11 @@ export default function TrackingPage() {
       setSelectedDelivery(filteredDeliveries[0])
     }
   }, [filteredDeliveries, selectedDelivery])
+
+  // Fonction pour gérer la sélection d'une livraison
+  const handleDeliverySelect = (delivery: Delivery) => {
+    setSelectedDelivery(delivery)
+  }
 
   const containerStyle: React.CSSProperties = {
     display: 'flex',
@@ -338,7 +521,7 @@ export default function TrackingPage() {
                 key={delivery.id}
                 delivery={delivery}
                 isSelected={selectedDelivery?.id === delivery.id}
-                onSelect={() => setSelectedDelivery(delivery)}
+                onSelect={() => handleDeliverySelect(delivery)}
               />
             ))
           )}
@@ -347,7 +530,11 @@ export default function TrackingPage() {
 
       {/* Panneau droit : Carte */}
       <div style={rightPanelStyle}>
-        <TrackingMap selectedDelivery={selectedDelivery} />
+        <TrackingMap 
+          selectedDelivery={selectedDelivery} 
+          isLoaded={isLoaded}
+          loadError={loadError}
+        />
       </div>
     </div>
   )

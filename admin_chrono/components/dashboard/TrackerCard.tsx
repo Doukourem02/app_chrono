@@ -2,7 +2,10 @@
 
 import { Phone, MessageSquare } from 'lucide-react'
 import { useMemo } from 'react'
-import { GoogleMap, useLoadScript, Marker, Polyline } from '@react-google-maps/api'
+import { GoogleMap, Marker, Polyline } from '@react-google-maps/api'
+import { useQuery } from '@tanstack/react-query'
+import { adminApiService } from '@/lib/adminApiService'
+import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
 
 // Type pour l'API Google Maps dans window
 interface GoogleMapsWindow extends Window {
@@ -67,11 +70,7 @@ const timelineData = [
 ]
 
 function MapComponent() {
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
-
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: googleMapsApiKey || '',
-  })
+  const { isLoaded, loadError } = useGoogleMaps()
 
   const mapOptions = useMemo(
     () => ({
@@ -106,14 +105,6 @@ function MapComponent() {
   const mapPlaceholderErrorStyle: React.CSSProperties = {
     ...mapPlaceholderTextStyle,
     color: '#EF4444',
-  }
-
-  if (!googleMapsApiKey) {
-    return (
-      <div style={mapPlaceholderStyle}>
-        <p style={mapPlaceholderTextStyle}>Carte non disponible</p>
-      </div>
-    )
   }
 
   if (loadError) {
@@ -166,6 +157,70 @@ function MapComponent() {
 }
 
 export default function TrackerCard() {
+  // Récupérer une commande en cours avec un driver assigné
+  const { data: ordersData } = useQuery({
+    queryKey: ['active-orders-with-driver'],
+    queryFn: async () => {
+      // Récupérer les commandes en cours (enroute, picked_up, accepted)
+      const result = await adminApiService.getOrdersByStatus('onProgress')
+      return result
+    },
+    refetchInterval: 30000, // Refetch toutes les 30 secondes
+  })
+
+  // Trouver une commande avec un driver assigné
+  const orders = ordersData?.data || []
+  const activeOrder = orders.find((order: any) => order.driver_id || order.driverId)
+  const driverId = activeOrder?.driver_id || activeOrder?.driverId
+
+  const { data: driverData } = useQuery({
+    queryKey: ['driver-details', driverId],
+    queryFn: async () => {
+      if (!driverId) return null
+      const result = await adminApiService.getDriverDetails(driverId)
+      return result
+    },
+    enabled: !!driverId,
+  })
+
+  const driver = driverData?.data
+
+  // Fonction pour obtenir le nom d'affichage du driver
+  const getDisplayName = () => {
+    if (driver?.full_name && driver.full_name.trim()) {
+      return driver.full_name
+    }
+    if (driver?.email) {
+      return driver.email
+    }
+    // Si pas de driver, essayer de récupérer depuis l'order
+    if (activeOrder?.driver?.full_name) {
+      return activeOrder.driver.full_name
+    }
+    if (activeOrder?.driver?.email) {
+      return activeOrder.driver.email
+    }
+    return 'Jayson Tatum'
+  }
+
+  // Fonction pour obtenir l'initiale du driver
+  const getInitial = () => {
+    if (driver?.full_name && driver.full_name.trim()) {
+      return driver.full_name.charAt(0).toUpperCase()
+    }
+    if (driver?.email) {
+      return driver.email.charAt(0).toUpperCase()
+    }
+    // Si pas de driver, essayer de récupérer depuis l'order
+    if (activeOrder?.driver?.full_name) {
+      return activeOrder.driver.full_name.charAt(0).toUpperCase()
+    }
+    if (activeOrder?.driver?.email) {
+      return activeOrder.driver.email.charAt(0).toUpperCase()
+    }
+    return 'J'
+  }
+
   const cardStyle: React.CSSProperties = {
     backgroundColor: '#FFFFFF',
     borderRadius: '16px',
@@ -349,10 +404,10 @@ export default function TrackerCard() {
 
       <div style={{ ...driverInfoStyle, flexShrink: 0 }}>
         <div style={driverLeftStyle}>
-          <div style={avatarStyle}>M</div>
+          <div style={avatarStyle}>{getInitial()}</div>
           <div>
-            <p style={driverNameStyle}>Moriarty</p>
-            <p style={driverRoleStyle}>Drive / Courier</p>
+            <p style={driverNameStyle}>{getDisplayName()}</p>
+            <p style={driverRoleStyle}>Drive, Actif il y a 1h</p>
           </div>
         </div>
         <div style={driverActionsStyle}>

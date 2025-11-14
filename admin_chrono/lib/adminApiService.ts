@@ -1149,6 +1149,38 @@ class AdminApiService {
       return { success: false }
     }
   }
+
+  /**
+   * Récupère la clé API Google Maps depuis le serveur
+   */
+  async getGoogleMapsConfig(): Promise<{
+    apiKey?: string
+  }> {
+    try {
+      const token = await this.getAccessToken()
+      if (!token) {
+        return {}
+      }
+
+      const response = await fetch('/api/google-maps-config', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        return {}
+      }
+
+      const result = await response.json()
+      return { apiKey: result.apiKey }
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [adminApiService] Error in getGoogleMapsConfig:', error)
+      }
+      return {}
+    }
+  }
 }
 
 // Export singleton

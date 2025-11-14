@@ -607,6 +607,41 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
       return field;
     };
 
+    // Récupérer les informations des clients et drivers en une seule requête
+    const userIds = [...new Set(result.rows.map((o: any) => o.user_id).filter(Boolean))];
+    const driverIds = [...new Set(result.rows.map((o: any) => o.driver_id).filter(Boolean))];
+    
+    let usersMap = new Map();
+    let driversMap = new Map();
+
+    if (userIds.length > 0) {
+      try {
+        const usersResult = await (pool as any).query(
+          `SELECT id, email, phone, full_name, avatar_url, role FROM users WHERE id = ANY($1)`,
+          [userIds]
+        );
+        usersResult.rows.forEach((user: any) => {
+          usersMap.set(user.id, user);
+        });
+      } catch (usersError) {
+        logger.warn('Erreur lors de la récupération des utilisateurs:', usersError);
+      }
+    }
+
+    if (driverIds.length > 0) {
+      try {
+        const driversResult = await (pool as any).query(
+          `SELECT id, email, phone, full_name, avatar_url, role FROM users WHERE id = ANY($1)`,
+          [driverIds]
+        );
+        driversResult.rows.forEach((driver: any) => {
+          driversMap.set(driver.id, driver);
+        });
+      } catch (driversError) {
+        logger.warn('Erreur lors de la récupération des drivers:', driversError);
+      }
+    }
+
     const formatted = result.rows.map((order: any) => {
       const pickup = parseJsonField(order.pickup_address || order.pickup);
       const dropoff = parseJsonField(order.dropoff_address || order.dropoff);
@@ -638,6 +673,10 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
         dropoffCoords = { lat: dropoff.latitude, lng: dropoff.longitude };
       }
 
+      // Récupérer les informations du client et du driver
+      const client = order.user_id ? usersMap.get(order.user_id) : null;
+      const driver = order.driver_id ? driversMap.get(order.driver_id) : null;
+
       return {
         id: order.id,
         shipmentNumber,
@@ -656,6 +695,20 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
         driverId: order.driver_id,
         userId: order.user_id,
         createdAt: order.created_at,
+        client: client ? {
+          id: client.id,
+          email: client.email,
+          full_name: client.full_name,
+          phone: client.phone,
+          avatar_url: client.avatar_url,
+        } : null,
+        driver: driver ? {
+          id: driver.id,
+          email: driver.email,
+          full_name: driver.full_name,
+          phone: driver.phone,
+          avatar_url: driver.avatar_url,
+        } : null,
       };
     });
 

@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 import { Phone, MessageSquare, Truck } from 'lucide-react'
 
 interface DeliveryCardProps {
@@ -21,6 +22,20 @@ interface DeliveryCardProps {
     }
     driverId?: string
     userId?: string
+    client?: {
+      id: string
+      email: string
+      full_name?: string
+      phone?: string
+      avatar_url?: string
+    } | null
+    driver?: {
+      id: string
+      email: string
+      full_name?: string
+      phone?: string
+      avatar_url?: string
+    } | null
   }
   isSelected?: boolean
   onSelect?: () => void
@@ -236,15 +251,59 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect }:
 
       <div style={partnerSectionStyle}>
         <div style={partnerInfoStyle}>
-          <div style={avatarStyle}>C</div>
-          <div style={partnerTextStyle}>
-            <div style={partnerNameStyle}>Client</div>
-            <div style={partnerAddressStyle}>Adresse de Livraison</div>
-          </div>
+          {(() => {
+            // Déterminer si on affiche le client ou le driver
+            // Si un driver est assigné, on affiche le driver, sinon le client
+            const person = delivery.driver || delivery.client
+            const isDriver = !!delivery.driver
+            const displayName = person?.full_name || person?.email || (isDriver ? 'Jayson Tatum' : 'Client')
+            // Le label dépend du rôle : "Partners" pour les entreprises, "Client" pour les clients, "Drive" pour les drivers
+            const displayLabel = isDriver 
+              ? 'Drive' 
+              : (delivery.client?.role === 'partner' || delivery.client?.role === 'Partner' ? 'Partners' : 'Client')
+            const displayAddress = delivery.dropoff.address || 'Adresse de Livraison'
+            const avatarUrl = person?.avatar_url
+            const initial = displayName.charAt(0).toUpperCase()
+
+            return (
+              <>
+                {avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt={displayName}
+                    width={40}
+                    height={40}
+                    style={{
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  <div style={avatarStyle}>{initial}</div>
+                )}
+                <div style={partnerTextStyle}>
+                  <div style={{ ...partnerNameStyle, fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
+                    {displayLabel}
+                  </div>
+                  <div style={{ ...partnerNameStyle, fontSize: '14px', fontWeight: 600, marginBottom: '2px' }}>
+                    {displayName}
+                  </div>
+                  <div style={partnerAddressStyle}>{displayAddress}</div>
+                </div>
+              </>
+            )
+          })()}
         </div>
         <div style={contactButtonsStyle}>
           <button
             style={contactButtonStyle}
+            onClick={(e) => {
+              e.stopPropagation()
+              const person = delivery.driver || delivery.client
+              if (person?.phone) {
+                window.location.href = `tel:${person.phone}`
+              }
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#F3F4F6'
             }}
@@ -256,6 +315,10 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect }:
           </button>
           <button
             style={contactButtonStyle}
+            onClick={(e) => {
+              e.stopPropagation()
+              // TODO: Ouvrir le chat
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#F3F4F6'
             }}

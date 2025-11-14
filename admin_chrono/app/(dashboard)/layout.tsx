@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
+import { GoogleMapsProvider } from '@/contexts/GoogleMapsContext'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -89,26 +90,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isTrackingPage = pathname?.includes('/tracking')
 
   return (
-    <div style={containerStyle}>
-      <Sidebar />
-      <div style={contentWrapperStyle}>
-        <div style={scrollableStyle}>
-          {isTrackingPage ? (
-            <main style={{ height: '100%', padding: 0 }}>
-              {children}
-            </main>
-          ) : (
-            <div style={innerContainerStyle}>
-              <div style={maxWidthContainerStyle}>
-                <Header />
-                <main>
-                  {children}
-                </main>
+    <GoogleMapsProvider>
+      <div style={containerStyle}>
+        <Sidebar />
+        <div style={contentWrapperStyle}>
+          <div style={scrollableStyle}>
+            {isTrackingPage ? (
+              <main style={{ height: '100%', padding: 0 }}>
+                {children}
+              </main>
+            ) : (
+              <div style={innerContainerStyle}>
+                <div style={maxWidthContainerStyle}>
+                  <Header />
+                  <main>
+                    {children}
+                  </main>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </GoogleMapsProvider>
   )
 }
