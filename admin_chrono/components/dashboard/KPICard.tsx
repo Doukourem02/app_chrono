@@ -44,12 +44,18 @@ export default function KPICard({
   const getIconBgColor = () => {
     if (iconColor === 'text-blue-600') return '#EFF6FF'
     if (iconColor === 'text-green-600') return '#F0FDF4'
+    if (iconColor === 'text-yellow-600') return '#FEFCE8'
+    if (iconColor === 'text-red-600') return '#FEF2F2'
+    if (iconColor === 'text-purple-600') return '#FAF5FF'
     return '#FAF5FF'
   }
 
   const getIconColor = () => {
     if (iconColor === 'text-blue-600') return '#2563EB'
     if (iconColor === 'text-green-600') return '#16A34A'
+    if (iconColor === 'text-yellow-600') return '#CA8A04'
+    if (iconColor === 'text-red-600') return '#DC2626'
+    if (iconColor === 'text-purple-600') return '#9333EA'
     return '#9333EA'
   }
 

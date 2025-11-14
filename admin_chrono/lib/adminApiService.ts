@@ -7,11 +7,9 @@ const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   'http://localhost:4000'
 
-// Log de la configuration au démarrage (uniquement côté client)
-if (typeof window !== 'undefined') {
+// Log de la configuration au démarrage (uniquement côté client et en développement)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   console.log('🔧 [adminApiService] API_BASE_URL configured:', API_BASE_URL)
-  console.log('🔧 [adminApiService] NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL)
-  console.log('🔧 [adminApiService] EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL)
 }
 
 class AdminApiService {
@@ -22,7 +20,11 @@ class AdminApiService {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       return session?.access_token || null
-    } catch {
+    } catch (error) {
+      // Ne pas logger le token en production
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [adminApiService] Error getting access token:', error)
+      }
       return null
     }
   }
@@ -33,39 +35,57 @@ class AdminApiService {
   private async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
     const token = await this.getAccessToken()
     if (!token) {
-      console.error('❌ [adminApiService] No access token available')
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [adminApiService] No access token available')
+      }
       throw new Error('No access token available')
     }
 
-    const headers = {
+    const headers: HeadersInit = {
       ...options?.headers,
-      'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     }
+    
+    // Ajouter Content-Type seulement pour les méthodes qui envoient du JSON
+    if (options?.method && ['POST', 'PUT', 'PATCH'].includes(options.method)) {
+      headers['Content-Type'] = 'application/json'
+    }
 
-    console.log('🔍 [adminApiService] Making request to:', url)
-    console.log('🔍 [adminApiService] API_BASE_URL:', API_BASE_URL)
-    console.log('🔍 [adminApiService] Has token:', !!token)
+    // Logs uniquement en développement
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [adminApiService] Making request to:', url)
+      console.log('🔍 [adminApiService] API_BASE_URL:', API_BASE_URL)
+      console.log('🔍 [adminApiService] Has token:', !!token)
+    }
 
     try {
-      console.log('🔍 [adminApiService] Attempting fetch to:', url)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [adminApiService] Attempting fetch to:', url)
+      }
       const response = await fetch(url, { ...options, headers })
-      console.log('🔍 [adminApiService] Response status:', response.status, response.statusText)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [adminApiService] Response status:', response.status, response.statusText)
+      }
       return response
     } catch (error: any) {
-      console.error('❌ [adminApiService] Fetch error:', error?.message || error)
-      console.error('❌ [adminApiService] Error type:', error?.name)
-      console.error('❌ [adminApiService] Full error:', error)
-      console.error('❌ [adminApiService] URL attempted:', url)
-      console.error('❌ [adminApiService] API_BASE_URL:', API_BASE_URL)
-      
-      // Vérifier si c'est une erreur réseau
-      if (error?.message?.includes('Load failed') || error?.message?.includes('Failed to fetch') || error?.name === 'TypeError') {
-        console.error('❌ [adminApiService] Network error - Backend may not be running or URL is incorrect')
-        console.error('❌ [adminApiService] Please check:')
-        console.error('   1. Is the backend running? (cd chrono_backend && npm start)')
-        console.error('   2. Is NEXT_PUBLIC_API_URL correct in .env.local?')
-        console.error('   3. Current API_BASE_URL:', API_BASE_URL)
+      // Logs d'erreur conditionnels
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [adminApiService] Fetch error:', error?.message || error)
+        console.error('❌ [adminApiService] Error type:', error?.name)
+        console.error('❌ [adminApiService] URL attempted:', url)
+        console.error('❌ [adminApiService] API_BASE_URL:', API_BASE_URL)
+        
+        // Vérifier si c'est une erreur réseau
+        if (error?.message?.includes('Load failed') || error?.message?.includes('Failed to fetch') || error?.name === 'TypeError') {
+          console.error('❌ [adminApiService] Network error - Backend may not be running or URL is incorrect')
+          console.error('❌ [adminApiService] Please check:')
+          console.error('   1. Is the backend running? (cd chrono_backend && npm start)')
+          console.error('   2. Is NEXT_PUBLIC_API_URL correct in .env.local?')
+          console.error('   3. Current API_BASE_URL:', API_BASE_URL)
+        }
+      } else {
+        // En production, logger uniquement les erreurs critiques sans détails sensibles
+        console.error('❌ [adminApiService] API request failed')
       }
       
       throw error
@@ -670,6 +690,463 @@ class AdminApiService {
           users: [],
         },
       }
+    }
+  }
+
+  /**
+   * Récupère les statistiques financières
+   */
+  async getFinancialStats(): Promise<{
+    success: boolean
+    data?: {
+      totalRevenue: { today: number; week: number; month: number; year: number }
+      transactionsByMethod: Record<string, number>
+      paymentStatus: Record<string, number>
+      conversionRate: number
+      revenueByDriver: Array<{ driverId: string; deliveries: number; revenue: number }>
+      revenueByDeliveryType: Record<string, number>
+    }
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/financial-stats`)
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          data: {
+            totalRevenue: { today: 0, week: 0, month: 0, year: 0 },
+            transactionsByMethod: { orange_money: 0, wave: 0, cash: 0, deferred: 0 },
+            paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
+            conversionRate: 0,
+            revenueByDriver: [],
+            revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },
+          },
+        }
+      }
+
+      const result = await response.json()
+      return {
+        success: result.success || false,
+        data: result.data,
+      }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getFinancialStats:', error)
+      return {
+        success: false,
+        data: {
+          totalRevenue: { today: 0, week: 0, month: 0, year: 0 },
+          transactionsByMethod: { orange_money: 0, wave: 0, cash: 0, deferred: 0 },
+          paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
+          conversionRate: 0,
+          revenueByDriver: [],
+          revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },
+        },
+      }
+    }
+  }
+
+  /**
+   * Récupère toutes les transactions
+   */
+  async getTransactions(params?: {
+    page?: number
+    limit?: number
+    status?: string
+    method?: string
+    startDate?: string
+    endDate?: string
+    search?: string
+  }): Promise<{
+    success: boolean
+    data?: any[]
+    pagination?: { page: number; limit: number; total: number; totalPages: number }
+  }> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params?.page) queryParams.append('page', params.page.toString())
+      if (params?.limit) queryParams.append('limit', params.limit.toString())
+      if (params?.status) queryParams.append('status', params.status)
+      if (params?.method) queryParams.append('method', params.method)
+      if (params?.startDate) queryParams.append('startDate', params.startDate)
+      if (params?.endDate) queryParams.append('endDate', params.endDate)
+      if (params?.search) queryParams.append('search', params.search)
+
+      const url = `${API_BASE_URL}/api/admin/transactions${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      
+      if (!response.ok) {
+        return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
+      }
+
+      const result = await response.json()
+      return {
+        success: result.success || false,
+        data: result.data || [],
+        pagination: result.pagination,
+      }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getTransactions:', error)
+      return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
+    }
+  }
+
+  /**
+   * Génère un rapport des livraisons
+   */
+  async getReportDeliveries(params?: {
+    startDate?: string
+    endDate?: string
+    status?: string
+    driverId?: string
+  }): Promise<{ success: boolean; data?: any[] }> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params?.startDate) queryParams.append('startDate', params.startDate)
+      if (params?.endDate) queryParams.append('endDate', params.endDate)
+      if (params?.status) queryParams.append('status', params.status)
+      if (params?.driverId) queryParams.append('driverId', params.driverId)
+
+      const url = `${API_BASE_URL}/api/admin/reports/deliveries${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      
+      if (!response.ok) return { success: false, data: [] }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data || [] }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getReportDeliveries:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  /**
+   * Génère un rapport des revenus
+   */
+  async getReportRevenues(params?: {
+    startDate?: string
+    endDate?: string
+    driverId?: string
+    deliveryType?: string
+  }): Promise<{ success: boolean; data?: any[] }> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params?.startDate) queryParams.append('startDate', params.startDate)
+      if (params?.endDate) queryParams.append('endDate', params.endDate)
+      if (params?.driverId) queryParams.append('driverId', params.driverId)
+      if (params?.deliveryType) queryParams.append('deliveryType', params.deliveryType)
+
+      const url = `${API_BASE_URL}/api/admin/reports/revenues${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      
+      if (!response.ok) return { success: false, data: [] }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data || [] }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getReportRevenues:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  /**
+   * Génère un rapport des clients
+   */
+  async getReportClients(params?: {
+    startDate?: string
+    endDate?: string
+  }): Promise<{ success: boolean; data?: any[] }> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params?.startDate) queryParams.append('startDate', params.startDate)
+      if (params?.endDate) queryParams.append('endDate', params.endDate)
+
+      const url = `${API_BASE_URL}/api/admin/reports/clients${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      
+      if (!response.ok) return { success: false, data: [] }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data || [] }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getReportClients:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  /**
+   * Génère un rapport des drivers
+   */
+  async getReportDrivers(params?: {
+    startDate?: string
+    endDate?: string
+  }): Promise<{ success: boolean; data?: any[] }> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params?.startDate) queryParams.append('startDate', params.startDate)
+      if (params?.endDate) queryParams.append('endDate', params.endDate)
+
+      const url = `${API_BASE_URL}/api/admin/reports/drivers${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      
+      if (!response.ok) return { success: false, data: [] }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data || [] }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getReportDrivers:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  /**
+   * Génère un rapport des paiements
+   */
+  async getReportPayments(params?: {
+    startDate?: string
+    endDate?: string
+  }): Promise<{ success: boolean; data?: any[] }> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params?.startDate) queryParams.append('startDate', params.startDate)
+      if (params?.endDate) queryParams.append('endDate', params.endDate)
+
+      const url = `${API_BASE_URL}/api/admin/reports/payments${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      
+      if (!response.ok) return { success: false, data: [] }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data || [] }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getReportPayments:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  /**
+   * Récupère les détails d'un driver
+   */
+  async getDriverDetails(driverId: string): Promise<{
+    success: boolean
+    data?: any
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/drivers/${driverId}/details`)
+      if (!response.ok) return { success: false }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getDriverDetails:', error)
+      return { success: false }
+    }
+  }
+
+  /**
+   * Met à jour le statut d'un driver
+   */
+  async updateDriverStatus(driverId: string, isActive: boolean): Promise<{
+    success: boolean
+    message?: string
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/drivers/${driverId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ isActive }),
+      })
+      if (!response.ok) return { success: false }
+      const result = await response.json()
+      return { success: result.success || false, message: result.message }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in updateDriverStatus:', error)
+      return { success: false }
+    }
+  }
+
+  /**
+   * Récupère les détails d'un client
+   */
+  async getClientDetails(clientId: string): Promise<{
+    success: boolean
+    data?: any
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/clients/${clientId}/details`)
+      if (!response.ok) return { success: false }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getClientDetails:', error)
+      return { success: false }
+    }
+  }
+
+  /**
+   * Récupère les statistiques d'un client
+   */
+  async getClientStatistics(clientId: string): Promise<{
+    success: boolean
+    data?: any
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/clients/${clientId}/statistics`)
+      if (!response.ok) return { success: false }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getClientStatistics:', error)
+      return { success: false }
+    }
+  }
+
+  /**
+   * Récupère toutes les évaluations
+   */
+  async getRatings(params?: {
+    page?: number
+    limit?: number
+    driverId?: string
+    clientId?: string
+    minRating?: number
+    startDate?: string
+    endDate?: string
+  }): Promise<{
+    success: boolean
+    data?: any[]
+    pagination?: { page: number; limit: number; total: number; totalPages: number }
+  }> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params?.page) queryParams.append('page', params.page.toString())
+      if (params?.limit) queryParams.append('limit', params.limit.toString())
+      if (params?.driverId) queryParams.append('driverId', params.driverId)
+      if (params?.clientId) queryParams.append('clientId', params.clientId)
+      if (params?.minRating) queryParams.append('minRating', params.minRating.toString())
+      if (params?.startDate) queryParams.append('startDate', params.startDate)
+      if (params?.endDate) queryParams.append('endDate', params.endDate)
+
+      const url = `${API_BASE_URL}/api/admin/ratings${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      if (!response.ok) return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data || [], pagination: result.pagination }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getRatings:', error)
+      return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
+    }
+  }
+
+  /**
+   * Supprime une évaluation
+   */
+  async deleteRating(ratingId: string): Promise<{
+    success: boolean
+    message?: string
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/ratings/${ratingId}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) return { success: false }
+      const result = await response.json()
+      return { success: result.success || false, message: result.message }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in deleteRating:', error)
+      return { success: false }
+    }
+  }
+
+  /**
+   * Récupère tous les codes promo
+   */
+  async getPromoCodes(): Promise<{
+    success: boolean
+    data?: any[]
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/promo-codes`)
+      if (!response.ok) return { success: false, data: [] }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data || [] }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getPromoCodes:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  /**
+   * Crée un nouveau code promo
+   */
+  async createPromoCode(data: {
+    code: string
+    discountType: 'percentage' | 'fixed'
+    discountValue: number
+    maxUses?: number
+    validFrom?: string
+    validUntil?: string
+    isActive?: boolean
+  }): Promise<{
+    success: boolean
+    data?: any
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/promo-codes`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+      if (!response.ok) return { success: false }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in createPromoCode:', error)
+      return { success: false }
+    }
+  }
+
+  /**
+   * Récupère toutes les disputes
+   */
+  async getDisputes(params?: {
+    page?: number
+    limit?: number
+    status?: string
+  }): Promise<{
+    success: boolean
+    data?: any[]
+    pagination?: { page: number; limit: number; total: number; totalPages: number }
+  }> {
+    try {
+      const queryParams = new URLSearchParams()
+      if (params?.page) queryParams.append('page', params.page.toString())
+      if (params?.limit) queryParams.append('limit', params.limit.toString())
+      if (params?.status) queryParams.append('status', params.status)
+
+      const url = `${API_BASE_URL}/api/admin/disputes${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      if (!response.ok) return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data || [], pagination: result.pagination }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in getDisputes:', error)
+      return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
+    }
+  }
+
+  /**
+   * Met à jour une dispute
+   */
+  async updateDispute(disputeId: string, data: {
+    status?: string
+    adminNotes?: string
+  }): Promise<{
+    success: boolean
+    data?: any
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/disputes/${disputeId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      })
+      if (!response.ok) return { success: false }
+      const result = await response.json()
+      return { success: result.success || false, data: result.data }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in updateDispute:', error)
+      return { success: false }
     }
   }
 }

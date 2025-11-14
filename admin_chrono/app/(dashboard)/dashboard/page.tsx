@@ -7,7 +7,7 @@ import TrackerCard from '@/components/dashboard/TrackerCard'
 import QuickMessage from '@/components/dashboard/QuickMessage'
 import { useQuery } from '@tanstack/react-query'
 import { getDashboardStats } from '@/lib/dashboardApi'
-import { Truck, ShieldCheck, DollarSign, Calendar } from 'lucide-react'
+import { Truck, ShieldCheck, DollarSign, Calendar, Star, Clock, XCircle, Users, UserCheck } from 'lucide-react'
 
 export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -153,6 +153,62 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* Nouveaux KPIs supplémentaires */}
+      {stats && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '12px',
+          marginBottom: '16px',
+        }}>
+          <KPICard
+            title="Taux de satisfaction"
+            value={stats.averageRating ? `${stats.averageRating.toFixed(1)} ⭐` : 'N/A'}
+            change={0}
+            subtitle={`${stats.totalRatings || 0} évaluations`}
+            icon={Star}
+            iconColor="text-yellow-600"
+            isLoading={statsLoading}
+          />
+          <KPICard
+            title="Temps moyen"
+            value={stats.averageDeliveryTime ? `${stats.averageDeliveryTime} min` : 'N/A'}
+            change={0}
+            subtitle="Temps de livraison"
+            icon={Clock}
+            iconColor="text-blue-600"
+            isLoading={statsLoading}
+          />
+          <KPICard
+            title="Taux d'annulation"
+            value={stats.cancellationRate ? `${stats.cancellationRate.toFixed(1)}%` : '0%'}
+            change={0}
+            subtitle="Cette semaine"
+            icon={XCircle}
+            iconColor="text-red-600"
+            isLoading={statsLoading}
+          />
+          <KPICard
+            title="Clients actifs"
+            value={stats.activeClients || 0}
+            change={0}
+            subtitle="Cette semaine"
+            icon={Users}
+            iconColor="text-green-600"
+            isLoading={statsLoading}
+          />
+          <KPICard
+            title="Drivers actifs"
+            value={stats.activeDrivers || 0}
+            change={0}
+            subtitle="Cette semaine"
+            icon={UserCheck}
+            iconColor="text-purple-600"
+            isLoading={statsLoading}
+          />
+        </div>
+      )}
 
       <div style={mainGridStyle}>
         {/* Colonne gauche : 3 cartes KPI empilées */}

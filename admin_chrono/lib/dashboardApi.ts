@@ -8,6 +8,13 @@ export interface DashboardStats {
   successDeliveriesChange: number
   revenue: number
   revenueChange: number
+  // Nouvelles métriques
+  averageRating?: number
+  totalRatings?: number
+  averageDeliveryTime?: number
+  cancellationRate?: number
+  activeClients?: number
+  activeDrivers?: number
 }
 
 export interface DeliveryAnalyticsData {

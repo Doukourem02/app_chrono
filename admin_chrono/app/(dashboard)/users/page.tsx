@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Search, User, Truck, Shield } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ChevronLeft, ChevronRight, Search, User, Truck, Shield, Eye } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 
 interface UserData {
@@ -14,6 +15,7 @@ interface UserData {
 }
 
 export default function UsersPage() {
+  const router = useRouter()
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
@@ -358,6 +360,7 @@ export default function UsersPage() {
                     <th style={thStyle}>Téléphone</th>
                     <th style={thStyle}>Rôle</th>
                     <th style={thStyle}>Date de création</th>
+                    <th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -388,6 +391,33 @@ export default function UsersPage() {
                       </td>
                       <td style={tdStyle}>
                         <span style={{ fontSize: '14px', color: '#374151' }}>{user.createdAt}</span>
+                      </td>
+                      <td style={tdStyle}>
+                        <button
+                          onClick={() => router.push(`/users/${user.id}`)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            backgroundColor: '#8B5CF6',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#7C3AED'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#8B5CF6'
+                          }}
+                        >
+                          <Eye size={14} />
+                          Voir
+                        </button>
                       </td>
                     </tr>
                   ))}

@@ -12,6 +12,7 @@ import {
   Calendar,
   Users,
   Settings,
+  Star,
 } from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
@@ -28,6 +29,7 @@ const navigation = [
   { href: "/finance", icon: Wallet },
   { href: "/planning", icon: Calendar },
   { href: "/users", icon: Users },
+  { href: "/ratings", icon: Star },
   { href: "/settings", icon: Settings },
 ];
 

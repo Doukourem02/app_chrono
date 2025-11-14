@@ -56,8 +56,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('🔍 Checking user existence:', { userId: user.id, email: user.email })
-
     // Vérifier si l'utilisateur existe dans la table users
     const { data: existingUser, error: checkError } = await supabaseAdmin
       .from('users')
@@ -65,10 +63,14 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    console.log('🔍 User check result:', { existingUser, checkError })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 User check result:', { hasUser: !!existingUser, error: checkError?.code })
+    }
 
     if (checkError && checkError.code === 'PGRST116') {
-      console.log('📝 User does not exist, creating...')
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📝 User does not exist, creating...')
+      }
       // L'utilisateur n'existe pas, le créer
       // D'abord, vérifier si la colonne avatar_url existe en essayant de l'insérer
       const insertData: {
@@ -101,40 +103,64 @@ export async function POST(request: NextRequest) {
               .insert([insertData])
             
             if (insertError2) {
-              console.error('Error creating user profile:', insertError2)
+              if (process.env.NODE_ENV === 'development') {
+                console.error('Error creating user profile:', insertError2)
+              }
               return NextResponse.json(
                 { 
-                  error: insertError2.message || 'Error creating user profile',
-                  hint: 'La colonne avatar_url n\'existe peut-être pas dans la table users. Exécutez le script SQL dans migrations/add_avatar_url_to_users.sql'
+                  error: process.env.NODE_ENV === 'production' 
+                    ? 'Error creating user profile'
+                    : (insertError2.message || 'Error creating user profile'),
+                  hint: process.env.NODE_ENV === 'development' 
+                    ? 'La colonne avatar_url n\'existe peut-être pas dans la table users. Exécutez le script SQL dans migrations/add_avatar_url_to_users.sql'
+                    : undefined
                 },
                 { status: 500 }
               )
             }
           } else {
-            console.error('Error creating user profile:', insertError)
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Error creating user profile:', insertError)
+            }
             return NextResponse.json(
-              { error: insertError.message || 'Error creating user profile' },
+              { 
+                error: process.env.NODE_ENV === 'production'
+                  ? 'Error creating user profile'
+                  : (insertError.message || 'Error creating user profile')
+              },
               { status: 500 }
             )
           }
         }
       } catch (err) {
-        console.error('Error in insert:', err)
-        const errorMessage = err instanceof Error ? err.message : 'Error creating user profile'
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in insert:', err)
+        }
+        const errorMessage = process.env.NODE_ENV === 'production'
+          ? 'Error creating user profile'
+          : (err instanceof Error ? err.message : 'Error creating user profile')
         return NextResponse.json(
           { error: errorMessage },
           { status: 500 }
         )
       }
     } else if (checkError) {
-      console.error('Error checking user profile:', checkError)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error checking user profile:', checkError)
+      }
       return NextResponse.json(
-        { error: checkError.message || 'Error checking user profile' },
+        { 
+          error: process.env.NODE_ENV === 'production'
+            ? 'Error checking user profile'
+            : (checkError.message || 'Error checking user profile')
+        },
         { status: 500 }
       )
     } else {
       // L'utilisateur existe, mettre à jour
-      console.log('📝 User exists, updating avatar_url...')
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📝 User exists, updating avatar_url...')
+      }
       // Essayer de mettre à jour avatar_url, mais gérer le cas où la colonne n'existe pas
       try {
         const { data: updateData, error: updateError } = await supabaseAdmin
@@ -143,15 +169,19 @@ export async function POST(request: NextRequest) {
           .eq('id', user.id)
           .select()
 
-        console.log('📝 Update result:', { updateData, updateError })
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📝 Update result:', { hasData: !!updateData, error: updateError?.code })
+        }
 
         if (updateError) {
-          console.error('❌ Update error details:', {
-            message: updateError.message,
-            code: updateError.code,
-            details: updateError.details,
-            hint: updateError.hint,
-          })
+          if (process.env.NODE_ENV === 'development') {
+            console.error('❌ Update error details:', {
+              message: updateError.message,
+              code: updateError.code,
+              details: updateError.details,
+              hint: updateError.hint,
+            })
+          }
 
           // Si l'erreur est due à la colonne manquante
           if (
@@ -179,9 +209,13 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        console.log('✅ Avatar URL updated successfully')
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Avatar URL updated successfully')
+        }
       } catch (err) {
-        console.error('❌ Error in update catch:', err)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ Error in update catch:', err)
+        }
         const errorMessage = err instanceof Error ? err.message : 'Error updating profile'
         return NextResponse.json(
           { 
@@ -198,8 +232,12 @@ export async function POST(request: NextRequest) {
       message: 'Avatar URL updated successfully',
     })
   } catch (error) {
-    console.error('Error in update-avatar-url API:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error'
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error in update-avatar-url API:', error)
+    }
+    const errorMessage = process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : (error instanceof Error ? error.message : 'Internal server error')
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

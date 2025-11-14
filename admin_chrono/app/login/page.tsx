@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -22,7 +24,13 @@ export default function LoginPage() {
     if (!supabaseUrl || !supabaseKey || supabaseUrl === 'https://placeholder.supabase.co') {
       setConfigError(true)
     }
-  }, [])
+
+    // Vérifier s'il y a un message d'erreur dans l'URL
+    const errorParam = searchParams.get('error')
+    if (errorParam === 'access_denied') {
+      setError('Accès refusé. Vous devez être administrateur.')
+    }
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,7 +56,9 @@ export default function LoginPage() {
           return
         }
 
-        router.push('/dashboard')
+        // Rediriger vers la page demandée ou le dashboard
+        const redirect = searchParams.get('redirect') || '/dashboard'
+        router.push(redirect)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue lors de la connexion'
@@ -58,21 +68,164 @@ export default function LoginPage() {
     }
   }
 
+  const containerStyle: React.CSSProperties = {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9FAFB',
+    padding: '16px',
+  }
+
+  const cardStyle: React.CSSProperties = {
+    maxWidth: '448px',
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: '16px',
+    boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+    padding: '32px',
+  }
+
+  const headerStyle: React.CSSProperties = {
+    textAlign: 'center',
+    marginBottom: '32px',
+  }
+
+  const logoContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 16px',
+    width: '120px',
+    height: '120px',
+    position: 'relative',
+  }
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: '24px',
+    fontWeight: 700,
+    color: '#111827',
+    marginBottom: '8px',
+  }
+
+  const subtitleStyle: React.CSSProperties = {
+    fontSize: '14px',
+    color: '#6B7280',
+    marginTop: '8px',
+  }
+
+  const formStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px',
+  }
+
+  const errorStyle: React.CSSProperties = {
+    backgroundColor: '#FEF2F2',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#FECACA',
+    color: '#991B1B',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    fontSize: '14px',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: '14px',
+    fontWeight: 500,
+    color: '#374151',
+    marginBottom: '8px',
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#D1D5DB',
+    borderRadius: '8px',
+    fontSize: '14px',
+    outline: 'none',
+    transition: 'all 0.2s',
+  }
+
+  const buttonStyle: React.CSSProperties = {
+    width: '100%',
+    backgroundColor: '#8B5CF6',
+    color: '#FFFFFF',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 500,
+    border: 'none',
+    cursor: loading ? 'not-allowed' : 'pointer',
+    opacity: loading ? 0.5 : 1,
+    transition: 'background-color 0.2s',
+  }
+
+  const configErrorContainerStyle: React.CSSProperties = {
+    ...containerStyle,
+  }
+
+  const configErrorCardStyle: React.CSSProperties = {
+    ...cardStyle,
+  }
+
+  const configErrorIconStyle: React.CSSProperties = {
+    width: '64px',
+    height: '64px',
+    backgroundColor: '#FEE2E2',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 16px',
+  }
+
+  const codeStyle: React.CSSProperties = {
+    backgroundColor: '#F3F4F6',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    borderRadius: '4px',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+  }
+
+  const codeBlockStyle: React.CSSProperties = {
+    backgroundColor: '#F3F4F6',
+    padding: '16px',
+    borderRadius: '8px',
+    textAlign: 'left',
+    fontSize: '12px',
+    fontFamily: 'monospace',
+    marginTop: '16px',
+  }
+
   if (configError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div style={configErrorContainerStyle}>
+        <div style={configErrorCardStyle}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={configErrorIconStyle}>
+              <svg style={{ width: '32px', height: '32px', color: '#DC2626' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Configuration requise</h1>
-            <p className="text-gray-600 mb-4">
-              Supabase n&apos;est pas configuré. Veuillez créer un fichier <code className="bg-gray-100 px-2 py-1 rounded">.env.local</code> à la racine du projet avec :
+            <h1 style={titleStyle}>Configuration requise</h1>
+            <p style={{ ...subtitleStyle, marginBottom: '16px' }}>
+              Supabase n&apos;est pas configuré. Veuillez créer un fichier <code style={codeStyle}>.env.local</code> à la racine du projet avec :
             </p>
-            <div className="bg-gray-100 p-4 rounded-lg text-left text-sm font-mono">
+            <div style={codeBlockStyle}>
               <div>NEXT_PUBLIC_SUPABASE_URL=your_supabase_url</div>
               <div>NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key</div>
             </div>
@@ -83,25 +236,34 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <div className="w-10 h-10 bg-white rounded-lg"></div>
+    <div style={containerStyle}>
+      <div style={cardStyle}>
+        <div style={headerStyle}>
+          <div style={logoContainerStyle}>
+            <Image
+              src="/assets/logo.png"
+              alt="Chrono Admin Logo"
+              width={120}
+              height={120}
+              style={{
+                objectFit: 'contain',
+              }}
+              priority
+            />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Chrono Admin</h1>
-          <p className="text-gray-600 mt-2">Connectez-vous à votre compte</p>
+          <h1 style={titleStyle}>Chrono Admin</h1>
+          <p style={subtitleStyle}>Connectez-vous à votre compte</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} style={formStyle}>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            <div style={errorStyle}>
               {error}
             </div>
           )}
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="email" style={labelStyle}>
               Email
             </label>
             <input
@@ -110,13 +272,23 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               placeholder="admin@chrono.com"
+              style={{
+                ...inputStyle,
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#8B5CF6'
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#D1D5DB'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" style={labelStyle}>
               Mot de passe
             </label>
             <input
@@ -125,15 +297,35 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               placeholder="••••••••"
+              style={{
+                ...inputStyle,
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#8B5CF6'
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#D1D5DB'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={buttonStyle}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#7C3AED'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#8B5CF6'
+              }
+            }}
           >
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>

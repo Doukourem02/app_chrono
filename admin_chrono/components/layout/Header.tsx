@@ -143,9 +143,14 @@ export default function Header() {
   }
 
   const buttonStyle: React.CSSProperties = {
-    padding: '12px',
+    paddingTop: '12px',
+    paddingBottom: '12px',
+    paddingLeft: '12px',
+    paddingRight: '12px',
     borderRadius: '12px',
-    border: '1px solid #E5E7EB',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#E5E7EB',
     backgroundColor: 'transparent',
     color: '#6B7280',
     cursor: 'pointer',
@@ -210,6 +215,8 @@ export default function Header() {
   const activeFilterStyle: React.CSSProperties = {
     ...buttonStyle,
     backgroundColor: '#8B5CF6',
+    borderWidth: '1px',
+    borderStyle: 'solid',
     borderColor: '#8B5CF6',
     color: '#FFFFFF',
   }

@@ -92,9 +92,15 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      console.error('Upload error:', uploadError)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Upload error:', uploadError)
+      }
       return NextResponse.json(
-        { error: uploadError.message },
+        { 
+          error: process.env.NODE_ENV === 'production' 
+            ? 'Erreur lors de l\'upload' 
+            : uploadError.message 
+        },
         { status: 500 }
       )
     }
@@ -110,8 +116,12 @@ export async function POST(request: NextRequest) {
       path: filePath,
     })
   } catch (error) {
-    console.error('Error in upload-avatar API:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error'
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error in upload-avatar API:', error)
+    }
+    const errorMessage = process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : (error instanceof Error ? error.message : 'Internal server error')
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
