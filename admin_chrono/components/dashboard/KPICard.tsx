@@ -9,6 +9,7 @@ interface KPICardProps {
   subtitle: string
   icon: LucideIcon
   iconColor?: string
+  isLoading?: boolean
 }
 
 export default function KPICard({
@@ -17,26 +18,114 @@ export default function KPICard({
   change,
   subtitle,
   icon: Icon,
-  iconColor = 'text-purple-600',
+  iconColor = 'text-blue-600',
+  isLoading = false,
 }: KPICardProps) {
   const isPositive = change >= 0
-  const formattedValue = typeof value === 'number' ? value.toLocaleString() : value
+  const formattedValue = typeof value === 'number' 
+    ? value.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    : value
+
+  const cardStyle: React.CSSProperties = {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '16px',
+    padding: '16px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #F3F4F6',
+  }
+
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: '12px',
+  }
+
+  const getIconBgColor = () => {
+    if (iconColor === 'text-blue-600') return '#EFF6FF'
+    if (iconColor === 'text-green-600') return '#F0FDF4'
+    return '#FAF5FF'
+  }
+
+  const getIconColor = () => {
+    if (iconColor === 'text-blue-600') return '#2563EB'
+    if (iconColor === 'text-green-600') return '#16A34A'
+    return '#9333EA'
+  }
+
+  const iconContainerStyle: React.CSSProperties = {
+    padding: '8px',
+    borderRadius: '12px',
+    backgroundColor: getIconBgColor(),
+  }
+
+  const iconStyle: React.CSSProperties = {
+    width: '20px',
+    height: '20px',
+    color: getIconColor(),
+  }
+
+  const changeStyle: React.CSSProperties = {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: isPositive ? '#16A34A' : '#DC2626',
+  }
+
+  const contentStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  }
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: '14px',
+    color: '#4B5563',
+    fontWeight: 500,
+  }
+
+  const valueStyle: React.CSSProperties = {
+    fontSize: '30px',
+    fontWeight: 700,
+    color: '#111827',
+  }
+
+  const subtitleStyle: React.CSSProperties = {
+    fontSize: '12px',
+    color: '#6B7280',
+  }
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-xl bg-gray-50 ${iconColor}`}>
-          <Icon className="w-6 h-6" />
+    <div style={cardStyle}>
+      <div style={headerStyle}>
+        <div style={iconContainerStyle}>
+          <Icon style={iconStyle} />
         </div>
-        <div className={`text-sm font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-          {isPositive ? '+' : ''}{change}%
-        </div>
+        {!isLoading && (
+          <div style={changeStyle}>
+            {isPositive ? '+' : ''}{change.toFixed(1).replace('.', ',')}%
+          </div>
+        )}
       </div>
       
-      <div className="space-y-1">
-        <h3 className="text-sm text-gray-600 font-medium">{title}</h3>
-        <p className="text-2xl font-bold text-gray-900">{formattedValue}</p>
-        <p className="text-xs text-gray-500">{subtitle}</p>
+      <div style={contentStyle}>
+        <h3 style={titleStyle}>{title}</h3>
+        <p style={valueStyle}>
+          {isLoading ? (
+            <span
+              style={{
+                display: 'inline-block',
+                width: '80px',
+                height: '32px',
+                backgroundColor: '#E5E7EB',
+                borderRadius: '4px',
+                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              }}
+            ></span>
+          ) : (
+            formattedValue
+          )}
+        </p>
+        <p style={subtitleStyle}>{subtitle}</p>
       </div>
     </div>
   )

@@ -2,13 +2,14 @@
 
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, loading, setUser, setLoading, checkAdminRole } = useAuthStore()
 
   useEffect(() => {
@@ -37,24 +38,76 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Chargement...</div>
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <div style={{ color: '#4B5563' }}>Chargement...</div>
       </div>
     )
   }
 
   if (!user) return null
 
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    height: '100vh',
+    backgroundColor: '#F5F6FA',
+  }
+
+  const contentWrapperStyle: React.CSSProperties = {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  }
+
+  const scrollableStyle: React.CSSProperties = {
+    flex: 1,
+    overflowY: 'auto',
+  }
+
+  const innerContainerStyle: React.CSSProperties = {
+    paddingLeft: '16px',
+    paddingRight: '24px',
+    paddingTop: '16px',
+    paddingBottom: '16px',
+    minHeight: '100%',
+  }
+
+  const maxWidthContainerStyle: React.CSSProperties = {
+    maxWidth: '1152px',
+    margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  }
+
+  // Vérifier si on est sur la page tracking pour ajuster le layout
+  const isTrackingPage = pathname?.includes('/tracking')
+
   return (
-    <div className="flex h-screen bg-[#F5F6FA] p-4">
+    <div style={containerStyle}>
       <Sidebar />
-
-      <div className="flex-1 flex flex-col ml-6">
-        <Header />
-
-        <main className="flex-1 overflow-y-auto p-2">
-          {children}
-        </main>
+      <div style={contentWrapperStyle}>
+        <div style={scrollableStyle}>
+          {isTrackingPage ? (
+            <main style={{ height: '100%', padding: 0 }}>
+              {children}
+            </main>
+          ) : (
+            <div style={innerContainerStyle}>
+              <div style={maxWidthContainerStyle}>
+                <Header />
+                <main>
+                  {children}
+                </main>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

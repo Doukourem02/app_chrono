@@ -27,42 +27,168 @@ const contacts: MessageContact[] = [
   },
 ]
 
+const totalOnline = 24
+
 export default function QuickMessage() {
-  const onlineCount = contacts.filter((c) => c.status === 'online').length
+  const cardStyle: React.CSSProperties = {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '16px',
+    padding: '16px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #F3F4F6',
+    flex: 0.8,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+  }
+
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '12px',
+    flexShrink: 0,
+  }
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#111827',
+  }
+
+  const onlineBadgeStyle: React.CSSProperties = {
+    paddingLeft: '12px',
+    paddingRight: '12px',
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    backgroundColor: '#D1FAE5',
+    color: '#16A34A',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: 600,
+  }
+
+  const contactsListStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'auto',
+  }
+
+  const contactItemStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '12px',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+  }
+
+  const avatarContainerStyle: React.CSSProperties = {
+    position: 'relative',
+  }
+
+  const avatarStyle: React.CSSProperties = {
+    width: '48px',
+    height: '48px',
+    backgroundColor: '#9333EA',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#FFFFFF',
+    fontWeight: 700,
+    fontSize: '14px',
+  }
+
+  const onlineIndicatorStyle: React.CSSProperties = {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: '12px',
+    height: '12px',
+    backgroundColor: '#22C55E',
+    borderRadius: '50%',
+    border: '2px solid #FFFFFF',
+  }
+
+  const contactInfoStyle: React.CSSProperties = {
+    flex: 1,
+    minWidth: 0,
+  }
+
+  const contactHeaderStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '4px',
+  }
+
+  const contactNameStyle: React.CSSProperties = {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#111827',
+  }
+
+  const unreadBadgeStyle: React.CSSProperties = {
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    backgroundColor: '#2563EB',
+    color: '#FFFFFF',
+    fontSize: '12px',
+    fontWeight: 600,
+    borderRadius: '4px',
+  }
+
+  const contactStatusStyle: React.CSSProperties = {
+    fontSize: '12px',
+    color: '#6B7280',
+  }
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-bold text-gray-900">Quick Message</h2>
-        <span className="px-3 py-1 bg-green-100 text-green-600 rounded-lg text-xs font-semibold">
-          {onlineCount} Online
+    <div style={cardStyle}>
+      <div style={headerStyle}>
+        <h2 style={titleStyle}>Quick Message</h2>
+        <span style={onlineBadgeStyle}>
+          {totalOnline} Online
         </span>
       </div>
 
-      <div className="space-y-4">
+      <div style={contactsListStyle}>
         {contacts.map((contact) => (
           <div
             key={contact.id}
-            className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+            style={contactItemStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#F9FAFB'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+            }}
           >
-            <div className="relative">
-              <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+            <div style={avatarContainerStyle}>
+              <div style={avatarStyle}>
                 {contact.avatar}
               </div>
               {contact.status === 'online' && (
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                <div style={onlineIndicatorStyle}></div>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-semibold text-gray-900">{contact.name}</p>
+            <div style={contactInfoStyle}>
+              <div style={contactHeaderStyle}>
+                <p style={contactNameStyle}>{contact.name}</p>
                 {contact.unreadCount && (
-                  <span className="px-2 py-0.5 bg-blue-600 text-white text-xs font-semibold rounded-full">
+                  <span style={unreadBadgeStyle}>
                     {contact.unreadCount} new message
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500">
+              <p style={contactStatusStyle}>
                 {contact.status === 'online' ? 'Online' : 'Offline'} {contact.lastSeen}
               </p>
             </div>

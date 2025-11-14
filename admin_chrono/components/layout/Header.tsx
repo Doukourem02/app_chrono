@@ -1,61 +1,154 @@
 'use client'
 
-import { Search, Filter, Bell, Calendar } from 'lucide-react'
+import { Search, Bell, Calendar, SlidersHorizontal } from 'lucide-react'
 import { useState } from 'react'
 
 export default function Header() {
   const [query, setQuery] = useState('')
 
+  const headerStyle: React.CSSProperties = {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '28px',
+    boxShadow: '0 15px 35px rgba(15,23,42,0.08)',
+    border: '1px solid #F3F4F6',
+    paddingLeft: '16px',
+    paddingRight: '24px',
+    paddingTop: '12px',
+    paddingBottom: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  }
+
+  const searchContainerStyle: React.CSSProperties = {
+    flex: 1,
+    position: 'relative',
+  }
+
+  const searchIconStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: '16px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '20px',
+    height: '20px',
+    color: '#9CA3AF',
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    paddingLeft: '48px',
+    paddingRight: '16px',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    backgroundColor: '#F5F6FA',
+    borderRadius: '16px',
+    border: 'none',
+    outline: 'none',
+    fontSize: '14px',
+  }
+
+  const buttonsContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  }
+
+  const buttonStyle: React.CSSProperties = {
+    padding: '12px',
+    borderRadius: '12px',
+    border: '1px solid #E5E7EB',
+    backgroundColor: 'transparent',
+    color: '#6B7280',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background-color 0.2s',
+  }
+
+  const monthButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    gap: '8px',
+    paddingLeft: '16px',
+    paddingRight: '16px',
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    fontSize: '14px',
+    fontWeight: 500,
+    color: '#374151',
+  }
+
+  const notificationButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    position: 'relative',
+    color: '#4B5563',
+  }
+
+  const notificationDotStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '4px',
+    right: '4px',
+    width: '10px',
+    height: '10px',
+    backgroundColor: '#EF4444',
+    borderRadius: '50%',
+  }
+
   return (
-    <div className="
-      bg-white
-      shadow-sm
-      border
-      border-gray-100
-      rounded-2xl
-      px-8 py-4
-      flex items-center justify-between
-      mb-6
-    ">
-      
-      {/* Search bar */}
-      <div className="flex-1 max-w-xl relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+    <div style={headerStyle}>
+      <div style={searchContainerStyle}>
+        <Search style={searchIconStyle} />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search orders, drivers, customers..."
-          className="
-            w-full pl-12 pr-12 py-3
-            bg-[#F5F6FA]
-            rounded-xl
-            focus:outline-none
-            focus:ring-2 focus:ring-purple-500
-            text-sm
-          "
+          style={inputStyle}
+          onFocus={(e) => {
+            e.target.style.boxShadow = '0 0 0 2px rgba(99, 102, 241, 0.2)'
+          }}
+          onBlur={(e) => {
+            e.target.style.boxShadow = 'none'
+          }}
         />
-        <button className="absolute right-4 top-1/2 -translate-y-1/2">
-          <Filter className="w-5 h-5 text-gray-400" />
-        </button>
       </div>
 
-      {/* Right section */}
-      <div className="flex items-center gap-6 ml-8">
-        <button className="flex items-center gap-2 px-4 py-2 bg-[#F5F6FA] rounded-xl text-gray-700">
-          <Calendar className="w-5 h-5" />
-          <span className="text-sm">Ce mois</span>
+      <div style={buttonsContainerStyle}>
+        <button
+          style={buttonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#F9FAFB'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+          }}
+        >
+          <SlidersHorizontal size={20} />
         </button>
-
-        <div className="text-sm text-gray-700">11 December 2024</div>
-
-        <button className="px-5 py-2 bg-blue-600 text-white rounded-xl shadow-sm hover:bg-blue-700">
-          + New Shipping
+        <button
+          style={monthButtonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#F9FAFB'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+          }}
+        >
+          <span style={{ color: '#6B7280' }}>Ce mois</span>
+          <Calendar size={16} style={{ color: '#6B7280' }} />
         </button>
-
-        <button className="relative p-2 rounded-xl hover:bg-gray-100">
-          <Bell className="w-6 h-6 text-gray-700" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+        <button
+          style={notificationButtonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#F9FAFB'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+          }}
+        >
+          <Bell size={20} />
+          <span style={notificationDotStyle}></span>
         </button>
       </div>
     </div>

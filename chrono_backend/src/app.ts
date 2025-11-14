@@ -10,6 +10,7 @@ import ratingRoutes from './routes/ratingRoutes.js';
 import syncRoutes from './routes/syncRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSwagger } from './config/swagger.js';
 
@@ -55,6 +56,9 @@ const allowedOrigins =
   process.env.ALLOWED_ORIGINS?.split(',') || [
     'http://localhost:808',
     'http://localhost:9006',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://192.168.1.85:3000',
     'exp://localhost:808',
   ];
 
@@ -98,6 +102,7 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use(errorHandler);
 
