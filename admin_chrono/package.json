@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "create-admin": "node scripts/create-admin.js"
+    "create-admin": "node scripts/create-admin.js",
+    "create-avatars-bucket": "node scripts/create-avatars-bucket.js",
+    "add-avatar-column": "node scripts/add-avatar-url-column.js"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.7",

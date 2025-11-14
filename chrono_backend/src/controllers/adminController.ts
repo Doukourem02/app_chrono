@@ -347,6 +347,142 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
 };
 
 /**
+ * Recherche globale dans les commandes, utilisateurs, etc.
+ */
+export const getAdminGlobalSearch = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const query = req.query.q as string | undefined;
+    logger.info('🚀 [getAdminGlobalSearch] DÉBUT, query:', query);
+
+    if (!query || query.trim().length === 0) {
+      res.json({
+        success: true,
+        data: {
+          orders: [],
+          users: [],
+        },
+      });
+      return;
+    }
+
+    if (!process.env.DATABASE_URL) {
+      logger.warn('DATABASE_URL non configuré pour getAdminGlobalSearch');
+      res.json({
+        success: true,
+        data: {
+          orders: [],
+          users: [],
+        },
+      });
+      return;
+    }
+
+    const searchTerm = `%${query.trim()}%`;
+
+    // Rechercher dans les commandes
+    const ordersQuery = `
+      SELECT id, status, created_at, pickup_address, dropoff_address
+      FROM orders
+      WHERE 
+        id::text ILIKE $1 OR
+        status::text ILIKE $1 OR
+        pickup_address::text ILIKE $1 OR
+        dropoff_address::text ILIKE $1
+      ORDER BY created_at DESC
+      LIMIT 10
+    `;
+
+    // Rechercher dans les utilisateurs
+    const usersQuery = `
+      SELECT id, email, phone, role, created_at
+      FROM users
+      WHERE 
+        email ILIKE $1 OR
+        phone ILIKE $1 OR
+        role ILIKE $1
+      ORDER BY created_at DESC
+      LIMIT 10
+    `;
+
+    let ordersResult, usersResult;
+    try {
+      ordersResult = await (pool as any).query(ordersQuery, [searchTerm]);
+      usersResult = await (pool as any).query(usersQuery, [searchTerm]);
+    } catch (queryError: any) {
+      logger.error('❌ [getAdminGlobalSearch] Erreur lors de la requête SQL:', queryError);
+      throw queryError;
+    }
+
+    // Helper pour parser JSON
+    const parseJsonField = (field: any): any => {
+      if (!field) return null;
+      if (typeof field === 'string') {
+        try {
+          return JSON.parse(field);
+        } catch {
+          return field;
+        }
+      }
+      return field;
+    };
+
+    const formattedOrders = ordersResult.rows.map((order: any) => {
+      const pickup = parseJsonField(order.pickup_address);
+      const dropoff = parseJsonField(order.dropoff_address);
+      const idParts = order.id.replace(/-/g, '').substring(0, 9);
+      const deliveryId = `${idParts.substring(0, 2)}-${idParts.substring(2, 7)}-${idParts.substring(7, 9)}`.toUpperCase();
+
+      return {
+        id: order.id,
+        deliveryId,
+        status: order.status,
+        pickup: pickup?.address || pickup?.formatted_address || pickup?.name || 'Adresse inconnue',
+        dropoff: dropoff?.address || dropoff?.formatted_address || dropoff?.name || 'Adresse inconnue',
+        createdAt: new Date(order.created_at).toLocaleDateString('fr-FR'),
+      };
+    });
+
+    const formattedUsers = usersResult.rows.map((user: any) => ({
+      id: user.id,
+      email: user.email,
+      phone: user.phone || 'N/A',
+      role: user.role,
+      createdAt: new Date(user.created_at).toLocaleDateString('fr-FR'),
+    }));
+
+    logger.info(`✅ [getAdminGlobalSearch] Résultats: ${formattedOrders.length} commandes, ${formattedUsers.length} utilisateurs`);
+
+    res.json({
+      success: true,
+      data: {
+        orders: formattedOrders,
+        users: formattedUsers,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Erreur getAdminGlobalSearch:', error);
+    
+    if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
+      logger.warn('Erreur de connexion DB, retour de données vides');
+      res.json({
+        success: true,
+        data: {
+          orders: [],
+          users: [],
+        },
+      });
+      return;
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: error.message,
+    });
+  }
+};
+
+/**
  * Récupère les livraisons en cours pour la page tracking
  */
 export const getAdminOngoingDeliveries = async (req: Request, res: Response): Promise<void> => {

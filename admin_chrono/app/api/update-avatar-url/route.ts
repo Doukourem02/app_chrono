@@ -1,0 +1,209 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+// Créer un client Supabase avec service role key pour bypass RLS
+const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : null
+
+export async function POST(request: NextRequest) {
+  try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Supabase not configured' },
+        { status: 500 }
+      )
+    }
+
+    // Vérifier l'authentification de l'utilisateur
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Extraire le token
+    const token = authHeader.replace('Bearer ', '')
+    
+    // Vérifier le token avec Supabase
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      )
+    }
+
+    // Récupérer les données
+    const body = await request.json()
+    const { avatarUrl } = body
+
+    if (!avatarUrl) {
+      return NextResponse.json(
+        { error: 'avatarUrl is required' },
+        { status: 400 }
+      )
+    }
+
+    console.log('🔍 Checking user existence:', { userId: user.id, email: user.email })
+
+    // Vérifier si l'utilisateur existe dans la table users
+    const { data: existingUser, error: checkError } = await supabaseAdmin
+      .from('users')
+      .select('id, email, role')
+      .eq('id', user.id)
+      .single()
+
+    console.log('🔍 User check result:', { existingUser, checkError })
+
+    if (checkError && checkError.code === 'PGRST116') {
+      console.log('📝 User does not exist, creating...')
+      // L'utilisateur n'existe pas, le créer
+      // D'abord, vérifier si la colonne avatar_url existe en essayant de l'insérer
+      const insertData: {
+        id: string
+        email: string
+        role: string
+        created_at: string
+        avatar_url?: string
+      } = {
+        id: user.id,
+        email: user.email || '',
+        role: 'admin',
+        created_at: new Date().toISOString(),
+      }
+      
+      // Essayer d'ajouter avatar_url seulement si la colonne existe
+      // Sinon, on utilisera une requête SQL directe
+      try {
+        insertData.avatar_url = avatarUrl
+        const { error: insertError } = await supabaseAdmin
+          .from('users')
+          .insert([insertData])
+
+        if (insertError) {
+          // Si l'erreur est due à la colonne manquante, créer l'utilisateur sans avatar_url
+          if (insertError.message.includes('avatar_url') || insertError.message.includes('column')) {
+            delete insertData.avatar_url
+            const { error: insertError2 } = await supabaseAdmin
+              .from('users')
+              .insert([insertData])
+            
+            if (insertError2) {
+              console.error('Error creating user profile:', insertError2)
+              return NextResponse.json(
+                { 
+                  error: insertError2.message || 'Error creating user profile',
+                  hint: 'La colonne avatar_url n\'existe peut-être pas dans la table users. Exécutez le script SQL dans migrations/add_avatar_url_to_users.sql'
+                },
+                { status: 500 }
+              )
+            }
+          } else {
+            console.error('Error creating user profile:', insertError)
+            return NextResponse.json(
+              { error: insertError.message || 'Error creating user profile' },
+              { status: 500 }
+            )
+          }
+        }
+      } catch (err) {
+        console.error('Error in insert:', err)
+        const errorMessage = err instanceof Error ? err.message : 'Error creating user profile'
+        return NextResponse.json(
+          { error: errorMessage },
+          { status: 500 }
+        )
+      }
+    } else if (checkError) {
+      console.error('Error checking user profile:', checkError)
+      return NextResponse.json(
+        { error: checkError.message || 'Error checking user profile' },
+        { status: 500 }
+      )
+    } else {
+      // L'utilisateur existe, mettre à jour
+      console.log('📝 User exists, updating avatar_url...')
+      // Essayer de mettre à jour avatar_url, mais gérer le cas où la colonne n'existe pas
+      try {
+        const { data: updateData, error: updateError } = await supabaseAdmin
+          .from('users')
+          .update({ avatar_url: avatarUrl })
+          .eq('id', user.id)
+          .select()
+
+        console.log('📝 Update result:', { updateData, updateError })
+
+        if (updateError) {
+          console.error('❌ Update error details:', {
+            message: updateError.message,
+            code: updateError.code,
+            details: updateError.details,
+            hint: updateError.hint,
+          })
+
+          // Si l'erreur est due à la colonne manquante
+          if (
+            updateError.message.includes('avatar_url') || 
+            updateError.message.includes('column') ||
+            updateError.message.includes('schema cache') ||
+            updateError.code === '42703'
+          ) {
+            return NextResponse.json(
+              { 
+                error: 'La colonne avatar_url n\'existe pas dans la table users',
+                hint: 'Exécutez ce script SQL dans Supabase SQL Editor:\n\nALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;'
+              },
+              { status: 500 }
+            )
+          }
+          
+          return NextResponse.json(
+            { 
+              error: updateError.message || 'Error updating profile',
+              code: updateError.code,
+              details: updateError.details,
+            },
+            { status: 500 }
+          )
+        }
+
+        console.log('✅ Avatar URL updated successfully')
+      } catch (err) {
+        console.error('❌ Error in update catch:', err)
+        const errorMessage = err instanceof Error ? err.message : 'Error updating profile'
+        return NextResponse.json(
+          { 
+            error: errorMessage,
+            hint: 'La colonne avatar_url n\'existe peut-être pas. Exécutez le script SQL dans migrations/add_avatar_url_to_users.sql'
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Avatar URL updated successfully',
+    })
+  } catch (error) {
+    console.error('Error in update-avatar-url API:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500 }
+    )
+  }
+}
+

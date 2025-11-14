@@ -98,12 +98,37 @@ export const verifyAdminSupabase = async (
     }
 
     // Vérifier le rôle admin dans la base de données
-    const result = await (pool as any).query(
-      'SELECT id, role FROM users WHERE id = $1 OR email = $2',
-      [user.id, user.email]
-    );
+    // Essayer d'abord avec PostgreSQL, puis fallback sur Supabase
+    let dbUser: any = null;
+    
+    try {
+      const result = await (pool as any).query(
+        'SELECT id, role FROM users WHERE id = $1 OR email = $2',
+        [user.id, user.email]
+      );
 
-    if (result.rows.length === 0) {
+      if (result.rows.length > 0) {
+        dbUser = result.rows[0];
+      }
+    } catch (dbError: any) {
+      logger.warn('⚠️ [verifyAdminSupabase] Erreur de connexion PostgreSQL, utilisation de Supabase comme fallback:', dbError.message);
+      
+      // Fallback: utiliser Supabase pour vérifier le rôle
+      if (supabaseUrl && supabaseServiceKey) {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const { data: supabaseUser, error: supabaseError } = await supabase
+          .from('users')
+          .select('id, role')
+          .or(`id.eq.${user.id},email.eq.${user.email}`)
+          .single();
+
+        if (!supabaseError && supabaseUser) {
+          dbUser = supabaseUser;
+        }
+      }
+    }
+
+    if (!dbUser) {
       res.status(401).json({
         success: false,
         message: 'Utilisateur non trouvé dans la base de données',
@@ -111,7 +136,6 @@ export const verifyAdminSupabase = async (
       return;
     }
 
-    const dbUser = result.rows[0];
     if (dbUser.role !== 'admin' && dbUser.role !== 'super_admin') {
       res.status(403).json({
         success: false,

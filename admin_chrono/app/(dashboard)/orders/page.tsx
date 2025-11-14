@@ -60,14 +60,28 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  const { data: ordersData, isLoading } = useQuery({
+  const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ['orders', activeTab],
     queryFn: async () => {
+      console.log('🔍 [OrdersPage] Fetching orders for tab:', activeTab)
       const result = await adminApiService.getOrdersByStatus(activeTab === 'all' ? undefined : activeTab)
+      console.log('🔍 [OrdersPage] Orders result:', result)
       return result
     },
     refetchInterval: 30000,
+    retry: 1,
   })
+
+  // Debug logs
+  React.useEffect(() => {
+    if (isError) {
+      console.error('❌ [OrdersPage] Error loading orders:', error)
+    }
+    if (ordersData) {
+      console.log('🔍 [OrdersPage] Orders data:', ordersData)
+      console.log('🔍 [OrdersPage] Orders count:', ordersData.data?.length || 0)
+    }
+  }, [ordersData, isError, error])
 
   const orders = ordersData?.data || []
   const counts = ordersData?.counts || {

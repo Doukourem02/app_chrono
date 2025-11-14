@@ -1,7 +1,18 @@
 // Service API pour le dashboard admin - utilise le backend API comme les autres apps
 import { supabase } from './supabase'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+// Utiliser EXPO_PUBLIC_API_URL si disponible (comme dans les autres apps), sinon NEXT_PUBLIC_API_URL
+const API_BASE_URL = 
+  process.env.NEXT_PUBLIC_API_URL || 
+  process.env.EXPO_PUBLIC_API_URL ||
+  'http://localhost:4000'
+
+// Log de la configuration au démarrage (uniquement côté client)
+if (typeof window !== 'undefined') {
+  console.log('🔧 [adminApiService] API_BASE_URL configured:', API_BASE_URL)
+  console.log('🔧 [adminApiService] NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL)
+  console.log('🔧 [adminApiService] EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL)
+}
 
 class AdminApiService {
   /**
@@ -22,7 +33,7 @@ class AdminApiService {
   private async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
     const token = await this.getAccessToken()
     if (!token) {
-      console.warn('⚠️ [adminApiService] No access token available')
+      console.error('❌ [adminApiService] No access token available')
       throw new Error('No access token available')
     }
 
@@ -32,10 +43,33 @@ class AdminApiService {
       'Authorization': `Bearer ${token}`,
     }
 
-    console.debug('🔍 [adminApiService] Making request to:', url)
-    console.debug('🔍 [adminApiService] Has token:', !!token)
+    console.log('🔍 [adminApiService] Making request to:', url)
+    console.log('🔍 [adminApiService] API_BASE_URL:', API_BASE_URL)
+    console.log('🔍 [adminApiService] Has token:', !!token)
 
-    return fetch(url, { ...options, headers })
+    try {
+      console.log('🔍 [adminApiService] Attempting fetch to:', url)
+      const response = await fetch(url, { ...options, headers })
+      console.log('🔍 [adminApiService] Response status:', response.status, response.statusText)
+      return response
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Fetch error:', error?.message || error)
+      console.error('❌ [adminApiService] Error type:', error?.name)
+      console.error('❌ [adminApiService] Full error:', error)
+      console.error('❌ [adminApiService] URL attempted:', url)
+      console.error('❌ [adminApiService] API_BASE_URL:', API_BASE_URL)
+      
+      // Vérifier si c'est une erreur réseau
+      if (error?.message?.includes('Load failed') || error?.message?.includes('Failed to fetch') || error?.name === 'TypeError') {
+        console.error('❌ [adminApiService] Network error - Backend may not be running or URL is incorrect')
+        console.error('❌ [adminApiService] Please check:')
+        console.error('   1. Is the backend running? (cd chrono_backend && npm start)')
+        console.error('   2. Is NEXT_PUBLIC_API_URL correct in .env.local?')
+        console.error('   3. Current API_BASE_URL:', API_BASE_URL)
+      }
+      
+      throw error
+    }
   }
 
   /**
@@ -161,7 +195,7 @@ class AdminApiService {
   }> {
     try {
       const url = `${API_BASE_URL}/api/admin/recent-activities?limit=${limit}`
-      console.debug('🔍 [adminApiService] Fetching recent activities from:', url)
+      console.log('🔍 [adminApiService] Fetching recent activities from:', url)
       
       let response: Response
       try {
@@ -323,7 +357,8 @@ class AdminApiService {
   }> {
     try {
       const url = `${API_BASE_URL}/api/admin/orders${status ? `?status=${status}` : ''}`
-      console.debug('🔍 [adminApiService] Fetching orders from:', url)
+      console.log('🔍 [adminApiService] Fetching orders from:', url)
+      console.log('🔍 [adminApiService] Status filter:', status)
       
       let response: Response
       try {
@@ -354,13 +389,18 @@ class AdminApiService {
       
       if (!response.ok) {
         let errorMessage = 'Network error'
+        let errorData: any = null
         try {
-          const error = await response.json()
-          errorMessage = error.message || errorMessage
+          errorData = await response.json()
+          errorMessage = errorData.message || errorMessage
         } catch {
           // Si on ne peut pas parser l'erreur, utiliser le message par défaut
+          const errorText = await response.text().catch(() => 'Unknown error')
+          errorMessage = errorText || errorMessage
         }
-        console.warn('⚠️ [adminApiService] Error fetching orders:', errorMessage)
+        console.error('❌ [adminApiService] Error fetching orders:', errorMessage)
+        console.error('❌ [adminApiService] Error data:', errorData)
+        console.error('❌ [adminApiService] Response status:', response.status)
         return {
           success: false,
           data: [],
@@ -406,10 +446,10 @@ class AdminApiService {
         }
       }
       
-      console.debug('🔍 [adminApiService] Response data:', result)
+      console.log('🔍 [adminApiService] Response data:', result)
       
       if (result.success && result.data && Array.isArray(result.data)) {
-        console.debug(`✅ [adminApiService] Received ${result.data.length} orders`)
+        console.log(`✅ [adminApiService] Received ${result.data.length} orders`)
         return {
           success: true,
           data: result.data,
@@ -466,7 +506,7 @@ class AdminApiService {
   }> {
     try {
       const url = `${API_BASE_URL}/api/admin/users`
-      console.debug('🔍 [adminApiService] Fetching users from:', url)
+      console.log('🔍 [adminApiService] Fetching users from:', url)
       
       let response: Response
       try {
@@ -562,6 +602,72 @@ class AdminApiService {
           driver: 0,
           admin: 0,
           total: 0,
+        },
+      }
+    }
+  }
+
+  /**
+   * Recherche globale
+   */
+  async globalSearch(query: string): Promise<{
+    success: boolean
+    data?: {
+      orders: any[]
+      users: any[]
+    }
+  }> {
+    try {
+      const url = `${API_BASE_URL}/api/admin/search?q=${encodeURIComponent(query)}`
+      console.debug('🔍 [adminApiService] Global search:', url)
+      
+      let response: Response
+      try {
+        response = await this.fetchWithAuth(url)
+      } catch (authError: any) {
+        console.warn('⚠️ [adminApiService] Authentication error:', authError?.message || authError)
+        return {
+          success: false,
+          data: {
+            orders: [],
+            users: [],
+          },
+        }
+      }
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          data: {
+            orders: [],
+            users: [],
+          },
+        }
+      }
+
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        return {
+          success: true,
+          data: result.data,
+        }
+      }
+
+      return {
+        success: false,
+        data: {
+          orders: [],
+          users: [],
+        },
+      }
+    } catch (error: any) {
+      console.error('❌ [adminApiService] Error in globalSearch:', error)
+      return {
+        success: false,
+        data: {
+          orders: [],
+          users: [],
         },
       }
     }

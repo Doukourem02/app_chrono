@@ -47,7 +47,7 @@ const statusConfig: Record<string, { label: string; backgroundColor: string; col
 export default function ActivityTable() {
   const router = useRouter()
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 4 // Limité à 4 comme demandé
+  const itemsPerPage = 3 // Limité à 3 comme demandé
   
   const { data: activities, isLoading, isError, error } = useQuery({
     queryKey: ['recent-activities', currentPage],
@@ -358,25 +358,28 @@ export default function ActivityTable() {
             >
               <ChevronLeft size={20} style={{ color: '#4B5563' }} />
             </button>
-            {[1, 2, 3, 4].map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                style={pageButtonStyle(currentPage === page)}
-                onMouseEnter={(e) => {
-                  if (currentPage !== page) {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (currentPage !== page) {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }
-                }}
-              >
-                {page}
-              </button>
-            ))}
+            {Array.from({ length: Math.min(4, totalPages) }, (_, i) => {
+              const page = i + 1
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  style={pageButtonStyle(currentPage === page)}
+                  onMouseEnter={(e) => {
+                    if (currentPage !== page) {
+                      e.currentTarget.style.backgroundColor = '#F3F4F6'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (currentPage !== page) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }
+                  }}
+                >
+                  {page}
+                </button>
+              )
+            })}
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
