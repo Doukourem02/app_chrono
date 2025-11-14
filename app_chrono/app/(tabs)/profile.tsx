@@ -99,42 +99,42 @@ export default function ProfilePage() {
       icon: 'person-outline',
       title: 'Informations personnelles',
       subtitle: 'Nom, téléphone, email',
-      onPress: () => console.log('Informations personnelles'),
+      onPress: () => router.push('/profile/personal-info'),
       color: '#8B5CF6'
     },
     {
       icon: 'location-outline',
       title: 'Mes adresses',
       subtitle: 'Domicile, bureau, favoris',
-      onPress: () => console.log('Mes adresses'),
+      onPress: () => router.push('/profile/addresses'),
       color: '#10B981'
     },
     {
       icon: 'card-outline',
       title: 'Moyens de paiement',
       subtitle: 'Cartes, portefeuille mobile',
-      onPress: () => console.log('Paiements'),
+      onPress: () => router.push('/profile/payment-methods'),
       color: '#F59E0B'
     },
     {
       icon: 'time-outline',
       title: 'Historique des commandes',
       subtitle: 'Voir toutes vos livraisons',
-      onPress: () => console.log('Historique'),
+      onPress: () => router.push('/profile/order-history'),
       color: '#3B82F6'
     },
     {
       icon: 'star-outline',
       title: 'Mes évaluations',
       subtitle: 'Évaluations et commentaires',
-      onPress: () => console.log('Évaluations'),
+      onPress: () => router.push('/profile/ratings'),
       color: '#EF4444'
     },
     {
       icon: 'gift-outline',
       title: 'Codes promo',
       subtitle: 'Mes réductions et offres',
-      onPress: () => console.log('Codes promo'),
+      onPress: () => router.push('/profile/promo-codes'),
       color: '#EC4899'
     },
     {
@@ -159,22 +159,22 @@ export default function ProfilePage() {
     {
       icon: 'settings-outline',
       title: 'Paramètres',
-      onPress: () => console.log('Paramètres')
+      onPress: () => router.push('/profile/settings')
     },
     {
       icon: 'help-circle-outline',
       title: 'Aide & Support',
-      onPress: () => console.log('Aide')
+      onPress: () => router.push('/profile/support')
     },
     {
       icon: 'shield-checkmark-outline',
       title: 'Politique de confidentialité',
-      onPress: () => console.log('Confidentialité')
+      onPress: () => router.push('/profile/privacy')
     },
     {
       icon: 'information-circle-outline',
       title: 'À propos',
-      onPress: () => console.log('À propos')
+      onPress: () => router.push('/profile/about')
     }
   ];
 

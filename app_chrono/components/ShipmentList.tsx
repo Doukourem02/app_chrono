@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { View, ActivityIndicator, RefreshControl, ScrollView, Text, StyleSheet } from "react-native";
+import { View, RefreshControl, ScrollView, Text, StyleSheet } from "react-native";
 import ShipmentCard from "./ShipmentCard";
 import { userApiService } from "../services/userApiService";
 import { useAuthStore } from "../store/useAuthStore";
@@ -339,7 +339,8 @@ export default function ShipmentList() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, activeOrdersFromStore.length]); // activeOrdersFromStore.length pour éviter les re-renders infinis
 
   useEffect(() => {
     loadOrders();

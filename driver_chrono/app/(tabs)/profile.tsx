@@ -83,25 +83,25 @@ export default function ProfilePage() {
       icon: 'person-outline',
       title: 'Informations personnelles',
       subtitle: 'Gérer vos données personnelles',
-      onPress: () => console.log('Informations personnelles'),
+      onPress: () => router.push('/profile/personal-info'),
     },
     {
       icon: 'car-outline',
       title: 'Mon véhicule',
       subtitle: 'Gérer les informations du véhicule',
-      onPress: () => console.log('Mon véhicule'),
+      onPress: () => router.push('/profile/vehicle'),
     },
     {
       icon: 'card-outline',
       title: 'Paiements',
       subtitle: 'Gérer vos moyens de paiement',
-      onPress: () => console.log('Paiements'),
+      onPress: () => router.push('/profile/payments'),
     },
     {
       icon: 'stats-chart-outline',
       title: 'Statistiques',
       subtitle: 'Voir vos performances',
-      onPress: () => console.log('Statistiques'),
+      onPress: () => router.push('/profile/statistics'),
     },
     {
       icon: 'star-outline',
@@ -126,13 +126,13 @@ export default function ProfilePage() {
       icon: 'settings-outline',
       title: 'Paramètres',
       subtitle: 'Préférences de l\'application',
-      onPress: () => console.log('Paramètres'),
+      onPress: () => router.push('/profile/settings' as any),
     },
     {
       icon: 'help-circle-outline',
       title: 'Aide et support',
       subtitle: 'Besoin d\'aide ?',
-      onPress: () => console.log('Aide'),
+      onPress: () => router.push('/profile/support' as any),
     },
   ];
 
