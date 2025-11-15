@@ -2,14 +2,16 @@
 
 import React from 'react'
 import { Truck, Package, CheckSquare, User } from 'lucide-react'
+import { AnimatedCard } from '@/components/animations'
 
 interface StatusKPICardProps {
   type: 'onProgress' | 'successful' | 'onHold' | 'canceled'
   count: number
   change?: number
+  index?: number
 }
 
-export default function StatusKPICard({ type, count, change = 0 }: StatusKPICardProps) {
+export default function StatusKPICard({ type, count, change = 0, index = 0 }: StatusKPICardProps) {
   const config = {
     onProgress: {
       icon: Truck,
@@ -95,7 +97,7 @@ export default function StatusKPICard({ type, count, change = 0 }: StatusKPICard
   }
 
   return (
-    <div style={cardStyle}>
+    <AnimatedCard index={index} delay={index * 50} style={cardStyle}>
       <div style={headerStyle}>
         <div style={{ flex: 1 }}>
           <div style={titleStyle}>{label}</div>
@@ -108,7 +110,7 @@ export default function StatusKPICard({ type, count, change = 0 }: StatusKPICard
         <div style={valueStyle}>{count} {count === 1 ? 'Order' : 'Orders'}</div>
         <div style={comparisonStyle}>{formatChange(change)}</div>
       </div>
-    </div>
+    </AnimatedCard>
   )
 }
 

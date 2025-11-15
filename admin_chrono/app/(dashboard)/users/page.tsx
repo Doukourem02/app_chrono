@@ -5,6 +5,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Search, User, Truck, Shield, Eye } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
+import { ScreenTransition } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
+import { AnimatedCard } from '@/components/animations'
 
 interface UserData {
   id: string
@@ -275,7 +278,8 @@ export default function UsersPage() {
   })
 
   return (
-    <div style={containerStyle}>
+    <ScreenTransition direction="fade" duration={0.3}>
+      <div style={containerStyle}>
       <div style={headerStyle}>
         <h1 style={titleStyle}>Users</h1>
         <div style={statsContainerStyle}>
@@ -343,8 +347,12 @@ export default function UsersPage() {
 
       <div style={tableContainerStyle}>
         {isLoading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280' }}>
-            Chargement des utilisateurs...
+          <div style={{ padding: '48px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
           </div>
         ) : filteredUsers.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280' }}>
@@ -508,5 +516,6 @@ export default function UsersPage() {
         )}
       </div>
     </div>
+    </ScreenTransition>
   )
 }

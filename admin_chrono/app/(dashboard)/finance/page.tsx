@@ -4,6 +4,8 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { Wallet, TrendingUp, CreditCard, DollarSign, Users, BarChart3, Download } from 'lucide-react'
+import { ScreenTransition } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
 import {
   BarChart,
   Bar,
@@ -349,7 +351,8 @@ export default function FinancePage() {
   }
 
   return (
-    <div style={containerStyle}>
+    <ScreenTransition direction="fade" duration={0.3}>
+      <div style={containerStyle}>
       <div style={headerStyle}>
         <h1 style={titleStyle}>Finance</h1>
         <button
@@ -652,5 +655,6 @@ export default function FinancePage() {
         )}
       </div>
     </div>
+    </ScreenTransition>
   )
 }

@@ -6,6 +6,7 @@ import { validateEnvironment } from './config/envCheck.js';
 import app from './app.js';
 import deliverySocket from './sockets/deliverySocket.js';
 import { setupOrderSocket } from './sockets/orderSocket.js';
+import { setupAdminSocket } from './sockets/adminSocket.js';
 import logger from './utils/logger.js';
 
 if (process.env.SENTRY_DSN) {
@@ -51,17 +52,31 @@ const allowedOrigins =
     'exp://localhost:808',
   ];
 
+// En développement, accepter toutes les origines localhost
+if (process.env.NODE_ENV === 'development') {
+  allowedOrigins.push('http://localhost:*');
+}
+
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
       if (!origin) {
+        // Permettre les connexions sans origin (par exemple depuis Postman ou des outils de test)
         return callback(null, true);
+      }
+
+      // En développement, accepter toutes les origines localhost
+      if (process.env.NODE_ENV === 'development') {
+        if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.')) {
+          return callback(null, true);
+        }
       }
 
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         console.warn(`Socket.io CORS bloqué pour origin: ${origin}`);
+        console.warn(`Origins autorisées:`, allowedOrigins);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -79,6 +94,7 @@ io.on('connection', (socket) => {
 });
 
 setupOrderSocket(io);
+setupAdminSocket(io);
 
 app.set('io', io);
 

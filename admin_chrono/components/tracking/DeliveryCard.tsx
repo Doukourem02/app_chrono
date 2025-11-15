@@ -3,6 +3,7 @@
 import React from 'react'
 import Image from 'next/image'
 import { Phone, MessageSquare, Truck } from 'lucide-react'
+import { AnimatedCard } from '@/components/animations'
 
 interface DeliveryCardProps {
   delivery: {
@@ -39,9 +40,10 @@ interface DeliveryCardProps {
   }
   isSelected?: boolean
   onSelect?: () => void
+  index?: number
 }
 
-export default function DeliveryCard({ delivery, isSelected = false, onSelect }: DeliveryCardProps) {
+export default function DeliveryCard({ delivery, isSelected = false, onSelect, index = 0 }: DeliveryCardProps) {
   const cardStyle: React.CSSProperties = {
     backgroundColor: '#FFFFFF',
     borderRadius: '16px',
@@ -205,19 +207,11 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect }:
   }
 
   return (
-    <div
-      style={cardStyle}
+    <AnimatedCard
+      index={index}
+      delay={0}
       onClick={onSelect}
-      onMouseEnter={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.borderColor = '#D1D5DB'
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.borderColor = '#E5E7EB'
-        }
-      }}
+      style={cardStyle}
     >
       <div style={headerStyle}>
         <div style={shipmentInfoStyle}>
@@ -331,7 +325,7 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect }:
           </button>
         </div>
       </div>
-    </div>
+    </AnimatedCard>
   )
 }
 

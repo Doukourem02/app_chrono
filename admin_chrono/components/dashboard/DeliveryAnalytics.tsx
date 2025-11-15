@@ -13,6 +13,8 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { getDeliveryAnalytics } from '@/lib/dashboardApi'
+import { AnimatedCard } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
 
 const mockData = [
   { month: 'Jul', packageDelivered: 8500, reported: 45 },
@@ -97,7 +99,7 @@ export default function DeliveryAnalytics() {
   }
 
   return (
-    <div style={cardStyle}>
+    <AnimatedCard index={0} delay={100} style={cardStyle}>
       <div style={headerStyle}>
         <h2 style={titleStyle}>Delivery Analytics</h2>
         <div style={legendContainerStyle}>
@@ -114,7 +116,7 @@ export default function DeliveryAnalytics() {
 
       {isLoading ? (
         <div style={loadingContainerStyle}>
-          <div style={loadingTextStyle}>Chargement des données...</div>
+          <SkeletonLoader width="100%" height={300} borderRadius={8} />
         </div>
       ) : data && data.length > 0 ? (
         <div style={{ flex: 1, minHeight: '300px', height: '100%', width: '100%' }}>
@@ -174,7 +176,7 @@ export default function DeliveryAnalytics() {
           <div style={loadingTextStyle}>Aucune donnée disponible</div>
         </div>
       )}
-    </div>
+    </AnimatedCard>
   )
 }
 

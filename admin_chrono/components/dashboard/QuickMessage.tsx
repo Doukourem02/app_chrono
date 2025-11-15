@@ -1,5 +1,7 @@
 'use client'
 
+import { AnimatedCard } from '@/components/animations'
+
 interface MessageContact {
   id: string
   name: string
@@ -151,7 +153,7 @@ export default function QuickMessage() {
   }
 
   return (
-    <div style={cardStyle}>
+    <AnimatedCard index={0} delay={200} style={cardStyle}>
       <div style={headerStyle}>
         <h2 style={titleStyle}>Quick Message</h2>
         <span style={onlineBadgeStyle}>
@@ -195,7 +197,7 @@ export default function QuickMessage() {
           </div>
         ))}
       </div>
-    </div>
+    </AnimatedCard>
   )
 }
 

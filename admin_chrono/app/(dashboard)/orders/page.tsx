@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import StatusKPICard from '@/components/orders/StatusKPICard'
+import { ScreenTransition } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
@@ -158,7 +160,8 @@ export default function OrdersPage() {
   ]
 
   return (
-    <div style={containerStyle}>
+    <ScreenTransition direction="fade" duration={0.3}>
+      <div style={containerStyle}>
       <div style={kpiCardsContainerStyle}>
         <StatusKPICard 
           type="onProgress" 
@@ -206,10 +209,14 @@ export default function OrdersPage() {
         ))}
       </div>
 
-      {isLoading ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280' }}>
-          Chargement des commandes...
-        </div>
+        {isLoading ? (
+          <div style={{ padding: '48px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+          </div>
       ) : orders.length === 0 ? (
         <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280' }}>
           Aucune commande trouvée
@@ -397,5 +404,6 @@ export default function OrdersPage() {
         </div>
       )}
     </div>
+    </ScreenTransition>
   )
 }

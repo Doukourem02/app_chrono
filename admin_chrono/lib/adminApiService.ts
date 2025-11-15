@@ -1151,6 +1151,55 @@ class AdminApiService {
   }
 
   /**
+   * Récupère les drivers en ligne
+   */
+  async getOnlineDrivers(): Promise<{
+    success: boolean
+    data?: Array<{
+      user_id: string
+      first_name: string
+      last_name: string
+      vehicle_type: string
+      current_latitude: number
+      current_longitude: number
+      is_online: boolean
+      is_available: boolean
+      rating: number
+      total_deliveries: number
+    }>
+    message?: string
+  }> {
+    try {
+      const token = await this.getAccessToken()
+      if (!token) {
+        return { success: false, message: 'No access token' }
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/drivers/online`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        return { success: false, message: `HTTP ${response.status}` }
+      }
+
+      const result = await response.json()
+      return {
+        success: result.success || false,
+        data: result.data || [],
+        message: result.message,
+      }
+    } catch (error: any) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ [adminApiService] Error in getOnlineDrivers:', error)
+      }
+      return { success: false, message: error.message }
+    }
+  }
+
+  /**
    * Récupère la clé API Google Maps depuis le serveur
    */
   async getGoogleMapsConfig(): Promise<{

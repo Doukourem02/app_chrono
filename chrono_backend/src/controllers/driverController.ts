@@ -51,6 +51,7 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
     });
 
     const existingDriver = realDriverStatuses.get(userId) || {} as DriverStatus;
+    const wasOffline = existingDriver.is_online === false || !existingDriver.is_online;
     const updatedDriver: DriverStatus = {
       ...existingDriver,
       user_id: userId,
@@ -72,6 +73,7 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
           }
         }, 5000);
       } else {
+        // Driver repasse en ligne
         if (typeof is_available !== 'boolean') {
           updatedDriver.is_available = true;
         } else {
@@ -88,6 +90,34 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
     }
 
     realDriverStatuses.set(userId, updatedDriver);
+
+    // Émettre immédiatement l'événement si le driver repasse en ligne
+    if (typeof is_online === 'boolean' && is_online === true && wasOffline) {
+      // Récupérer l'instance io depuis app
+      const app = req.app;
+      const io = app.get('io');
+      if (io) {
+        // Importer dynamiquement pour éviter les dépendances circulaires
+        import('../sockets/adminSocket.js').then((module) => {
+          if (module.broadcastDriverStatusToAdmins) {
+            module.broadcastDriverStatusToAdmins(io, 'driver:online', {
+              userId,
+              is_online: true,
+              is_available: updatedDriver.is_available,
+              current_latitude: updatedDriver.current_latitude,
+              current_longitude: updatedDriver.current_longitude,
+              updated_at: updatedDriver.updated_at,
+            });
+            if (process.env.DEBUG_SOCKETS === 'true') {
+              logger.info(`[updateDriverStatus] Événement driver:online émis immédiatement pour ${maskUserId(userId)}`);
+            }
+          }
+        }).catch((err) => {
+          // Si l'import échoue, l'intervalle le détectera dans 2 secondes
+          logger.debug('Impossible d\'émettre immédiatement driver:online, l\'intervalle le détectera:', err);
+        });
+      }
+    }
     
     try {
       await pool.query(
@@ -493,29 +523,71 @@ export const getOnlineDrivers = async (req: Request, res: Response): Promise<voi
       realDriverStatuses.delete(userId);
     });
 
+    // Nettoyer les drivers inactifs (pas de mise à jour dans les 5 dernières minutes)
+    const now = new Date();
+    const inactiveDrivers: string[] = [];
+    for (const [userId, driverData] of realDriverStatuses.entries()) {
+      if (driverData.updated_at) {
+        const updatedAt = new Date(driverData.updated_at);
+        const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
+        if (diffInMinutes > 5) {
+          inactiveDrivers.push(userId);
+          logger.debug(`Chauffeur inactif détecté (>5 min) : ${maskUserId(userId)} (dernière mise à jour: ${diffInMinutes.toFixed(1)} min)`);
+        }
+      } else if (driverData.is_online === true) {
+        // Si pas de updated_at mais marqué comme online, considérer comme inactif
+        inactiveDrivers.push(userId);
+        logger.debug(`Chauffeur sans updated_at mais marqué online : ${maskUserId(userId)} - considéré comme inactif`);
+      }
+    }
+    
+    // Retirer les drivers inactifs
+    inactiveDrivers.forEach(userId => {
+      realDriverStatuses.delete(userId);
+      logger.info(`Chauffeur inactif retiré de la Map : ${maskUserId(userId)}`);
+    });
+
     for (const [userId, driverData] of realDriverStatuses.entries()) {
       logger.debug(`Vérification chauffeur ${maskUserId(userId)}`);
 
       if (driverData.is_online === true) {
-        logger.debug(`Livreur online détecté : ${maskUserId(userId)}`);
+        // Vérifier que le driver est vraiment actif (mis à jour dans les 5 dernières minutes)
+        let isActive = true;
+        if (driverData.updated_at) {
+          const updatedAt = new Date(driverData.updated_at);
+          const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
+          isActive = diffInMinutes <= 5;
+        } else {
+          // Si pas de updated_at, considérer comme inactif
+          isActive = false;
+        }
 
-        const rating = await calculateDriverRating(userId);
-        const emailName = userId.substring(0, 8);
-        const driverProfile = {
-          user_id: userId,
-          first_name: 'Livreur',
-          last_name: emailName,
-          vehicle_type: 'moto',
-          current_latitude: driverData.current_latitude || 5.3453,
-          current_longitude: driverData.current_longitude || -4.0244,
-          is_online: true,
-          is_available: driverData.is_available || false,
-          rating,
-          total_deliveries: 0
-        };
-        
-        allDrivers.push(driverProfile);
-        logger.info(`Livreur ajouté:`, driverProfile.first_name, driverProfile.last_name);
+        if (isActive) {
+          logger.debug(`Livreur online et actif détecté : ${maskUserId(userId)}`);
+
+          const rating = await calculateDriverRating(userId);
+          const emailName = userId.substring(0, 8);
+          const driverProfile = {
+            user_id: userId,
+            first_name: 'Livreur',
+            last_name: emailName,
+            vehicle_type: 'moto',
+            current_latitude: driverData.current_latitude || 5.3453,
+            current_longitude: driverData.current_longitude || -4.0244,
+            is_online: true,
+            is_available: driverData.is_available || false,
+            rating,
+            total_deliveries: 0,
+            updated_at: driverData.updated_at || new Date().toISOString()
+          };
+          
+          allDrivers.push(driverProfile);
+          logger.info(`Livreur ajouté:`, driverProfile.first_name, driverProfile.last_name);
+        } else {
+          logger.info(`Chauffeur online mais inactif ignoré : ${maskUserId(userId)} (pas de mise à jour récente)`);
+          // Retirer de la Map car inactif
+          realDriverStatuses.delete(userId);
+        }
       } else {
         if (driverData.is_online === false || driverData.is_online === undefined || driverData.is_online === null) {
           logger.info(`Chauffeur offline/undefined ignoré et retiré : ${maskUserId(userId)} (is_online: ${driverData.is_online})`);

@@ -8,6 +8,8 @@ import QuickMessage from '@/components/dashboard/QuickMessage'
 import { useQuery } from '@tanstack/react-query'
 import { getDashboardStats } from '@/lib/dashboardApi'
 import { Truck, ShieldCheck, DollarSign, Calendar, Star, Clock, XCircle, Users, UserCheck } from 'lucide-react'
+import { AnimatedButton } from '@/components/animations'
+import { ScreenTransition } from '@/components/animations'
 
 export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -122,35 +124,30 @@ export default function DashboardPage() {
   }
 
   return (
-    <div style={pageContainerStyle}>
+    <ScreenTransition direction="fade" duration={0.3}>
+      <div style={pageContainerStyle}>
       <div style={headerRowStyle}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <h1 style={titleStyle}>Dashboard</h1>
         </div>
         <div style={actionsContainerStyle}>
-          <button
+          <AnimatedButton
+            onClick={() => {}}
+            variant="outline"
             style={dateButtonStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F9FAFB'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
           >
-            <Calendar size={16} style={{ color: '#6B7280' }} />
-            11 December 2024
-          </button>
-          <button
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar size={16} style={{ color: '#6B7280' }} />
+              11 December 2024
+            </div>
+          </AnimatedButton>
+          <AnimatedButton
+            onClick={() => {}}
+            variant="primary"
             style={newShippingButtonStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#7C3AED'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#8B5CF6'
-            }}
           >
             + New Shipping
-          </button>
+          </AnimatedButton>
         </div>
       </div>
 
@@ -170,6 +167,7 @@ export default function DashboardPage() {
             icon={Star}
             iconColor="text-yellow-600"
             isLoading={statsLoading}
+            index={0}
           />
           <KPICard
             title="Temps moyen"
@@ -179,6 +177,7 @@ export default function DashboardPage() {
             icon={Clock}
             iconColor="text-blue-600"
             isLoading={statsLoading}
+            index={1}
           />
           <KPICard
             title="Taux d'annulation"
@@ -188,6 +187,7 @@ export default function DashboardPage() {
             icon={XCircle}
             iconColor="text-red-600"
             isLoading={statsLoading}
+            index={2}
           />
           <KPICard
             title="Clients actifs"
@@ -197,6 +197,7 @@ export default function DashboardPage() {
             icon={Users}
             iconColor="text-green-600"
             isLoading={statsLoading}
+            index={3}
           />
           <KPICard
             title="Drivers actifs"
@@ -206,6 +207,7 @@ export default function DashboardPage() {
             icon={UserCheck}
             iconColor="text-purple-600"
             isLoading={statsLoading}
+            index={4}
           />
         </div>
       )}
@@ -221,6 +223,7 @@ export default function DashboardPage() {
             icon={Truck}
             iconColor="text-blue-600"
             isLoading={statsLoading}
+            index={0}
           />
           <KPICard
             title="Success Deliveries"
@@ -230,6 +233,7 @@ export default function DashboardPage() {
             icon={ShieldCheck}
             iconColor="text-green-600"
             isLoading={statsLoading}
+            index={1}
           />
           <KPICard
             title="Revenue"
@@ -239,6 +243,7 @@ export default function DashboardPage() {
             icon={DollarSign}
             iconColor="text-purple-600"
             isLoading={statsLoading}
+            index={2}
           />
         </div>
 
@@ -259,5 +264,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </ScreenTransition>
   )
 }

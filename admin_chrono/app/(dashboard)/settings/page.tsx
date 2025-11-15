@@ -4,6 +4,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 import { Camera, Save, User, Mail, Phone } from 'lucide-react'
+import { ScreenTransition } from '@/components/animations'
+import { AnimatedButton } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
+import { SuccessAnimation, ErrorAnimation } from '@/components/animations'
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
@@ -656,16 +660,21 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div style={containerStyle}>
-        <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280' }}>
-          Chargement du profil...
+      <ScreenTransition direction="fade" duration={0.3}>
+        <div style={containerStyle}>
+          <div style={{ padding: '48px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+            <SkeletonLoader width={200} height={200} borderRadius={100} />
+            <SkeletonLoader width={300} height={40} borderRadius={8} />
+            <SkeletonLoader width={300} height={40} borderRadius={8} />
+          </div>
         </div>
-      </div>
+      </ScreenTransition>
     )
   }
 
   return (
-    <div style={containerStyle}>
+    <ScreenTransition direction="fade" duration={0.3}>
+      <div style={containerStyle}>
         <div style={headerStyle}>
           <h1 style={titleStyle}>Mon profil</h1>
           <p style={subtitleStyle}>Gérez vos informations personnelles et votre photo de profil</p>
@@ -768,25 +777,14 @@ export default function SettingsPage() {
             />
           </div>
 
-          <button
+          <AnimatedButton
             onClick={handleSave}
             disabled={saving}
+            variant="primary"
             style={{
               ...buttonStyle,
               opacity: saving ? 0.6 : 1,
               cursor: saving ? 'not-allowed' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (!saving) {
-                e.currentTarget.style.backgroundColor = '#7C3AED'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!saving) {
-                e.currentTarget.style.backgroundColor = '#8B5CF6'
-                e.currentTarget.style.boxShadow = 'none'
-              }
             }}
           >
             {saving ? (
@@ -808,9 +806,10 @@ export default function SettingsPage() {
                 Enregistrer les modifications
               </>
             )}
-          </button>
+          </AnimatedButton>
         </div>
       </div>
     </div>
+    </ScreenTransition>
   )
 }

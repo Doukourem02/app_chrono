@@ -1,6 +1,8 @@
 'use client'
 
 import { LucideIcon } from 'lucide-react'
+import { AnimatedCard } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
 
 interface KPICardProps {
   title: string
@@ -10,6 +12,7 @@ interface KPICardProps {
   icon: LucideIcon
   iconColor?: string
   isLoading?: boolean
+  index?: number
 }
 
 export default function KPICard({
@@ -20,6 +23,7 @@ export default function KPICard({
   icon: Icon,
   iconColor = 'text-blue-600',
   isLoading = false,
+  index = 0,
 }: KPICardProps) {
   const isPositive = change >= 0
   const formattedValue = typeof value === 'number' 
@@ -101,7 +105,7 @@ export default function KPICard({
   }
 
   return (
-    <div style={cardStyle}>
+    <AnimatedCard index={index} delay={0} style={cardStyle}>
       <div style={headerStyle}>
         <div style={iconContainerStyle}>
           <Icon style={iconStyle} />
@@ -115,25 +119,16 @@ export default function KPICard({
       
       <div style={contentStyle}>
         <h3 style={titleStyle}>{title}</h3>
-        <p style={valueStyle}>
+        <div style={valueStyle}>
           {isLoading ? (
-            <span
-              style={{
-                display: 'inline-block',
-                width: '80px',
-                height: '32px',
-                backgroundColor: '#E5E7EB',
-                borderRadius: '4px',
-                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              }}
-            ></span>
+            <SkeletonLoader width={80} height={32} borderRadius={4} />
           ) : (
             formattedValue
           )}
-        </p>
+        </div>
         <p style={subtitleStyle}>{subtitle}</p>
       </div>
-    </div>
+    </AnimatedCard>
   )
 }
 

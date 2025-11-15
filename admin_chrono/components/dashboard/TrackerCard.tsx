@@ -6,6 +6,7 @@ import { GoogleMap, Marker, Polyline } from '@react-google-maps/api'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
+import { AnimatedCard } from '@/components/animations'
 
 // Type pour l'API Google Maps dans window
 interface GoogleMapsWindow extends Window {
@@ -370,7 +371,7 @@ export default function TrackerCard() {
   }
 
   return (
-    <div style={cardStyle}>
+    <AnimatedCard index={0} delay={150} style={cardStyle}>
       <div style={sectionStyle}>
         <MapComponent />
       </div>
@@ -435,7 +436,7 @@ export default function TrackerCard() {
           </button>
         </div>
       </div>
-    </div>
+    </AnimatedCard>
   )
 }
 

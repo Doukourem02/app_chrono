@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import { GoogleMapsProvider } from '@/contexts/GoogleMapsContext'
+import { SkeletonLoader } from '@/components/animations'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -42,10 +43,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div style={{
         minHeight: '100vh',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: '16px',
       }}>
-        <div style={{ color: '#4B5563' }}>Chargement...</div>
+        <SkeletonLoader width={200} height={40} borderRadius={8} />
+        <SkeletonLoader width={300} height={20} borderRadius={4} />
       </div>
     )
   }

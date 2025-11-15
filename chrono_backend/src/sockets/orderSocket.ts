@@ -5,6 +5,7 @@ import { saveOrder, updateOrderStatus as updateOrderStatusDB, saveDeliveryProofR
 } from '../config/orderStorage.js';
 import { maskOrderId, maskUserId, sanitizeObject } from '../utils/maskSensitiveData.js';
 import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionForOrder.js';
+import { broadcastOrderUpdateToAdmins } from './adminSocket.js';
 import pool from '../config/db.js'; // Interfaces for order data
 interface OrderCoordinates { latitude: number; longitude: number;
 }
@@ -278,6 +279,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 
         activeOrders.set(order.id, order);
         
+        // Diffuser la nouvelle commande aux admins
+        broadcastOrderUpdateToAdmins(io, 'order:created', { order });
+        
         let dbSaved = false;
         let dbErrorMsg: string | null = null;
         try {
@@ -328,65 +332,274 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       } catch (error: any) {
        console.error('Erreur création commande:', error); socket.emit('order-error', { success: false, message: 'Erreur lors de la création de la commande' }); } });
 
-   socket.on('accept-order', async (data: { orderId: string; driverId: string }) => { const { orderId, driverId } = data; const order = activeOrders.get(orderId); if (!order) {
-       socket.emit('order-not-found', { orderId }); return; } if (order.status !== 'pending') { socket.emit('order-already-taken', { orderId }); return; } const activeOrdersCount = getActiveOrdersCountByDriver(driverId);
+    socket.on('accept-order', async (data: { orderId: string; driverId: string }) => {
+      const { orderId, driverId } = data;
+      const order = activeOrders.get(orderId);
+      
+      if (!order) {
+        socket.emit('order-not-found', { orderId });
+        return;
+      }
+      
+      if (order.status !== 'pending') {
+        socket.emit('order-already-taken', { orderId });
+        return;
+      }
+      
+      const activeOrdersCount = getActiveOrdersCountByDriver(driverId);
       if (activeOrdersCount >= MAX_ACTIVE_ORDERS_PER_DRIVER) {
-       const errorMsg = `Vous avez déjà ${activeOrdersCount} commande(s) active(s). Limite: ${MAX_ACTIVE_ORDERS_PER_DRIVER}`; socket.emit('order-accept-error', { orderId, message: errorMsg }); return; } order.status = 'accepted'; order.driverId = driverId; order.acceptedAt = new Date(); let dbSavedAssign = false; let dbErrorAssign: string | null = null;
+        const errorMsg = `Vous avez déjà ${activeOrdersCount} commande(s) active(s). Limite: ${MAX_ACTIVE_ORDERS_PER_DRIVER}`;
+        socket.emit('order-accept-error', { orderId, message: errorMsg });
+        return;
+      }
+      
+      order.status = 'accepted';
+      order.driverId = driverId;
+      order.acceptedAt = new Date();
+      
+      let dbSavedAssign = false;
+      let dbErrorAssign: string | null = null;
+      
       try {
-       await updateOrderStatusDB(orderId, 'accepted', { driver_id: driverId, accepted_at: order.acceptedAt, assigned_at: order.assignedAt || order.createdAt,
+        await updateOrderStatusDB(orderId, 'accepted', {
+          driver_id: driverId,
+          accepted_at: order.acceptedAt,
+          assigned_at: order.assignedAt || order.createdAt,
         });
         dbSavedAssign = true;
-       if (DEBUG) console.log(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`); try { await (pool as any).query( `UPDATE invoices SET driver_id = $1 WHERE order_id = $2 AND driver_id IS NULL`, [driverId, orderId] ); if (DEBUG) console.log(`Facture mise à jour avec driverId pour commande ${maskOrderId(orderId)}`); } catch (invoiceError: any) { if (DEBUG) console.warn(`Échec mise à jour facture pour ${maskOrderId(orderId)}:`, invoiceError.message); } } catch (dbError: any) { dbSavedAssign = false;
+        
+        if (DEBUG) console.log(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
+        
+        try {
+          await (pool as any).query(
+            `UPDATE invoices SET driver_id = $1 WHERE order_id = $2 AND driver_id IS NULL`,
+            [driverId, orderId]
+          );
+          if (DEBUG) console.log(`Facture mise à jour avec driverId pour commande ${maskOrderId(orderId)}`);
+        } catch (invoiceError: any) {
+          if (DEBUG) console.warn(`Échec mise à jour facture pour ${maskOrderId(orderId)}:`, invoiceError.message);
+        }
+      } catch (dbError: any) {
+        dbSavedAssign = false;
         dbErrorAssign = dbError && dbError.message ? dbError.message : String(dbError);
-       console.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorAssign); } if (DEBUG) console.log(`Commande ${maskOrderId(orderId)} acceptée par driver ${maskUserId(driverId)}`); socket.emit('order-accepted-confirmation', { success: true, order, dbSaved: dbSavedAssign, dbError: dbErrorAssign, message: 'Commande acceptée avec succès' }); const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) {
+        console.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorAssign);
+      }
+      
+      if (DEBUG) console.log(`Commande ${maskOrderId(orderId)} acceptée par driver ${maskUserId(driverId)}`);
+      
+      socket.emit('order-accepted-confirmation', {
+        success: true,
+        order,
+        dbSaved: dbSavedAssign,
+        dbError: dbErrorAssign,
+        message: 'Commande acceptée avec succès'
+      });
+      
+      // Diffuser aux admins
+      broadcastOrderUpdateToAdmins(io, 'order:assigned', { order, driverId });
+      
+      const userSocketId = connectedUsers.get(order.user.id);
+      if (userSocketId) {
         (async () => {
           try {
-           const { realDriverStatuses } = await import('../controllers/driverController.js'); const driverData: any = realDriverStatuses.get(driverId) || {}; const driverInfo = { id: driverId,
-             first_name: driverData.first_name || 'Livreur', last_name: driverData.last_name || driverId?.substring(0, 8) || null, current_latitude: driverData.current_latitude || null, current_longitude: driverData.current_longitude || null,
+            const { realDriverStatuses } = await import('../controllers/driverController.js');
+            const driverData: any = realDriverStatuses.get(driverId) || {};
+            const driverInfo = {
+              id: driverId,
+              first_name: driverData.first_name || 'Livreur',
+              last_name: driverData.last_name || driverId?.substring(0, 8) || null,
+              current_latitude: driverData.current_latitude || null,
+              current_longitude: driverData.current_longitude || null,
               phone: driverData.phone || null,
               profile_image_url: driverData.profile_image_url || null,
             };
 
-           io.to(userSocketId).emit('order-accepted', { order, driverInfo, dbSaved: dbSavedAssign,
+            io.to(userSocketId).emit('order-accepted', {
+              order,
+              driverInfo,
+              dbSaved: dbSavedAssign,
               dbError: dbErrorAssign
             });
           } catch (err) {
-           io.to(userSocketId).emit('order-accepted', { order, driverInfo: { id: driverId } });
+            io.to(userSocketId).emit('order-accepted', {
+              order,
+              driverInfo: { id: driverId }
+            });
           }
         })();
       }
     });
 
-   socket.on('decline-order', (data: { orderId: string; driverId: string }) => { const { orderId, driverId } = data; const order = activeOrders.get(orderId); if (!order) {
-       socket.emit('order-not-found', { orderId }); return; } if (DEBUG) console.log(`Commande ${maskOrderId(orderId)} déclinée par driver ${maskUserId(driverId)}`); recordOrderAssignment(orderId, driverId, { declinedAt: new Date() }).catch(() => {}); socket.emit('order-declined-confirmation', { success: true, orderId, message: 'Commande déclinée' }); }); socket.on('update-delivery-status', async (data: { orderId: string; status: string; location?: any }, ack?: (response: any) => void) => { try { const { orderId, status, location } = data || {}; const order = activeOrders.get(orderId);
+    socket.on('decline-order', (data: { orderId: string; driverId: string }) => {
+      const { orderId, driverId } = data;
+      const order = activeOrders.get(orderId);
+      
+      if (!order) {
+        socket.emit('order-not-found', { orderId });
+        return;
+      }
+      
+      if (DEBUG) console.log(`Commande ${maskOrderId(orderId)} déclinée par driver ${maskUserId(driverId)}`);
+      
+      recordOrderAssignment(orderId, driverId, { declinedAt: new Date() }).catch(() => {});
+      
+      socket.emit('order-declined-confirmation', {
+        success: true,
+        orderId,
+        message: 'Commande déclinée'
+      });
+    });
+
+    socket.on('update-delivery-status', async (data: { orderId: string; status: string; location?: any }, ack?: (response: any) => void) => {
+      try {
+        const { orderId, status, location } = data || {};
+        const order = activeOrders.get(orderId);
 
         if (!order) {
-         if (typeof ack === 'function') ack({ success: false, message: 'Order not found' }); socket.emit('order-not-found', { orderId }); return; } const driverId = socket.driverId;
+          if (typeof ack === 'function') ack({ success: false, message: 'Order not found' });
+          socket.emit('order-not-found', { orderId });
+          return;
+        }
+        
+        const driverId = socket.driverId;
         if (!driverId) {
-         if (typeof ack === 'function') ack({ success: false, message: 'Driver not authenticated on socket' }); socket.emit('unauthorized', { message: 'Driver not authenticated' }); return; } if (order.driverId && order.driverId !== driverId) {
-         if (typeof ack === 'function') ack({ success: false, message: 'Driver not assigned to this order' }); socket.emit('forbidden', { message: 'Driver not assigned to this order' }); return; } const allowed: { [key: string]: string[] } = {
-         pending: ['accepted', 'cancelled'], accepted: ['enroute', 'cancelled'], enroute: ['picked_up', 'cancelled'], picked_up: ['completed', 'cancelled'], completed: [], cancelled: [] };
+          if (typeof ack === 'function') ack({ success: false, message: 'Driver not authenticated on socket' });
+          socket.emit('unauthorized', { message: 'Driver not authenticated' });
+          return;
+        }
+        
+        if (order.driverId && order.driverId !== driverId) {
+          if (typeof ack === 'function') ack({ success: false, message: 'Driver not assigned to this order' });
+          socket.emit('forbidden', { message: 'Driver not assigned to this order' });
+          return;
+        }
+        
+        const allowed: { [key: string]: string[] } = {
+          pending: ['accepted', 'cancelled'],
+          accepted: ['enroute', 'cancelled'],
+          enroute: ['picked_up', 'cancelled'],
+          picked_up: ['completed', 'cancelled'],
+          completed: [],
+          cancelled: []
+        };
 
-       const current = order.status || 'pending'; if (current === status) { if (typeof ack === 'function') ack({ success: true, message: 'No-op: status already set', order }); return; } if (!allowed[current] || !allowed[current].includes(status)) {
-        if (typeof ack === 'function') ack({ success: false, message: `Invalid transition from ${current} to ${status}` }); return; } order.status = status; if (status === 'completed') { order.completedAt = new Date(); } let dbSavedStatus = false; let dbErrorStatus: string | null = null;
+        const current = order.status || 'pending';
+        if (current === status) {
+          if (typeof ack === 'function') ack({ success: true, message: 'No-op: status already set', order });
+          return;
+        }
+        
+        if (!allowed[current] || !allowed[current].includes(status)) {
+          if (typeof ack === 'function') ack({ success: false, message: `Invalid transition from ${current} to ${status}` });
+          return;
+        }
+        
+        order.status = status;
+        if (status === 'completed') {
+          order.completedAt = new Date();
+        }
+        
+        let dbSavedStatus = false;
+        let dbErrorStatus: string | null = null;
+        
         try {
           await updateOrderStatusDB(orderId, status, {
             driver_id: driverId,
-           completed_at: status === 'completed' ? order.completedAt : undefined }); dbSavedStatus = true; if (DEBUG) console.log(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`); } catch (dbError: any) { dbSavedStatus = false; dbErrorStatus = dbError && dbError.message ? dbError.message : String(dbError);
-         console.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorStatus); } if (DEBUG) console.log(`Statut livraison ${maskOrderId(orderId)}: ${status} par driver ${maskUserId(driverId)}`); const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) { io.to(userSocketId).emit('order:status:update', { order, location, dbSaved: dbSavedStatus, dbError: dbErrorStatus }); } if (typeof ack === 'function') ack({ success: true, order, dbSaved: dbSavedStatus, dbError: dbErrorStatus }); if (status === 'completed') { setTimeout(() => { activeOrders.delete(order.id); if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} supprimée du cache`); }, 1000 * 60 * 5); } } catch (err: any) {
-       if (DEBUG) console.error('Error in update-delivery-status socket handler', err); if (typeof ack === 'function') ack({ success: false, message: 'Server error' }); } }); socket.on('send-proof', async (data: { orderId: string; proofBase64: string; proofType?: string }, ack?: (response: any) => void) => { try { const { orderId, proofBase64, proofType = 'image' } = data || {}; if (!orderId || !proofBase64) { if (typeof ack === 'function') ack({ success: false, message: 'orderId and proofBase64 required' }); return; } const order = activeOrders.get(orderId);
+            completed_at: status === 'completed' ? order.completedAt : undefined
+          });
+          dbSavedStatus = true;
+          if (DEBUG) console.log(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
+        } catch (dbError: any) {
+          dbSavedStatus = false;
+          dbErrorStatus = dbError && dbError.message ? dbError.message : String(dbError);
+          console.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorStatus);
+        }
+        
+        if (DEBUG) console.log(`Statut livraison ${maskOrderId(orderId)}: ${status} par driver ${maskUserId(driverId)}`);
+        
+        const userSocketId = connectedUsers.get(order.user.id);
+        if (userSocketId) {
+          io.to(userSocketId).emit('order:status:update', {
+            order,
+            location,
+            dbSaved: dbSavedStatus,
+            dbError: dbErrorStatus
+          });
+        }
+        
+        // Diffuser aux admins
+        broadcastOrderUpdateToAdmins(io, 'order:status:update', {
+          order,
+          location,
+          dbSaved: dbSavedStatus,
+          dbError: dbErrorStatus
+        });
+        
+        if (typeof ack === 'function') {
+          ack({
+            success: true,
+            order,
+            dbSaved: dbSavedStatus,
+            dbError: dbErrorStatus
+          });
+        }
+        
+        if (status === 'completed') {
+          setTimeout(() => {
+            activeOrders.delete(order.id);
+            if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} supprimée du cache`);
+          }, 1000 * 60 * 5);
+        }
+      } catch (err: any) {
+        if (DEBUG) console.error('Error in update-delivery-status socket handler', err);
+        if (typeof ack === 'function') {
+          ack({ success: false, message: 'Server error' });
+        }
+      }
+    });
+
+    socket.on('send-proof', async (data: { orderId: string; proofBase64: string; proofType?: string }, ack?: (response: any) => void) => {
+      try {
+        const { orderId, proofBase64, proofType = 'image' } = data || {};
+        
+        if (!orderId || !proofBase64) {
+          if (typeof ack === 'function') ack({ success: false, message: 'orderId and proofBase64 required' });
+          return;
+        }
+        
+        const order = activeOrders.get(orderId);
         if (!order) {
-         if (typeof ack === 'function') ack({ success: false, message: 'Order not found' }); return; } const driverId = socket.driverId;
+          if (typeof ack === 'function') ack({ success: false, message: 'Order not found' });
+          return;
+        }
+        
+        const driverId = socket.driverId;
         if (!driverId) {
-         if (typeof ack === 'function') ack({ success: false, message: 'Driver not authenticated on socket' }); return; } if (order.driverId && order.driverId !== driverId) {
-         if (typeof ack === 'function') ack({ success: false, message: 'Driver not assigned to order' }); return; } let dbSavedProof = false;
+          if (typeof ack === 'function') ack({ success: false, message: 'Driver not authenticated on socket' });
+          return;
+        }
+        
+        if (order.driverId && order.driverId !== driverId) {
+          if (typeof ack === 'function') ack({ success: false, message: 'Driver not assigned to order' });
+          return;
+        }
+        
+        let dbSavedProof = false;
         let dbErrorProof: string | null = null;
+        
         try {
           const uploadedAt = new Date();
-         const normalizedType = proofType === 'image' ? 'photo' : proofType; await saveDeliveryProofRecord({ orderId, driverId,
+          const normalizedType = proofType === 'image' ? 'photo' : proofType;
+          
+          await saveDeliveryProofRecord({
+            orderId,
+            driverId,
             proofType: normalizedType,
             metadata: {
-             received_from: 'socket', uploaded_at: uploadedAt.toISOString(), has_inline_proof: !!proofBase64, },
+              received_from: 'socket',
+              uploaded_at: uploadedAt.toISOString(),
+              has_inline_proof: !!proofBase64,
+            },
           });
 
           await updateOrderStatusDB(orderId, order.status, {
@@ -403,32 +616,106 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           };
 
           dbSavedProof = true;
-         if (DEBUG) console.log(`Preuve de livraison sauvegardée pour ${maskOrderId(orderId)}`); } catch (err: any) { dbSavedProof = false; dbErrorProof = err && err.message ? err.message : String(err);
-         if (DEBUG) console.warn('Failed to save proof to DB', dbErrorProof); } const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) {
-         io.to(userSocketId).emit('order:proof:uploaded', { orderId, uploadedAt: order.proof?.uploadedAt || new Date(), dbSaved: dbSavedProof, dbError: dbErrorProof }); } if (typeof ack === 'function') ack({ success: true, order, dbSaved: dbSavedProof, dbError: dbErrorProof }); } catch (err: any) { if (DEBUG) console.error('Error in send-proof socket handler', err); if (typeof ack === 'function') ack({ success: false, message: 'Server error' }); } }); socket.on('user-reconnect', ({ userId }: { userId?: string } = {}) => { try { if (!userId) return; const pending: Order[] = [];
+          if (DEBUG) console.log(`Preuve de livraison sauvegardée pour ${maskOrderId(orderId)}`);
+        } catch (err: any) {
+          dbSavedProof = false;
+          dbErrorProof = err && err.message ? err.message : String(err);
+          if (DEBUG) console.warn('Failed to save proof to DB', dbErrorProof);
+        }
+        
+        const userSocketId = connectedUsers.get(order.user.id);
+        if (userSocketId) {
+          io.to(userSocketId).emit('order:proof:uploaded', {
+            orderId,
+            uploadedAt: order.proof?.uploadedAt || new Date(),
+            dbSaved: dbSavedProof,
+            dbError: dbErrorProof
+          });
+        }
+        
+        if (typeof ack === 'function') {
+          ack({
+            success: true,
+            order,
+            dbSaved: dbSavedProof,
+            dbError: dbErrorProof
+          });
+        }
+      } catch (err: any) {
+        if (DEBUG) console.error('Error in send-proof socket handler', err);
+        if (typeof ack === 'function') {
+          ack({ success: false, message: 'Server error' });
+        }
+      }
+    });
+
+    socket.on('user-reconnect', ({ userId }: { userId?: string } = {}) => {
+      try {
+        if (!userId) return;
+        
+        const pending: Order[] = [];
         const current: Order[] = [];
+        
         for (const [, o] of activeOrders.entries()) {
           if (o.user && o.user.id === userId) {
-           if (o.status === 'pending') { pending.push(o); } else if (o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined') { current.push(o); } }
-        }
-       io.to(socket.id).emit('resync-order-state', { pendingOrders: pending, activeOrders: current, pendingOrder: pending.length ? pending[0] : null,
-          currentOrder: current.length ? current[0] : null,
-        });
-      } catch (err: any) {
-       if (DEBUG) console.warn('Error handling user-reconnect', err); } }); socket.on('driver-reconnect', ({ driverId }: { driverId?: string } = {}) => { try { if (!driverId) return; const pending: Order[] = [];
-        const active: Order[] = [];
-        for (const [, o] of activeOrders.entries()) {
-         if (o.driverId === driverId && o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined') { if (o.status === 'pending') { pending.push(o); } else { active.push(o);
+            if (o.status === 'pending') {
+              pending.push(o);
+            } else if (o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined') {
+              current.push(o);
             }
           }
         }
-       io.to(socket.id).emit('resync-order-state', { pendingOrders: pending, activeOrders: active, pendingOrder: pending.length ? pending[0] : null,
+        
+        io.to(socket.id).emit('resync-order-state', {
+          pendingOrders: pending,
+          activeOrders: current,
+          pendingOrder: pending.length ? pending[0] : null,
+          currentOrder: current.length ? current[0] : null,
+        });
+      } catch (err: any) {
+        if (DEBUG) console.warn('Error handling user-reconnect', err);
+      }
+    });
+
+    socket.on('driver-reconnect', ({ driverId }: { driverId?: string } = {}) => {
+      try {
+        if (!driverId) return;
+        
+        const pending: Order[] = [];
+        const active: Order[] = [];
+        
+        for (const [, o] of activeOrders.entries()) {
+          if (o.driverId === driverId && o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined') {
+            if (o.status === 'pending') {
+              pending.push(o);
+            } else {
+              active.push(o);
+            }
+          }
+        }
+        
+        io.to(socket.id).emit('resync-order-state', {
+          pendingOrders: pending,
+          activeOrders: active,
+          pendingOrder: pending.length ? pending[0] : null,
           currentOrder: active.length ? active[0] : null,
         });
       } catch (err: any) {
-       if (DEBUG) console.warn('Error handling driver-reconnect', err); } }); socket.on('disconnect', () => {
-     if (DEBUG) console.log(`Déconnexion Socket: ${socket.id}`); if (socket.driverId) { connectedDrivers.delete(socket.driverId); if (DEBUG) console.log(`Driver déconnecté: ${socket.driverId}`); } if (socket.userId) { connectedUsers.delete(socket.userId);
-       if (DEBUG) console.log(`User déconnecté: ${socket.userId}`);
+        if (DEBUG) console.warn('Error handling driver-reconnect', err);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      if (DEBUG) console.log(`Déconnexion Socket: ${socket.id}`);
+      
+      if (socket.driverId) {
+        connectedDrivers.delete(socket.driverId);
+        if (DEBUG) console.log(`Driver déconnecté: ${socket.driverId}`);
+      }
+      
+      if (socket.userId) {
+        connectedUsers.delete(socket.userId);
+        if (DEBUG) console.log(`User déconnecté: ${socket.userId}`);
       }
     });
   });

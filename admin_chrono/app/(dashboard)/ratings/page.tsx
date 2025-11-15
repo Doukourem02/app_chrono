@@ -4,6 +4,8 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { Star, Search, Filter, Trash2, User, Truck } from 'lucide-react'
+import { ScreenTransition } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
 
 export default function RatingsPage() {
   const [currentPage, setCurrentPage] = useState(1)
@@ -179,7 +181,8 @@ export default function RatingsPage() {
   })
 
   return (
-    <div style={containerStyle}>
+    <ScreenTransition direction="fade" duration={0.3}>
+      <div style={containerStyle}>
       <div style={headerStyle}>
         <h1 style={titleStyle}>Évaluations</h1>
       </div>
@@ -283,7 +286,13 @@ export default function RatingsPage() {
           Liste des évaluations
         </h3>
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
+          <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+            <SkeletonLoader width="100%" height={60} borderRadius={8} />
+          </div>
         ) : ratings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
             Aucune évaluation trouvée
@@ -430,6 +439,7 @@ export default function RatingsPage() {
         )}
       </div>
     </div>
+    </ScreenTransition>
   )
 }
 

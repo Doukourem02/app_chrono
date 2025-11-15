@@ -5,6 +5,8 @@ import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { getRecentActivities } from '@/lib/dashboardApi'
+import { AnimatedCard } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
@@ -216,7 +218,7 @@ export default function ActivityTable() {
   })
 
   return (
-    <div style={cardStyle}>
+    <AnimatedCard index={0} delay={0} style={cardStyle}>
       <div style={headerStyle}>
         <h2 
           style={{ ...titleStyle, cursor: 'pointer' }}
@@ -402,7 +404,7 @@ export default function ActivityTable() {
           </div>
         </div>
       )}
-    </div>
+    </AnimatedCard>
   )
 }
 

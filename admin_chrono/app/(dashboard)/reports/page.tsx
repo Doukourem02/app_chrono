@@ -4,6 +4,8 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { FileText, Download, Calendar, TrendingUp, Users, Truck, CreditCard } from 'lucide-react'
+import { ScreenTransition } from '@/components/animations'
+import { SkeletonLoader } from '@/components/animations'
 import {
   BarChart,
   Bar,
@@ -540,7 +542,8 @@ export default function ReportsPage() {
   }
 
   return (
-    <div style={containerStyle}>
+    <ScreenTransition direction="fade" duration={0.3}>
+      <div style={containerStyle}>
       <div style={headerStyle}>
         <h1 style={titleStyle}>Rapports</h1>
         <button
@@ -666,5 +669,6 @@ export default function ReportsPage() {
       {/* Contenu du rapport */}
       {renderReportContent()}
     </div>
+    </ScreenTransition>
   )
 }
