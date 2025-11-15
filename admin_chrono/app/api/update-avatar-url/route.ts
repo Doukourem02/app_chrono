@@ -64,12 +64,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 User check result:', { hasUser: !!existingUser, error: checkError?.code })
+      console.log(' User check result:', { hasUser: !!existingUser, error: checkError?.code })
     }
 
     if (checkError && checkError.code === 'PGRST116') {
       if (process.env.NODE_ENV === 'development') {
-        console.log('📝 User does not exist, creating...')
+        console.log(' User does not exist, creating...')
       }
       // L'utilisateur n'existe pas, le créer
       // D'abord, vérifier si la colonne avatar_url existe en essayant de l'insérer
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     } else {
       // L'utilisateur existe, mettre à jour
       if (process.env.NODE_ENV === 'development') {
-        console.log('📝 User exists, updating avatar_url...')
+        console.log('User exists, updating avatar_url...')
       }
       // Essayer de mettre à jour avatar_url, mais gérer le cas où la colonne n'existe pas
       try {
@@ -170,12 +170,12 @@ export async function POST(request: NextRequest) {
           .select()
 
         if (process.env.NODE_ENV === 'development') {
-          console.log('📝 Update result:', { hasData: !!updateData, error: updateError?.code })
+          console.log(' Update result:', { hasData: !!updateData, error: updateError?.code })
         }
 
         if (updateError) {
           if (process.env.NODE_ENV === 'development') {
-            console.error('❌ Update error details:', {
+            console.error(' Update error details:', {
               message: updateError.message,
               code: updateError.code,
               details: updateError.details,
@@ -210,11 +210,11 @@ export async function POST(request: NextRequest) {
         }
 
         if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Avatar URL updated successfully')
+          console.log(' Avatar URL updated successfully')
         }
       } catch (err) {
         if (process.env.NODE_ENV === 'development') {
-          console.error('❌ Error in update catch:', err)
+          console.error(' Error in update catch:', err)
         }
         const errorMessage = err instanceof Error ? err.message : 'Error updating profile'
         return NextResponse.json(

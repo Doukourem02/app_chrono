@@ -44,6 +44,67 @@ export interface Delivery {
   } | null
 }
 
+interface OrderFromAPI {
+  id: string
+  shipmentNumber?: string
+  status: string
+  driverId?: string
+  driver_id?: string
+  userId?: string
+  user_id?: string
+  user?: {
+    id: string
+    email?: string
+    name?: string
+    full_name?: string
+    phone?: string
+    avatar?: string
+    avatar_url?: string
+  }
+  pickup?: {
+    name?: string
+    address?: string
+    formatted_address?: string
+    coordinates?: {
+      latitude?: number
+      lat?: number
+      longitude?: number
+      lng?: number
+    }
+  }
+  dropoff?: {
+    name?: string
+    address?: string
+    formatted_address?: string
+    coordinates?: {
+      latitude?: number
+      lat?: number
+      longitude?: number
+      lng?: number
+    }
+  }
+  client?: Delivery['client']
+  driver?: {
+    id: string
+    email?: string
+    name?: string
+    full_name?: string
+    phone?: string
+    avatar?: string
+    avatar_url?: string
+  }
+}
+
+interface OrderUpdateData {
+  order: OrderFromAPI
+  location?: {
+    latitude?: number
+    longitude?: number
+    lat?: number
+    lng?: number
+  }
+}
+
 export interface UseRealTimeTrackingReturn {
   // Drivers
   onlineDrivers: Map<string, OnlineDriver>
@@ -129,9 +190,10 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     const connectSocket = async () => {
       try {
         await adminSocketService.connect()
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('❌ [useRealTimeTracking] Erreur de connexion:', err)
-        setError(err?.message || 'Erreur de connexion au serveur')
+        const errorMessage = err instanceof Error ? err.message : 'Erreur de connexion au serveur'
+        setError(errorMessage)
         setIsLoading(false)
         
         // Ne pas bloquer l'interface si le socket ne peut pas se connecter
@@ -293,10 +355,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     })
 
     // Écouter les mises à jour de commandes
-    const unsubscribeOrderUpdate = adminSocketService.on('order:status:update', (data: {
-      order: any
-      location?: any
-    }) => {
+    const unsubscribeOrderUpdate = adminSocketService.on('order:status:update', (data: OrderUpdateData) => {
       if (data.order) {
         // Convertir l'order en Delivery
         const delivery: Delivery = {
@@ -308,20 +367,22 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
             name: data.order.pickup?.name || data.order.pickup?.address || 'Adresse inconnue',
             address: data.order.pickup?.address || data.order.pickup?.formatted_address || 'Adresse inconnue',
             coordinates: data.order.pickup?.coordinates
-              ? {
-                  lat: data.order.pickup.coordinates.latitude || data.order.pickup.coordinates.lat,
-                  lng: data.order.pickup.coordinates.longitude || data.order.pickup.coordinates.lng,
-                }
+              ? (() => {
+                  const lat = data.order.pickup.coordinates.latitude ?? data.order.pickup.coordinates.lat
+                  const lng = data.order.pickup.coordinates.longitude ?? data.order.pickup.coordinates.lng
+                  return lat !== undefined && lng !== undefined ? { lat, lng } : null
+                })()
               : null,
           },
           dropoff: {
             name: data.order.dropoff?.name || data.order.dropoff?.address || 'Adresse inconnue',
             address: data.order.dropoff?.address || data.order.dropoff?.formatted_address || 'Adresse inconnue',
             coordinates: data.order.dropoff?.coordinates
-              ? {
-                  lat: data.order.dropoff.coordinates.latitude || data.order.dropoff.coordinates.lat,
-                  lng: data.order.dropoff.coordinates.longitude || data.order.dropoff.coordinates.lng,
-                }
+              ? (() => {
+                  const lat = data.order.dropoff.coordinates.latitude ?? data.order.dropoff.coordinates.lat
+                  const lng = data.order.dropoff.coordinates.longitude ?? data.order.dropoff.coordinates.lng
+                  return lat !== undefined && lng !== undefined ? { lat, lng } : null
+                })()
               : null,
           },
           driverId: data.order.driverId,
@@ -339,7 +400,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
             ? {
                 id: data.order.driver.id,
                 email: data.order.driver.email || '',
-                full_name: data.order.driver.full_name || data.order.driver.name,
+                full_name: data.order.driver.full_name ?? data.order.driver.name,
                 phone: data.order.driver.phone,
                 avatar_url: data.order.driver.avatar_url,
               }
@@ -432,7 +493,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
         const result = await adminApiService.getOngoingDeliveries()
         if (result.success && result.data) {
           // Convertir les données de l'API en format Delivery
-          const deliveries: Delivery[] = result.data.map((order: any) => ({
+          const deliveries: Delivery[] = result.data.map((order: OrderFromAPI) => ({
             id: order.id,
             shipmentNumber: order.shipmentNumber || `EV-${order.id.replace(/-/g, '').substring(0, 10)}`,
             type: 'Orders',
@@ -441,26 +502,36 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
               name: order.pickup?.name || order.pickup?.address || 'Adresse inconnue',
               address: order.pickup?.address || order.pickup?.formatted_address || 'Adresse inconnue',
               coordinates: order.pickup?.coordinates
-                ? {
-                    lat: order.pickup.coordinates.latitude || order.pickup.coordinates.lat,
-                    lng: order.pickup.coordinates.longitude || order.pickup.coordinates.lng,
-                  }
+                ? (() => {
+                    const lat = order.pickup.coordinates.latitude ?? order.pickup.coordinates.lat
+                    const lng = order.pickup.coordinates.longitude ?? order.pickup.coordinates.lng
+                    return lat !== undefined && lng !== undefined ? { lat, lng } : null
+                  })()
                 : null,
             },
             dropoff: {
               name: order.dropoff?.name || order.dropoff?.address || 'Adresse inconnue',
               address: order.dropoff?.address || order.dropoff?.formatted_address || 'Adresse inconnue',
               coordinates: order.dropoff?.coordinates
-                ? {
-                    lat: order.dropoff.coordinates.latitude || order.dropoff.coordinates.lat,
-                    lng: order.dropoff.coordinates.longitude || order.dropoff.coordinates.lng,
-                  }
+                ? (() => {
+                    const lat = order.dropoff.coordinates.latitude ?? order.dropoff.coordinates.lat
+                    const lng = order.dropoff.coordinates.longitude ?? order.dropoff.coordinates.lng
+                    return lat !== undefined && lng !== undefined ? { lat, lng } : null
+                  })()
                 : null,
             },
             driverId: order.driverId || order.driver_id,
             userId: order.userId || order.user_id,
             client: order.client,
-            driver: order.driver,
+            driver: order.driver
+              ? {
+                  id: order.driver.id,
+                  email: order.driver.email || '',
+                  full_name: order.driver.full_name ?? order.driver.name,
+                  phone: order.driver.phone,
+                  avatar_url: order.driver.avatar_url ?? order.driver.avatar,
+                }
+              : null,
           }))
           
           setOngoingDeliveries(deliveries)
@@ -482,7 +553,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
         
         // Charger les livraisons initiales depuis l'API si le socket n'est pas connecté après 5 secondes
         const deliveriesFallbackTimeout = setTimeout(async () => {
-          if (!adminSocketService.isConnected() && ongoingDeliveries.length === 0) {
+          if (!adminSocketService.isConnected() && deliveriesRef.current.length === 0) {
             if (process.env.NODE_ENV === 'development') {
               console.log('🔄 [useRealTimeTracking] Chargement des livraisons via API (fallback)')
             }
@@ -490,7 +561,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
             try {
               const result = await adminApiService.getOngoingDeliveries()
               if (result.success && result.data) {
-                const deliveries: Delivery[] = result.data.map((order: any) => ({
+                const deliveries: Delivery[] = result.data.map((order: OrderFromAPI) => ({
                   id: order.id,
                   shipmentNumber: order.shipmentNumber || `EV-${order.id.replace(/-/g, '').substring(0, 10)}`,
                   type: 'Orders',
@@ -499,26 +570,36 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
                     name: order.pickup?.name || order.pickup?.address || 'Adresse inconnue',
                     address: order.pickup?.address || order.pickup?.formatted_address || 'Adresse inconnue',
                     coordinates: order.pickup?.coordinates
-                      ? {
-                          lat: order.pickup.coordinates.latitude || order.pickup.coordinates.lat,
-                          lng: order.pickup.coordinates.longitude || order.pickup.coordinates.lng,
-                        }
+                      ? (() => {
+                          const lat = order.pickup.coordinates.latitude ?? order.pickup.coordinates.lat
+                          const lng = order.pickup.coordinates.longitude ?? order.pickup.coordinates.lng
+                          return lat !== undefined && lng !== undefined ? { lat, lng } : null
+                        })()
                       : null,
                   },
                   dropoff: {
                     name: order.dropoff?.name || order.dropoff?.address || 'Adresse inconnue',
                     address: order.dropoff?.address || order.dropoff?.formatted_address || 'Adresse inconnue',
                     coordinates: order.dropoff?.coordinates
-                      ? {
-                          lat: order.dropoff.coordinates.latitude || order.dropoff.coordinates.lat,
-                          lng: order.dropoff.coordinates.longitude || order.dropoff.coordinates.lng,
-                        }
+                      ? (() => {
+                          const lat = order.dropoff.coordinates.latitude ?? order.dropoff.coordinates.lat
+                          const lng = order.dropoff.coordinates.longitude ?? order.dropoff.coordinates.lng
+                          return lat !== undefined && lng !== undefined ? { lat, lng } : null
+                        })()
                       : null,
                   },
                   driverId: order.driverId || order.driver_id,
                   userId: order.userId || order.user_id,
                   client: order.client,
-                  driver: order.driver,
+                  driver: order.driver
+                    ? {
+                        id: order.driver.id,
+                        email: order.driver.email || '',
+                        full_name: order.driver.full_name ?? order.driver.name,
+                        phone: order.driver.phone,
+                        avatar_url: order.driver.avatar_url ?? order.driver.avatar,
+                      }
+                    : null,
                 }))
                 
                 setOngoingDeliveries(deliveries)
@@ -578,7 +659,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       // Recharger les livraisons
       const deliveriesResult = await adminApiService.getOngoingDeliveries()
       if (deliveriesResult.success && deliveriesResult.data) {
-        const deliveries: Delivery[] = deliveriesResult.data.map((order: any) => ({
+        const deliveries: Delivery[] = deliveriesResult.data.map((order: OrderFromAPI) => ({
           id: order.id,
           shipmentNumber: order.shipmentNumber || `EV-${order.id.replace(/-/g, '').substring(0, 10)}`,
           type: 'Orders',
@@ -587,26 +668,36 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
             name: order.pickup?.name || order.pickup?.address || 'Adresse inconnue',
             address: order.pickup?.address || order.pickup?.formatted_address || 'Adresse inconnue',
             coordinates: order.pickup?.coordinates
-              ? {
-                  lat: order.pickup.coordinates.latitude || order.pickup.coordinates.lat,
-                  lng: order.pickup.coordinates.longitude || order.pickup.coordinates.lng,
-                }
+              ? (() => {
+                  const lat = order.pickup.coordinates.latitude ?? order.pickup.coordinates.lat
+                  const lng = order.pickup.coordinates.longitude ?? order.pickup.coordinates.lng
+                  return lat !== undefined && lng !== undefined ? { lat, lng } : null
+                })()
               : null,
           },
           dropoff: {
             name: order.dropoff?.name || order.dropoff?.address || 'Adresse inconnue',
             address: order.dropoff?.address || order.dropoff?.formatted_address || 'Adresse inconnue',
             coordinates: order.dropoff?.coordinates
-              ? {
-                  lat: order.dropoff.coordinates.latitude || order.dropoff.coordinates.lat,
-                  lng: order.dropoff.coordinates.longitude || order.dropoff.coordinates.lng,
-                }
+              ? (() => {
+                  const lat = order.dropoff.coordinates.latitude ?? order.dropoff.coordinates.lat
+                  const lng = order.dropoff.coordinates.longitude ?? order.dropoff.coordinates.lng
+                  return lat !== undefined && lng !== undefined ? { lat, lng } : null
+                })()
               : null,
           },
           driverId: order.driverId || order.driver_id,
           userId: order.userId || order.user_id,
           client: order.client,
-          driver: order.driver,
+          driver: order.driver
+            ? {
+                id: order.driver.id,
+                email: order.driver.email || '',
+                full_name: order.driver.full_name ?? order.driver.name,
+                phone: order.driver.phone,
+                avatar_url: order.driver.avatar_url ?? order.driver.avatar,
+              }
+            : null,
         }))
         
         // Filtrer les livraisons terminées

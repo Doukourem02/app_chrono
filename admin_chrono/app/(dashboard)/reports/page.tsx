@@ -3,9 +3,8 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { FileText, Download, Calendar, TrendingUp, Users, Truck, CreditCard } from 'lucide-react'
+import { Download, TrendingUp, Users, Truck, CreditCard, LucideIcon } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
-import { SkeletonLoader } from '@/components/animations'
 import {
   BarChart,
   Bar,
@@ -22,6 +21,57 @@ import {
 type ReportType = 'deliveries' | 'revenues' | 'clients' | 'drivers' | 'payments'
 type PeriodPreset = 'today' | 'week' | 'month' | 'year' | 'custom'
 
+interface Delivery {
+  id: string
+  created_at?: string
+  status?: string
+  user_id?: string
+  driver_id?: string
+  price?: number | string
+  price_cfa?: number | string
+}
+
+interface Revenue {
+  date?: string
+  revenue?: string | number
+  deliveries?: string | number
+  delivery_method?: string
+}
+
+interface Client {
+  id: string
+  email?: string
+  phone?: string
+  created_at?: string
+  total_orders?: number
+  completed_orders?: number
+}
+
+interface Driver {
+  id: string
+  email?: string
+  phone?: string
+  created_at?: string
+  total_deliveries?: number
+  completed_deliveries?: number
+  total_revenue?: string | number
+  averageRating?: number
+  totalRatings?: number
+}
+
+interface Payment {
+  date?: string
+  payment_method_type?: string
+  status?: string
+  count?: number
+  total_amount?: string | number
+}
+
+interface PaymentChartData {
+  date: string
+  [key: string]: string | number
+}
+
 export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>('deliveries')
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('month')
@@ -33,7 +83,7 @@ export default function ReportsPage() {
   React.useEffect(() => {
     const now = new Date()
     let start: Date
-    let end: Date = now
+    const end: Date = now
 
     switch (periodPreset) {
       case 'today':
@@ -51,11 +101,13 @@ export default function ReportsPage() {
       case 'year':
         start = new Date(now.getFullYear(), 0, 1)
         break
-      default:
+      case 'custom':
         return // custom - ne pas modifier
+      default:
+        return
     }
 
-    if (periodPreset !== 'custom') {
+    if (periodPreset !== 'custom' as PeriodPreset) {
       setStartDate(start.toISOString().split('T')[0])
       setEndDate(end.toISOString().split('T')[0])
     }
@@ -134,7 +186,7 @@ export default function ReportsPage() {
     alert('Fonctionnalité d\'export à venir')
   }
 
-  const reportTypes: { key: ReportType; label: string; icon: any }[] = [
+  const reportTypes: { key: ReportType; label: string; icon: LucideIcon }[] = [
     { key: 'deliveries', label: 'Livraisons', icon: Truck },
     { key: 'revenues', label: 'Revenus', icon: TrendingUp },
     { key: 'clients', label: 'Clients', icon: Users },
@@ -298,7 +350,7 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {deliveries.slice(0, 50).map((order: any) => (
+                  {deliveries.slice(0, 50).map((order: Delivery) => (
                     <tr key={order.id}>
                       <td style={tdStyle}>{order.id.slice(0, 8)}...</td>
                       <td style={tdStyle}>{formatDate(order.created_at || '')}</td>
@@ -306,7 +358,13 @@ export default function ReportsPage() {
                       <td style={tdStyle}>{order.user_id?.slice(0, 8) || 'N/A'}...</td>
                       <td style={tdStyle}>{order.driver_id?.slice(0, 8) || 'N/A'}...</td>
                       <td style={tdStyle}>
-                        {formatCurrency(order.price || order.price_cfa || 0)}
+                        {formatCurrency(
+                          typeof order.price === 'number' 
+                            ? order.price 
+                            : typeof order.price_cfa === 'number'
+                            ? order.price_cfa
+                            : parseFloat(String(order.price || order.price_cfa || 0))
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -318,10 +376,10 @@ export default function ReportsPage() {
 
       case 'revenues':
         const revenues = revenuesData?.data || []
-        const revenueChartData = revenues.map((r: any) => ({
-          date: formatDate(r.date),
-          revenue: parseFloat(r.revenue || 0),
-          deliveries: parseInt(r.deliveries || 0),
+        const revenueChartData = revenues.map((r: Revenue) => ({
+          date: formatDate(r.date || ''),
+          revenue: typeof r.revenue === 'number' ? r.revenue : parseFloat(String(r.revenue || 0)),
+          deliveries: typeof r.deliveries === 'number' ? r.deliveries : parseInt(String(r.deliveries || 0)),
         }))
 
         return (
@@ -362,12 +420,16 @@ export default function ReportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {revenues.map((r: any, idx: number) => (
+                    {revenues.map((r: Revenue, idx: number) => (
                       <tr key={idx}>
-                        <td style={tdStyle}>{formatDate(r.date)}</td>
+                        <td style={tdStyle}>{formatDate(r.date || '')}</td>
                         <td style={tdStyle}>{r.delivery_method || 'N/A'}</td>
                         <td style={tdStyle}>{r.deliveries || 0}</td>
-                        <td style={tdStyle}>{formatCurrency(parseFloat(r.revenue || 0))}</td>
+                        <td style={tdStyle}>
+                          {formatCurrency(
+                            typeof r.revenue === 'number' ? r.revenue : parseFloat(String(r.revenue || 0))
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -394,13 +456,13 @@ export default function ReportsPage() {
                   <tr>
                     <th style={thStyle}>Email</th>
                     <th style={thStyle}>Téléphone</th>
-                    <th style={thStyle}>Date d'inscription</th>
+                    <th style={thStyle}>Date d&apos;inscription</th>
                     <th style={thStyle}>Commandes totales</th>
                     <th style={thStyle}>Commandes complétées</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {clients.map((client: any) => (
+                  {clients.map((client: Client) => (
                     <tr key={client.id}>
                       <td style={tdStyle}>{client.email || 'N/A'}</td>
                       <td style={tdStyle}>{client.phone || 'N/A'}</td>
@@ -432,7 +494,7 @@ export default function ReportsPage() {
                   <tr>
                     <th style={thStyle}>Email</th>
                     <th style={thStyle}>Téléphone</th>
-                    <th style={thStyle}>Date d'inscription</th>
+                    <th style={thStyle}>Date d&apos;inscription</th>
                     <th style={thStyle}>Livraisons totales</th>
                     <th style={thStyle}>Livraisons complétées</th>
                     <th style={thStyle}>Revenus totaux</th>
@@ -440,7 +502,7 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {drivers.map((driver: any) => (
+                  {drivers.map((driver: Driver) => (
                     <tr key={driver.id}>
                       <td style={tdStyle}>{driver.email || 'N/A'}</td>
                       <td style={tdStyle}>{driver.phone || 'N/A'}</td>
@@ -448,7 +510,11 @@ export default function ReportsPage() {
                       <td style={tdStyle}>{driver.total_deliveries || 0}</td>
                       <td style={tdStyle}>{driver.completed_deliveries || 0}</td>
                       <td style={tdStyle}>
-                        {formatCurrency(parseFloat(driver.total_revenue || 0))}
+                        {formatCurrency(
+                          typeof driver.total_revenue === 'number' 
+                            ? driver.total_revenue 
+                            : parseFloat(String(driver.total_revenue || 0))
+                        )}
                       </td>
                       <td style={tdStyle}>
                         {driver.averageRating
@@ -465,14 +531,20 @@ export default function ReportsPage() {
 
       case 'payments':
         const payments = paymentsData?.data || []
-        const paymentChartData = payments.reduce((acc: any[], p: any) => {
-          const existing = acc.find((a) => a.date === formatDate(p.date))
+        const paymentChartData = payments.reduce((acc: PaymentChartData[], p: Payment) => {
+          const dateKey = formatDate(p.date || '')
+          const methodType = p.payment_method_type || 'unknown'
+          const existing = acc.find((a) => a.date === dateKey)
+          const amount = typeof p.total_amount === 'number' 
+            ? p.total_amount 
+            : parseFloat(String(p.total_amount || 0))
+          
           if (existing) {
-            existing[p.payment_method_type] = (existing[p.payment_method_type] || 0) + parseFloat(p.total_amount || 0)
+            existing[methodType] = (typeof existing[methodType] === 'number' ? existing[methodType] : 0) + amount
           } else {
             acc.push({
-              date: formatDate(p.date),
-              [p.payment_method_type]: parseFloat(p.total_amount || 0),
+              date: dateKey,
+              [methodType]: amount,
             })
           }
           return acc
@@ -520,13 +592,19 @@ export default function ReportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {payments.map((p: any, idx: number) => (
+                    {payments.map((p: Payment, idx: number) => (
                       <tr key={idx}>
-                        <td style={tdStyle}>{formatDate(p.date)}</td>
+                        <td style={tdStyle}>{formatDate(p.date || '')}</td>
                         <td style={tdStyle}>{p.payment_method_type || 'N/A'}</td>
                         <td style={tdStyle}>{p.status || 'N/A'}</td>
                         <td style={tdStyle}>{p.count || 0}</td>
-                        <td style={tdStyle}>{formatCurrency(parseFloat(p.total_amount || 0))}</td>
+                        <td style={tdStyle}>
+                          {formatCurrency(
+                            typeof p.total_amount === 'number' 
+                              ? p.total_amount 
+                              : parseFloat(String(p.total_amount || 0))
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

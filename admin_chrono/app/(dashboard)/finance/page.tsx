@@ -3,9 +3,8 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { Wallet, TrendingUp, CreditCard, DollarSign, Users, BarChart3, Download } from 'lucide-react'
+import { Wallet, TrendingUp, CreditCard, DollarSign, Download } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
-import { SkeletonLoader } from '@/components/animations'
 import {
   BarChart,
   Bar,
@@ -13,7 +12,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -21,6 +19,17 @@ import {
 } from 'recharts'
 
 type Period = 'today' | 'week' | 'month' | 'year'
+
+interface Transaction {
+  id: string
+  order_id_full?: string
+  user_email?: string
+  user_phone?: string
+  amount?: number | string
+  payment_method_type?: string
+  status?: string
+  created_at?: string
+}
 
 export default function FinancePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('month')
@@ -131,7 +140,7 @@ export default function FinancePage() {
   // Données pour le graphique en camembert des méthodes de paiement
   const paymentMethodData = stats
     ? Object.entries(stats.transactionsByMethod)
-        .filter(([_, value]) => value > 0)
+        .filter(([, value]) => value > 0)
         .map(([method, value]) => ({
           name: getMethodLabel(method),
           value,
@@ -476,7 +485,11 @@ export default function FinancePage() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={(entry: { name?: string; percent?: number }) => {
+                  const name = entry.name || ''
+                  const percent = entry.percent || 0
+                  return `${name} ${(percent * 100).toFixed(0)}%`
+                }}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
@@ -573,7 +586,7 @@ export default function FinancePage() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((transaction: any) => (
+                {transactions.map((transaction: Transaction) => (
                   <tr key={transaction.id}>
                     <td style={tdStyle}>{transaction.id.slice(0, 8)}...</td>
                     <td style={tdStyle}>{transaction.order_id_full?.slice(0, 8) || 'N/A'}...</td>
@@ -583,7 +596,13 @@ export default function FinancePage() {
                         {transaction.user_phone || ''}
                       </div>
                     </td>
-                    <td style={tdStyle}>{formatCurrency(transaction.amount || 0)}</td>
+                    <td style={tdStyle}>
+                      {formatCurrency(
+                        typeof transaction.amount === 'string' 
+                          ? parseFloat(transaction.amount) || 0 
+                          : transaction.amount || 0
+                      )}
+                    </td>
                     <td style={tdStyle}>{getMethodLabel(transaction.payment_method_type || '')}</td>
                     <td style={tdStyle}>
                       <span style={getStatusBadgeStyle(transaction.status || '')}>

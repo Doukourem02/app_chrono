@@ -21,7 +21,7 @@ interface PromoCode {
 }
 
 export default function PromoCodesPage() {
-  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [promoCodes] = useState<PromoCode[]>([]);
   const [inputCode, setInputCode] = useState('');
 
   const handleApplyCode = () => {
@@ -99,7 +99,7 @@ export default function PromoCodesPage() {
                   )}
                 </View>
                 <Text style={styles.codeExpiry}>
-                  Valide jusqu'au {new Date(code.validUntil).toLocaleDateString('fr-FR')}
+                  Valide jusqu&apos;au {new Date(code.validUntil).toLocaleDateString('fr-FR')}
                 </Text>
               </View>
             ))

@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { paymentApi, PaymentMethod, Transaction, PaymentMethodType, PaymentStatus } from '../services/paymentApi';
+import { paymentApi, PaymentMethod, Transaction, PaymentStatus } from '../services/paymentApi';
 
 interface PaymentStore {
   // État

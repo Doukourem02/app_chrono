@@ -651,7 +651,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
       const shipmentNumber = `EV-${idParts}`;
 
       // Extraire les coordonnées (peuvent être dans coordinates.latitude/longitude ou directement latitude/longitude)
-      let pickupCoords = null;
+      let pickupCoords: { lat: number; lng: number } | null = null;
       if (pickup?.coordinates) {
         if (pickup.coordinates.latitude && pickup.coordinates.longitude) {
           pickupCoords = { lat: pickup.coordinates.latitude, lng: pickup.coordinates.longitude };
@@ -662,7 +662,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
         pickupCoords = { lat: pickup.latitude, lng: pickup.longitude };
       }
 
-      let dropoffCoords = null;
+      let dropoffCoords: { lat: number; lng: number } | null = null;
       if (dropoff?.coordinates) {
         if (dropoff.coordinates.latitude && dropoff.coordinates.longitude) {
           dropoffCoords = { lat: dropoff.coordinates.latitude, lng: dropoff.coordinates.longitude };

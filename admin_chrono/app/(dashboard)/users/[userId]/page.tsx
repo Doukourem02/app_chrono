@@ -1,36 +1,28 @@
 'use client'
 
-import React, { useState } from 'react'
+import React from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
 import {
   ArrowLeft,
-  User,
   Mail,
   Phone,
   Calendar,
   Truck,
-  TrendingUp,
-  DollarSign,
-  Clock,
-  Star,
   MapPin,
   Power,
-  Package,
 } from 'lucide-react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-} from 'recharts'
+
+interface User {
+  id: string
+  role?: string
+  email?: string
+  phone?: string
+  avatarUrl?: string
+  [key: string]: unknown
+}
 
 export default function UserDetailsPage() {
   const router = useRouter()
@@ -43,7 +35,7 @@ export default function UserDetailsPage() {
     queryFn: async () => {
       // Détecter le type d'utilisateur en récupérant d'abord les infos de base
       const usersResult = await adminApiService.getUsers()
-      const user = usersResult.data?.find((u: any) => u.id === userId)
+      const user = usersResult.data?.find((u: User) => u.id === userId)
       
       if (!user) return null
 
@@ -228,9 +220,11 @@ export default function UserDetailsPage() {
         <div style={profileHeaderStyle}>
           <div style={avatarStyle}>
             {user.avatarUrl ? (
-              <img
+              <Image
                 src={user.avatarUrl}
                 alt="Avatar"
+                width={80}
+                height={80}
                 style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
               />
             ) : (
@@ -344,7 +338,7 @@ export default function UserDetailsPage() {
                   </div>
                   <div style={statCardStyle}>
                     <div style={statValueStyle}>{user.statistics.todayDeliveries || 0}</div>
-                    <div style={statLabelStyle}>Aujourd'hui</div>
+                    <div style={statLabelStyle}>Aujourd&apos;hui</div>
                   </div>
                   <div style={statCardStyle}>
                     <div style={statValueStyle}>{user.statistics.weekDeliveries || 0}</div>
@@ -386,7 +380,7 @@ export default function UserDetailsPage() {
                     <div style={statValueStyle}>
                       {user.statistics.acceptanceRate?.toFixed(1) || 0}%
                     </div>
-                    <div style={statLabelStyle}>Taux d'acceptation</div>
+                    <div style={statLabelStyle}>Taux d&apos;acceptation</div>
                   </div>
                 </>
               ) : (

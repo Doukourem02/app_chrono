@@ -3,7 +3,29 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { Plus, Search, Edit, Trash2, Tag, Percent, DollarSign } from 'lucide-react'
+import { Plus, Search, Percent, DollarSign } from 'lucide-react'
+
+interface PromoCode {
+  id: string
+  code: string
+  discount_type: 'percentage' | 'fixed'
+  discount_value: number
+  current_uses?: number
+  max_uses?: number | null
+  valid_from?: string
+  valid_until?: string | null
+  is_active?: boolean
+}
+
+interface CreatePromoCodeData {
+  code: string
+  discountType: 'percentage' | 'fixed'
+  discountValue: number
+  maxUses?: number
+  validFrom?: string
+  validUntil?: string
+  isActive?: boolean
+}
 
 export default function PromoCodesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -27,7 +49,7 @@ export default function PromoCodesPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreatePromoCodeData) => {
       return await adminApiService.createPromoCode(data)
     },
     onSuccess: () => {
@@ -47,11 +69,11 @@ export default function PromoCodesPage() {
 
   const promoCodes = promoCodesData?.data || []
 
-  const filteredCodes = promoCodes.filter((code: any) =>
+  const filteredCodes = promoCodes.filter((code: PromoCode) =>
     code.code?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
     return date.toLocaleDateString('fr-FR', {
@@ -212,12 +234,12 @@ export default function PromoCodesPage() {
                 <th style={thStyle}>Valeur</th>
                 <th style={thStyle}>Utilisations</th>
                 <th style={thStyle}>Valide du</th>
-                <th style={thStyle}>Valide jusqu'au</th>
+                <th style={thStyle}>Valide jusqu&apos;au</th>
                 <th style={thStyle}>Statut</th>
               </tr>
             </thead>
             <tbody>
-              {filteredCodes.map((code: any) => (
+              {filteredCodes.map((code: PromoCode) => (
                 <tr key={code.id}>
                   <td style={tdStyle}>
                     <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '14px' }}>
@@ -338,7 +360,7 @@ export default function PromoCodesPage() {
               </div>
 
               <div>
-                <label style={labelStyle}>Valide jusqu'au (optionnel)</label>
+                <label style={labelStyle}>Valide jusqu&apos;au (optionnel)</label>
                 <input
                   type="date"
                   value={formData.validUntil}

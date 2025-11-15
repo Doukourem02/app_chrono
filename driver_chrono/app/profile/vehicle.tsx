@@ -29,9 +29,9 @@ export default function VehiclePage() {
       setFormData({
         vehicleType: profile.vehicle_type || '',
         vehiclePlate: profile.vehicle_plate || '',
-        vehicleBrand: profile.vehicle_brand || '',
+        vehicleBrand: (profile as any).vehicle_brand || '',
         vehicleModel: profile.vehicle_model || '',
-        vehicleColor: profile.vehicle_color || '',
+        vehicleColor: (profile as any).vehicle_color || '',
       });
     }
   }, [profile]);
@@ -48,7 +48,7 @@ export default function VehiclePage() {
       Alert.alert('Succès', 'Les informations du véhicule ont été mises à jour', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Impossible de mettre à jour les informations');
     } finally {
       setIsLoading(false);
@@ -93,7 +93,7 @@ export default function VehiclePage() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Plaque d'immatriculation</Text>
+            <Text style={styles.label}>Plaque d&apos;immatriculation</Text>
             <TextInput
               style={styles.input}
               value={formData.vehiclePlate}

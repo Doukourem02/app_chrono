@@ -21,6 +21,17 @@ interface GoogleMapsWindow extends Window {
   }
 }
 
+interface Order {
+  id?: string
+  driver_id?: string
+  driverId?: string
+  driver?: {
+    full_name?: string
+    email?: string
+  }
+  [key: string]: unknown
+}
+
 // Helper pour créer un Size Google Maps de manière sûre
 const createGoogleMapsSize = (width: number, height: number) => {
   if (typeof window === 'undefined') return undefined
@@ -171,7 +182,7 @@ export default function TrackerCard() {
 
   // Trouver une commande avec un driver assigné
   const orders = ordersData?.data || []
-  const activeOrder = orders.find((order: any) => order.driver_id || order.driverId)
+  const activeOrder = orders.find((order: Order) => order.driver_id || order.driverId)
   const driverId = activeOrder?.driver_id || activeOrder?.driverId
 
   const { data: driverData } = useQuery({

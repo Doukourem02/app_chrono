@@ -51,40 +51,6 @@ const MOCK_ANALYTICS_DATA: DeliveryAnalyticsData[] = [
   { month: 'nov.', packageDelivered: 12500, reported: 62 },
 ]
 
-const MOCK_ACTIVITIES_DATA: ActivityData[] = [
-  {
-    id: '1',
-    deliveryId: 'CA-12321-ID',
-    date: '12/11/2024',
-    departure: 'California, US',
-    destination: 'Jakarta, ID',
-    status: 'enroute',
-  },
-  {
-    id: '2',
-    deliveryId: 'NY-12321-SF',
-    date: '14/11/2024',
-    departure: 'New York, US',
-    destination: 'San Francisco, US',
-    status: 'enroute',
-  },
-  {
-    id: '3',
-    deliveryId: 'CGK-12321-NY',
-    date: '14/11/2024',
-    departure: 'Jakarta, ID',
-    destination: 'New York, US',
-    status: 'pending',
-  },
-  {
-    id: '4',
-    deliveryId: 'UK-12321-MLG',
-    date: '18/11/2024',
-    departure: 'London, UK',
-    destination: 'Malang, ID',
-    status: 'completed',
-  },
-]
 
 /**
  * Récupère les statistiques principales du dashboard
@@ -96,7 +62,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       return result.data
     }
     return MOCK_DASHBOARD_STATS
-  } catch (error) {
+  } catch {
     console.warn('⚠️ Error fetching dashboard stats. Using mock data.')
     return MOCK_DASHBOARD_STATS
   }
@@ -112,7 +78,7 @@ export async function getDeliveryAnalytics(): Promise<DeliveryAnalyticsData[]> {
       return result.data
     }
     return MOCK_ANALYTICS_DATA
-  } catch (error) {
+  } catch {
     console.warn('⚠️ Error fetching delivery analytics. Using mock data.')
     return MOCK_ANALYTICS_DATA
   }
@@ -135,9 +101,10 @@ export async function getRecentActivities(limit: number = 5): Promise<ActivityDa
     // Si l'API échoue, on retourne un tableau vide pour montrer qu'il n'y a pas de données
     console.warn('⚠️ [dashboardApi] API returned no data for recent activities. Result:', result)
     return []
-  } catch (error: any) {
+  } catch (error: unknown) {
     // En cas d'erreur réseau, on retourne un tableau vide
-    console.error('❌ [dashboardApi] Error fetching recent activities:', error?.message || error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('❌ [dashboardApi] Error fetching recent activities:', errorMessage)
     return []
   }
 }

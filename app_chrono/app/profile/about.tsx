@@ -36,7 +36,7 @@ export default function AboutPage() {
           <View style={styles.infoSection}>
             <Text style={styles.infoTitle}>Développé avec ❤️</Text>
             <Text style={styles.infoText}>
-              Application développée pour offrir le meilleur service de livraison en Côte d'Ivoire.
+              Application développée pour offrir le meilleur service de livraison en Côte d&apos;Ivoire.
             </Text>
           </View>
 

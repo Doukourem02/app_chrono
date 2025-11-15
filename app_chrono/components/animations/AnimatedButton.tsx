@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, StyleSheet, ViewStyle, TextStyle, StyleProp } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 interface AnimatedButtonProps {
   children: React.ReactNode;
   onPress: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   textStyle?: TextStyle;
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'outline';

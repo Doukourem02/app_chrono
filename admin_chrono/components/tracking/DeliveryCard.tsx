@@ -29,6 +29,7 @@ interface DeliveryCardProps {
       full_name?: string
       phone?: string
       avatar_url?: string
+      role?: string
     } | null
     driver?: {
       id: string

@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useAuthStore } from '../../store/useAuthStore';
 
 interface Address {
   id: string;
@@ -20,7 +19,6 @@ interface Address {
 }
 
 export default function AddressesPage() {
-  const { user } = useAuthStore();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -44,7 +42,7 @@ export default function AddressesPage() {
           isDefault: true,
         },
       ]);
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Impossible de charger les adresses');
     } finally {
       setIsLoading(false);
@@ -59,7 +57,7 @@ export default function AddressesPage() {
         isDefault: addr.id === addressId,
       })));
       Alert.alert('Succès', 'Adresse par défaut mise à jour');
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Impossible de mettre à jour l\'adresse');
     }
   };
@@ -78,7 +76,7 @@ export default function AddressesPage() {
               // TODO: Supprimer l'adresse via l'API
               setAddresses(addresses.filter(addr => addr.id !== addressId));
               Alert.alert('Succès', 'Adresse supprimée');
-            } catch (error) {
+            } catch {
               Alert.alert('Erreur', 'Impossible de supprimer l\'adresse');
             }
           },
@@ -95,7 +93,7 @@ export default function AddressesPage() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mes adresses</Text>
         <TouchableOpacity
-          onPress={() => router.push('/profile/add-address')}
+          onPress={() => router.push('/profile/add-address' as any)}
           style={styles.addButton}
         >
           <Ionicons name="add" size={24} color="#8B5CF6" />
@@ -113,7 +111,7 @@ export default function AddressesPage() {
             <Text style={styles.emptyText}>Aucune adresse enregistrée</Text>
             <TouchableOpacity
               style={styles.addFirstButton}
-              onPress={() => router.push('/profile/add-address')}
+              onPress={() => router.push('/profile/add-address' as any)}
             >
               <Text style={styles.addFirstButtonText}>Ajouter une adresse</Text>
             </TouchableOpacity>
@@ -132,7 +130,7 @@ export default function AddressesPage() {
                 </View>
                 <View style={styles.addressActions}>
                   <TouchableOpacity
-                    onPress={() => router.push(`/profile/edit-address?id=${address.id}`)}
+                    onPress={() => router.push(`/profile/edit-address?id=${address.id}` as any)}
                     style={styles.actionButton}
                   >
                     <Ionicons name="pencil" size={20} color="#8B5CF6" />

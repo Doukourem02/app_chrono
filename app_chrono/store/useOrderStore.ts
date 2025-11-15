@@ -167,9 +167,12 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         // Retirer les commandes terminées/annulées après un délai
         const status: OrderStatus = (order.status as OrderStatus) || 'pending';
         if (status === 'completed' || status === 'cancelled' || status === 'declined') {
-          setTimeout(() => {
-            get().removeOrder(order.id);
-          }, 2000);
+          const orderId = order.id;
+          if (orderId) {
+            setTimeout(() => {
+              get().removeOrder(orderId);
+            }, 2000);
+          }
         }
       }
 

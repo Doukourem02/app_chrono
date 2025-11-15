@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Calendar, ChevronLeft, ChevronRight, Plus, Filter } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 
 export default function PlanningPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -120,10 +120,6 @@ export default function PlanningPage() {
     [weekDays[2].toISOString().split('T')[0]]: [
       { id: '3', time: '09:00', client: 'Client C' },
     ],
-  }
-
-  const formatDateHeader = (date: Date) => {
-    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   }
 
   const navigateWeek = (direction: 'prev' | 'next') => {

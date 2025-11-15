@@ -9,8 +9,10 @@
  * SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/create-admin.js
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 require('dotenv').config({ path: '.env.local' })
 const { createClient } = require('@supabase/supabase-js')
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -32,6 +34,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 })
 
 async function createAdmin() {
+  /* eslint-disable-next-line @typescript-eslint/no-require-imports */
   const readline = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout
@@ -75,7 +78,7 @@ async function createAdmin() {
     // Ajouter dans la table users avec rôle admin
     console.log('⏳ Ajout dans la table users avec rôle admin...')
     
-    const { data: userData, error: userError } = await supabaseAdmin
+    const { error: userError } = await supabaseAdmin
       .from('users')
       .insert([
         {

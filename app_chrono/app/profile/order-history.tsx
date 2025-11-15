@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -30,11 +30,7 @@ export default function OrderHistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
 
-  useEffect(() => {
-    loadOrders();
-  }, [filter]);
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     if (!user?.id) return;
     
     setIsLoading(true);
@@ -52,7 +48,11 @@ export default function OrderHistoryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id, filter]);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

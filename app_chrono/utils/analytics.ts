@@ -62,8 +62,8 @@ class AnalyticsService {
     if (user) {
       this.setUser(user.id, {
         email: user.email,
-        name: user.name,
-        role: user.role,
+        name: (user as any).name || (user as any).full_name || '',
+        role: (user as any).role || 'user',
       });
     }
 
@@ -188,7 +188,7 @@ class AnalyticsService {
       }).catch(() => {
         // Ignorer les erreurs silencieusement
       });
-    } catch (error) {
+    } catch {
       // Ignorer les erreurs silencieusement
     }
   }

@@ -5,8 +5,10 @@
  * node scripts/add-avatar-url-column.js
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 require('dotenv').config({ path: '.env.local' })
 const { createClient } = require('@supabase/supabase-js')
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -31,8 +33,11 @@ async function addAvatarUrlColumn() {
     console.log('\n📝 Ajout de la colonne avatar_url à la table users...\n')
 
     // Exécuter la requête SQL pour ajouter la colonne
-    const { data, error } = await supabaseAdmin.rpc('exec_sql', {
+    // Note: RPC exec_sql peut ne pas exister, on utilise une approche alternative ci-dessous
+    await supabaseAdmin.rpc('exec_sql', {
       sql: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;'
+    }).catch(() => {
+      // Ignorer l'erreur si RPC n'existe pas, on utilisera l'approche alternative
     })
 
     // Si RPC n'existe pas, utiliser une approche alternative

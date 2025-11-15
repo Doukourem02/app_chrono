@@ -15,7 +15,6 @@ import { DeliveryMapView } from '../../components/DeliveryMapView';
 import { DeliveryBottomSheet } from '../../components/DeliveryBottomSheet';
 import { DeliveryMethodBottomSheet } from '../../components/DeliveryMethodBottomSheet';
 import { OrderDetailsSheet } from '../../components/OrderDetailsSheet';
-import TrackingBottomSheet from '../../components/TrackingBottomSheet.tsx';
 import RatingBottomSheet from '../../components/RatingBottomSheet';
 import PaymentBottomSheet from '../../components/PaymentBottomSheet';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
@@ -25,7 +24,6 @@ import { usePaymentStore } from '../../store/usePaymentStore';
 import { logger } from '../../utils/logger';
 import { calculatePrice, estimateDurationMinutes, formatDurationLabel, getDistanceInKm } from '../../services/orderApi';
 import { locationService } from '../../services/locationService';
-import { paymentApi } from '../../services/paymentApi';
 import { userApiService } from '../../services/userApiService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -234,11 +232,20 @@ export default function MapPage() {
     searchSeconds,
     driverCoords: searchDriverCoords,
     pulseAnim,
-    startDriverSearch,
     stopDriverSearch,
   } = useDriverSearch(resetAfterDriverSearch);
 
-  const { activeOrders, selectedOrderId, driverCoords: orderDriverCoordsMap, setSelectedOrder } = useOrderStore();
+  const { selectedOrderId, driverCoords: orderDriverCoordsMap, setSelectedOrder } = useOrderStore();
+  
+  // Bottom sheet pour les commandes normales (création/tracking) - déclaré avant useFocusEffect
+  const {
+    animatedHeight,
+    isExpanded,
+    panResponder,
+    toggle: toggleBottomSheet,
+    expand: expandBottomSheet,
+    collapse: collapseBottomSheet,
+  } = useBottomSheet();
   
   // 🆕 Réinitialiser complètement la map quand on arrive sur la page (depuis n'importe où)
   // Utiliser useFocusEffect pour détecter chaque fois qu'on arrive sur la page
@@ -246,7 +253,7 @@ export default function MapPage() {
   useFocusEffect(
     useCallback(() => {
       const now = Date.now();
-      const timeSinceLastFocus = now - lastFocusTimeRef.current;
+      lastFocusTimeRef.current = now;
       
       // 🛡️ Protection contre les boucles infinies : ne pas réinitialiser si déjà en cours
       if (isResettingRef.current) {
@@ -309,7 +316,7 @@ export default function MapPage() {
       setDropoffCoords(null);
       setPickupLocation('');
       setDeliveryLocation('');
-      setSelectedMethod(null);
+      setSelectedMethod('moto');
       
       // Recentrer la map sur la position actuelle de l'utilisateur
       // Utiliser un timeout pour s'assurer que region est disponible
@@ -453,7 +460,7 @@ export default function MapPage() {
         }
       }
     }
-  }, [pendingOrder, isSearchingDriver, currentOrder, selectedOrderId, orderDriverCoordsMap, clearRoute]);
+  }, [pendingOrder, isSearchingDriver, currentOrder, selectedOrderId, orderDriverCoordsMap, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation]);
 
   // Arrêter la recherche de chauffeur si pendingOrder devient null (aucun chauffeur disponible)
   useEffect(() => {
@@ -475,15 +482,6 @@ export default function MapPage() {
     }
   }, [orderDriverCoords, displayedRouteCoords.length, clearRoute]);
 
-  // Bottom sheet pour les commandes normales (création/tracking)
-  const {
-    animatedHeight,
-    isExpanded,
-    panResponder,
-    toggle: toggleBottomSheet,
-    expand: expandBottomSheet, // 🆕 Exposer la fonction expand
-    collapse: collapseBottomSheet,
-  } = useBottomSheet();
 
   // Bottom sheet séparé pour l'évaluation (ne pas interférer avec le bottom sheet principal)
   const {
@@ -974,7 +972,7 @@ export default function MapPage() {
           setDropoffCoords(null);
           setPickupLocation('');
           setDeliveryLocation('');
-          setSelectedMethod(null);
+          setSelectedMethod('moto');
           
           // Réinitialiser le mode création pour permettre une nouvelle commande
           setIsCreatingNewOrder(true);
@@ -1013,10 +1011,11 @@ export default function MapPage() {
         Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
       }
     }
-  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod, setIsCreatingNewOrder, animateToCoordinate, region, expandBottomSheet]);
+  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod, setIsCreatingNewOrder, animateToCoordinate, region, expandBottomSheet, recipientInfo.isRegistered, recipientInfo.userId]);
 
   // Handler pour annuler une commande
-  const handleCancelOrder = useCallback(async (orderId: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleCancelOrder = useCallback(async (orderId: string) => {
     Alert.alert(
       'Annuler la commande',
       'Êtes-vous sûr de vouloir annuler cette commande ?',
@@ -1039,7 +1038,7 @@ export default function MapPage() {
                 setDropoffCoords(null);
                 setPickupLocation('');
                 setDeliveryLocation('');
-                setSelectedMethod(null);
+                setSelectedMethod('moto');
                 
                 logger.info('✅ Commande annulée avec succès', 'map.tsx', { orderId });
                 Alert.alert('Succès', 'Commande annulée avec succès');
@@ -1055,7 +1054,7 @@ export default function MapPage() {
         },
       ]
     );
-  }, [clearRoute]);
+  }, [clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod]);
 
   if (!region) {
     return (

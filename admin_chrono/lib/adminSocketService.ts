@@ -8,7 +8,7 @@ class AdminSocketService {
   private isConnecting = false
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
-  private listeners: Map<string, Set<Function>> = new Map()
+  private listeners: Map<string, Set<(data: unknown) => void>> = new Map()
 
   /**
    * Se connecter au serveur Socket.IO
@@ -55,8 +55,6 @@ class AdminSocketService {
         withCredentials: true,
         // Options supplémentaires pour améliorer la stabilité
         rememberUpgrade: true,
-        // Désactiver le polling si websocket fonctionne
-        upgradeTimeout: 10000,
       })
 
       // Gérer la connexion
@@ -194,9 +192,10 @@ class AdminSocketService {
         this.emit('admin:error', data)
       })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.isConnecting = false
-      console.error('❌ [adminSocketService] Erreur lors de la connexion:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error('❌ [adminSocketService] Erreur lors de la connexion:', errorMessage)
       throw error
     }
   }
@@ -228,7 +227,7 @@ class AdminSocketService {
   /**
    * Écouter un événement
    */
-  on(event: string, callback: Function): () => void {
+  on(event: string, callback: (data: unknown) => void): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set())
     }
@@ -243,7 +242,7 @@ class AdminSocketService {
   /**
    * Émettre un événement local (pour les listeners)
    */
-  private emit(event: string, data: any): void {
+  private emit(event: string, data: unknown): void {
     const callbacks = this.listeners.get(event)
     if (callbacks) {
       callbacks.forEach((callback) => {
@@ -259,7 +258,7 @@ class AdminSocketService {
   /**
    * Émettre un événement au serveur
    */
-  emitToServer(event: string, data: any): void {
+  emitToServer(event: string, data: unknown): void {
     if (this.socket?.connected) {
       this.socket.emit(event, data)
     } else {

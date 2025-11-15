@@ -36,7 +36,7 @@ export default function PrivacyPage() {
 
           <Text style={styles.sectionTitle}>3. Partage des données</Text>
           <Text style={styles.text}>
-            Nous ne vendons pas vos données personnelles. Nous pouvons partager certaines informations avec nos partenaires de livraison uniquement dans le cadre de l'exécution de vos commandes.
+            Nous ne vendons pas vos données personnelles. Nous pouvons partager certaines informations avec nos partenaires de livraison uniquement dans le cadre de l&apos;exécution de vos commandes.
           </Text>
 
           <Text style={styles.sectionTitle}>4. Sécurité</Text>
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
 
           <Text style={styles.sectionTitle}>5. Vos droits</Text>
           <Text style={styles.text}>
-            Vous avez le droit d'accéder, de modifier ou de supprimer vos données personnelles à tout moment en contactant notre service client.
+            Vous avez le droit d&apos;accéder, de modifier ou de supprimer vos données personnelles à tout moment en contactant notre service client.
           </Text>
         </View>
       </ScrollView>

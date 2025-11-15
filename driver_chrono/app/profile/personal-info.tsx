@@ -48,7 +48,7 @@ export default function PersonalInfoPage() {
       Alert.alert('Succès', 'Vos informations ont été mises à jour', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Impossible de mettre à jour vos informations');
     } finally {
       setIsLoading(false);
@@ -97,7 +97,7 @@ export default function PersonalInfoPage() {
               editable={false}
               placeholderTextColor="#9CA3AF"
             />
-            <Text style={styles.helperText}>L'email ne peut pas être modifié</Text>
+            <Text style={styles.helperText}>L&apos;email ne peut pas être modifié</Text>
           </View>
 
           <View style={styles.inputGroup}>

@@ -3,9 +3,22 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { Star, Search, Filter, Trash2, User, Truck } from 'lucide-react'
+import { Star, Search, Trash2 } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+
+interface Rating {
+  id: string
+  rating: string | number
+  user_email?: string
+  user_phone?: string
+  driver_email?: string
+  driver_phone?: string
+  order_id?: string
+  order_id_full?: string
+  comment?: string
+  created_at?: string
+}
 
 export default function RatingsPage() {
   const [currentPage, setCurrentPage] = useState(1)
@@ -41,7 +54,7 @@ export default function RatingsPage() {
   const ratings = ratingsData?.data || []
   const pagination = ratingsData?.pagination
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
     return date.toLocaleDateString('fr-FR', {
@@ -173,10 +186,10 @@ export default function RatingsPage() {
   const totalRatings = ratings.length
   const averageRating =
     totalRatings > 0
-      ? ratings.reduce((sum: number, r: any) => sum + (parseInt(r.rating) || 0), 0) / totalRatings
+      ? ratings.reduce((sum: number, r: Rating) => sum + (parseInt(String(r.rating)) || 0), 0) / totalRatings
       : 0
   const ratingDistribution = Array.from({ length: 5 }, (_, i) => {
-    const count = ratings.filter((r: any) => parseInt(r.rating) === 5 - i).length
+    const count = ratings.filter((r: Rating) => parseInt(String(r.rating)) === 5 - i).length
     return { rating: 5 - i, count }
   })
 
@@ -313,7 +326,7 @@ export default function RatingsPage() {
               </thead>
               <tbody>
                 {ratings
-                  .filter((rating: any) => {
+                  .filter((rating: Rating) => {
                     if (!searchQuery) return true
                     const query = searchQuery.toLowerCase()
                     return (
@@ -321,11 +334,11 @@ export default function RatingsPage() {
                       rating.order_id_full?.toLowerCase().includes(query)
                     )
                   })
-                  .map((rating: any) => (
+                  .map((rating: Rating) => (
                     <tr key={rating.id}>
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {renderStars(parseInt(rating.rating) || 0)}
+                          {renderStars(parseInt(String(rating.rating)) || 0)}
                           <span style={{ marginLeft: '8px', fontWeight: 600 }}>
                             {rating.rating}/5
                           </span>

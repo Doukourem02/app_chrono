@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 
@@ -23,25 +23,32 @@ export default function StatisticsPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadStatistics();
-  }, []);
-
-  const loadStatistics = async () => {
+  const loadStatistics = useCallback(async () => {
     if (!user?.id) return;
     
     setIsLoading(true);
     try {
       const result = await apiService.getDriverStatistics(user.id);
       if (result.success && result.data) {
-        setStatistics(result.data);
+        const data = result.data as any;
+        setStatistics({
+          completedDeliveries: data.completedDeliveries || 0,
+          averageRating: data.averageRating || 0,
+          totalEarnings: data.totalEarnings || 0,
+          totalDistance: data.totalDistance || 0,
+          averageDeliveryTime: data.averageDeliveryTime || 0,
+        });
       }
     } catch (error) {
       console.error('Erreur chargement statistiques:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadStatistics();
+  }, [loadStatistics]);
 
   const formatCurrency = (amount?: number) => {
     if (!amount && amount !== 0) return '0 FCFA';

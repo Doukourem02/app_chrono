@@ -20,7 +20,7 @@ export const config = {
 
 // Validation des variables critiques
 if (!config.googleApiKey) {
-  console.warn('⚠️ Google API Key not configured. Map features may not work properly.')
+  console.warn(' Google API Key not configured. Map features may not work properly.')
 }
 
 export default config

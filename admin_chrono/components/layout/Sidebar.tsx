@@ -59,7 +59,7 @@ export default function Sidebar() {
       if (error) {
         if (error.code === 'PGRST116') {
           // Utilisateur n'existe pas dans la table users, utiliser user_metadata
-          console.log('⚠️ [Sidebar] User not found in users table, using user_metadata');
+          console.log(' [Sidebar] User not found in users table, using user_metadata');
           setAvatarUrl(null);
           setUserProfile({
             full_name: user?.user_metadata?.full_name || undefined,
@@ -67,7 +67,7 @@ export default function Sidebar() {
           });
         } else {
           // Autre erreur (permissions, réseau, etc.)
-          console.warn('❌ [Sidebar] Error loading profile from users table:', {
+          console.warn(' [Sidebar] Error loading profile from users table:', {
             code: error.code,
             message: error.message,
             details: error.details,
@@ -82,7 +82,7 @@ export default function Sidebar() {
         }
       } else if (userData) {
         // Données trouvées dans la table users
-        console.log('✅ [Sidebar] Profile loaded from database:', {
+        console.log(' [Sidebar] Profile loaded from database:', {
           avatar_url: userData.avatar_url,
           avatar_url_type: typeof userData.avatar_url,
           avatar_url_length: userData.avatar_url?.length,
@@ -90,7 +90,7 @@ export default function Sidebar() {
           user_id: user.id,
         });
         let newAvatarUrl = userData.avatar_url || null;
-        console.log('🖼️ [Sidebar] Raw avatar URL from DB:', newAvatarUrl);
+        console.log(' [Sidebar] Raw avatar URL from DB:', newAvatarUrl);
         
         // Corriger l'URL si elle contient un double "avatars/avatars"
         if (newAvatarUrl && newAvatarUrl.includes('/avatars/avatars/')) {
@@ -100,10 +100,10 @@ export default function Sidebar() {
         
         // Vérifier que l'URL est valide
         if (newAvatarUrl && !newAvatarUrl.startsWith('http')) {
-          console.warn('⚠️ [Sidebar] Avatar URL does not start with http:', newAvatarUrl);
+          console.warn(' [Sidebar] Avatar URL does not start with http:', newAvatarUrl);
         }
         
-        console.log('🖼️ [Sidebar] Final avatar URL to set:', newAvatarUrl);
+        console.log(' [Sidebar] Final avatar URL to set:', newAvatarUrl);
         // Mettre à jour directement l'URL (la vérification se fera via onLoad/onError de l'img)
         setAvatarUrl(newAvatarUrl);
         
@@ -115,7 +115,7 @@ export default function Sidebar() {
     } catch (error) {
       // Erreur inattendue
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.warn('❌ [Sidebar] Unexpected error loading profile:', {
+      console.warn(' [Sidebar] Unexpected error loading profile:', {
         message: errorMessage,
         error,
       });
@@ -144,21 +144,21 @@ export default function Sidebar() {
         let correctedUrl = newAvatarUrl;
         if (newAvatarUrl.includes('/avatars/avatars/')) {
           correctedUrl = newAvatarUrl.replace('/avatars/avatars/', '/avatars/');
-          console.log('🔧 [Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
+          console.log(' [Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
         }
-        console.log('✅ [Sidebar] Setting avatar URL immediately:', correctedUrl);
+        console.log(' [Sidebar] Setting avatar URL immediately:', correctedUrl);
         // Mettre à jour immédiatement
         setAvatarUrl(correctedUrl);
         // Recharger aussi le profil complet pour avoir les dernières données de la DB
         loadProfile();
       } else {
-        console.warn('⚠️ [Sidebar] No avatar URL in event detail');
+        console.warn(' [Sidebar] No avatar URL in event detail');
       }
     };
 
     const handleProfileUpdate = (event: CustomEvent) => {
       const { fullName, phone, avatarUrl: newAvatarUrl } = event.detail;
-      console.log('📢 [Sidebar] Received profile-updated event:', { fullName, phone, newAvatarUrl });
+      console.log(' [Sidebar] Received profile-updated event:', { fullName, phone, newAvatarUrl });
       if (fullName) {
         setUserProfile(prev => ({ ...prev, full_name: fullName }));
       }
@@ -170,9 +170,9 @@ export default function Sidebar() {
         let correctedUrl = newAvatarUrl;
         if (newAvatarUrl.includes('/avatars/avatars/')) {
           correctedUrl = newAvatarUrl.replace('/avatars/avatars/', '/avatars/');
-          console.log('🔧 [Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
+          console.log(' [Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
         }
-        console.log('✅ [Sidebar] Setting avatar URL from profile-updated:', correctedUrl);
+        console.log(' [Sidebar] Setting avatar URL from profile-updated:', correctedUrl);
         setAvatarUrl(correctedUrl);
       } else {
         // Si pas d'avatarUrl dans l'événement, réinitialiser pour afficher les initiales
@@ -502,7 +502,7 @@ export default function Sidebar() {
             <div style={avatarImageWrapperStyle}>
               {avatarUrl ? (
                 <>
-                  {console.log('🖼️ [Sidebar] Rendering avatar with URL:', avatarUrl)}
+                  {console.log('[Sidebar] Rendering avatar with URL:', avatarUrl)}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     key={avatarUrl} // Force re-render quand l'URL change
@@ -517,10 +517,10 @@ export default function Sidebar() {
                       backgroundColor: 'transparent',
                     }}
                     onLoad={() => {
-                      console.log('✅ [Sidebar] Avatar image loaded successfully:', avatarUrl);
+                      console.log(' [Sidebar] Avatar image loaded successfully:', avatarUrl);
                     }}
                     onError={(e) => {
-                      console.error('❌ [Sidebar] Avatar image failed to load:', avatarUrl);
+                      console.error(' [Sidebar] Avatar image failed to load:', avatarUrl);
                       console.error('Error event:', e);
                       // Si l'image ne charge pas, réinitialiser avatarUrl pour afficher les initiales
                       setAvatarUrl(null);

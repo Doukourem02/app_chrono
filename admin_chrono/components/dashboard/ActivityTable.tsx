@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { getRecentActivities } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
-import { SkeletonLoader } from '@/components/animations'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {

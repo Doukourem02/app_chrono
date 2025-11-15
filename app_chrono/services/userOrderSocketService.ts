@@ -310,7 +310,7 @@ class UserOrderSocketService {
     this.socket.on('order-cancelled', (data) => {
       try {
         logger.info('❌ Commande annulée reçue', 'userOrderSocketService', data);
-        const { orderId, reason } = data || {};
+        const { orderId } = data || {};
         if (orderId) {
           // Mettre à jour le store pour refléter l'annulation
           const store = useOrderStore.getState();

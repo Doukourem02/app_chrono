@@ -151,7 +151,7 @@ class UserApiService {
       let result: any;
       try {
         result = await response.json();
-      } catch (jsonError) {
+      } catch {
         // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
         console.error('❌ Réponse non-JSON reçue:', response.status, response.statusText);
         return {
@@ -239,7 +239,6 @@ class UserApiService {
         accessToken,
         refreshToken,
         setTokens,
-        logout,
       } = useAuthStore.getState();
 
       // Vérifier si le token existe et s'il n'est pas expiré

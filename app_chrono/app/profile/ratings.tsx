@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
 import { useAuthStore } from '../../store/useAuthStore';
-import { userApiService } from '../../services/userApiService';
 
 interface Rating {
   id: string;
@@ -27,11 +26,7 @@ export default function RatingsPage() {
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadRatings();
-  }, []);
-
-  const loadRatings = async () => {
+  const loadRatings = useCallback(async () => {
     if (!user?.id) return;
     
     setIsLoading(true);
@@ -47,7 +42,11 @@ export default function RatingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadRatings();
+  }, [loadRatings]);
 
   const renderStars = (rating: number) => {
     return (

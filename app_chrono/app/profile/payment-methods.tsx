@@ -35,7 +35,7 @@ export default function PaymentMethodsPage() {
       if (result.success && result.data) {
         setPaymentMethods(result.data);
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Impossible de charger les méthodes de paiement');
     } finally {
       setIsLoading(false);
@@ -79,7 +79,7 @@ export default function PaymentMethodsPage() {
         methods.map(m => ({ ...m, is_default: m.id === methodId }))
       );
       Alert.alert('Succès', 'Méthode de paiement par défaut mise à jour');
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Impossible de mettre à jour la méthode');
     }
   };
@@ -98,7 +98,7 @@ export default function PaymentMethodsPage() {
               // TODO: Supprimer via l'API
               setPaymentMethods(methods => methods.filter(m => m.id !== methodId));
               Alert.alert('Succès', 'Méthode supprimée');
-            } catch (error) {
+            } catch {
               Alert.alert('Erreur', 'Impossible de supprimer la méthode');
             }
           },
@@ -115,7 +115,7 @@ export default function PaymentMethodsPage() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Moyens de paiement</Text>
         <TouchableOpacity
-          onPress={() => router.push('/profile/add-payment-method')}
+          onPress={() => router.push('/profile/add-payment-method' as any)}
           style={styles.addButton}
         >
           <Ionicons name="add" size={24} color="#8B5CF6" />
@@ -133,7 +133,7 @@ export default function PaymentMethodsPage() {
             <Text style={styles.emptyText}>Aucune méthode de paiement</Text>
             <TouchableOpacity
               style={styles.addFirstButton}
-              onPress={() => router.push('/profile/add-payment-method')}
+              onPress={() => router.push('/profile/add-payment-method' as any)}
             >
               <Text style={styles.addFirstButtonText}>Ajouter une méthode</Text>
             </TouchableOpacity>

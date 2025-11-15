@@ -3,13 +3,28 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { AlertTriangle, CheckCircle, XCircle, Search, MessageSquare } from 'lucide-react'
+import { CheckCircle, XCircle, Search, MessageSquare } from 'lucide-react'
+
+interface Dispute {
+  id: string
+  dispute_type?: string
+  user_email?: string
+  user_phone?: string
+  transaction_id?: string
+  order_id_full?: string
+  amount?: string | number
+  status?: string
+  created_at?: string
+  description?: string
+  admin_notes?: string
+  reason?: string
+}
 
 export default function DisputesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedDispute, setSelectedDispute] = useState<any | null>(null)
+  const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null)
   const [adminNotes, setAdminNotes] = useState('')
   const itemsPerPage = 20
   const queryClient = useQueryClient()
@@ -43,7 +58,7 @@ export default function DisputesPage() {
     return `${amount.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} FCFA`
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
     return date.toLocaleDateString('fr-FR', {
@@ -252,7 +267,7 @@ export default function DisputesPage() {
               </thead>
               <tbody>
                 {disputes
-                  .filter((dispute: any) => {
+                  .filter((dispute: Dispute) => {
                     if (!searchQuery) return true
                     const query = searchQuery.toLowerCase()
                     return (
@@ -261,7 +276,7 @@ export default function DisputesPage() {
                       dispute.id?.toLowerCase().includes(query)
                     )
                   })
-                  .map((dispute: any) => (
+                  .map((dispute: Dispute) => (
                     <tr key={dispute.id}>
                       <td style={tdStyle}>
                         <span style={{ fontSize: '12px', fontFamily: 'monospace' }}>
@@ -283,7 +298,7 @@ export default function DisputesPage() {
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        {dispute.amount ? formatCurrency(parseFloat(dispute.amount)) : 'N/A'}
+                        {dispute.amount ? formatCurrency(parseFloat(String(dispute.amount))) : 'N/A'}
                       </td>
                       <td style={tdStyle}>
                         <span style={getStatusBadgeStyle(dispute.status || 'pending')}>
@@ -486,7 +501,7 @@ export default function DisputesPage() {
               <div>
                 <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Montant</div>
                 <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                  {selectedDispute.amount ? formatCurrency(parseFloat(selectedDispute.amount)) : 'N/A'}
+                  {selectedDispute.amount ? formatCurrency(parseFloat(String(selectedDispute.amount))) : 'N/A'}
                 </div>
               </div>
 

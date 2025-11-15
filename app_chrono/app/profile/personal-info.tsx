@@ -12,7 +12,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
-import { userApiService } from '../../services/userApiService';
 
 export default function PersonalInfoPage() {
   const { user } = useAuthStore();
@@ -27,9 +26,15 @@ export default function PersonalInfoPage() {
   useEffect(() => {
     // Charger les données utilisateur
     if (user) {
+      // Extraire prénom et nom depuis full_name si disponible, sinon utiliser des valeurs par défaut
+      const fullName = (user as any).full_name || '';
+      const nameParts = fullName.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
       setFormData({
-        firstName: user.first_name || '',
-        lastName: user.last_name || '',
+        firstName,
+        lastName,
         email: user.email || '',
         phone: user.phone || '',
       });
@@ -55,7 +60,7 @@ export default function PersonalInfoPage() {
       Alert.alert('Succès', 'Vos informations ont été mises à jour', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } catch (error) {
+    } catch {
       Alert.alert('Erreur', 'Impossible de mettre à jour vos informations');
     } finally {
       setIsLoading(false);
@@ -104,7 +109,7 @@ export default function PersonalInfoPage() {
               editable={false}
               placeholderTextColor="#9CA3AF"
             />
-            <Text style={styles.helperText}>L'email ne peut pas être modifié</Text>
+            <Text style={styles.helperText}>L&apos;email ne peut pas être modifié</Text>
           </View>
 
           <View style={styles.inputGroup}>

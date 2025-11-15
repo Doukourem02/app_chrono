@@ -215,7 +215,7 @@ export default function MessagePage() {
                 {/* Messages */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ padding: '12px 16px', borderRadius: '12px', backgroundColor: '#F3F4F6', maxWidth: '70%', alignSelf: 'flex-start' }}>
-                    <div style={{ fontSize: '14px', color: '#111827' }}>Bonjour, j'ai une question sur ma commande.</div>
+                    <div style={{ fontSize: '14px', color: '#111827' }}>Bonjour, j&apos;ai une question sur ma commande.</div>
                     <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>10:30</div>
                   </div>
                   <div style={{ padding: '12px 16px', borderRadius: '12px', backgroundColor: '#8B5CF6', maxWidth: '70%', alignSelf: 'flex-end' }}>

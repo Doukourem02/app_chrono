@@ -71,7 +71,7 @@ export default function PaymentsPage() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Paiements</Text>
         <TouchableOpacity
-          onPress={() => router.push('/profile/add-payment-method')}
+          onPress={() => router.push('/profile/add-payment-method' as any)}
           style={styles.addButton}
         >
           <Ionicons name="add" size={24} color="#8B5CF6" />
@@ -92,7 +92,7 @@ export default function PaymentsPage() {
             </Text>
             <TouchableOpacity
               style={styles.addFirstButton}
-              onPress={() => router.push('/profile/add-payment-method')}
+              onPress={() => router.push('/profile/add-payment-method' as any)}
             >
               <Text style={styles.addFirstButtonText}>Ajouter une méthode</Text>
             </TouchableOpacity>
