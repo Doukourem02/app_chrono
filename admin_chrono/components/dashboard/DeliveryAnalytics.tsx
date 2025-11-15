@@ -29,14 +29,28 @@ export default function DeliveryAnalytics() {
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   
-  // Log pour voir si les dates changent
-  React.useEffect(() => {
-    console.log('🔄 [DeliveryAnalytics] Date range changed:', { dateFilter, startDate, endDate })
-  }, [dateFilter, startDate, endDate])
+  // DÉSACTIVÉ : Log qui se déclenchait en boucle et causait des re-renders
+  // React.useEffect(() => {
+  //   console.log('🔄 [DeliveryAnalytics] Date range changed:', { dateFilter, startDate, endDate })
+  // }, [dateFilter, startDate, endDate])
   
-  // Stabiliser la queryKey - React Query compare par valeur, pas par référence
+  // Stabiliser la queryKey avec useRef pour éviter les recalculs inutiles
+  const queryKeyRef = React.useRef<[string, string, string, string] | null>(null)
   const queryKey = React.useMemo(() => {
     const key: [string, string, string, string] = ['delivery-analytics', dateFilter, startDate, endDate]
+    
+    // Vérifier si la queryKey a vraiment changé
+    if (queryKeyRef.current && 
+        queryKeyRef.current[0] === key[0] &&
+        queryKeyRef.current[1] === key[1] &&
+        queryKeyRef.current[2] === key[2] &&
+        queryKeyRef.current[3] === key[3]) {
+      // La queryKey n'a pas changé, retourner la référence précédente
+      return queryKeyRef.current
+    }
+    
+    // La queryKey a changé, mettre à jour la référence
+    queryKeyRef.current = key
     console.log('🔑 [DeliveryAnalytics] QueryKey calculated:', key)
     return key
   }, [dateFilter, startDate, endDate])

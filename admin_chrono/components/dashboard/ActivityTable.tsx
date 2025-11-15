@@ -53,22 +53,57 @@ export default function ActivityTable() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 3 // Limité à 3 comme demandé
   
-  // Log pour voir si les dates changent
-  useEffect(() => {
-    console.log('🔄 [ActivityTable] Date range changed:', { dateFilter, startDate, endDate })
-  }, [dateFilter, startDate, endDate])
-  
-  // Stabiliser la queryKey - React Query compare par valeur, pas par référence
+  // Stabiliser la queryKey avec useRef pour éviter les recalculs inutiles
+  const queryKeyRef = React.useRef<[string, number, string, string, string] | null>(null)
   const queryKey = React.useMemo(() => {
     const key: [string, number, string, string, string] = ['recent-activities', currentPage, dateFilter, startDate, endDate]
+    
+    // Vérifier si la queryKey a vraiment changé
+    if (queryKeyRef.current && 
+        queryKeyRef.current[0] === key[0] &&
+        queryKeyRef.current[1] === key[1] &&
+        queryKeyRef.current[2] === key[2] &&
+        queryKeyRef.current[3] === key[3] &&
+        queryKeyRef.current[4] === key[4]) {
+      // La queryKey n'a pas changé, retourner la référence précédente
+      return queryKeyRef.current
+    }
+    
+    // La queryKey a changé, mettre à jour la référence
+    queryKeyRef.current = key
     console.log('🔑 [ActivityTable] QueryKey calculated:', key)
     return key
   }, [currentPage, dateFilter, startDate, endDate])
   
+  // DÉSACTIVÉ : Logs qui se déclenchaient en boucle et causaient des re-renders
+  // useEffect(() => {
+  //   console.warn('🔄🔄🔄 [ActivityTable] Date range changed:', { 
+  //     dateFilter, 
+  //     startDate, 
+  //     endDate,
+  //     timestamp: new Date().toISOString(),
+  //     stack: new Error().stack?.split('\n').slice(2, 10).join('\n')
+  //   })
+  // }, [dateFilter, startDate, endDate])
+  
+  // useEffect(() => {
+  //   console.warn('🔑🔑🔑 [ActivityTable] QueryKey changed:', {
+  //     queryKey,
+  //     timestamp: new Date().toISOString(),
+  //     stack: new Error().stack?.split('\n').slice(2, 10).join('\n')
+  //   })
+  // }, [queryKey])
+  
   const { data: activities, isLoading, isError, error } = useQuery({
     queryKey,
     queryFn: () => {
-      console.log('🚀 [ActivityTable] queryFn CALLED - getRecentActivities', { itemsPerPage, startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
+      console.warn('🚀🚀🚀 [ActivityTable] queryFn CALLED - getRecentActivities', { 
+        itemsPerPage, 
+        startDate, 
+        endDate, 
+        timestamp: new Date().toISOString(), 
+        stack: new Error().stack?.split('\n').slice(2, 15).join('\n')
+      })
       return getRecentActivities(itemsPerPage, startDate, endDate)
     },
     refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
@@ -76,12 +111,15 @@ export default function ActivityTable() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
+    refetchIntervalInBackground: false, // Désactiver complètement le refetch en arrière-plan
     retry: false, // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
+    enabled: true, // Toujours activé, mais les autres options empêchent le refetch
     placeholderData: (previousData) => {
       if (previousData) {
         console.log('📦 [ActivityTable] Using cached data, skipping fetch')
+        return previousData
       }
-      return previousData
+      return undefined
     },
     structuralSharing: true,
   })

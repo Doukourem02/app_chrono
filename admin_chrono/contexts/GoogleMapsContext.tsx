@@ -56,8 +56,14 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
     id: 'google-maps-script-global', // ID unique global pour toute l'application
   })
 
+  // Mémoriser la valeur du contexte pour éviter les re-renders inutiles
+  const contextValue = useMemo(() => ({
+    isLoaded,
+    loadError
+  }), [isLoaded, loadError])
+
   return (
-    <GoogleMapsContext.Provider value={{ isLoaded, loadError }}>
+    <GoogleMapsContext.Provider value={contextValue}>
       {children}
     </GoogleMapsContext.Provider>
   )

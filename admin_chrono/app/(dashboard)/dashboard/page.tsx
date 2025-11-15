@@ -17,10 +17,10 @@ export default function DashboardPage() {
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   
-  // Log pour voir si les dates changent
-  React.useEffect(() => {
-    console.log('🔄 [DashboardPage] Date range changed:', { dateFilter, startDate, endDate })
-  }, [dateFilter, startDate, endDate])
+  // DÉSACTIVÉ : Log qui se déclenchait en boucle et causait des re-renders
+  // React.useEffect(() => {
+  //   console.log('🔄 [DashboardPage] Date range changed:', { dateFilter, startDate, endDate })
+  // }, [dateFilter, startDate, endDate])
   
   // Fonction pour obtenir le label de la période
   const getPeriodLabel = () => {
@@ -40,9 +40,23 @@ export default function DashboardPage() {
     }
   }
   
-  // Stabiliser la queryKey - React Query compare par valeur, pas par référence
+  // Stabiliser la queryKey avec useRef pour éviter les recalculs inutiles
+  const queryKeyRef = React.useRef<[string, string, string, string] | null>(null)
   const queryKey = React.useMemo(() => {
     const key: [string, string, string, string] = ['dashboard-stats', dateFilter, startDate, endDate]
+    
+    // Vérifier si la queryKey a vraiment changé
+    if (queryKeyRef.current && 
+        queryKeyRef.current[0] === key[0] &&
+        queryKeyRef.current[1] === key[1] &&
+        queryKeyRef.current[2] === key[2] &&
+        queryKeyRef.current[3] === key[3]) {
+      // La queryKey n'a pas changé, retourner la référence précédente
+      return queryKeyRef.current
+    }
+    
+    // La queryKey a changé, mettre à jour la référence
+    queryKeyRef.current = key
     console.log('🔑 [DashboardPage] QueryKey calculated:', key)
     return key
   }, [dateFilter, startDate, endDate])
@@ -50,27 +64,31 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey,
     queryFn: () => {
-      console.log('🚀 [DashboardPage] queryFn CALLED - getDashboardStats', { startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
+      console.warn('🚀🚀🚀 [DashboardPage] queryFn CALLED - getDashboardStats', { 
+        startDate, 
+        endDate, 
+        timestamp: new Date().toISOString(), 
+        stack: new Error().stack?.split('\n').slice(2, 15).join('\n')
+      })
       return getDashboardStats(startDate, endDate)
     },
-    refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
-    refetchOnWindowFocus: false, // Ne pas rafraîchir quand on revient sur l'onglet
-    refetchOnMount: false, // Ne pas rafraîchir au montage
-    refetchOnReconnect: false, // Ne pas rafraîchir à la reconnexion
-    // Utiliser les données en cache si disponibles pour un affichage immédiat
+    refetchInterval: false,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchIntervalInBackground: false,
     placeholderData: (previousData) => {
       if (previousData) {
         console.log('📦 [DashboardPage] Using cached data, skipping fetch')
+        return previousData
       }
-      return previousData
+      return undefined
     },
-    // Réduire le temps de chargement initial en utilisant les données en cache
-    gcTime: 30 * 60 * 1000, // Garder les données en cache pendant 30 minutes
-    // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
+    gcTime: 30 * 60 * 1000,
     retry: false,
-    // Ne pas refetch si les données sont déjà en cache
     structuralSharing: true,
+    enabled: true,
   })
 
   const formatRevenue = (amount: number) => {

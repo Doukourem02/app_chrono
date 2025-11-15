@@ -1,134 +1,121 @@
 'use client'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () => {
-      const client = new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
-            gcTime: 30 * 60 * 1000, // Garder en cache pendant 30 minutes
-            refetchOnWindowFocus: false, // Ne pas rafraîchir quand on revient sur l'onglet
-            refetchOnMount: false, // Ne pas rafraîchir au montage du composant
-            refetchOnReconnect: false, // Ne pas rafraîchir lors de la reconnexion réseau
-            refetchInterval: false, // Pas de refresh automatique par défaut
-            retry: false, // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
-            networkMode: 'online', // Ne faire des requêtes que si en ligne
-          },
+  const [queryClient] = useState(() => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: Infinity,
+          gcTime: 30 * 60 * 1000,
+          refetchOnWindowFocus: false,
+          refetchOnMount: false,
+          refetchOnReconnect: false,
+          refetchInterval: false,
+          refetchIntervalInBackground: false,
+          retry: false,
+          networkMode: 'online',
         },
-      })
+      },
+    })
 
-      // Intercepter les invalidations de queries pour les logger
-      if (process.env.NODE_ENV === 'development') {
-        const originalInvalidateQueries = client.invalidateQueries.bind(client)
-        client.invalidateQueries = function(...args) {
-          console.warn('⚠️ [QueryClient] invalidateQueries called:', {
-            filters: args[0],
-            options: args[1],
-            stack: new Error().stack?.split('\n').slice(2, 10).join('\n')
-          })
-          return originalInvalidateQueries(...args)
-        }
-
-        const originalRefetchQueries = client.refetchQueries.bind(client)
-        client.refetchQueries = function(...args) {
-          console.warn('⚠️ [QueryClient] refetchQueries called:', {
-            filters: args[0],
-            options: args[1],
-            stack: new Error().stack?.split('\n').slice(2, 10).join('\n')
-          })
-          return originalRefetchQueries(...args)
-        }
+    // --- DEV LOGS POUR REACT QUERY ---
+    if (process.env.NODE_ENV === 'development') {
+      // Log des invalidations
+      const originalInvalidate = client.invalidateQueries.bind(client)
+      client.invalidateQueries = (...args) => {
+        console.warn('⚠️ [ReactQuery] invalidateQueries', {
+          args,
+          stack: new Error().stack?.split('\n').slice(2, 10).join('\n'),
+        })
+        return originalInvalidate(...args)
       }
 
-      return client
-    }
-  )
+      // Log des refetch
+      const originalRefetch = client.refetchQueries.bind(client)
+      client.refetchQueries = (...args) => {
+        console.warn('⚠️ [ReactQuery] refetchQueries', {
+          args,
+          stack: new Error().stack?.split('\n').slice(2, 10).join('\n'),
+        })
+        return originalRefetch(...args)
+      }
 
-  // Intercepteur global pour toutes les requêtes fetch (uniquement en développement)
+      // Log des fetchQuery
+      const originalFetchQuery = client.fetchQuery.bind(client)
+      client.fetchQuery = (...args) => {
+        console.warn('⚠️ [ReactQuery] fetchQuery', {
+          queryKey: args[0]?.queryKey ?? args[0],
+          stack: new Error().stack?.split('\n').slice(2, 10).join('\n'),
+        })
+        return originalFetchQuery(...args)
+      }
+    }
+
+    return client
+  })
+
+  // --- INTERCEPTEUR GLOBAL FETCH ---
   useEffect(() => {
     if (typeof window === 'undefined' || process.env.NODE_ENV !== 'development') return
 
     const originalFetch = window.fetch
-    let requestCount = 0
-    const requestTimestamps: Map<number, number> = new Map()
     let lastRequestTime: number | null = null
-    const requestHistory: Array<{ url: string; timestamp: number; timeSinceLast: number | null }> = []
 
-    window.fetch = async function(...args) {
-      const requestId = ++requestCount
-      let url: string
-      if (typeof args[0] === 'string') {
-        url = args[0]
-      } else if (args[0] instanceof URL) {
-        url = args[0].href
-      } else if (args[0] instanceof Request) {
-        url = args[0].url
-      } else {
-        url = 'unknown'
-      }
-      const timestamp = Date.now()
-      const timeSinceLast = lastRequestTime ? timestamp - lastRequestTime : null
-      requestTimestamps.set(requestId, timestamp)
+    window.fetch = async (...args) => {
+      // Détection URL
+      let url = 'unknown'
+      const req = args[0]
+      if (typeof req === 'string') url = req
+      else if (req instanceof URL) url = req.href
+      else if (req instanceof Request) url = req.url
 
-      // Log uniquement les requêtes vers localhost:4000 (notre API)
-      if (url.includes('localhost:4000') || url.includes('/api/')) {
-        // Garder l'historique des 10 dernières requêtes
-        requestHistory.push({ url, timestamp, timeSinceLast })
-        if (requestHistory.length > 10) {
-          requestHistory.shift()
-        }
+      const isApi = url.includes('localhost:4000') || url.startsWith('/api/')
+      const now = Date.now()
 
-        // Détecter les patterns de requêtes périodiques (5 minutes = 300000ms)
-        const isPeriodic = timeSinceLast !== null && timeSinceLast > 300000 && timeSinceLast < 310000 // Entre 5 minutes et 5 minutes 10 secondes
-        
-        console.log('🔍 [Global Fetch Interceptor] REQUEST', {
-          id: requestId,
+      // Calcul intervalle
+      const interval = lastRequestTime ? now - lastRequestTime : null
+      const isPeriodic =
+        interval !== null &&
+        interval > 295000 &&
+        interval < 305000 // ~5 minutes
+
+      if (isApi) {
+        console.log('🔍 [Fetch] REQUEST', {
           url,
-          timestamp: new Date(timestamp).toISOString(),
-          method: args[1]?.method || 'GET',
-          timeSinceLast: timeSinceLast ? `${(timeSinceLast / 1000).toFixed(1)}s` : 'N/A',
-          isPeriodic: isPeriodic ? '⚠️ PERIODIC REQUEST DETECTED ⚠️' : false,
-          stack: new Error().stack?.split('\n').slice(2, 10).join('\n')
+          timestamp: new Date(now).toISOString(),
+          method: args[1]?.method ?? 'GET',
+          interval: interval ? `${interval}ms` : 'N/A',
+          periodic: isPeriodic ? '⚠️ YES (5min)' : false,
         })
 
         if (isPeriodic) {
-          console.warn('⚠️⚠️⚠️ PERIODIC REQUEST DETECTED ⚠️⚠️⚠️', {
+          console.warn('⚠️⚠️⚠️ PERIODIC API REQUEST DETECTED (5min) ⚠️⚠️⚠️', {
             url,
-            interval: `${(timeSinceLast / 1000).toFixed(1)}s`,
-            requestHistory: requestHistory.slice(-5)
+            interval: `${interval}ms`,
+            stack: new Error().stack?.split('\n').slice(2, 10).join('\n'),
           })
         }
 
-        lastRequestTime = timestamp
+        lastRequestTime = now
       }
 
-      try {
-        const response = await originalFetch.apply(this, args)
-        const responseTimestamp = Date.now()
-        const duration = responseTimestamp - timestamp
+      // Exécuter la requête
+      const response = await originalFetch(...args)
+      const end = Date.now()
 
-        if (url.includes('localhost:4000') || url.includes('/api/')) {
-          console.log('✅ [Global Fetch Interceptor] RESPONSE', {
-            id: requestId,
-            url,
-            status: response.status,
-            statusText: response.statusText,
-            timestamp: new Date(responseTimestamp).toISOString(),
-            duration: `${duration}ms`
-          })
-        }
-
-        requestTimestamps.delete(requestId)
-        return response
-      } catch (error) {
-        requestTimestamps.delete(requestId)
-        throw error
+      if (isApi) {
+        console.log('✅ [Fetch] RESPONSE', {
+          url,
+          status: response.status,
+          duration: `${end - now}ms`,
+        })
       }
+
+      return response
     }
 
     return () => {
@@ -136,10 +123,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // --- RENDER ---
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
     </ErrorBoundary>
   )
 }
-

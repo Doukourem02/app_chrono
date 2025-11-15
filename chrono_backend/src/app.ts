@@ -69,6 +69,13 @@ app.use(
         return callback(null, true);
       }
 
+      // En développement (ou si NODE_ENV n'est pas défini), accepter toutes les origines localhost et 192.168.*
+      if (process.env.NODE_ENV !== 'production') {
+        if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.')) {
+          return callback(null, true);
+        }
+      }
+
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {

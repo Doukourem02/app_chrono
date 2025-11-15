@@ -65,7 +65,11 @@ export default function OrdersPage() {
   const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ['orders', activeTab],
     queryFn: async () => {
-      console.log('🔍 [OrdersPage] Fetching orders for tab:', activeTab)
+      console.warn('🚀🚀🚀 [OrdersPage] queryFn CALLED - getOrdersByStatus', {
+        activeTab,
+        timestamp: new Date().toISOString(),
+        stack: new Error().stack?.split('\n').slice(2, 15).join('\n')
+      })
       const result = await adminApiService.getOrdersByStatus(activeTab === 'all' ? undefined : activeTab)
       console.log('🔍 [OrdersPage] Orders result:', result)
       return result
@@ -75,7 +79,9 @@ export default function OrdersPage() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
+    refetchIntervalInBackground: false, // Désactiver complètement le refetch en arrière-plan
     retry: false, // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
+    enabled: true, // Toujours activé, mais les autres options empêchent le refetch
   })
 
   // Debug logs

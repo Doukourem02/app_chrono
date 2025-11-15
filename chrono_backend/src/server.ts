@@ -49,13 +49,12 @@ const allowedOrigins =
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://192.168.1.85:3000',
+    'http://192.168.1.91:3000', // Ajout explicite de cette IP
     'exp://localhost:808',
   ];
 
-// En développement, accepter toutes les origines localhost
-if (process.env.NODE_ENV === 'development') {
-  allowedOrigins.push('http://localhost:*');
-}
+// En développement, accepter toutes les origines localhost et 192.168.*
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
 const io = new Server(server, {
   cors: {
@@ -65,8 +64,8 @@ const io = new Server(server, {
         return callback(null, true);
       }
 
-      // En développement, accepter toutes les origines localhost
-      if (process.env.NODE_ENV === 'development') {
+      // En développement (ou si NODE_ENV n'est pas défini), accepter toutes les origines localhost et 192.168.*
+      if (isDevelopment) {
         if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.')) {
           return callback(null, true);
         }
@@ -77,6 +76,7 @@ const io = new Server(server, {
       } else {
         console.warn(`Socket.io CORS bloqué pour origin: ${origin}`);
         console.warn(`Origins autorisées:`, allowedOrigins);
+        console.warn(`NODE_ENV: ${process.env.NODE_ENV}, isDevelopment: ${isDevelopment}`);
         callback(new Error('Not allowed by CORS'));
       }
     },

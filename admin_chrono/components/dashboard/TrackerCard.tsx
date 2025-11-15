@@ -181,7 +181,10 @@ export default function TrackerCard() {
   const { data: ordersData } = useQuery({
     queryKey: ['active-orders-with-driver'],
     queryFn: async () => {
-      console.log('🚀 [TrackerCard] queryFn CALLED - getOrdersByStatus', { timestamp: new Date().toISOString() })
+      console.warn('🚀🚀🚀 [TrackerCard] queryFn CALLED - getOrdersByStatus', { 
+        timestamp: new Date().toISOString(),
+        stack: new Error().stack?.split('\n').slice(2, 15).join('\n')
+      })
       // Récupérer les commandes en cours (enroute, picked_up, accepted)
       const result = await adminApiService.getOrdersByStatus('onProgress')
       console.log('✅ [TrackerCard] getOrdersByStatus SUCCESS', { hasData: !!result.data, timestamp: new Date().toISOString() })
@@ -192,6 +195,9 @@ export default function TrackerCard() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
+    refetchIntervalInBackground: false, // Désactiver complètement le refetch en arrière-plan
+    retry: false, // Ne pas réessayer en cas d'erreur
+    enabled: true, // Toujours activé, mais les autres options empêchent le refetch
   })
 
   // Trouver une commande avec un driver assigné

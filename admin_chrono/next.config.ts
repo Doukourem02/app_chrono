@@ -3,7 +3,36 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Configuration pour permettre les requêtes cross-origin en développement
   ...(process.env.NODE_ENV === 'development' && {
-    allowedDevOrigins: ['http://192.168.1.85:3000', 'http://localhost:3000'],
+    allowedDevOrigins: ['http://192.168.1.85:3000', 'http://localhost:3000', 'http://192.168.1.91:3000'],
+  }),
+  
+  // Configuration pour réduire les problèmes de HMR (Hot Module Replacement)
+  ...(process.env.NODE_ENV === 'development' && {
+    webpack: (config, { dev, isServer }) => {
+      if (dev && !isServer) {
+        // Réduire les tentatives de reconnexion du HMR
+        config.watchOptions = {
+          ...config.watchOptions,
+          poll: false, // Désactiver le polling pour éviter les problèmes
+          aggregateTimeout: 300, // Attendre 300ms avant de recompiler
+          ignored: ['**/node_modules', '**/.git', '**/.next'], // Ignorer les dossiers qui changent souvent
+        }
+        
+        // Désactiver le HMR si DISABLE_HMR est défini
+        if (process.env.DISABLE_HMR === 'true') {
+          config.optimization = {
+            ...config.optimization,
+            minimize: false,
+          }
+        }
+      }
+      return config
+    },
+    // Configuration Turbopack vide pour éviter l'erreur avec Next.js 16
+    // (on utilise webpack via le flag --webpack dans package.json)
+    turbopack: {},
+    // Désactiver les indicateurs de développement qui peuvent causer des problèmes
+    devIndicators: false,
   }),
   async headers() {
     // En développement, on désactive les headers qui forcent HTTPS

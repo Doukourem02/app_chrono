@@ -50,6 +50,8 @@ class AdminSocketService {
       // Créer la connexion Socket.IO
       // Note: Socket.IO n'utilise pas directement l'auth dans les options
       // L'authentification se fait via l'événement 'admin-connect'
+      // Note: pingTimeout et pingInterval sont des options serveur, pas client
+      // Le client utilise les valeurs configurées par le serveur
       this.socket = io(SOCKET_URL, {
         transports: ['websocket', 'polling'], // Essayer websocket en premier, puis polling
         reconnection: true,
