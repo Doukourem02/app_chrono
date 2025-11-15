@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { getRecentActivities } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
+import { useDateFilter } from '@/contexts/DateFilterContext'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
@@ -47,14 +48,42 @@ const statusConfig: Record<string, { label: string; backgroundColor: string; col
 
 export default function ActivityTable() {
   const router = useRouter()
+  const { dateFilter, dateRange } = useDateFilter()
+  const { startDate, endDate } = dateRange
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 3 // Limité à 3 comme demandé
   
+  // Log pour voir si les dates changent
+  useEffect(() => {
+    console.log('🔄 [ActivityTable] Date range changed:', { dateFilter, startDate, endDate })
+  }, [dateFilter, startDate, endDate])
+  
+  // Stabiliser la queryKey - React Query compare par valeur, pas par référence
+  const queryKey = React.useMemo(() => {
+    const key: [string, number, string, string, string] = ['recent-activities', currentPage, dateFilter, startDate, endDate]
+    console.log('🔑 [ActivityTable] QueryKey calculated:', key)
+    return key
+  }, [currentPage, dateFilter, startDate, endDate])
+  
   const { data: activities, isLoading, isError, error } = useQuery({
-    queryKey: ['recent-activities', currentPage],
-    queryFn: () => getRecentActivities(itemsPerPage),
-    refetchInterval: 30000, // Rafraîchir toutes les 30 secondes
-    retry: 1, // Ne réessayer qu'une seule fois en cas d'erreur
+    queryKey,
+    queryFn: () => {
+      console.log('🚀 [ActivityTable] queryFn CALLED - getRecentActivities', { itemsPerPage, startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
+      return getRecentActivities(itemsPerPage, startDate, endDate)
+    },
+    refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: false, // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
+    placeholderData: (previousData) => {
+      if (previousData) {
+        console.log('📦 [ActivityTable] Using cached data, skipping fetch')
+      }
+      return previousData
+    },
+    structuralSharing: true,
   })
 
   // Debug: logger les données reçues
@@ -75,14 +104,6 @@ export default function ActivityTable() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
-  
-  console.debug('🔍 [ActivityTable] Display data:', {
-    activities,
-    displayDataLength: displayData.length,
-    paginatedDataLength: paginatedData.length,
-    isLoading,
-    isError,
-  })
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: '#FFFFFF',

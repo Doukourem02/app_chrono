@@ -15,6 +15,7 @@ import {
 import { getDeliveryAnalytics } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+import { useDateFilter } from '@/contexts/DateFilterContext'
 
 const mockData = [
   { month: 'Jul', packageDelivered: 8500, reported: 45 },
@@ -25,10 +26,39 @@ const mockData = [
 ]
 
 export default function DeliveryAnalytics() {
+  const { dateFilter, dateRange } = useDateFilter()
+  const { startDate, endDate } = dateRange
+  
+  // Log pour voir si les dates changent
+  React.useEffect(() => {
+    console.log('🔄 [DeliveryAnalytics] Date range changed:', { dateFilter, startDate, endDate })
+  }, [dateFilter, startDate, endDate])
+  
+  // Stabiliser la queryKey - React Query compare par valeur, pas par référence
+  const queryKey = React.useMemo(() => {
+    const key: [string, string, string, string] = ['delivery-analytics', dateFilter, startDate, endDate]
+    console.log('🔑 [DeliveryAnalytics] QueryKey calculated:', key)
+    return key
+  }, [dateFilter, startDate, endDate])
+  
   const { data: analyticsData, isLoading } = useQuery({
-    queryKey: ['delivery-analytics'],
-    queryFn: getDeliveryAnalytics,
-    refetchInterval: 60000,
+    queryKey,
+    queryFn: () => {
+      console.log('🚀 [DeliveryAnalytics] queryFn CALLED - getDeliveryAnalytics', { startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
+      return getDeliveryAnalytics(startDate, endDate)
+    },
+    refetchInterval: false, // Pas de refresh automatique - les analytics changent rarement
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    placeholderData: (previousData) => {
+      if (previousData) {
+        console.log('📦 [DeliveryAnalytics] Using cached data, skipping fetch')
+      }
+      return previousData
+    },
+    structuralSharing: true,
   })
 
   const data = analyticsData && analyticsData.length > 0 ? analyticsData : mockData
@@ -119,8 +149,8 @@ export default function DeliveryAnalytics() {
           <SkeletonLoader width="100%" height={300} borderRadius={8} />
         </div>
       ) : data && data.length > 0 ? (
-        <div style={{ flex: 1, minHeight: '300px', height: '100%', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+        <div style={{ flex: 1, minHeight: '300px', height: '100%', width: '100%', position: 'relative' }}>
+          <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
           <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis 

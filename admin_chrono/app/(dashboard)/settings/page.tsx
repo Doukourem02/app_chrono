@@ -7,7 +7,6 @@ import { Camera, Save, User, Mail, Phone } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { AnimatedButton } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
-import { SuccessAnimation, ErrorAnimation } from '@/components/animations'
 
 export default function SettingsPage() {
   const { user } = useAuthStore()

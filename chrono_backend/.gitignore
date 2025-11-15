@@ -36,8 +36,11 @@ coverage/
 
 # Backups
 backups/
+backups-test/
 *.sql
+*.sql.gz
 *.json.backup
+backup_metadata.json
 
 # Test
 .tmp/

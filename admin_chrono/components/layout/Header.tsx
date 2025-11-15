@@ -5,15 +5,30 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
+import { useDateFilter, type DateFilterType } from '@/contexts/DateFilterContext'
+
+interface SearchOrder {
+  id: string
+  deliveryId: string
+  pickup: string
+  dropoff: string
+}
+
+interface SearchUser {
+  id: string
+  email: string
+  role: string
+  phone: string
+}
 
 export default function Header() {
   const router = useRouter()
+  const { dateFilter, setDateFilter } = useDateFilter()
   const [query, setQuery] = useState('')
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [dateFilter, setDateFilter] = useState('thisMonth')
   const searchRef = useRef<HTMLDivElement>(null)
   const filtersRef = useRef<HTMLDivElement>(null)
   const datePickerRef = useRef<HTMLDivElement>(null)
@@ -23,7 +38,10 @@ export default function Header() {
     queryKey: ['global-search', query],
     queryFn: () => adminApiService.globalSearch(query),
     enabled: query.trim().length > 2,
-    staleTime: 30000,
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
   // Fermer les menus quand on clique en dehors
@@ -57,7 +75,7 @@ export default function Header() {
     setQuery('')
   }
 
-  const dateOptions = [
+  const dateOptions: { value: DateFilterType; label: string }[] = [
     { value: 'today', label: "Aujourd'hui" },
     { value: 'thisWeek', label: 'Cette semaine' },
     { value: 'thisMonth', label: 'Ce mois' },
@@ -289,7 +307,7 @@ export default function Header() {
                     <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
                       Commandes ({searchResults.data.orders.length})
                     </div>
-                    {searchResults.data.orders.map((order: { id: string; deliveryId: string; pickup: string; dropoff: string }) => (
+                    {((searchResults.data.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
                       <div
                         key={order.id}
                         style={searchResultItemStyle}
@@ -319,7 +337,7 @@ export default function Header() {
                     <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
                       Utilisateurs ({searchResults.data.users.length})
                     </div>
-                    {searchResults.data.users.map((user: { id: string; email: string; role: string; phone: string }) => (
+                    {((searchResults.data.users as SearchUser[]) || []).map((user: SearchUser) => (
                       <div
                         key={user.id}
                         style={searchResultItemStyle}
@@ -478,7 +496,6 @@ export default function Header() {
                   onClick={() => {
                     setDateFilter(option.value)
                     setShowDatePicker(false)
-                    // Ici on pourrait appliquer le filtre de date aux données
                   }}
                 >
                   {option.label}

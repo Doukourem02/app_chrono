@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client'
 import { supabase } from './supabase'
+import { logger } from '@/utils/logger'
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
 
@@ -16,17 +17,24 @@ class AdminSocketService {
   async connect(): Promise<void> {
     if (this.socket?.connected || this.isConnecting) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('ℹ️ [adminSocketService] Connexion déjà en cours ou établie')
+        logger.debug('[adminSocketService] Connexion déjà en cours ou établie')
       }
       return
     }
+
+    console.log('🔌 [adminSocketService] connect() CALLED', { 
+      timestamp: new Date().toISOString(), 
+      stack: new Error().stack,
+      alreadyConnected: this.socket?.connected,
+      isConnecting: this.isConnecting
+    })
 
     this.isConnecting = true
 
     try {
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 [adminSocketService] Tentative de connexion à:', SOCKET_URL)
-        console.log('🔄 [adminSocketService] Origin actuel:', typeof window !== 'undefined' ? window.location.origin : 'server-side')
+        logger.debug('[adminSocketService] Tentative de connexion à:', SOCKET_URL)
+        logger.debug('[adminSocketService] Origin actuel:', typeof window !== 'undefined' ? window.location.origin : 'server-side')
       }
 
       // Récupérer le token d'authentification
@@ -36,7 +44,7 @@ class AdminSocketService {
       }
       
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔑 [adminSocketService] Token d\'authentification récupéré')
+        logger.debug('[adminSocketService] Token d\'authentification récupéré')
       }
 
       // Créer la connexion Socket.IO
@@ -63,7 +71,7 @@ class AdminSocketService {
         this.isConnecting = false
         
         if (process.env.NODE_ENV === 'development') {
-          console.log('✅ [adminSocketService] Connecté au serveur Socket.IO')
+          logger.info('[adminSocketService] Connecté au serveur Socket.IO')
         }
 
         // Envoyer l'événement admin-connect avec l'ID de l'admin
@@ -79,11 +87,11 @@ class AdminSocketService {
         // Ne pas logger les déconnexions normales ou les timeouts comme des erreurs
         if (process.env.NODE_ENV === 'development') {
           if (reason === 'io client disconnect') {
-            console.log('ℹ️ [adminSocketService] Déconnexion volontaire')
+            logger.debug('[adminSocketService] Déconnexion volontaire')
           } else if (reason === 'transport close' || reason === 'transport error') {
-            console.warn('⚠️ [adminSocketService] Déconnexion due à une erreur de transport:', reason)
+            logger.warn('[adminSocketService] Déconnexion due à une erreur de transport:', reason)
           } else {
-            console.log('ℹ️ [adminSocketService] Déconnexion:', reason)
+            logger.debug('[adminSocketService] Déconnexion:', reason)
           }
         }
 
@@ -107,32 +115,32 @@ class AdminSocketService {
         // Ne logger que les erreurs importantes ou après plusieurs tentatives
         if (process.env.NODE_ENV === 'development') {
           if (!isTemporaryPollError || this.reconnectAttempts >= 3) {
-            console.error('❌ [adminSocketService] Erreur de connexion:', error.message)
-            console.error('❌ [adminSocketService] URL Socket.IO:', SOCKET_URL)
-            console.error('❌ [adminSocketService] Tentative:', this.reconnectAttempts, '/', this.maxReconnectAttempts)
+            logger.error('[adminSocketService] Erreur de connexion:', error.message)
+            logger.error('[adminSocketService] URL Socket.IO:', SOCKET_URL)
+            logger.error('[adminSocketService] Tentative:', this.reconnectAttempts, '/', this.maxReconnectAttempts)
             
             // Afficher des suggestions selon le type d'erreur
             if (error.message.includes('timeout')) {
-              console.warn('⚠️ [adminSocketService] Timeout - Vérifiez que le serveur backend est démarré sur', SOCKET_URL)
+              logger.warn('[adminSocketService] Timeout - Vérifiez que le serveur backend est démarré sur', SOCKET_URL)
             } else if (error.message.includes('CORS')) {
-              console.warn('⚠️ [adminSocketService] Erreur CORS - Vérifiez ALLOWED_ORIGINS dans le backend')
+              logger.warn('[adminSocketService] Erreur CORS - Vérifiez ALLOWED_ORIGINS dans le backend')
             } else if (error.message.includes('ECONNREFUSED')) {
-              console.warn('⚠️ [adminSocketService] Connexion refusée - Le serveur n\'est peut-être pas démarré')
+              logger.warn('[adminSocketService] Connexion refusée - Le serveur n\'est peut-être pas démarré')
             } else if (isTemporaryPollError) {
-              console.warn('⚠️ [adminSocketService] Erreur de polling HTTP (tentative', this.reconnectAttempts, ')')
-              console.warn('   Socket.IO essaie différents transports, cela peut être normal...')
+              logger.warn('[adminSocketService] Erreur de polling HTTP (tentative', this.reconnectAttempts, ')')
+              logger.warn('   Socket.IO essaie différents transports, cela peut être normal...')
             }
           }
         }
 
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          console.warn('⚠️ [adminSocketService] Nombre maximum de tentatives de reconnexion atteint')
-          console.warn('⚠️ [adminSocketService] Le suivi en temps réel est désactivé')
-          console.warn('⚠️ [adminSocketService] L\'application continuera avec le polling HTTP')
-          console.warn('⚠️ [adminSocketService] Pour activer le temps réel, vérifiez que:')
-          console.warn('   1. Le serveur backend est démarré (cd chrono_backend && npm run dev)')
-          console.warn('   2. NEXT_PUBLIC_SOCKET_URL est correct dans .env.local:', SOCKET_URL)
-          console.warn('   3. Le port 4000 n\'est pas bloqué par un firewall')
+          logger.warn('[adminSocketService] Nombre maximum de tentatives de reconnexion atteint')
+          logger.warn('[adminSocketService] Le suivi en temps réel est désactivé')
+          logger.warn('[adminSocketService] L\'application continuera avec le polling HTTP')
+          logger.warn('[adminSocketService] Pour activer le temps réel, vérifiez que:')
+          logger.warn('   1. Le serveur backend est démarré (cd chrono_backend && npm run dev)')
+          logger.warn('   2. NEXT_PUBLIC_SOCKET_URL est correct dans .env.local:', SOCKET_URL)
+          logger.warn('   3. Le port 4000 n\'est pas bloqué par un firewall')
           
           // Émettre un événement pour informer les composants
           this.emit('admin:connection-failed', {
@@ -145,7 +153,7 @@ class AdminSocketService {
       // Écouter la confirmation de connexion admin
       this.socket.on('admin:connected', (data) => {
         if (process.env.NODE_ENV === 'development') {
-          console.log('✅ [adminSocketService] Admin connecté:', data)
+          logger.info('[adminSocketService] Admin connecté:', data)
         }
         this.emit('admin:connected', data)
       })
@@ -153,7 +161,7 @@ class AdminSocketService {
       // Écouter les drivers initiaux
       this.socket.on('admin:initial-drivers', (data) => {
         if (process.env.NODE_ENV === 'development') {
-          console.log('📋 [adminSocketService] Drivers initiaux reçus:', data.drivers?.length || 0)
+          logger.debug('[adminSocketService] Drivers initiaux reçus:', data.drivers?.length || 0)
         }
         this.emit('admin:initial-drivers', data)
       })
@@ -161,14 +169,14 @@ class AdminSocketService {
       // Écouter les événements de drivers
       this.socket.on('driver:online', (data) => {
         if (process.env.NODE_ENV === 'development') {
-          console.log('🟢 [adminSocketService] Driver en ligne:', data.userId)
+          logger.debug('[adminSocketService] Driver en ligne:', data.userId)
         }
         this.emit('driver:online', data)
       })
 
       this.socket.on('driver:offline', (data) => {
         if (process.env.NODE_ENV === 'development') {
-          console.log('🔴 [adminSocketService] Driver hors ligne:', data.userId)
+          logger.debug('[adminSocketService] Driver hors ligne:', data.userId)
         }
         this.emit('driver:offline', data)
       })
@@ -181,21 +189,21 @@ class AdminSocketService {
       // Écouter les mises à jour de commandes
       this.socket.on('order:status:update', (data) => {
         if (process.env.NODE_ENV === 'development') {
-          console.log('📦 [adminSocketService] Mise à jour de commande:', data.order?.id)
+          logger.debug('[adminSocketService] Mise à jour de commande:', data.order?.id)
         }
         this.emit('order:status:update', data)
       })
 
       // Écouter les erreurs
       this.socket.on('admin:error', (data) => {
-        console.error('❌ [adminSocketService] Erreur serveur:', data)
+        logger.error('[adminSocketService] Erreur serveur:', data)
         this.emit('admin:error', data)
       })
 
     } catch (error: unknown) {
       this.isConnecting = false
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('❌ [adminSocketService] Erreur lors de la connexion:', errorMessage)
+      logger.error('[adminSocketService] Erreur lors de la connexion:', errorMessage)
       throw error
     }
   }
@@ -212,7 +220,7 @@ class AdminSocketService {
       this.listeners.clear()
       
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔌 [adminSocketService] Déconnecté du serveur')
+        logger.debug('[adminSocketService] Déconnecté du serveur')
       }
     }
   }
@@ -249,7 +257,7 @@ class AdminSocketService {
         try {
           callback(data)
         } catch (error) {
-          console.error(`❌ [adminSocketService] Erreur dans le callback pour ${event}:`, error)
+          logger.error(`[adminSocketService] Erreur dans le callback pour ${event}:`, error)
         }
       })
     }
@@ -262,7 +270,7 @@ class AdminSocketService {
     if (this.socket?.connected) {
       this.socket.emit(event, data)
     } else {
-      console.warn(`⚠️ [adminSocketService] Tentative d'émettre ${event} mais non connecté`)
+      logger.warn(`[adminSocketService] Tentative d'émettre ${event} mais non connecté`)
     }
   }
 }

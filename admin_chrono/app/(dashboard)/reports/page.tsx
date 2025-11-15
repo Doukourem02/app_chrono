@@ -122,6 +122,11 @@ export default function ReportsPage() {
         status: additionalFilter || undefined,
       }),
     enabled: reportType === 'deliveries' && !!startDate && !!endDate,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   })
 
   const { data: revenuesData, isLoading: revenuesLoading } = useQuery({
@@ -133,6 +138,11 @@ export default function ReportsPage() {
         deliveryType: additionalFilter || undefined,
       }),
     enabled: reportType === 'revenues' && !!startDate && !!endDate,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   })
 
   const { data: clientsData, isLoading: clientsLoading } = useQuery({
@@ -143,6 +153,11 @@ export default function ReportsPage() {
         endDate,
       }),
     enabled: reportType === 'clients' && !!startDate && !!endDate,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   })
 
   const { data: driversData, isLoading: driversLoading } = useQuery({
@@ -153,6 +168,11 @@ export default function ReportsPage() {
         endDate,
       }),
     enabled: reportType === 'drivers' && !!startDate && !!endDate,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   })
 
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
@@ -163,6 +183,11 @@ export default function ReportsPage() {
         endDate,
       }),
     enabled: reportType === 'payments' && !!startDate && !!endDate,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   })
 
   const isLoading =
@@ -327,7 +352,7 @@ export default function ReportsPage() {
 
     switch (reportType) {
       case 'deliveries':
-        const deliveries = deliveriesData?.data || []
+        const deliveries: Delivery[] = (deliveriesData?.data as Delivery[]) || []
         return (
           <div style={cardStyle}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
@@ -375,7 +400,7 @@ export default function ReportsPage() {
         )
 
       case 'revenues':
-        const revenues = revenuesData?.data || []
+        const revenues: Revenue[] = (revenuesData?.data as Revenue[]) || []
         const revenueChartData = revenues.map((r: Revenue) => ({
           date: formatDate(r.date || ''),
           revenue: typeof r.revenue === 'number' ? r.revenue : parseFloat(String(r.revenue || 0)),
@@ -440,7 +465,7 @@ export default function ReportsPage() {
         )
 
       case 'clients':
-        const clients = clientsData?.data || []
+        const clients: Client[] = (clientsData?.data as Client[]) || []
         return (
           <div style={cardStyle}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
@@ -478,7 +503,7 @@ export default function ReportsPage() {
         )
 
       case 'drivers':
-        const drivers = driversData?.data || []
+        const drivers: Driver[] = (driversData?.data as Driver[]) || []
         return (
           <div style={cardStyle}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
@@ -530,8 +555,8 @@ export default function ReportsPage() {
         )
 
       case 'payments':
-        const payments = paymentsData?.data || []
-        const paymentChartData = payments.reduce((acc: PaymentChartData[], p: Payment) => {
+        const payments: Payment[] = (paymentsData?.data as Payment[]) || []
+        const paymentChartData: PaymentChartData[] = payments.reduce((acc: PaymentChartData[], p: Payment) => {
           const dateKey = formatDate(p.date || '')
           const methodType = p.payment_method_type || 'unknown'
           const existing = acc.find((a) => a.date === dateKey)

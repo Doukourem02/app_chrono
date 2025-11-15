@@ -45,7 +45,11 @@ export default function PromoCodesPage() {
   const { data: promoCodesData, isLoading } = useQuery({
     queryKey: ['promo-codes'],
     queryFn: () => adminApiService.getPromoCodes(),
-    refetchInterval: 30000,
+    refetchInterval: false, // Pas de refresh automatique - les codes promo changent rarement
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
   const createMutation = useMutation({
@@ -67,7 +71,7 @@ export default function PromoCodesPage() {
     },
   })
 
-  const promoCodes = promoCodesData?.data || []
+  const promoCodes: PromoCode[] = (promoCodesData?.data as PromoCode[]) || []
 
   const filteredCodes = promoCodes.filter((code: PromoCode) =>
     code.code?.toLowerCase().includes(searchQuery.toLowerCase())

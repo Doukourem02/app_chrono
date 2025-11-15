@@ -37,7 +37,11 @@ export default function DisputesPage() {
         limit: itemsPerPage,
         status: statusFilter !== 'all' ? statusFilter : undefined,
       }),
-    refetchInterval: 30000,
+    refetchInterval: false, // Pas de refresh automatique - les litiges changent rarement
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
   const updateMutation = useMutation({
@@ -51,7 +55,7 @@ export default function DisputesPage() {
     },
   })
 
-  const disputes = disputesData?.data || []
+  const disputes: Dispute[] = (disputesData?.data as Dispute[]) || []
   const pagination = disputesData?.pagination
 
   const formatCurrency = (amount: number) => {

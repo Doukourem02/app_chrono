@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { Wallet, TrendingUp, CreditCard, DollarSign, Download } from 'lucide-react'
+import { Wallet, TrendingUp, CreditCard, Clock, Download, RefreshCw } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import {
   BarChart,
@@ -37,12 +37,18 @@ export default function FinancePage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [methodFilter, setMethodFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const itemsPerPage = 20
+  const queryClient = useQueryClient()
 
   const { data: financialStats, isLoading: statsLoading } = useQuery({
     queryKey: ['financial-stats'],
     queryFn: () => adminApiService.getFinancialStats(),
-    refetchInterval: 60000,
+    refetchInterval: false, // Pas de refresh automatique - l'utilisateur peut rafraîchir manuellement
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
   const { data: transactionsData, isLoading: transactionsLoading } = useQuery({
@@ -55,7 +61,11 @@ export default function FinancePage() {
         method: methodFilter !== 'all' ? methodFilter : undefined,
         search: searchQuery || undefined,
       }),
-    refetchInterval: 30000,
+    refetchInterval: false, // Pas de refresh automatique - l'utilisateur peut rafraîchir manuellement
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
   const formatCurrency = (amount: number) => {
@@ -364,25 +374,62 @@ export default function FinancePage() {
       <div style={containerStyle}>
       <div style={headerStyle}>
         <h1 style={titleStyle}>Finance</h1>
-        <button
-          style={{
-            padding: '10px 20px',
-            borderRadius: '8px',
-            backgroundColor: '#8B5CF6',
-            color: '#FFFFFF',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <Download size={16} />
-          Exporter
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '12px' }}>
+          <button
+            onClick={async () => {
+              setIsRefreshing(true)
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['financial-stats'] }),
+                queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+              ])
+              setTimeout(() => setIsRefreshing(false), 500)
+            }}
+            disabled={isRefreshing}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              backgroundColor: '#F3F4F6',
+              color: '#374151',
+              border: '1px solid #E5E7EB',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: isRefreshing ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: '8px',
+              opacity: isRefreshing ? 0.6 : 1,
+            }}
+          >
+            <RefreshCw 
+              size={16} 
+              style={{ 
+                animation: isRefreshing ? 'spin 1s linear infinite' : undefined,
+                transform: isRefreshing ? undefined : 'none',
+              }} 
+            />
+            Actualiser
+          </button>
+          <button
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              backgroundColor: '#8B5CF6',
+              color: '#FFFFFF',
+              border: 'none',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <Download size={16} />
+            Exporter
+          </button>
+        </div>
       </div>
 
       {/* Filtres de période */}
@@ -451,7 +498,7 @@ export default function FinancePage() {
         <div style={kpiCardStyle}>
           <div style={kpiCardHeaderStyle}>
             <div style={{ ...kpiIconStyle, backgroundColor: '#E0E7FF' }}>
-              <DollarSign size={20} color="#6366F1" />
+              <Clock size={20} color="#6366F1" />
             </div>
             <div>
               <div style={kpiValueStyle}>{stats?.paymentStatus.pending || 0}</div>
@@ -586,32 +633,35 @@ export default function FinancePage() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((transaction: Transaction) => (
-                  <tr key={transaction.id}>
-                    <td style={tdStyle}>{transaction.id.slice(0, 8)}...</td>
-                    <td style={tdStyle}>{transaction.order_id_full?.slice(0, 8) || 'N/A'}...</td>
-                    <td style={tdStyle}>
-                      <div>{transaction.user_email || 'N/A'}</div>
-                      <div style={{ fontSize: '12px', color: '#6B7280' }}>
-                        {transaction.user_phone || ''}
-                      </div>
-                    </td>
-                    <td style={tdStyle}>
-                      {formatCurrency(
-                        typeof transaction.amount === 'string' 
-                          ? parseFloat(transaction.amount) || 0 
-                          : transaction.amount || 0
-                      )}
-                    </td>
-                    <td style={tdStyle}>{getMethodLabel(transaction.payment_method_type || '')}</td>
-                    <td style={tdStyle}>
-                      <span style={getStatusBadgeStyle(transaction.status || '')}>
-                        {getStatusLabel(transaction.status || '')}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>{formatDate(transaction.created_at || '')}</td>
-                  </tr>
-                ))}
+                {transactions.map((transaction) => {
+                  const tx = transaction as Transaction
+                  return (
+                    <tr key={tx.id}>
+                      <td style={tdStyle}>{tx.id.slice(0, 8)}...</td>
+                      <td style={tdStyle}>{tx.order_id_full?.slice(0, 8) || 'N/A'}...</td>
+                      <td style={tdStyle}>
+                        <div>{tx.user_email || 'N/A'}</div>
+                        <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                          {tx.user_phone || ''}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        {formatCurrency(
+                          typeof tx.amount === 'string' 
+                            ? parseFloat(tx.amount) || 0 
+                            : tx.amount || 0
+                        )}
+                      </td>
+                      <td style={tdStyle}>{getMethodLabel(tx.payment_method_type || '')}</td>
+                      <td style={tdStyle}>
+                        <span style={getStatusBadgeStyle(tx.status || '')}>
+                          {getStatusLabel(tx.status || '')}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>{formatDate(tx.created_at || '')}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
 

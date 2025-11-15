@@ -7,7 +7,6 @@ import { usePathname } from 'next/navigation'
 import DeliveryCard from '@/components/tracking/DeliveryCard'
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
 import { useRealTimeTracking } from '@/hooks/useRealTimeTracking'
-import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 
@@ -442,7 +441,7 @@ export default function TrackingPage() {
   const { isLoaded, loadError } = useGoogleMaps()
 
   // Utiliser le suivi en temps réel
-  const { onlineDrivers, ongoingDeliveries, isConnected, isLoading, reloadData } = useRealTimeTracking()
+  const { onlineDrivers, ongoingDeliveries, isLoading, reloadData } = useRealTimeTracking()
 
   // Recharger les données quand on revient sur la page Tracking
   useEffect(() => {
@@ -485,41 +484,28 @@ export default function TrackingPage() {
     }
   }, [pathname, reloadData])
 
-  // Charger les livraisons initiales depuis l'API (fallback si socket non connecté)
-  useEffect(() => {
-    const loadInitialDeliveries = async () => {
-      try {
-        const result = await adminApiService.getOngoingDeliveries()
-        if (result.success && result.data && result.data.length > 0) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('🔄 [TrackingPage] Livraisons initiales chargées:', result.data.length)
-          }
-        }
-      } catch (err) {
-        console.error('Erreur lors du chargement initial des livraisons:', err)
-      }
-    }
-
-    // Charger les données initiales si le socket n'est pas connecté après 3 secondes
-    if (!isConnected) {
-      const timeout = setTimeout(() => {
-        if (!isConnected && !isLoading) {
-          loadInitialDeliveries()
-        }
-      }, 3000)
-      
-      return () => clearTimeout(timeout)
-    } else {
-      // Si le socket est connecté, charger quand même les données initiales pour s'assurer qu'elles sont à jour
-      loadInitialDeliveries()
-    }
-  }, [isConnected, isLoading])
+  // Ne plus charger les livraisons initiales ici - elles sont gérées par useRealTimeTracking
+  // Le hook gère déjà le chargement via Socket.IO et l'API en fallback
 
   // Utiliser les vraies données du suivi en temps réel
   // Filtrer les commandes terminées ou annulées
   const filteredDeliveries = useMemo(() => {
+    // Log pour déboguer les changements
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [TrackingPage] filteredDeliveries recalculé:', {
+        ongoingDeliveriesLength: ongoingDeliveries.length,
+        timestamp: new Date().toISOString(),
+        stack: new Error().stack?.split('\n').slice(2, 5).join('\n')
+      })
+    }
+    
     const deliveries = ongoingDeliveries.length > 0 ? ongoingDeliveries : []
-    if (!deliveries || deliveries.length === 0) return []
+    if (!deliveries || deliveries.length === 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ [TrackingPage] Aucune livraison disponible')
+      }
+      return []
+    }
     
     // Filtrer les commandes terminées ou annulées
     const activeDeliveries = deliveries.filter((delivery: Delivery) => 

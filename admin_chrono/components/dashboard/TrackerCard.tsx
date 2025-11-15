@@ -1,7 +1,7 @@
 'use client'
 
 import { Phone, MessageSquare } from 'lucide-react'
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { GoogleMap, Marker, Polyline } from '@react-google-maps/api'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
@@ -29,6 +29,14 @@ interface Order {
     full_name?: string
     email?: string
   }
+  [key: string]: unknown
+}
+
+interface Driver {
+  id?: string
+  full_name?: string
+  email?: string
+  phone?: string
   [key: string]: unknown
 }
 
@@ -173,29 +181,49 @@ export default function TrackerCard() {
   const { data: ordersData } = useQuery({
     queryKey: ['active-orders-with-driver'],
     queryFn: async () => {
+      console.log('🚀 [TrackerCard] queryFn CALLED - getOrdersByStatus', { timestamp: new Date().toISOString() })
       // Récupérer les commandes en cours (enroute, picked_up, accepted)
       const result = await adminApiService.getOrdersByStatus('onProgress')
+      console.log('✅ [TrackerCard] getOrdersByStatus SUCCESS', { hasData: !!result.data, timestamp: new Date().toISOString() })
       return result
     },
-    refetchInterval: 30000, // Refetch toutes les 30 secondes
+    refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
   // Trouver une commande avec un driver assigné
-  const orders = ordersData?.data || []
-  const activeOrder = orders.find((order: Order) => order.driver_id || order.driverId)
+  const orders: Order[] = (ordersData?.data as Order[]) || []
+  const activeOrder: Order | undefined = orders.find((order: Order) => order.driver_id || order.driverId)
   const driverId = activeOrder?.driver_id || activeOrder?.driverId
 
+  // Log pour voir si driverId change
+  React.useEffect(() => {
+    console.log('🔄 [TrackerCard] driverId changed:', driverId)
+  }, [driverId])
+
+  const driverQueryKey = ['driver-details', driverId] as const
+
   const { data: driverData } = useQuery({
-    queryKey: ['driver-details', driverId],
+    queryKey: driverQueryKey,
     queryFn: async () => {
+      console.log('🚀 [TrackerCard] queryFn CALLED - getDriverDetails', { driverId, timestamp: new Date().toISOString() })
       if (!driverId) return null
       const result = await adminApiService.getDriverDetails(driverId)
+      console.log('✅ [TrackerCard] getDriverDetails SUCCESS', { hasData: !!result.data, timestamp: new Date().toISOString() })
       return result
     },
     enabled: !!driverId,
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   })
 
-  const driver = driverData?.data
+  const driver: Driver | undefined = driverData?.data as Driver | undefined
 
   // Fonction pour obtenir le nom d'affichage du driver
   const getDisplayName = () => {

@@ -115,6 +115,9 @@ export default function KPICard({
             {isPositive ? '+' : ''}{change.toFixed(1).replace('.', ',')}%
           </div>
         )}
+        {isLoading && (
+          <SkeletonLoader width={50} height={16} borderRadius={4} />
+        )}
       </div>
       
       <div style={contentStyle}>
@@ -126,7 +129,13 @@ export default function KPICard({
             formattedValue
           )}
         </div>
-        <p style={subtitleStyle}>{subtitle}</p>
+        <div style={subtitleStyle}>
+          {isLoading ? (
+            <SkeletonLoader width={100} height={14} borderRadius={4} />
+          ) : (
+            subtitle
+          )}
+        </div>
       </div>
     </AnimatedCard>
   )

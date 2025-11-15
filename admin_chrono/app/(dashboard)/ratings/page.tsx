@@ -39,7 +39,11 @@ export default function RatingsPage() {
         clientId: clientFilter || undefined,
         minRating: minRatingFilter ? parseInt(minRatingFilter) : undefined,
       }),
-    refetchInterval: 30000,
+    refetchInterval: false, // Pas de refresh automatique - les évaluations changent rarement
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
   const deleteMutation = useMutation({
@@ -51,7 +55,7 @@ export default function RatingsPage() {
     },
   })
 
-  const ratings = ratingsData?.data || []
+  const ratings: Rating[] = (ratingsData?.data as Rating[]) || []
   const pagination = ratingsData?.pagination
 
   const formatDate = (dateString: string | undefined) => {

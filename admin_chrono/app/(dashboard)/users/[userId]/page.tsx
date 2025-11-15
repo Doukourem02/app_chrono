@@ -24,6 +24,47 @@ interface User {
   [key: string]: unknown
 }
 
+interface UserProfile {
+  isOnline?: boolean
+  vehicleType?: string
+  vehiclePlate?: string
+  currentLatitude?: number
+  currentLongitude?: number
+  [key: string]: unknown
+}
+
+interface UserStatistics {
+  totalDeliveries?: number
+  todayDeliveries?: number
+  weekDeliveries?: number
+  totalRevenue?: number
+  averageRevenuePerDelivery?: number
+  averageDeliveryTime?: number
+  totalDistance?: number
+  averageRating?: number
+  totalRatings?: number
+  acceptanceRate?: number
+  totalOrders?: number
+  weekOrders?: number
+  monthOrders?: number
+  completedOrders?: number
+  totalSpent?: number
+  loyaltyPoints?: number
+  [key: string]: unknown
+}
+
+interface UserDetails {
+  id?: string
+  role?: string
+  email?: string
+  phone?: string
+  avatarUrl?: string
+  createdAt?: string
+  profile?: UserProfile
+  statistics?: UserStatistics
+  [key: string]: unknown
+}
+
 export default function UserDetailsPage() {
   const router = useRouter()
   const params = useParams()
@@ -32,21 +73,27 @@ export default function UserDetailsPage() {
 
   const { data: userData, isLoading } = useQuery({
     queryKey: ['user-details', userId],
-    queryFn: async () => {
+    queryFn: async (): Promise<{ data: UserDetails } | null> => {
       // Détecter le type d'utilisateur en récupérant d'abord les infos de base
       const usersResult = await adminApiService.getUsers()
-      const user = usersResult.data?.find((u: User) => u.id === userId)
+      const users: User[] = (usersResult.data as User[]) || []
+      const user = users.find((u: User) => u.id === userId)
       
       if (!user) return null
 
       if (user.role === 'driver') {
-        return await adminApiService.getDriverDetails(userId)
+        return await adminApiService.getDriverDetails(userId) as { data: UserDetails }
       } else if (user.role === 'client') {
-        return await adminApiService.getClientDetails(userId)
+        return await adminApiService.getClientDetails(userId) as { data: UserDetails }
       }
       return null
     },
     enabled: !!userId,
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   })
 
   const updateStatusMutation = useMutation({
@@ -72,7 +119,7 @@ export default function UserDetailsPage() {
     })
   }
 
-  const user = userData?.data
+  const user: UserDetails | undefined = userData?.data
   const isDriver = user?.profile !== undefined
   const isClient = !isDriver && user?.statistics
 
@@ -249,7 +296,7 @@ export default function UserDetailsPage() {
               <div style={infoItemStyle}>
                 <Calendar size={16} style={{ color: '#6B7280' }} />
                 <span style={{ fontSize: '14px', color: '#374151' }}>
-                  Inscrit le {formatDate(user.createdAt)}
+                  Inscrit le {user.createdAt ? formatDate(user.createdAt) : 'N/A'}
                 </span>
               </div>
             </div>
@@ -257,6 +304,7 @@ export default function UserDetailsPage() {
           {isDriver && user.profile && (
             <button
               onClick={() => {
+                if (!user.profile) return
                 const newStatus = !user.profile.isOnline
                 updateStatusMutation.mutate(newStatus)
               }}
@@ -297,7 +345,7 @@ export default function UserDetailsPage() {
                   </div>
                 </div>
               </div>
-              {user.profile.vehiclePlate && (
+              {user.profile?.vehiclePlate && (
                 <div style={infoItemStyle}>
                   <Truck size={16} style={{ color: '#6B7280' }} />
                   <div>

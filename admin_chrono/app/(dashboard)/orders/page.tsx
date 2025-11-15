@@ -70,8 +70,12 @@ export default function OrdersPage() {
       console.log('🔍 [OrdersPage] Orders result:', result)
       return result
     },
-    refetchInterval: 30000,
-    retry: 1,
+    refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: false, // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
   })
 
   // Debug logs
@@ -85,7 +89,7 @@ export default function OrdersPage() {
     }
   }, [ordersData, isError, error])
 
-  const orders = ordersData?.data || []
+  const orders: Order[] = (ordersData?.data as Order[]) || []
   const counts = ordersData?.counts || {
     all: 0,
     onProgress: 0,

@@ -1,7 +1,8 @@
 'use client'
 
-import React, { createContext, useContext, ReactNode } from 'react'
+import React, { createContext, useContext, ReactNode, useMemo } from 'react'
 import { useLoadScript } from '@react-google-maps/api'
+import type { Library } from '@googlemaps/js-api-loader'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
@@ -11,6 +12,9 @@ interface GoogleMapsContextType {
 }
 
 const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(undefined)
+
+// Définir les libraries comme constante en dehors du composant pour éviter les re-renders
+const GOOGLE_MAPS_LIBRARIES: Library[] = ['places']
 
 export function GoogleMapsProvider({ children }: { children: ReactNode }) {
   const directApiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY || ''
@@ -37,14 +41,18 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
     },
     enabled: !directApiKey,
     staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
   })
   
-  const googleMapsApiKey = directApiKey || googleConfig?.apiKey || ''
+  const googleMapsApiKey = useMemo(() => directApiKey || googleConfig?.apiKey || '', [directApiKey, googleConfig?.apiKey])
 
   // Charger Google Maps une seule fois avec un ID unique global
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: googleMapsApiKey || 'dummy-key-to-avoid-error',
-    libraries: ['places'],
+    libraries: GOOGLE_MAPS_LIBRARIES, // Utiliser la constante pour éviter les re-renders
     id: 'google-maps-script-global', // ID unique global pour toute l'application
   })
 

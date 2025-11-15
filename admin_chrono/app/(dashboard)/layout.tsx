@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import { GoogleMapsProvider } from '@/contexts/GoogleMapsContext'
+import { DateFilterProvider } from '@/contexts/DateFilterContext'
 import { SkeletonLoader } from '@/components/animations'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -94,28 +95,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isTrackingPage = pathname?.includes('/tracking')
 
   return (
-    <GoogleMapsProvider>
-      <div style={containerStyle}>
-        <Sidebar />
-        <div style={contentWrapperStyle}>
-          <div style={scrollableStyle}>
-            {isTrackingPage ? (
-              <main style={{ height: '100%', padding: 0 }}>
-                {children}
-              </main>
-            ) : (
-              <div style={innerContainerStyle}>
-                <div style={maxWidthContainerStyle}>
-                  <Header />
-                  <main>
-                    {children}
-                  </main>
+    <DateFilterProvider>
+      <GoogleMapsProvider>
+        <div style={containerStyle}>
+          <Sidebar />
+          <div style={contentWrapperStyle}>
+            <div style={scrollableStyle}>
+              {isTrackingPage ? (
+                <main style={{ height: '100%', padding: 0 }}>
+                  {children}
+                </main>
+              ) : (
+                <div style={innerContainerStyle}>
+                  <div style={maxWidthContainerStyle}>
+                    <Header />
+                    <main>
+                      {children}
+                    </main>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </GoogleMapsProvider>
+      </GoogleMapsProvider>
+    </DateFilterProvider>
   )
 }

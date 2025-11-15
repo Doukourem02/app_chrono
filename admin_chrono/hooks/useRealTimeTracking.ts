@@ -134,6 +134,8 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
   // Utiliser des refs pour éviter les re-renders inutiles
   const driversRef = useRef<Map<string, OnlineDriver>>(new Map())
   const deliveriesRef = useRef<Delivery[]>([])
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isConnectedRef = useRef(false) // Ref pour éviter les mises à jour inutiles de isConnected
 
   // Mettre à jour les refs quand l'état change
   useEffect(() => {
@@ -169,11 +171,28 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       if (index >= 0) {
         const updated = [...prev]
         updated[index] = delivery
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔄 [useRealTimeTracking] Livraison mise à jour:', {
+            id: delivery.id,
+            status: delivery.status,
+            totalDeliveries: updated.length,
+            timestamp: new Date().toISOString()
+          })
+        }
         return updated
       } else {
         // Si la livraison n'existe pas, l'ajouter seulement si elle est en cours
         if (['pending', 'accepted', 'enroute', 'picked_up'].includes(delivery.status)) {
-          return [...prev, delivery]
+          const newList = [...prev, delivery]
+          if (process.env.NODE_ENV === 'development') {
+            console.log('➕ [useRealTimeTracking] Nouvelle livraison ajoutée:', {
+              id: delivery.id,
+              status: delivery.status,
+              totalDeliveries: newList.length,
+              timestamp: new Date().toISOString()
+            })
+          }
+          return newList
         }
         return prev
       }
@@ -207,14 +226,33 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     connectSocket()
 
     // Vérifier l'état de connexion
+    // Utiliser une ref pour éviter les mises à jour inutiles qui déclenchent des re-renders
     const checkConnection = () => {
-      setIsConnected(adminSocketService.isConnected())
+      const nowConnected = adminSocketService.isConnected()
+      
+      // Ne mettre à jour l'état QUE si la valeur a réellement changé
+      // Cela évite les re-renders inutiles qui déclenchent des effets
+      if (isConnectedRef.current !== nowConnected) {
+        const wasConnected = isConnectedRef.current
+        isConnectedRef.current = nowConnected
+        setIsConnected(nowConnected)
+        
+        console.log('🔌 [useRealTimeTracking] Connection state changed:', { 
+          wasConnected, 
+          nowConnected, 
+          timestamp: new Date().toISOString() 
+        })
+      }
     }
+    
+    // Vérifier l'état de connexion initial
     checkConnection()
-    const connectionInterval = setInterval(checkConnection, 1000)
+    // Vérifier la connexion toutes les 10 secondes (réduit de 5s pour moins de vérifications)
+    const connectionInterval = setInterval(checkConnection, 10000)
 
     // Écouter la connexion admin
     const unsubscribeConnected = adminSocketService.on('admin:connected', () => {
+      isConnectedRef.current = true
       setIsConnected(true)
       setIsLoading(false)
       setError(null)
@@ -226,11 +264,12 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     })
 
     // Écouter les drivers initiaux
-    const unsubscribeInitialDrivers = adminSocketService.on('admin:initial-drivers', (data: { drivers: OnlineDriver[] }) => {
-      if (data.drivers && Array.isArray(data.drivers)) {
+    const unsubscribeInitialDrivers = adminSocketService.on('admin:initial-drivers', (data: unknown) => {
+      const typedData = data as { drivers: OnlineDriver[] }
+      if (typedData.drivers && Array.isArray(typedData.drivers)) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('📋 [useRealTimeTracking] Drivers initiaux reçus:', data.drivers.length)
-          data.drivers.forEach((driver) => {
+          console.log('📋 [useRealTimeTracking] Drivers initiaux reçus:', typedData.drivers.length)
+          typedData.drivers.forEach((driver) => {
             const updatedAt = driver.updated_at ? new Date(driver.updated_at) : null
             const now = new Date()
             const diffInMinutes = updatedAt ? (now.getTime() - updatedAt.getTime()) / (1000 * 60) : null
@@ -253,7 +292,7 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
         const now = new Date()
         
         // Filtrer uniquement les drivers en ligne avec coordonnées ET actifs (mis à jour dans les 5 dernières minutes)
-        data.drivers.forEach((driver) => {
+        typedData.drivers.forEach((driver) => {
           const isOnline = driver.is_online === true
           const hasCoordinates = !!(driver.current_latitude && driver.current_longitude)
           
@@ -285,14 +324,15 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     })
 
     // Écouter les événements de drivers
-    const unsubscribeDriverOnline = adminSocketService.on('driver:online', (data: OnlineDriver) => {
+    const unsubscribeDriverOnline = adminSocketService.on('driver:online', (data: unknown) => {
+      const typedData = data as OnlineDriver
       // Ne mettre à jour que si le driver est réellement en ligne
-      if (data.is_online === true) {
+      if (typedData.is_online === true) {
         // Vérifier aussi que le driver est actif (mis à jour récemment)
         const now = new Date()
         let isActive = true
-        if (data.updated_at) {
-          const updatedAt = new Date(data.updated_at)
+        if (typedData.updated_at) {
+          const updatedAt = new Date(typedData.updated_at)
           const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60)
           isActive = diffInMinutes <= 5
         }
@@ -300,109 +340,112 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
         if (isActive) {
           if (process.env.NODE_ENV === 'development') {
             console.log('🟢 [useRealTimeTracking] Driver en ligne et actif:', {
-              userId: data.userId.substring(0, 8),
-              is_online: data.is_online,
-              is_available: data.is_available,
-              hasCoordinates: !!(data.current_latitude && data.current_longitude),
-              coordinates: data.current_latitude && data.current_longitude 
-                ? `${data.current_latitude}, ${data.current_longitude}` 
+              userId: typedData.userId.substring(0, 8),
+              is_online: typedData.is_online,
+              is_available: typedData.is_available,
+              hasCoordinates: !!(typedData.current_latitude && typedData.current_longitude),
+              coordinates: typedData.current_latitude && typedData.current_longitude 
+                ? `${typedData.current_latitude}, ${typedData.current_longitude}` 
                 : 'Non disponible',
-              updated_at: data.updated_at,
+              updated_at: typedData.updated_at,
             })
           }
-          updateDriver(data)
+          updateDriver(typedData)
         } else {
           // Driver marqué en ligne mais inactif (pas de mise à jour récente)
           if (process.env.NODE_ENV === 'development') {
-            console.log('⚠️ [useRealTimeTracking] Driver marqué en ligne mais inactif (>5 min):', data.userId.substring(0, 8))
+            console.log('⚠️ [useRealTimeTracking] Driver marqué en ligne mais inactif (>5 min):', typedData.userId.substring(0, 8))
           }
-          removeDriver(data.userId)
+          removeDriver(typedData.userId)
         }
       } else {
         // Si is_online est false, retirer le driver
         if (process.env.NODE_ENV === 'development') {
-          console.log('🔴 [useRealTimeTracking] Driver hors ligne (via driver:online):', data.userId.substring(0, 8))
+          console.log('🔴 [useRealTimeTracking] Driver hors ligne (via driver:online):', typedData.userId.substring(0, 8))
         }
-        removeDriver(data.userId)
+        removeDriver(typedData.userId)
       }
     })
 
-    const unsubscribeDriverOffline = adminSocketService.on('driver:offline', (data: { userId: string }) => {
-      removeDriver(data.userId)
+    const unsubscribeDriverOffline = adminSocketService.on('driver:offline', (data: unknown) => {
+      const typedData = data as { userId: string }
+      removeDriver(typedData.userId)
     })
 
-    const unsubscribeDriverPosition = adminSocketService.on('driver:position:update', (data: {
-      userId: string
-      current_latitude?: number
-      current_longitude?: number
-      updated_at?: string
-    }) => {
-      const currentDriver = driversRef.current.get(data.userId)
+    const unsubscribeDriverPosition = adminSocketService.on('driver:position:update', (data: unknown) => {
+      const typedData = data as {
+        userId: string
+        current_latitude?: number
+        current_longitude?: number
+        updated_at?: string
+      }
+      const currentDriver = driversRef.current.get(typedData.userId)
       if (currentDriver) {
         // Mettre à jour uniquement si le driver est toujours en ligne
         if (currentDriver.is_online === true) {
           updateDriver({
             ...currentDriver,
-            current_latitude: data.current_latitude,
-            current_longitude: data.current_longitude,
-            updated_at: data.updated_at,
+            current_latitude: typedData.current_latitude,
+            current_longitude: typedData.current_longitude,
+            updated_at: typedData.updated_at,
           })
         } else {
           // Si le driver n'est plus en ligne, le retirer
-          removeDriver(data.userId)
+          removeDriver(typedData.userId)
         }
       }
     })
 
     // Écouter les mises à jour de commandes
-    const unsubscribeOrderUpdate = adminSocketService.on('order:status:update', (data: OrderUpdateData) => {
-      if (data.order) {
+    const unsubscribeOrderUpdate = adminSocketService.on('order:status:update', (data: unknown) => {
+      const typedData = data as OrderUpdateData
+      if (typedData.order) {
         // Convertir l'order en Delivery
         const delivery: Delivery = {
-          id: data.order.id,
-          shipmentNumber: `EV-${data.order.id.replace(/-/g, '').substring(0, 10)}`,
+          id: typedData.order.id,
+          shipmentNumber: `EV-${typedData.order.id.replace(/-/g, '').substring(0, 10)}`,
           type: 'Orders',
-          status: data.order.status,
+          status: typedData.order.status,
           pickup: {
-            name: data.order.pickup?.name || data.order.pickup?.address || 'Adresse inconnue',
-            address: data.order.pickup?.address || data.order.pickup?.formatted_address || 'Adresse inconnue',
-            coordinates: data.order.pickup?.coordinates
+            name: typedData.order.pickup?.name || typedData.order.pickup?.address || 'Adresse inconnue',
+            address: typedData.order.pickup?.address || typedData.order.pickup?.formatted_address || 'Adresse inconnue',
+            coordinates: typedData.order.pickup?.coordinates
               ? (() => {
-                  const lat = data.order.pickup.coordinates.latitude ?? data.order.pickup.coordinates.lat
-                  const lng = data.order.pickup.coordinates.longitude ?? data.order.pickup.coordinates.lng
+                  const lat = typedData.order.pickup.coordinates.latitude ?? typedData.order.pickup.coordinates.lat
+                  const lng = typedData.order.pickup.coordinates.longitude ?? typedData.order.pickup.coordinates.lng
                   return lat !== undefined && lng !== undefined ? { lat, lng } : null
                 })()
               : null,
           },
           dropoff: {
-            name: data.order.dropoff?.name || data.order.dropoff?.address || 'Adresse inconnue',
-            address: data.order.dropoff?.address || data.order.dropoff?.formatted_address || 'Adresse inconnue',
-            coordinates: data.order.dropoff?.coordinates
+            name: typedData.order.dropoff?.name || typedData.order.dropoff?.address || 'Adresse inconnue',
+            address: typedData.order.dropoff?.address || typedData.order.dropoff?.formatted_address || 'Adresse inconnue',
+            coordinates: typedData.order.dropoff?.coordinates
               ? (() => {
-                  const lat = data.order.dropoff.coordinates.latitude ?? data.order.dropoff.coordinates.lat
-                  const lng = data.order.dropoff.coordinates.longitude ?? data.order.dropoff.coordinates.lng
+                  const lat = typedData.order.dropoff.coordinates.latitude ?? typedData.order.dropoff.coordinates.lat
+                  const lng = typedData.order.dropoff.coordinates.longitude ?? typedData.order.dropoff.coordinates.lng
                   return lat !== undefined && lng !== undefined ? { lat, lng } : null
                 })()
               : null,
           },
-          driverId: data.order.driverId,
-          userId: data.order.user?.id,
-          client: data.order.user
+          driverId: typedData.order.driverId,
+          userId: typedData.order.user?.id,
+          client: typedData.order.user
             ? {
-                id: data.order.user.id,
-                email: data.order.user.email || '',
-                full_name: data.order.user.name || data.order.user.full_name,
-                phone: data.order.user.phone,
-                avatar_url: data.order.user.avatar,
+                id: typedData.order.user.id,
+                email: typedData.order.user.email || '',
+                full_name: typedData.order.user.name || typedData.order.user.full_name,
+                phone: typedData.order.user.phone,
+                avatar_url: typedData.order.user.avatar,
               }
             : null,
-          driver: data.order.driver
+          driver: typedData.order.driver
             ? {
-                id: data.order.driver.id,
-                email: data.order.driver.email || '',
-                full_name: data.order.driver.full_name ?? data.order.driver.name,
-                phone: data.order.driver.phone,
-                avatar_url: data.order.driver.avatar_url,
+                id: typedData.order.driver.id,
+                email: typedData.order.driver.email || '',
+                full_name: typedData.order.driver.full_name ?? typedData.order.driver.name,
+                phone: typedData.order.driver.phone,
+                avatar_url: typedData.order.driver.avatar_url,
               }
             : null,
         }
@@ -418,16 +461,19 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     })
 
     // Écouter les erreurs
-    const unsubscribeError = adminSocketService.on('admin:error', (data: { message: string }) => {
-      setError(data.message)
+    const unsubscribeError = adminSocketService.on('admin:error', (data: unknown) => {
+      const typedData = data as { message: string }
+      setError(typedData.message)
     })
 
     // Charger les drivers depuis l'API si le socket n'est pas connecté après 5 secondes
     const loadDriversFromAPI = async () => {
       try {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔄 [useRealTimeTracking] Chargement des drivers via API (fallback)')
-        }
+        console.log('🔄 [useRealTimeTracking] loadDriversFromAPI CALLED', { 
+          timestamp: new Date().toISOString(), 
+          stack: new Error().stack,
+          isConnected: adminSocketService.isConnected()
+        })
         const result = await adminApiService.getOnlineDrivers()
         if (process.env.NODE_ENV === 'development') {
           console.log('📡 [useRealTimeTracking] Réponse API getOnlineDrivers:', {
@@ -468,32 +514,48 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
     }
 
     // Écouter les échecs de connexion
-    const unsubscribeConnectionFailed = adminSocketService.on('admin:connection-failed', async (data: { message: string; url: string }) => {
+    const unsubscribeConnectionFailed = adminSocketService.on('admin:connection-failed', async (data: unknown) => {
+      const typedData = data as { message: string; url: string }
       if (process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ [useRealTimeTracking] Connexion Socket.IO échouée:', data.message)
+        console.warn('⚠️ [useRealTimeTracking] Connexion Socket.IO échouée:', typedData.message)
         console.warn('⚠️ [useRealTimeTracking] Le polling HTTP sera utilisé à la place')
       }
-      setError(data.message)
+      setError(typedData.message)
       setIsLoading(false)
       
       // Charger les drivers depuis l'API comme fallback
       await loadDriversFromAPI()
       
-      // Mettre en place un polling toutes les 10 secondes si le socket ne fonctionne pas
-      const pollingInterval = setInterval(() => {
+      // Nettoyer l'ancien intervalle s'il existe
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+      
+      // Mettre en place un polling toutes les 5 minutes si le socket ne fonctionne pas
+      // DÉSACTIVÉ : Le polling cause des refresh indésirables sur toutes les pages
+      // Le socket devrait gérer les mises à jour en temps réel
+      // Si le socket ne fonctionne pas, l'utilisateur peut recharger manuellement
+      /*
+      pollingIntervalRef.current = setInterval(() => {
         if (!adminSocketService.isConnected()) {
           loadDriversFromAPI()
         } else {
-          clearInterval(pollingInterval)
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+          }
         }
-      }, 10000)
+      }, 300000) // 5 minutes (300000ms) - polling très espacé pour éviter les refreshs
+      */
       
       // Charger les données initiales via l'API comme fallback
       try {
         const result = await adminApiService.getOngoingDeliveries()
         if (result.success && result.data) {
           // Convertir les données de l'API en format Delivery
-          const deliveries: Delivery[] = result.data.map((order: OrderFromAPI) => ({
+          const orders: OrderFromAPI[] = (result.data as OrderFromAPI[]) || []
+          const deliveries: Delivery[] = orders.map((order: OrderFromAPI) => ({
             id: order.id,
             shipmentNumber: order.shipmentNumber || `EV-${order.id.replace(/-/g, '').substring(0, 10)}`,
             type: 'Orders',
@@ -544,10 +606,13 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
         // Charger les drivers depuis l'API si le socket n'est pas connecté après 5 secondes
         const fallbackTimeout = setTimeout(async () => {
           if (!adminSocketService.isConnected()) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('🔄 [useRealTimeTracking] Socket non connecté, chargement des drivers via API (fallback)')
-            }
+            console.log('⏰ [useRealTimeTracking] Fallback timeout triggered (5s), loading drivers via API', {
+              timestamp: new Date().toISOString(),
+              isConnected: adminSocketService.isConnected()
+            })
             await loadDriversFromAPI()
+          } else {
+            console.log('✅ [useRealTimeTracking] Socket connected, skipping fallback')
           }
         }, 5000)
         
@@ -561,7 +626,8 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
             try {
               const result = await adminApiService.getOngoingDeliveries()
               if (result.success && result.data) {
-                const deliveries: Delivery[] = result.data.map((order: OrderFromAPI) => ({
+                const orders: OrderFromAPI[] = (result.data as OrderFromAPI[]) || []
+                const deliveries: Delivery[] = orders.map((order: OrderFromAPI) => ({
                   id: order.id,
                   shipmentNumber: order.shipmentNumber || `EV-${order.id.replace(/-/g, '').substring(0, 10)}`,
                   type: 'Orders',
@@ -602,8 +668,19 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
                     : null,
                 }))
                 
-                setOngoingDeliveries(deliveries)
+                // Filtrer les livraisons terminées avant de les définir
+                const activeDeliveries = deliveries.filter(
+                  (d) => d.status !== 'completed' && d.status !== 'cancelled'
+                )
+                setOngoingDeliveries(activeDeliveries)
                 setIsLoading(false)
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('📦 [useRealTimeTracking] Livraisons chargées via API (fallback):', {
+                    total: deliveries.length,
+                    active: activeDeliveries.length,
+                    timestamp: new Date().toISOString()
+                  })
+                }
               }
             } catch (apiError) {
               console.error('❌ [useRealTimeTracking] Erreur lors du chargement des livraisons via API:', apiError)
@@ -617,6 +694,11 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       clearInterval(connectionInterval)
       clearTimeout(fallbackTimeout)
       clearTimeout(deliveriesFallbackTimeout)
+      // Nettoyer le polling interval s'il existe
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
       unsubscribeConnected()
       unsubscribeInitialDrivers()
       unsubscribeDriverOnline()
@@ -627,6 +709,8 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       unsubscribeConnectionFailed()
       // Ne pas déconnecter ici car d'autres composants pourraient utiliser le service
     }
+    // Ne pas inclure isConnected dans les dépendances pour éviter les réexécutions inutiles
+    // On utilise isConnectedRef pour vérifier l'état sans déclencher de re-renders
   }, [updateDriver, removeDriver, updateDelivery, removeDelivery])
 
   // Fonction pour recharger les données manuellement
@@ -659,7 +743,8 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
       // Recharger les livraisons
       const deliveriesResult = await adminApiService.getOngoingDeliveries()
       if (deliveriesResult.success && deliveriesResult.data) {
-        const deliveries: Delivery[] = deliveriesResult.data.map((order: OrderFromAPI) => ({
+        const orders: OrderFromAPI[] = (deliveriesResult.data as OrderFromAPI[]) || []
+        const deliveries: Delivery[] = orders.map((order: OrderFromAPI) => ({
           id: order.id,
           shipmentNumber: order.shipmentNumber || `EV-${order.id.replace(/-/g, '').substring(0, 10)}`,
           type: 'Orders',

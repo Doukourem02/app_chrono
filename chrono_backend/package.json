@@ -12,9 +12,13 @@
     "start": "node dist/server.js",
     "simulate": "node scripts/simulate_flow.js",
     "simulate:ws": "SOCKET_URL=http://127.0.0.1:4000 node scripts/simulate_flow.js",
-    "backup:postgres": "tsx scripts/backup.ts postgres",
-    "backup:supabase": "tsx scripts/backup.ts supabase",
-    "backup:all": "tsx scripts/backup.ts all"
+    "backup:postgres": "tsx scripts/backup-enhanced.ts postgres",
+    "backup:supabase": "tsx scripts/backup-enhanced.ts supabase",
+    "backup:all": "tsx scripts/backup-enhanced.ts all",
+    "backup:test": "tsx scripts/backup-enhanced.ts test",
+    "recovery:list": "tsx scripts/recovery.ts list",
+    "recovery:test": "tsx scripts/recovery.ts test",
+    "recovery:restore": "tsx scripts/recovery.ts restore"
   },
   "keywords": [],
   "author": "",

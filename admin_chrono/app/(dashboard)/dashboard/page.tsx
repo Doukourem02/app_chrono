@@ -6,16 +6,71 @@ import ActivityTable from '@/components/dashboard/ActivityTable'
 import TrackerCard from '@/components/dashboard/TrackerCard'
 import QuickMessage from '@/components/dashboard/QuickMessage'
 import { useQuery } from '@tanstack/react-query'
+import React from 'react'
 import { getDashboardStats } from '@/lib/dashboardApi'
 import { Truck, ShieldCheck, DollarSign, Calendar, Star, Clock, XCircle, Users, UserCheck } from 'lucide-react'
 import { AnimatedButton } from '@/components/animations'
 import { ScreenTransition } from '@/components/animations'
+import { useDateFilter } from '@/contexts/DateFilterContext'
 
 export default function DashboardPage() {
+  const { dateFilter, dateRange } = useDateFilter()
+  const { startDate, endDate } = dateRange
+  
+  // Log pour voir si les dates changent
+  React.useEffect(() => {
+    console.log('🔄 [DashboardPage] Date range changed:', { dateFilter, startDate, endDate })
+  }, [dateFilter, startDate, endDate])
+  
+  // Fonction pour obtenir le label de la période
+  const getPeriodLabel = () => {
+    switch (dateFilter) {
+      case 'today':
+        return "Aujourd'hui"
+      case 'thisWeek':
+        return 'Cette semaine'
+      case 'thisMonth':
+        return 'Ce mois'
+      case 'lastMonth':
+        return 'Mois dernier'
+      case 'all':
+        return 'Tout'
+      default:
+        return 'Cette semaine'
+    }
+  }
+  
+  // Stabiliser la queryKey - React Query compare par valeur, pas par référence
+  const queryKey = React.useMemo(() => {
+    const key: [string, string, string, string] = ['dashboard-stats', dateFilter, startDate, endDate]
+    console.log('🔑 [DashboardPage] QueryKey calculated:', key)
+    return key
+  }, [dateFilter, startDate, endDate])
+  
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['dashboard-stats'],
-    queryFn: getDashboardStats,
-    refetchInterval: 30000,
+    queryKey,
+    queryFn: () => {
+      console.log('🚀 [DashboardPage] queryFn CALLED - getDashboardStats', { startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
+      return getDashboardStats(startDate, endDate)
+    },
+    refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false, // Ne pas rafraîchir quand on revient sur l'onglet
+    refetchOnMount: false, // Ne pas rafraîchir au montage
+    refetchOnReconnect: false, // Ne pas rafraîchir à la reconnexion
+    // Utiliser les données en cache si disponibles pour un affichage immédiat
+    placeholderData: (previousData) => {
+      if (previousData) {
+        console.log('📦 [DashboardPage] Using cached data, skipping fetch')
+      }
+      return previousData
+    },
+    // Réduire le temps de chargement initial en utilisant les données en cache
+    gcTime: 30 * 60 * 1000, // Garder les données en cache pendant 30 minutes
+    // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
+    retry: false,
+    // Ne pas refetch si les données sont déjà en cache
+    structuralSharing: true,
   })
 
   const formatRevenue = (amount: number) => {
@@ -151,39 +206,38 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Nouveaux KPIs supplémentaires */}
-      {stats && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '12px',
-          marginBottom: '16px',
-        }}>
-          <KPICard
-            title="Taux de satisfaction"
-            value={stats.averageRating ? `${stats.averageRating.toFixed(1)} ⭐` : 'N/A'}
-            change={0}
-            subtitle={`${stats.totalRatings || 0} évaluations`}
-            icon={Star}
-            iconColor="text-yellow-600"
-            isLoading={statsLoading}
-            index={0}
-          />
-          <KPICard
-            title="Temps moyen"
-            value={stats.averageDeliveryTime ? `${stats.averageDeliveryTime} min` : 'N/A'}
-            change={0}
-            subtitle="Temps de livraison"
-            icon={Clock}
-            iconColor="text-blue-600"
-            isLoading={statsLoading}
-            index={1}
-          />
+      {/* Nouveaux KPIs supplémentaires - Toujours affichés, même pendant le chargement */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '12px',
+        marginBottom: '16px',
+      }}>
+        <KPICard
+          title="Taux de satisfaction"
+          value={stats?.averageRating ? `${stats.averageRating.toFixed(1)} ⭐` : 'N/A'}
+          change={0}
+          subtitle={statsLoading ? 'Chargement...' : `${stats?.totalRatings || 0} évaluations`}
+          icon={Star}
+          iconColor="text-yellow-600"
+          isLoading={statsLoading}
+          index={0}
+        />
+        <KPICard
+          title="Temps moyen"
+          value={stats?.averageDeliveryTime ? `${stats.averageDeliveryTime} min` : 'N/A'}
+          change={0}
+          subtitle="Temps de livraison"
+          icon={Clock}
+          iconColor="text-blue-600"
+          isLoading={statsLoading}
+          index={1}
+        />
           <KPICard
             title="Taux d'annulation"
-            value={stats.cancellationRate ? `${stats.cancellationRate.toFixed(1)}%` : '0%'}
+            value={stats?.cancellationRate ? `${stats.cancellationRate.toFixed(1)}%` : '0%'}
             change={0}
-            subtitle="Cette semaine"
+            subtitle={getPeriodLabel()}
             icon={XCircle}
             iconColor="text-red-600"
             isLoading={statsLoading}
@@ -191,9 +245,9 @@ export default function DashboardPage() {
           />
           <KPICard
             title="Clients actifs"
-            value={stats.activeClients || 0}
+            value={stats?.activeClients || 0}
             change={0}
-            subtitle="Cette semaine"
+            subtitle={getPeriodLabel()}
             icon={Users}
             iconColor="text-green-600"
             isLoading={statsLoading}
@@ -201,16 +255,15 @@ export default function DashboardPage() {
           />
           <KPICard
             title="Drivers actifs"
-            value={stats.activeDrivers || 0}
+            value={stats?.activeDrivers || 0}
             change={0}
-            subtitle="Cette semaine"
+            subtitle={getPeriodLabel()}
             icon={UserCheck}
             iconColor="text-purple-600"
             isLoading={statsLoading}
             index={4}
           />
-        </div>
-      )}
+      </div>
 
       <div style={mainGridStyle}>
         {/* Colonne gauche : 3 cartes KPI empilées */}

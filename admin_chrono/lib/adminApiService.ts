@@ -1,5 +1,6 @@
 // Service API pour le dashboard admin - utilise le backend API comme les autres apps
 import { supabase } from './supabase'
+import { logger } from '@/utils/logger'
 
 // Utiliser EXPO_PUBLIC_API_URL si disponible (comme dans les autres apps), sinon NEXT_PUBLIC_API_URL
 const API_BASE_URL = 
@@ -48,8 +49,8 @@ function hasMessage(obj: unknown): obj is { message: string } {
 }
 
 // Log de la configuration au démarrage (uniquement côté client et en développement)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  console.log(' [adminApiService] API_BASE_URL configured:', API_BASE_URL)
+if (typeof window !== 'undefined') {
+  logger.debug('[adminApiService] API_BASE_URL configured:', API_BASE_URL)
 }
 
 class AdminApiService {
@@ -62,9 +63,7 @@ class AdminApiService {
       return session?.access_token || null
     } catch (error) {
       // Ne pas logger le token en production
-      if (process.env.NODE_ENV === 'development') {
-        console.error(' [adminApiService] Error getting access token:', error)
-      }
+      logger.error('[adminApiService] Error getting access token:', error)
       return null
     }
   }
@@ -75,9 +74,7 @@ class AdminApiService {
   private async fetchWithAuth(url: string, options?: RequestInit): Promise<Response> {
     const token = await this.getAccessToken()
     if (!token) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error(' [adminApiService] No access token available')
-      }
+      logger.error('[adminApiService] No access token available')
       throw new Error('No access token available')
     }
 
@@ -91,42 +88,47 @@ class AdminApiService {
       headers['Content-Type'] = 'application/json'
     }
 
-    // Logs uniquement en développement
-    if (process.env.NODE_ENV === 'development') {
-      console.log(' [adminApiService] Making request to:', url)
-      console.log(' [adminApiService] API_BASE_URL:', API_BASE_URL)
-      console.log(' [adminApiService] Has token:', !!token)
-    }
+    // Logs de debug
+    const timestamp = new Date().toISOString()
+    const stackTrace = new Error().stack
+    const stackLines = stackTrace ? stackTrace.split('\n').slice(2, 8) : [] // Lignes 2-7 de la stack (ignorer Error et fetchWithAuth)
+    console.log('🌐 [adminApiService] ⚠️ FETCH REQUEST ⚠️', {
+      url,
+      timestamp,
+      method: options?.method || 'GET',
+      stack: stackLines.join('\n')
+    })
+    logger.debug('[adminApiService] Making request to:', url)
+    logger.debug('[adminApiService] API_BASE_URL:', API_BASE_URL)
+    logger.debug('[adminApiService] Has token:', !!token)
 
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(' [adminApiService] Attempting fetch to:', url)
-      }
+      logger.debug('[adminApiService] Attempting fetch to:', url)
       const response = await fetch(url, { ...options, headers })
-      if (process.env.NODE_ENV === 'development') {
-        console.log(' [adminApiService] Response status:', response.status, response.statusText)
-      }
+      const responseTimestamp = new Date().toISOString()
+      console.log('✅ [adminApiService] ⚠️ FETCH RESPONSE ⚠️', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        timestamp: responseTimestamp,
+        duration: new Date(responseTimestamp).getTime() - new Date(timestamp).getTime() + 'ms'
+      })
+      logger.debug('[adminApiService] Response status:', response.status, response.statusText)
       return response
     } catch (error: unknown) {
-      // Logs d'erreur conditionnels
-      if (process.env.NODE_ENV === 'development') {
-        const errorMessage = getErrorMessage(error)
-        console.error(' [adminApiService] Fetch error:', errorMessage)
-        console.error(' [adminApiService] Error type:', isError(error) ? error.name : typeof error)
-        console.error(' [adminApiService] URL attempted:', url)
-        console.error(' [adminApiService] API_BASE_URL:', API_BASE_URL)
-        
-        // Vérifier si c'est une erreur réseau
-        if (isError(error) && (error.message.includes('Load failed') || error.message.includes('Failed to fetch') || error.name === 'TypeError')) {
-          console.error(' [adminApiService] Network error - Backend may not be running or URL is incorrect')
-          console.error(' [adminApiService] Please check:')
-          console.error('   1. Is the backend running? (cd chrono_backend && npm start)')
-          console.error('   2. Is NEXT_PUBLIC_API_URL correct in .env.local?')
-          console.error('   3. Current API_BASE_URL:', API_BASE_URL)
-        }
-      } else {
-        // En production, logger uniquement les erreurs critiques sans détails sensibles
-        console.error(' [adminApiService] API request failed')
+      const errorMessage = getErrorMessage(error)
+      logger.error('[adminApiService] Fetch error:', errorMessage)
+      logger.error('[adminApiService] Error type:', isError(error) ? error.name : typeof error)
+      logger.error('[adminApiService] URL attempted:', url)
+      logger.error('[adminApiService] API_BASE_URL:', API_BASE_URL)
+      
+      // Vérifier si c'est une erreur réseau
+      if (isError(error) && (error.message.includes('Load failed') || error.message.includes('Failed to fetch') || error.name === 'TypeError')) {
+        logger.error('[adminApiService] Network error - Backend may not be running or URL is incorrect')
+        logger.error('[adminApiService] Please check:')
+        logger.error('   1. Is the backend running? (cd chrono_backend && npm start)')
+        logger.error('   2. Is NEXT_PUBLIC_API_URL correct in .env.local?')
+        logger.error('   3. Current API_BASE_URL:', API_BASE_URL)
       }
       
       throw error
@@ -136,7 +138,7 @@ class AdminApiService {
   /**
    * Récupère les statistiques globales du dashboard
    */
-  async getDashboardStats(): Promise<{
+  async getDashboardStats(startDate?: string, endDate?: string): Promise<{
     success: boolean
     data?: {
       onDelivery: number
@@ -145,14 +147,25 @@ class AdminApiService {
       successDeliveriesChange: number
       revenue: number
       revenueChange: number
+      averageRating?: number
+      totalRatings?: number
+      averageDeliveryTime?: number
+      cancellationRate?: number
+      activeClients?: number
+      activeDrivers?: number
     }
   }> {
     try {
-      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/dashboard-stats`)
+      const params = new URLSearchParams()
+      if (startDate) params.append('startDate', startDate)
+      if (endDate) params.append('endDate', endDate)
+      const queryString = params.toString()
+      const url = `${API_BASE_URL}/api/admin/dashboard-stats${queryString ? `?${queryString}` : ''}`
+      const response = await this.fetchWithAuth(url)
       
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Network error' }))
-        console.warn(' Error fetching dashboard stats:', error.message)
+        logger.warn('Error fetching dashboard stats:', error.message)
         return {
           success: false,
           data: {
@@ -178,6 +191,12 @@ class AdminApiService {
             successDeliveriesChange: number
             revenue: number
             revenueChange: number
+            averageRating?: number
+            totalRatings?: number
+            averageDeliveryTime?: number
+            cancellationRate?: number
+            activeClients?: number
+            activeDrivers?: number
           }
         }
       }
@@ -194,7 +213,7 @@ class AdminApiService {
         }
       }
     } catch (error) {
-      console.warn(' Error getDashboardStats:', error)
+      logger.warn('Error getDashboardStats:', error)
       return {
         success: false,
         data: {
@@ -212,7 +231,7 @@ class AdminApiService {
   /**
    * Récupère les données d'analytics pour les graphiques
    */
-  async getDeliveryAnalytics(): Promise<{
+  async getDeliveryAnalytics(startDate?: string, endDate?: string): Promise<{
     success: boolean
     data?: {
       month: string
@@ -221,11 +240,16 @@ class AdminApiService {
     }[]
   }> {
     try {
-      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/delivery-analytics`)
+      const params = new URLSearchParams()
+      if (startDate) params.append('startDate', startDate)
+      if (endDate) params.append('endDate', endDate)
+      const queryString = params.toString()
+      const url = `${API_BASE_URL}/api/admin/delivery-analytics${queryString ? `?${queryString}` : ''}`
+      const response = await this.fetchWithAuth(url)
       
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Network error' }))
-        console.warn(' Error fetching delivery analytics:', error.message)
+        logger.warn('Error fetching delivery analytics:', error.message)
         return {
           success: false,
           data: []
@@ -246,7 +270,7 @@ class AdminApiService {
         data: []
       }
     } catch (error) {
-      console.warn(' Error getDeliveryAnalytics:', error)
+      logger.warn('Error getDeliveryAnalytics:', error)
       return {
         success: false,
         data: []
@@ -257,26 +281,30 @@ class AdminApiService {
   /**
    * Récupère les activités récentes
    */
-  async getRecentActivities(limit: number = 10): Promise<{
+  async getRecentActivities(limit: number = 10, startDate?: string, endDate?: string): Promise<{
     success: boolean
     data?: unknown[]
   }> {
     try {
-      const url = `${API_BASE_URL}/api/admin/recent-activities?limit=${limit}`
-      console.log(' [adminApiService] Fetching recent activities from:', url)
+      const params = new URLSearchParams()
+      params.append('limit', limit.toString())
+      if (startDate) params.append('startDate', startDate)
+      if (endDate) params.append('endDate', endDate)
+      const url = `${API_BASE_URL}/api/admin/recent-activities?${params.toString()}`
+      logger.debug('[adminApiService] Fetching recent activities from:', url)
       
       let response: Response
       try {
         response = await this.fetchWithAuth(url)
       } catch (authError: unknown) {
-        console.warn(' [adminApiService] Authentication error:', getErrorMessage(authError))
+        logger.warn('[adminApiService] Authentication error:', getErrorMessage(authError))
         return {
           success: false,
           data: []
         }
       }
       
-      console.debug(' [adminApiService] Response status:', response.status, response.statusText)
+      logger.debug('[adminApiService] Response status:', response.status, response.statusText)
       
       if (!response.ok) {
         let errorMessage = 'Network error'
@@ -286,7 +314,7 @@ class AdminApiService {
         } catch {
           // Si on ne peut pas parser l'erreur, utiliser le message par défaut
         }
-        console.warn(' [adminApiService] Error fetching recent activities:', errorMessage)
+        logger.warn('[adminApiService] Error fetching recent activities:', errorMessage)
         return {
           success: false,
           data: []
@@ -297,30 +325,30 @@ class AdminApiService {
       try {
         result = await response.json()
       } catch (parseError) {
-        console.error(' [adminApiService] Error parsing JSON response:', parseError)
+        logger.error('[adminApiService] Error parsing JSON response:', parseError)
         return {
           success: false,
           data: []
         }
       }
       
-      console.debug(' [adminApiService] Response data:', result)
+      logger.debug('[adminApiService] Response data:', result)
       
       if (isApiResponse(result) && result.data && Array.isArray(result.data)) {
-        console.debug(` [adminApiService] Received ${result.data.length} activities`)
+        logger.debug(`[adminApiService] Received ${result.data.length} activities`)
         return {
           success: true,
           data: result.data
         }
       }
 
-      console.warn(' [adminApiService] API returned no data or success=false')
+      logger.warn('[adminApiService] API returned no data or success=false')
       return {
         success: false,
         data: []
       }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Unexpected error in getRecentActivities:', getErrorMessage(error))
+      logger.error('[adminApiService] Unexpected error in getRecentActivities:', getErrorMessage(error))
       return {
         success: false,
         data: []
@@ -337,20 +365,20 @@ class AdminApiService {
   }> {
     try {
       const url = `${API_BASE_URL}/api/admin/ongoing-deliveries`
-      console.debug(' [adminApiService] Fetching ongoing deliveries from:', url)
+      logger.debug('[adminApiService] Fetching ongoing deliveries from:', url)
       
       let response: Response
       try {
         response = await this.fetchWithAuth(url)
       } catch (authError: unknown) {
-        console.warn(' [adminApiService] Authentication error:', getErrorMessage(authError))
+        logger.warn('[adminApiService] Authentication error:', getErrorMessage(authError))
         return {
           success: false,
           data: []
         }
       }
       
-      console.debug(' [adminApiService] Response status:', response.status, response.statusText)
+      logger.debug('[adminApiService] Response status:', response.status, response.statusText)
       
       if (!response.ok) {
         let errorMessage = 'Network error'
@@ -360,7 +388,7 @@ class AdminApiService {
         } catch {
           // Si on ne peut pas parser l'erreur, utiliser le message par défaut
         }
-        console.warn(' [adminApiService] Error fetching ongoing deliveries:', errorMessage)
+        logger.warn('[adminApiService] Error fetching ongoing deliveries:', errorMessage)
         return {
           success: false,
           data: []
@@ -371,30 +399,30 @@ class AdminApiService {
       try {
         result = await response.json()
       } catch (parseError) {
-        console.error(' [adminApiService] Error parsing JSON response:', parseError)
+        logger.error('[adminApiService] Error parsing JSON response:', parseError)
         return {
           success: false,
           data: []
         }
       }
       
-      console.debug(' [adminApiService] Response data:', result)
+      logger.debug('[adminApiService] Response data:', result)
       
       if (isApiResponse(result) && result.data && Array.isArray(result.data)) {
-        console.debug(` [adminApiService] Received ${result.data.length} ongoing deliveries`)
+        logger.debug(`[adminApiService] Received ${result.data.length} ongoing deliveries`)
         return {
           success: true,
           data: result.data
         }
       }
 
-      console.warn(' [adminApiService] API returned no data or success=false')
+      logger.warn('[adminApiService] API returned no data or success=false')
       return {
         success: false,
         data: []
       }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Unexpected error in getOngoingDeliveries:', getErrorMessage(error))
+      logger.error('[adminApiService] Unexpected error in getOngoingDeliveries:', getErrorMessage(error))
       return {
         success: false,
         data: []
@@ -425,14 +453,14 @@ class AdminApiService {
   }> {
     try {
       const url = `${API_BASE_URL}/api/admin/orders${status ? `?status=${status}` : ''}`
-      console.log(' [adminApiService] Fetching orders from:', url)
-      console.log(' [adminApiService] Status filter:', status)
+      logger.debug('[adminApiService] Fetching orders from:', url)
+      logger.debug('[adminApiService] Status filter:', status)
       
       let response: Response
       try {
         response = await this.fetchWithAuth(url)
       } catch (authError: unknown) {
-        console.warn(' [adminApiService] Authentication error:', getErrorMessage(authError))
+        logger.warn('[adminApiService] Authentication error:', getErrorMessage(authError))
         return {
           success: false,
           data: [],
@@ -453,7 +481,7 @@ class AdminApiService {
         }
       }
       
-      console.debug(' [adminApiService] Response status:', response.status, response.statusText)
+      logger.debug('[adminApiService] Response status:', response.status, response.statusText)
       
       if (!response.ok) {
         let errorMessage = 'Network error'
@@ -466,9 +494,9 @@ class AdminApiService {
           const errorText = await response.text().catch(() => 'Unknown error')
           errorMessage = errorText || errorMessage
         }
-        console.error(' [adminApiService] Error fetching orders:', errorMessage)
-        console.error(' [adminApiService] Error data:', errorData)
-        console.error(' [adminApiService] Response status:', response.status)
+        logger.error('[adminApiService] Error fetching orders:', errorMessage)
+        logger.error('[adminApiService] Error data:', errorData)
+        logger.error('[adminApiService] Response status:', response.status)
         return {
           success: false,
           data: [],
@@ -493,7 +521,7 @@ class AdminApiService {
       try {
         result = await response.json()
       } catch (parseError) {
-        console.error(' [adminApiService] Error parsing JSON response:', parseError)
+        logger.error('[adminApiService] Error parsing JSON response:', parseError)
         return {
           success: false,
           data: [],
@@ -514,10 +542,10 @@ class AdminApiService {
         }
       }
       
-      console.log(' [adminApiService] Response data:', result)
+      logger.debug('[adminApiService] Response data:', result)
       
       if (isApiResponse(result) && result.data && Array.isArray(result.data)) {
-        console.log(` [adminApiService] Received ${result.data.length} orders`)
+        logger.debug(`[adminApiService] Received ${result.data.length} orders`)
         return {
           success: true,
           data: result.data,
@@ -537,7 +565,7 @@ class AdminApiService {
         }
       }
 
-      console.warn(' [adminApiService] API returned no data or success=false')
+      logger.warn('[adminApiService] API returned no data or success=false')
       return {
         success: false,
         data: [],
@@ -550,7 +578,7 @@ class AdminApiService {
         },
       }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Unexpected error in getOrdersByStatus:', getErrorMessage(error))
+      logger.error('[adminApiService] Unexpected error in getOrdersByStatus:', getErrorMessage(error))
       return {
         success: false,
         data: [],
@@ -580,13 +608,13 @@ class AdminApiService {
   }> {
     try {
       const url = `${API_BASE_URL}/api/admin/users`
-      console.log(' [adminApiService] Fetching users from:', url)
+      logger.debug('[adminApiService] Fetching users from:', url)
       
       let response: Response
       try {
         response = await this.fetchWithAuth(url)
       } catch (authError: unknown) {
-        console.warn(' [adminApiService] Authentication error:', getErrorMessage(authError))
+        logger.warn('[adminApiService] Authentication error:', getErrorMessage(authError))
         return {
           success: false,
           data: [],
@@ -599,7 +627,7 @@ class AdminApiService {
         }
       }
       
-      console.debug(' [adminApiService] Response status:', response.status, response.statusText)
+      logger.debug('[adminApiService] Response status:', response.status, response.statusText)
       
       if (!response.ok) {
         let errorMessage = 'Network error'
@@ -609,7 +637,7 @@ class AdminApiService {
         } catch {
           // Si on ne peut pas parser l'erreur, utiliser le message par défaut
         }
-        console.warn(' [adminApiService] Error fetching users:', errorMessage)
+        logger.warn('[adminApiService] Error fetching users:', errorMessage)
         return {
           success: false,
           data: [],
@@ -626,7 +654,7 @@ class AdminApiService {
       try {
         result = await response.json()
       } catch (parseError) {
-        console.error(' [adminApiService] Error parsing JSON response:', parseError)
+        logger.error('[adminApiService] Error parsing JSON response:', parseError)
         return {
           success: false,
           data: [],
@@ -639,10 +667,10 @@ class AdminApiService {
         }
       }
       
-      console.debug(' [adminApiService] Response data:', result)
+      logger.debug('[adminApiService] Response data:', result)
       
       if (isApiResponse(result) && result.data && Array.isArray(result.data)) {
-        console.debug(` [adminApiService] Received ${result.data.length} users`)
+        logger.debug(`[adminApiService] Received ${result.data.length} users`)
         return {
           success: true,
           data: result.data,
@@ -660,7 +688,7 @@ class AdminApiService {
         }
       }
 
-      console.warn(' [adminApiService] API returned no data or success=false')
+      logger.warn('[adminApiService] API returned no data or success=false')
       return {
         success: false,
         data: [],
@@ -672,7 +700,7 @@ class AdminApiService {
         },
       }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Unexpected error in getUsers:', getErrorMessage(error))
+      logger.error('[adminApiService] Unexpected error in getUsers:', getErrorMessage(error))
       return {
         success: false,
         data: [],
@@ -698,13 +726,13 @@ class AdminApiService {
   }> {
     try {
       const url = `${API_BASE_URL}/api/admin/search?q=${encodeURIComponent(query)}`
-      console.debug(' [adminApiService] Global search:', url)
+      logger.debug('[adminApiService] Global search:', url)
       
       let response: Response
       try {
         response = await this.fetchWithAuth(url)
       } catch (authError: unknown) {
-        console.warn(' [adminApiService] Authentication error:', getErrorMessage(authError))
+        logger.warn('[adminApiService] Authentication error:', getErrorMessage(authError))
         return {
           success: false,
           data: {
@@ -744,7 +772,7 @@ class AdminApiService {
         },
       }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in globalSearch:', error)
+      logger.error('[adminApiService] Error in globalSearch:', error)
       return {
         success: false,
         data: {
@@ -812,7 +840,7 @@ class AdminApiService {
         },
       }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getFinancialStats:', error)
+      logger.error('[adminApiService] Error in getFinancialStats:', error)
       return {
         success: false,
         data: {
@@ -874,7 +902,7 @@ class AdminApiService {
         pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
       }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getTransactions:', error)
+      logger.error('[adminApiService] Error in getTransactions:', error)
       return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
     }
   }
@@ -905,7 +933,7 @@ class AdminApiService {
       }
       return { success: false, data: [] }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getReportDeliveries:', error)
+      logger.error('[adminApiService] Error in getReportDeliveries:', error)
       return { success: false, data: [] }
     }
   }
@@ -936,7 +964,7 @@ class AdminApiService {
       }
       return { success: false, data: [] }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getReportRevenues:', error)
+      logger.error('[adminApiService] Error in getReportRevenues:', error)
       return { success: false, data: [] }
     }
   }
@@ -963,7 +991,7 @@ class AdminApiService {
       }
       return { success: false, data: [] }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getReportClients:', error)
+      logger.error('[adminApiService] Error in getReportClients:', error)
       return { success: false, data: [] }
     }
   }
@@ -990,7 +1018,7 @@ class AdminApiService {
       }
       return { success: false, data: [] }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getReportDrivers:', error)
+      logger.error('[adminApiService] Error in getReportDrivers:', error)
       return { success: false, data: [] }
     }
   }
@@ -1017,7 +1045,7 @@ class AdminApiService {
       }
       return { success: false, data: [] }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getReportPayments:', error)
+      logger.error('[adminApiService] Error in getReportPayments:', error)
       return { success: false, data: [] }
     }
   }
@@ -1038,7 +1066,7 @@ class AdminApiService {
       }
       return { success: false, data: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getDriverDetails:', error)
+      logger.error('[adminApiService] Error in getDriverDetails:', error)
       return { success: false }
     }
   }
@@ -1062,7 +1090,7 @@ class AdminApiService {
       }
       return { success: false, message: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in updateDriverStatus:', error)
+      logger.error('[adminApiService] Error in updateDriverStatus:', error)
       return { success: false }
     }
   }
@@ -1083,7 +1111,7 @@ class AdminApiService {
       }
       return { success: false, data: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getClientDetails:', error)
+      logger.error('[adminApiService] Error in getClientDetails:', error)
       return { success: false }
     }
   }
@@ -1104,7 +1132,7 @@ class AdminApiService {
       }
       return { success: false, data: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getClientStatistics:', error)
+      logger.error('[adminApiService] Error in getClientStatistics:', error)
       return { success: false }
     }
   }
@@ -1144,7 +1172,7 @@ class AdminApiService {
       }
       return { success: false, data: [], pagination: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getRatings:', error)
+      logger.error('[adminApiService] Error in getRatings:', error)
       return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
     }
   }
@@ -1167,7 +1195,7 @@ class AdminApiService {
       }
       return { success: false, message: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in deleteRating:', error)
+      logger.error('[adminApiService] Error in deleteRating:', error)
       return { success: false }
     }
   }
@@ -1188,7 +1216,7 @@ class AdminApiService {
       }
       return { success: false, data: [] }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getPromoCodes:', error)
+      logger.error('[adminApiService] Error in getPromoCodes:', error)
       return { success: false, data: [] }
     }
   }
@@ -1220,7 +1248,7 @@ class AdminApiService {
       }
       return { success: false, data: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in createPromoCode:', error)
+      logger.error('[adminApiService] Error in createPromoCode:', error)
       return { success: false }
     }
   }
@@ -1252,7 +1280,7 @@ class AdminApiService {
       }
       return { success: false, data: [], pagination: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in getDisputes:', error)
+      logger.error('[adminApiService] Error in getDisputes:', error)
       return { success: false, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
     }
   }
@@ -1279,7 +1307,7 @@ class AdminApiService {
       }
       return { success: false, data: undefined }
     } catch (error: unknown) {
-      console.error(' [adminApiService] Error in updateDispute:', error)
+      logger.error('[adminApiService] Error in updateDispute:', error)
       return { success: false }
     }
   }
@@ -1309,10 +1337,22 @@ class AdminApiService {
         return { success: false, message: 'No access token' }
       }
 
+      const timestamp = new Date().toISOString()
+      console.log('🌐 [adminApiService] ⚠️ FETCH REQUEST (getOnlineDrivers) ⚠️', {
+        url: `${API_BASE_URL}/api/drivers/online`,
+        timestamp,
+        method: 'GET',
+        stack: new Error().stack?.split('\n').slice(2, 8).join('\n')
+      })
       const response = await fetch(`${API_BASE_URL}/api/drivers/online`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+      })
+      console.log('✅ [adminApiService] ⚠️ FETCH RESPONSE (getOnlineDrivers) ⚠️', {
+        url: `${API_BASE_URL}/api/drivers/online`,
+        status: response.status,
+        timestamp: new Date().toISOString()
       })
 
       if (!response.ok) {
@@ -1327,7 +1367,7 @@ class AdminApiService {
       }
     } catch (error: unknown) {
       if (process.env.NODE_ENV === 'development') {
-        console.error(' [adminApiService] Error in getOnlineDrivers:', error)
+        logger.error('[adminApiService] Error in getOnlineDrivers:', error)
       }
       return { success: false, message: getErrorMessage(error) }
     }
@@ -1359,7 +1399,7 @@ class AdminApiService {
       return { apiKey: result.apiKey }
     } catch (error: unknown) {
       if (process.env.NODE_ENV === 'development') {
-        console.error(' [adminApiService] Error in getGoogleMapsConfig:', error)
+        logger.error('[adminApiService] Error in getGoogleMapsConfig:', error)
       }
       return {}
     }

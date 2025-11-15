@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Search, User, Truck, Shield, Eye } from 'luc
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
-import { AnimatedCard } from '@/components/animations'
+import { asApiArray } from '@/types/api'
 
 interface UserData {
   id: string
@@ -30,10 +30,17 @@ export default function UsersPage() {
       const result = await adminApiService.getUsers()
       return result
     },
-    refetchInterval: 30000,
+    refetchInterval: false, // Pas de refresh automatique - les utilisateurs changent rarement
+    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 
-  const users = React.useMemo(() => usersData?.data || [], [usersData?.data])
+  const users = React.useMemo(() => {
+    if (!usersData) return []
+    return asApiArray<UserData>(usersData)
+  }, [usersData])
   const counts = usersData?.counts || {
     client: 0,
     driver: 0,
