@@ -10,11 +10,68 @@ import { useRealTimeTracking } from '@/hooks/useRealTimeTracking'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 
+const DEFAULT_CENTER = { lat: 5.3600, lng: -4.0083 } // Abidjan
+const DELIVERY_ZOOM = 12.8
+const OVERVIEW_ZOOM = 13.1
+
 const mapContainerStyle = {
   width: '100%',
   height: '100%',
   borderRadius: '12px',
+  overflow: 'hidden',
 }
+
+const minimalMapStyle: google.maps.MapTypeStyle[] = [
+  {
+    elementType: 'geometry',
+    stylers: [{ color: '#F7F8FC' }],
+  },
+  {
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#94A3B8' }],
+  },
+  {
+    elementType: 'labels.text.stroke',
+    stylers: [{ color: '#FFFFFF' }],
+  },
+  {
+    featureType: 'administrative',
+    elementType: 'geometry',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'poi',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#E4E7EC' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#A0AEC0' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#C7D2FE' }],
+  },
+  {
+    featureType: 'transit',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#D8E7FB' }],
+  },
+]
 
 interface Delivery {
   id: string
@@ -54,7 +111,8 @@ function TrackingMap({
   selectedDelivery, 
   isLoaded, 
   loadError,
-  onlineDrivers
+  onlineDrivers,
+  adminLocation,
 }: { 
   selectedDelivery: Delivery | null
   isLoaded: boolean
@@ -67,6 +125,7 @@ function TrackingMap({
     current_longitude?: number
     updated_at?: string
   }>
+  adminLocation: { lat: number; lng: number }
 }) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
 
@@ -80,13 +139,8 @@ function TrackingMap({
     () => ({
       disableDefaultUI: true,
       zoomControl: true,
-      styles: [
-        {
-          featureType: 'poi',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }],
-        },
-      ],
+      styles: minimalMapStyle,
+      backgroundColor: '#F7F8FC',
     }),
     []
   )
@@ -98,11 +152,8 @@ function TrackingMap({
         lng: selectedDelivery.pickup.coordinates.lng,
       }
     }
-    return {
-      lat: 5.3600, // Abidjan par défaut
-      lng: -4.0083,
-    }
-  }, [selectedDelivery])
+    return adminLocation
+  }, [selectedDelivery, adminLocation])
 
   const routePath = useMemo(() => {
     if (selectedDelivery?.pickup?.coordinates && selectedDelivery?.dropoff?.coordinates) {
@@ -210,7 +261,7 @@ function TrackingMap({
       key={mapKey}
       mapContainerStyle={mapContainerStyle}
       center={center}
-      zoom={routePath.length > 0 ? 12 : 10}
+      zoom={selectedDelivery && routePath.length > 0 ? DELIVERY_ZOOM : OVERVIEW_ZOOM}
       options={mapOptions}
     >
       {/* Afficher uniquement le polyline et les marqueurs de la livraison sélectionnée */}
@@ -435,6 +486,7 @@ function TrackingMap({
 export default function TrackingPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null)
+  const [adminLocation, setAdminLocation] = useState<{ lat: number; lng: number }>(DEFAULT_CENTER)
   const pathname = usePathname()
   const hasLoadedRef = useRef(false)
 
@@ -443,6 +495,29 @@ export default function TrackingPage() {
 
   // Utiliser le suivi en temps réel
   const { onlineDrivers, ongoingDeliveries, isLoading, reloadData } = useRealTimeTracking()
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setAdminLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+      },
+      (error) => {
+        console.warn('[TrackingPage] Impossible de récupérer la position admin:', error)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60 * 1000,
+      }
+    )
+  }, [])
 
   // Recharger les données quand on revient sur la page Tracking
   useEffect(() => {
@@ -785,6 +860,7 @@ export default function TrackingPage() {
           isLoaded={isLoaded}
           loadError={loadError}
           onlineDrivers={onlineDriversArray}
+          adminLocation={adminLocation}
         />
       </div>
     </div>

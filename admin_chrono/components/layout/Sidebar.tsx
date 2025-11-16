@@ -21,16 +21,16 @@ import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
 
 const navigation = [
-  { href: "/dashboard", icon: LayoutDashboard },
-  { href: "/tracking", icon: MapPin },
-  { href: "/orders", icon: Package },
-  { href: "/message", icon: MessageSquare },
-  { href: "/reports", icon: FileText },
-  { href: "/finance", icon: Wallet },
-  { href: "/planning", icon: Calendar },
-  { href: "/users", icon: Users },
-  { href: "/ratings", icon: Star },
-  { href: "/settings", icon: Settings },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/tracking", icon: MapPin, label: "Tracking Orders" },
+  { href: "/orders", icon: Package, label: "Orders" },
+  { href: "/message", icon: MessageSquare, label: "Message" },
+  { href: "/reports", icon: FileText, label: "Reports" },
+  { href: "/finance", icon: Wallet, label: "Finance" },
+  { href: "/planning", icon: Calendar, label: "Planning" },
+  { href: "/users", icon: Users, label: "Users" },
+  { href: "/ratings", icon: Star, label: "Ratings" },
+  { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export default function Sidebar() {
@@ -38,6 +38,7 @@ export default function Sidebar() {
   const router = useRouter();
   const { user, signOut } = useAuthStore();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string } | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -236,78 +237,115 @@ export default function Sidebar() {
     router.push('/login');
   };
 
+  const collapsedWidth = 72
+  const expandedWidth = 240
+  const iconSlotSize = 44
+  const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
+
   const sidebarStyle: React.CSSProperties = {
     height: '100vh',
-    width: '110px',
+    width: isExpanded ? expandedWidth : collapsedWidth,
     backgroundColor: '#FFFFFF',
     borderRight: '1px solid #E5E7EB',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    paddingTop: '40px',
-    paddingBottom: '40px',
+    alignItems: isExpanded ? 'flex-start' : 'center',
+    paddingTop: 28,
+    paddingBottom: 28,
+    paddingLeft: isExpanded ? 24 : 0,
+    paddingRight: isExpanded ? 16 : 0,
     borderTopRightRadius: '32px',
     borderBottomRightRadius: '32px',
     boxShadow: '4px 0 20px rgba(0,0,0,0.05)',
     position: 'relative',
+    transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
   }
 
   const logoContainerStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: '40px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    zIndex: 10,
+    gap: '12px',
+    width: '100%',
+    marginBottom: isExpanded ? 8 : 0,
+    transition: 'transform 0.2s ease',
   }
 
   const logoImageContainerStyle: React.CSSProperties = {
-    width: '60px',
-    height: '60px',
+    width: 60,
+    height: 60,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   }
 
   const logoTextStyle: React.CSSProperties = {
-    marginTop: '12px',
     fontSize: '13px',
     fontWeight: 600,
     color: '#374151',
     letterSpacing: '-0.025em',
+    opacity: isExpanded ? 1 : 0,
+    transform: `translateX(${isExpanded ? 0 : -10}px)`,
+    transition: 'opacity 0.2s ease, transform 0.2s ease',
+    display: isExpanded ? 'block' : 'none',
   }
 
   const navStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
+    alignItems: isExpanded ? 'flex-start' : 'center',
     justifyContent: 'center',
-    gap: '24px',
+    gap: isExpanded ? 12 : 20,
     flex: 1,
     width: '100%',
+    marginTop: 20,
   }
 
   const getNavButtonStyle = (active: boolean): React.CSSProperties => ({
-    width: '52px',
-    height: '52px',
-    borderRadius: '16px',
+    width: isExpanded ? '100%' : collapsedWidth,
+    height: 62,
+    borderRadius: 18,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: isExpanded ? 14 : 0,
+    paddingLeft: isExpanded ? 16 : collapsedIconOffset,
+    paddingRight: isExpanded ? 16 : collapsedIconOffset,
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    backgroundColor: active ? '#8B5CF6' : 'transparent',
+    color: active ? '#FFFFFF' : '#6B7280',
+    boxShadow: active
+      ? (isExpanded ? '0 4px 12px rgba(139,92,246,0.4)' : '0 6px 20px rgba(139,92,246,0.35)')
+      : 'none',
+    textDecoration: 'none',
+    fontWeight: 500,
+    fontSize: '14px',
+  })
+
+  const iconWrapperStyle: React.CSSProperties = {
+    width: iconSlotSize,
+    height: iconSlotSize,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s',
-    backgroundColor: active ? '#8B5CF6' : 'transparent',
-    color: active ? '#FFFFFF' : '#6B7280',
-    transform: active ? 'scale(1.1)' : 'scale(1)',
-    boxShadow: active ? '0 4px 12px rgba(139,92,246,0.4)' : 'none',
-    textDecoration: 'none',
+    flexShrink: 0,
+  }
+
+  const getNavLabelStyle = (active: boolean): React.CSSProperties => ({
+    opacity: isExpanded ? 1 : 0,
+    transform: `translateX(${isExpanded ? 0 : -8}px)`,
+    transition: 'opacity 0.2s ease, transform 0.2s ease',
+    color: active ? '#FFFFFF' : '#111827',
+    whiteSpace: 'nowrap',
   })
 
   const avatarContainerStyle: React.CSSProperties = {
-    position: 'absolute',
-    bottom: '40px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    width: '100%',
+    marginTop: isExpanded ? 24 : 16,
+    transition: 'align-items 0.2s ease',
   }
 
   const avatarWrapperStyle: React.CSSProperties = {
@@ -315,13 +353,15 @@ export default function Sidebar() {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   }
 
   const avatarImageWrapperStyle: React.CSSProperties = {
     position: 'relative',
-    width: '48px',
-    height: '48px',
-    marginBottom: '8px',
+    width: 48,
+    height: 48,
+    marginBottom: 8,
   }
 
   const avatarButtonStyle: React.CSSProperties = {
@@ -333,6 +373,7 @@ export default function Sidebar() {
     cursor: 'pointer',
     padding: 0,
     transition: 'transform 0.2s',
+    width: '100%',
   }
 
   // Calculer le style de l'avatar dynamiquement pour qu'il se mette à jour
@@ -376,9 +417,14 @@ export default function Sidebar() {
   }, [avatarUrl]);
 
   const avatarNameStyle: React.CSSProperties = {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 500,
     color: '#374151',
+    opacity: isExpanded ? 1 : 0,
+    transform: `translateX(${isExpanded ? 0 : -10}px)`,
+    transition: 'opacity 0.2s ease, transform 0.2s ease',
+    textAlign: isExpanded ? 'left' : 'center',
+    marginTop: 4,
   }
 
   const profileMenuStyle: React.CSSProperties = {
@@ -438,7 +484,11 @@ export default function Sidebar() {
   }
 
   return (
-    <div style={sidebarStyle}>
+    <div
+      style={sidebarStyle}
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
+    >
       <div style={logoContainerStyle}>
         <div style={logoImageContainerStyle}>
           <Image
@@ -466,20 +516,13 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               style={getNavButtonStyle(active)}
-              onMouseEnter={(e) => {
-                if (!active) {
-                  e.currentTarget.style.backgroundColor = '#F3F4F6'
-                  e.currentTarget.style.color = '#111827'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!active) {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = '#6B7280'
-                }
-              }}
             >
-              <Icon size={20} strokeWidth={1.7} />
+              <span style={iconWrapperStyle}>
+                <Icon size={20} strokeWidth={1.7} />
+              </span>
+              {isExpanded && (
+                <span style={getNavLabelStyle(active)}>{item.label}</span>
+              )}
             </Link>
           );
         })}
@@ -533,7 +576,9 @@ export default function Sidebar() {
                 </div>
               )}
             </div>
-            <p style={avatarNameStyle}>{getUserName()}</p>
+            {isExpanded && (
+              <p style={avatarNameStyle}>{getUserName()}</p>
+            )}
           </button>
 
           {showProfileMenu && (
