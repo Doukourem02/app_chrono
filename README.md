@@ -1,33 +1,310 @@
-# 🚚 Chrono Livraison
+# 🚚 Chrono Livraison – Monorepo
 
-Plateforme de livraison en temps réel connectant les clients et les chauffeurs pour des livraisons rapides et efficaces.
+Plateforme de livraison en temps réel connectant clients, chauffeurs **et administrateurs**. Ce dépôt rassemble :
 
-## 📋 Table des matières
-
-- [Architecture](#architecture)
-- [Prérequis](#prérequis)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Démarrage](#démarrage)
-- [Structure du projet](#structure-du-projet)
-- [API Documentation](#api-documentation)
-- [Technologies utilisées](#technologies-utilisées)
-
-## 🏗️ Architecture
-
-Le projet est divisé en trois parties principales :
-
-1. **Backend** (`chrono_backend/`) - API REST et WebSocket en Node.js/Express
-2. **App Client** (`app_chrono/`) - Application mobile React Native/Expo pour les clients
-3. **App Driver** (`driver_chrono/`) - Application mobile React Native/Expo pour les chauffeurs
+- `chrono_backend/` → API REST + Socket.IO
+- `admin_chrono/` → Dashboard web (Next.js 16 / React 18)
+- `app_chrono/` → App mobile client (Expo / React Native)
+- `driver_chrono/` → App mobile chauffeur (Expo / React Native)
 
 ```
 PROJET_CHRONO/
-├── chrono_backend/      # Backend API
-├── app_chrono/          # App client (React Native)
-├── driver_chrono/        # App chauffeur (React Native)
-└── README.md            # Ce fichier
+├── chrono_backend/
+├── admin_chrono/
+├── app_chrono/
+├── driver_chrono/
+└── README.md
 ```
+
+---
+
+## 📋 Sommaire
+
+- [Architecture](#architecture)
+- [Prérequis](#prérequis)
+- [Installation rapide](#installation-rapide)
+- [Configuration](#configuration)
+- [Démarrage](#démarrage)
+- [Structure du projet](#structure-du-projet)
+- [Documentation API](#documentation-api)
+- [Technologies](#technologies)
+- [Dépannage](#dépannage)
+
+---
+
+## 🏗️ Architecture
+
+| Composant | Stack | Description |
+| --- | --- | --- |
+| `chrono_backend/` | Node.js + Express + Socket.IO | API REST, WebSocket, migrations SQL |
+| `admin_chrono/` | Next.js 16, React Query, Socket.IO client | Dashboard web pour les ops/admin |
+| `app_chrono/` | Expo, React Native, Expo Router | Application client (commande / tracking) |
+| `driver_chrono/` | Expo, React Native | Application chauffeur |
+
+---
+
+## 📦 Prérequis
+
+- Node.js ≥ 18
+- npm ou yarn
+- PostgreSQL 14+ ou Supabase
+- Expo CLI (pour les apps mobiles)
+- Google Maps API key
+- Compte Supabase (recommandé)
+
+---
+
+## ⚙️ Installation rapide
+
+```bash
+git clone <repo>
+cd PROJET_CHRONO
+
+# Backend
+cd chrono_backend && npm install && cd -
+
+# Dashboard admin
+cd admin_chrono && npm install && cd -
+
+# Apps mobiles
+cd app_chrono && npm install && cd -
+cd driver_chrono && npm install && cd -
+```
+
+---
+
+## 🔐 Configuration
+
+### 1. Base de données
+
+1. Créez un projet Supabase ou une instance PostgreSQL.
+2. Copiez les fichiers `.env.example` de chaque app.
+3. Appliquez les migrations :
+   ```bash
+   cd chrono_backend/migrations
+   # suivre le README local pour l'ordre exact
+   ```
+
+### 2. Variables d’environnement
+
+#### Backend (`chrono_backend/.env`)
+
+```bash
+cp chrono_backend/.env.example chrono_backend/.env
+```
+
+Variables clés :
+- `DATABASE_URL`
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+- `JWT_SECRET`
+- `EMAIL_*`, `VONAGE_*` (optionnel)
+
+#### Dashboard admin (`admin_chrono/.env.local`)
+
+```bash
+cp admin_chrono/.env.example admin_chrono/.env.local
+```
+
+Variables clés :
+- `NEXT_PUBLIC_API_URL` (ex: `http://localhost:4000`)
+- `NEXT_PUBLIC_SOCKET_URL`
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+#### Apps mobiles (`app_chrono/.env`, `driver_chrono/.env`)
+
+```bash
+cp app_chrono/.env.example app_chrono/.env
+cp driver_chrono/.env.example driver_chrono/.env
+```
+
+Variables clés :
+- `EXPO_PUBLIC_API_URL`
+- `EXPO_PUBLIC_SOCKET_URL`
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_GOOGLE_API_KEY`
+
+---
+
+## 🚀 Démarrage
+
+```bash
+# Backend
+cd chrono_backend
+npm run dev          # http://localhost:4000
+
+# Dashboard admin
+cd admin_chrono
+npm run dev -- --hostname 0.0.0.0 --port 3000
+# http://localhost:3000/dashboard
+
+# App client
+cd app_chrono && npm start
+
+# App chauffeur
+cd driver_chrono && npm start
+```
+
+Expo propose ensuite `i` (iOS), `a` (Android), ou QR code via Expo Go.
+
+---
+
+## 📁 Structure du projet
+
+### Backend (`chrono_backend/`)
+
+```
+chrono_backend/
+├── src/
+│   ├── controllers/   # Auth, deliveries, drivers, admin…
+│   ├── routes/        # Routes Express
+│   ├── middleware/    # Auth, validation
+│   ├── sockets/       # Handlers Socket.IO
+│   ├── services/      # OTP, email, etc.
+│   ├── config/        # DB, logger, Supabase
+│   └── utils/
+├── migrations/
+├── scripts/
+└── logs/
+```
+
+### Dashboard admin (`admin_chrono/`)
+
+```
+admin_chrono/
+├── app/                 # App Router (pages / api routes)
+├── components/          # KPI cards, tables, tracker, etc.
+├── hooks/               # useRealTimeTracking, useSocketConnection…
+├── lib/                 # Services API, adminSocketService
+├── contexts/            # DateFilter, GoogleMaps
+├── stores/              # Zustand stores (auth…)
+└── utils/               # formatDeliveryId, debug helpers
+```
+
+### Apps Expo (`app_chrono/` & `driver_chrono/`)
+
+```
+app_chrono/
+├── app/ (Expo Router)
+├── components/
+├── hooks/
+├── services/
+├── store/
+├── utils/
+└── types/
+```
+
+`driver_chrono/` reprend la même organisation adaptée au flux chauffeur.
+
+---
+
+## 🔌 Documentation API (extraits)
+
+### Auth
+- `POST /api/auth-simple/send-otp`
+- `POST /api/auth-simple/verify-otp`
+- `GET /api/auth-simple/check/:email`
+
+### Commandes
+- Socket `create-order`, `accept-order`, `update-order-status`
+
+### Chauffeurs
+- `GET /api/drivers/nearby`
+- `POST /api/drivers/update-location`
+
+### WebSocket (Server → Client)
+- `order:status:update`
+- `driver:location:update`
+- `new-order-request`
+
+---
+
+## 🧰 Technologies
+
+### Backend
+- Node.js / Express
+- Socket.IO
+- PostgreSQL / Supabase
+- JWT, Joi, Winston, Nodemailer
+
+### Dashboard (`admin_chrono`)
+- Next.js 16 (App Router)
+- React Query + Zustand
+- Socket.IO client
+- Google Maps JS API
+
+### Apps mobiles
+- Expo + React Native
+- Expo Router
+- Zustand
+- Socket.IO client
+- React Native Maps
+
+---
+
+## 🛠️ Scripts utiles
+
+```bash
+# Backend
+npm run dev
+npm run simulate
+
+# Dashboard admin
+npm run dev
+npm run lint
+
+# Apps mobiles
+npm start
+npm run android
+npm run ios
+npm run lint
+```
+
+---
+
+## 🧪 Tests
+
+Tests automatisés à venir (TODO commun aux 4 projets).
+
+---
+
+## 🐛 Dépannage rapide
+
+| Problème | Pistes |
+| --- | --- |
+| WebSocket indisponible | Vérifier backend, `*_SOCKET_URL`, CORS |
+| DB inaccessible | Migrations exécutées ? `DATABASE_URL` correct ? |
+| Google Maps vide | Permissions + `EXPO/NEXT_PUBLIC_GOOGLE_API_KEY` |
+| Dashboard boucle de fetch | Tenir compte des instructions dans `admin_chrono/README` local (filtres de dates, query keys stabilisés) |
+
+---
+
+## 📚 Ressources
+
+- [Expo docs](https://docs.expo.dev/)
+- [Supabase docs](https://supabase.com/docs)
+- [Socket.IO docs](https://socket.io/docs/)
+- [Next.js docs](https://nextjs.org/docs)
+- [React Query docs](https://tanstack.com/query)
+
+---
+
+## 🤝 Contribution
+
+1. Fork
+2. `git checkout -b feature/AmazingFeature`
+3. Commit (`git commit -m "Add AmazingFeature"`)
+4. Push (`git push origin feature/AmazingFeature`)
+5. Ouvrir une Pull Request
+
+---
+
+## 📄 Licence
+
+À définir.
+
+## 👥 Auteurs & Remerciements
+
+À compléter.
 
 ## 📦 Prérequis
 
