@@ -42,8 +42,8 @@ const statusConfig: Record<string, { label: string; backgroundColor: string; col
   },
   cancelled: {
     label: 'Cancelled',
-    backgroundColor: '#F3F4F6',
-    color: '#4B5563',
+    backgroundColor: '#FEE2E2',
+    color: '#B91C1C',
   },
 }
 

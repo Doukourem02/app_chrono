@@ -8,10 +8,12 @@ import QuickMessage from '@/components/dashboard/QuickMessage'
 import { useQuery } from '@tanstack/react-query'
 import React from 'react'
 import { getDashboardStats } from '@/lib/dashboardApi'
+import { adminApiService } from '@/lib/adminApiService'
 import { Truck, ShieldCheck, DollarSign, Calendar, Star, Clock, XCircle, Users, UserCheck } from 'lucide-react'
 import { AnimatedButton } from '@/components/animations'
 import { ScreenTransition } from '@/components/animations'
 import { useDateFilter } from '@/contexts/DateFilterContext'
+import type { Delivery } from '@/hooks/types'
 
 export default function DashboardPage() {
   const { dateFilter, dateRange } = useDateFilter()
@@ -102,6 +104,33 @@ export default function DashboardPage() {
   const formatRevenue = (amount: number) => {
     return `${amount.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} FCFA`
   }
+
+  const { data: ongoingDeliveriesResponse, isLoading: ongoingDeliveriesLoading } = useQuery({
+    queryKey: ['ongoing-delivery-card'],
+    queryFn: async () => {
+      console.warn('🚀🚀🚀 [DashboardPage] queryFn CALLED - getOngoingDeliveries', {
+        timestamp: new Date().toISOString(),
+        stack: new Error().stack?.split('\n').slice(2, 15).join('\n'),
+      })
+      const result = await adminApiService.getOngoingDeliveries()
+      console.log('✅ [DashboardPage] getOngoingDeliveries SUCCESS', {
+        hasData: !!result.data && (result.data as Delivery[]).length > 0,
+        timestamp: new Date().toISOString(),
+      })
+      return result
+    },
+    refetchInterval: 15000,
+    staleTime: 5000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  })
+
+  const ongoingDeliveries = React.useMemo(() => {
+    const data = ongoingDeliveriesResponse?.data as Delivery[] | undefined
+    return Array.isArray(data) ? data : []
+  }, [ongoingDeliveriesResponse])
+
+  const liveOnDeliveryCount = ongoingDeliveries.length
 
   const pageContainerStyle: React.CSSProperties = {
     display: 'flex',
@@ -296,12 +325,18 @@ export default function DashboardPage() {
         <div style={leftColumnStyle}>
           <KPICard
             title="On Delivery"
-            value={statsLoading ? '...' : stats?.onDelivery || 0}
-            change={stats?.onDeliveryChange || 0}
-            subtitle="Since last week"
+          value={ongoingDeliveriesLoading ? '...' : liveOnDeliveryCount}
+          change={stats?.onDeliveryChange || 0}
+          subtitle={
+            ongoingDeliveriesLoading
+              ? 'Mise à jour...'
+              : liveOnDeliveryCount === 1
+                ? '1 livraison en cours'
+                : `${liveOnDeliveryCount} livraisons en cours`
+          }
             icon={Truck}
             iconColor="text-blue-600"
-            isLoading={statsLoading}
+          isLoading={ongoingDeliveriesLoading}
             index={0}
           />
           <KPICard
@@ -338,7 +373,7 @@ export default function DashboardPage() {
 
         {/* Colonne droite : Tracker + Quick Message */}
         <div style={rightColumnStyle}>
-          <TrackerCard />
+          <TrackerCard deliveries={ongoingDeliveries} isLoading={ongoingDeliveriesLoading} />
           <QuickMessage />
         </div>
       </div>

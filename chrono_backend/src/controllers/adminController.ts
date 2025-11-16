@@ -3,6 +3,43 @@ import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { formatDeliveryId } from '../utils/formatDeliveryId.js';
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const normalizeDate = (date: Date, endOfDay = false): Date => {
+  const normalized = new Date(date);
+  if (endOfDay) {
+    normalized.setHours(23, 59, 59, 999);
+  } else {
+    normalized.setHours(0, 0, 0, 0);
+  }
+  return normalized;
+};
+
+const parseDateParam = (value?: string, endOfDay = false): Date | null => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return normalizeDate(parsed, endOfDay);
+};
+
+const getDateRange = (startParam?: string, endParam?: string) => {
+  const now = new Date();
+  let rangeStart = parseDateParam(startParam) ?? normalizeDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  let rangeEnd = parseDateParam(endParam, true) ?? normalizeDate(now, true);
+
+  if (rangeStart > rangeEnd) {
+    const tmp = rangeStart;
+    rangeStart = normalizeDate(rangeEnd);
+    rangeEnd = normalizeDate(tmp, true);
+  }
+
+  const duration = Math.max(rangeEnd.getTime() - rangeStart.getTime(), DAY_IN_MS);
+  const previousEnd = normalizeDate(new Date(rangeStart.getTime() - 1), true);
+  const previousStart = normalizeDate(new Date(previousEnd.getTime() - duration));
+
+  return { rangeStart, rangeEnd, previousStart, previousEnd, duration };
+};
+
 /**
  * Récupère les statistiques du dashboard admin
  */
@@ -24,19 +61,18 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
       return;
     }
 
-    const now = new Date();
-    
-    // Commandes en cours (toutes les commandes actives)
+    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    const { rangeStart, rangeEnd, previousStart, previousEnd } = getDateRange(startDate, endDate);
+
+    // Commandes en cours (dans la période sélectionnée)
     const activeOrdersResult = await (pool as any).query(
       `SELECT COUNT(*) as count FROM orders 
-       WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')`
+       WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')
+       AND created_at <= $2
+       AND (completed_at IS NULL OR completed_at >= $1)`,
+      [rangeStart.toISOString(), rangeEnd.toISOString()]
     );
     const onDelivery = parseInt(activeOrdersResult.rows[0]?.count || '0');
-
-    // Calculer les dates pour cette semaine (7 derniers jours)
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - 7);
-    startOfWeek.setHours(0, 0, 0, 0);
 
     // Vérifier quelle colonne de prix existe
     const priceColumnsInfo = await (pool as any).query(
@@ -65,49 +101,37 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     }
 
     // Livraisons complétées cette semaine
-    const completedThisWeekResult = await (pool as any).query(
+    const completedCurrentRangeResult = await (pool as any).query(
       `SELECT COUNT(*) as count, COALESCE(SUM(${priceColumn}), 0) as total_revenue
        FROM orders 
        WHERE status = 'completed' 
        AND completed_at >= $1 
        AND completed_at <= $2`,
-      [startOfWeek.toISOString(), now.toISOString()]
+      [rangeStart.toISOString(), rangeEnd.toISOString()]
     );
-    const successDeliveries = parseInt(completedThisWeekResult.rows[0]?.count || '0');
-    const revenue = parseFloat(completedThisWeekResult.rows[0]?.total_revenue || '0');
+    const successDeliveries = parseInt(completedCurrentRangeResult.rows[0]?.count || '0');
+    const revenue = parseFloat(completedCurrentRangeResult.rows[0]?.total_revenue || '0');
 
-    // Calculer les dates pour la semaine dernière
-    const startOfLastWeek = new Date(startOfWeek);
-    startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
-    const endOfLastWeek = new Date(startOfWeek);
-
-    // Livraisons complétées la semaine dernière
-    const completedLastWeekResult = await (pool as any).query(
+    // Livraisons complétées pendant la période précédente (même durée)
+    const completedPreviousRangeResult = await (pool as any).query(
       `SELECT COUNT(*) as count, COALESCE(SUM(${priceColumn}), 0) as total_revenue
        FROM orders 
        WHERE status = 'completed' 
        AND completed_at >= $1 
        AND completed_at < $2`,
-      [startOfLastWeek.toISOString(), endOfLastWeek.toISOString()]
+      [previousStart.toISOString(), previousEnd.toISOString()]
     );
-    const successDeliveriesLastWeek = parseInt(completedLastWeekResult.rows[0]?.count || '0');
-    const revenueLastWeek = parseFloat(completedLastWeekResult.rows[0]?.total_revenue || '0');
+    const successDeliveriesLastWeek = parseInt(completedPreviousRangeResult.rows[0]?.count || '0');
+    const revenueLastWeek = parseFloat(completedPreviousRangeResult.rows[0]?.total_revenue || '0');
 
-    // Commandes en cours il y a 7 jours (pour comparer)
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-    const eightDaysAgo = new Date(sevenDaysAgo);
-    eightDaysAgo.setDate(eightDaysAgo.getDate() - 1);
-
-    const activeOrdersLastWeekResult = await (pool as any).query(
+    const activeOrdersPreviousRangeResult = await (pool as any).query(
       `SELECT COUNT(*) as count FROM orders 
        WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')
-       AND created_at >= $1 
-       AND created_at <= $2`,
-      [eightDaysAgo.toISOString(), sevenDaysAgo.toISOString()]
+       AND created_at <= $2
+       AND (completed_at IS NULL OR completed_at >= $1)`,
+      [previousStart.toISOString(), previousEnd.toISOString()]
     );
-    const onDeliveryLastWeek = parseInt(activeOrdersLastWeekResult.rows[0]?.count || '0');
+    const onDeliveryLastWeek = parseInt(activeOrdersPreviousRangeResult.rows[0]?.count || '0');
 
     // Calculer les pourcentages de changement
     const onDeliveryChange = onDeliveryLastWeek > 0
@@ -123,7 +147,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
       : revenue > 0 ? 100 : 0;
 
     // Calculer le taux de satisfaction (moyenne des ratings)
-    let averageRating = 5.0;
+    let averageRating = 0;
     let totalRatings = 0;
     try {
       const ratingsTableCheck = await (pool as any).query(
@@ -134,10 +158,13 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
       );
       if (ratingsTableCheck.rows[0]?.exists) {
         const ratingsResult = await (pool as any).query(
-          `SELECT COALESCE(AVG(rating)::numeric, 5.0) as avg_rating, COUNT(*) as count FROM ratings`
+          `SELECT COALESCE(AVG(rating)::numeric, 0) as avg_rating, COUNT(*) as count
+           FROM ratings
+           WHERE created_at >= $1 AND created_at <= $2`,
+          [rangeStart.toISOString(), rangeEnd.toISOString()]
         );
         if (ratingsResult.rows[0]) {
-          averageRating = parseFloat(ratingsResult.rows[0].avg_rating || '5.0');
+          averageRating = parseFloat(ratingsResult.rows[0].avg_rating || '0');
           totalRatings = parseInt(ratingsResult.rows[0].count || '0');
         }
       }
@@ -148,14 +175,14 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     // Temps moyen de livraison (en minutes)
     let averageDeliveryTime = 0;
     try {
-      const deliveryTimeResult = await (pool as any).query(
+    const deliveryTimeResult = await (pool as any).query(
         `SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 60) as avg_time
          FROM orders 
          WHERE status = 'completed' 
          AND completed_at >= $1 
          AND completed_at IS NOT NULL 
          AND created_at IS NOT NULL`,
-        [startOfWeek.toISOString()]
+        [rangeStart.toISOString()]
       );
       if (deliveryTimeResult.rows[0]?.avg_time) {
         averageDeliveryTime = Math.round(parseFloat(deliveryTimeResult.rows[0].avg_time || '0'));
@@ -165,23 +192,23 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     }
 
     // Taux d'annulation
-    const cancelledThisWeekResult = await (pool as any).query(
+    const cancelledCurrentRangeResult = await (pool as any).query(
       `SELECT COUNT(*) as count FROM orders 
        WHERE status = 'cancelled' 
        AND created_at >= $1`,
-      [startOfWeek.toISOString()]
+      [rangeStart.toISOString()]
     );
-    const cancelledThisWeek = parseInt(cancelledThisWeekResult.rows[0]?.count || '0');
-    const totalOrdersThisWeek = successDeliveries + cancelledThisWeek;
-    const cancellationRate = totalOrdersThisWeek > 0
-      ? (cancelledThisWeek / totalOrdersThisWeek) * 100
+    const cancelledCurrentRange = parseInt(cancelledCurrentRangeResult.rows[0]?.count || '0');
+    const totalOrdersCurrentRange = successDeliveries + cancelledCurrentRange;
+    const cancellationRate = totalOrdersCurrentRange > 0
+      ? (cancelledCurrentRange / totalOrdersCurrentRange) * 100
       : 0;
 
     // Nombre de clients actifs (qui ont passé au moins une commande cette semaine)
     const activeClientsResult = await (pool as any).query(
       `SELECT COUNT(DISTINCT user_id) as count FROM orders 
        WHERE created_at >= $1`,
-      [startOfWeek.toISOString()]
+      [rangeStart.toISOString()]
     );
     const activeClients = parseInt(activeClientsResult.rows[0]?.count || '0');
 
@@ -191,7 +218,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
        WHERE status = 'completed' 
        AND completed_at >= $1 
        AND driver_id IS NOT NULL`,
-      [startOfWeek.toISOString()]
+      [rangeStart.toISOString()]
     );
     const activeDrivers = parseInt(activeDriversResult.rows[0]?.count || '0');
 
@@ -237,10 +264,19 @@ export const getAdminDeliveryAnalytics = async (req: Request, res: Response): Pr
       return;
     }
 
-    // Récupérer les données des 4 derniers mois
-    const fourMonthsAgo = new Date();
-    fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4);
-    fourMonthsAgo.setHours(0, 0, 0, 0);
+    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    let rangeStart: Date;
+    let rangeEnd: Date;
+    if (startDate || endDate) {
+      const range = getDateRange(startDate, endDate);
+      rangeStart = range.rangeStart;
+      rangeEnd = range.rangeEnd;
+    } else {
+      rangeEnd = normalizeDate(new Date(), true);
+      rangeStart = new Date(rangeEnd);
+      rangeStart.setMonth(rangeStart.getMonth() - 4);
+      rangeStart = normalizeDate(rangeStart);
+    }
 
     const result = await (pool as any).query(
       `SELECT 
@@ -249,9 +285,10 @@ export const getAdminDeliveryAnalytics = async (req: Request, res: Response): Pr
         COUNT(*) FILTER (WHERE status IN ('cancelled', 'declined')) as reported
        FROM orders 
        WHERE created_at >= $1
+       AND created_at <= $2
        GROUP BY DATE_TRUNC('month', created_at)
        ORDER BY month ASC`,
-      [fourMonthsAgo.toISOString()]
+      [rangeStart.toISOString(), rangeEnd.toISOString()]
     );
 
     const monthlyData = result.rows.map((row: any) => {
@@ -264,15 +301,12 @@ export const getAdminDeliveryAnalytics = async (req: Request, res: Response): Pr
       };
     });
 
-    // Trier et garder les 4 derniers mois
-    const sorted = monthlyData
-      .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime())
-      .slice(-4)
-      .map(({ sortDate, ...rest }) => rest);
+    const sorted = monthlyData.sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
+    const trimmed = (startDate || endDate ? sorted : sorted.slice(-4)).map(({ sortDate, ...rest }) => rest);
 
     res.json({
       success: true,
-      data: sorted,
+      data: trimmed,
     });
   } catch (error: any) {
     logger.error('Erreur getAdminDeliveryAnalytics:', error);
@@ -290,6 +324,9 @@ export const getAdminDeliveryAnalytics = async (req: Request, res: Response): Pr
 export const getAdminRecentActivities = async (req: Request, res: Response): Promise<void> => {
   try {
     const limit = parseInt(req.query.limit as string) || 5; // Limité à 5 par défaut
+    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    const hasFilters = Boolean(startDate || endDate);
+    const range = hasFilters ? getDateRange(startDate, endDate) : null;
 
     logger.info('🚀 [getAdminRecentActivities] DÉBUT, limit:', limit);
     logger.debug('🔍 [getAdminRecentActivities] User from middleware:', (req as any).user);
@@ -318,13 +355,26 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
     }
 
     // Récupérer toutes les commandes récentes (comme dans getActiveOrdersByUser - SELECT *)
-    const query = `SELECT * FROM orders ORDER BY created_at DESC LIMIT $1`;
+    let query = `SELECT * FROM orders`;
+    const params: any[] = [];
+    const conditions: string[] = [];
+    if (range) {
+      conditions.push(`created_at >= $${params.length + 1}`);
+      params.push(range.rangeStart.toISOString());
+      conditions.push(`created_at <= $${params.length + 1}`);
+      params.push(range.rangeEnd.toISOString());
+    }
+    if (conditions.length > 0) {
+      query += ` WHERE ${conditions.join(' AND ')}`;
+    }
+    params.push(limit);
+    query += ` ORDER BY created_at DESC LIMIT $${params.length}`;
     logger.info('📝 [getAdminRecentActivities] Requête SQL:', query);
-    logger.info('📝 [getAdminRecentActivities] Paramètres:', [limit]);
+    logger.info('📝 [getAdminRecentActivities] Paramètres:', params);
 
     let result;
     try {
-      result = await (pool as any).query(query, [limit]);
+      result = await (pool as any).query(query, params);
       logger.info(`✅ [getAdminRecentActivities] Requête réussie: ${result.rows.length} lignes récupérées`);
     } catch (queryError: any) {
       logger.error('❌ [getAdminRecentActivities] Erreur lors de la requête SQL:', queryError);
@@ -372,13 +422,9 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
         destination = dropoff?.address || dropoff?.formatted_address || dropoff?.name || dropoff?.street || (typeof dropoff === 'string' ? dropoff : 'Adresse inconnue');
       }
 
-      // Générer un ID de livraison formaté
-      const idParts = order.id.replace(/-/g, '').substring(0, 9);
-      const deliveryId = `${idParts.substring(0, 2)}-${idParts.substring(2, 7)}-${idParts.substring(7, 9)}`.toUpperCase();
-
       return {
         id: order.id,
-        deliveryId,
+        deliveryId: formatDeliveryId(order.id, order.created_at),
         date: new Date(order.created_at).toLocaleDateString('fr-FR', {
           day: '2-digit',
           month: '2-digit',

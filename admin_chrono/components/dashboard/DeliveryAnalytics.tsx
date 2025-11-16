@@ -17,14 +17,6 @@ import { AnimatedCard } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { useDateFilter } from '@/contexts/DateFilterContext'
 
-const mockData = [
-  { month: 'Jul', packageDelivered: 8500, reported: 45 },
-  { month: 'Aug', packageDelivered: 9200, reported: 52 },
-  { month: 'Sept', packageDelivered: 10123, reported: 56 },
-  { month: 'Oct', packageDelivered: 11200, reported: 48 },
-  { month: 'Nov', packageDelivered: 12500, reported: 62 },
-]
-
 export default function DeliveryAnalytics() {
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
@@ -81,14 +73,23 @@ export default function DeliveryAnalytics() {
     structuralSharing: true,
   })
 
-  const data = analyticsData && analyticsData.length > 0 ? analyticsData : mockData
+  const chartData = React.useMemo(() => {
+    if (Array.isArray(analyticsData)) {
+      return analyticsData
+    }
+    return []
+  }, [analyticsData])
 
-  // Debug: vérifier les données
-  React.useEffect(() => {
-    console.debug('🔍 [DeliveryAnalytics] Data:', data)
-    console.debug('🔍 [DeliveryAnalytics] Data length:', data?.length)
-    console.debug('🔍 [DeliveryAnalytics] Is loading:', isLoading)
-  }, [data, isLoading])
+  const hasData = chartData.length > 0
+
+  const yDomain = React.useMemo(() => {
+    if (!hasData) return [0, 1]
+    const maxValue = chartData.reduce((max, item) => {
+      const currentMax = Math.max(item.packageDelivered ?? 0, item.reported ?? 0)
+      return Math.max(max, currentMax)
+    }, 0)
+    return [0, Math.max(maxValue * 1.1, 1)]
+  }, [chartData, hasData])
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: '#FFFFFF',
@@ -168,10 +169,10 @@ export default function DeliveryAnalytics() {
         <div style={loadingContainerStyle}>
           <SkeletonLoader width="100%" height={300} borderRadius={8} />
         </div>
-      ) : data && data.length > 0 ? (
+      ) : hasData ? (
         <div style={{ flex: 1, minHeight: '300px', height: '100%', width: '100%', position: 'relative' }}>
           <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
-          <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis 
               dataKey="month" 
@@ -181,7 +182,7 @@ export default function DeliveryAnalytics() {
             <YAxis 
               tick={{ fill: '#6b7280', fontSize: 12 }}
               axisLine={{ stroke: '#e5e7eb' }}
-              domain={[500, 15000]}
+              domain={yDomain}
               tickFormatter={(value) => {
                 if (value >= 1000) return `${value / 1000}K`
                 return value.toString()

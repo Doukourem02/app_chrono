@@ -161,9 +161,16 @@ function MapComponent({ routePath }: { routePath?: LatLng[] }) {
   )
 }
 
-export default function TrackerCard() {
+interface TrackerCardProps {
+  deliveries?: Delivery[]
+  isLoading?: boolean
+}
+
+export default function TrackerCard({ deliveries: providedDeliveries, isLoading: providedLoading }: TrackerCardProps = {}) {
+  const useProvidedDeliveries = Array.isArray(providedDeliveries)
+
   // Récupérer les livraisons en cours (même source que la page Tracking)
-  const { data: deliveriesResponse, isLoading } = useQuery({
+  const { data: deliveriesResponse, isLoading: queryLoading } = useQuery({
     queryKey: ['ongoing-delivery-card'],
     queryFn: async () => {
       console.warn('🚀🚀🚀 [TrackerCard] queryFn CALLED - getOngoingDeliveries', {
@@ -184,13 +191,18 @@ export default function TrackerCard() {
     refetchOnReconnect: false,
     refetchIntervalInBackground: false,
     retry: false,
-    enabled: true,
+    enabled: !useProvidedDeliveries,
   })
 
   const deliveries: Delivery[] = useMemo(() => {
+    if (useProvidedDeliveries) {
+      return providedDeliveries || []
+    }
     const data = deliveriesResponse?.data as Delivery[] | undefined
     return Array.isArray(data) ? data : []
-  }, [deliveriesResponse])
+  }, [useProvidedDeliveries, providedDeliveries, deliveriesResponse])
+
+  const isLoading = useProvidedDeliveries ? !!providedLoading : queryLoading
 
   const activeDelivery = useMemo(() => {
     if (deliveries.length === 0) return null
