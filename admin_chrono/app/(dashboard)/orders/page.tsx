@@ -7,6 +7,22 @@ import { adminApiService } from '@/lib/adminApiService'
 import StatusKPICard from '@/components/orders/StatusKPICard'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+import { formatDeliveryId } from '@/utils/formatDeliveryId'
+const parseDateToISO = (value?: string) => {
+  if (!value) return undefined
+  const parts = value.split(/[\/\-]/)
+  if (parts.length === 3) {
+    const [first, second, third] = parts
+    if (first.length === 2 && second.length === 2 && third.length === 4) {
+      return `${third}-${second}-${first}`
+    }
+    if (first.length === 4) {
+      return `${first}-${second}-${third}`
+    }
+  }
+  return undefined
+}
+
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
@@ -41,8 +57,8 @@ const statusConfig: Record<string, { label: string; backgroundColor: string; col
   },
   cancelled: {
     label: 'Cancelled',
-    backgroundColor: '#F3F4F6',
-    color: '#4B5563',
+    backgroundColor: '#FEE2E2',
+    color: '#B91C1C',
   },
 }
 
@@ -270,7 +286,9 @@ export default function OrdersPage() {
                       }}
                     >
                       <td style={{ padding: '12px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{order.deliveryId}</span>
+                        <span style={{ fontSize: '13px', color: '#111827', fontWeight: 500 }}>
+                          {formatDeliveryId(order.deliveryId, parseDateToISO(order.date) || order.date)}
+                        </span>
                       </td>
                       <td style={{ padding: '12px' }}>
                         <span style={{ fontSize: '14px', color: '#374151' }}>{order.date}</span>

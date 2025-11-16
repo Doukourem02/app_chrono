@@ -34,26 +34,32 @@ export default function DeliveryAnalytics() {
   //   console.log('🔄 [DeliveryAnalytics] Date range changed:', { dateFilter, startDate, endDate })
   // }, [dateFilter, startDate, endDate])
   
-  // Stabiliser la queryKey avec useRef pour éviter les recalculs inutiles
-  const queryKeyRef = React.useRef<[string, string, string, string] | null>(null)
-  const queryKey = React.useMemo(() => {
-    const key: [string, string, string, string] = ['delivery-analytics', dateFilter, startDate, endDate]
-    
-    // Vérifier si la queryKey a vraiment changé
-    if (queryKeyRef.current && 
-        queryKeyRef.current[0] === key[0] &&
-        queryKeyRef.current[1] === key[1] &&
-        queryKeyRef.current[2] === key[2] &&
-        queryKeyRef.current[3] === key[3]) {
-      // La queryKey n'a pas changé, retourner la référence précédente
-      return queryKeyRef.current
-    }
-    
-    // La queryKey a changé, mettre à jour la référence
-    queryKeyRef.current = key
-    console.log('🔑 [DeliveryAnalytics] QueryKey calculated:', key)
-    return key
-  }, [dateFilter, startDate, endDate])
+  const latestKey = React.useMemo(
+    () =>
+      ['delivery-analytics', dateFilter, startDate, endDate] as [
+        string,
+        string,
+        string,
+        string
+      ],
+    [dateFilter, startDate, endDate]
+  )
+
+  const [queryKey, setQueryKey] = React.useState(latestKey)
+
+  React.useEffect(() => {
+    setQueryKey((prev) => {
+      if (
+        prev &&
+        prev.length === latestKey.length &&
+        prev.every((value, index) => value === latestKey[index])
+      ) {
+        return prev
+      }
+      console.log('🔑 [DeliveryAnalytics] QueryKey calculated:', latestKey)
+      return latestKey
+    })
+  }, [latestKey])
   
   const { data: analyticsData, isLoading } = useQuery({
     queryKey,

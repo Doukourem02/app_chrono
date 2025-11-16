@@ -1,9 +1,12 @@
-import { Delivery } from '../useRealTimeTracking'
+import type { Delivery } from '../types'
+import { formatDeliveryId } from '@/utils/formatDeliveryId'
 
 export interface OrderFromAPI {
   id: string
   shipmentNumber?: string
   status: string
+  createdAt?: string
+  created_at?: string
   driverId?: string
   driver_id?: string
   userId?: string
@@ -52,13 +55,6 @@ export interface OrderFromAPI {
 }
 
 /**
- * Génère un numéro de shipment à partir d'un ID de commande
- */
-function generateShipmentNumber(orderId: string): string {
-  return `EV-${orderId.replace(/-/g, '').substring(0, 10)}`
-}
-
-/**
  * Extrait les coordonnées d'un objet coordinates (gère les variations de format)
  */
 function extractCoordinates(
@@ -87,9 +83,10 @@ function extractCoordinates(
 export function mapOrderToDelivery(order: OrderFromAPI): Delivery {
   return {
     id: order.id,
-    shipmentNumber: order.shipmentNumber || generateShipmentNumber(order.id),
+    shipmentNumber: formatDeliveryId(order.id, order.createdAt || order.created_at),
     type: 'Orders',
     status: order.status,
+    createdAt: order.createdAt || order.created_at,
     pickup: {
       name: order.pickup?.name || order.pickup?.address || 'Adresse inconnue',
       address: order.pickup?.address || order.pickup?.formatted_address || 'Adresse inconnue',

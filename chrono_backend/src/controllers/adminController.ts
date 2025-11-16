@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import { formatDeliveryId } from '../utils/formatDeliveryId.js';
 
 /**
  * Récupère les statistiques du dashboard admin
@@ -646,9 +647,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
       const pickup = parseJsonField(order.pickup_address || order.pickup);
       const dropoff = parseJsonField(order.dropoff_address || order.dropoff);
 
-      // Générer un ID de shipment formaté (EV-2017002346)
-      const idParts = order.id.replace(/-/g, '').substring(0, 10);
-      const shipmentNumber = `EV-${idParts}`;
+      const shipmentNumber = formatDeliveryId(order.id, order.created_at);
 
       // Extraire les coordonnées (peuvent être dans coordinates.latitude/longitude ou directement latitude/longitude)
       let pickupCoords: { lat: number; lng: number } | null = null;
@@ -770,11 +769,14 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
     }
 
     // Définir les statuts pour chaque catégorie
+    const onProgressStatuses = ['accepted', 'enroute', 'picked_up'];
+    const onHoldStatuses = ['pending', 'declined'];
+
     const statusMap: Record<string, string[]> = {
       all: [],
-      onProgress: ['pending', 'accepted', 'enroute', 'picked_up'],
+      onProgress: onProgressStatuses,
       successful: ['completed'],
-      onHold: ['declined'],
+      onHold: onHoldStatuses,
       canceled: ['cancelled'],
     };
 
@@ -808,16 +810,19 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
+    const formatStatusList = (statuses: string[]) =>
+      statuses.map((s) => `'${s}'`).join(', ');
+
     const countsQuery = `
       SELECT 
-        COUNT(*) FILTER (WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up') AND created_at >= $1) as onProgress,
+        COUNT(*) FILTER (WHERE status IN (${formatStatusList(onProgressStatuses)}) AND created_at >= $1) as onProgress,
         COUNT(*) FILTER (WHERE status = 'completed' AND created_at >= $1) as successful,
-        COUNT(*) FILTER (WHERE status = 'declined' AND created_at >= $1) as onHold,
+        COUNT(*) FILTER (WHERE status IN (${formatStatusList(onHoldStatuses)}) AND created_at >= $1) as onHold,
         COUNT(*) FILTER (WHERE status = 'cancelled' AND created_at >= $1) as canceled,
         COUNT(*) FILTER (WHERE created_at >= $1) as all,
-        COUNT(*) FILTER (WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up') AND created_at >= $2 AND created_at < $3) as onProgressLastMonth,
+        COUNT(*) FILTER (WHERE status IN (${formatStatusList(onProgressStatuses)}) AND created_at >= $2 AND created_at < $3) as onProgressLastMonth,
         COUNT(*) FILTER (WHERE status = 'completed' AND created_at >= $2 AND created_at < $3) as successfulLastMonth,
-        COUNT(*) FILTER (WHERE status = 'declined' AND created_at >= $2 AND created_at < $3) as onHoldLastMonth,
+        COUNT(*) FILTER (WHERE status IN (${formatStatusList(onHoldStatuses)}) AND created_at >= $2 AND created_at < $3) as onHoldLastMonth,
         COUNT(*) FILTER (WHERE status = 'cancelled' AND created_at >= $2 AND created_at < $3) as canceledLastMonth,
         COUNT(*) FILTER (WHERE created_at >= $2 AND created_at < $3) as allLastMonth
       FROM orders
@@ -885,9 +890,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
       const pickup = parseJsonField(order.pickup_address || order.pickup);
       const dropoff = parseJsonField(order.dropoff_address || order.dropoff);
 
-      // Générer un ID de livraison formaté
-      const idParts = order.id.replace(/-/g, '').substring(0, 9);
-      const deliveryId = `${idParts.substring(0, 2)}-${idParts.substring(2, 7)}-${idParts.substring(7, 9)}`.toUpperCase();
+      const deliveryId = formatDeliveryId(order.id, order.created_at);
 
       return {
         id: order.id,

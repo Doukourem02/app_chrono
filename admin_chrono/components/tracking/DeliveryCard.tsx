@@ -4,6 +4,7 @@ import React from 'react'
 import Image from 'next/image'
 import { Phone, MessageSquare, Truck } from 'lucide-react'
 import { AnimatedCard } from '@/components/animations'
+import { formatDeliveryId } from '@/utils/formatDeliveryId'
 
 interface DeliveryCardProps {
   delivery: {
@@ -11,6 +12,7 @@ interface DeliveryCardProps {
     shipmentNumber: string
     type: string
     status: string
+    createdAt?: string
     pickup: {
       name: string
       address: string
@@ -220,7 +222,9 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
             <Truck size={20} style={{ color: '#6B7280' }} />
           </div>
           <div>
-            <div style={shipmentNumberStyle}>Shipment number {delivery.shipmentNumber}</div>
+            <div style={shipmentNumberStyle}>
+              {formatDeliveryId(delivery.id, delivery.createdAt)}
+            </div>
             <div style={typeStyle}>Type {delivery.type}</div>
           </div>
         </div>

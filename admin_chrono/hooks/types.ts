@@ -1,7 +1,3 @@
-/**
- * Types partagés pour les hooks de suivi en temps réel
- */
-
 export interface OnlineDriver {
   userId: string
   is_online: boolean
@@ -16,6 +12,7 @@ export interface Delivery {
   shipmentNumber: string
   type: string
   status: string
+  createdAt?: string
   pickup: {
     name: string
     address: string

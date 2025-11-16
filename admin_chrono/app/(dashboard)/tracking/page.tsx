@@ -21,6 +21,7 @@ interface Delivery {
   shipmentNumber: string
   type: string
   status: string
+  createdAt?: string
   pickup: {
     name: string
     address: string

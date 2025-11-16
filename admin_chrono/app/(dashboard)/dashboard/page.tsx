@@ -41,25 +41,33 @@ export default function DashboardPage() {
   }
   
   // Stabiliser la queryKey avec useRef pour éviter les recalculs inutiles
-  const queryKeyRef = React.useRef<[string, string, string, string] | null>(null)
-  const queryKey = React.useMemo(() => {
-    const key: [string, string, string, string] = ['dashboard-stats', dateFilter, startDate, endDate]
-    
-    // Vérifier si la queryKey a vraiment changé
-    if (queryKeyRef.current && 
-        queryKeyRef.current[0] === key[0] &&
-        queryKeyRef.current[1] === key[1] &&
-        queryKeyRef.current[2] === key[2] &&
-        queryKeyRef.current[3] === key[3]) {
-      // La queryKey n'a pas changé, retourner la référence précédente
-      return queryKeyRef.current
-    }
-    
-    // La queryKey a changé, mettre à jour la référence
-    queryKeyRef.current = key
-    console.log('🔑 [DashboardPage] QueryKey calculated:', key)
-    return key
-  }, [dateFilter, startDate, endDate])
+  const latestKey = React.useMemo(
+    () =>
+      ['dashboard-stats', dateFilter, startDate, endDate] as [
+        string,
+        string,
+        string,
+        string
+      ],
+    [dateFilter, startDate, endDate]
+  )
+
+  const [queryKey, setQueryKey] = React.useState(latestKey)
+
+  React.useEffect(() => {
+    setQueryKey((prev) => {
+      if (
+        prev &&
+        prev.length === latestKey.length &&
+        prev.every((value, index) => value === latestKey[index])
+      ) {
+        return prev
+      }
+
+      console.log('🔑 [DashboardPage] QueryKey calculated:', latestKey)
+      return latestKey
+    })
+  }, [latestKey])
   
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey,

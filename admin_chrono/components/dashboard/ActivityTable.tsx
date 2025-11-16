@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { getRecentActivities } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
 import { useDateFilter } from '@/contexts/DateFilterContext'
+import { formatDeliveryId } from '@/utils/formatDeliveryId'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
@@ -46,6 +47,21 @@ const statusConfig: Record<string, { label: string; backgroundColor: string; col
   },
 }
 
+const parseDateToISO = (value?: string) => {
+  if (!value) return undefined
+  const parts = value.split(/[\/\-]/)
+  if (parts.length === 3) {
+    const [first, second, third] = parts
+    if (first.length === 2 && second.length === 2 && third.length === 4) {
+      return `${third}-${second}-${first}`
+    }
+    if (first.length === 4) {
+      return `${first}-${second}-${third}`
+    }
+  }
+  return undefined
+}
+
 export default function ActivityTable() {
   const router = useRouter()
   const { dateFilter, dateRange } = useDateFilter()
@@ -54,26 +70,33 @@ export default function ActivityTable() {
   const itemsPerPage = 3 // Limité à 3 comme demandé
   
   // Stabiliser la queryKey avec useRef pour éviter les recalculs inutiles
-  const queryKeyRef = React.useRef<[string, number, string, string, string] | null>(null)
-  const queryKey = React.useMemo(() => {
-    const key: [string, number, string, string, string] = ['recent-activities', currentPage, dateFilter, startDate, endDate]
-    
-    // Vérifier si la queryKey a vraiment changé
-    if (queryKeyRef.current && 
-        queryKeyRef.current[0] === key[0] &&
-        queryKeyRef.current[1] === key[1] &&
-        queryKeyRef.current[2] === key[2] &&
-        queryKeyRef.current[3] === key[3] &&
-        queryKeyRef.current[4] === key[4]) {
-      // La queryKey n'a pas changé, retourner la référence précédente
-      return queryKeyRef.current
-    }
-    
-    // La queryKey a changé, mettre à jour la référence
-    queryKeyRef.current = key
-    console.log('🔑 [ActivityTable] QueryKey calculated:', key)
-    return key
-  }, [currentPage, dateFilter, startDate, endDate])
+  const latestKey = React.useMemo(
+    () =>
+      ['recent-activities', currentPage, dateFilter, startDate, endDate] as [
+        string,
+        number,
+        string,
+        string,
+        string
+      ],
+    [currentPage, dateFilter, startDate, endDate]
+  )
+
+  const [queryKey, setQueryKey] = React.useState(latestKey)
+
+  React.useEffect(() => {
+    setQueryKey((prev) => {
+      if (
+        prev &&
+        prev.length === latestKey.length &&
+        prev.every((item, index) => item === latestKey[index])
+      ) {
+        return prev
+      }
+      console.log('🔑 [ActivityTable] QueryKey calculated:', latestKey)
+      return latestKey
+    })
+  }, [latestKey])
   
   // DÉSACTIVÉ : Logs qui se déclenchaient en boucle et causaient des re-renders
   // useEffect(() => {
@@ -365,7 +388,9 @@ export default function ActivityTable() {
                     }}
                   >
                     <td style={tdStyle}>
-                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{row.deliveryId}</span>
+                      <span style={{ fontSize: '13px', color: '#111827', fontWeight: 500 }}>
+                        {formatDeliveryId(row.deliveryId, parseDateToISO(row.date) || row.date)}
+                      </span>
                     </td>
                     <td style={tdStyle}>
                       <span style={{ fontSize: '14px', color: '#374151' }}>{row.date}</span>

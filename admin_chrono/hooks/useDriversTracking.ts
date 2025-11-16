@@ -5,9 +5,7 @@ import type { OnlineDriver } from './types'
 import { isDriverValid } from './utils/driverValidation'
 import { debug, debugWarn, debugError } from '@/utils/debug'
 
-/**
- * Hook pour gérer le suivi des drivers en temps réel
- */
+
 export function useDriversTracking(isSocketConnected: boolean) {
   const [onlineDrivers, setOnlineDrivers] = useState<Map<string, OnlineDriver>>(new Map())
   const driversRef = useRef<Map<string, OnlineDriver>>(new Map())

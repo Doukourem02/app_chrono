@@ -1,12 +1,14 @@
 'use client'
 
-import { Phone, MessageSquare } from 'lucide-react'
+import { Phone, MessageSquare, MapPin, Navigation } from 'lucide-react'
 import React, { useMemo } from 'react'
 import { GoogleMap, Marker, Polyline } from '@react-google-maps/api'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
 import { AnimatedCard } from '@/components/animations'
+import type { Delivery } from '@/hooks/types'
+import { formatDeliveryId } from '@/utils/formatDeliveryId'
 
 // Type pour l'API Google Maps dans window
 interface GoogleMapsWindow extends Window {
@@ -19,25 +21,6 @@ interface GoogleMapsWindow extends Window {
       }
     }
   }
-}
-
-interface Order {
-  id?: string
-  driver_id?: string
-  driverId?: string
-  driver?: {
-    full_name?: string
-    email?: string
-  }
-  [key: string]: unknown
-}
-
-interface Driver {
-  id?: string
-  full_name?: string
-  email?: string
-  phone?: string
-  [key: string]: unknown
 }
 
 // Helper pour créer un Size Google Maps de manière sûre
@@ -61,36 +44,34 @@ const mapContainerStyle = {
   borderRadius: '12px',
 }
 
-const center = {
+interface LatLng {
+  lat: number
+  lng: number
+}
+
+const defaultCenter: LatLng = {
   lat: 5.3600, // Abidjan, Côte d'Ivoire
   lng: -4.0083,
 }
 
-const routePath = [
+const defaultRoutePath: LatLng[] = [
   { lat: 5.3600, lng: -4.0083 }, // Abidjan (départ)
   { lat: 5.3204, lng: -4.0267 }, // Abidjan (arrivée)
 ]
 
-const timelineData = [
-  {
-    title: 'Colis en route vers Abidjan',
-    date: '12/12/2024',
-    time: '02:00 AM',
-  },
-  {
-    title: 'Vérification de l\'entrepôt',
-    date: '11/12/2024',
-    time: '22:32',
-  },
-  {
-    title: 'Enregistrement du colis',
-    date: '11/12/2024',
-    time: '17:00',
-  }, 
+const statusSteps: Array<{ key: string; label: string }> = [
+  { key: 'pending', label: 'Commande créée' },
+  { key: 'accepted', label: 'Driver assigné' },
+  { key: 'enroute', label: 'Driver en route' },
+  { key: 'picked_up', label: 'Colis récupéré' },
+  { key: 'completed', label: 'Livraison terminée' },
 ]
 
-function MapComponent() {
+function MapComponent({ routePath }: { routePath?: LatLng[] }) {
   const { isLoaded, loadError } = useGoogleMaps()
+
+  const computedRoute = routePath && routePath.length >= 2 ? routePath : defaultRoutePath
+  const computedCenter = computedRoute[0] ?? defaultCenter
 
   const mapOptions = useMemo(
     () => ({
@@ -146,90 +127,145 @@ function MapComponent() {
   return (
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
-      center={center}
+      center={computedCenter}
       zoom={12}
       options={mapOptions}
     >
-      <Polyline
-        path={routePath}
-        options={{
-          strokeColor: '#2563eb',
-          strokeWeight: 3,
-          strokeOpacity: 0.8,
-        }}
-      />
-      <Marker
-        position={routePath[0]}
-        icon={{
-          url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-          scaledSize: createGoogleMapsSize(32, 32),
-        }}
-      />
-      <Marker
-        position={routePath[1]}
-        icon={{
-          url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-          scaledSize: createGoogleMapsSize(32, 32),
-        }}
-      />
+      {computedRoute.length >= 2 && (
+        <>
+          <Polyline
+            path={computedRoute}
+            options={{
+              strokeColor: '#2563eb',
+              strokeWeight: 3,
+              strokeOpacity: 0.8,
+            }}
+          />
+          <Marker
+            position={computedRoute[0]}
+            icon={{
+              url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+              scaledSize: createGoogleMapsSize(32, 32),
+            }}
+          />
+          <Marker
+            position={computedRoute[computedRoute.length - 1]}
+            icon={{
+              url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+              scaledSize: createGoogleMapsSize(32, 32),
+            }}
+          />
+        </>
+      )}
     </GoogleMap>
   )
 }
 
 export default function TrackerCard() {
-  // Récupérer une commande en cours avec un driver assigné
-  const { data: ordersData } = useQuery({
-    queryKey: ['active-orders-with-driver'],
+  // Récupérer les livraisons en cours (même source que la page Tracking)
+  const { data: deliveriesResponse, isLoading } = useQuery({
+    queryKey: ['ongoing-delivery-card'],
     queryFn: async () => {
-      console.warn('🚀🚀🚀 [TrackerCard] queryFn CALLED - getOrdersByStatus', { 
+      console.warn('🚀🚀🚀 [TrackerCard] queryFn CALLED - getOngoingDeliveries', {
         timestamp: new Date().toISOString(),
-        stack: new Error().stack?.split('\n').slice(2, 15).join('\n')
+        stack: new Error().stack?.split('\n').slice(2, 15).join('\n'),
       })
-      // Récupérer les commandes en cours (enroute, picked_up, accepted)
-      const result = await adminApiService.getOrdersByStatus('onProgress')
-      console.log('✅ [TrackerCard] getOrdersByStatus SUCCESS', { hasData: !!result.data, timestamp: new Date().toISOString() })
+      const result = await adminApiService.getOngoingDeliveries()
+      console.log('✅ [TrackerCard] getOngoingDeliveries SUCCESS', {
+        hasData: !!result.data && (result.data as Delivery[]).length > 0,
+        timestamp: new Date().toISOString(),
+      })
       return result
     },
-    refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
-    refetchIntervalInBackground: false, // Désactiver complètement le refetch en arrière-plan
-    retry: false, // Ne pas réessayer en cas d'erreur
-    enabled: true, // Toujours activé, mais les autres options empêchent le refetch
-  })
-
-  // Trouver une commande avec un driver assigné
-  const orders: Order[] = (ordersData?.data as Order[]) || []
-  const activeOrder: Order | undefined = orders.find((order: Order) => order.driver_id || order.driverId)
-  const driverId = activeOrder?.driver_id || activeOrder?.driverId
-
-  // Log pour voir si driverId change
-  React.useEffect(() => {
-    console.log('🔄 [TrackerCard] driverId changed:', driverId)
-  }, [driverId])
-
-  const driverQueryKey = ['driver-details', driverId] as const
-
-  const { data: driverData } = useQuery({
-    queryKey: driverQueryKey,
-    queryFn: async () => {
-      console.log('🚀 [TrackerCard] queryFn CALLED - getDriverDetails', { driverId, timestamp: new Date().toISOString() })
-      if (!driverId) return null
-      const result = await adminApiService.getDriverDetails(driverId)
-      console.log('✅ [TrackerCard] getDriverDetails SUCCESS', { hasData: !!result.data, timestamp: new Date().toISOString() })
-      return result
-    },
-    enabled: !!driverId,
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
     refetchInterval: false,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchIntervalInBackground: false,
+    retry: false,
+    enabled: true,
   })
 
-  const driver: Driver | undefined = driverData?.data as Driver | undefined
+  const deliveries: Delivery[] = useMemo(() => {
+    const data = deliveriesResponse?.data as Delivery[] | undefined
+    return Array.isArray(data) ? data : []
+  }, [deliveriesResponse])
+
+  const activeDelivery = useMemo(() => {
+    if (deliveries.length === 0) return null
+    return deliveries.reduce((latest, current) => {
+      if (!latest) return current
+      if (!latest.createdAt) return current
+      if (!current.createdAt) return latest
+      return new Date(current.createdAt).getTime() > new Date(latest.createdAt).getTime() ? current : latest
+    }, deliveries[0])
+  }, [deliveries])
+
+  const trackerId = activeDelivery?.id
+  const pickupAddress = activeDelivery?.pickup?.address || 'Adresse pickup inconnue'
+  const dropoffAddress = activeDelivery?.dropoff?.address || 'Adresse destination inconnue'
+  const driver = activeDelivery?.driver
+
+  const statusStyles: Record<
+    string,
+    { label: string; backgroundColor: string; color: string }
+  > = {
+    pending: { label: 'En attente', backgroundColor: '#FEF3C7', color: '#D97706' },
+    accepted: { label: 'Acceptée', backgroundColor: '#E0E7FF', color: '#4338CA' },
+    enroute: { label: 'En route', backgroundColor: '#DBEAFE', color: '#1D4ED8' },
+    picked_up: { label: 'Pris en charge', backgroundColor: '#E0F2FE', color: '#0369A1' },
+    completed: { label: 'Livrée', backgroundColor: '#DCFCE7', color: '#166534' },
+    cancelled: { label: 'Annulée', backgroundColor: '#FEE2E2', color: '#B91C1C' },
+    declined: { label: 'Refusée', backgroundColor: '#FEE2E2', color: '#B91C1C' },
+  }
+
+  const statusMeta =
+    (activeDelivery?.status && statusStyles[activeDelivery.status]) ||
+    statusStyles.pending
+
+  const pickupCoordinates = activeDelivery?.pickup?.coordinates
+  const dropoffCoordinates = activeDelivery?.dropoff?.coordinates
+
+  const computedRoute = pickupCoordinates && dropoffCoordinates
+    ? [
+        { lat: pickupCoordinates.lat, lng: pickupCoordinates.lng },
+        { lat: dropoffCoordinates.lat, lng: dropoffCoordinates.lng },
+      ]
+    : undefined
+
+  const formatDateTime = (value?: string | null): string => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+  }
+
+  const currentStepIndex = activeDelivery
+    ? Math.max(
+        statusSteps.findIndex((step) => step.key === activeDelivery.status),
+        0
+      )
+    : 0
+
+  const timelineItems = statusSteps.map((step, index) => ({
+    ...step,
+    active: index <= currentStepIndex,
+    description:
+      index === 0
+        ? formatDateTime(activeDelivery?.createdAt || null)
+        : index < currentStepIndex
+          ? 'Terminé'
+          : index === currentStepIndex
+            ? 'En cours'
+            : 'À venir',
+  }))
 
   // Fonction pour obtenir le nom d'affichage du driver
   const getDisplayName = () => {
@@ -239,14 +275,7 @@ export default function TrackerCard() {
     if (driver?.email) {
       return driver.email
     }
-    // Si pas de driver, essayer de récupérer depuis l'order
-    if (activeOrder?.driver?.full_name) {
-      return activeOrder.driver.full_name
-    }
-    if (activeOrder?.driver?.email) {
-      return activeOrder.driver.email
-    }
-    return 'Jayson Tatum'
+    return 'Driver non assigné'
   }
 
   // Fonction pour obtenir l'initiale du driver
@@ -257,14 +286,7 @@ export default function TrackerCard() {
     if (driver?.email) {
       return driver.email.charAt(0).toUpperCase()
     }
-    // Si pas de driver, essayer de récupérer depuis l'order
-    if (activeOrder?.driver?.full_name) {
-      return activeOrder.driver.full_name.charAt(0).toUpperCase()
-    }
-    if (activeOrder?.driver?.email) {
-      return activeOrder.driver.email.charAt(0).toUpperCase()
-    }
-    return 'J'
+    return '—'
   }
 
   const cardStyle: React.CSSProperties = {
@@ -308,8 +330,8 @@ export default function TrackerCard() {
     paddingRight: '12px',
     paddingTop: '4px',
     paddingBottom: '4px',
-    backgroundColor: '#FEF3C7',
-    color: '#D97706',
+    backgroundColor: statusMeta.backgroundColor,
+    color: statusMeta.color,
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: 600,
@@ -415,72 +437,163 @@ export default function TrackerCard() {
     transition: 'background-color 0.2s',
   }
 
+  const infoRowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    padding: '10px 12px',
+    borderRadius: '12px',
+    backgroundColor: '#F9FAFB',
+    marginBottom: '8px',
+  }
+
+  const infoIconStyle: React.CSSProperties = {
+    padding: '8px',
+    borderRadius: '10px',
+    backgroundColor: '#EEF2FF',
+    color: '#4C1D95',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
+
+  const infoContentStyle: React.CSSProperties = {
+    flex: 1,
+  }
+
+  const infoTitleStyle: React.CSSProperties = {
+    fontSize: '12px',
+    textTransform: 'uppercase',
+    color: '#6B7280',
+    marginBottom: '4px',
+  }
+
+  const infoTextStyle: React.CSSProperties = {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#111827',
+  }
+
+  const renderEmpty = () => (
+    <div
+      style={{
+        ...sectionStyle,
+        padding: '16px',
+        borderRadius: '12px',
+        backgroundColor: '#F3F4F6',
+        textAlign: 'center',
+        color: '#6B7280',
+      }}
+    >
+      {isLoading ? 'Chargement des livraisons en cours...' : 'Aucune livraison en cours'}
+    </div>
+  )
+
+  const driverPhone = driver?.phone
+
   return (
     <AnimatedCard index={0} delay={150} style={cardStyle}>
       <div style={sectionStyle}>
-        <MapComponent />
+        <MapComponent routePath={computedRoute} />
       </div>
 
-      <div style={sectionStyle}>
-        <h3 style={trackerHeaderStyle}>Tracker ID</h3>
-        <div style={trackerRowStyle}>
-          <p style={trackerIdStyle}>ABJ-12321-CI</p>
-          <span style={statusBadgeStyle}>En cours</span>
-        </div>
-      </div>
+      {activeDelivery ? (
+        <>
+          <div style={sectionStyle}>
+            <h3 style={trackerHeaderStyle}>Tracker ID</h3>
+            <div style={trackerRowStyle}>
+              <p style={trackerIdStyle}>
+                {trackerId ? formatDeliveryId(trackerId, activeDelivery?.createdAt) : '—'}
+              </p>
+              <span style={statusBadgeStyle}>{statusMeta.label}</span>
+            </div>
+          </div>
 
-      <div style={{ ...sectionStyle, marginBottom: '12px', flex: 1, minHeight: 0, overflow: 'auto' }}>
-        <div style={timelineStyle}>
-          {timelineData.map((item, index) => (
-            <div key={index} style={timelineItemStyle}>
-              <div style={timelineDotContainerStyle}>
-                <div style={timelineDotStyle(index === 0)}></div>
-                {index < timelineData.length - 1 && (
-                  <div style={timelineLineStyle}></div>
-                )}
+          <div style={{ ...sectionStyle, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={infoRowStyle}>
+              <div style={infoIconStyle}>
+                <MapPin size={16} />
               </div>
-              <div style={timelineContentStyle}>
-                <p style={timelineTitleStyle}>{item.title}</p>
-                <p style={timelineDateStyle}>{item.date} - {item.time}</p>
+              <div style={infoContentStyle}>
+                <p style={infoTitleStyle}>Point de départ</p>
+                <p style={infoTextStyle}>{pickupAddress}</p>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ ...driverInfoStyle, flexShrink: 0 }}>
-        <div style={driverLeftStyle}>
-          <div style={avatarStyle}>{getInitial()}</div>
-          <div>
-            <p style={driverNameStyle}>{getDisplayName()}</p>
-            <p style={driverRoleStyle}>Drive, Actif il y a 1h</p>
+            <div style={infoRowStyle}>
+              <div style={infoIconStyle}>
+                <Navigation size={16} />
+              </div>
+              <div style={infoContentStyle}>
+                <p style={infoTitleStyle}>Destination</p>
+                <p style={infoTextStyle}>{dropoffAddress}</p>
+              </div>
+            </div>
           </div>
-        </div>
-        <div style={driverActionsStyle}>
-          <button
-            style={actionButtonStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#FEF3C7'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
-          >
-            <Phone size={20} style={{ color: '#4B5563' }} />
-          </button>
-          <button
-            style={actionButtonStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#FEF3C7'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
-          >
-            <MessageSquare size={20} style={{ color: '#4B5563' }} />
-          </button>
-        </div>
-      </div>
+
+          <div style={{ ...sectionStyle, marginBottom: '12px', flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <div style={timelineStyle}>
+              {timelineItems.map((item, index) => (
+                <div key={item.key} style={timelineItemStyle}>
+                  <div style={timelineDotContainerStyle}>
+                    <div style={timelineDotStyle(item.active)}></div>
+                    {index < timelineItems.length - 1 && <div style={timelineLineStyle}></div>}
+                  </div>
+                  <div style={timelineContentStyle}>
+                    <p style={timelineTitleStyle}>{item.label}</p>
+                    <p style={timelineDateStyle}>{item.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ ...driverInfoStyle, flexShrink: 0 }}>
+            <div style={driverLeftStyle}>
+              <div style={avatarStyle}>{getInitial()}</div>
+              <div>
+                <p style={driverNameStyle}>{getDisplayName()}</p>
+                <p style={driverRoleStyle}>
+                  {driver?.phone ? `+${driver.phone}` : 'Contact indisponible'}
+                </p>
+              </div>
+            </div>
+            <div style={driverActionsStyle}>
+              <button
+                style={{ ...actionButtonStyle, opacity: driverPhone ? 1 : 0.5, cursor: driverPhone ? 'pointer' : 'not-allowed' }}
+                disabled={!driverPhone}
+                onClick={() => {
+                  if (driverPhone) {
+                    window.open(`tel:${driverPhone}`, '_self')
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  if (driverPhone) {
+                    e.currentTarget.style.backgroundColor = '#FEF3C7'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                <Phone size={20} style={{ color: '#4B5563' }} />
+              </button>
+              <button
+                style={actionButtonStyle}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FEF3C7'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                <MessageSquare size={20} style={{ color: '#4B5563' }} />
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        renderEmpty()
+      )}
     </AnimatedCard>
   )
 }

@@ -24,7 +24,7 @@ export function DateFilterProvider({ children }: { children: ReactNode }) {
   // Pour 'today' et 'thisWeek', on met à jour toutes les minutes
   // Pour 'thisMonth', on met à jour toutes les heures
   // Pour 'lastMonth' et 'all', on ne met jamais à jour
-  const [currentDate, setCurrentDate] = useState(() => new Date())
+  const [currentDate] = useState(() => new Date())
   
   // DÉSACTIVÉ : Le setInterval causait des refetch automatiques toutes les 5 minutes
   // Même si la date ne changeait pas, le recalcul de dateRange changeait la référence

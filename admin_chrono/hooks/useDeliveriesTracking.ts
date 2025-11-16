@@ -15,9 +15,7 @@ interface OrderUpdateData {
   }
 }
 
-/**
- * Hook pour gérer le suivi des livraisons en temps réel
- */
+
 export function useDeliveriesTracking(isSocketConnected: boolean) {
   const [ongoingDeliveries, setOngoingDeliveries] = useState<Delivery[]>([])
   const deliveriesRef = useRef<Delivery[]>([])
