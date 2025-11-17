@@ -19,6 +19,7 @@ import RatingBottomSheet from '../../components/RatingBottomSheet';
 import PaymentBottomSheet from '../../components/PaymentBottomSheet';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { useOrderStore } from '../../store/useOrderStore';
+import type { OrderStatus } from '../../store/useOrderStore';
 import { useRatingStore } from '../../store/useRatingStore';
 import { usePaymentStore } from '../../store/usePaymentStore';
 import { logger } from '../../utils/logger';
@@ -27,6 +28,7 @@ import { locationService } from '../../services/locationService';
 import { userApiService } from '../../services/userApiService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PENDING_STATUS: OrderStatus = 'pending';
 
 type Coordinates = {
   latitude: number;
@@ -231,7 +233,7 @@ export default function MapPage() {
     isSearchingDriver,
     searchSeconds,
     driverCoords: searchDriverCoords,
-    pulseAnim,
+    startDriverSearch,
     stopDriverSearch,
   } = useDriverSearch(resetAfterDriverSearch);
 
@@ -368,7 +370,21 @@ export default function MapPage() {
     }
     return s.activeOrders.find(o => o.status !== 'pending') || s.activeOrders[0] || null;
   });
-  const pendingOrder = useOrderStore((s) => s.activeOrders.find(o => o.status === 'pending') || null);
+  const pendingOrder = useOrderStore((s) => s.activeOrders.find(o => o.status === PENDING_STATUS) || null);
+
+  const radarPulseCoords = useMemo(() => {
+    if (pickupCoords) {
+      return pickupCoords;
+    }
+    if (pendingOrder?.pickup?.coordinates) {
+      const coords = pendingOrder.pickup.coordinates;
+      return {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      };
+    }
+    return null;
+  }, [pickupCoords, pendingOrder?.pickup?.coordinates]);
   // Récupérer les coordonnées du driver pour la commande sélectionnée
   const orderDriverCoords = selectedOrderId ? orderDriverCoordsMap.get(selectedOrderId) || null : null;
   
@@ -471,6 +487,25 @@ export default function MapPage() {
       logger.info('🛑 Recherche de chauffeur arrêtée (aucun chauffeur disponible)', 'map.tsx');
     }
   }, [pendingOrder, isSearchingDriver, stopDriverSearch]);
+
+  // Démarrer automatiquement la pulsation radar quand une commande est en attente d'un livreur
+  useEffect(() => {
+    if (pendingOrder?.status === PENDING_STATUS) {
+      if (!isSearchingDriver) {
+        logger.info('📡 Démarrage animation radar (commande en attente)', 'map.tsx', {
+          orderId: pendingOrder.id,
+        });
+        startDriverSearch();
+      }
+    } else if (isSearchingDriver && pendingOrder && pendingOrder.status !== PENDING_STATUS) {
+      // La commande a changé d'état (acceptée/refusée) → arrêter le pulse
+      logger.info('📡 Arrêt animation radar (commande plus en attente)', 'map.tsx', {
+        orderId: pendingOrder.id,
+        status: pendingOrder.status,
+      });
+      stopDriverSearch();
+    }
+  }, [pendingOrder?.id, pendingOrder?.status, isSearchingDriver, startDriverSearch, stopDriverSearch, pendingOrder]);
 
   // 🆕 Nettoyer la route violette dès qu'une commande est acceptée (orderDriverCoords disponible)
   // Pour ne montrer que le tracking en direct (polyline vert/rouge)
@@ -734,9 +769,14 @@ export default function MapPage() {
       currentOrder.status !== 'completed' && 
       currentOrder.status !== 'cancelled' && 
       currentOrder.status !== 'declined';
+    const hasOrderInProgress = Boolean(pendingOrder || isActiveOrder);
+
+    if (hasOrderInProgress) {
+      return;
+    }
     
     // Ouvrir automatiquement le formulaire de création si :
-    // 1. Pas de commande active OU on est en mode création
+    // 1. Pas de commande active
     // 2. Le bottom sheet n'est pas déjà ouvert
     // 3. L'utilisateur ne l'a pas fermé manuellement
     const shouldShowCreationForm = !isActiveOrder || isCreatingNewOrder;
@@ -751,7 +791,7 @@ export default function MapPage() {
         return () => clearTimeout(timer);
       }
     }
-  }, [expandBottomSheet, isExpanded, currentOrder, showRatingBottomSheet, isCreatingNewOrder]);
+  }, [expandBottomSheet, isExpanded, currentOrder, showRatingBottomSheet, isCreatingNewOrder, pendingOrder]);
 
   // 🆕 Réouvrir automatiquement le bottom sheet après le nettoyage d'une commande
   // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
@@ -762,10 +802,11 @@ export default function MapPage() {
       currentOrder.status !== 'completed' && 
       currentOrder.status !== 'cancelled' && 
       currentOrder.status !== 'declined';
+    const hasOrderInProgress = Boolean(pendingOrder || isActiveOrder);
     
     // Si on n'a pas de commande active et que le bottom sheet n'est pas ouvert, le réouvrir
     // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
-    if (!isActiveOrder && !currentOrder && !isExpanded && !showRatingBottomSheet && !userManuallyClosedRef.current) {
+    if (!hasOrderInProgress && !currentOrder && !isExpanded && !showRatingBottomSheet && !userManuallyClosedRef.current) {
       // Réinitialiser hasAutoOpenedRef pour permettre la réouverture
       hasAutoOpenedRef.current = false;
       isProgrammaticCloseRef.current = true; // 🆕 Marquer comme fermeture programmatique (si on ferme avant)
@@ -777,7 +818,7 @@ export default function MapPage() {
 
       return () => clearTimeout(timer);
     }
-  }, [currentOrder, isExpanded, showRatingBottomSheet, expandBottomSheet]);
+  }, [currentOrder, pendingOrder, isExpanded, showRatingBottomSheet, expandBottomSheet]);
 
   // NOTE: Bouton de test retiré en production — la création de commande
   // est maintenant déclenchée via le flow utilisateur (handleConfirm)
@@ -1086,7 +1127,6 @@ export default function MapPage() {
         orderStatus={currentOrder?.status}
         onlineDrivers={onlineDrivers} // 🚗 NOUVEAU
         isSearchingDriver={isSearchingDriver}
-        pulseAnim={pulseAnim}
         destinationPulseAnim={destinationPulseAnim}
         userPulseAnim={userPulseAnim}
         durationText={durationText}
@@ -1094,6 +1134,7 @@ export default function MapPage() {
         selectedMethod={selectedMethod}
         availableVehicles={[]} // Remplacé par une valeur par défaut
         showMethodSelection={showMethodSelection}
+        radarCoords={radarPulseCoords}
         onMapPress={() => {
           // 🆕 Ouvrir automatiquement le bottom sheet au clic sur la carte avec animation fluide
           // Mais uniquement si on n'a pas de commande active (on affiche le DeliveryBottomSheet)

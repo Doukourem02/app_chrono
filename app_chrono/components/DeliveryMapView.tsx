@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, Animated } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { OnlineDriver } from '../hooks/useOnlineDrivers';
+import { useRadarPulse } from '../hooks/useRadarPulse';
 
 type Coordinates = {
   latitude: number;
@@ -19,7 +20,6 @@ interface DeliveryMapViewProps {
   orderStatus?: string | null;
   onlineDrivers: OnlineDriver[]; 
   isSearchingDriver: boolean;
-  pulseAnim: Animated.Value;
   destinationPulseAnim: Animated.Value;
   userPulseAnim: Animated.Value;
   durationText: string | null;
@@ -28,6 +28,7 @@ interface DeliveryMapViewProps {
   availableVehicles: any[];
   showMethodSelection: boolean;
   onMapPress?: () => void; 
+  radarCoords?: Coordinates | null;
 }
 
 export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
@@ -41,7 +42,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   orderStatus,
   onlineDrivers, 
   isSearchingDriver,
-  pulseAnim,
   destinationPulseAnim,
   userPulseAnim,
   durationText,
@@ -50,7 +50,9 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   availableVehicles,
   showMethodSelection,
   onMapPress, // 🆕
+  radarCoords,
 }) => {
+  const { pulseAnim: radarPulseAnim } = useRadarPulse(isSearchingDriver);
 
   
   return (
@@ -101,11 +103,11 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       )}
 
       
-      {isSearchingDriver && pickupCoords && (
+      {isSearchingDriver && (radarCoords || pickupCoords) && (
         <Marker 
-          coordinate={pickupCoords} 
+          coordinate={radarCoords || pickupCoords!} 
           anchor={{ x: 0.5, y: 0.5 }} 
-          tracksViewChanges={false}
+          tracksViewChanges
         >
           <View style={styles.searchContainer}>
             <Animated.View
@@ -114,13 +116,13 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
                 {
                   transform: [
                     {
-                      scale: pulseAnim.interpolate({ 
+                      scale: radarPulseAnim.interpolate({ 
                         inputRange: [0, 1], 
                         outputRange: [0.5, 2.0] 
                       }),
                     },
                   ],
-                  opacity: pulseAnim.interpolate({ 
+                  opacity: radarPulseAnim.interpolate({ 
                     inputRange: [0, 1], 
                     outputRange: [0.6, 0] 
                   }),
@@ -133,13 +135,13 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
                 {
                   transform: [
                     {
-                      scale: pulseAnim.interpolate({ 
+                      scale: radarPulseAnim.interpolate({ 
                         inputRange: [0, 1], 
                         outputRange: [0.7, 1.2] 
                       }),
                     },
                   ],
-                  opacity: pulseAnim.interpolate({ 
+                  opacity: radarPulseAnim.interpolate({ 
                     inputRange: [0, 1], 
                     outputRange: [0.8, 0.3] 
                   }),

@@ -284,8 +284,7 @@ export default function OrderTrackingPage() {
         orderDriverCoords={orderDriverCoords} // Coordonnées du driver assigné
         orderStatus={currentOrder?.status}
         onlineDrivers={[]} // Pas besoin d'afficher les autres drivers
-        isSearchingDriver={false}
-        pulseAnim={new Animated.Value(1)}
+        isSearchingDriver={currentOrder?.status === 'pending'}
         destinationPulseAnim={new Animated.Value(1)}
         userPulseAnim={new Animated.Value(1)}
         durationText=""

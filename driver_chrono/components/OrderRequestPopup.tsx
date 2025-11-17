@@ -39,7 +39,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   visible,
   onAccept,
   onDecline,
-  autoDeclineTimer = 30,
+  autoDeclineTimer = 25,
 }) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;

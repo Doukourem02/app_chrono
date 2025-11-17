@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import StatusKPICard from '@/components/orders/StatusKPICard'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
+import { adminSocketService } from '@/lib/adminSocketService'
 const parseDateToISO = (value?: string) => {
   if (!value) return undefined
   const parts = value.split(/[\/\-]/)
@@ -77,6 +78,7 @@ export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<TabType>('onProgress')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const queryClient = useQueryClient()
 
   const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ['orders', activeTab],
@@ -131,6 +133,16 @@ export default function OrdersPage() {
   React.useEffect(() => {
     setCurrentPage(1)
   }, [activeTab])
+
+  React.useEffect(() => {
+    const unsubscribe = adminSocketService.on('order:status:update', () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [queryClient])
 
   // Calculer la pagination
   const totalPages = Math.max(1, Math.ceil(orders.length / itemsPerPage))

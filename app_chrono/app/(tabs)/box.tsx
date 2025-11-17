@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,7 +16,7 @@ import {
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
-import { OrderRequest, OrderStatus } from '../../store/useOrderStore';
+import { OrderRequest, OrderStatus, useOrderStore } from '../../store/useOrderStore';
 
 interface OrderWithDB extends OrderRequest {
   created_at?: string;
@@ -41,6 +41,70 @@ interface FilterItem {
 
 const FILTER_KEYS: FilterKey[] = ['all', 'pending', 'accepted', 'enroute', 'completed', 'cancelled'];
 
+const FILTER_STATUS_MAP: Record<Exclude<FilterKey, 'all'>, OrderStatus[]> = {
+  pending: ['pending'],
+  accepted: ['accepted', 'enroute', 'picked_up'],
+  enroute: ['enroute', 'picked_up'],
+  completed: ['completed'],
+  cancelled: ['cancelled', 'declined'],
+};
+
+const normalizeDateValue = (value?: string | Date | null): string | undefined => {
+  if (!value) return undefined;
+  if (typeof value === 'string') return value;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value.toISOString();
+  }
+  return undefined;
+};
+
+const normalizeStoreOrder = (order: OrderRequest): OrderWithDB => ({
+  ...order,
+  created_at: normalizeDateValue((order as any).created_at || order.createdAt),
+  accepted_at: normalizeDateValue((order as any).accepted_at || (order as any).acceptedAt),
+  completed_at: normalizeDateValue((order as any).completed_at || (order as any).completedAt),
+  cancelled_at: normalizeDateValue((order as any).cancelled_at || (order as any).cancelledAt),
+});
+
+const filterMatchesStatus = (filter: FilterKey, status: OrderStatus): boolean => {
+  if (filter === 'all') return true;
+  const allowed = FILTER_STATUS_MAP[filter];
+  return allowed.includes(status);
+};
+
+const mergeOrders = (apiOrders: OrderWithDB[], liveOrders: OrderWithDB[]): OrderWithDB[] => {
+  const map = new Map<string, OrderWithDB>();
+
+  apiOrders.forEach((order) => {
+    map.set(order.id, order);
+  });
+
+  liveOrders.forEach((order) => {
+    const existing = map.get(order.id);
+    if (existing) {
+      map.set(order.id, {
+        ...existing,
+        ...order,
+        pickup: order.pickup || existing.pickup,
+        dropoff: order.dropoff || existing.dropoff,
+        status: order.status,
+      });
+    } else {
+      map.set(order.id, order);
+    }
+  });
+
+  const dateValue = (order: OrderWithDB) => {
+    const date =
+      normalizeDateValue(order.created_at || (order as any).createdAt) ||
+      normalizeDateValue(order.accepted_at) ||
+      normalizeDateValue(order.completed_at);
+    return date ? new Date(date).getTime() : 0;
+  };
+
+  return Array.from(map.values()).sort((a, b) => dateValue(b) - dateValue(a));
+};
+
 const createInitialPagination = (): PaginationState => ({
   page: 1,
   limit: 20,
@@ -51,6 +115,7 @@ const createInitialPagination = (): PaginationState => ({
 export default function BoxPage() {
   const { requireAuth } = useRequireAuth();
   const { user } = useAuthStore();
+  const activeOrders = useOrderStore((state) => state.activeOrders);
   const [orders, setOrders] = useState<OrderWithDB[]>([]);
   const [ordersByFilter, setOrdersByFilter] = useState<Record<FilterKey, OrderWithDB[]>>(() =>
     FILTER_KEYS.reduce((acc, key) => {
@@ -336,7 +401,23 @@ export default function BoxPage() {
     { key: 'cancelled', label: 'Annulées' },
   ];
 
-  if (isInitialLoading && orders.length === 0) {
+  const normalizedActiveOrders = useMemo(
+    () => activeOrders.map(normalizeStoreOrder),
+    [activeOrders]
+  );
+
+  const liveOrdersForFilter = useMemo(
+    () =>
+      normalizedActiveOrders.filter((order) => filterMatchesStatus(selectedFilter, order.status)),
+    [normalizedActiveOrders, selectedFilter]
+  );
+
+  const displayedOrders = useMemo(
+    () => mergeOrders(orders, liveOrdersForFilter),
+    [orders, liveOrdersForFilter]
+  );
+
+  if (isInitialLoading && displayedOrders.length === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -478,13 +559,13 @@ export default function BoxPage() {
       </View>
 
       {/* Liste ou état vide */}
-      {orders.length === 0 ? (
+      {displayedOrders.length === 0 ? (
         <View style={styles.emptyStateContainer}>
           {renderEmptyState()}
         </View>
       ) : (
         <FlatList
-          data={orders}
+          data={displayedOrders}
           renderItem={renderOrder}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.ordersListContent}

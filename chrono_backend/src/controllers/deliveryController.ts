@@ -59,21 +59,81 @@ export const getUserDeliveries = async (
     const { userId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
 
-    if (!process.env.DATABASE_URL) {
-      logger.warn('DATABASE_URL non configuré pour getUserDeliveries');
+    const normalizeDateValue = (value?: string | Date | null): Date | null => {
+      if (!value) return null;
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value;
+      }
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const fallbackOrders: any[] = Array.from(activeOrders.values())
+      .filter((order: any) => order?.user?.id === userId)
+      .filter((order: any) => {
+        if (!status || status === 'all') {
+          return true;
+        }
+        return order?.status === status;
+      })
+      .map((order: any) => {
+        const pickup = order?.pickup || order?.pickup_address || null;
+        const dropoff = order?.dropoff || order?.dropoff_address || null;
+
+        return {
+          id: order.id,
+          user_id: order.user?.id,
+          driver_id: order.driverId || order.driver?.id || null,
+          pickup,
+          dropoff,
+          pickup_address: pickup,
+          dropoff_address: dropoff,
+          price: order.price ?? order.price_cfa ?? null,
+          price_cfa: order.price ?? order.price_cfa ?? null,
+          distance: order.distance ?? order.distance_km ?? null,
+          distance_km: order.distance ?? order.distance_km ?? null,
+          delivery_method: order.deliveryMethod || order.method || null,
+          status: order.status,
+          created_at: normalizeDateValue(order.createdAt || order.created_at) || new Date(),
+          accepted_at: normalizeDateValue(order.acceptedAt || order.accepted_at),
+          completed_at: normalizeDateValue(order.completedAt || order.completed_at),
+          cancelled_at: normalizeDateValue(order.cancelledAt || order.cancelled_at),
+          proof: order.proof || null,
+        };
+      })
+      .sort((a, b) => {
+        const aDate = new Date(a.created_at).getTime();
+        const bDate = new Date(b.created_at).getTime();
+        return bDate - aDate;
+      });
+
+    const sendFallbackOrders = () => {
+      const totalFallback = fallbackOrders.length;
+      const safeLimit = limit > 0 ? limit : 1;
+      const start = (page - 1) * safeLimit;
+      const paginatedFallback =
+        totalFallback > 0 ? fallbackOrders.slice(start, start + safeLimit) : [];
+
       res.json({
         success: true,
-        data: [],
+        data: paginatedFallback,
         pagination: {
           page,
           limit,
-          total: 0,
-          totalPages: 0,
+          total: totalFallback,
+          totalPages: totalFallback > 0 ? Math.ceil(totalFallback / safeLimit) : 0,
+        },
+        meta: {
+          source: 'memory',
         },
       });
+    };
+
+    if (!process.env.DATABASE_URL) {
+      logger.warn('DATABASE_URL non configuré pour getUserDeliveries');
+      sendFallbackOrders();
       return;
     }
 
@@ -87,6 +147,8 @@ export const getUserDeliveries = async (
       queryParams.push(status);
     }
 
+    const offset = Math.max((page - 1) * limit, 0);
+
     query += ` ORDER BY created_at DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
     queryParams.push(limit, offset);
 
@@ -96,9 +158,15 @@ export const getUserDeliveries = async (
     const countResult = await (pool as any).query(countQuery, countParams);
     const total = parseInt(countResult.rows[0]?.count || '0');
 
+    const rows = result.rows || [];
+    if (rows.length === 0 && fallbackOrders.length > 0) {
+      sendFallbackOrders();
+      return;
+    }
+
     res.json({
       success: true,
-      data: (result.rows || []).map((order: any) => {
+      data: rows.map((order: any) => {
         let pickup = order.pickup_address || order.pickup;
         let dropoff = order.dropoff_address || order.dropoff;
 
@@ -151,16 +219,7 @@ export const getUserDeliveries = async (
       (error.message.includes('SASL') || error.message.includes('password'))
     ) {
       logger.warn('Erreur de connexion DB (peut-être non configurée), retour de données vides');
-      res.json({
-        success: true,
-        data: [],
-        pagination: {
-          page: parseInt(req.query.page as string) || 1,
-          limit: parseInt(req.query.limit as string) || 20,
-          total: 0,
-          totalPages: 0,
-        },
-      });
+      sendFallbackOrders();
       return;
     }
 

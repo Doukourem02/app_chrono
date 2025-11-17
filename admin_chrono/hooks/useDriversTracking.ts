@@ -132,6 +132,11 @@ export function useDriversTracking(isSocketConnected: boolean) {
       const typedData = data as OnlineDriver
       if (typedData.is_online === true) {
         updateDriver(typedData)
+        const hasCoords = typeof typedData.current_latitude === 'number' && typeof typedData.current_longitude === 'number'
+        if (!hasCoords) {
+          // Recharger la liste complète pour récupérer la dernière position connue
+          loadDriversFromAPI()
+        }
       } else {
         removeDriver(typedData.userId)
       }
@@ -151,12 +156,29 @@ export function useDriversTracking(isSocketConnected: boolean) {
       }
       
       const currentDriver = driversRef.current.get(typedData.userId)
+      const hasCoords =
+        typeof typedData.current_latitude === 'number' &&
+        typeof typedData.current_longitude === 'number'
+
+      if (!hasCoords) {
+        return
+      }
+
       if (currentDriver) {
         updateDriver({
           ...currentDriver,
           current_latitude: typedData.current_latitude,
           current_longitude: typedData.current_longitude,
           updated_at: typedData.updated_at,
+        })
+      } else {
+        updateDriver({
+          userId: typedData.userId,
+          is_online: true,
+          is_available: true,
+          current_latitude: typedData.current_latitude,
+          current_longitude: typedData.current_longitude,
+          updated_at: typedData.updated_at ?? new Date().toISOString(),
         })
       }
     })

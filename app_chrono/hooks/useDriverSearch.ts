@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated } from 'react-native';
 import { io } from 'socket.io-client';
 import { logger } from '../utils/logger';
 import { errorHandler } from '../utils/errorHandler';
@@ -19,30 +18,6 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
   
   const searchIntervalRef = useRef<number | null>(null);
   const searchTimeoutRef = useRef<number | null>(null);
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-
-
-  useEffect(() => {
-    let loop: any;
-    if (isSearchingDriver) {
-      pulseAnim.setValue(0);
-      loop = Animated.loop(
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1400,
-          useNativeDriver: true,
-        })
-      );
-      loop.start();
-    } else {
-      pulseAnim.stopAnimation(() => pulseAnim.setValue(0));
-      if (loop && loop.stop) loop.stop();
-    }
-
-    return () => {
-      if (loop && loop.stop) loop.stop();
-    };
-  }, [isSearchingDriver, pulseAnim]);
 
   useEffect(() => {
     let socket: any;
@@ -87,7 +62,7 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
     }
     searchTimeoutRef.current = (setTimeout(() => {
       stopDriverSearch();
-    }, 20000) as unknown) as number;
+    }, 25000) as unknown) as number;
   };
 
   const stopDriverSearch = () => {
@@ -101,7 +76,6 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
       searchTimeoutRef.current = null;
     }
     setSearchSeconds(0);
-    
  
     if (onSearchComplete) {
       onSearchComplete();
@@ -112,7 +86,6 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
     isSearchingDriver,
     searchSeconds,
     driverCoords,
-    pulseAnim,
     startDriverSearch,
     stopDriverSearch,
   };
