@@ -86,9 +86,17 @@ class UserOrderSocketService {
       
       // Réinitialiser l'état pour permettre une nouvelle commande
       try {
-        
-        // Nettoyer complètement l'état pour réinitialiser l'interface
-        useOrderStore.getState().clear(); // clear() remet aussi deliveryStage à 'idle'
+        // Forcer la commande à passer en "cancelled" pour déclencher les effets de nettoyage côté UI
+        if (data?.orderId) {
+          const store = useOrderStore.getState();
+          const existing = store.activeOrders.find((o) => o.id === data.orderId);
+          if (existing) {
+            store.updateOrderStatus(data.orderId, 'cancelled');
+          }
+        } else {
+          // Fallback si aucun orderId n'est fourni
+          useOrderStore.getState().clear();
+        }
         
         // Afficher une alerte à l'utilisateur
         Alert.alert(

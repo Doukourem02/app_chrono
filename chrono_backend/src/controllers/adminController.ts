@@ -1016,7 +1016,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
     }
 
     // Récupérer tous les utilisateurs avec leurs informations
-    const query = `SELECT id, email, phone, role, created_at FROM users ORDER BY created_at DESC`;
+    const query = `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url FROM users ORDER BY created_at DESC`;
 
     logger.info('📝 [getAdminUsers] Requête SQL:', query);
 
@@ -1047,7 +1047,10 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
         id: user.id,
         email: user.email,
         phone: user.phone || 'N/A',
+        first_name: user.first_name || null,
+        last_name: user.last_name || null,
         role: user.role,
+        avatar_url: user.avatar_url || null,
         createdAt: new Date(user.created_at).toLocaleDateString('fr-FR', {
           day: '2-digit',
           month: '2-digit',
@@ -1321,6 +1324,8 @@ export const getAdminTransactions = async (req: Request, res: Response): Promise
         o.id as order_id_full,
         u.email as user_email,
         u.phone as user_phone,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name,
         d.email as driver_email,
         d.phone as driver_phone
       FROM transactions t
@@ -1358,14 +1363,19 @@ export const getAdminTransactions = async (req: Request, res: Response): Promise
     }
 
     if (search) {
+      const searchPattern = `%${search}%`;
       query += ` AND (
         t.id::text ILIKE $${paramIndex} OR
         t.order_id::text ILIKE $${paramIndex} OR
         u.email ILIKE $${paramIndex} OR
-        u.phone ILIKE $${paramIndex}
+        u.phone ILIKE $${paramIndex} OR
+        u.first_name ILIKE $${paramIndex} OR
+        u.last_name ILIKE $${paramIndex} OR
+        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) ILIKE $${paramIndex}
       )`;
-      params.push(`%${search}%`);
-      paramIndex++;
+      // Utiliser le même pattern pour tous les champs de recherche
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      paramIndex += 7;
     }
 
     const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as count FROM');
@@ -1414,35 +1424,45 @@ export const getAdminReportDeliveries = async (req: Request, res: Response): Pro
       return;
     }
 
-    let query = `SELECT * FROM orders WHERE 1=1`;
+    let query = `
+      SELECT 
+        o.*,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name,
+        u.email as user_email,
+        u.phone as user_phone
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE 1=1
+    `;
     const params: any[] = [];
     let paramIndex = 1;
 
     if (startDate) {
-      query += ` AND created_at >= $${paramIndex}`;
+      query += ` AND o.created_at >= $${paramIndex}`;
       params.push(startDate);
       paramIndex++;
     }
 
     if (endDate) {
-      query += ` AND created_at <= $${paramIndex}`;
+      query += ` AND o.created_at <= $${paramIndex}`;
       params.push(endDate);
       paramIndex++;
     }
 
     if (status && status !== 'all') {
-      query += ` AND status = $${paramIndex}`;
+      query += ` AND o.status = $${paramIndex}`;
       params.push(status);
       paramIndex++;
     }
 
     if (driverId) {
-      query += ` AND driver_id = $${paramIndex}`;
+      query += ` AND o.driver_id = $${paramIndex}`;
       params.push(driverId);
       paramIndex++;
     }
 
-    query += ` ORDER BY created_at DESC`;
+    query += ` ORDER BY o.created_at DESC`;
 
     const result = await (pool as any).query(query, params);
 
@@ -1557,6 +1577,8 @@ export const getAdminReportClients = async (req: Request, res: Response): Promis
         u.id,
         u.email,
         u.phone,
+        u.first_name,
+        u.last_name,
         u.role,
         u.created_at,
         COUNT(DISTINCT o.id) as total_orders,
@@ -1580,7 +1602,7 @@ export const getAdminReportClients = async (req: Request, res: Response): Promis
       paramIndex++;
     }
 
-    query += ` GROUP BY u.id, u.email, u.phone, u.role, u.created_at ORDER BY total_orders DESC`;
+    query += ` GROUP BY u.id, u.email, u.phone, u.first_name, u.last_name, u.role, u.created_at ORDER BY total_orders DESC`;
 
     const result = await (pool as any).query(query, params);
 
@@ -1765,7 +1787,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
 
     // Récupérer les infos utilisateur
     const userResult = await (pool as any).query(
-      `SELECT id, email, phone, role, created_at, avatar_url
+      `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users
        WHERE id = $1 AND role = 'driver'`,
       [driverId]
@@ -1869,12 +1891,294 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         ? (acceptanceResult.rows[0].accepted / acceptanceResult.rows[0].total_assigned) * 100
         : 0;
 
+    // Compter les livraisons annulées
+    const cancelledQuery = `
+      SELECT COUNT(*) as cancelled_count
+      FROM orders
+      WHERE driver_id = $1 AND status = 'cancelled'
+    `;
+    const cancelledResult = await (pool as any).query(cancelledQuery, [driverId]);
+    const cancelledDeliveries = parseInt(cancelledResult.rows[0]?.cancelled_count || '0');
+
+    // Récupérer les courses en attente de paiement (orders complétées avec paiement partiel/différé ou sans transaction complète)
+    let pendingPaymentOrders: any[] = [];
+    try {
+      // D'abord, récupérer TOUTES les orders complétées du livreur (sans filtre sur les transactions)
+      // Ensuite, on calculera côté application si elles sont en attente de paiement
+      const allCompletedOrdersQuery = `
+        SELECT 
+          o.id as order_id,
+          o.created_at as order_created_at,
+          o.status as order_status,
+          ${priceColumn || '0'} as order_amount,
+          u.id as client_id,
+          u.first_name as client_first_name,
+          u.last_name as client_last_name,
+          u.email as client_email,
+          u.phone as client_phone
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        WHERE o.driver_id = $1
+          AND o.status = 'completed'
+        ORDER BY o.created_at DESC
+        LIMIT 500
+      `;
+      const allCompletedOrdersResult = await (pool as any).query(allCompletedOrdersQuery, [driverId]);
+      
+      logger.info(`[getAdminDriverDetails] Récupéré ${allCompletedOrdersResult.rows.length} orders complétées pour driver ${driverId}`);
+      
+      // Pour chaque order, récupérer toutes ses transactions et déterminer si elle est en attente de paiement
+      const pendingPaymentResult = {
+        rows: [] as any[]
+      };
+      
+      for (const orderRow of allCompletedOrdersResult.rows) {
+        const orderId = orderRow.order_id;
+        
+        // Récupérer toutes les transactions pour cette order
+        const transactionsQuery = `
+          SELECT 
+            id,
+            amount,
+            partial_amount,
+            remaining_amount,
+            is_partial,
+            payment_method_type,
+            status,
+            created_at
+          FROM transactions
+          WHERE order_id = $1
+          ORDER BY created_at DESC
+        `;
+        const transactionsResult = await (pool as any).query(transactionsQuery, [orderId]);
+        const transactions = transactionsResult.rows || [];
+        
+        // Calculer le montant total payé
+        let totalPaid = 0;
+        let latestRemaining = 0;
+        let latestTransaction: any = null;
+        
+        if (transactions.length > 0) {
+          // Utiliser la transaction la plus récente pour les infos de statut
+          latestTransaction = transactions[0];
+          
+          // Calculer le total payé en additionnant toutes les transactions
+          for (const tx of transactions) {
+            const paidAmount = tx.partial_amount && tx.partial_amount > 0 
+              ? parseFloat(tx.partial_amount) 
+              : parseFloat(tx.amount || '0');
+            totalPaid += paidAmount;
+          }
+          
+          latestRemaining = parseFloat(latestTransaction.remaining_amount || '0');
+        }
+        
+        const orderAmount = parseFloat(orderRow.order_amount || '0');
+        const remainingAmount = latestRemaining > 0 
+          ? latestRemaining 
+          : Math.max(0, orderAmount - totalPaid);
+        
+        // Déterminer si cette order est en attente de paiement
+        const isPendingPayment = 
+          transactions.length === 0 || // Pas de transaction = en attente
+          latestTransaction?.is_partial === true || // Paiement partiel
+          latestTransaction?.payment_method_type === 'deferred' || // Paiement différé
+          remainingAmount > 0 || // Montant restant > 0
+          (latestTransaction?.status && latestTransaction.status !== 'paid'); // Transaction non payée
+        
+        if (isPendingPayment) {
+          pendingPaymentResult.rows.push({
+            order_id: orderId,
+            order_created_at: orderRow.order_created_at,
+            order_status: orderRow.order_status,
+            order_amount: orderAmount,
+            transaction_id: latestTransaction?.id || null,
+            transaction_amount: latestTransaction?.amount || orderAmount,
+            partial_amount: totalPaid,
+            remaining_amount: remainingAmount,
+            is_partial: latestTransaction?.is_partial || false,
+            payment_method_type: latestTransaction?.payment_method_type || null,
+            transaction_status: latestTransaction?.status || null,
+            transaction_created_at: latestTransaction?.created_at || null,
+            client_id: orderRow.client_id,
+            client_first_name: orderRow.client_first_name,
+            client_last_name: orderRow.client_last_name,
+            client_email: orderRow.client_email,
+            client_phone: orderRow.client_phone,
+          });
+        }
+      }
+      
+      logger.info(`[getAdminDriverDetails] ${pendingPaymentResult.rows.length} orders en attente de paiement pour driver ${driverId}`);
+      
+      // Mapper les résultats au format attendu
+      pendingPaymentOrders = pendingPaymentResult.rows.map((row: any) => ({
+        orderId: row.order_id,
+        orderCreatedAt: row.order_created_at,
+        orderStatus: row.order_status,
+        orderAmount: parseFloat(row.order_amount || '0'),
+        transactionId: row.transaction_id || null,
+        transactionAmount: parseFloat(row.transaction_amount || row.order_amount || '0'),
+        partialAmount: parseFloat(row.partial_amount || '0'),
+        remainingAmount: parseFloat(row.remaining_amount || '0'),
+        isPartial: row.is_partial || false,
+        paymentMethodType: row.payment_method_type || null,
+        transactionStatus: row.transaction_status || null,
+        transactionCreatedAt: row.transaction_created_at || null,
+        client: {
+          id: row.client_id,
+          firstName: row.client_first_name,
+          lastName: row.client_last_name,
+          email: row.client_email,
+          phone: row.client_phone,
+        },
+      }));
+    } catch (pendingPaymentError) {
+      logger.warn('Erreur récupération courses en attente de paiement:', pendingPaymentError);
+    }
+
+    // Récupérer l'historique des courses récentes (toutes les courses du livreur)
+    let recentOrders: any[] = [];
+    try {
+      // Utiliser une sous-requête LATERAL pour obtenir la transaction la plus récente par order
+      const recentOrdersQuery = `
+        SELECT 
+          o.id,
+          o.status,
+          o.created_at,
+          o.accepted_at,
+          o.completed_at,
+          o.cancelled_at,
+          ${priceColumn || '0'} as price,
+          o.distance,
+          o.delivery_method,
+          u.id as client_id,
+          u.first_name as client_first_name,
+          u.last_name as client_last_name,
+          u.email as client_email,
+          t.id as transaction_id,
+          COALESCE(t.amount, ${priceColumn || '0'}) as transaction_amount,
+          COALESCE(t.partial_amount, 0) as partial_amount,
+          COALESCE(t.remaining_amount, CASE WHEN t.id IS NULL THEN ${priceColumn || '0'} ELSE 0 END) as remaining_amount,
+          COALESCE(t.is_partial, false) as is_partial,
+          t.payment_method_type,
+          t.status as transaction_status
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN LATERAL (
+          SELECT * FROM transactions 
+          WHERE order_id = o.id 
+          ORDER BY created_at DESC 
+          LIMIT 1
+        ) t ON true
+        WHERE o.driver_id = $1
+        ORDER BY o.created_at DESC
+        LIMIT 200
+      `;
+      const recentOrdersResult = await (pool as any).query(recentOrdersQuery, [driverId]);
+      
+      logger.info(`[getAdminDriverDetails] Récupéré ${recentOrdersResult.rows.length} orders pour l'historique du driver ${driverId}`);
+      
+      // Pour chaque order, calculer correctement le montant payé et restant en tenant compte de toutes les transactions
+      recentOrders = await Promise.all(recentOrdersResult.rows.map(async (row: any) => {
+        const orderId = row.id;
+        const orderAmount = parseFloat(row.price || '0');
+        
+        // Récupérer toutes les transactions pour cette order
+        const allTransactionsQuery = `
+          SELECT 
+            id,
+            amount,
+            partial_amount,
+            remaining_amount,
+            is_partial,
+            payment_method_type,
+            status,
+            created_at
+          FROM transactions
+          WHERE order_id = $1
+          ORDER BY created_at DESC
+        `;
+        const transactionsResult = await (pool as any).query(allTransactionsQuery, [orderId]);
+        const transactions = transactionsResult.rows || [];
+        
+        // Calculer le montant total payé
+        let totalPaid = 0;
+        let latestRemaining = 0;
+        let latestTransaction: any = null;
+        
+        if (transactions.length > 0) {
+          latestTransaction = transactions[0];
+          
+          // Calculer le total payé en additionnant toutes les transactions
+          for (const tx of transactions) {
+            const paidAmount = tx.partial_amount && tx.partial_amount > 0 
+              ? parseFloat(tx.partial_amount) 
+              : parseFloat(tx.amount || '0');
+            totalPaid += paidAmount;
+          }
+          
+          latestRemaining = parseFloat(latestTransaction.remaining_amount || '0');
+        }
+        
+        const remainingAmount = latestRemaining > 0 
+          ? latestRemaining 
+          : (row.status === 'completed' ? Math.max(0, orderAmount - totalPaid) : 0);
+        
+        // Déterminer le statut de paiement
+        let paymentStatus: 'paid' | 'partial' | 'pending' | 'none' = 'none';
+        if (row.status === 'completed') {
+          if (transactions.length === 0) {
+            paymentStatus = 'pending'; // Pas de transaction = en attente
+          } else if (latestTransaction.status === 'paid' && remainingAmount === 0) {
+            paymentStatus = 'paid'; // Payé complètement
+          } else if (latestTransaction.is_partial === true || remainingAmount > 0) {
+            paymentStatus = 'partial'; // Paiement partiel
+          } else if (latestTransaction.status && latestTransaction.status !== 'paid') {
+            paymentStatus = 'pending'; // Transaction non payée
+          } else {
+            paymentStatus = 'pending';
+          }
+        }
+        
+        return {
+          id: row.id,
+          status: row.status,
+          createdAt: row.created_at,
+          acceptedAt: row.accepted_at,
+          completedAt: row.completed_at,
+          cancelledAt: row.cancelled_at,
+          price: orderAmount,
+          distance: parseFloat(row.distance || '0'),
+          deliveryMethod: row.delivery_method,
+          client: {
+            id: row.client_id,
+            firstName: row.client_first_name,
+            lastName: row.client_last_name,
+            email: row.client_email,
+          },
+          payment: {
+            status: paymentStatus,
+            partialAmount: totalPaid,
+            remainingAmount,
+            transactionStatus: latestTransaction?.status || null,
+          },
+        };
+      }));
+      
+      logger.info(`[getAdminDriverDetails] ${recentOrders.length} orders mappées pour l'historique du driver ${driverId}`);
+    } catch (recentOrdersError) {
+      logger.warn('Erreur récupération historique courses:', recentOrdersError);
+    }
+
     res.json({
       success: true,
       data: {
         id: user.id,
         email: user.email,
         phone: user.phone,
+        first_name: user.first_name || null,
+        last_name: user.last_name || null,
         createdAt: user.created_at,
         avatarUrl: user.avatar_url,
         // Profil driver
@@ -1882,11 +2186,15 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
           ? {
               vehicleType: driverProfile.vehicle_type,
               vehiclePlate: driverProfile.vehicle_plate,
+              vehicleBrand: driverProfile.vehicle_brand,
               vehicleModel: driverProfile.vehicle_model,
+              vehicleColor: driverProfile.vehicle_color,
+              licenseNumber: driverProfile.license_number,
               isOnline: driverProfile.is_online || false,
               isAvailable: driverProfile.is_available || false,
               currentLatitude: driverProfile.current_latitude,
               currentLongitude: driverProfile.current_longitude,
+              lastLocationUpdate: driverProfile.last_location_update,
             }
           : null,
         // Statistiques
@@ -1894,6 +2202,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
           totalDeliveries: parseInt(stats.total_completed || '0'),
           todayDeliveries: parseInt(stats.today_completed || '0'),
           weekDeliveries: parseInt(stats.week_completed || '0'),
+          cancelledDeliveries,
           totalRevenue: parseFloat(stats.total_revenue || '0'),
           averageRevenuePerDelivery:
             parseInt(stats.total_completed || '0') > 0
@@ -1905,6 +2214,10 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
           totalRatings,
           acceptanceRate: Math.round(acceptanceRate * 10) / 10,
         },
+        // Courses en attente de paiement
+        pendingPaymentOrders,
+        // Historique des courses récentes
+        recentOrders,
       },
     });
   } catch (error: any) {
@@ -1966,7 +2279,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
 
     // Récupérer les infos utilisateur
     const userResult = await (pool as any).query(
-      `SELECT id, email, phone, role, created_at, avatar_url
+      `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users
        WHERE id = $1 AND role = 'client'`,
       [clientId]
@@ -2053,12 +2366,86 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
       // Colonne peut ne pas exister
     }
 
+    // Récupérer les informations sur les paiements différés
+    let deferredPayments = {
+      totalPaid: 0,
+      totalRemaining: 0,
+      totalDue: 0,
+      globalStatus: 'paid' as 'paid' | 'partially_paid' | 'unpaid',
+      transactions: [] as any[],
+    };
+
+    try {
+      // Récupérer toutes les transactions avec paiement différé ou partiel
+      const deferredTransactionsQuery = `
+        SELECT 
+          t.id,
+          t.order_id,
+          t.amount,
+          t.partial_amount,
+          t.remaining_amount,
+          t.is_partial,
+          t.payment_method_type,
+          t.status,
+          t.created_at,
+          o.id as order_id_full
+        FROM transactions t
+        LEFT JOIN orders o ON t.order_id = o.id
+        WHERE t.user_id = $1 
+          AND (t.is_partial = true OR t.payment_method_type = 'deferred' OR t.remaining_amount > 0)
+        ORDER BY t.created_at DESC
+      `;
+
+      const deferredResult = await (pool as any).query(deferredTransactionsQuery, [clientId]);
+      const transactions = deferredResult.rows || [];
+
+      // Calculer les totaux
+      let totalPaid = 0;
+      let totalRemaining = 0;
+
+      transactions.forEach((tx: any) => {
+        const partialAmount = parseFloat(tx.partial_amount || tx.amount || '0');
+        const remainingAmount = parseFloat(tx.remaining_amount || '0');
+        
+        totalPaid += partialAmount;
+        totalRemaining += remainingAmount;
+      });
+
+      // Déterminer le statut global
+      let globalStatus: 'paid' | 'partially_paid' | 'unpaid' = 'paid';
+      if (totalRemaining > 0) {
+        globalStatus = totalPaid > 0 ? 'partially_paid' : 'unpaid';
+      }
+
+      deferredPayments = {
+        totalPaid,
+        totalRemaining,
+        totalDue: totalPaid + totalRemaining,
+        globalStatus,
+        transactions: transactions.map((tx: any) => ({
+          id: tx.id,
+          orderId: tx.order_id || tx.order_id_full,
+          amount: parseFloat(tx.amount || '0'),
+          partialAmount: parseFloat(tx.partial_amount || '0'),
+          remainingAmount: parseFloat(tx.remaining_amount || '0'),
+          isPartial: tx.is_partial || false,
+          paymentMethodType: tx.payment_method_type,
+          status: tx.status,
+          createdAt: tx.created_at,
+        })),
+      };
+    } catch (deferredError) {
+      logger.warn('Erreur récupération paiements différés:', deferredError);
+    }
+
     res.json({
       success: true,
       data: {
         id: user.id,
         email: user.email,
         phone: user.phone,
+        first_name: user.first_name || null,
+        last_name: user.last_name || null,
         createdAt: user.created_at,
         avatarUrl: user.avatar_url,
         statistics: {
@@ -2071,6 +2458,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
           averageRatingGiven,
           totalRatingsGiven,
         },
+        deferredPayments,
       },
     });
   } catch (error: any) {

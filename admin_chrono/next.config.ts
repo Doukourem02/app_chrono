@@ -1,6 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Configuration des images pour autoriser les domaines externes
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
+  
   // Configuration pour permettre les requêtes cross-origin en développement
   ...(process.env.NODE_ENV === 'development' && {
     allowedDevOrigins: ['http://192.168.1.85:3000', 'http://localhost:3000', 'http://192.168.1.91:3000'],

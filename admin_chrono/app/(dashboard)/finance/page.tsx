@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { Wallet, TrendingUp, CreditCard, Clock, Download, RefreshCw } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
+import { exportData } from '@/utils/exportUtils'
 import {
   BarChart,
   Bar,
@@ -25,6 +26,8 @@ interface Transaction {
   order_id_full?: string
   user_email?: string
   user_phone?: string
+  user_first_name?: string
+  user_last_name?: string
   amount?: number | string
   payment_method_type?: string
   status?: string
@@ -200,10 +203,14 @@ export default function FinancePage() {
   }
 
   const periodTabActiveStyle: React.CSSProperties = {
-    ...periodTabStyle,
+    padding: '8px 16px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    border: '1px solid #8B5CF6',
     backgroundColor: '#8B5CF6',
     color: '#FFFFFF',
-    borderColor: '#8B5CF6',
   }
 
   const kpiGridStyle: React.CSSProperties = {
@@ -411,6 +418,45 @@ export default function FinancePage() {
             Actualiser
           </button>
           <button
+            onClick={() => {
+              const transactions: Transaction[] = (transactionsData?.data as Transaction[]) || []
+              if (transactions.length === 0) {
+                alert('Aucune transaction à exporter')
+                return
+              }
+
+              exportData({
+                title: `Rapport Financier - ${periods.find((p) => p.key === selectedPeriod)?.label || 'Période'}`,
+                headers: [
+                  'ID Transaction',
+                  'ID Commande',
+                  'Nom et Prénom Client',
+                  'Téléphone Client',
+                  'Montant (FCFA)',
+                  'Méthode de paiement',
+                  'Statut',
+                  'Date',
+                ],
+                rows: transactions.map((tx: Transaction) => {
+                  const clientName = (tx.user_first_name && tx.user_last_name)
+                    ? `${tx.user_first_name} ${tx.user_last_name}`
+                    : tx.user_email || 'N/A'
+                  return [
+                    tx.id.slice(0, 8) + '...',
+                    tx.order_id_full?.slice(0, 8) + '...' || 'N/A',
+                    clientName,
+                    tx.user_phone || 'N/A',
+                    typeof tx.amount === 'string'
+                      ? parseFloat(tx.amount) || 0
+                      : tx.amount || 0,
+                    getMethodLabel(tx.payment_method_type || ''),
+                    getStatusLabel(tx.status || ''),
+                    formatDate(tx.created_at || ''),
+                  ]
+                }),
+                filename: `rapport_financier_${selectedPeriod}_${new Date().toISOString().split('T')[0]}`,
+              })
+            }}
             style={{
               padding: '10px 20px',
               borderRadius: '8px',
@@ -571,7 +617,7 @@ export default function FinancePage() {
       <div style={filtersStyle}>
         <input
           type="text"
-          placeholder="Rechercher par ID transaction, commande, email..."
+          placeholder="Rechercher par ID transaction, commande, nom, prénom, email..."
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value)
@@ -640,7 +686,11 @@ export default function FinancePage() {
                       <td style={tdStyle}>{tx.id.slice(0, 8)}...</td>
                       <td style={tdStyle}>{tx.order_id_full?.slice(0, 8) || 'N/A'}...</td>
                       <td style={tdStyle}>
-                        <div>{tx.user_email || 'N/A'}</div>
+                        <div>
+                          {(tx.user_first_name && tx.user_last_name)
+                            ? `${tx.user_first_name} ${tx.user_last_name}`
+                            : tx.user_email || 'N/A'}
+                        </div>
                         <div style={{ fontSize: '12px', color: '#6B7280' }}>
                           {tx.user_phone || ''}
                         </div>

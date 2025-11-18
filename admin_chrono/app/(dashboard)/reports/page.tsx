@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { Download, TrendingUp, Users, Truck, CreditCard, LucideIcon } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
+import { exportData } from '@/utils/exportUtils'
 import {
   BarChart,
   Bar,
@@ -29,6 +30,10 @@ interface Delivery {
   driver_id?: string
   price?: number | string
   price_cfa?: number | string
+  user_first_name?: string
+  user_last_name?: string
+  user_email?: string
+  user_phone?: string
 }
 
 interface Revenue {
@@ -42,6 +47,8 @@ interface Client {
   id: string
   email?: string
   phone?: string
+  first_name?: string
+  last_name?: string
   created_at?: string
   total_orders?: number
   completed_orders?: number
@@ -207,8 +214,152 @@ export default function ReportsPage() {
   }
 
   const handleExport = () => {
-    // TODO: Implémenter l'export PDF/Excel
-    alert('Fonctionnalité d\'export à venir')
+    switch (reportType) {
+      case 'deliveries': {
+        const deliveries: Delivery[] = (deliveriesData?.data as Delivery[]) || []
+        if (deliveries.length === 0) {
+          alert('Aucune donnée à exporter')
+          return
+        }
+
+        exportData(
+          {
+            title: `Rapport des Livraisons - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
+            headers: ['ID', 'Date', 'Statut', 'Client', 'Driver ID', 'Montant (FCFA)'],
+            rows: deliveries.map((order: Delivery) => {
+              const clientName = (order.user_first_name && order.user_last_name)
+                ? `${order.user_first_name} ${order.user_last_name}`
+                : order.user_email || order.user_id?.slice(0, 8) + '...' || 'N/A'
+              return [
+                order.id.slice(0, 8) + '...',
+                formatDate(order.created_at || ''),
+                order.status || 'N/A',
+                clientName,
+                order.driver_id?.slice(0, 8) + '...' || 'N/A',
+                typeof order.price === 'number'
+                  ? order.price
+                  : typeof order.price_cfa === 'number'
+                  ? order.price_cfa
+                  : parseFloat(String(order.price || order.price_cfa || 0)),
+              ]
+            }),
+            filename: `rapport_livraisons_${new Date().toISOString().split('T')[0]}`,
+          }
+        )
+        break
+      }
+
+      case 'revenues': {
+        const revenues: Revenue[] = (revenuesData?.data as Revenue[]) || []
+        if (revenues.length === 0) {
+          alert('Aucune donnée à exporter')
+          return
+        }
+
+        exportData(
+          {
+            title: `Rapport des Revenus - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
+            headers: ['Date', 'Type de livraison', 'Nombre de livraisons', 'Revenus (FCFA)'],
+            rows: revenues.map((r: Revenue) => [
+              formatDate(r.date || ''),
+              r.delivery_method || 'N/A',
+              typeof r.deliveries === 'number' ? r.deliveries : parseInt(String(r.deliveries || 0)),
+              typeof r.revenue === 'number' ? r.revenue : parseFloat(String(r.revenue || 0)),
+            ]),
+            filename: `rapport_revenus_${new Date().toISOString().split('T')[0]}`,
+          }
+        )
+        break
+      }
+
+      case 'clients': {
+        const clients: Client[] = (clientsData?.data as Client[]) || []
+        if (clients.length === 0) {
+          alert('Aucune donnée à exporter')
+          return
+        }
+
+        exportData(
+          {
+            title: `Rapport des Clients - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
+            headers: ['Nom et Prénom', 'Téléphone', "Date d'inscription", 'Commandes totales', 'Commandes complétées'],
+            rows: clients.map((client: Client) => {
+              const clientName = (client.first_name && client.last_name)
+                ? `${client.first_name} ${client.last_name}`
+                : client.email || 'N/A'
+              return [
+                clientName,
+                client.phone || 'N/A',
+                formatDate(client.created_at || ''),
+                client.total_orders || 0,
+                client.completed_orders || 0,
+              ]
+            }),
+            filename: `rapport_clients_${new Date().toISOString().split('T')[0]}`,
+          }
+        )
+        break
+      }
+
+      case 'drivers': {
+        const drivers: Driver[] = (driversData?.data as Driver[]) || []
+        if (drivers.length === 0) {
+          alert('Aucune donnée à exporter')
+          return
+        }
+
+        exportData(
+          {
+            title: `Rapport des Drivers - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
+            headers: ['Email', 'Téléphone', "Date d'inscription", 'Livraisons totales', 'Livraisons complétées', 'Revenus totaux (FCFA)', 'Rating moyen'],
+            rows: drivers.map((driver: Driver) => [
+              driver.email || 'N/A',
+              driver.phone || 'N/A',
+              formatDate(driver.created_at || ''),
+              driver.total_deliveries || 0,
+              driver.completed_deliveries || 0,
+              typeof driver.total_revenue === 'number'
+                ? driver.total_revenue
+                : parseFloat(String(driver.total_revenue || 0)),
+              driver.averageRating
+                ? `${driver.averageRating.toFixed(1)} ⭐ (${driver.totalRatings || 0})`
+                : 'N/A',
+            ]),
+            filename: `rapport_drivers_${new Date().toISOString().split('T')[0]}`,
+          }
+        )
+        break
+      }
+
+      case 'payments': {
+        const payments: Payment[] = (paymentsData?.data as Payment[]) || []
+        if (payments.length === 0) {
+          alert('Aucune donnée à exporter')
+          return
+        }
+
+        exportData(
+          {
+            title: `Rapport des Paiements - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
+            headers: ['Date', 'Méthode de paiement', 'Statut', 'Nombre', 'Montant total (FCFA)'],
+            rows: payments.map((p: Payment) => [
+              formatDate(p.date || ''),
+              p.payment_method_type || 'N/A',
+              p.status || 'N/A',
+              p.count || 0,
+              typeof p.total_amount === 'number'
+                ? p.total_amount
+                : parseFloat(String(p.total_amount || 0)),
+            ]),
+            filename: `rapport_paiements_${new Date().toISOString().split('T')[0]}`,
+          }
+        )
+        break
+      }
+
+      default:
+        alert('Type de rapport non supporté pour l\'export')
+    }
   }
 
   const reportTypes: { key: ReportType; label: string; icon: LucideIcon }[] = [
@@ -260,9 +411,7 @@ export default function ReportsPage() {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: '#E5E7EB',
+    border: '1px solid #E5E7EB',
     backgroundColor: '#FFFFFF',
     color: '#6B7280',
     display: 'flex',
@@ -272,10 +421,18 @@ export default function ReportsPage() {
   }
 
   const tabActiveStyle: React.CSSProperties = {
-    ...tabStyle,
+    padding: '12px 20px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    border: '1px solid #8B5CF6',
     backgroundColor: '#8B5CF6',
     color: '#FFFFFF',
-    borderColor: '#8B5CF6',
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8px',
   }
 
   const filtersCardStyle: React.CSSProperties = {
@@ -375,24 +532,29 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {deliveries.slice(0, 50).map((order: Delivery) => (
-                    <tr key={order.id}>
-                      <td style={tdStyle}>{order.id.slice(0, 8)}...</td>
-                      <td style={tdStyle}>{formatDate(order.created_at || '')}</td>
-                      <td style={tdStyle}>{order.status || 'N/A'}</td>
-                      <td style={tdStyle}>{order.user_id?.slice(0, 8) || 'N/A'}...</td>
-                      <td style={tdStyle}>{order.driver_id?.slice(0, 8) || 'N/A'}...</td>
-                      <td style={tdStyle}>
-                        {formatCurrency(
-                          typeof order.price === 'number' 
-                            ? order.price 
-                            : typeof order.price_cfa === 'number'
-                            ? order.price_cfa
-                            : parseFloat(String(order.price || order.price_cfa || 0))
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {deliveries.slice(0, 50).map((order: Delivery) => {
+                    const clientName = (order.user_first_name && order.user_last_name)
+                      ? `${order.user_first_name} ${order.user_last_name}`
+                      : order.user_email || order.user_id?.slice(0, 8) + '...' || 'N/A'
+                    return (
+                      <tr key={order.id}>
+                        <td style={tdStyle}>{order.id.slice(0, 8)}...</td>
+                        <td style={tdStyle}>{formatDate(order.created_at || '')}</td>
+                        <td style={tdStyle}>{order.status || 'N/A'}</td>
+                        <td style={tdStyle}>{clientName}</td>
+                        <td style={tdStyle}>{order.driver_id?.slice(0, 8) || 'N/A'}...</td>
+                        <td style={tdStyle}>
+                          {formatCurrency(
+                            typeof order.price === 'number' 
+                              ? order.price 
+                              : typeof order.price_cfa === 'number'
+                              ? order.price_cfa
+                              : parseFloat(String(order.price || order.price_cfa || 0))
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             )}
@@ -479,7 +641,7 @@ export default function ReportsPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th style={thStyle}>Email</th>
+                    <th style={thStyle}>Nom et Prénom</th>
                     <th style={thStyle}>Téléphone</th>
                     <th style={thStyle}>Date d&apos;inscription</th>
                     <th style={thStyle}>Commandes totales</th>
@@ -487,15 +649,20 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clients.map((client: Client) => (
-                    <tr key={client.id}>
-                      <td style={tdStyle}>{client.email || 'N/A'}</td>
-                      <td style={tdStyle}>{client.phone || 'N/A'}</td>
-                      <td style={tdStyle}>{formatDate(client.created_at || '')}</td>
-                      <td style={tdStyle}>{client.total_orders || 0}</td>
-                      <td style={tdStyle}>{client.completed_orders || 0}</td>
-                    </tr>
-                  ))}
+                  {clients.map((client: Client) => {
+                    const clientName = (client.first_name && client.last_name)
+                      ? `${client.first_name} ${client.last_name}`
+                      : client.email || 'N/A'
+                    return (
+                      <tr key={client.id}>
+                        <td style={tdStyle}>{clientName}</td>
+                        <td style={tdStyle}>{client.phone || 'N/A'}</td>
+                        <td style={tdStyle}>{formatDate(client.created_at || '')}</td>
+                        <td style={tdStyle}>{client.total_orders || 0}</td>
+                        <td style={tdStyle}>{client.completed_orders || 0}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             )}

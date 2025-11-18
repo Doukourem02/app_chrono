@@ -94,7 +94,9 @@ const activeOrders = new Map<string, Order>();
 const connectedDrivers = new Map<string, string>(); // driverId -> socketId
 const connectedUsers = new Map<string, string>(); // userId -> socketId // Limites configurable pour les commandes multiples
 const MAX_ACTIVE_ORDERS_PER_CLIENT = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_CLIENT || '5');
-const MAX_ACTIVE_ORDERS_PER_DRIVER = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_DRIVER || ''); // Fonction pour compter les commandes actives d'un client
+const MAX_ACTIVE_ORDERS_PER_DRIVER = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_DRIVER || '3');
+
+// Fonction pour compter les commandes actives d'un client
 function getActiveOrdersCountByUser(userId: string): number { let count = 0; for (const [, order] of activeOrders.entries()) { if (order.user.id === userId && 
         order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined') { count++; } }
   return count;
@@ -315,8 +317,15 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             driverData.current_longitude!
           ) : null;
           
-         console.log(` - ${maskUserId(driverId)}: online=${driverData.is_online}, available=${driverData.is_available}, connected=${isConnected}, has_position=${hasPosition}${distance !== null ? `, distance=${distance.toFixed(2)}km` : ''}`); } if (nearbyDrivers.length === 0) { console.log(`Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`); io.to(socket.id).emit('no-drivers-available', { orderId: order.id, message: 'Aucun chauffeur disponible dans votre zone' }); return; } if (DEBUG) console.log(`${nearbyDrivers.length} chauffeurs trouvés pour la commande ${maskOrderId(order.id)}`); let driverIndex = 0; const tryNextDriver = async (): Promise<void> => { if (driverIndex >= nearbyDrivers.length) {
-           console.log(`Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)} - Annulation automatique`); try { order.status = 'cancelled'; order.cancelledAt = new Date(); await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt }); console.log(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB`); } catch (dbError: any) { console.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message); } const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) { io.to(userSocketId).emit('order-cancelled', { orderId: order.id, reason: 'no_drivers_available', message: 'Aucun chauffeur disponible - Commande annulée' }); } socket.emit('no-drivers-available', { orderId: order.id, message: 'Tous les chauffeurs sont occupés - Commande annulée' }); activeOrders.delete(order.id); return;
+         console.log(` - ${maskUserId(driverId)}: online=${driverData.is_online}, available=${driverData.is_available}, connected=${isConnected}, has_position=${hasPosition}${distance !== null ? `, distance=${distance.toFixed(2)}km` : ''}`); } if (nearbyDrivers.length === 0) {
+          console.log(`Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`);
+          io.to(socket.id).emit('no-drivers-available', { orderId: order.id, message: 'Aucun chauffeur disponible dans votre zone' });
+          return;
+        }
+        if (DEBUG) console.log(`${nearbyDrivers.length} chauffeurs trouvés pour la commande ${maskOrderId(order.id)}`);
+        let driverIndex = 0;
+        const tryNextDriver = async (): Promise<void> => { if (driverIndex >= nearbyDrivers.length) {
+            console.log(`Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)} - Annulation automatique`); try { order.status = 'cancelled'; order.cancelledAt = new Date(); await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt }); console.log(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB`); } catch (dbError: any) { console.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message); } const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) { io.to(userSocketId).emit('order-cancelled', { orderId: order.id, reason: 'no_drivers_available', message: 'Aucun chauffeur disponible - Commande annulée' }); } socket.emit('no-drivers-available', { orderId: order.id, message: 'Tous les chauffeurs sont occupés - Commande annulée' }); activeOrders.delete(order.id); return;
           }
 
           const driver = nearbyDrivers[driverIndex];

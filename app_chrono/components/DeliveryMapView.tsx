@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { StyleSheet, View, Text, Animated } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Circle } from 'react-native-maps';
 import { OnlineDriver } from '../hooks/useOnlineDrivers';
 import { useRadarPulse } from '../hooks/useRadarPulse';
+import { useAnimatedRoute } from '../hooks/useAnimatedRoute';
 
 type Coordinates = {
   latitude: number;
@@ -31,6 +32,59 @@ interface DeliveryMapViewProps {
   radarCoords?: Coordinates | null;
 }
 
+// Style minimal de la carte (similaire à admin_chrono)
+const minimalMapStyle = [
+  {
+    elementType: 'geometry',
+    stylers: [{ color: '#F7F8FC' }],
+  },
+  {
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#94A3B8' }],
+  },
+  {
+    elementType: 'labels.text.stroke',
+    stylers: [{ color: '#FFFFFF' }],
+  },
+  {
+    featureType: 'administrative',
+    elementType: 'geometry',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'poi',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#E4E7EC' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#A0AEC0' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#C7D2FE' }],
+  },
+  {
+    featureType: 'transit',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#D8E7FB' }],
+  },
+];
+
 export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   mapRef,
   region,
@@ -40,7 +94,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   driverCoords,
   orderDriverCoords,
   orderStatus,
-  onlineDrivers, 
+  onlineDrivers,
   isSearchingDriver,
   destinationPulseAnim,
   userPulseAnim,
@@ -49,17 +103,63 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   selectedMethod,
   availableVehicles,
   showMethodSelection,
-  onMapPress, // 🆕
+  onMapPress,
   radarCoords,
 }) => {
-  const { pulseAnim: radarPulseAnim } = useRadarPulse(isSearchingDriver);
+  const { outerPulse, innerPulse } = useRadarPulse(isSearchingDriver);
+  const radarCenter = radarCoords || pickupCoords || null;
+  const [outerRadius, setOuterRadius] = useState(0);
+  const [innerRadius, setInnerRadius] = useState(0);
 
-  
+  useEffect(() => {
+    const outerListenerId = outerPulse.addListener(({ value }) => {
+      setOuterRadius(120 + value * (340 - 120));
+    });
+
+    const innerListenerId = innerPulse.addListener(({ value }) => {
+      setInnerRadius(60 + value * (220 - 60));
+    });
+
+    return () => {
+      outerPulse.removeListener(outerListenerId);
+      innerPulse.removeListener(innerListenerId);
+    };
+  }, [outerPulse, innerPulse]);
+
+  const filteredOnlineDrivers = useMemo(() => {
+    if (!onlineDrivers) return [];
+
+    return onlineDrivers
+      .filter((driver) => driver.is_online === true)
+      .filter((driver) => {
+        if (!orderDriverCoords) return true;
+        const latDiff = Math.abs(driver.current_latitude - orderDriverCoords.latitude);
+        const lonDiff = Math.abs(driver.current_longitude - orderDriverCoords.longitude);
+        return latDiff > 0.00001 || lonDiff > 0.00001;
+      });
+  }, [onlineDrivers, orderDriverCoords]);
+
+  // Route animée du livreur vers le pickup (quand commande acceptée/en route)
+  const driverToPickupRoute = useAnimatedRoute({
+    origin: (orderStatus === 'accepted' || orderStatus === 'pending') && orderDriverCoords ? orderDriverCoords : null,
+    destination: (orderStatus === 'accepted' || orderStatus === 'pending') && pickupCoords ? pickupCoords : null,
+    enabled: !!(orderStatus === 'accepted' || orderStatus === 'pending') && !!orderDriverCoords && !!pickupCoords,
+  });
+
+  // Route animée du livreur vers le dropoff (quand colis récupéré)
+  const driverToDropoffRoute = useAnimatedRoute({
+    origin: (orderStatus === 'enroute' || orderStatus === 'picked_up') && orderDriverCoords ? orderDriverCoords : null,
+    destination: (orderStatus === 'enroute' || orderStatus === 'picked_up') && dropoffCoords ? dropoffCoords : null,
+    enabled: !!(orderStatus === 'enroute' || orderStatus === 'picked_up') && !!orderDriverCoords && !!dropoffCoords,
+  });
+
   return (
     <MapView 
+      provider={PROVIDER_GOOGLE}
       ref={mapRef} 
       style={styles.map} 
       region={region}
+      customMapStyle={minimalMapStyle}
       showsUserLocation={false}
       showsMyLocationButton={false}
       showsCompass={false}
@@ -68,12 +168,17 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       showsTraffic={false}
       showsIndoors={false}
       showsPointsOfInterest={false}
+      mapType="standard"
+      toolbarEnabled={false}
+      rotateEnabled={true}
+      pitchEnabled={false}
+      scrollEnabled={true}
+      zoomEnabled={true}
       onPress={onMapPress} 
     >
 
 
-      {onlineDrivers
-        ?.filter(driver => driver.is_online === true) 
+      {filteredOnlineDrivers
         .map((driver) => (
           <Marker
             key={driver.user_id}
@@ -83,10 +188,9 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             }}
             title={`${driver.first_name} ${driver.last_name}`}
             description={`${driver.vehicle_type} • Note: ${driver.rating}/5`}
+            tracksViewChanges={false}
           >
-            <View style={styles.driverMarker}>
-              <Text style={styles.driverIcon}>🚗</Text>
-            </View>
+            <View style={styles.driverMarker} />
           </Marker>
         ))}
 
@@ -95,6 +199,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
           coordinate={pickupCoords} 
           title="Ma position" 
           anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={false}
         >
           <View style={styles.userLocationMarker}>
             <View style={styles.userLocationDot} />
@@ -103,59 +208,37 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       )}
 
       
-      {isSearchingDriver && (radarCoords || pickupCoords) && (
-        <Marker 
-          coordinate={radarCoords || pickupCoords!} 
-          anchor={{ x: 0.5, y: 0.5 }} 
-          tracksViewChanges
-        >
-          <View style={styles.searchContainer}>
-            <Animated.View
-              style={[
-                styles.pulseOuter,
-                {
-                  transform: [
-                    {
-                      scale: radarPulseAnim.interpolate({ 
-                        inputRange: [0, 1], 
-                        outputRange: [0.5, 2.0] 
-                      }),
-                    },
-                  ],
-                  opacity: radarPulseAnim.interpolate({ 
-                    inputRange: [0, 1], 
-                    outputRange: [0.6, 0] 
-                  }),
-                },
-              ]}
-            />
-            <Animated.View
-              style={[
-                styles.pulseInner,
-                {
-                  transform: [
-                    {
-                      scale: radarPulseAnim.interpolate({ 
-                        inputRange: [0, 1], 
-                        outputRange: [0.7, 1.2] 
-                      }),
-                    },
-                  ],
-                  opacity: radarPulseAnim.interpolate({ 
-                    inputRange: [0, 1], 
-                    outputRange: [0.8, 0.3] 
-                  }),
-                },
-              ]}
-            />
-          
-          </View>
-        </Marker>
+      {isSearchingDriver && radarCenter && (
+        <>
+          <Circle
+            center={radarCenter}
+            radius={outerRadius}
+            strokeColor="rgba(99,102,241,0.35)"
+            fillColor="rgba(99,102,241,0.12)"
+            strokeWidth={1}
+          />
+          <Circle
+            center={radarCenter}
+            radius={innerRadius}
+            strokeColor="rgba(99,102,241,0.45)"
+            fillColor="rgba(99,102,241,0.18)"
+            strokeWidth={1}
+          />
+          <Marker
+            coordinate={radarCenter}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+          >
+            <View style={styles.radarCore}>
+              <View style={styles.radarCoreInner} />
+            </View>
+          </Marker>
+        </>
       )}
 
+      {/* Marqueur de destination - toujours visible si disponible */}
       {!isSearchingDriver && 
       dropoffCoords && 
-       !orderDriverCoords && 
       orderStatus !== 'completed' && 
       orderStatus !== 'cancelled' && 
       orderStatus !== 'declined' && (
@@ -163,101 +246,109 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
           coordinate={dropoffCoords} 
           title="Destination" 
           anchor={{ x: 0.5, y: 1 }}
+          tracksViewChanges={false}
         >
-          <Animated.View 
-            style={[
-              styles.destinationMarker,
-              displayedRouteCoords.length > 0 && {
-                transform: [
-                  {
-                    scale: destinationPulseAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 2.0]
-                    })
-                  }
-                ],
-                opacity: destinationPulseAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.8, 0.3]
-                })
-              }
-            ]}
-          >
+          <View style={styles.destinationMarker}>
             <View style={styles.destinationPin} />
             <View style={styles.destinationShadow} />
-          </Animated.View>
+          </View>
         </Marker>
       )}
 
+      {/* Route pickup -> dropoff (gris discrète comme admin_chrono) - toujours visible si disponible */}
       {!isSearchingDriver && 
        displayedRouteCoords && 
        displayedRouteCoords.length > 0 && 
-       !orderDriverCoords && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
         <Polyline
           coordinates={displayedRouteCoords}
-          strokeColor="#6366F1"
-          strokeWidth={5}
+          strokeColor="rgba(229,231,235,0.7)"
+          strokeWidth={3}
           lineJoin="round"
           lineCap="round"
         />
       )}
 
+      {/* Commande active avec livreur assigné */}
       {orderDriverCoords && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
         <>
+          {/* Marqueur du livreur avec cercle extérieur pulsant comme admin_chrono */}
           <Marker
             coordinate={orderDriverCoords}
-            title={`Livreur`}
-            description={'Livreur en route'}
+            title="Livreur"
+            description="Livreur en route"
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
           >
-            <View style={styles.orderDriverMarker}>
-              <Text style={styles.driverIcon}>🚚</Text>
+            <View style={styles.orderDriverMarkerContainer}>
+              <View style={styles.driverPulseOuter} />
+              <View style={styles.orderDriverMarker} />
             </View>
           </Marker>
 
-      
-          {((orderStatus === 'accepted' || orderStatus === 'pending') && 
-            pickupCoords && 
-            orderDriverCoords &&
-            orderDriverCoords.latitude && 
-            orderDriverCoords.longitude) && (
+          {/* Route animée du livreur vers le pickup (violet comme admin_chrono) */}
+          {(orderStatus === 'accepted' || orderStatus === 'pending') && 
+           driverToPickupRoute.animatedCoordinates.length > 0 && (
             <Polyline
-              coordinates={[orderDriverCoords, pickupCoords]}
-              strokeColor="#10B981"
-              strokeWidth={5}
+              coordinates={driverToPickupRoute.animatedCoordinates}
+              strokeColor="#8B5CF6"
+              strokeWidth={6}
               lineJoin="round"
               lineCap="round"
             />
           )}
 
-          {(((orderStatus === 'enroute') || (orderStatus === 'picked_up')) && 
-            dropoffCoords && 
-            orderDriverCoords &&
-            orderDriverCoords.latitude && 
-            orderDriverCoords.longitude &&
-            Math.abs(orderDriverCoords.latitude) > 0.0001 &&
-            Math.abs(orderDriverCoords.longitude) > 0.0001) && (
+          {/* Route animée du livreur vers le dropoff (violet comme admin_chrono) */}
+          {(orderStatus === 'enroute' || orderStatus === 'picked_up') && 
+           driverToDropoffRoute.animatedCoordinates.length > 0 && (
             <Polyline
-              coordinates={[orderDriverCoords, dropoffCoords]}
-              strokeColor="#EF4444"
-              strokeWidth={5}
+              coordinates={driverToDropoffRoute.animatedCoordinates}
+              strokeColor="#8B5CF6"
+              strokeWidth={6}
               lineJoin="round"
               lineCap="round"
             />
+          )}
+
+          {/* Marqueur pickup (vert) */}
+          {pickupCoords && (
+            <Marker
+              coordinate={pickupCoords}
+              title="Point de collecte"
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+            >
+              <View style={styles.pickupMarker}>
+                <View style={styles.pickupPin} />
+              </View>
+            </Marker>
+          )}
+
+          {/* Marqueur dropoff (violet) */}
+          {dropoffCoords && (
+            <Marker
+              coordinate={dropoffCoords}
+              title="Destination"
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+            >
+              <View style={styles.dropoffMarker}>
+                <View style={styles.dropoffPin} />
+              </View>
+            </Marker>
           )}
         </>
       )}
 
-
+      {/* Badge ETA - toujours visible si disponible */}
       {!isSearchingDriver && 
        durationText && 
        pickupCoords && 
-       !orderDriverCoords && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
@@ -281,17 +372,17 @@ const styles = StyleSheet.create({
   },
 
   userLocationMarker: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   userLocationDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#6366F1',
-    borderWidth: 3,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#3B82F6',
+    borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -320,15 +411,16 @@ const styles = StyleSheet.create({
 
   destinationMarker: {
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    height: 40,
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
   },
   destinationPin: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#6366F1',
-    borderWidth: 3,
+    backgroundColor: '#8B5CF6',
+    borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -337,33 +429,20 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   destinationShadow: {
-    width: 8,
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 4,
-    marginTop: 2,
+    display: 'none',
   },
-
-
-  searchContainer: {
+  // Marqueurs uniformisés comme admin_chrono
+  pickupMarker: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 100,
-    height: 100,
+    width: 20,
+    height: 20,
   },
-  pulseOuter: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#6366F1',
-  },
-  pulseInner: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#6366F1',
+  pickupPin: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#10B981',
     borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
@@ -371,6 +450,64 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  dropoffMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
+  },
+  dropoffPin: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#8B5CF6',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  // Driver marker avec cercle extérieur comme admin_chrono
+  orderDriverMarkerContainer: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverPulseOuter: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#DC2626',
+    backgroundColor: 'rgba(220,38,38,0.15)',
+  },
+
+
+  radarCore: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#6366F1',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  radarCoreInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4C1D95',
   },
   
   // Badge ETA sur la carte
@@ -396,15 +533,13 @@ const styles = StyleSheet.create({
     color: '#6366F1',
   },
 
-  // 🚗 Styles pour les chauffeurs en ligne
+  // 🚗 Styles pour les chauffeurs en ligne (uniformisés comme admin_chrono)
   driverMarker: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#4CAF50',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#3B82F6',
+    borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -413,22 +548,22 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   driverIcon: {
-    fontSize: 16,
-    color: '#FFFFFF',
+    display: 'none', // Pas d'icône, juste un cercle comme admin_chrono
   },
   orderDriverMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#111827',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DC2626',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 6,
+    position: 'absolute',
   },
 });

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, FlatList, Image } from 'react-native';
 import { useDriverStore } from '../../store/useDriverStore';
@@ -40,6 +41,7 @@ export default function RevenusPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('all'); // Commencer par 'all' pour voir toutes les données
   const [revenuesData, setRevenuesData] = useState<RevenuesData | null>(null);
+  const [highlightedDay, setHighlightedDay] = useState<string | null>(null);
 
   const loadRevenues = useCallback(async () => {
     if (!user?.id) {
@@ -206,33 +208,77 @@ export default function RevenusPage() {
     if (!revenuesData || !revenuesData.earningsByDay) return null;
 
     const days = Object.keys(revenuesData.earningsByDay).sort();
-    if (days.length === 0) return null;
+    if (days.length === 0) {
+      return (
+        <View style={styles.chartContainer}>
+          <Text style={styles.chartTitle}>Revenus par jour</Text>
+          <Text style={styles.emptySectionText}>Aucune donnée pour cette période.</Text>
+        </View>
+      );
+    }
 
-    const maxEarning = Math.max(...Object.values(revenuesData.earningsByDay));
-    const chartHeight = 150;
+    const chartData = days.map((day) => {
+      const value = revenuesData.earningsByDay[day];
+      const date = new Date(day);
+      const label = date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+      const miniLabel = date.toLocaleDateString('fr-FR', { weekday: 'short' });
+      return { day, value, label, miniLabel };
+    });
+
+    const maxEarning = Math.max(...chartData.map((d) => d.value), 1);
 
     return (
       <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Revenus par jour</Text>
-        <View style={styles.chart}>
-          {days.map((day, index) => {
-            const earning = revenuesData.earningsByDay[day];
-            const height = maxEarning > 0 ? (earning / maxEarning) * chartHeight : 0;
-            const date = new Date(day);
-            
-            return (
-              <View key={day} style={styles.chartBarContainer}>
-                <View style={styles.chartBarWrapper}>
-                  <View style={[styles.chartBar, { height: Math.max(height, 10) }]} />
-                  <Text style={styles.chartBarValue}>{formatCurrency(earning)}</Text>
-                </View>
-                <Text style={styles.chartBarLabel}>
-                  {date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-                </Text>
-              </View>
-            );
-          })}
+        <View style={styles.chartHeader}>
+          <View>
+            <Text style={styles.chartTitle}>Revenus par jour</Text>
+            <Text style={styles.chartSubtitle}>Somme totale • {formatCurrency(chartData.reduce((sum, d) => sum + d.value, 0))}</Text>
+          </View>
+          {highlightedDay && (
+            <View style={styles.chartChip}>
+              <Text style={styles.chartChipText}>{formatCurrency(revenuesData.earningsByDay[highlightedDay])}</Text>
+            </View>
+          )}
         </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chartScrollContent}
+        >
+          <View style={styles.chartBarsRow}>
+            {chartData.map((point, index) => {
+              const height = Math.max((point.value / maxEarning) * 160, 8);
+              const isActive = highlightedDay === point.day;
+
+              return (
+                <TouchableOpacity
+                  key={point.day}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.chartBarTouchable,
+                    index === chartData.length - 1 && styles.chartBarTouchableLast,
+                  ]}
+                  onPress={() => setHighlightedDay((prev) => (prev === point.day ? null : point.day))}
+                >
+                  <LinearGradient
+                    colors={isActive ? ['#7C3AED', '#6D28D9'] : ['#E0E7FF', '#C7D2FE']}
+                    start={{ x: 0, y: 1 }}
+                    end={{ x: 0, y: 0 }}
+                    style={[styles.chartBarGradient, { height }]}
+                  >
+                    {isActive && (
+                      <View style={styles.chartBarValueBubble}>
+                        <Text style={styles.chartBarValueText}>{formatCurrency(point.value)}</Text>
+                      </View>
+                    )}
+                  </LinearGradient>
+                  <Text style={styles.chartBarDay}>{point.miniLabel}</Text>
+                  <Text style={styles.chartBarLabel}>{point.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
       </View>
     );
   };
@@ -590,16 +636,68 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     marginBottom: 24,
   },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   chartTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 16,
   },
-  chart: {
+  chartSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  chartChip: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chartChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4C1D95',
+  },
+  chartScrollContent: {
+    paddingVertical: 8,
+    paddingRight: 12,
+  },
+  chartBarsRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
+  },
+  chartBarTouchable: {
+    alignItems: 'center',
+    marginRight: 18,
+  },
+  chartBarTouchableLast: {
+    marginRight: 0,
+  },
+  chartBarGradient: {
+    width: 36,
+    borderRadius: 18,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 6,
+    position: 'relative',
+  },
+  chartBarValueBubble: {
+    position: 'absolute',
+    top: -28,
+    backgroundColor: '#111827',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  chartBarValueText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   chartBarContainer: {
     alignItems: 'center',
@@ -622,11 +720,17 @@ const styles = StyleSheet.create({
     color: '#6366F1',
     marginTop: 6,
   },
+  chartBarDay: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#4C1D95',
+    marginTop: 10,
+    textTransform: 'capitalize',
+  },
   chartBarLabel: {
     fontSize: 10,
     color: '#6B7280',
-    marginTop: 6,
-    textTransform: 'capitalize',
+    textAlign: 'center',
   },
   methodsContainer: {
     backgroundColor: '#FFFFFF',

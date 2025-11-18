@@ -622,6 +622,191 @@ class ApiService {
       };
     }
   }
+
+  /**
+   * 👤 Mettre à jour le profil utilisateur
+   */
+  async updateProfile(
+    userId: string,
+    profileData: {
+      first_name?: string;
+      last_name?: string;
+      phone?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      id: string;
+      email: string;
+      phone: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      role: string;
+      created_at: string;
+      updated_at: string;
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la mise à jour du profil');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur updateProfile:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
+   * 📸 Uploader un avatar
+   */
+  async uploadAvatar(
+    userId: string,
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      avatar_url: string;
+      user: {
+        id: string;
+        email: string;
+        phone: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        avatar_url: string | null;
+        role: string;
+        created_at: string;
+        updated_at: string;
+      };
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageBase64,
+          mimeType,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de l\'upload de l\'avatar');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur uploadAvatar:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
+   * 🚗 Mettre à jour les informations du véhicule du driver
+   */
+  async updateDriverVehicle(
+    userId: string,
+    vehicleData: {
+      vehicle_type?: 'moto' | 'vehicule' | 'cargo';
+      vehicle_plate?: string;
+      vehicle_brand?: string;
+      vehicle_model?: string;
+      vehicle_color?: string;
+      license_number?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      vehicle_type: 'moto' | 'vehicule' | 'cargo';
+      vehicle_plate: string | null;
+      vehicle_brand: string | null;
+      vehicle_model: string | null;
+      vehicle_color: string | null;
+      license_number: string | null;
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/vehicle`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(vehicleData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la mise à jour du véhicule');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur updateDriverVehicle:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
 }
 
 

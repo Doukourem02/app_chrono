@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
+import { apiService } from '../../services/apiService';
 
 export default function PersonalInfoPage() {
   const { user, profile } = useDriverStore();
@@ -21,7 +22,6 @@ export default function PersonalInfoPage() {
     lastName: '',
     email: user?.email || '',
     phone: user?.phone || '',
-    licenseNumber: '',
   });
 
   useEffect(() => {
@@ -31,7 +31,6 @@ export default function PersonalInfoPage() {
         lastName: profile.last_name || '',
         email: user?.email || '',
         phone: user?.phone || '',
-        licenseNumber: profile.license_number || '',
       });
     }
   }, [profile, user]);
@@ -42,13 +41,48 @@ export default function PersonalInfoPage() {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Erreur', 'Utilisateur non identifié');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // TODO: Implémenter l'API pour mettre à jour le profil livreur
-      Alert.alert('Succès', 'Vos informations ont été mises à jour', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    } catch {
+      const result = await apiService.updateProfile(user.id, {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        phone: formData.phone.trim() || undefined,
+      });
+
+      if (result.success && result.data) {
+        // Mettre à jour le store avec les nouvelles données
+        const currentState = useDriverStore.getState();
+        if (currentState.user) {
+          useDriverStore.getState().setUser({
+            ...currentState.user,
+            first_name: result.data.first_name,
+            last_name: result.data.last_name,
+            phone: result.data.phone || currentState.user.phone,
+          });
+        }
+        
+        // Mettre à jour aussi le profil driver si disponible
+        if (currentState.profile) {
+          useDriverStore.getState().updateProfile({
+            first_name: result.data.first_name,
+            last_name: result.data.last_name,
+            phone: result.data.phone || currentState.profile.phone,
+          });
+        }
+
+        Alert.alert('Succès', 'Vos informations ont été mises à jour', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour vos informations');
+      }
+    } catch (error) {
+      console.error('Erreur mise à jour profil:', error);
       Alert.alert('Erreur', 'Impossible de mettre à jour vos informations');
     } finally {
       setIsLoading(false);
@@ -109,17 +143,6 @@ export default function PersonalInfoPage() {
               placeholder="Votre numéro de téléphone"
               placeholderTextColor="#9CA3AF"
               keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Numéro de permis</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.licenseNumber}
-              onChangeText={(text) => setFormData({ ...formData, licenseNumber: text })}
-              placeholder="Votre numéro de permis"
-              placeholderTextColor="#9CA3AF"
             />
           </View>
         </View>

@@ -280,7 +280,7 @@ export default function BoxPage() {
       if (filter === selectedFilter) return;
 
       selectedFilterRef.current = filter;
-      setSelectedFilter(filter);
+    setSelectedFilter(filter);
 
       const cachedOrders = ordersByFilter[filter] || [];
       setOrders(cachedOrders);

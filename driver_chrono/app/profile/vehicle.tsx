@@ -12,9 +12,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
+import { apiService } from '../../services/apiService';
 
 export default function VehiclePage() {
-  const { profile } = useDriverStore();
+  const { profile, user } = useDriverStore();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     vehicleType: '',
@@ -22,6 +23,7 @@ export default function VehiclePage() {
     vehicleBrand: '',
     vehicleModel: '',
     vehicleColor: '',
+    licenseNumber: '',
   });
 
   useEffect(() => {
@@ -32,6 +34,7 @@ export default function VehiclePage() {
         vehicleBrand: (profile as any).vehicle_brand || '',
         vehicleModel: profile.vehicle_model || '',
         vehicleColor: (profile as any).vehicle_color || '',
+        licenseNumber: profile.license_number || '',
       });
     }
   }, [profile]);
@@ -42,13 +45,44 @@ export default function VehiclePage() {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Erreur', 'Utilisateur non identifié');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // TODO: Implémenter l'API pour mettre à jour les infos véhicule
-      Alert.alert('Succès', 'Les informations du véhicule ont été mises à jour', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    } catch {
+      const result = await apiService.updateDriverVehicle(user.id, {
+        vehicle_type: formData.vehicleType as 'moto' | 'vehicule' | 'cargo',
+        vehicle_plate: formData.vehiclePlate.trim(),
+        vehicle_brand: formData.vehicleBrand.trim() || undefined,
+        vehicle_model: formData.vehicleModel.trim() || undefined,
+        vehicle_color: formData.vehicleColor.trim() || undefined,
+        license_number: formData.licenseNumber.trim() || undefined,
+      });
+
+      if (result.success && result.data) {
+        // Mettre à jour le store avec les nouvelles données
+        const currentState = useDriverStore.getState();
+        if (currentState.profile) {
+          useDriverStore.getState().updateProfile({
+            vehicle_type: result.data.vehicle_type,
+            vehicle_plate: result.data.vehicle_plate,
+            vehicle_brand: result.data.vehicle_brand,
+            vehicle_model: result.data.vehicle_model,
+            vehicle_color: result.data.vehicle_color,
+            license_number: result.data.license_number,
+          });
+        }
+
+        Alert.alert('Succès', 'Les informations du véhicule ont été mises à jour', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour les informations');
+      }
+    } catch (error) {
+      console.error('Erreur mise à jour véhicule:', error);
       Alert.alert('Erreur', 'Impossible de mettre à jour les informations');
     } finally {
       setIsLoading(false);
@@ -134,6 +168,18 @@ export default function VehiclePage() {
               onChangeText={(text) => setFormData({ ...formData, vehicleColor: text })}
               placeholder="Ex: Rouge, Bleu"
               placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Numéro de permis</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.licenseNumber}
+              onChangeText={(text) => setFormData({ ...formData, licenseNumber: text })}
+              placeholder="Votre numéro de permis de conduire"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="characters"
             />
           </View>
         </View>

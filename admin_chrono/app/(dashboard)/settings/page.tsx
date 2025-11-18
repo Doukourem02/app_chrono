@@ -13,7 +13,8 @@ export default function SettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -26,10 +27,10 @@ export default function SettingsPage() {
     }
 
     try {
-      // Charger depuis la table users (sans full_name car cette colonne n'existe pas)
+      // Charger depuis la table users avec first_name et last_name
       const { data: userData, error } = await supabase
         .from('users')
-        .select('avatar_url, phone')
+        .select('avatar_url, phone, first_name, last_name')
         .eq('id', user.id)
         .single()
 
@@ -39,7 +40,10 @@ export default function SettingsPage() {
         if (error.code === 'PGRST116') {
           // Utilisateur n'existe pas dans la table users, utiliser user_metadata
           console.debug('User not found in users table, using user_metadata')
-          setFullName(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '')
+          const fullNameFromMetadata = user?.user_metadata?.full_name || ''
+          const names = fullNameFromMetadata.split(' ')
+          setFirstName(names[0] || '')
+          setLastName(names.slice(1).join(' ') || '')
           setAvatarUrl(null)
           setPhone('')
         } else {
@@ -51,7 +55,10 @@ export default function SettingsPage() {
             hint: error.hint,
           })
           // Fallback sur user_metadata même en cas d'erreur
-          setFullName(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '')
+          const fullNameFromMetadata = user?.user_metadata?.full_name || ''
+          const names = fullNameFromMetadata.split(' ')
+          setFirstName(names[0] || '')
+          setLastName(names.slice(1).join(' ') || '')
           setAvatarUrl(null)
           setPhone('')
         }
@@ -81,12 +88,16 @@ export default function SettingsPage() {
         
         console.log('🖼️ [Settings] Final avatar URL to set:', correctedAvatarUrl);
         setAvatarUrl(correctedAvatarUrl);
-        // full_name n'existe pas dans la table users, utiliser user_metadata
-        setFullName(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '')
+        // Charger first_name et last_name depuis la base de données
+        setFirstName(userData.first_name || '')
+        setLastName(userData.last_name || '')
         setPhone(userData.phone || '')
       } else {
         // Pas de données, utiliser user_metadata
-        setFullName(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '')
+        const fullNameFromMetadata = user?.user_metadata?.full_name || ''
+        const names = fullNameFromMetadata.split(' ')
+        setFirstName(names[0] || '')
+        setLastName(names.slice(1).join(' ') || '')
         setAvatarUrl(null)
         setPhone('')
       }
@@ -100,7 +111,10 @@ export default function SettingsPage() {
         error,
       })
       // Fallback sur user_metadata
-      setFullName(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '')
+      const fullNameFromMetadata = user?.user_metadata?.full_name || ''
+      const names = fullNameFromMetadata.split(' ')
+      setFirstName(names[0] || '')
+      setLastName(names.slice(1).join(' ') || '')
       setAvatarUrl(null)
       setPhone('')
     } finally {
@@ -130,12 +144,15 @@ export default function SettingsPage() {
   // Écouter les événements de mise à jour depuis d'autres composants
   useEffect(() => {
     const handleProfileUpdate = (event: CustomEvent) => {
-      const { avatarUrl: newAvatarUrl, fullName: newFullName, phone: newPhone } = event.detail
+      const { avatarUrl: newAvatarUrl, firstName: newFirstName, lastName: newLastName, phone: newPhone } = event.detail
       if (newAvatarUrl !== undefined) {
         setAvatarUrl(newAvatarUrl)
       }
-      if (newFullName !== undefined) {
-        setFullName(newFullName)
+      if (newFirstName !== undefined) {
+        setFirstName(newFirstName)
+      }
+      if (newLastName !== undefined) {
+        setLastName(newLastName)
       }
       if (newPhone !== undefined) {
         setPhone(newPhone)
@@ -379,12 +396,14 @@ export default function SettingsPage() {
       // Recharger le profil pour mettre à jour l'affichage
       const { data: userData } = await supabase
         .from('users')
-        .select('avatar_url, phone')
+        .select('avatar_url, phone, first_name, last_name')
         .eq('id', user.id)
         .single()
 
       if (userData) {
         setAvatarUrl(userData.avatar_url || publicUrl)
+        setFirstName(userData.first_name || '')
+        setLastName(userData.last_name || '')
       } else {
         setAvatarUrl(publicUrl)
       }
@@ -424,7 +443,7 @@ export default function SettingsPage() {
         .single()
 
       if (checkError && checkError.code === 'PGRST116') {
-        // L'utilisateur n'existe pas, le créer (full_name n'existe pas dans users)
+        // L'utilisateur n'existe pas, le créer avec first_name et last_name
         const { error: insertError } = await supabase
           .from('users')
           .insert([
@@ -432,6 +451,8 @@ export default function SettingsPage() {
               id: user.id,
               email: user.email || '',
               phone: phone || null,
+              first_name: firstName.trim() || null,
+              last_name: lastName.trim() || null,
               role: 'admin',
               created_at: new Date().toISOString(),
             },
@@ -447,11 +468,14 @@ export default function SettingsPage() {
         alert('Erreur lors de la vérification du profil')
         return
       } else {
-        // L'utilisateur existe, mettre à jour (full_name n'existe pas dans users, on met à jour seulement phone)
+        // L'utilisateur existe, mettre à jour first_name, last_name et phone
         const { error: updateError } = await supabase
           .from('users')
           .update({
             phone: phone || null,
+            first_name: firstName.trim() || null,
+            last_name: lastName.trim() || null,
+            updated_at: new Date().toISOString(),
           })
           .eq('id', user.id)
 
@@ -462,10 +486,11 @@ export default function SettingsPage() {
         }
       }
 
-      // Mettre à jour aussi les metadata de l'utilisateur
+      // Mettre à jour aussi les metadata de l'utilisateur (pour compatibilité)
+      const fullNameForMetadata = `${firstName.trim()} ${lastName.trim()}`.trim()
       const { error: metadataError } = await supabase.auth.updateUser({
         data: {
-          full_name: fullName,
+          full_name: fullNameForMetadata || undefined,
         },
       })
 
@@ -476,13 +501,13 @@ export default function SettingsPage() {
       // Recharger le profil pour mettre à jour l'affichage
       const { data: updatedUser } = await supabase
         .from('users')
-        .select('phone, avatar_url')
+        .select('phone, avatar_url, first_name, last_name')
         .eq('id', user.id)
         .single()
 
       if (updatedUser) {
-        // full_name n'existe pas dans la table users, utiliser user_metadata
-        setFullName(user?.user_metadata?.full_name || fullName || '')
+        setFirstName(updatedUser.first_name || '')
+        setLastName(updatedUser.last_name || '')
         setPhone(updatedUser.phone || '')
         if (updatedUser.avatar_url) {
           setAvatarUrl(updatedUser.avatar_url)
@@ -492,7 +517,8 @@ export default function SettingsPage() {
       // Notifier le Sidebar que le profil a été mis à jour
       window.dispatchEvent(new CustomEvent('profile-updated', {
         detail: { 
-          fullName: user?.user_metadata?.full_name || fullName,
+          firstName: updatedUser?.first_name || firstName,
+          lastName: updatedUser?.last_name || lastName,
           phone: updatedUser?.phone || phone,
           avatarUrl: updatedUser?.avatar_url || avatarUrl
         }
@@ -509,12 +535,14 @@ export default function SettingsPage() {
   }
 
   const getUserInitials = () => {
-    if (fullName) {
-      const names = fullName.split(' ')
-      if (names.length >= 2) {
-        return (names[0][0] + names[names.length - 1][0]).toUpperCase()
-      }
-      return fullName.charAt(0).toUpperCase()
+    if (firstName && lastName) {
+      return `${firstName[0]}${lastName[0]}`.toUpperCase()
+    }
+    if (firstName) {
+      return firstName.charAt(0).toUpperCase()
+    }
+    if (lastName) {
+      return lastName.charAt(0).toUpperCase()
     }
     if (user?.email) {
       return user.email.charAt(0).toUpperCase()
@@ -717,13 +745,35 @@ export default function SettingsPage() {
           <div style={inputGroupStyle}>
             <label style={labelStyle}>
               <User size={16} style={{ color: '#6B7280' }} />
-              Nom complet
+              Prénom
             </label>
             <input
               type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Votre nom complet"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Votre prénom"
+              style={inputStyle}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#8B5CF6'
+                e.target.style.backgroundColor = '#FFFFFF'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#E5E7EB'
+                e.target.style.backgroundColor = '#F9FAFB'
+              }}
+            />
+          </div>
+
+          <div style={inputGroupStyle}>
+            <label style={labelStyle}>
+              <User size={16} style={{ color: '#6B7280' }} />
+              Nom
+            </label>
+            <input
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Votre nom"
               style={inputStyle}
               onFocus={(e) => {
                 e.target.style.borderColor = '#8B5CF6'

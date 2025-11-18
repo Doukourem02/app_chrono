@@ -1155,3 +1155,133 @@ export const getDriverStatistics = async (req: Request, res: Response): Promise<
     });
   }
 };
+
+/**
+ * Met à jour les informations du véhicule du driver
+ */
+export const updateDriverVehicle = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const {
+      vehicle_type,
+      vehicle_plate,
+      vehicle_brand,
+      vehicle_model,
+      vehicle_color,
+      license_number,
+    } = req.body;
+
+    if (req.user && req.user.id !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez modifier que votre propre véhicule',
+      });
+      return;
+    }
+
+    // Vérifier que le profil driver existe
+    const profileResult = await (pool as any).query(
+      'SELECT id FROM driver_profiles WHERE user_id = $1',
+      [userId]
+    );
+
+    if (!profileResult.rows || profileResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Profil chauffeur non trouvé',
+      });
+      return;
+    }
+
+    // Construire la requête de mise à jour dynamiquement
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (vehicle_type !== undefined) {
+      if (!['moto', 'vehicule', 'cargo'].includes(vehicle_type)) {
+        res.status(400).json({
+          success: false,
+          message: 'Type de véhicule invalide. Doit être: moto, vehicule ou cargo',
+        });
+        return;
+      }
+      updates.push(`vehicle_type = $${paramIndex}`);
+      values.push(vehicle_type);
+      paramIndex++;
+    }
+
+    if (vehicle_plate !== undefined) {
+      updates.push(`vehicle_plate = $${paramIndex}`);
+      values.push(vehicle_plate || null);
+      paramIndex++;
+    }
+
+    if (vehicle_brand !== undefined) {
+      updates.push(`vehicle_brand = $${paramIndex}`);
+      values.push(vehicle_brand || null);
+      paramIndex++;
+    }
+
+    if (vehicle_model !== undefined) {
+      updates.push(`vehicle_model = $${paramIndex}`);
+      values.push(vehicle_model || null);
+      paramIndex++;
+    }
+
+    if (vehicle_color !== undefined) {
+      updates.push(`vehicle_color = $${paramIndex}`);
+      values.push(vehicle_color || null);
+      paramIndex++;
+    }
+
+    if (license_number !== undefined) {
+      updates.push(`license_number = $${paramIndex}`);
+      values.push(license_number || null);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Aucune donnée à mettre à jour',
+      });
+      return;
+    }
+
+    // Ajouter updated_at
+    updates.push(`updated_at = NOW()`);
+    values.push(userId);
+
+    const updateQuery = `
+      UPDATE driver_profiles 
+      SET ${updates.join(', ')}
+      WHERE user_id = $${paramIndex}
+      RETURNING vehicle_type, vehicle_plate, vehicle_brand, vehicle_model, vehicle_color, license_number
+    `;
+
+    const result = await (pool as any).query(updateQuery, values);
+
+    logger.info(`Informations véhicule mises à jour pour ${maskUserId(userId)}`, {
+      vehicle_type: vehicle_type !== undefined,
+      vehicle_plate: vehicle_plate !== undefined,
+      vehicle_brand: vehicle_brand !== undefined,
+      vehicle_model: vehicle_model !== undefined,
+      vehicle_color: vehicle_color !== undefined,
+      license_number: license_number !== undefined,
+    });
+
+    res.json({
+      success: true,
+      message: 'Informations du véhicule mises à jour avec succès',
+      data: result.rows[0],
+    });
+  } catch (error: any) {
+    logger.error('Erreur mise à jour véhicule:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour du véhicule',
+      error: error.message,
+    });
+  }
+};

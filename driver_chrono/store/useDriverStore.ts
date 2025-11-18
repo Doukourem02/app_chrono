@@ -8,9 +8,11 @@ export interface DriverProfile {
   first_name: string;
   last_name: string;
   license_number?: string;
-  vehicle_type?: string;
+  vehicle_type?: 'moto' | 'vehicule' | 'cargo';
   vehicle_plate?: string;
+  vehicle_brand?: string;
   vehicle_model?: string;
+  vehicle_color?: string;
   current_latitude?: number;
   current_longitude?: number;
   is_online: boolean;

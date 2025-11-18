@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { View, RefreshControl, ScrollView, Text, StyleSheet } from "react-native";
 import ShipmentCard from "./ShipmentCard";
 import { userApiService } from "../services/userApiService";
@@ -54,6 +54,8 @@ const getProgressPercentage = (status: OrderStatus): number => {
   }
 };
 
+const PENDING_AUTO_CANCEL_DELAY_MS = 60 * 1000; // 1 minute max en violet sans réponse
+
 export default function ShipmentList() {
   const { user } = useAuthStore();
   // 🆕 Utiliser les commandes actives depuis le store en priorité
@@ -61,6 +63,48 @@ export default function ShipmentList() {
   const [orders, setOrders] = useState<OrderWithDB[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const autoCancelledPendingRef = useRef<Set<string>>(new Set());
+
+  const autoCancelPendingOrders = useCallback(async (incomingOrders: OrderWithDB[]) => {
+    const updatedOrders = [...incomingOrders];
+    const now = Date.now();
+
+    for (const order of incomingOrders) {
+      if (order.status !== 'pending' || order.driverId || autoCancelledPendingRef.current.has(order.id)) {
+        continue;
+      }
+
+      const createdAt = order.created_at || (order as any).createdAt;
+      const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
+
+      if (!createdTime || now - createdTime < PENDING_AUTO_CANCEL_DELAY_MS) {
+        continue;
+      }
+
+      autoCancelledPendingRef.current.add(order.id);
+      try {
+        const result = await userApiService.cancelOrder(order.id);
+        if (result.success) {
+          useOrderStore.getState().updateOrderStatus(order.id, 'cancelled');
+          const targetIndex = updatedOrders.findIndex((o) => o.id === order.id);
+          if (targetIndex !== -1) {
+            updatedOrders[targetIndex] = {
+              ...updatedOrders[targetIndex],
+              status: 'cancelled',
+              cancelled_at: new Date().toISOString(),
+            };
+          }
+        } else {
+          autoCancelledPendingRef.current.delete(order.id);
+        }
+      } catch (err) {
+        console.warn('⚠️ Auto-cancel pending échoué', order.id, err);
+        autoCancelledPendingRef.current.delete(order.id);
+      }
+    }
+
+    return updatedOrders;
+  }, []);
 
   const loadOrders = useCallback(async () => {
     if (!user?.id) {
@@ -198,6 +242,8 @@ export default function ShipmentList() {
           };
         }) as OrderWithDB[];
 
+        const sanitizedOrders = await autoCancelPendingOrders(formattedOrders);
+
         // Calculer les dates d'aujourd'hui
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Début de la journée
@@ -206,7 +252,7 @@ export default function ShipmentList() {
         tomorrow.setDate(tomorrow.getDate() + 1); // Début de demain
 
         // Séparer les commandes en cours et terminées
-        const inProgressOrders = formattedOrders.filter((order) => {
+        const inProgressOrders = sanitizedOrders.filter((order) => {
           const isInProgress = order.status === 'pending' || 
                             order.status === 'accepted' || 
                             order.status === 'enroute' || 
@@ -214,7 +260,7 @@ export default function ShipmentList() {
           return isInProgress;
         });
 
-        const completedOrders = formattedOrders.filter((order) => {
+        const completedOrders = sanitizedOrders.filter((order) => {
           return order.status === 'completed';
         });
 
@@ -255,7 +301,7 @@ export default function ShipmentList() {
 
         // Debug: logger les filtres
         console.log('🔍 Filtres:', {
-          total: formattedOrders.length,
+          total: sanitizedOrders.length,
           inProgress: inProgressOrders.length,
           completed: completedOrders.length,
           todayInProgress: todayInProgress.length,
@@ -417,6 +463,69 @@ export default function ShipmentList() {
       loadOrders();
     }
   }, [activeOrdersFromStore.length, loadOrders]);
+
+  // 🆕 Vérifier périodiquement les commandes en pending et les annuler automatiquement
+  useEffect(() => {
+    const checkAndCancelPendingOrders = async () => {
+      const pendingOrders = orders.filter(
+        (order) => order.status === 'pending' && !order.driverId
+      );
+
+      if (pendingOrders.length === 0) return;
+
+      const now = Date.now();
+      const ordersToCancel: OrderWithDB[] = [];
+
+      for (const order of pendingOrders) {
+        if (autoCancelledPendingRef.current.has(order.id)) continue;
+
+        const createdAt = order.created_at || (order as any).createdAt;
+        const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
+
+        if (!createdTime) continue;
+
+        const age = now - createdTime;
+        if (age >= PENDING_AUTO_CANCEL_DELAY_MS) {
+          ordersToCancel.push(order);
+        }
+      }
+
+      if (ordersToCancel.length > 0) {
+        for (const order of ordersToCancel) {
+          autoCancelledPendingRef.current.add(order.id);
+          try {
+            console.log(`⏰ Auto-annulation commande ${order.id} (en pending depuis ${Math.round((now - (order.created_at ? new Date(order.created_at).getTime() : now)) / 1000)}s)`);
+            const result = await userApiService.cancelOrder(order.id);
+            if (result.success) {
+              useOrderStore.getState().updateOrderStatus(order.id, 'cancelled');
+              setOrders((prevOrders) =>
+                prevOrders.map((o) =>
+                  o.id === order.id
+                    ? { ...o, status: 'cancelled' as OrderStatus, cancelled_at: new Date().toISOString() }
+                    : o
+                )
+              );
+            } else {
+              autoCancelledPendingRef.current.delete(order.id);
+            }
+          } catch (err) {
+            console.warn('⚠️ Auto-cancel pending échoué', order.id, err);
+            autoCancelledPendingRef.current.delete(order.id);
+          }
+        }
+      }
+    };
+
+    // Vérifier immédiatement
+    checkAndCancelPendingOrders();
+
+    // Vérifier toutes les 5 secondes
+    const interval = setInterval(() => {
+      checkAndCancelPendingOrders();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [orders]);
 
   // 🆕 Rafraîchir automatiquement la liste toutes les 5 secondes si on a des commandes en cours
   useEffect(() => {

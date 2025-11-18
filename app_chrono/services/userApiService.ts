@@ -496,6 +496,120 @@ class UserApiService {
       };
     }
   }
+
+  /**
+   * 👤 Mettre à jour le profil utilisateur
+   */
+  async updateProfile(
+    userId: string,
+    profileData: {
+      first_name?: string;
+      last_name?: string;
+      phone?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      id: string;
+      email: string;
+      phone: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      role: string;
+      created_at: string;
+      updated_at: string;
+    };
+  }> {
+    try {
+      const token = await this.ensureAccessToken();
+      if (!token) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la mise à jour du profil');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur updateProfile:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
+   * 📸 Uploader un avatar
+   */
+  async uploadAvatar(
+    userId: string,
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      avatar_url: string;
+      user: {
+        id: string;
+        email: string;
+        phone: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        avatar_url: string | null;
+        role: string;
+        created_at: string;
+        updated_at: string;
+      };
+    };
+  }> {
+    try {
+      const token = await this.ensureAccessToken();
+      if (!token) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageBase64,
+          mimeType,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de l\'upload de l\'avatar');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur uploadAvatar:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
 }
 
 // Export singleton

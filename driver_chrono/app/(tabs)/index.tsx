@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Text } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusToggle } from "../../components/StatusToggle";
 import { StatsCards } from "../../components/StatsCards";
@@ -14,8 +14,8 @@ import { useOrderStore } from "../../store/useOrderStore";
 import { apiService } from "../../services/apiService";
 import { orderSocketService } from "../../services/orderSocketService";
 import { logger } from '../../utils/logger';
-import { useRouteTracking } from '../../hooks/useRouteTracking';
 import { useMapCamera } from '../../hooks/useMapCamera';
+import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
 
 export default function Index() {
   const { 
@@ -167,11 +167,21 @@ export default function Index() {
   };
 
   const destination = getCurrentDestination();
-  const { route: routeToDestination, isLoading: isRouteLoading, refetch: refetchRoute } = useRouteTracking(
-    location,
-    destination,
-    isOnline && !!currentOrder && !!destination
-  );
+  const currentPickupCoord = currentOrder ? resolveCoords(currentOrder.pickup) : null;
+  const currentDropoffCoord = currentOrder ? resolveCoords(currentOrder.dropoff) : null;
+  
+  // Route animée vers la destination
+  const animatedRoute = useAnimatedRoute({
+    origin: location,
+    destination: destination,
+    enabled: isOnline && !!currentOrder && !!destination && !!location,
+  });
+
+  const orderFullRoute = useAnimatedRoute({
+    origin: currentPickupCoord,
+    destination: currentDropoffCoord,
+    enabled: !!currentOrder && !!currentPickupCoord && !!currentDropoffCoord,
+  });
 
   useEffect(() => {
     if (currentOrder && location) {
@@ -202,7 +212,7 @@ export default function Index() {
   const { fitToRoute, centerOnDriver } = useMapCamera(
     mapRef as React.RefObject<MapView>,
     location,
-    routeToDestination ? { coordinates: routeToDestination.coordinates } : null,
+    animatedRoute.routeCoordinates.length > 0 ? { coordinates: animatedRoute.routeCoordinates } : null,
     currentOrder,
     isOnline
   );
@@ -521,6 +531,7 @@ export default function Index() {
   return (
     <View style={styles.container}>
       <MapView
+        provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFillObject}
         ref={mapRef}
         initialRegion={location ? {
@@ -534,9 +545,21 @@ export default function Index() {
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
-        customMapStyle={grayMapStyle}
+        customMapStyle={minimalMapStyle}
         showsUserLocation={false}
         showsMyLocationButton={false}
+        showsCompass={false}
+        showsScale={false}
+        showsBuildings={false}
+        showsTraffic={false}
+        showsIndoors={false}
+        showsPointsOfInterest={false}
+        mapType="standard"
+        toolbarEnabled={false}
+        rotateEnabled={true}
+        pitchEnabled={false}
+        scrollEnabled={true}
+        zoomEnabled={true}
         followsUserLocation={false}
       >
         {isOnline && (animatedDriverPos || location) && (
@@ -547,65 +570,47 @@ export default function Index() {
             }}
             title="Ma position"
             description="Chauffeur en ligne"
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
           >
-            <View style={styles.driverMarker}>
-              <Ionicons name="car" size={20} color="#fff" />
+            <View style={styles.driverMarkerContainer}>
+              <View style={styles.driverPulseOuter} />
+              <View style={styles.driverMarkerInner} />
             </View>
           </Marker>
         )}
 
-        {isOnline && location && currentOrder && routeToDestination && routeToDestination.coordinates.length > 0 && (
-          <Polyline
-            coordinates={routeToDestination.coordinates}
-            strokeColor={
-              String(currentOrder.status) === 'picked_up' || String(currentOrder.status) === 'delivering'
-                ? '#10B981'
-                : '#8B5CF6'
-            }
-            strokeWidth={5}
-            lineCap="round"
-            lineJoin="round"
-          />
+        {/* Route animée vers la destination */}
+        {isOnline && location && currentOrder && animatedRoute.animatedCoordinates.length > 0 && (
+          <>
+            {/* Route complète pickup -> dropoff (ligne grise discrète) */}
+            {currentPickupCoord && currentDropoffCoord && (
+              <Polyline
+                coordinates={
+                  orderFullRoute.routeCoordinates.length > 0
+                    ? orderFullRoute.routeCoordinates
+                    : [currentPickupCoord, currentDropoffCoord]
+                }
+                strokeColor="rgba(229,231,235,0.9)"
+                strokeWidth={3}
+                lineCap="round"
+                lineJoin="round"
+              />
+            )}
+
+            {/* Route animée active (violet comme admin_chrono) */}
+            <Polyline
+              coordinates={animatedRoute.animatedCoordinates}
+              strokeColor="#8B5CF6"
+              strokeWidth={6}
+              strokeOpacity={1}
+              lineCap="round"
+              lineJoin="round"
+            />
+          </>
         )}
 
-        {isOnline && location && currentOrder && (!routeToDestination || routeToDestination.coordinates.length === 0) && !isRouteLoading && (() => {
-          const pickupCoord = resolveCoords(currentOrder.pickup);
-          const dropoffCoord = resolveCoords(currentOrder.dropoff);
-          const status = String(currentOrder.status || '');
-
-          if ((status === 'accepted' || status === 'enroute' || status === 'in_progress') && pickupCoord) {
-            return (
-              <Polyline
-                coordinates={[
-                  { latitude: location.latitude, longitude: location.longitude },
-                  { latitude: pickupCoord.latitude, longitude: pickupCoord.longitude }
-                ]}
-                strokeColor="#8B5CF6"
-                strokeWidth={4}
-                lineCap="round"
-                lineDashPattern={[5, 5]} // Ligne pointillée pour indiquer que c'est un fallback
-              />
-            );
-          }
-
-          if ((status === 'picked_up' || status === 'delivering') && dropoffCoord) {
-            return (
-              <Polyline
-                coordinates={[
-                  { latitude: location.latitude, longitude: location.longitude },
-                  { latitude: dropoffCoord.latitude, longitude: dropoffCoord.longitude }
-                ]}
-                strokeColor="#10B981"
-                strokeWidth={4}
-                lineCap="round"
-                lineDashPattern={[5, 5]}
-              />
-            );
-          }
-
-          return null;
-        })()}
-
+        {/* Afficher toutes les commandes - toujours visibles */}
         {[...activeOrders, ...pendingOrders].map((order) => {
           const pickupCoord = resolveCoords(order.pickup);
           const dropoffCoord = resolveCoords(order.dropoff);
@@ -616,6 +621,7 @@ export default function Index() {
 
           return (
             <React.Fragment key={order.id}>
+              {/* Marqueur pickup (vert comme admin_chrono) */}
               {pickupCoord && (
                 <Marker
                   coordinate={pickupCoord}
@@ -629,29 +635,15 @@ export default function Index() {
                     setSelectedOrder(order.id);
                     logger.info('Commande sélectionnée depuis marqueur pickup', 'driver-index', { orderId: order.id });
                   }}
+                  tracksViewChanges={false}
                 >
-                  <View style={{
-                    width: isSelected ? 32 : 28,
-                    height: isSelected ? 32 : 28,
-                    borderRadius: isSelected ? 16 : 14,
-                    backgroundColor: isPending 
-                      ? '#F59E0B' // Orange pour pending
-                      : (isSelected ? '#8B5CF6' : '#A78BFA'), // Violet pour actives
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: isSelected ? 3 : 2,
-                    borderColor: '#fff',
-                    shadowColor: isPending ? '#F59E0B' : (isSelected ? '#8B5CF6' : '#000'),
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isSelected ? 0.5 : 0.2,
-                    shadowRadius: isSelected ? 4 : 2,
-                    elevation: isSelected ? 5 : 2,
-                  }}>
-                    <Ionicons name={isPending ? "time" : "cube"} size={isSelected ? 18 : 16} color="#fff" />
+                  <View style={styles.pickupMarker}>
+                    <View style={styles.pickupPin} />
                   </View>
                 </Marker>
               )}
 
+              {/* Marqueur dropoff (violet comme admin_chrono) */}
               {dropoffCoord && !isPending && (
                 <Marker
                   coordinate={dropoffCoord}
@@ -661,23 +653,10 @@ export default function Index() {
                     setSelectedOrder(order.id);
                     logger.info('Commande sélectionnée depuis marqueur dropoff', 'driver-index', { orderId: order.id });
                   }}
+                  tracksViewChanges={false}
                 >
-                  <View style={{
-                    width: isSelected ? 28 : 24,
-                    height: isSelected ? 28 : 24,
-                    borderRadius: isSelected ? 14 : 12,
-                    backgroundColor: (status === 'picked_up' || status === 'delivering') ? '#10B981' : '#34D399',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: isSelected ? 3 : 2,
-                    borderColor: '#fff',
-                    shadowColor: isSelected ? '#10B981' : '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isSelected ? 0.5 : 0.2,
-                    shadowRadius: isSelected ? 4 : 2,
-                    elevation: isSelected ? 5 : 2,
-                  }}>
-                    <Ionicons name="location" size={isSelected ? 16 : 14} color="#fff" />
+                  <View style={styles.dropoffMarker}>
+                    <View style={styles.dropoffPin} />
                   </View>
                 </Marker>
               )}
@@ -767,7 +746,7 @@ export default function Index() {
                 if (location && dropoffCoord) {
                   setAnimatedDriverPos(null);
                   setTimeout(() => {
-                    refetchRoute();
+                    animatedRoute.refetch();
                     fitToRoute();
                   }, 500);
                 }
@@ -932,49 +911,126 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  // Marqueurs uniformisés comme admin_chrono
+  pickupMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
+  },
+  pickupPin: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  dropoffMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
+  },
+  dropoffPin: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#8B5CF6',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  // Driver marker avec cercle extérieur comme admin_chrono
+  driverMarkerContainer: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverPulseOuter: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(59,130,246,0.15)',
+  },
+  driverMarkerInner: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#3B82F6',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
+    position: 'absolute',
+  },
 });
 
-const grayMapStyle = [
+// Style minimal de la carte (similaire à admin_chrono)
+const minimalMapStyle = [
   {
-    elementType: "geometry",
-    stylers: [{ color: "#ebe3cd" }],
+    elementType: 'geometry',
+    stylers: [{ color: '#F7F8FC' }],
   },
   {
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#523735" }],
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
   },
   {
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#f5f1e6" }],
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#94A3B8' }],
   },
   {
-    featureType: "administrative",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#c9b2a6" }],
+    elementType: 'labels.text.stroke',
+    stylers: [{ color: '#FFFFFF' }],
   },
   {
-    featureType: "poi",
-    elementType: "geometry",
-    stylers: [{ color: "#dfd2ae" }],
+    featureType: 'administrative',
+    elementType: 'geometry',
+    stylers: [{ visibility: 'off' }],
   },
   {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#f5f1e6" }],
+    featureType: 'poi',
+    stylers: [{ visibility: 'off' }],
   },
   {
-    featureType: "road.arterial",
-    elementType: "geometry",
-    stylers: [{ color: "#fdfcf8" }],
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#E4E7EC' }],
   },
   {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#f8c967" }],
+    featureType: 'road',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#A0AEC0' }],
   },
   {
-    featureType: "water",
-    elementType: "geometry.fill",
-    stylers: [{ color: "#b9d3c2" }],
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#C7D2FE' }],
+  },
+  {
+    featureType: 'transit',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#D8E7FB' }],
   },
 ];

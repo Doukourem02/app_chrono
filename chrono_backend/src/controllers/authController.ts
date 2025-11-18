@@ -839,6 +839,216 @@ const refreshToken = async (
   }
 };
 
+/**
+ * Met à jour le profil utilisateur (first_name, last_name, phone)
+ */
+export const updateUserProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { first_name, last_name, phone, avatar_url } = req.body;
+
+    // Vérifier que l'utilisateur existe
+    const userResult = await (pool as any).query(
+      'SELECT id FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (!userResult.rows || userResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé',
+      });
+      return;
+    }
+
+    // Construire la requête de mise à jour dynamiquement
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (first_name !== undefined) {
+      updates.push(`first_name = $${paramIndex}`);
+      values.push(first_name || null);
+      paramIndex++;
+    }
+
+    if (last_name !== undefined) {
+      updates.push(`last_name = $${paramIndex}`);
+      values.push(last_name || null);
+      paramIndex++;
+    }
+
+    if (phone !== undefined) {
+      updates.push(`phone = $${paramIndex}`);
+      values.push(phone || null);
+      paramIndex++;
+    }
+
+    if (avatar_url !== undefined) {
+      updates.push(`avatar_url = $${paramIndex}`);
+      values.push(avatar_url || null);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Aucune donnée à mettre à jour',
+      });
+      return;
+    }
+
+    // Ajouter updated_at
+    updates.push(`updated_at = NOW()`);
+    
+    // Ajouter userId à la fin pour la clause WHERE
+    values.push(userId);
+    const whereParamIndex = paramIndex;
+
+    const updateQuery = `
+      UPDATE users 
+      SET ${updates.join(', ')}
+      WHERE id = $${whereParamIndex}
+      RETURNING id, email, phone, first_name, last_name, avatar_url, role, created_at, updated_at
+    `;
+
+    const result = await (pool as any).query(updateQuery, values);
+
+    logger.info(`Profil utilisateur mis à jour pour ${maskUserId(userId)}`, {
+      first_name: first_name !== undefined,
+      last_name: last_name !== undefined,
+      phone: phone !== undefined,
+      avatar_url: avatar_url !== undefined,
+    });
+
+    res.json({
+      success: true,
+      message: 'Profil mis à jour avec succès',
+      data: result.rows[0],
+    });
+  } catch (error: any) {
+    logger.error('Erreur mise à jour profil utilisateur:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour du profil',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Upload un avatar vers Supabase Storage et met à jour le profil utilisateur
+ */
+export const uploadAvatar = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { imageBase64, mimeType = 'image/jpeg' } = req.body;
+
+    if (!imageBase64) {
+      res.status(400).json({
+        success: false,
+        message: 'Image base64 requise',
+      });
+      return;
+    }
+
+    // Vérifier que l'utilisateur existe
+    const userResult = await (pool as any).query(
+      'SELECT id FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (!userResult.rows || userResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé',
+      });
+      return;
+    }
+
+    if (!supabaseAdmin) {
+      res.status(500).json({
+        success: false,
+        message: 'Supabase non configuré',
+      });
+      return;
+    }
+
+    // Convertir base64 en Buffer
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Vérifier la taille (max 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (buffer.length > maxSize) {
+      res.status(400).json({
+        success: false,
+        message: 'Image trop grande. Taille maximum: 50MB',
+      });
+      return;
+    }
+
+    // Déterminer l'extension du fichier
+    const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/gif' ? 'gif' : 'jpg';
+    const fileName = `${userId}-${Date.now()}.${ext}`;
+    const filePath = `avatars/${fileName}`;
+
+    // Upload vers Supabase Storage
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('avatars')
+      .upload(filePath, buffer, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: mimeType,
+      });
+
+    if (uploadError) {
+      logger.error('Erreur upload avatar:', uploadError);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur lors de l\'upload de l\'image',
+        error: uploadError.message,
+      });
+      return;
+    }
+
+    // Obtenir l'URL publique
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    // Mettre à jour le profil utilisateur avec l'URL de l'avatar
+    const updateResult = await (pool as any).query(
+      `UPDATE users 
+       SET avatar_url = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, email, phone, first_name, last_name, avatar_url, role, created_at, updated_at`,
+      [publicUrl, userId]
+    );
+
+    logger.info(`Avatar uploadé pour ${maskUserId(userId)}`, {
+      filePath,
+      publicUrl,
+    });
+
+    res.json({
+      success: true,
+      message: 'Avatar uploadé avec succès',
+      data: {
+        avatar_url: publicUrl,
+        user: updateResult.rows[0],
+      },
+    });
+  } catch (error: any) {
+    logger.error('Erreur upload avatar:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de l\'upload de l\'avatar',
+      error: error.message,
+    });
+  }
+};
+
 export {
   registerUserWithPostgreSQL,
   loginUserWithPostgreSQL,

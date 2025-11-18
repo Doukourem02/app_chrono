@@ -9,9 +9,12 @@ import {
   ScrollView,
   Image,
   Switch,
-  StatusBar
+  StatusBar,
+  ActivityIndicator
 } from 'react-native';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
@@ -24,7 +27,7 @@ interface UserStatistics {
 
 export default function ProfilePage() {
   const { requireAuth } = useRequireAuth();
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [statistics, setStatistics] = useState<UserStatistics>({
@@ -33,6 +36,8 @@ export default function ProfilePage() {
     totalSaved: 0
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>((user as any)?.avatar_url || null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat('fr-FR', {
@@ -43,12 +48,10 @@ export default function ProfilePage() {
     return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
   };
 
-  // Mock profile data - À remplacer par vraies données depuis le backend si disponible
-  const profile = {
-    first_name: 'Client',
-    last_name: 'Chrono',
-    profile_image_url: null,
-  };
+  // Mettre à jour l'avatar quand l'utilisateur change
+  useEffect(() => {
+    setAvatarUrl((user as any)?.avatar_url || null);
+  }, [user]);
 
   // Charger les statistiques depuis le backend
   useEffect(() => {
@@ -72,6 +75,103 @@ export default function ProfilePage() {
       loadStatistics();
     });
   }, [requireAuth, user?.id]);
+
+  const handleAvatarPress = async () => {
+    if (!user?.id) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour changer votre avatar');
+      return;
+    }
+
+    try {
+      // Demander les permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'Nous avons besoin de l\'accès à vos photos pour changer votre avatar');
+        return;
+      }
+
+      // Afficher les options
+      Alert.alert(
+        'Changer l\'avatar',
+        'Choisissez une option',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Prendre une photo',
+            onPress: async () => {
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets[0]) {
+                await uploadAvatar(result.assets[0].uri, result.assets[0].mimeType || 'image/jpeg');
+              }
+            },
+          },
+          {
+            text: 'Choisir depuis la galerie',
+            onPress: async () => {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets[0]) {
+                await uploadAvatar(result.assets[0].uri, result.assets[0].mimeType || 'image/jpeg');
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Erreur sélection image:', error);
+      Alert.alert('Erreur', 'Impossible d\'accéder à vos photos');
+    }
+  };
+
+  const uploadAvatar = async (imageUri: string, mimeType: string) => {
+    if (!user?.id) return;
+
+    try {
+      setUploadingAvatar(true);
+
+      // Lire l'image en base64 avec expo-file-system/legacy
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const base64DataUri = `data:${mimeType};base64,${base64}`;
+
+      // Uploader vers le backend
+      const result = await userApiService.uploadAvatar(user.id, base64DataUri, mimeType);
+
+      if (result.success && result.data) {
+        // Mettre à jour l'avatar localement
+        setAvatarUrl(result.data.avatar_url);
+        
+        // Mettre à jour le store
+        if (user) {
+          setUser({
+            ...user,
+            avatar_url: result.data.avatar_url,
+          } as any);
+        }
+
+        Alert.alert('Succès', 'Votre avatar a été mis à jour');
+      } else {
+        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour l\'avatar');
+      }
+    } catch (error) {
+      console.error('Erreur upload avatar:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour l\'avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -187,22 +287,34 @@ export default function ProfilePage() {
         <View style={styles.header}>
           <View style={styles.profileSection}>
             <View style={styles.avatarContainer}>
-              {profile?.profile_image_url ? (
-                <Image source={{ uri: profile.profile_image_url }} style={styles.avatar} />
+              {uploadingAvatar ? (
+                <View style={styles.avatarPlaceholder}>
+                  <ActivityIndicator size="large" color="#8B5CF6" />
+                </View>
+              ) : avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
                   <Ionicons name="person" size={40} color="#8B5CF6" />
                 </View>
               )}
-              <TouchableOpacity style={styles.cameraButton}>
-                <Ionicons name="camera" size={16} color="#FFFFFF" />
+              <TouchableOpacity 
+                style={styles.cameraButton}
+                onPress={handleAvatarPress}
+                disabled={uploadingAvatar}
+              >
+                {uploadingAvatar ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="camera" size={16} color="#FFFFFF" />
+                )}
               </TouchableOpacity>
             </View>
             
             <View style={styles.userInfo}>
               <Text style={styles.userName}>
-                {profile?.first_name && profile?.last_name 
-                  ? `${profile.first_name} ${profile.last_name}`
+                {((user as any)?.first_name && (user as any)?.last_name)
+                  ? `${(user as any).first_name} ${(user as any).last_name}`
                   : 'Client Chrono'
                 }
               </Text>

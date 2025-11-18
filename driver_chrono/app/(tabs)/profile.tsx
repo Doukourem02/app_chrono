@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, Switch, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 
@@ -12,7 +14,7 @@ interface DriverStatistics {
 }
 
 export default function ProfilePage() {
-  const { user, profile, isOnline, logout, setOnlineStatus } = useDriverStore();
+  const { user, profile, isOnline, logout, setOnlineStatus, setUser, updateProfile } = useDriverStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [statistics, setStatistics] = useState<DriverStatistics>({
     completedDeliveries: 0,
@@ -20,6 +22,8 @@ export default function ProfilePage() {
     totalEarnings: 0
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>((user as any)?.avatar_url || profile?.profile_image_url || null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat('fr-FR', {
@@ -59,6 +63,115 @@ export default function ProfilePage() {
   useEffect(() => {
     loadStatistics();
   }, [loadStatistics]);
+
+  // Mettre à jour l'avatar quand l'utilisateur ou le profil change
+  useEffect(() => {
+    setAvatarUrl((user as any)?.avatar_url || profile?.profile_image_url || null);
+  }, [user, profile]);
+
+  const handleAvatarPress = async () => {
+    if (!user?.id) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour changer votre avatar');
+      return;
+    }
+
+    try {
+      // Demander les permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'Nous avons besoin de l\'accès à vos photos pour changer votre avatar');
+        return;
+      }
+
+      // Afficher les options
+      Alert.alert(
+        'Changer l\'avatar',
+        'Choisissez une option',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Prendre une photo',
+            onPress: async () => {
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets[0]) {
+                await uploadAvatar(result.assets[0].uri, result.assets[0].mimeType || 'image/jpeg');
+              }
+            },
+          },
+          {
+            text: 'Choisir depuis la galerie',
+            onPress: async () => {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets[0]) {
+                await uploadAvatar(result.assets[0].uri, result.assets[0].mimeType || 'image/jpeg');
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Erreur sélection image:', error);
+      Alert.alert('Erreur', 'Impossible d\'accéder à vos photos');
+    }
+  };
+
+  const uploadAvatar = async (imageUri: string, mimeType: string) => {
+    if (!user?.id) return;
+
+    try {
+      setUploadingAvatar(true);
+
+      // Lire l'image en base64 avec expo-file-system/legacy
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const base64DataUri = `data:${mimeType};base64,${base64}`;
+
+      // Uploader vers le backend
+      const result = await apiService.uploadAvatar(user.id, base64DataUri, mimeType);
+
+      if (result.success && result.data) {
+        // Mettre à jour l'avatar localement
+        setAvatarUrl(result.data.avatar_url);
+        
+        // Mettre à jour le store
+        if (user) {
+          setUser({
+            ...user,
+            avatar_url: result.data.avatar_url,
+          } as any);
+        }
+
+        // Mettre à jour le profil si disponible
+        if (profile) {
+          updateProfile({
+            profile_image_url: result.data.avatar_url,
+          } as any);
+        }
+
+        Alert.alert('Succès', 'Votre avatar a été mis à jour');
+      } else {
+        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour l\'avatar');
+      }
+    } catch (error) {
+      console.error('Erreur upload avatar:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour l\'avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -142,13 +255,28 @@ export default function ProfilePage() {
       <View style={styles.header}>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            {profile?.profile_image_url ? (
-              <Image source={{ uri: profile.profile_image_url }} style={styles.avatar} />
+            {uploadingAvatar ? (
+              <View style={styles.avatarPlaceholder}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+              </View>
+            ) : avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Ionicons name="person" size={40} color="#8B5CF6" />
               </View>
             )}
+            <TouchableOpacity 
+              style={styles.cameraButton}
+              onPress={handleAvatarPress}
+              disabled={uploadingAvatar}
+            >
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera" size={16} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
             <View style={[styles.statusBadge, isOnline ? styles.onlineBadge : styles.offlineBadge]}>
               <Text style={styles.statusText}>{isOnline ? 'En ligne' : 'Hors ligne'}</Text>
             </View>
@@ -156,9 +284,11 @@ export default function ProfilePage() {
           
           <View style={styles.userInfo}>
             <Text style={styles.userName}>
-              {profile?.first_name && profile?.last_name 
-                ? `${profile.first_name} ${profile.last_name}`
-                : 'Livreur'
+              {((user as any)?.first_name && (user as any)?.last_name)
+                ? `${(user as any).first_name} ${(user as any).last_name}`
+                : (profile?.first_name && profile?.last_name)
+                  ? `${profile.first_name} ${profile.last_name}`
+                  : 'Livreur'
               }
             </Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
@@ -332,10 +462,24 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#8B5CF6',
   },
-  statusBadge: {
+  cameraButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#8B5CF6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    zIndex: 2,
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,

@@ -13,7 +13,10 @@ interface UserData {
   id: string
   email: string
   phone: string
+  first_name?: string | null
+  last_name?: string | null
   role: string
+  avatar_url?: string | null
   createdAt: string
 }
 
@@ -64,7 +67,10 @@ export default function UsersPage() {
         (user: UserData) =>
           user.email.toLowerCase().includes(query) ||
           user.phone.toLowerCase().includes(query) ||
-          user.role.toLowerCase().includes(query)
+          user.role.toLowerCase().includes(query) ||
+          (user.first_name && user.first_name.toLowerCase().includes(query)) ||
+          (user.last_name && user.last_name.toLowerCase().includes(query)) ||
+          ((user.first_name && user.last_name) && `${user.first_name} ${user.last_name}`.toLowerCase().includes(query))
       )
     }
 
@@ -334,7 +340,7 @@ export default function UsersPage() {
           <Search size={20} style={searchIconStyle} />
           <input
             type="text"
-            placeholder="Rechercher par email, téléphone..."
+            placeholder="Rechercher par nom, prénom, email, téléphone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={searchInputStyle}
@@ -371,6 +377,8 @@ export default function UsersPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr>
+                    <th style={thStyle}>Nom</th>
+                    <th style={thStyle}>Prénom</th>
                     <th style={thStyle}>Email</th>
                     <th style={thStyle}>Téléphone</th>
                     <th style={thStyle}>Rôle</th>
@@ -393,6 +401,16 @@ export default function UsersPage() {
                         e.currentTarget.style.backgroundColor = 'transparent'
                       }}
                     >
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: '14px', color: '#374151' }}>
+                          {user.last_name || 'N/A'}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: '14px', color: '#374151' }}>
+                          {user.first_name || 'N/A'}
+                        </span>
+                      </td>
                       <td style={tdStyle}>
                         <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
                           {user.email}

@@ -72,6 +72,91 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     return points;
   };
 
+  const simplifyRoute = (points: Coordinates[], tolerance = 0.00002): Coordinates[] => {
+    if (!points || points.length <= 2) return points;
+
+    const sqTolerance = tolerance * tolerance;
+
+    const sqDist = (a: Coordinates, b: Coordinates) => {
+      const dx = a.latitude - b.latitude;
+      const dy = a.longitude - b.longitude;
+      return dx * dx + dy * dy;
+    };
+
+    const simplifyRadialDistance = (pts: Coordinates[], sqTol: number) => {
+      const newPoints: Coordinates[] = [pts[0]];
+      let prevPoint = pts[0];
+
+      for (let i = 1; i < pts.length; i++) {
+        const point = pts[i];
+        if (sqDist(point, prevPoint) > sqTol) {
+          newPoints.push(point);
+          prevPoint = point;
+        }
+      }
+
+      if (prevPoint !== pts[pts.length - 1]) {
+        newPoints.push(pts[pts.length - 1]);
+      }
+
+      return newPoints;
+    };
+
+    const sqSegDist = (p: Coordinates, a: Coordinates, b: Coordinates) => {
+      let x = a.latitude;
+      let y = a.longitude;
+      let dx = b.latitude - x;
+      let dy = b.longitude - y;
+
+      if (dx !== 0 || dy !== 0) {
+        const t = ((p.latitude - x) * dx + (p.longitude - y) * dy) / (dx * dx + dy * dy);
+        if (t > 1) {
+          x = b.latitude;
+          y = b.longitude;
+        } else if (t > 0) {
+          x += dx * t;
+          y += dy * t;
+        }
+      }
+
+      dx = p.latitude - x;
+      dy = p.longitude - y;
+
+      return dx * dx + dy * dy;
+    };
+
+    const simplifyDouglasPeucker = (pts: Coordinates[], sqTol: number) => {
+      const last = pts.length - 1;
+      const stack: [number, number][] = [[0, last]];
+      const keep: boolean[] = new Array(pts.length).fill(false);
+      keep[0] = keep[last] = true;
+
+      while (stack.length) {
+        const [start, end] = stack.pop()!;
+        let maxDist = 0;
+        let index = 0;
+
+        for (let i = start + 1; i < end; i++) {
+          const dist = sqSegDist(pts[i], pts[start], pts[end]);
+          if (dist > maxDist) {
+            index = i;
+            maxDist = dist;
+          }
+        }
+
+        if (maxDist > sqTol) {
+          keep[index] = true;
+          stack.push([start, index], [index, end]);
+        }
+      }
+
+      return pts.filter((_, i) => keep[i]);
+    };
+
+    const radialSimplified = simplifyRadialDistance(points, sqTolerance);
+    return simplifyDouglasPeucker(radialSimplified, sqTolerance);
+  };
+
   // Animation de la polyline
   const animatePolyline = (points: Coordinates[]) => {
     try {
@@ -206,6 +291,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
       if (json.routes && json.routes.length > 0) {
         const route = json.routes[0];
         let points = decodePolyline(route.overview_polyline.points);
+        points = simplifyRoute(points);
 
         const almostEqual = (a: Coordinates, b: Coordinates, eps = 0.0001) =>
           Math.abs(a.latitude - b.latitude) < eps && Math.abs(a.longitude - b.longitude) < eps;

@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
+import { userApiService } from '../../services/userApiService';
 
 export default function PersonalInfoPage() {
   const { user } = useAuthStore();
@@ -26,11 +27,9 @@ export default function PersonalInfoPage() {
   useEffect(() => {
     // Charger les données utilisateur
     if (user) {
-      // Extraire prénom et nom depuis full_name si disponible, sinon utiliser des valeurs par défaut
-      const fullName = (user as any).full_name || '';
-      const nameParts = fullName.split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      // Utiliser first_name et last_name depuis le store si disponibles
+      const firstName = (user as any).first_name || '';
+      const lastName = (user as any).last_name || '';
       
       setFormData({
         firstName,
@@ -47,20 +46,36 @@ export default function PersonalInfoPage() {
       return;
     }
 
-    if (!formData.email.trim()) {
-      Alert.alert('Erreur', 'L\'email est requis');
+    if (!user?.id) {
+      Alert.alert('Erreur', 'Utilisateur non identifié');
       return;
     }
 
     setIsLoading(true);
     try {
-      // TODO: Implémenter l'API pour mettre à jour le profil
-      // const result = await userApiService.updateProfile(user?.id, formData);
-      
-      Alert.alert('Succès', 'Vos informations ont été mises à jour', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    } catch {
+      const result = await userApiService.updateProfile(user.id, {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        phone: formData.phone.trim() || undefined,
+      });
+
+      if (result.success && result.data) {
+        // Mettre à jour le store avec les nouvelles données
+        useAuthStore.getState().setUser({
+          ...user,
+          first_name: result.data.first_name,
+          last_name: result.data.last_name,
+          phone: result.data.phone || user.phone,
+        });
+
+        Alert.alert('Succès', 'Vos informations ont été mises à jour', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour vos informations');
+      }
+    } catch (error) {
+      console.error('Erreur mise à jour profil:', error);
       Alert.alert('Erreur', 'Impossible de mettre à jour vos informations');
     } finally {
       setIsLoading(false);

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Search, Filter } from 'lucide-react'
 import { GoogleMap, Marker, Polyline, InfoWindow } from '@react-google-maps/api'
 import { usePathname } from 'next/navigation'
@@ -155,7 +155,10 @@ function TrackingMap({
     return adminLocation
   }, [selectedDelivery, adminLocation])
 
-  const routePath = useMemo(() => {
+  const [fullRoutePath, setFullRoutePath] = useState<Array<{ lat: number; lng: number }>>([])
+  const previousDeliveryIdRef = useRef<string | null>(null)
+
+  const routePathFallback = useMemo(() => {
     if (selectedDelivery?.pickup?.coordinates && selectedDelivery?.dropoff?.coordinates) {
       return [
         selectedDelivery.pickup.coordinates,
@@ -164,6 +167,245 @@ function TrackingMap({
     }
     return []
   }, [selectedDelivery])
+
+  // Fonction pour décoder le polyline encodé de Google
+  const decodePolyline = useCallback((encoded: string): Array<{ lat: number; lng: number }> => {
+    const points: Array<{ lat: number; lng: number }> = []
+    let index = 0
+    const len = encoded.length
+    let lat = 0
+    let lng = 0
+
+    while (index < len) {
+      let b: number
+      let shift = 0
+      let result = 0
+
+      do {
+        b = encoded.charCodeAt(index++) - 63
+        result |= (b & 0x1f) << shift
+        shift += 5
+      } while (b >= 0x20)
+
+      const dlat = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1))
+      lat += dlat
+
+      shift = 0
+      result = 0
+
+      do {
+        b = encoded.charCodeAt(index++) - 63
+        result |= (b & 0x1f) << shift
+        shift += 5
+      } while (b >= 0x20)
+
+      const dlng = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1))
+      lng += dlng
+
+      points.push({
+        lat: lat * 1e-5,
+        lng: lng * 1e-5,
+      })
+    }
+
+    return points
+  }, [])
+
+  // Fonction pour simplifier le polyline et éviter les auto-intersections (même logique que app_chrono)
+  const simplifyRoute = useCallback((points: Array<{ lat: number; lng: number }>, tolerance = 0.00002): Array<{ lat: number; lng: number }> => {
+    if (!points || points.length <= 2) return points
+
+    const sqTolerance = tolerance * tolerance
+
+    const sqDist = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+      const dx = a.lat - b.lat
+      const dy = a.lng - b.lng
+      return dx * dx + dy * dy
+    }
+
+    const simplifyRadialDistance = (pts: Array<{ lat: number; lng: number }>, sqTol: number) => {
+      const newPoints: Array<{ lat: number; lng: number }> = [pts[0]]
+      let prevPoint = pts[0]
+
+      for (let i = 1; i < pts.length; i++) {
+        const point = pts[i]
+        if (sqDist(point, prevPoint) > sqTol) {
+          newPoints.push(point)
+          prevPoint = point
+        }
+      }
+
+      if (prevPoint !== pts[pts.length - 1]) {
+        newPoints.push(pts[pts.length - 1])
+      }
+
+      return newPoints
+    }
+
+    const sqSegDist = (p: { lat: number; lng: number }, a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+      let x = a.lat
+      let y = a.lng
+      let dx = b.lat - x
+      let dy = b.lng - y
+
+      if (dx !== 0 || dy !== 0) {
+        const t = ((p.lat - x) * dx + (p.lng - y) * dy) / (dx * dx + dy * dy)
+        if (t > 1) {
+          x = b.lat
+          y = b.lng
+        } else if (t > 0) {
+          x += dx * t
+          y += dy * t
+        }
+      }
+
+      dx = p.lat - x
+      dy = p.lng - y
+
+      return dx * dx + dy * dy
+    }
+
+    const simplifyDouglasPeucker = (pts: Array<{ lat: number; lng: number }>, sqTol: number) => {
+      const last = pts.length - 1
+      const stack: [number, number][] = [[0, last]]
+      const keep: boolean[] = new Array(pts.length).fill(false)
+      keep[0] = keep[last] = true
+
+      while (stack.length) {
+        const [start, end] = stack.pop()!
+        let maxDist = 0
+        let index = 0
+
+        for (let i = start + 1; i < end; i++) {
+          const dist = sqSegDist(pts[i], pts[start], pts[end])
+          if (dist > maxDist) {
+            index = i
+            maxDist = dist
+          }
+        }
+
+        if (maxDist > sqTol) {
+          keep[index] = true
+          stack.push([start, index], [index, end])
+        }
+      }
+
+      return pts.filter((_, i) => keep[i])
+    }
+
+    const radialSimplified = simplifyRadialDistance(points, sqTolerance)
+    return simplifyDouglasPeucker(radialSimplified, sqTolerance)
+  }, [])
+
+  useEffect(() => {
+    if (!selectedDelivery?.pickup?.coordinates || !selectedDelivery?.dropoff?.coordinates || !window.google) {
+      return
+    }
+
+    const currentDeliveryId = selectedDelivery.id
+    const isNewDelivery = previousDeliveryIdRef.current !== currentDeliveryId
+    
+    if (isNewDelivery) {
+      previousDeliveryIdRef.current = currentDeliveryId
+      // Réinitialiser le chemin pour éviter d'afficher l'ancienne route pendant le chargement
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFullRoutePath([])
+    }
+
+    const pickupCoords = selectedDelivery.pickup.coordinates
+    const dropoffCoords = selectedDelivery.dropoff.coordinates
+    
+    // Vérifier que les coordonnées sont valides
+    if (!pickupCoords || !dropoffCoords) {
+      console.warn('Coordonnées pickup ou dropoff manquantes')
+      return
+    }
+
+    // Utiliser DirectionsService de Google Maps (déjà chargé) pour éviter les problèmes CORS
+    const directionsService = new window.google.maps.DirectionsService()
+    
+    directionsService.route(
+      {
+        origin: pickupCoords,
+        destination: dropoffCoords,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: false,
+      },
+      (result, status) => {
+        // Vérifier que la livraison n'a pas changé pendant le chargement
+        if (previousDeliveryIdRef.current !== currentDeliveryId) {
+          return // Ignorer le résultat si la livraison a changé
+        }
+
+        if (status === window.google.maps.DirectionsStatus.OK && result?.routes?.[0]) {
+          const route = result.routes[0]
+          
+          // Fonction pour s'assurer que le chemin commence et se termine exactement sur pickup et dropoff (même logique que app_chrono)
+          const ensureExactEndpoints = (path: Array<{ lat: number; lng: number }>) => {
+            if (!path || path.length === 0) return path
+            
+            const almostEqual = (a: { lat: number; lng: number }, b: { lat: number; lng: number }, eps = 0.0001) => {
+              return Math.abs(a.lat - b.lat) < eps && Math.abs(a.lng - b.lng) < eps
+            }
+            
+            let finalPath = [...path]
+            
+            // S'assurer que le premier point correspond exactement au pickup (ajouter au début si nécessaire)
+            if (finalPath.length > 0 && pickupCoords && !almostEqual(finalPath[0], pickupCoords)) {
+              finalPath = [{ lat: pickupCoords.lat, lng: pickupCoords.lng }, ...finalPath]
+            }
+            
+            // S'assurer que le dernier point correspond exactement au dropoff (ajouter à la fin si nécessaire)
+            if (finalPath.length > 0 && dropoffCoords && !almostEqual(finalPath[finalPath.length - 1], dropoffCoords)) {
+              finalPath = [...finalPath, { lat: dropoffCoords.lat, lng: dropoffCoords.lng }]
+            }
+            
+            return finalPath
+          }
+          
+          // Utiliser overview_polyline exactement comme dans app_chrono
+          const overviewPolyline = route.overview_polyline
+          if (overviewPolyline && typeof overviewPolyline === 'object' && 'points' in overviewPolyline) {
+            try {
+              const encodedPoints = (overviewPolyline as { points: string }).points
+              if (encodedPoints) {
+                let points = decodePolyline(encodedPoints)
+                // Simplifier exactement comme dans app_chrono (même tolérance 0.00002)
+                points = simplifyRoute(points)
+                // S'assurer que le chemin commence et se termine exactement sur pickup et dropoff
+                const finalPath = ensureExactEndpoints(points)
+                setFullRoutePath(finalPath)
+                return
+              }
+            } catch (err) {
+              console.warn('Erreur décodage polyline:', err)
+            }
+          }
+          
+          // Fallback: utiliser overview_path si overview_polyline n'est pas disponible
+          if (route.overview_path && route.overview_path.length > 1) {
+            let overviewPath = route.overview_path.map((point) => ({
+              lat: point.lat(),
+              lng: point.lng(),
+            }))
+            // Simplifier exactement comme dans app_chrono (même tolérance 0.00002)
+            overviewPath = simplifyRoute(overviewPath)
+            // S'assurer que le chemin commence et se termine exactement sur pickup et dropoff
+            const finalPath = ensureExactEndpoints(overviewPath)
+            setFullRoutePath(finalPath)
+            return
+          }
+        }
+        
+        // Ne pas utiliser le fallback (ligne droite) - laisser vide si Google Directions échoue
+        // Seulement si la livraison n'a pas changé
+        if (previousDeliveryIdRef.current === currentDeliveryId) {
+          console.warn('Google Directions API a échoué ou n\'a pas retourné de route valide')
+          setFullRoutePath([])
+        }
+      }
+    )
+  }, [selectedDelivery, decodePolyline, simplifyRoute])
 
   // Calculer la position actuelle du véhicule (position réelle du livreur ou milieu de la route)
   // Ne retourner la position que si le livreur est en ligne
@@ -179,43 +421,7 @@ function TrackingMap({
     return null
   }, [assignedDriver])
 
-  // Calculer le trajet du livreur vers le point de livraison
-  // Ne calculer que si le livreur est en ligne et a une position
-  const driverRoutePath = useMemo(() => {
-    // Vérifier que le livreur est en ligne avant de calculer le trajet
-    if (!currentVehiclePosition || !assignedDriver || assignedDriver.is_online !== true) {
-      return []
-    }
-    
-    // Selon le statut de la commande, le livreur va vers pickup ou dropoff
-    if (selectedDelivery?.status === 'accepted' || selectedDelivery?.status === 'enroute') {
-      // Le livreur va vers le point de pickup
-      if (selectedDelivery?.pickup?.coordinates) {
-        return [currentVehiclePosition, selectedDelivery.pickup.coordinates]
-      }
-    } else if (selectedDelivery?.status === 'picked_up') {
-      // Le livreur va vers le point de dropoff
-      if (selectedDelivery?.dropoff?.coordinates) {
-        return [currentVehiclePosition, selectedDelivery.dropoff.coordinates]
-      }
-    }
-    
-    return []
-  }, [currentVehiclePosition, selectedDelivery, assignedDriver])
 
-  // État pour l'animation du polyline
-  const [animationOffset, setAnimationOffset] = useState(0)
-
-  // Animation du polyline
-  useEffect(() => {
-    if (driverRoutePath.length < 2) return
-
-    const interval = setInterval(() => {
-      setAnimationOffset((prev) => (prev + 0.01) % 1)
-    }, 50) // Mise à jour toutes les 50ms pour une animation fluide
-
-    return () => clearInterval(interval)
-  }, [driverRoutePath.length])
 
   const mapPlaceholderStyle: React.CSSProperties = {
     width: '100%',
@@ -261,53 +467,23 @@ function TrackingMap({
       key={mapKey}
       mapContainerStyle={mapContainerStyle}
       center={center}
-      zoom={selectedDelivery && routePath.length > 0 ? DELIVERY_ZOOM : OVERVIEW_ZOOM}
+      zoom={selectedDelivery && routePathFallback.length > 0 ? DELIVERY_ZOOM : OVERVIEW_ZOOM}
       options={mapOptions}
     >
       {/* Afficher uniquement le polyline et les marqueurs de la livraison sélectionnée */}
-      {selectedDelivery && routePath.length >= 2 && (
+      {selectedDelivery && routePathFallback.length >= 2 && (
         <>
-          {/* Polyline entre le point de départ et d'arrivée (route complète) */}
-          <Polyline
-            key={`polyline-full-${selectedDelivery.id}`}
-            path={routePath}
-            options={{
-              strokeColor: '#E5E7EB',
-              strokeWeight: 3,
-              strokeOpacity: 0.5,
-              zIndex: 1,
-            }}
-          />
-          
-          {/* Polyline du livreur vers le point de livraison (trajet actuel avec animation) */}
-          {driverRoutePath.length >= 2 && (
+          {/* Polyline entre le point de départ et d'arrivée (route complète) - Violet, ligne continue */}
+          {/* N'afficher QUE si on a une vraie route de Google Directions (pas de ligne droite) */}
+          {fullRoutePath.length >= 2 && (
             <Polyline
-              key={`polyline-driver-${selectedDelivery.id}-${animationOffset}`}
-              path={driverRoutePath}
+              key={`polyline-full-${selectedDelivery.id}`}
+              path={fullRoutePath}
               options={{
-                strokeColor: '#8B5CF6',
+                strokeColor: '#6366F1',
                 strokeWeight: 6,
                 strokeOpacity: 1,
-                zIndex: 2,
-                icons: [
-                  {
-                    icon: {
-                      // Créer une flèche personnalisée pointant vers l'avant
-                      path: window.google?.maps?.SymbolPath?.FORWARD_CLOSED_ARROW || 
-                            (window.google?.maps?.SymbolPath?.FORWARD_OPEN_ARROW) ||
-                            // Fallback: créer un chemin de flèche manuellement
-                            'M 0,-2 0,2 M -2,-2 0,0 -2,2',
-                      scale: 5,
-                      strokeColor: '#FFFFFF',
-                      strokeWeight: 2.5,
-                      fillColor: '#8B5CF6',
-                      fillOpacity: 1,
-                      rotation: 0,
-                    },
-                    offset: `${(animationOffset * 100).toFixed(0)}%`,
-                    repeat: '80px',
-                  },
-                ],
+                zIndex: 1,
               }}
             />
           )}
@@ -315,7 +491,7 @@ function TrackingMap({
           {/* Marqueur de départ (vert) */}
           <Marker
             key={`marker-pickup-${selectedDelivery.id}`}
-            position={routePath[0]}
+            position={routePathFallback[0]}
             icon={{
               path: window.google?.maps?.SymbolPath?.CIRCLE || 0,
               scale: 10,
@@ -325,7 +501,7 @@ function TrackingMap({
               strokeWeight: 2,
             }}
           />
-          <InfoWindow position={routePath[0]}>
+          <InfoWindow position={routePathFallback[0]}>
             <div style={{ padding: '4px' }}>
               <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
                 {selectedDelivery.pickup?.name || 'Point de départ'}
@@ -339,7 +515,7 @@ function TrackingMap({
           {/* Marqueur d'arrivée (violet) */}
           <Marker
             key={`marker-dropoff-${selectedDelivery.id}`}
-            position={routePath[1]}
+            position={routePathFallback[1]}
             icon={{
               path: window.google?.maps?.SymbolPath?.CIRCLE || 0,
               scale: 10,
@@ -349,7 +525,7 @@ function TrackingMap({
               strokeWeight: 2,
             }}
           />
-          <InfoWindow position={routePath[1]}>
+          <InfoWindow position={routePathFallback[1]}>
             <div style={{ padding: '4px' }}>
               <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
                 {selectedDelivery.dropoff?.name || 'Point d\'arrivée'}

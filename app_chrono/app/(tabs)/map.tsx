@@ -338,14 +338,15 @@ export default function MapPage() {
       }, 200);
       
       // Réouvrir le bottom sheet après un court délai pour permettre la création
-      setTimeout(() => {
-        expandBottomSheet();
-        // Réinitialiser le flag après un délai pour permettre une nouvelle réinitialisation si nécessaire
-        setTimeout(() => {
-          isResettingRef.current = false;
-        }, 1000);
-      }, 400);
-    }, [setSelectedOrder, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, pickupLocation, deliveryLocation, setSelectedMethod, animateToCoordinate, region, expandBottomSheet])
+      scheduleBottomSheetOpen(400);
+      const resetTimer = setTimeout(() => {
+        isResettingRef.current = false;
+      }, 1400);
+
+      return () => {
+        clearTimeout(resetTimer);
+      };
+    }, [setSelectedOrder, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, pickupLocation, deliveryLocation, setSelectedMethod, animateToCoordinate, region, scheduleBottomSheetOpen])
   );
 
   // 🆕 Détecter quand l'utilisateur commence à remplir les champs pour éviter la réinitialisation
@@ -593,6 +594,24 @@ export default function MapPage() {
         
         // Mettre à jour les coordonnées de pickup avec la position actuelle
         setPickupCoords({ latitude, longitude });
+
+        // Rafraîchir également l'adresse affichée dans le champ "Où récupérer ?"
+        try {
+          const refreshedAddress = await locationService.reverseGeocode({
+            latitude,
+            longitude,
+            timestamp: Date.now(),
+          });
+          
+          if (refreshedAddress) {
+            setPickupLocation(refreshedAddress);
+          } else {
+            setPickupLocation(`Ma position (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+          }
+        } catch (geoError) {
+          logger.warn('Erreur reverse geocode pendant cleanup', 'map.tsx', geoError);
+          setPickupLocation(`Ma position (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+        }
         
         // Animer la caméra vers la position actuelle du client
         setTimeout(() => {
@@ -601,6 +620,8 @@ export default function MapPage() {
       } else {
         // Fallback sur region si pas de permission ou erreur
         if (region) {
+          setPickupCoords({ latitude: region.latitude, longitude: region.longitude });
+          setPickupLocation('Votre position actuelle');
           setTimeout(() => {
             animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
           }, 100);
@@ -610,6 +631,8 @@ export default function MapPage() {
       logger.warn('Erreur récupération position actuelle', 'map.tsx', error);
       // Fallback sur region en cas d'erreur
       if (region) {
+        setPickupCoords({ latitude: region.latitude, longitude: region.longitude });
+        setPickupLocation('Votre position actuelle');
         setTimeout(() => {
           animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.01);
         }, 100);
@@ -675,11 +698,9 @@ export default function MapPage() {
       userManuallyClosedRef.current = false; // 🆕 Réinitialiser le flag de fermeture manuelle
       isProgrammaticCloseRef.current = true; // 🆕 Marquer comme fermeture programmatique
       // Réouvrir le bottom sheet de création de commande
-      setTimeout(() => {
-        expandBottomSheet();
-      }, 200);
+      scheduleBottomSheetOpen(200);
     }, 300); // Petit délai pour laisser le bottom sheet se fermer
-  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState, expandBottomSheet]);
+  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState, scheduleBottomSheetOpen]);
 
   // Callback quand le rating bottom sheet est fermé
   const handleRatingClose = useCallback(() => {
@@ -694,11 +715,9 @@ export default function MapPage() {
       userManuallyClosedRef.current = false; // 🆕 Réinitialiser le flag de fermeture manuelle
       isProgrammaticCloseRef.current = true; // 🆕 Marquer comme fermeture programmatique
       // Réouvrir le bottom sheet de création de commande
-      setTimeout(() => {
-        expandBottomSheet();
-      }, 200);
+      scheduleBottomSheetOpen(200);
     }, 300); // Petit délai pour laisser le bottom sheet se fermer
-  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState, expandBottomSheet]);
+  }, [resetRatingBottomSheet, collapseRatingBottomSheet, cleanupOrderState, scheduleBottomSheetOpen]);
 
   // 🆕 Vérifier si une commande est trop ancienne et la nettoyer automatiquement
   // (par exemple, si elle est restée en "accepted" ou "enroute" depuis plus de 30 minutes)
@@ -744,6 +763,30 @@ export default function MapPage() {
   const userManuallyClosedRef = useRef(false); // 🆕 Suivre si l'utilisateur a fermé manuellement
   const isProgrammaticCloseRef = useRef(false); // 🆕 Suivre si on ferme programmatiquement (pour éviter de marquer comme fermeture manuelle)
   const previousIsExpandedRef = useRef(isExpanded); // 🆕 Suivre l'état précédent de isExpanded
+  const autoOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 🆕 Permettre d'annuler les ouvertures auto en attente
+
+  const scheduleBottomSheetOpen = useCallback((delay = 0) => {
+    if (userManuallyClosedRef.current) {
+      return;
+    }
+    if (autoOpenTimeoutRef.current) {
+      clearTimeout(autoOpenTimeoutRef.current);
+    }
+    autoOpenTimeoutRef.current = setTimeout(() => {
+      if (!userManuallyClosedRef.current) {
+        expandBottomSheet();
+      }
+      autoOpenTimeoutRef.current = null;
+    }, delay);
+  }, [expandBottomSheet]);
+
+  useEffect(() => {
+    return () => {
+      if (autoOpenTimeoutRef.current) {
+        clearTimeout(autoOpenTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // 🆕 Détecter quand le bottom sheet est fermé (par glissement ou toggle)
   // et marquer comme fermeture manuelle si ce n'est pas une fermeture programmatique
@@ -753,6 +796,10 @@ export default function MapPage() {
     if (previousIsExpandedRef.current && !isExpanded && !isProgrammaticCloseRef.current) {
       userManuallyClosedRef.current = true;
       logger.debug('🔒 Bottom sheet fermé manuellement par l\'utilisateur', 'map.tsx');
+      if (autoOpenTimeoutRef.current) {
+        clearTimeout(autoOpenTimeoutRef.current);
+        autoOpenTimeoutRef.current = null;
+      }
     }
     // Mettre à jour l'état précédent
     previousIsExpandedRef.current = isExpanded;
@@ -784,14 +831,10 @@ export default function MapPage() {
     if (shouldShowCreationForm && !isExpanded && !showRatingBottomSheet && !userManuallyClosedRef.current) {
       if (!hasAutoOpenedRef.current) {
         hasAutoOpenedRef.current = true;
-        const timer = setTimeout(() => {
-          expandBottomSheet();
-        }, 100);
-
-        return () => clearTimeout(timer);
+        scheduleBottomSheetOpen(100);
       }
     }
-  }, [expandBottomSheet, isExpanded, currentOrder, showRatingBottomSheet, isCreatingNewOrder, pendingOrder]);
+  }, [isExpanded, currentOrder, showRatingBottomSheet, isCreatingNewOrder, pendingOrder, scheduleBottomSheetOpen]);
 
   // 🆕 Réouvrir automatiquement le bottom sheet après le nettoyage d'une commande
   // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
@@ -810,15 +853,15 @@ export default function MapPage() {
       // Réinitialiser hasAutoOpenedRef pour permettre la réouverture
       hasAutoOpenedRef.current = false;
       isProgrammaticCloseRef.current = true; // 🆕 Marquer comme fermeture programmatique (si on ferme avant)
-      const timer = setTimeout(() => {
+      scheduleBottomSheetOpen(300);
+      const resetTimer = setTimeout(() => {
         isProgrammaticCloseRef.current = false; // Réinitialiser avant l'ouverture
-        expandBottomSheet();
         hasAutoOpenedRef.current = true;
       }, 300);
 
-      return () => clearTimeout(timer);
+      return () => clearTimeout(resetTimer);
     }
-  }, [currentOrder, pendingOrder, isExpanded, showRatingBottomSheet, expandBottomSheet]);
+  }, [currentOrder, pendingOrder, isExpanded, showRatingBottomSheet, scheduleBottomSheetOpen]);
 
   // NOTE: Bouton de test retiré en production — la création de commande
   // est maintenant déclenchée via le flow utilisateur (handleConfirm)
@@ -932,6 +975,12 @@ export default function MapPage() {
     if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user && selectedMethod) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       console.log('📦 Envoi commande avec détails...');
+
+      // Toujours repartir d'un état de recherche propre avant de lancer une nouvelle commande
+      try {
+        stopDriverSearch();
+        resetAfterDriverSearch();
+      } catch {}
       
       const orderData = {
         pickup: {
@@ -1042,7 +1091,7 @@ export default function MapPage() {
           setTimeout(() => {
             userManuallyClosedRef.current = false;
             hasAutoOpenedRef.current = false;
-            expandBottomSheet();
+            scheduleBottomSheetOpen();
           }, 500);
         }, 300);
         
@@ -1052,7 +1101,7 @@ export default function MapPage() {
         Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
       }
     }
-  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod, setIsCreatingNewOrder, animateToCoordinate, region, expandBottomSheet, recipientInfo.isRegistered, recipientInfo.userId]);
+  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod, setIsCreatingNewOrder, animateToCoordinate, region, scheduleBottomSheetOpen, recipientInfo.isRegistered, recipientInfo.userId, stopDriverSearch, resetAfterDriverSearch]);
 
   // Handler pour annuler une commande
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
