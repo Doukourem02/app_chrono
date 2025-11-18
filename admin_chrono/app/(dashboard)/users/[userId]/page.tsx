@@ -136,6 +136,62 @@ interface DeferredPayments {
   transactions: DeferredPaymentTransaction[]
 }
 
+interface AdminActivity {
+  lastLogin?: string | null
+  recentActions?: any[]
+  recentTickets?: any[]
+}
+
+interface ClientWithPartialPayment {
+  clientId: string
+  firstName?: string | null
+  lastName?: string | null
+  email?: string | null
+  phone?: string | null
+  totalRemaining: number
+  lastOrderDate?: string | null
+  lastDriverId?: string | null
+  lastDriverName?: string | null
+}
+
+interface ProblematicOrder {
+  orderId: string
+  status: string
+  createdAt: string
+  problemType: string
+  client: {
+    firstName?: string | null
+    lastName?: string | null
+    email?: string | null
+  }
+  driver?: {
+    firstName?: string | null
+    lastName?: string | null
+    email?: string | null
+  } | null
+}
+
+interface DriverUnderSurveillance {
+  driverId: string
+  firstName?: string | null
+  lastName?: string | null
+  email?: string | null
+  phone?: string | null
+  cancelledCount: number
+  declinedCount: number
+  totalOrders: number
+  lastOrderDate?: string | null
+  isOnline: boolean
+  isAvailable: boolean
+  cancellationRate: string
+}
+
+interface Monitoring {
+  clientsWithPartialPayments: ClientWithPartialPayment[]
+  problematicOrders: ProblematicOrder[]
+  driversUnderSurveillance: DriverUnderSurveillance[]
+}
+
 interface UserDetails {
   id?: string
   role?: string
@@ -150,6 +206,8 @@ interface UserDetails {
   deferredPayments?: DeferredPayments
   pendingPaymentOrders?: PendingPaymentOrder[]
   recentOrders?: RecentOrder[]
+  adminActivity?: AdminActivity
+  monitoring?: Monitoring
   [key: string]: unknown
 }
 
@@ -180,6 +238,11 @@ export default function UserDetailsPage() {
           try {
             const driverResult = await adminApiService.getDriverDetails(userId)
             if (driverResult.success && driverResult.data) {
+              const driverData = driverResult.data as UserDetails
+              console.log('[UserDetails] Driver details récupérés:', {
+                pendingPaymentOrdersCount: driverData.pendingPaymentOrders?.length || 0,
+                recentOrdersCount: driverData.recentOrders?.length || 0,
+              })
               return driverResult as { data: UserDetails }
             }
           } catch (error) {
@@ -196,6 +259,16 @@ export default function UserDetailsPage() {
             console.warn('[UserDetails] Error fetching client details, using basic info:', error)
           }
           // Si les détails du client échouent, utiliser les infos de base
+        } else if (user.role === 'admin' || user.role === 'super_admin') {
+          try {
+            const adminResult = await adminApiService.getAdminDetails(userId)
+            if (adminResult.success && adminResult.data) {
+              return adminResult as { data: UserDetails }
+            }
+          } catch (error) {
+            console.warn('[UserDetails] Error fetching admin details, using basic info:', error)
+          }
+          // Si les détails de l'admin échouent, utiliser les infos de base
         }
 
         // Pour les admins ou si les détails spécifiques ont échoué, retourner les informations de base
@@ -581,6 +654,24 @@ export default function UserDetailsPage() {
         ['Date d\'inscription', user.createdAt ? formatDate(user.createdAt) : 'N/A'],
       ]
 
+      // Ajouter les données de monitoring si disponibles (clients en paiement partiel uniquement)
+      if (user.monitoring && user.monitoring.clientsWithPartialPayments && user.monitoring.clientsWithPartialPayments.length > 0) {
+        rows.push(['', ''])
+        rows.push(['CLIENTS EN PAIEMENT PARTIEL', ''])
+        rows.push(['Client', 'Montant restant', 'Dernière commande', 'Dernier livreur'])
+        user.monitoring.clientsWithPartialPayments.forEach((client: ClientWithPartialPayment) => {
+          const clientName = (client.firstName && client.lastName)
+            ? `${client.firstName} ${client.lastName}`
+            : client.email || 'N/A'
+          rows.push([
+            clientName,
+            formatCurrency(client.totalRemaining),
+            client.lastOrderDate ? formatDate(client.lastOrderDate) : 'N/A',
+            client.lastDriverName || 'N/A',
+          ])
+        })
+      }
+
       exportData({
         title: `Détails Admin - ${userName}`,
         headers,
@@ -887,35 +978,143 @@ export default function UserDetailsPage() {
 
         {/* Informations pour les admins */}
         {isAdmin && (
-          <div style={{ marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>
-              Informations administratives
-            </h3>
-            <div style={infoGridStyle}>
-              <div style={infoItemStyle}>
-                <Shield size={16} style={{ color: '#6B7280' }} />
-                <div>
-                  <div style={{ fontSize: '12px', color: '#6B7280' }}>Rôle</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                    {user.role === 'super_admin' ? 'Super Administrateur' : 'Administrateur'}
+          <>
+            {/* Section Activité administrative */}
+            {user.adminActivity && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>
+                  Activité administrative
+                </h3>
+                <div style={infoGridStyle}>
+                  {user.adminActivity.lastLogin && (
+                    <div style={infoItemStyle}>
+                      <Calendar size={16} style={{ color: '#6B7280' }} />
+                      <div>
+                        <div style={{ fontSize: '12px', color: '#6B7280' }}>Dernière connexion</div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                          {formatDate(user.adminActivity.lastLogin)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div style={infoItemStyle}>
+                    <Shield size={16} style={{ color: '#6B7280' }} />
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#6B7280' }}>Rôle</div>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                        {user.role === 'super_admin' ? 'Super Administrateur' : 'Administrateur'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={infoItemStyle}>
+                    <Calendar size={16} style={{ color: '#6B7280' }} />
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#6B7280' }}>Compte créé le</div>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                        {user.createdAt ? formatDate(user.createdAt) : 'N/A'}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div style={infoItemStyle}>
-                <Calendar size={16} style={{ color: '#6B7280' }} />
-                <div>
-                  <div style={{ fontSize: '12px', color: '#6B7280' }}>Compte créé le</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                    {user.createdAt ? formatDate(user.createdAt) : 'N/A'}
-                  </div>
+            )}
+
+            {/* Section Monitoring - Clients en paiement partiel uniquement */}
+            {user.monitoring && user.monitoring.clientsWithPartialPayments && user.monitoring.clientsWithPartialPayments.length > 0 && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>
+                  Clients en paiement partiel
+                </h3>
+                <div style={{
+                  backgroundColor: '#F9FAFB',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  overflow: 'hidden',
+                }}>
+                  <table style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                  }}>
+                    <thead>
+                      <tr style={{
+                        backgroundColor: '#F3F4F6',
+                        borderBottom: '1px solid #E5E7EB',
+                      }}>
+                        <th style={{
+                          padding: '12px',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#4B5563',
+                          textTransform: 'uppercase',
+                        }}>Client</th>
+                        <th style={{
+                          padding: '12px',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#4B5563',
+                          textTransform: 'uppercase',
+                        }}>Montant restant</th>
+                        <th style={{
+                          padding: '12px',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#4B5563',
+                          textTransform: 'uppercase',
+                        }}>Dernière commande</th>
+                        <th style={{
+                          padding: '12px',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#4B5563',
+                          textTransform: 'uppercase',
+                        }}>Dernier livreur</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {user.monitoring.clientsWithPartialPayments.map((client: ClientWithPartialPayment, index: number) => (
+                        <tr
+                          key={client.clientId}
+                          style={{
+                            borderBottom: index < user.monitoring!.clientsWithPartialPayments.length - 1 ? '1px solid #E5E7EB' : 'none',
+                          }}
+                        >
+                          <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
+                            <div>
+                              {(client.firstName && client.lastName)
+                                ? `${client.firstName} ${client.lastName}`
+                                : client.email || 'N/A'}
+                            </div>
+                            {client.phone && (
+                              <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                                {client.phone}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px', fontSize: '14px', color: '#EF4444', fontWeight: 600 }}>
+                            {formatCurrency(client.totalRemaining)}
+                          </td>
+                          <td style={{ padding: '12px', fontSize: '14px', color: '#6B7280' }}>
+                            {client.lastOrderDate ? formatDate(client.lastOrderDate) : 'N/A'}
+                          </td>
+                          <td style={{ padding: '12px', fontSize: '14px', color: '#6B7280' }}>
+                            {client.lastDriverName || 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
 
-        {/* Statistiques */}
-        {user.statistics && (
+        {/* Statistiques - uniquement pour drivers et clients */}
+        {user.statistics && !isAdmin && (
           <div>
             <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>
               Statistiques
@@ -1021,12 +1220,60 @@ export default function UserDetailsPage() {
               Courses en attente de paiement client
             </h3>
             {user.pendingPaymentOrders && user.pendingPaymentOrders.length > 0 ? (
-              <div style={{
-                backgroundColor: '#F9FAFB',
-                borderRadius: '12px',
-                border: '1px solid #E5E7EB',
-                overflow: 'hidden',
-              }}>
+              <>
+                {/* Résumé des courses en attente de paiement */}
+                {(() => {
+                  const totalPaid = user.pendingPaymentOrders.reduce((sum, order) => sum + (order.partialAmount || 0), 0)
+                  const totalRemaining = user.pendingPaymentOrders.reduce((sum, order) => sum + (order.remainingAmount || 0), 0)
+                  const totalDue = totalPaid + totalRemaining
+                  const pendingCount = user.pendingPaymentOrders.length
+                  
+                  return (
+                    <div style={statsGridStyle}>
+                      <div style={statCardStyle}>
+                        <div style={statValueStyle}>
+                          {formatCurrency(totalPaid)}
+                        </div>
+                        <div style={statLabelStyle}>Montant total payé par les clients</div>
+                      </div>
+                      <div style={statCardStyle}>
+                        <div style={{
+                          ...statValueStyle,
+                          color: totalRemaining > 0 ? '#EF4444' : '#10B981',
+                        }}>
+                          {formatCurrency(totalRemaining)}
+                        </div>
+                        <div style={statLabelStyle}>Montant total restant dû</div>
+                      </div>
+                      <div style={statCardStyle}>
+                        <div style={statValueStyle}>
+                          {formatCurrency(totalDue)}
+                        </div>
+                        <div style={statLabelStyle}>Total dû par les clients</div>
+                      </div>
+                      <div style={statCardStyle}>
+                        <div style={{
+                          ...statValueStyle,
+                          color: pendingCount > 0 ? '#F59E0B' : '#10B981',
+                        }}>
+                          {pendingCount}
+                        </div>
+                        <div style={statLabelStyle}>
+                          {pendingCount > 1 ? 'Courses en attente' : 'Course en attente'}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+                
+                {/* Tableau détaillé */}
+                <div style={{
+                  marginTop: '24px',
+                  backgroundColor: '#F9FAFB',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  overflow: 'hidden',
+                }}>
                 <table style={{
                   width: '100%',
                   borderCollapse: 'collapse',
@@ -1134,7 +1381,8 @@ export default function UserDetailsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              </>
             ) : (
               <div style={{
                 padding: '24px',

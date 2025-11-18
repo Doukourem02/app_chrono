@@ -1072,6 +1072,27 @@ class AdminApiService {
   }
 
   /**
+   * Récupère les détails d'un admin
+   */
+  async getAdminDetails(adminId: string): Promise<{
+    success: boolean
+    data?: unknown
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/admins/${adminId}/details`)
+      if (!response.ok) return { success: false }
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) {
+        return { success: result.success || false, data: result.data }
+      }
+      return { success: false, data: undefined }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Error in getAdminDetails:', error)
+      return { success: false }
+    }
+  }
+
+  /**
    * Met à jour le statut d'un driver
    */
   async updateDriverStatus(driverId: string, isActive: boolean): Promise<{

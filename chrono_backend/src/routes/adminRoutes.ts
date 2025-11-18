@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminRecentActivities, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminUsers, getAdminGlobalSearch, getAdminFinancialStats, getAdminTransactions, getAdminReportDeliveries, getAdminReportRevenues, getAdminReportClients, getAdminReportDrivers, getAdminReportPayments, getAdminDriverDetails, updateAdminDriverStatus, getAdminClientDetails, getAdminClientStatistics, getAdminRatings, deleteAdminRating, getAdminPromoCodes, createAdminPromoCode, getAdminDisputes, updateAdminDispute } from '../controllers/adminController.js';
+import { getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminRecentActivities, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminUsers, getAdminGlobalSearch, getAdminFinancialStats, getAdminTransactions, getAdminReportDeliveries, getAdminReportRevenues, getAdminReportClients, getAdminReportDrivers, getAdminReportPayments, getAdminDriverDetails, updateAdminDriverStatus, getAdminClientDetails, getAdminClientStatistics, getAdminRatings, deleteAdminRating, getAdminPromoCodes, createAdminPromoCode, getAdminDisputes, updateAdminDispute, getAdminAdminDetails } from '../controllers/adminController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 
 const router: Router = express.Router();
@@ -23,6 +23,7 @@ router.get('/drivers/:driverId/details', verifyAdminSupabase, getAdminDriverDeta
 router.put('/drivers/:driverId/status', verifyAdminSupabase, updateAdminDriverStatus);
 router.get('/clients/:clientId/details', verifyAdminSupabase, getAdminClientDetails);
 router.get('/clients/:clientId/statistics', verifyAdminSupabase, getAdminClientStatistics);
+router.get('/admins/:adminId/details', verifyAdminSupabase, getAdminAdminDetails);
 router.get('/ratings', verifyAdminSupabase, getAdminRatings);
 router.delete('/ratings/:ratingId', verifyAdminSupabase, deleteAdminRating);
 router.get('/promo-codes', verifyAdminSupabase, getAdminPromoCodes);

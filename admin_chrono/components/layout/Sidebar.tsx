@@ -40,7 +40,7 @@ export default function Sidebar() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string; first_name?: string | null; last_name?: string | null } | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   // Fonction pour charger le profil utilisateur avec l'avatar
@@ -51,7 +51,7 @@ export default function Sidebar() {
       console.log('🔄 [Sidebar] Loading profile for user:', user.id);
       const { data: userData, error } = await supabase
         .from('users')
-        .select('avatar_url, phone')
+        .select('avatar_url, phone, first_name, last_name')
         .eq('id', user.id)
         .single();
 
@@ -62,10 +62,12 @@ export default function Sidebar() {
           // Utilisateur n'existe pas dans la table users, utiliser user_metadata
           console.log(' [Sidebar] User not found in users table, using user_metadata');
           setAvatarUrl(null);
-          setUserProfile({
-            full_name: user?.user_metadata?.full_name || undefined,
-            phone: undefined,
-          });
+        setUserProfile({
+          full_name: user?.user_metadata?.full_name || undefined,
+          phone: undefined,
+          first_name: undefined,
+          last_name: undefined,
+        });
         } else {
           // Autre erreur (permissions, réseau, etc.)
           console.warn(' [Sidebar] Error loading profile from users table:', {
@@ -76,10 +78,12 @@ export default function Sidebar() {
           });
           // Fallback sur user_metadata même en cas d'erreur
           setAvatarUrl(null);
-          setUserProfile({
-            full_name: user?.user_metadata?.full_name || undefined,
-            phone: undefined,
-          });
+        setUserProfile({
+          full_name: user?.user_metadata?.full_name || undefined,
+          phone: undefined,
+          first_name: undefined,
+          last_name: undefined,
+        });
         }
       } else if (userData) {
         // Données trouvées dans la table users
@@ -111,6 +115,8 @@ export default function Sidebar() {
         setUserProfile({
           full_name: user?.user_metadata?.full_name || undefined,
           phone: userData.phone || undefined,
+          first_name: userData.first_name || undefined,
+          last_name: userData.last_name || undefined,
         });
       }
     } catch (error) {
@@ -122,10 +128,12 @@ export default function Sidebar() {
       });
       // Fallback sur user_metadata
       setAvatarUrl(null);
-      setUserProfile({
-        full_name: user?.user_metadata?.full_name || undefined,
-        phone: undefined,
-      });
+        setUserProfile({
+          full_name: user?.user_metadata?.full_name || undefined,
+          phone: undefined,
+          first_name: undefined,
+          last_name: undefined,
+        });
     }
   }, [user]);
 
@@ -206,10 +214,16 @@ export default function Sidebar() {
 
   // Récupérer les initiales et le nom de l'utilisateur
   const getUserInitials = () => {
+    // Priorité 1: Utiliser first_name et last_name depuis la base de données
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${(userProfile.last_name[0] || '').toUpperCase()}${(userProfile.first_name[0] || '').toUpperCase()}`;
+    }
+    // Priorité 2: Utiliser full_name (fallback)
     if (userProfile?.full_name) {
       const names = userProfile.full_name.split(' ');
       if (names.length >= 2) {
-        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+        // Si on a un full_name, on suppose que c'est "Prénom Nom", donc on inverse pour les initiales
+        return (names[names.length - 1][0] + names[0][0]).toUpperCase();
       }
       return userProfile.full_name.charAt(0).toUpperCase();
     }
@@ -220,6 +234,11 @@ export default function Sidebar() {
   };
 
   const getUserName = () => {
+    // Priorité 1: Utiliser first_name et last_name depuis la base de données (format: "Nom Prénom")
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.last_name} ${userProfile.first_name}`;
+    }
+    // Priorité 2: Utiliser full_name (fallback)
     if (userProfile?.full_name) {
       return userProfile.full_name;
     }
