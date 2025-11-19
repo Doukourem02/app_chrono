@@ -21,22 +21,21 @@ interface UseOnlineDriversOptions {
     latitude: number;
     longitude: number;
   };
-  refreshInterval?: number; // En millisecondes
+  refreshInterval?: number; 
   autoRefresh?: boolean;
 }
 
 export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
   const {
     userLocation,
-    refreshInterval = 30000, // 30 secondes par défaut (au lieu de 10)
+    refreshInterval = 30000, 
     autoRefresh = true
   } = options;
 
-  // Stabiliser la position pour éviter les re-renders constants
   const stableUserLocation = useMemo(() => {
     if (!userLocation?.latitude || !userLocation?.longitude) return undefined;
     return {
-      latitude: Math.round(userLocation.latitude * 10000) / 10000, // Arrondir à 4 décimales
+      latitude: Math.round(userLocation.latitude * 10000) / 10000, 
       longitude: Math.round(userLocation.longitude * 10000) / 10000
     };
   }, [userLocation?.latitude, userLocation?.longitude]);
@@ -46,7 +45,6 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Fonction pour récupérer les chauffeurs
   const fetchDrivers = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -55,7 +53,6 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
         const result = await userApiService.getOnlineDrivers(stableUserLocation);
         
         if (result.success && result.data) {
-          // 🔍 Filtrer strictement pour ne garder QUE les chauffeurs en ligne
           const onlineOnly = result.data.filter(driver => driver.is_online === true);
           setDrivers(onlineOnly);
           setLastUpdate(new Date());
@@ -74,7 +71,6 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
       }
   }, [stableUserLocation]);
 
-  // Effet pour le chargement initial et le rafraîchissement automatique
   useEffect(() => {
     const loadDrivers = async () => {
       setLoading(true);
@@ -84,11 +80,9 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
         const result = await userApiService.getOnlineDrivers(stableUserLocation);
         
         if (result.success && result.data) {
-          // 🔍 Filtrer strictement pour ne garder QUE les chauffeurs en ligne
           const onlineOnly = result.data.filter(driver => driver.is_online === true);
           setDrivers(onlineOnly);
           setLastUpdate(new Date());
-          // Log uniquement s'il y a des changements significatifs
         } else {
           setError(result.message || 'Erreur de récupération');
           setDrivers([]);

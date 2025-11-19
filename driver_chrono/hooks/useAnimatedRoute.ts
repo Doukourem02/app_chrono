@@ -211,7 +211,7 @@ export const useAnimatedRoute = ({
           setAnimatedCoordinates(fallbackRoute);
           setError('Route non disponible, affichage ligne droite');
         }
-      } catch (err) {
+      } catch {
         setError('Erreur lors du calcul de la route');
         // Ne pas fallback sur une ligne droite : garder les coordonnées existantes pour éviter une ligne aberrante
       } finally {

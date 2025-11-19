@@ -1,14 +1,5 @@
 import React from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  Animated, 
-  ScrollView,
-  Image,
-  Alert,
-} from 'react-native';
+import { StyleSheet, View,Text,TouchableOpacity, Animated,ScrollView,Image,Alert} from 'react-native';
 import PlacesAutocomplete from './PlacesAutocomplete';
 import { useShipmentStore } from '../store/useShipmentStore';
 
@@ -90,7 +81,6 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
         >
           <Text style={styles.title}>ENVOYER UN COLIS</Text>
 
-          {/* Champs de saisie avec autocomplete */}
           <View style={styles.inputContainer}>
             <PlacesAutocomplete
               placeholder="Où récupérer"

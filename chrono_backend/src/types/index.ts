@@ -1,8 +1,4 @@
-/**
- * Types TypeScript pour le backend Chrono Livraison
- */
 
-// Types pour les utilisateurs
 export interface User {
   id: string;
   email: string;
@@ -18,7 +14,8 @@ export interface User {
   created_at?: Date;
   updated_at?: Date;
 }
-
+ 
+// Driver Profile
 // Types pour les chauffeurs
 export interface DriverProfile {
   id: string;
@@ -35,10 +32,13 @@ export interface DriverProfile {
   total_deliveries: number;
   created_at?: Date;
   updated_at?: Date;
-} // Types pour les commandes
+} 
+
+// Order Status
 export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'completed' | 'declined' | 'cancelled'; export type DeliveryMethod = 'moto' | 'vehicule' | 'cargo'; export interface Coordinates { latitude: number; longitude: number;
 }
 
+// Address
 export interface Address {
   address: string;
   coordinates: Coordinates;

@@ -2,18 +2,15 @@ import { create } from 'zustand';
 import { persist } from './persist';
 
 export interface UserState {
-  // Données utilisateur
   id: string | null;
   name: string;
   email: string;
   phone: string;
   isLoggedIn: boolean;
   
-  // Préférences
   preferredLanguage: 'fr' | 'en';
   notifications: boolean;
   
-  // Actions
   setUser: (user: Partial<UserState>) => void;
   setLoginStatus: (status: boolean) => void;
   updatePreferences: (preferences: Partial<Pick<UserState, 'preferredLanguage' | 'notifications'>>) => void;
@@ -23,7 +20,6 @@ export interface UserState {
 export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
-      // État initial
       id: null,
       name: '',
       email: '',
@@ -32,7 +28,6 @@ export const useUserStore = create<UserState>()(
       preferredLanguage: 'fr',
       notifications: true,
       
-      // Actions
       setUser: (user) => set((state) => ({ ...state, ...user })),
       
       setLoginStatus: (status) => set({ isLoggedIn: status }),

@@ -33,7 +33,7 @@ export default function TabLayout() {
           name="map"
           options={{
             title: 'Localisation',
-            tabBarStyle: { display: 'none' }, // Cache la barre de navigation sur la map
+            tabBarStyle: { display: 'none' }, 
             tabBarIcon: ({ focused }) => (
               <View style={[styles.iconContainer, focused && styles.activeIcon]}>
                 <Ionicons name="location" size={20} color={focused ? '#fff' : '#555'} />

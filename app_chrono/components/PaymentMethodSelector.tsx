@@ -1,6 +1,3 @@
-/**
- * Composant pour sélectionner une méthode de paiement
- */
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
@@ -19,15 +16,15 @@ const PAYMENT_METHODS: {
   type: PaymentMethodType;
   name: string;
   icon?: keyof typeof Ionicons.glyphMap;
-  image?: any; // Image source pour require()
+  image?: any; 
   color: string;
-  useImage?: boolean; // Indique si on utilise une image au lieu d'une icône
+  useImage?: boolean; 
 }[] = [
   { 
     type: 'orange_money', 
     name: 'Orange Money', 
     icon: 'phone-portrait', 
-    image: require('../assets/images/images.png'), // Remplacez par le nom exact de votre image Orange
+    image: require('../assets/images/images.png'), 
     color: '#FF6600',
     useImage: true 
   },
@@ -52,7 +49,6 @@ export default function PaymentMethodSelector({
   const { paymentMethods, isLoading } = usePaymentStore();
 
   const handleSelect = (methodType: PaymentMethodType) => {
-    // Trouver la méthode de paiement correspondante
     const method = paymentMethods.find((m) => m.method_type === methodType);
     if (method) {
       usePaymentStore.getState().selectPaymentMethod(method);

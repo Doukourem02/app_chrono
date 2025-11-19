@@ -32,20 +32,8 @@ interface DeliveryMapViewProps {
   radarCoords?: Coordinates | null;
 }
 
-// Style minimal de la carte (similaire à admin_chrono)
 const minimalMapStyle = [
-  {
-    elementType: 'geometry',
-    stylers: [{ color: '#F7F8FC' }],
-  },
-  {
-    elementType: 'labels.icon',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#94A3B8' }],
-  },
+
   {
     elementType: 'labels.text.stroke',
     stylers: [{ color: '#FFFFFF' }],
@@ -139,14 +127,12 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       });
   }, [onlineDrivers, orderDriverCoords]);
 
-  // Route animée du livreur vers le pickup (quand commande acceptée/en route)
   const driverToPickupRoute = useAnimatedRoute({
     origin: (orderStatus === 'accepted' || orderStatus === 'pending') && orderDriverCoords ? orderDriverCoords : null,
     destination: (orderStatus === 'accepted' || orderStatus === 'pending') && pickupCoords ? pickupCoords : null,
     enabled: !!(orderStatus === 'accepted' || orderStatus === 'pending') && !!orderDriverCoords && !!pickupCoords,
   });
 
-  // Route animée du livreur vers le dropoff (quand colis récupéré)
   const driverToDropoffRoute = useAnimatedRoute({
     origin: (orderStatus === 'enroute' || orderStatus === 'picked_up') && orderDriverCoords ? orderDriverCoords : null,
     destination: (orderStatus === 'enroute' || orderStatus === 'picked_up') && dropoffCoords ? dropoffCoords : null,
@@ -236,7 +222,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </>
       )}
 
-      {/* Marqueur de destination - toujours visible si disponible */}
       {!isSearchingDriver && 
       dropoffCoords && 
       orderStatus !== 'completed' && 
@@ -255,7 +240,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </Marker>
       )}
 
-      {/* Route pickup -> dropoff (gris discrète comme admin_chrono) - toujours visible si disponible */}
       {!isSearchingDriver && 
        displayedRouteCoords && 
        displayedRouteCoords.length > 0 && 
@@ -271,13 +255,11 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         />
       )}
 
-      {/* Commande active avec livreur assigné */}
       {orderDriverCoords && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
         <>
-          {/* Marqueur du livreur avec cercle extérieur pulsant comme admin_chrono */}
           <Marker
             coordinate={orderDriverCoords}
             title="Livreur"
@@ -291,7 +273,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             </View>
           </Marker>
 
-          {/* Route animée du livreur vers le pickup (violet comme admin_chrono) */}
           {(orderStatus === 'accepted' || orderStatus === 'pending') && 
            driverToPickupRoute.animatedCoordinates.length > 0 && (
             <Polyline
@@ -303,7 +284,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             />
           )}
 
-          {/* Route animée du livreur vers le dropoff (violet comme admin_chrono) */}
           {(orderStatus === 'enroute' || orderStatus === 'picked_up') && 
            driverToDropoffRoute.animatedCoordinates.length > 0 && (
             <Polyline
@@ -315,7 +295,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             />
           )}
 
-          {/* Marqueur pickup (vert) */}
           {pickupCoords && (
             <Marker
               coordinate={pickupCoords}
@@ -329,7 +308,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             </Marker>
           )}
 
-          {/* Marqueur dropoff (violet) */}
           {dropoffCoords && (
             <Marker
               coordinate={dropoffCoords}
@@ -345,7 +323,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </>
       )}
 
-      {/* Badge ETA - toujours visible si disponible */}
       {!isSearchingDriver && 
        durationText && 
        pickupCoords && 
@@ -431,7 +408,6 @@ const styles = StyleSheet.create({
   destinationShadow: {
     display: 'none',
   },
-  // Marqueurs uniformisés comme admin_chrono
   pickupMarker: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -470,7 +446,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  // Driver marker avec cercle extérieur comme admin_chrono
   orderDriverMarkerContainer: {
     width: 48,
     height: 48,
@@ -510,7 +485,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#4C1D95',
   },
   
-  // Badge ETA sur la carte
   etaBadge: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
@@ -533,7 +507,6 @@ const styles = StyleSheet.create({
     color: '#6366F1',
   },
 
-  // 🚗 Styles pour les chauffeurs en ligne (uniformisés comme admin_chrono)
   driverMarker: {
     width: 16,
     height: 16,
@@ -548,7 +521,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   driverIcon: {
-    display: 'none', // Pas d'icône, juste un cercle comme admin_chrono
+    display: 'none', 
   },
   orderDriverMarker: {
     width: 28,

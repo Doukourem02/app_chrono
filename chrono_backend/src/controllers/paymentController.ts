@@ -84,7 +84,7 @@ export const createPaymentMethod = async (req: RequestWithUser, res: Response): 
 
     const result = await (pool as any).query(
       `INSERT INTO payment_methods (user_id, method_type, provider_account, provider_name, is_default, metadata) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
+      VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
       [userId, methodType, providerAccount || null, providerName || null, isDefault, metadata || null]
     );

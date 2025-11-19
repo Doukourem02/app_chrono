@@ -1,11 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-} from 'react-native';
+import {View,Text,TouchableOpacity,StyleSheet,Animated} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,7 +8,7 @@ export default function SuccessScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animation d'entrée
+  
     Animated.sequence([
       Animated.timing(scaleAnim, {
         toValue: 1,
@@ -30,8 +24,7 @@ export default function SuccessScreen() {
   });
 
   const handleContinue = () => {
-    // L'utilisateur a déjà été défini dans l'écran de vérification
-    // Naviguer vers l'app principale
+  
     router.push('/(tabs)' as any);
   };
 

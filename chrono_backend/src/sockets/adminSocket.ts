@@ -3,25 +3,18 @@ import { realDriverStatuses } from '../controllers/driverController.js';
 import { maskUserId } from '../utils/maskSensitiveData.js';
 import logger from '../utils/logger.js';
 
-// Map pour stocker les admins connectés : adminId -> socketId
 const connectedAdmins = new Map<string, string>();
 
-// Map pour stocker les sockets admin : socketId -> adminId
 const adminSockets = new Map<string, string>();
 
 interface ExtendedSocket extends Socket {
   adminId?: string;
 }
 
-/**
- * Setup admin socket handlers
- * Gère les connexions admin et diffuse les événements temps réel
- */
 export const setupAdminSocket = (io: SocketIOServer): void => {
   const DEBUG = process.env.DEBUG_SOCKETS === 'true';
 
   io.on('connection', (socket: ExtendedSocket) => {
-    // Écouter la connexion d'un admin
     socket.on('admin-connect', (adminId: string) => {
       try {
         if (!adminId) {
@@ -37,12 +30,10 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
           logger.info(`[adminSocket] Admin connecté: ${maskUserId(adminId)} (socket: ${socket.id})`);
           logger.info(`[adminSocket] Total admins connectés: ${connectedAdmins.size}`);
         }
-
-        // Envoyer la liste initiale des drivers en ligne ET actifs
+        
         const now = new Date();
         const onlineDrivers = Array.from(realDriverStatuses.entries())
           .filter(([_, status]) => {
-            // Filtrer uniquement les drivers en ligne
             if (status.is_online !== true) return false;
             
             // Vérifier qu'ils sont actifs (mis à jour dans les 5 dernières minutes)

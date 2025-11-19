@@ -136,10 +136,26 @@ interface DeferredPayments {
   transactions: DeferredPaymentTransaction[]
 }
 
+interface RecentAction {
+  id?: string
+  type?: string
+  description?: string
+  timestamp?: string
+  [key: string]: unknown
+}
+
+interface RecentTicket {
+  id?: string
+  title?: string
+  status?: string
+  createdAt?: string
+  [key: string]: unknown
+}
+
 interface AdminActivity {
   lastLogin?: string | null
-  recentActions?: any[]
-  recentTickets?: any[]
+  recentActions?: RecentAction[]
+  recentTickets?: RecentTicket[]
 }
 
 interface ClientWithPartialPayment {

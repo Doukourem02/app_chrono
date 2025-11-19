@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useDriverStore } from '../../store/useDriverStore';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
+import { config } from '../../config/index';
 
 export default function VerificationScreen() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -39,7 +40,7 @@ export default function VerificationScreen() {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/verify-otp`, {
+      const response = await fetch(`${config.apiUrl}/api/auth-simple/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,10 +54,16 @@ export default function VerificationScreen() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
+        throw new Error(`Erreur serveur (${response.status}). Le backend est peut-être inaccessible.`);
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Code de vérification incorrect');
+        throw new Error(data.error || data.message || 'Code de vérification incorrect');
       }
 
       console.log(`${otpMethod} OTP vérifié avec succès pour driver:`, data);
@@ -87,7 +94,16 @@ export default function VerificationScreen() {
       router.push('./success' as any);
     } catch (error) {
       console.error('Erreur lors de la vérification:', error);
-      Alert.alert('Erreur', (error as Error).message || 'Code de vérification incorrect. Veuillez réessayer.');
+      
+      // Gérer spécifiquement les erreurs réseau
+      let errorMessage = 'Code de vérification incorrect. Veuillez réessayer.';
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez que le backend est démarré et votre connexion internet.';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Erreur', errorMessage);
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {

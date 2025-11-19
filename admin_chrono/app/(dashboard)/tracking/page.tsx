@@ -10,7 +10,7 @@ import { useRealTimeTracking } from '@/hooks/useRealTimeTracking'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 
-const DEFAULT_CENTER = { lat: 5.3600, lng: -4.0083 } // Abidjan
+const DEFAULT_CENTER = { lat: 5.3600, lng: -4.0083 } 
 const DELIVERY_ZOOM = 12.8
 const OVERVIEW_ZOOM = 13.1
 
@@ -613,7 +613,7 @@ function TrackingMap({
             }
             
             if (process.env.NODE_ENV === 'development') {
-              console.log('✅ [TrackingMap] Affichage du driver:', {
+              console.log(' [TrackingMap] Affichage du driver:', {
                 userId: driver.userId?.substring(0, 8),
                 is_online: driver.is_online,
                 coords: `${driver.current_latitude}, ${driver.current_longitude}`,
@@ -706,7 +706,7 @@ export default function TrackingPage() {
     // Si on revient sur la page Tracking (pathname change vers /tracking)
     if (pathname === '/tracking') {
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 [TrackingPage] Retour sur la page Tracking, rechargement des données...')
+        console.log(' [TrackingPage] Retour sur la page Tracking, rechargement des données...')
       }
       // Recharger les données après un court délai pour s'assurer que le composant est monté
       const timer = setTimeout(() => {
@@ -723,7 +723,7 @@ export default function TrackingPage() {
       if (document.visibilityState === 'visible' && pathname === '/tracking') {
         // Recharger les données quand on revient sur l'onglet
         if (process.env.NODE_ENV === 'development') {
-          console.log('🔄 [TrackingPage] Onglet redevient visible, rechargement des données...')
+          console.log(' [TrackingPage] Onglet redevient visible, rechargement des données...')
         }
         reloadData()
       }
@@ -744,7 +744,7 @@ export default function TrackingPage() {
   const filteredDeliveries = useMemo(() => {
     // Log pour déboguer les changements
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 [TrackingPage] filteredDeliveries recalculé:', {
+      console.log(' [TrackingPage] filteredDeliveries recalculé:', {
         ongoingDeliveriesLength: ongoingDeliveries.length,
         timestamp: new Date().toISOString(),
         stack: new Error().stack?.split('\n').slice(2, 5).join('\n')
@@ -754,7 +754,7 @@ export default function TrackingPage() {
     const deliveries = ongoingDeliveries.length > 0 ? ongoingDeliveries : []
     if (!deliveries || deliveries.length === 0) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('⚠️ [TrackingPage] Aucune livraison disponible')
+        console.warn(' [TrackingPage] Aucune livraison disponible')
       }
       return []
     }
@@ -826,7 +826,7 @@ export default function TrackingPage() {
       return diffInMinutes <= 5
     }
     
-    console.log('🔍 [TrackingPage] DEBUG - Analyse des drivers:', {
+    console.log(' [TrackingPage] DEBUG - Analyse des drivers:', {
       totalInMap: allDrivers.length,
       drivers: allDrivers.map((d) => {
         const updatedAt = d.updated_at ? new Date(d.updated_at) : null
@@ -863,7 +863,7 @@ export default function TrackingPage() {
           if (!hasCoordinates) reasons.push('pas de coordonnées')
           if (!isActive) reasons.push('inactif (>5 min)')
           
-          console.log(`❌ [TrackingPage] Driver ${driver.userId?.substring(0, 8) || 'unknown'} FILTRÉ:`, {
+          console.log(` [TrackingPage] Driver ${driver.userId?.substring(0, 8) || 'unknown'} FILTRÉ:`, {
             is_online: driver.is_online,
             is_online_strict: isOnline,
             hasCoordinates,
@@ -877,7 +877,7 @@ export default function TrackingPage() {
       return shouldDisplay
     })
     
-    console.log('✅ [TrackingPage] Drivers après filtrage:', {
+    console.log(' [TrackingPage] Drivers après filtrage:', {
       total: allDrivers.length,
       filtered: filteredDrivers.length,
       willBeDisplayed: filteredDrivers.map((d) => d.userId?.substring(0, 8) || 'unknown'),

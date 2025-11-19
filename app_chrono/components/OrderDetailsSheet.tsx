@@ -1,18 +1,5 @@
 import React, { useState, useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Animated,
-  Dimensions,
-  Alert,
-  PanResponder,
-  Switch,
-} from 'react-native';
+import {StyleSheet,View,Text,TextInput,TouchableOpacity,ScrollView,Image,Animated,Dimensions,Alert,PanResponder,Switch} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';

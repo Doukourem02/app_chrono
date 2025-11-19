@@ -103,7 +103,6 @@ export default function OrderHistoryPage() {
         <View style={styles.placeholder} />
       </View>
 
-      {/* Filtres */}
       <View style={styles.filters}>
         <TouchableOpacity
           style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}

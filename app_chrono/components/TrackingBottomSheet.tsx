@@ -18,6 +18,7 @@ interface TrackingBottomSheetProps {
   onToggle: () => void;
   onCancel?: () => void;
   onNewOrder?: () => void; // Callback pour créer une nouvelle commande
+  onMessage?: () => void; // Callback pour ouvrir la messagerie
   activeOrdersCount?: number; // Nombre de commandes actives
 }
 
@@ -29,6 +30,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   onToggle,
   onCancel,
   onNewOrder,
+  onMessage,
   activeOrdersCount = 0,
 }) => {
   const insets = useSafeAreaInsets();
@@ -37,24 +39,46 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const isCompleted = status === 'completed';
   const canCancel = (status === 'pending' || status === 'accepted') && onCancel;
 
-  // Harmoniser avec OrderStatus: 'accepted' | 'enroute' | 'picked_up' | 'completed'
-  // Utiliser useMemo pour éviter la recréation à chaque render
+  // Séquence correcte des statuts :
+  // 1. accepted → "Livreur assigné" (quand le driver accepte la commande)
+  // 2. enroute → "Livreur en route pour récupérer le colis" (quand le driver clique sur "Je pars")
+  // 3. picked_up → "Colis pris en charge" (quand le driver clique sur "Colis récupéré")
+  // 4. picked_up (en route vers destination) → "En cours de livraison" (même statut, étape visuelle)
+  // 5. completed → "Colis livré" (quand le driver clique sur "Terminé")
   const statusSteps = useMemo(() => [
-    { label: "Livreur en route pour récupérer le colis", key: "accepted" },
+    { label: "Livreur assigné", key: "accepted" },
+    { label: "Livreur en route pour récupérer le colis", key: "enroute" },
     { label: "Colis pris en charge", key: "picked_up" },
-    { label: "En cours de livraison", key: "enroute" },
+    { label: "En cours de livraison", key: "delivering" }, // Étape visuelle pour picked_up
     { label: "Colis livré", key: "completed" },
   ], []);
 
-  const activeIndex = Math.max(
-    0,
-    statusSteps.findIndex((s) => s.key === status)
-  );
+  // Déterminer quels index sont actifs en fonction du statut
+  const getActiveIndexes = () => {
+    switch (status) {
+      case 'accepted':
+        return [0]; // "Livreur assigné"
+      case 'enroute':
+        return [0, 1]; // "Livreur assigné" + "Livreur en route pour récupérer le colis"
+      case 'picked_up':
+        // Quand le colis est récupéré, on active "Colis pris en charge" ET "En cours de livraison"
+        return [0, 1, 2, 3]; // Toutes les étapes jusqu'à "En cours de livraison"
+      case 'completed':
+        return [0, 1, 2, 3, 4]; // Toutes les étapes
+      default:
+        return [0];
+    }
+  };
+
+  const activeIndexes = getActiveIndexes();
+  
+  // Pour la compatibilité avec l'ancien code, on garde activeIndex comme le dernier index actif
+  const activeIndex = Math.max(...activeIndexes, 0);
 
   // 🎨 Animations pour les transitions de statut
   const stepAnimations = useRef(
     statusSteps.map((_, index) => {
-      const initialActive = index <= activeIndex;
+      const initialActive = activeIndexes.includes(index);
       return {
         color: new Animated.Value(initialActive ? 1 : 0),
         scale: new Animated.Value(1),
@@ -66,7 +90,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   // Animer les transitions quand le statut change
   useEffect(() => {
     statusSteps.forEach((_, index) => {
-      const isActive = index <= activeIndex;
+      const isActive = activeIndexes.includes(index);
       const targetColor = isActive ? 1 : 0;
       const targetOpacity = isActive ? 1 : 0.5;
       const isCurrentStep = index === activeIndex;
@@ -120,7 +144,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         useNativeDriver: false, // Utiliser JS driver pour cohérence
       }).start();
     });
-  }, [activeIndex, status, statusSteps, stepAnimations]);
+  }, [activeIndex, activeIndexes, status, statusSteps, stepAnimations]);
 
   return (
     <Animated.View
@@ -152,7 +176,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
               </View>
             ) : (
               <View style={styles.actionButtonsCollapsed}>
-                <TouchableOpacity style={styles.iconCircle}>
+                <TouchableOpacity 
+                  style={styles.iconCircle}
+                  onPress={onMessage}
+                >
                   <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconCircle}>
@@ -258,7 +285,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                   <Ionicons name="close-circle" size={20} color="#fff" />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={onMessage}
+              >
                 <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton}>

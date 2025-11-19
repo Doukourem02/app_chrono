@@ -111,7 +111,6 @@ export default function PlanningPage() {
   const weekDays = getWeekDays()
   const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
-  // Mock deliveries
   const mockDeliveries: Record<string, Array<{ id: string; time: string; client: string }>> = {
     [weekDays[0].toISOString().split('T')[0]]: [
       { id: '1', time: '10:00', client: 'Client A' },
@@ -217,7 +216,6 @@ export default function PlanningPage() {
           </button>
         </div>
 
-        {/* Vue semaine */}
         {viewMode === 'week' && (
           <div style={weekViewStyle}>
             {weekDays.map((day, index) => {
@@ -262,7 +260,6 @@ export default function PlanningPage() {
           </div>
         )}
 
-        {/* Vue jour */}
         {viewMode === 'day' && (
           <div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -283,7 +280,6 @@ export default function PlanningPage() {
                       {hourKey}
                     </div>
                     <div style={{ flex: 1 }}>
-                      {/* Livraisons pour cette heure */}
                     </div>
                   </div>
                 )
@@ -292,7 +288,6 @@ export default function PlanningPage() {
           </div>
         )}
 
-        {/* Vue mois */}
         {viewMode === 'month' && (
           <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
             Vue mensuelle à venir

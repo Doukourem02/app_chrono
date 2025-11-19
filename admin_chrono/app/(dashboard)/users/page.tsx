@@ -33,8 +33,8 @@ export default function UsersPage() {
       const result = await adminApiService.getUsers()
       return result
     },
-    refetchInterval: false, // Pas de refresh automatique - les utilisateurs changent rarement
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchInterval: false, 
+    staleTime: Infinity, 
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -51,16 +51,13 @@ export default function UsersPage() {
     total: 0,
   }
 
-  // Filtrer les utilisateurs
   const filteredUsers = React.useMemo(() => {
     let filtered = users
 
-    // Filtrer par rôle
     if (roleFilter !== 'all') {
       filtered = filtered.filter((user: UserData) => user.role === roleFilter)
     }
 
-    // Filtrer par recherche
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
@@ -77,14 +74,12 @@ export default function UsersPage() {
     return filtered
   }, [users, roleFilter, searchQuery])
 
-  // Calculer la pagination
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage))
   const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
 
-  // Réinitialiser la page quand on change de filtre
   React.useEffect(() => {
     setCurrentPage(1)
   }, [roleFilter, searchQuery])

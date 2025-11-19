@@ -28,8 +28,8 @@ export default function PersonalInfoPage() {
     // Charger les données utilisateur
     if (user) {
       // Utiliser first_name et last_name depuis le store si disponibles
-      const firstName = (user as any).first_name || '';
-      const lastName = (user as any).last_name || '';
+      const firstName = user.first_name || '';
+      const lastName = user.last_name || '';
       
       setFormData({
         firstName,

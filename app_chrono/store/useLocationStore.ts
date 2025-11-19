@@ -8,11 +8,9 @@ export interface Location {
 }
 
 export interface LocationState {
-  // Position actuelle
   currentLocation: Location | null;
   locationPermission: 'granted' | 'denied' | 'pending';
   
-  // Historique des adresses
   recentPickupLocations: string[];
   recentDeliveryLocations: string[];
   favoriteLocations: {
@@ -22,7 +20,6 @@ export interface LocationState {
     coordinates: Location;
   }[];
   
-  // Actions
   setCurrentLocation: (location: Location) => void;
   setLocationPermission: (permission: 'granted' | 'denied' | 'pending') => void;
   addRecentPickup: (address: string) => void;
@@ -35,14 +32,12 @@ export interface LocationState {
 export const useLocationStore = create<LocationState>()(
   persist(
     (set, get) => ({
-      // État initial
       currentLocation: null,
       locationPermission: 'pending',
       recentPickupLocations: [],
       recentDeliveryLocations: [],
       favoriteLocations: [],
       
-      // Actions
       setCurrentLocation: (location) => set({ currentLocation: location }),
       
       setLocationPermission: (permission) => set({ locationPermission: permission }),
@@ -51,14 +46,14 @@ export const useLocationStore = create<LocationState>()(
         recentPickupLocations: [
           address,
           ...state.recentPickupLocations.filter(addr => addr !== address)
-        ].slice(0, 10) // Garder seulement les 10 dernières
+        ].slice(0, 10) 
       })),
       
       addRecentDelivery: (address) => set((state) => ({
         recentDeliveryLocations: [
           address,
           ...state.recentDeliveryLocations.filter(addr => addr !== address)
-        ].slice(0, 10) // Garder seulement les 10 dernières
+        ].slice(0, 10) 
       })),
       
       addFavoriteLocation: (location) => set((state) => ({

@@ -5,10 +5,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusToggle } from "../../components/StatusToggle";
 import { StatsCards } from "../../components/StatsCards";
 import { OrderRequestPopup } from "../../components/OrderRequestPopup";
-import { RecipientDetailsSheet } from "../../components/RecipientDetailsSheet";
 import { OrdersListBottomSheet } from "../../components/OrdersListBottomSheet";
+import DriverOrderBottomSheet from "../../components/DriverOrderBottomSheet";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
 import { useBottomSheet } from "../../hooks/useBottomSheet";
+import { useOrdersListBottomSheet } from "../../hooks/useOrdersListBottomSheet";
 import { useDriverStore } from "../../store/useDriverStore";
 import { useOrderStore } from "../../store/useOrderStore";
 import { apiService } from "../../services/apiService";
@@ -25,7 +26,8 @@ export default function Index() {
     todayStats,
     updateTodayStats,
     user,
-    profile 
+    profile,
+    isAuthenticated
   } = useDriverStore();
   
   const [driverStats, setDriverStats] = useState<{
@@ -129,13 +131,14 @@ export default function Index() {
     return null;
   });
   
+  // Bottom sheet pour les détails de la commande (remplace RecipientDetailsSheet)
   const {
-    animatedHeight: recipientDetailsAnimatedHeight,
-    isExpanded: recipientDetailsIsExpanded,
-    panResponder: recipientDetailsPanResponder,
-    expand: expandRecipientDetailsSheet,
-    collapse: collapseRecipientDetailsSheet,
-    toggle: toggleRecipientDetailsSheet,
+    animatedHeight: orderBottomSheetAnimatedHeight,
+    panResponder: orderBottomSheetPanResponder,
+    isExpanded: orderBottomSheetIsExpanded,
+    expand: expandOrderBottomSheet,
+    collapse: collapseOrderBottomSheet,
+    toggle: toggleOrderBottomSheet,
   } = useBottomSheet();
 
   const {
@@ -144,7 +147,7 @@ export default function Index() {
     panResponder: ordersListPanResponder,
     collapse: collapseOrdersListSheet,
     toggle: toggleOrdersListSheet,
-  } = useBottomSheet();
+  } = useOrdersListBottomSheet();
   
   const userClosedBottomSheetRef = useRef(false);
   const lastOrderStatusRef = useRef<string | null>(null);
@@ -298,12 +301,15 @@ export default function Index() {
             console.warn('Échec synchronisation:', result.message);
           }
           
-          // Si la session est expirée, marquer le ref pour éviter les appels futurs
+          // Si la session est expirée, le logout() a déjà été appelé
+          // Le système de redirection gérera la navigation vers la page de connexion
           if (result.message?.includes('Session expirée')) {
             sessionExpiredRef.current = true;
+            // Ne pas afficher d'alerte, laisser le système de redirection faire son travail
             return;
           }
           
+          // Rollback du changement de statut en cas d'erreur (sauf erreur réseau)
           if (result.message && !result.message.includes('réseau') && !result.message.includes('connexion')) {
             setOnlineStatus(!value);
             Alert.alert(
@@ -321,6 +327,19 @@ export default function Index() {
         if (__DEV__) {
           console.error('Erreur updateDriverStatus:', error);
         }
+        
+        // Rollback en cas d'erreur
+        setOnlineStatus(!value);
+        
+        // Ne pas afficher d'erreur si c'est une session expirée (déjà géré par logout)
+        const errorMessage = error instanceof Error ? error.message : '';
+        if (!errorMessage.includes('Session expirée')) {
+          Alert.alert(
+            "Erreur",
+            "Impossible de synchroniser votre statut avec le serveur.",
+            [{ text: "OK" }]
+          );
+        }
       });
     } else {
       isTogglingRef.current = false;
@@ -334,8 +353,13 @@ export default function Index() {
       return;
     }
 
+    // Ne pas synchroniser si l'utilisateur n'est pas authentifié
+    if (!isAuthenticated || !user?.id) {
+      return;
+    }
+
     const syncLocation = async () => {
-      if (isOnline && location && user?.id && !sessionExpiredRef.current) {
+      if (isOnline && location && user?.id && isAuthenticated && !sessionExpiredRef.current) {
         try {
           const result = await apiService.updateDriverStatus(user.id, {
             current_latitude: location.latitude,
@@ -364,7 +388,7 @@ export default function Index() {
 
     const timeoutId = setTimeout(syncLocation, 5000);
     return () => clearTimeout(timeoutId);
-  }, [location, isOnline, user?.id]);
+  }, [location, isOnline, user?.id, isAuthenticated]);
 
   useEffect(() => {
     if (currentOrder) {
@@ -448,30 +472,31 @@ export default function Index() {
     if (currentOrder && isTransitioningToPickedUp && !userClosedBottomSheetRef.current) {
       userClosedBottomSheetRef.current = false;
       setTimeout(() => {
-        expandRecipientDetailsSheet();
+        expandOrderBottomSheet();
       }, 500);
     } else if (status === 'completed' || !currentOrder) {
       userClosedBottomSheetRef.current = false;
-      collapseRecipientDetailsSheet();
+      collapseOrderBottomSheet();
     }
-  }, [currentOrder?.status, currentOrder, expandRecipientDetailsSheet, collapseRecipientDetailsSheet]);
+  }, [currentOrder?.status, currentOrder, expandOrderBottomSheet, collapseOrderBottomSheet]);
 
   useEffect(() => {
-    if (!recipientDetailsIsExpanded && currentOrder) {
+    if (!orderBottomSheetIsExpanded && currentOrder) {
       const status = String(currentOrder?.status || '');
       if (status === 'picked_up' || status === 'delivering') {
         userClosedBottomSheetRef.current = true;
       }
-    } else if (recipientDetailsIsExpanded) {
+    } else if (orderBottomSheetIsExpanded) {
       userClosedBottomSheetRef.current = false;
     }
-  }, [recipientDetailsIsExpanded, currentOrder]);
+  }, [orderBottomSheetIsExpanded, currentOrder]);
 
   useEffect(() => {
     const loadStats = async () => {
-      if (!user?.id) {
+      // Vérifier que l'utilisateur est toujours authentifié
+      if (!isAuthenticated || !user?.id) {
         if (__DEV__) {
-          console.debug('[Index] Pas de user.id pour charger les stats');
+          console.debug('[Index] Pas de user.id ou utilisateur non authentifié pour charger les stats');
         }
         return;
       }
@@ -521,12 +546,15 @@ export default function Index() {
       }
     };
 
-    loadStats();
-    const interval = setInterval(loadStats, isOnline ? 30000 : 60000);
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [user?.id, isOnline, updateTodayStats]);
+    // Ne charger les stats que si l'utilisateur est authentifié
+    if (isAuthenticated && user?.id) {
+      loadStats();
+      const interval = setInterval(loadStats, isOnline ? 30000 : 60000);
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    }
+  }, [user?.id, isAuthenticated, isOnline, updateTodayStats]);
 
   return (
     <View style={styles.container}>
@@ -603,7 +631,6 @@ export default function Index() {
               coordinates={animatedRoute.animatedCoordinates}
               strokeColor="#8B5CF6"
               strokeWidth={6}
-              strokeOpacity={1}
               lineCap="round"
               lineJoin="round"
             />
@@ -614,7 +641,6 @@ export default function Index() {
         {[...activeOrders, ...pendingOrders].map((order) => {
           const pickupCoord = resolveCoords(order.pickup);
           const dropoffCoord = resolveCoords(order.dropoff);
-          const isSelected = selectedOrderId === order.id;
           const status = String(order.status || '');
           const isPending = status === 'pending';
           const distance = calculateDistanceToPickup(order);
@@ -718,54 +744,7 @@ export default function Index() {
         </TouchableOpacity>
       </View>
 
-      {currentOrder && (
-        <View style={styles.orderActionsContainer} pointerEvents="box-none">
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#6366F1', flexDirection: 'row', alignItems: 'center', gap: 6 }]}
-            onPress={expandRecipientDetailsSheet}
-          >
-            <Ionicons name="person-outline" size={18} color="#fff" />
-            <Text style={styles.actionText}>Destinataire</Text>
-          </TouchableOpacity>
-
-          {String(currentOrder.status) === 'accepted' && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => orderSocketService.updateDeliveryStatus(currentOrder.id, 'enroute', location)}
-            >
-              <Text style={styles.actionText}>Je pars</Text>
-            </TouchableOpacity>
-          )}
-
-          {(String(currentOrder.status) === 'enroute' || String(currentOrder.status) === 'accepted' || String(currentOrder.status) === 'in_progress') && (
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#F59E0B' }]}
-              onPress={async () => {
-                const dropoffCoord = resolveCoords(currentOrder.dropoff);
-                await orderSocketService.updateDeliveryStatus(currentOrder.id, 'picked_up', location);
-                if (location && dropoffCoord) {
-                  setAnimatedDriverPos(null);
-                  setTimeout(() => {
-                    animatedRoute.refetch();
-                    fitToRoute();
-                  }, 500);
-                }
-              }}
-            >
-              <Text style={styles.actionText}>Colis récupéré</Text>
-            </TouchableOpacity>
-          )}
-
-          {(String(currentOrder.status) === 'picked_up' || String(currentOrder.status) === 'in_progress') && (
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#10B981' }]}
-              onPress={() => orderSocketService.updateDeliveryStatus(currentOrder.id, 'completed', location)}
-            >
-              <Text style={styles.actionText}>Terminé</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+      {/* Les actions sont maintenant dans le DriverOrderBottomSheet */}
 
       <OrderRequestPopup
         order={pendingOrder}
@@ -775,13 +754,30 @@ export default function Index() {
         autoDeclineTimer={30}
       />
 
-      {currentOrder && recipientDetailsIsExpanded && (
-        <RecipientDetailsSheet
-          animatedHeight={recipientDetailsAnimatedHeight}
-          panResponder={recipientDetailsPanResponder}
-          isExpanded={recipientDetailsIsExpanded}
-          onToggle={toggleRecipientDetailsSheet}
-          order={currentOrder}
+      {/* Nouveau bottom sheet unifié pour les détails et la messagerie */}
+      {currentOrder && (
+        <DriverOrderBottomSheet
+          currentOrder={currentOrder}
+          panResponder={orderBottomSheetPanResponder}
+          animatedHeight={orderBottomSheetAnimatedHeight}
+          isExpanded={orderBottomSheetIsExpanded}
+          onToggle={toggleOrderBottomSheet}
+          onUpdateStatus={async (status: string) => {
+            if (status === 'picked_up') {
+              const dropoffCoord = resolveCoords(currentOrder.dropoff);
+              await orderSocketService.updateDeliveryStatus(currentOrder.id, status, location);
+              if (location && dropoffCoord) {
+                setAnimatedDriverPos(null);
+                setTimeout(() => {
+                  animatedRoute.refetch();
+                  fitToRoute();
+                }, 500);
+              }
+            } else {
+              await orderSocketService.updateDeliveryStatus(currentOrder.id, status, location);
+            }
+          }}
+          location={location}
         />
       )}
 

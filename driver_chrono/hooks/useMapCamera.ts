@@ -19,7 +19,7 @@ export const useMapCamera = (
   isTracking: boolean = true
 ) => {
   const lastCameraUpdate = useRef<number>(0);
-  const CAMERA_UPDATE_INTERVAL = 3000; // Limite les mises à jour pour éviter les animations excessives
+  const CAMERA_UPDATE_INTERVAL = 3000; 
 
   useEffect(() => {
     if (!isTracking || !driverLocation || !mapRef.current) return;

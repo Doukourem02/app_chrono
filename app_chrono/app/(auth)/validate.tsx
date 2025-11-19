@@ -1,11 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-} from 'react-native';
+import {View,Text,TouchableOpacity,StyleSheet,Animated} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,7 +8,6 @@ export default function ValidateScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animation d'entrée
     Animated.sequence([
       Animated.timing(scaleAnim, {
         toValue: 1,
@@ -30,14 +23,12 @@ export default function ValidateScreen() {
   });
 
   const handleContinue = () => {
-    // Naviguer vers l'app principale
     router.push('/(tabs)' as any);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
-        {/* Animation de succès */}
         <Animated.View 
           style={[
             styles.successIconContainer,
@@ -49,7 +40,6 @@ export default function ValidateScreen() {
           </View>
         </Animated.View>
 
-        {/* Texte de succès */}
         <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
           <Text style={styles.title}>Success!</Text>
           <Text style={styles.subtitle}>
@@ -57,7 +47,6 @@ export default function ValidateScreen() {
           </Text>
         </Animated.View>
 
-        {/* Bouton Continue */}
         <Animated.View style={[styles.buttonContainer, { opacity: fadeAnim }]}>
           <TouchableOpacity 
             style={styles.continueButton}

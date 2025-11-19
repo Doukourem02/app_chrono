@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  TextInput,
-  Switch,
-} from 'react-native';
+import {View,Text,StyleSheet,TouchableOpacity,ActivityIndicator,Alert,ScrollView,TextInput,Switch} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { paymentApi, PaymentMethodType } from '../services/paymentApi';
 import { usePaymentStore } from '../store/usePaymentStore';
@@ -26,15 +16,12 @@ interface PaymentBottomSheetProps {
   onClose: () => void;
   onPaymentSuccess?: (transactionId: string) => void;
   onPaymentError?: (error: string) => void;
-  // Qui paie
   payerType?: 'client' | 'recipient';
   recipientUserId?: string;
   recipientPhone?: string;
   recipientIsRegistered?: boolean;
-  // Paiement partiel (pré-configuré depuis OrderDetailsSheet)
   initialIsPartial?: boolean;
   initialPartialAmount?: number;
-  // Méthode de paiement déjà choisie (depuis OrderDetailsSheet)
   preselectedPaymentMethod?: PaymentMethodType;
 }
 
@@ -54,7 +41,7 @@ export default function PaymentBottomSheet({
   recipientIsRegistered = false,
   initialIsPartial = false,
   initialPartialAmount,
-  preselectedPaymentMethod, // Méthode de paiement déjà choisie
+    preselectedPaymentMethod, 
 }: PaymentBottomSheetProps) {
   const { paymentMethods, selectedPaymentMethod, loadPaymentMethods } = usePaymentStore();
   const [selectedMethodType, setSelectedMethodType] = useState<PaymentMethodType | null>(preselectedPaymentMethod || null);
@@ -69,7 +56,6 @@ export default function PaymentBottomSheet({
   useEffect(() => {
     if (visible) {
       loadPaymentMethods();
-      // Utiliser la méthode présélectionnée si disponible, sinon la méthode par défaut
       if (preselectedPaymentMethod) {
         setSelectedMethodType(preselectedPaymentMethod);
       } else if (selectedPaymentMethod) {
@@ -91,7 +77,6 @@ export default function PaymentBottomSheet({
       return;
     }
 
-    // Pour Mobile Money, vérifier qu'un numéro de téléphone est fourni
     if ((selectedMethodType === 'orange_money' || selectedMethodType === 'wave')) {
       const method = paymentMethods.find((m) => m.method_type === selectedMethodType);
       if (!method?.provider_account && !phoneNumber) {
@@ -100,7 +85,6 @@ export default function PaymentBottomSheet({
       }
     }
 
-    // Vérifier le paiement partiel
     if (isPartial && partialAmount) {
       const partial = parseFloat(partialAmount);
       if (isNaN(partial) || partial <= 0 || partial > price) {
@@ -109,7 +93,6 @@ export default function PaymentBottomSheet({
       }
     }
 
-    // Si le destinataire paie et n'est pas enregistré, il ne peut pas opter pour le paiement différé
     if (payerType === 'recipient' && !recipientIsRegistered && selectedMethodType === 'deferred') {
       Alert.alert(
         'Erreur',
@@ -168,21 +151,18 @@ export default function PaymentBottomSheet({
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Calcul de prix */}
           <PriceCalculationCard
             distance={distance}
             deliveryMethod={deliveryMethod}
             isUrgent={isUrgent}
           />
 
-          {/* Sélection de la méthode de paiement */}
           <PaymentMethodSelector
             selectedMethod={selectedMethodType}
             onSelect={handleSelectMethod}
             showAddNew={false}
           />
 
-          {/* Numéro de téléphone pour Mobile Money */}
           {(selectedMethodType === 'orange_money' || selectedMethodType === 'wave') && (
             <View style={styles.phoneInputContainer}>
               <Text style={styles.phoneLabel}>Numéro de téléphone</Text>
@@ -192,7 +172,6 @@ export default function PaymentBottomSheet({
             </View>
           )}
 
-          {/* Paiement partiel (uniquement pour le client) */}
           {payerType === 'client' && (
             <View style={styles.partialPaymentContainer}>
               <View style={styles.partialPaymentHeader}>
@@ -227,7 +206,6 @@ export default function PaymentBottomSheet({
             </View>
           )}
 
-          {/* Information sur qui paie */}
           {payerType === 'recipient' && (
             <View style={styles.payerInfoContainer}>
               <Ionicons name="information-circle" size={20} color="#007AFF" />
@@ -239,7 +217,6 @@ export default function PaymentBottomSheet({
             </View>
           )}
 
-          {/* Bouton de paiement */}
           <TouchableOpacity
             style={[styles.payButton, (isProcessing || !selectedMethodType) && styles.payButtonDisabled]}
             onPress={handlePay}

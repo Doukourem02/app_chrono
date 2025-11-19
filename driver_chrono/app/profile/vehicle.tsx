@@ -1,14 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import {View,Text,StyleSheet,TextInput,TouchableOpacity,ScrollView,Alert,ActivityIndicator} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
@@ -67,11 +58,11 @@ export default function VehiclePage() {
         if (currentState.profile) {
           useDriverStore.getState().updateProfile({
             vehicle_type: result.data.vehicle_type,
-            vehicle_plate: result.data.vehicle_plate,
-            vehicle_brand: result.data.vehicle_brand,
-            vehicle_model: result.data.vehicle_model,
-            vehicle_color: result.data.vehicle_color,
-            license_number: result.data.license_number,
+            vehicle_plate: result.data.vehicle_plate ?? undefined,
+            vehicle_brand: result.data.vehicle_brand ?? undefined,
+            vehicle_model: result.data.vehicle_model ?? undefined,
+            vehicle_color: result.data.vehicle_color ?? undefined,
+            license_number: result.data.license_number ?? undefined,
           });
         }
 

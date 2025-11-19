@@ -7,6 +7,8 @@ interface User {
   email: string;
   phone: string;
   isVerified: boolean;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 interface AuthState {

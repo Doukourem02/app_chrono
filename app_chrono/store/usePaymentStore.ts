@@ -1,6 +1,3 @@
-/**
- * Store Zustand pour la gestion des paiements
- */
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -8,7 +5,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { paymentApi, PaymentMethod, Transaction, PaymentStatus } from '../services/paymentApi';
 
 interface PaymentStore {
-  // État
   paymentMethods: PaymentMethod[];
   selectedPaymentMethod: PaymentMethod | null;
   currentTransaction: Transaction | null;
@@ -16,7 +12,6 @@ interface PaymentStore {
   isLoading: boolean;
   error: string | null;
 
-  // Actions
   loadPaymentMethods: () => Promise<void>;
   addPaymentMethod: (method: Omit<PaymentMethod, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<boolean>;
   selectPaymentMethod: (method: PaymentMethod | null) => void;
@@ -29,7 +24,6 @@ interface PaymentStore {
 export const usePaymentStore = create<PaymentStore>()(
   persist(
     (set, get) => ({
-      // État initial
       paymentMethods: [],
       selectedPaymentMethod: null,
       currentTransaction: null,
@@ -37,14 +31,12 @@ export const usePaymentStore = create<PaymentStore>()(
       isLoading: false,
       error: null,
 
-      // Charger les méthodes de paiement
       loadPaymentMethods: async () => {
         set({ isLoading: true, error: null });
         try {
           const result = await paymentApi.getPaymentMethods();
           if (result.success && result.data) {
             set({ paymentMethods: result.data });
-            // Sélectionner la méthode par défaut si disponible
             const defaultMethod = result.data.find((m) => m.is_default);
             if (defaultMethod) {
               set({ selectedPaymentMethod: defaultMethod });
@@ -59,7 +51,6 @@ export const usePaymentStore = create<PaymentStore>()(
         }
       },
 
-      // Ajouter une méthode de paiement
       addPaymentMethod: async (methodData) => {
         set({ isLoading: true, error: null });
         try {
@@ -90,17 +81,14 @@ export const usePaymentStore = create<PaymentStore>()(
         }
       },
 
-      // Sélectionner une méthode de paiement
       selectPaymentMethod: (method) => {
         set({ selectedPaymentMethod: method });
       },
 
-      // Définir la transaction courante
       setCurrentTransaction: (transaction) => {
         set({ currentTransaction: transaction });
       },
 
-      // Charger les transactions
       loadTransactions: async (params) => {
         set({ isLoading: true, error: null });
         try {
@@ -117,12 +105,10 @@ export const usePaymentStore = create<PaymentStore>()(
         }
       },
 
-      // Effacer l'erreur
       clearError: () => {
         set({ error: null });
       },
 
-      // Réinitialiser le store
       reset: () => {
         set({
           paymentMethods: [],

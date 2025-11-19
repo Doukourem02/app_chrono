@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
+import { config } from '../../config/index';
 
 export default function OTPMethodScreen() {
   const [selectedMethod, setSelectedMethod] = useState<'email' | 'sms'>('email');
@@ -19,7 +20,7 @@ export default function OTPMethodScreen() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/send-otp`, {
+      const response = await fetch(`${config.apiUrl}/api/auth-simple/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -32,10 +33,16 @@ export default function OTPMethodScreen() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
+        throw new Error(`Erreur serveur (${response.status}). Le backend est peut-être inaccessible.`);
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'envoi de l\'OTP');
+        throw new Error(data.error || data.message || 'Erreur lors de l\'envoi de l\'OTP');
       }
 
       console.log('OTP envoyé avec succès:', data);
@@ -44,7 +51,16 @@ export default function OTPMethodScreen() {
       router.push('./verification' as any);
     } catch (error) {
       console.error('Erreur lors de l\'envoi OTP:', error);
-      Alert.alert('Erreur', (error as Error).message || 'Une erreur est survenue. Veuillez réessayer.');
+      
+      // Gérer spécifiquement les erreurs réseau
+      let errorMessage = 'Une erreur est survenue. Veuillez réessayer.';
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez que le backend est démarré et votre connexion internet.';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setIsLoading(false);
     }

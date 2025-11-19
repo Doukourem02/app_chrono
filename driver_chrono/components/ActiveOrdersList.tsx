@@ -104,17 +104,13 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({
     );
   }
 
-  // Trier les commandes par priorité intelligente :
-  // 1. Pending (en attente de réponse) - priorité absolue
-  // 2. En cours (picked_up, enroute) - priorité haute
-  // 3. Acceptées (accepted) - triées par distance depuis la position actuelle du livreur
-  // Note: La distance sera calculée côté composant parent si disponible
+
   const sortedOrders = [...allOrders].sort((a, b) => {
-    // Pending toujours en premier
+    // Pending
     if (a.status === 'pending' && b.status !== 'pending') return -1;
     if (a.status !== 'pending' && b.status === 'pending') return 1;
     
-    // Ensuite, trier par statut (picked_up > enroute > accepted)
+    //trier par statut (picked_up > enroute > accepted)
     const statusPriority: Record<string, number> = {
       'picked_up': 3,
       'delivering': 3,
@@ -128,17 +124,14 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({
     const priorityB = statusPriority[b.status] || 0;
     
     if (priorityA !== priorityB) {
-      return priorityB - priorityA; // Plus haute priorité en premier
+      return priorityB - priorityA; 
     }
     
-    // Si même priorité, trier par date de création (plus récentes en premier)
-    // Note: Le tri par distance sera géré côté parent si la position est disponible
     const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
     const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return dateB - dateA;
   });
 
-  // Séparer les commandes triées par type
   const sortedPending = sortedOrders.filter(o => o.status === 'pending');
   const sortedActive = sortedOrders.filter(o => o.status !== 'pending');
 

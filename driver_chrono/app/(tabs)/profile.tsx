@@ -348,21 +348,43 @@ export default function ProfilePage() {
             if (currentState.user?.id) {
               try {
                 const { apiService } = await import('../../services/apiService');
-                await apiService.updateDriverStatus(currentState.user.id, {
+                const result = await apiService.updateDriverStatus(currentState.user.id, {
                   is_online: value,
                   is_available: value,
                   current_latitude: currentState.currentLocation?.latitude,
                   current_longitude: currentState.currentLocation?.longitude,
                 });
+                
+                // Si la session est expirée, le logout() a déjà été appelé
+                // Le système de redirection gérera la navigation vers la page de connexion
+                if (!result.success && result.message?.includes('Session expirée')) {
+                  // Ne pas afficher d'alerte, laisser le système de redirection faire son travail
+                  return;
+                }
+                
+                if (!result.success) {
+                  // Rollback en cas d'erreur
+                  setOnlineStatus(!value);
+                  Alert.alert(
+                    'Erreur',
+                    result.message || 'Impossible de synchroniser votre statut avec le serveur.',
+                    [{ text: 'OK' }]
+                  );
+                }
               } catch (error) {
                 console.error('Erreur synchronisation statut depuis profile:', error);
                 // Rollback en cas d'erreur
                 setOnlineStatus(!value);
-                Alert.alert(
-                  'Erreur',
-                  'Impossible de synchroniser votre statut avec le serveur.',
-                  [{ text: 'OK' }]
-                );
+                
+                // Ne pas afficher d'erreur si c'est une session expirée (déjà géré par logout)
+                const errorMessage = error instanceof Error ? error.message : '';
+                if (!errorMessage.includes('Session expirée')) {
+                  Alert.alert(
+                    'Erreur',
+                    'Impossible de synchroniser votre statut avec le serveur.',
+                    [{ text: 'OK' }]
+                  );
+                }
               }
             }
           }}

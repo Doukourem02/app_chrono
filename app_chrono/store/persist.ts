@@ -15,7 +15,6 @@ export const persist = <T>(
   return (set: any, get: any, api: any): T => {
     const { name, version = 1, migrate, partialize } = options;
 
-    // Load initial state from storage
     const loadState = async () => {
       try {
         const persistedState = await AsyncStorage.getItem(name);
@@ -25,15 +24,12 @@ export const persist = <T>(
           
           let state = parsed;
           
-          // Run migration if version has changed
           if (migrate && currentVersion < version) {
             state = migrate(parsed, currentVersion);
           }
           
-          // Remove version from state before merging
           delete state._version;
           
-          // Merge with current state
           set((current: T) => ({
             ...current,
             ...state,
@@ -44,7 +40,6 @@ export const persist = <T>(
       }
     };
 
-    // Save state to storage
     const saveState = async (state: T) => {
       try {
         const stateToSave = partialize ? partialize(state) : state;
@@ -58,10 +53,8 @@ export const persist = <T>(
       }
     };
 
-    // Load initial state
     loadState();
 
-    // Enhanced set function that also saves to storage
     const enhancedSet = (partial: any, replace?: boolean) => {
       set(partial, replace);
       const newState = get();

@@ -199,12 +199,28 @@ class UserApiService {
   }
 
   // Annuler une commande
-  async cancelOrder(orderId: string): Promise<{
+  async cancelOrder(orderId: string, currentStatus?: string): Promise<{
     success: boolean;
     message?: string;
     data?: any;
   }> {
     try {
+      // Vérifier le statut avant d'essayer d'annuler
+      if (currentStatus && currentStatus !== 'pending' && currentStatus !== 'accepted') {
+        const statusMessages: Record<string, string> = {
+          'picked_up': 'Impossible d\'annuler une commande dont le colis a déjà été récupéré',
+          'enroute': 'Impossible d\'annuler une commande en cours de livraison',
+          'completed': 'Impossible d\'annuler une commande déjà terminée',
+          'cancelled': 'Cette commande a déjà été annulée',
+          'declined': 'Cette commande a été refusée',
+        };
+        
+        return {
+          success: false,
+          message: statusMessages[currentStatus] || `Impossible d'annuler une commande avec le statut: ${currentStatus}`,
+        };
+      }
+
       const token = await this.ensureAccessToken();
       if (!token) {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
@@ -220,15 +236,43 @@ class UserApiService {
       const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(result.message || 'Erreur annulation commande');
+        // Améliorer les messages d'erreur du backend
+        let errorMessage = result.message || 'Erreur lors de l\'annulation de la commande';
+        
+        if (errorMessage.includes('Cannot cancel order with status')) {
+          const statusMatch = errorMessage.match(/status: (\w+)/);
+          if (statusMatch) {
+            const status = statusMatch[1];
+            const statusMessages: Record<string, string> = {
+              'picked_up': 'Impossible d\'annuler une commande dont le colis a déjà été récupéré',
+              'enroute': 'Impossible d\'annuler une commande en cours de livraison',
+              'completed': 'Impossible d\'annuler une commande déjà terminée',
+              'cancelled': 'Cette commande a déjà été annulée',
+              'declined': 'Cette commande a été refusée',
+            };
+            errorMessage = statusMessages[status] || errorMessage;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
       
       return result;
     } catch (error) {
-      console.error('❌ Erreur cancelOrder:', error);
+      // Ne logger comme erreur que les vraies erreurs (réseau, serveur, etc.)
+      // Pas les messages d'information attendus (statut invalide, etc.)
+      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      const isExpectedError = errorMessage.includes('Impossible d\'annuler') || 
+                             errorMessage.includes('déjà été') ||
+                             errorMessage.includes('Session expirée');
+      
+      if (!isExpectedError) {
+        console.error('❌ Erreur cancelOrder:', error);
+      }
+      
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: errorMessage
       };
     }
   }
@@ -239,6 +283,7 @@ class UserApiService {
         accessToken,
         refreshToken,
         setTokens,
+        logout,
       } = useAuthStore.getState();
 
       // Vérifier si le token existe et s'il n'est pas expiré
@@ -249,15 +294,16 @@ class UserApiService {
       // Si le token est expiré ou absent, essayer de le rafraîchir
       if (!refreshToken) {
         console.warn('⚠️ Pas de refreshToken disponible - session expirée');
-        // Ne pas déconnecter automatiquement, laisser l'appelant gérer l'erreur
-        // L'utilisateur pourra se reconnecter si nécessaire
+        // Déconnecter l'utilisateur car la session est expirée
+        logout();
         return null;
       }
 
       // Vérifier si le refresh token est encore valide
       if (!this.isTokenValid(refreshToken)) {
         console.warn('⚠️ Refresh token expiré - session expirée');
-        // Ne pas déconnecter automatiquement, laisser l'appelant gérer l'erreur
+        // Déconnecter l'utilisateur car la session est expirée
+        logout();
         return null;
       }
 
@@ -269,11 +315,15 @@ class UserApiService {
         return newAccessToken;
       }
 
-      // Impossible de rafraîchir => retourner null sans déconnecter
+      // Impossible de rafraîchir => déconnecter l'utilisateur
       console.warn('⚠️ Impossible de rafraîchir le token - session expirée');
+      logout();
       return null;
     } catch (error) {
       console.error('❌ Erreur ensureAccessToken:', error);
+      // En cas d'erreur, déconnecter pour éviter un état incohérent
+      const { logout } = useAuthStore.getState();
+      logout();
       return null;
     }
   }

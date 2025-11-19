@@ -1,15 +1,5 @@
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  Image,
-  Alert,
-  Animated,
-} from 'react-native';
+import {StyleSheet,View,Text,TouchableOpacity,TextInput,ScrollView,Image,Alert,Animated} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -32,7 +22,6 @@ interface SavedContact {
   phone: string;
 }
 
-// Contacts sauvegardés (pour l'instant statiques, à remplacer par un store/vraies données)
 const savedContacts: SavedContact[] = [
   { id: '1', name: 'John Doe', phone: '+225 07 12 34 56 78' },
   { id: '2', name: 'John Doe', phone: '+225 07 98 76 54 32' },
@@ -52,14 +41,12 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
   const [packageImages, setPackageImages] = useState<string[]>([]);
 
   const pickImage = async () => {
-    // Demander les permissions
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission requise', 'Vous devez autoriser l\'accès à vos photos pour ajouter des images.');
       return;
     }
 
-    // Ouvrir la galerie
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
@@ -100,7 +87,6 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
       style={[styles.bottomSheet, { height: animatedHeight }]}
       {...panResponder.panHandlers}
     >
-      {/* Indicateur de glissement */}
       <TouchableOpacity
         style={styles.dragIndicator}
         onPress={onToggle}
@@ -115,7 +101,6 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
           style={styles.scrollContent}
           scrollEnabled={isExpanded}
         >
-          {/* Bouton retour */}
           <TouchableOpacity
             style={styles.backButton}
             onPress={onBack}
@@ -125,7 +110,6 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
 
           <Text style={styles.title}>Détails supplémentaires</Text>
 
-          {/* Section Destinataire */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Destinataire</Text>
             <TextInput
@@ -139,7 +123,6 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
             />
           </View>
 
-          {/* Section Contact */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Contact</Text>
             {savedContacts.map((contact) => (
@@ -169,7 +152,6 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
             ))}
           </View>
 
-          {/* Section Images du colis */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Images du colis</Text>
             <TouchableOpacity
@@ -180,7 +162,6 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
               <Text style={styles.addImageText}>Ajouter des photos</Text>
             </TouchableOpacity>
 
-            {/* Afficher les images ajoutées */}
             {packageImages.length > 0 && (
               <View style={styles.imagesGrid}>
                 {packageImages.map((uri, index) => (
@@ -198,7 +179,6 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
             )}
           </View>
 
-          {/* Bouton de validation */}
           <TouchableOpacity
             style={[
               styles.confirmButton,

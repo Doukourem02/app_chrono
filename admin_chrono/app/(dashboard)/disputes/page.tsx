@@ -37,8 +37,8 @@ export default function DisputesPage() {
         limit: itemsPerPage,
         status: statusFilter !== 'all' ? statusFilter : undefined,
       }),
-    refetchInterval: false, // Pas de refresh automatique - les litiges changent rarement
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchInterval: false, 
+    staleTime: Infinity, 
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,

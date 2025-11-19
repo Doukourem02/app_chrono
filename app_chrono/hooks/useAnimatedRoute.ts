@@ -13,10 +13,6 @@ interface UseAnimatedRouteOptions {
   onRouteCalculated?: (route: Coordinates[]) => void;
 }
 
-/**
- * Hook pour obtenir une route animée entre deux points en utilisant Google Directions API
- * Retourne les coordonnées progressives pour animer le dessin de la polyline
- */
 export const useAnimatedRoute = ({
   origin,
   destination,

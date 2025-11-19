@@ -45,8 +45,8 @@ export default function PromoCodesPage() {
   const { data: promoCodesData, isLoading } = useQuery({
     queryKey: ['promo-codes'],
     queryFn: () => adminApiService.getPromoCodes(),
-    refetchInterval: false, // Pas de refresh automatique - les codes promo changent rarement
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchInterval: false, 
+    staleTime: Infinity, 
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -201,7 +201,6 @@ export default function PromoCodesPage() {
         </button>
       </div>
 
-      {/* Recherche */}
       <div style={{ position: 'relative' }}>
         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
         <input
@@ -221,7 +220,6 @@ export default function PromoCodesPage() {
         />
       </div>
 
-      {/* Table */}
       <div style={cardStyle}>
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
@@ -294,7 +292,6 @@ export default function PromoCodesPage() {
         )}
       </div>
 
-      {/* Modal de création */}
       {showCreateModal && (
         <div style={modalOverlayStyle} onClick={() => setShowCreateModal(false)}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>

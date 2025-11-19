@@ -49,12 +49,11 @@ export const useDriverLocation = (isOnline: boolean) => {
           accuracy: currentLocation.coords.accuracy || undefined,
         });
 
-        // Commencer le tracking en temps réel
         subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
-            timeInterval: 10000, // Mise à jour toutes les 10 secondes
-            distanceInterval: 50, // Ou quand le chauffeur bouge de 50m
+            timeInterval: 10000, 
+            distanceInterval: 50, 
           },
           (newLocation) => {
             setLocation({

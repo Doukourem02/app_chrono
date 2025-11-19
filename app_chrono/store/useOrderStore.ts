@@ -11,7 +11,6 @@ export interface OrderRequest {
     rating?: number;
     phone?: string;
   };
-  // Infos du chauffeur (optionnel) fournies après acceptation
   driver?: {
     id?: string;
     name?: string;
@@ -34,30 +33,26 @@ export interface OrderRequest {
   status: OrderStatus;
   driverId?: string;
   createdAt?: string | Date;
-  // Preuve de livraison (ex: signature/photo) envoyée par le chauffeur
   proof?: {
     uploadedAt?: string | Date;
     url?: string;
     type?: 'photo' | 'signature' | string;
     meta?: Record<string, any>;
   };
-  // Informations sur le destinataire et le colis
   recipient?: {
     name?: string;
     phone: string;
-    contactId?: string; // ID du contact sauvegardé si sélectionné depuis les contacts
+    contactId?: string; 
   };
-  packageImages?: string[]; // URLs ou URIs des images du colis
-  packageType?: 'standard' | 'fragile' | 'hot_sensitive'; // Type de colis
+  packageImages?: string[]; 
+  packageType?: 'standard' | 'fragile' | 'hot_sensitive'; 
 }
 
 interface OrderStore {
-  // Support pour plusieurs commandes actives
-  activeOrders: OrderRequest[]; // Toutes les commandes actives (pending, accepted, enroute, picked_up)
-  selectedOrderId: string | null; // ID de la commande actuellement sélectionnée/affichée
-  driverCoords: Map<string, { latitude: number; longitude: number }>; // Coordonnées par orderId
+  activeOrders: OrderRequest[]; 
+  selectedOrderId: string | null; 
+  driverCoords: Map<string, { latitude: number; longitude: number }>; 
   
-  // Méthodes pour gérer plusieurs commandes
   addOrder: (order: OrderRequest) => void;
   updateOrder: (orderId: string, updates: Partial<OrderRequest>) => void;
   removeOrder: (orderId: string) => void;
@@ -67,7 +62,6 @@ interface OrderStore {
   updateFromSocket: (payload: { order?: Partial<OrderRequest> | null; location?: { latitude?: number; longitude?: number } | null; proof?: any }) => void;
   clear: () => void;
   
-  // Getters pour compatibilité avec l'ancien code
   getCurrentOrder: () => OrderRequest | null;
   getPendingOrder: () => OrderRequest | null;
   getActiveOrdersCount: () => number;
@@ -79,12 +73,10 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   driverCoords: new Map(),
 
   addOrder: (order) => set((state) => {
-    // Vérifier si la commande existe déjà
     const exists = state.activeOrders.some(o => o.id === order.id);
     if (exists) {
       return state;
     }
-    // Ajouter la commande et la sélectionner si c'est la première
     const newOrders = [...state.activeOrders, order];
     return {
       activeOrders: newOrders,
@@ -100,11 +92,23 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   }),
 
   removeOrder: (orderId) => set((state) => {
+    const orderToRemove = state.activeOrders.find(o => o.id === orderId);
+    
+    if (orderToRemove) {
+      const isFinalStatus = orderToRemove.status === 'completed' || 
+                          orderToRemove.status === 'cancelled' || 
+                          orderToRemove.status === 'declined';
+      
+      if (!isFinalStatus) {
+        console.warn('⚠️ Tentative de retirer une commande active - ignorée', { orderId, status: orderToRemove.status });
+        return state;
+      }
+    }
+    
     const filteredOrders = state.activeOrders.filter(order => order.id !== orderId);
     const newCoords = new Map(state.driverCoords);
     newCoords.delete(orderId);
     
-    // Si la commande supprimée était sélectionnée, sélectionner une autre ou null
     let newSelectedId = state.selectedOrderId;
     if (state.selectedOrderId === orderId) {
       newSelectedId = filteredOrders.length > 0 ? filteredOrders[0].id : null;
@@ -134,7 +138,6 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       order.id === orderId ? { ...order, status } : order
     );
     
-    // Retirer les commandes terminées/annulées après un délai
     const completedOrders = updatedOrders.filter(o => 
       o.id === orderId && (status === 'completed' || status === 'cancelled' || status === 'declined')
     );
@@ -148,7 +151,6 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     return { activeOrders: updatedOrders };
   }),
 
-  // Update store from a socket payload (canonical handler for order:status:update and proof uploads)
   updateFromSocket: (payload) => {
     try {
       const { order, location, proof } = payload || {};
@@ -157,14 +159,11 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         const existingOrder = state.activeOrders.find(o => o.id === order.id);
         
         if (existingOrder) {
-          // Mettre à jour la commande existante
           get().updateOrder(order.id, order as Partial<OrderRequest>);
         } else {
-          // Ajouter une nouvelle commande si elle n'existe pas
           get().addOrder(order as OrderRequest);
         }
         
-        // Retirer les commandes terminées/annulées après un délai
         const status: OrderStatus = (order.status as OrderStatus) || 'pending';
         if (status === 'completed' || status === 'cancelled' || status === 'declined') {
           const orderId = order.id;
@@ -203,13 +202,11 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     driverCoords: new Map(),
   }),
 
-  // Getters pour compatibilité avec l'ancien code
   getCurrentOrder: () => {
     const state = get();
     if (state.selectedOrderId) {
       return state.activeOrders.find(o => o.id === state.selectedOrderId) || null;
     }
-    // Retourner la première commande active (non pending) ou la première en général
     return state.activeOrders.find(o => o.status !== 'pending') || state.activeOrders[0] || null;
   },
 

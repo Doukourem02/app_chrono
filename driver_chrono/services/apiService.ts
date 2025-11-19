@@ -57,7 +57,7 @@ class ApiService {
   }
 
   private async ensureAccessToken(): Promise<{ token: string | null; reason?: 'missing' | 'refresh_failed' }> {
-    const { accessToken, refreshToken, setTokens } = useDriverStore.getState();
+    const { accessToken, refreshToken, setTokens, logout } = useDriverStore.getState();
 
     // Vérifier si le token existe et s'il n'est pas expiré
     if (accessToken && this.isTokenValid(accessToken)) {
@@ -66,7 +66,22 @@ class ApiService {
 
     // Si le token est expiré ou absent, essayer de le rafraîchir
     if (!refreshToken) {
+      if (__DEV__) {
+        console.warn('⚠️ Pas de refreshToken disponible - session expirée');
+      }
+      // Déconnecter l'utilisateur car la session est expirée
+      logout();
       return { token: null, reason: 'missing' };
+    }
+
+    // Vérifier si le refresh token est encore valide avant d'essayer de rafraîchir
+    if (!this.isTokenValid(refreshToken)) {
+      if (__DEV__) {
+        console.warn('⚠️ Refresh token expiré - session expirée');
+      }
+      // Déconnecter l'utilisateur car la session est expirée
+      logout();
+      return { token: null, reason: 'refresh_failed' };
     }
 
     const newAccessToken = await this.refreshAccessToken(refreshToken);
@@ -75,7 +90,11 @@ class ApiService {
       return { token: newAccessToken };
     }
 
-    // Ne pas déconnecter automatiquement, laisser l'appelant gérer l'erreur
+    // Impossible de rafraîchir => déconnecter l'utilisateur
+    if (__DEV__) {
+      console.warn('⚠️ Impossible de rafraîchir le token - session expirée');
+    }
+    logout();
     return { token: null, reason: 'refresh_failed' };
   }
 

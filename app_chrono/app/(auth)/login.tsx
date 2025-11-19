@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import {View,Text,TextInput,StyleSheet,Alert} from 'react-native';
 import { router } from 'expo-router';
 import { useTempAuthStore } from '../../store/useTempAuthStore';
 import { AnimatedButton, ScreenTransition } from '../../components/animations';

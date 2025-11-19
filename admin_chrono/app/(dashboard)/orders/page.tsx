@@ -83,33 +83,32 @@ export default function OrdersPage() {
   const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ['orders', activeTab],
     queryFn: async () => {
-      console.warn('🚀🚀🚀 [OrdersPage] queryFn CALLED - getOrdersByStatus', {
+      console.warn(' [OrdersPage] queryFn CALLED - getOrdersByStatus', {
         activeTab,
         timestamp: new Date().toISOString(),
         stack: new Error().stack?.split('\n').slice(2, 15).join('\n')
       })
       const result = await adminApiService.getOrdersByStatus(activeTab === 'all' ? undefined : activeTab)
-      console.log('🔍 [OrdersPage] Orders result:', result)
+      console.log(' [OrdersPage] Orders result:', result)
       return result
     },
-    refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchInterval: false, 
+    staleTime: Infinity, 
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
-    refetchIntervalInBackground: false, // Désactiver complètement le refetch en arrière-plan
-    retry: false, // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
-    enabled: true, // Toujours activé, mais les autres options empêchent le refetch
+    refetchIntervalInBackground: false, 
+    retry: false, 
+    enabled: true, 
   })
 
-  // Debug logs
   React.useEffect(() => {
     if (isError) {
-      console.error('❌ [OrdersPage] Error loading orders:', error)
+      console.error(' [OrdersPage] Error loading orders:', error) 
     }
     if (ordersData) {
-      console.log('🔍 [OrdersPage] Orders data:', ordersData)
-      console.log('🔍 [OrdersPage] Orders count:', ordersData.data?.length || 0)
+      console.log(' [OrdersPage] Orders data:', ordersData)
+      console.log(' [OrdersPage] Orders count:', ordersData.data?.length || 0)
     }
   }, [ordersData, isError, error])
 
@@ -129,7 +128,6 @@ export default function OrdersPage() {
     },
   }
 
-  // Réinitialiser la page quand on change d'onglet
   React.useEffect(() => {
     setCurrentPage(1)
   }, [activeTab])
@@ -144,7 +142,6 @@ export default function OrdersPage() {
     }
   }, [queryClient])
 
-  // Calculer la pagination
   const totalPages = Math.max(1, Math.ceil(orders.length / itemsPerPage))
   const paginatedOrders = orders.slice(
     (currentPage - 1) * itemsPerPage,

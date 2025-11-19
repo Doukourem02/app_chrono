@@ -83,7 +83,7 @@ export default function ShipmentList() {
 
       autoCancelledPendingRef.current.add(order.id);
       try {
-        const result = await userApiService.cancelOrder(order.id);
+        const result = await userApiService.cancelOrder(order.id, order.status);
         if (result.success) {
           useOrderStore.getState().updateOrderStatus(order.id, 'cancelled');
           const targetIndex = updatedOrders.findIndex((o) => o.id === order.id);
@@ -495,7 +495,7 @@ export default function ShipmentList() {
           autoCancelledPendingRef.current.add(order.id);
           try {
             console.log(`⏰ Auto-annulation commande ${order.id} (en pending depuis ${Math.round((now - (order.created_at ? new Date(order.created_at).getTime() : now)) / 1000)}s)`);
-            const result = await userApiService.cancelOrder(order.id);
+            const result = await userApiService.cancelOrder(order.id, order.status);
             if (result.success) {
               useOrderStore.getState().updateOrderStatus(order.id, 'cancelled');
               setOrders((prevOrders) =>

@@ -34,11 +34,8 @@ export default function SettingsPage() {
         .eq('id', user.id)
         .single()
 
-      // PGRST116 = "No rows returned" - l'utilisateur n'existe pas encore dans la table users
-      // C'est normal, on utilise les données de user_metadata comme fallback
       if (error) {
         if (error.code === 'PGRST116') {
-          // Utilisateur n'existe pas dans la table users, utiliser user_metadata
           console.debug('User not found in users table, using user_metadata')
           const fullNameFromMetadata = user?.user_metadata?.full_name || ''
           const names = fullNameFromMetadata.split(' ')
@@ -64,7 +61,7 @@ export default function SettingsPage() {
         }
       } else if (userData) {
         // Données trouvées dans la table users
-        console.log('✅ [Settings] Profile loaded from database:', {
+        console.log(' [Settings] Profile loaded from database:', {
           avatar_url: userData.avatar_url,
           avatar_url_type: typeof userData.avatar_url,
           avatar_url_length: userData.avatar_url?.length,
@@ -72,7 +69,7 @@ export default function SettingsPage() {
           user_id: user.id,
         });
         const dbAvatarUrl = userData.avatar_url || null;
-        console.log('🖼️ [Settings] Raw avatar URL from DB:', dbAvatarUrl);
+        console.log(' [Settings] Raw avatar URL from DB:', dbAvatarUrl);
         
         // Corriger l'URL si elle contient un double "avatars/avatars"
         let correctedAvatarUrl = dbAvatarUrl;
@@ -83,10 +80,10 @@ export default function SettingsPage() {
         
         // Vérifier que l'URL est valide
         if (correctedAvatarUrl && !correctedAvatarUrl.startsWith('http')) {
-          console.warn('⚠️ [Settings] Avatar URL does not start with http:', correctedAvatarUrl);
+          console.warn(' [Settings] Avatar URL does not start with http:', correctedAvatarUrl);
         }
         
-        console.log('🖼️ [Settings] Final avatar URL to set:', correctedAvatarUrl);
+        console.log(' [Settings] Final avatar URL to set:', correctedAvatarUrl);
         setAvatarUrl(correctedAvatarUrl);
         // Charger first_name et last_name depuis la base de données
         setFirstName(userData.first_name || '')
@@ -188,7 +185,7 @@ export default function SettingsPage() {
       alert('Erreur de session. Veuillez vous reconnecter.')
       return
     }
-    console.log('✅ Session valide:', { userId: session.user.id, email: session.user.email })
+    console.log(' [Settings] Session valide:', { userId: session.user.id, email: session.user.email })
 
     // Vérifier le type de fichier
     if (!file.type.startsWith('image/')) {
@@ -347,21 +344,21 @@ export default function SettingsPage() {
         }),
       })
 
-      console.log('📤 Update API response status:', updateResponse.status, updateResponse.statusText)
+      console.log(' [Settings] Update API response status:', updateResponse.status, updateResponse.statusText)
 
       let updateResult: { error?: string; message?: string; hint?: string } = {}
       let responseText = ''
       
       try {
         responseText = await updateResponse.text()
-        console.log('📤 Update API response text:', responseText)
+        console.log(' [Settings] Update API response text:', responseText)
         
         if (responseText) {
           updateResult = JSON.parse(responseText)
         }
       } catch (jsonError) {
-        console.error('❌ Error parsing JSON response:', jsonError)
-        console.error('❌ Response text that failed to parse:', responseText)
+        console.error(' [Settings] Error parsing JSON response:', jsonError)
+        console.error(' [Settings] Response text that failed to parse:', responseText)
         setAvatarUrl(publicUrl)
         alert(
           'L\'image a été uploadée avec succès, mais la mise à jour du profil a échoué.\n\n' +
@@ -371,10 +368,10 @@ export default function SettingsPage() {
         return
       }
 
-      console.log('📤 Update result parsed:', updateResult)
+      console.log(' [Settings] Update result parsed:', updateResult)
 
       if (!updateResponse.ok) {
-        console.error('❌ Error updating profile:', {
+        console.error(' [Settings] Error updating profile:', {
           status: updateResponse.status,
           statusText: updateResponse.statusText,
           result: updateResult,
@@ -384,7 +381,7 @@ export default function SettingsPage() {
         // On affiche quand même l'avatar car il est uploadé
         setAvatarUrl(publicUrl)
         const errorMessage = updateResult?.error || updateResult?.message || responseText || 'Erreur inconnue'
-        const hint = updateResult?.hint ? `\n\n💡 ${updateResult.hint}` : ''
+        const hint = updateResult?.hint ? `\n\n ${updateResult.hint}` : ''
         alert(
           'L\'image a été uploadée avec succès, mais la mise à jour du profil a échoué.\n\n' +
           `Erreur (${updateResponse.status}): ${errorMessage}${hint}\n\n` +
@@ -410,7 +407,7 @@ export default function SettingsPage() {
 
       // Notifier le Sidebar et autres composants que l'avatar a été mis à jour
       const finalAvatarUrl = userData?.avatar_url || publicUrl
-      console.log('📢 [Settings] Dispatching avatar-updated event with URL:', finalAvatarUrl)
+      console.log(' [Settings] Dispatching avatar-updated event with URL:', finalAvatarUrl)
       window.dispatchEvent(new CustomEvent('avatar-updated', {
         detail: { avatarUrl: finalAvatarUrl }
       }))

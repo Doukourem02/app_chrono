@@ -818,23 +818,25 @@ export default function MapPage() {
       currentOrder.status !== 'declined';
     const hasOrderInProgress = Boolean(pendingOrder || isActiveOrder);
 
-    if (hasOrderInProgress) {
-      return;
-    }
-    
     // Ouvrir automatiquement le formulaire de création si :
-    // 1. Pas de commande active
+    // 1. Pas de commande active OU on est en mode création (permet plusieurs commandes)
     // 2. Le bottom sheet n'est pas déjà ouvert
     // 3. L'utilisateur ne l'a pas fermé manuellement
-    const shouldShowCreationForm = !isActiveOrder || isCreatingNewOrder;
+    // 4. On n'est pas en train de sélectionner une méthode ou de voir les détails
+    const shouldShowCreationForm = !hasOrderInProgress || isCreatingNewOrder;
     
-    if (shouldShowCreationForm && !isExpanded && !showRatingBottomSheet && !userManuallyClosedRef.current) {
+    if (shouldShowCreationForm && 
+        !isExpanded && 
+        !showRatingBottomSheet && 
+        !userManuallyClosedRef.current &&
+        !deliveryMethodIsExpanded &&
+        !orderDetailsIsExpanded) {
       if (!hasAutoOpenedRef.current) {
         hasAutoOpenedRef.current = true;
         scheduleBottomSheetOpen(100);
       }
     }
-  }, [isExpanded, currentOrder, showRatingBottomSheet, isCreatingNewOrder, pendingOrder, scheduleBottomSheetOpen]);
+  }, [isExpanded, currentOrder, showRatingBottomSheet, isCreatingNewOrder, pendingOrder, scheduleBottomSheetOpen, deliveryMethodIsExpanded, orderDetailsIsExpanded]);
 
   // 🆕 Réouvrir automatiquement le bottom sheet après le nettoyage d'une commande
   // MAIS seulement si l'utilisateur ne l'a pas fermé manuellement
@@ -947,7 +949,8 @@ export default function MapPage() {
   const handleDeliveryMethodConfirm = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     collapseDeliveryMethodSheet();
-    setIsCreatingNewOrder(false); // Réinitialiser l'état après confirmation
+    // Ne pas désactiver isCreatingNewOrder ici - on reste en mode création
+    // jusqu'à ce que la commande soit réellement créée
     // Attendre un peu avant d'ouvrir OrderDetailsSheet
     setTimeout(() => {
       expandOrderDetailsSheet();
@@ -1015,7 +1018,9 @@ export default function MapPage() {
       
       const success = await userOrderSocketService.createOrder(orderData);
       if (success) {
+        // Fermer tous les bottom sheets pour revenir à l'état initial
         collapseOrderDetailsSheet();
+        collapseDeliveryMethodSheet();
         
         // Vérifier si le destinataire est enregistré (si le destinataire paie)
         let recipientIsRegistered = false;
@@ -1090,7 +1095,9 @@ export default function MapPage() {
           // Réouvrir le bottom sheet de création après un court délai
           setTimeout(() => {
             userManuallyClosedRef.current = false;
-            hasAutoOpenedRef.current = false;
+            hasAutoOpenedRef.current = false; // Réinitialiser pour permettre la réouverture
+            // S'assurer que le mode création est activé
+            setIsCreatingNewOrder(true);
             scheduleBottomSheetOpen();
           }, 500);
         }, 300);
@@ -1099,13 +1106,35 @@ export default function MapPage() {
         // Le paiement sera déclenché automatiquement quand la commande sera acceptée (voir useEffect ci-dessus)
       } else {
         Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
+        // En cas d'erreur, réactiver le mode création pour permettre de réessayer
+        setIsCreatingNewOrder(true);
+        collapseOrderDetailsSheet();
+        collapseDeliveryMethodSheet();
+        // Réouvrir le bottom sheet de création
+        setTimeout(() => {
+          scheduleBottomSheetOpen();
+        }, 300);
       }
     }
-  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod, setIsCreatingNewOrder, animateToCoordinate, region, scheduleBottomSheetOpen, recipientInfo.isRegistered, recipientInfo.userId, stopDriverSearch, resetAfterDriverSearch]);
+  }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, collapseDeliveryMethodSheet, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod, setIsCreatingNewOrder, animateToCoordinate, region, scheduleBottomSheetOpen, recipientInfo.isRegistered, recipientInfo.userId, stopDriverSearch, resetAfterDriverSearch]);
 
   // Handler pour annuler une commande
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleCancelOrder = useCallback(async (orderId: string) => {
+    // Vérifier le statut de la commande avant d'afficher l'alerte
+    const currentOrder = useOrderStore.getState().activeOrders.find(o => o.id === orderId);
+    if (currentOrder && currentOrder.status !== 'pending' && currentOrder.status !== 'accepted') {
+      const statusMessages: Record<string, string> = {
+        'picked_up': 'Impossible d\'annuler une commande dont le colis a déjà été récupéré',
+        'enroute': 'Impossible d\'annuler une commande en cours de livraison',
+        'completed': 'Impossible d\'annuler une commande déjà terminée',
+        'cancelled': 'Cette commande a déjà été annulée',
+        'declined': 'Cette commande a été refusée',
+      };
+      Alert.alert('Annulation impossible', statusMessages[currentOrder.status] || 'Cette commande ne peut pas être annulée');
+      return;
+    }
+
     Alert.alert(
       'Annuler la commande',
       'Êtes-vous sûr de vouloir annuler cette commande ?',
@@ -1119,7 +1148,7 @@ export default function MapPage() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               logger.info('🔄 Annulation commande...', 'map.tsx', { orderId });
               
-              const result = await userApiService.cancelOrder(orderId);
+              const result = await userApiService.cancelOrder(orderId, currentOrder?.status);
               if (result.success) {
                 // Nettoyer l'état local
                 useOrderStore.getState().clear();

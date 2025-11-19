@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { config } from '../config/index';
 
 export interface DriverProfile {
   id: string;
   user_id: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
   license_number?: string;
   vehicle_type?: 'moto' | 'vehicule' | 'cargo';
   vehicle_plate?: string;
@@ -30,6 +32,8 @@ export interface DriverUser {
   phone: string;
   role: string;
   created_at: string;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 interface DriverStore {
@@ -125,7 +129,7 @@ export const useDriverStore = create<DriverStore>()(
         }
 
         try {
-          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/check/${encodeURIComponent(user.email)}`);
+          const response = await fetch(`${config.apiUrl}/api/auth-simple/check/${encodeURIComponent(user.email)}`);
           const data = await response.json();
 
           if (!response.ok) {

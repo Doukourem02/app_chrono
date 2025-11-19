@@ -19,12 +19,7 @@ export default function DashboardPage() {
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   
-  // DÉSACTIVÉ : Log qui se déclenchait en boucle et causait des re-renders
-  // React.useEffect(() => {
-  //   console.log('🔄 [DashboardPage] Date range changed:', { dateFilter, startDate, endDate })
-  // }, [dateFilter, startDate, endDate])
-  
-  // Fonction pour obtenir le label de la période
+
   const getPeriodLabel = () => {
     switch (dateFilter) {
       case 'today':
@@ -66,7 +61,7 @@ export default function DashboardPage() {
         return prev
       }
 
-      console.log('🔑 [DashboardPage] QueryKey calculated:', latestKey)
+      console.log(' [DashboardPage] QueryKey calculated:', latestKey)
       return latestKey
     })
   }, [latestKey])
@@ -74,7 +69,7 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey,
     queryFn: () => {
-      console.warn('🚀🚀🚀 [DashboardPage] queryFn CALLED - getDashboardStats', { 
+      console.warn(' [DashboardPage] queryFn CALLED - getDashboardStats', { 
         startDate, 
         endDate, 
         timestamp: new Date().toISOString(), 
@@ -90,7 +85,7 @@ export default function DashboardPage() {
     refetchIntervalInBackground: false,
     placeholderData: (previousData) => {
       if (previousData) {
-        console.log('📦 [DashboardPage] Using cached data, skipping fetch')
+        console.log(' [DashboardPage] Using cached data, skipping fetch')
         return previousData
       }
       return undefined
@@ -108,12 +103,12 @@ export default function DashboardPage() {
   const { data: ongoingDeliveriesResponse, isLoading: ongoingDeliveriesLoading } = useQuery({
     queryKey: ['ongoing-delivery-card'],
     queryFn: async () => {
-      console.warn('🚀🚀🚀 [DashboardPage] queryFn CALLED - getOngoingDeliveries', {
+      console.warn(' [DashboardPage] queryFn CALLED - getOngoingDeliveries', {
         timestamp: new Date().toISOString(),
         stack: new Error().stack?.split('\n').slice(2, 15).join('\n'),
       })
       const result = await adminApiService.getOngoingDeliveries()
-      console.log('✅ [DashboardPage] getOngoingDeliveries SUCCESS', {
+      console.log(' [DashboardPage] getOngoingDeliveries SUCCESS', {
         hasData: !!result.data && (result.data as Delivery[]).length > 0,
         timestamp: new Date().toISOString(),
       })

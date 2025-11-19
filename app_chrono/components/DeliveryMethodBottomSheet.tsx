@@ -1,22 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Animated,
-  Switch,
-  Dimensions,
-  PanResponder,
-} from 'react-native';
+import {StyleSheet,View,Text,TouchableOpacity,ScrollView,Image,Animated,Switch,Dimensions,PanResponder} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { calculatePrice, getDistanceInKm, estimateDurationMinutes, formatDurationLabel, BASE_PRICES } from '../services/orderApi';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const DELIVERY_METHOD_MAX_HEIGHT = SCREEN_HEIGHT * 0.85; // 85% de l'écran pour afficher toutes les infos
+const DELIVERY_METHOD_MAX_HEIGHT = SCREEN_HEIGHT * 0.85; 
 const DELIVERY_METHOD_MIN_HEIGHT = 100;
 
 interface DeliveryMethodBottomSheetProps {
@@ -43,7 +32,7 @@ const deliveryMethods = [
     icon: require('../assets/images/motoo.png'),
     price: 300,
     largeImage: require('../assets/images/motoo.png'),
-    popular: true, // Marquer comme populaire
+    popular: true, 
     avgTime: '15-20 min',
     badge: '⭐ Populaire',
   },
@@ -69,11 +58,9 @@ const deliveryMethods = [
   },
 ];
 
-// Options spécifiques pour chaque méthode de livraison - UNIQUES à notre app
 const getDeliveryOptions = (method: string) => {
   switch (method) {
     case 'vehicule':
-      // Options pour "Livraison en voiture" - UNIQUES à notre app
       return [
         {
           id: 'pickup_service',
@@ -93,11 +80,9 @@ const getDeliveryOptions = (method: string) => {
         },
       ];
     case 'cargo':
-      // Pour cargo, on ne montre PAS les options de vitesse - seulement les sections spéciales
       return [];
     case 'moto':
     default:
-      // Options pour "Livraison à moto" - alternatives créatives (pas Yango)
       return [
         {
           id: 'express',
@@ -151,22 +136,18 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
 
   const selectedMethodData = deliveryMethods.find(m => m.id === selectedMethod) || deliveryMethods[0];
   
-  // Récupérer l'option de vitesse sélectionnée
   const selectedSpeedOption = getDeliveryOptions(selectedMethod).find(opt => opt.id === selectedSpeed);
 
   const calculatedPrice = useMemo(() => {
     if (pickupCoords && dropoffCoords) {
       const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
       
-      // Si une option de vitesse est sélectionnée, utiliser son prix de base
       if (selectedSpeedOption && selectedSpeedOption.price) {
-        // Calculer le prix avec le prix de base de l'option + distance × tarif/km
         const pricing = BASE_PRICES[selectedMethod as 'moto' | 'vehicule' | 'cargo'] ?? BASE_PRICES.vehicule;
         const realPrice = Math.max(0, Math.round(selectedSpeedOption.price + distanceKm * pricing.perKm));
         return realPrice;
       }
-      
-      // Sinon, utiliser le calcul standard
+
       const realPrice = calculatePrice(distanceKm, selectedMethod as 'moto' | 'vehicule' | 'cargo');
       return realPrice;
     }
@@ -218,7 +199,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
 
 const customPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false, // Ne jamais prendre le contrôle au début
+      onStartShouldSetPanResponder: () => false, 
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         const { locationX, locationY } = evt.nativeEvent;
     
@@ -368,12 +349,10 @@ useEffect(() => {
                   styles.methodCardPrice,
                   selectedMethod === method.id && styles.methodCardPriceSelected,
                 ]} numberOfLines={1}>à partir de {method.price} F</Text>
-                {/* Afficher le prix calculé si c'est la méthode sélectionnée et qu'on a les coordonnées */}
                 {selectedMethod === method.id && pickupCoords && dropoffCoords && (
                   <Text style={styles.methodCardPriceCalculated}>
                     {(() => {
                       const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
-                      // Utiliser le prix calculé avec l'option de vitesse si disponible
                       const options = getDeliveryOptions(method.id);
                       const selectedOption = options.find(opt => opt.id === selectedSpeed);
                       if (selectedOption && selectedOption.price) {

@@ -1,13 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
+import {View,Text,StyleSheet,TextInput,TouchableOpacity,ScrollView,Alert,ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -69,9 +61,9 @@ export default function PersonalInfoPage() {
         // Mettre à jour aussi le profil driver si disponible
         if (currentState.profile) {
           useDriverStore.getState().updateProfile({
-            first_name: result.data.first_name,
-            last_name: result.data.last_name,
-            phone: result.data.phone || currentState.profile.phone,
+            first_name: result.data.first_name ?? undefined,
+            last_name: result.data.last_name ?? undefined,
+            phone: result.data.phone || currentState.user?.phone || undefined,
           });
         }
 

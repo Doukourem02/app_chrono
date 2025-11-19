@@ -1,7 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOrderStore } from '../store/useOrderStore';
 import { ActiveOrdersList } from './ActiveOrdersList';
+
+const NAV_BAR_HEIGHT = 80;
+const NAV_BAR_BOTTOM = 25;
+const SPACING_ABOVE_NAV = 15;
+const BOTTOM_OFFSET = NAV_BAR_HEIGHT + NAV_BAR_BOTTOM + SPACING_ABOVE_NAV; // 120px
 
 interface OrdersListBottomSheetProps {
   animatedHeight: any;
@@ -18,6 +24,7 @@ export const OrdersListBottomSheet: React.FC<OrdersListBottomSheetProps> = ({
   onToggle,
   onOrderSelect,
 }) => {
+  const insets = useSafeAreaInsets();
   const { activeOrders, pendingOrders, setSelectedOrder } = useOrderStore();
   const totalOrders = activeOrders.length + pendingOrders.length;
 
@@ -39,6 +46,7 @@ export const OrdersListBottomSheet: React.FC<OrdersListBottomSheetProps> = ({
         styles.container,
         {
           height: animatedHeight,
+          bottom: Math.max(insets.bottom, BOTTOM_OFFSET),
         },
       ]}
     >
@@ -65,12 +73,16 @@ export const OrdersListBottomSheet: React.FC<OrdersListBottomSheetProps> = ({
       </View>
 
       {/* Liste des commandes */}
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={true}
+      >
         <ActiveOrdersList 
           onOrderSelect={handleOrderSelect}
           showPending={true}
         />
-      </View>
+      </ScrollView>
     </Animated.View>
   );
 };
@@ -80,7 +92,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -136,8 +147,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 20,
   },
 });
 

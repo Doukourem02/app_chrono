@@ -47,8 +47,8 @@ export default function FinancePage() {
   const { data: financialStats, isLoading: statsLoading } = useQuery({
     queryKey: ['financial-stats'],
     queryFn: () => adminApiService.getFinancialStats(),
-    refetchInterval: false, // Pas de refresh automatique - l'utilisateur peut rafraîchir manuellement
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchInterval: false, 
+    staleTime: Infinity, 
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -64,8 +64,8 @@ export default function FinancePage() {
         method: methodFilter !== 'all' ? methodFilter : undefined,
         search: searchQuery || undefined,
       }),
-    refetchInterval: false, // Pas de refresh automatique - l'utilisateur peut rafraîchir manuellement
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchInterval: false, 
+    staleTime: Infinity, 
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,

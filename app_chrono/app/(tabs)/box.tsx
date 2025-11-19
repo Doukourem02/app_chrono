@@ -233,12 +233,20 @@ export default function BoxPage() {
             };
           });
         } else if (!result.success && result.message && isFirstPage && selectedFilterRef.current === filter) {
-          Alert.alert('Erreur', result.message);
+          // Si la session est expirée, le logout() a déjà été appelé, ne pas afficher d'alerte
+          // Le système de redirection gérera la navigation vers la page de connexion
+          if (!result.message.includes('Session expirée')) {
+            Alert.alert('Erreur', result.message);
+          }
         }
       } catch (err) {
         console.error('Erreur chargement commandes:', err);
         if (isFirstPage) {
-          Alert.alert('Erreur', 'Impossible de charger vos commandes');
+          // Vérifier si c'est une erreur de session expirée
+          const errorMessage = err instanceof Error ? err.message : 'Impossible de charger vos commandes';
+          if (!errorMessage.includes('Session expirée')) {
+            Alert.alert('Erreur', errorMessage);
+          }
         }
       } finally {
         if (isFirstPage) {
@@ -261,6 +269,10 @@ export default function BoxPage() {
 
   // Vérifier l'authentification dès l'accès à la page
   useEffect(() => {
+    // Vérifier si l'utilisateur est toujours connecté
+    if (!user?.id) {
+      return;
+    }
     requireAuth(() => {
       // L'utilisateur est connecté, charger les commandes
       if (user?.id) {
@@ -302,6 +314,22 @@ export default function BoxPage() {
   );
 
   const handleCancelOrder = async (orderId: string) => {
+    // Trouver la commande pour vérifier son statut
+    const order = orders.find(o => o.id === orderId);
+    
+    // Vérifier le statut de la commande avant d'afficher l'alerte
+    if (order && order.status !== 'pending' && order.status !== 'accepted') {
+      const statusMessages: Record<string, string> = {
+        'picked_up': 'Impossible d\'annuler une commande dont le colis a déjà été récupéré',
+        'enroute': 'Impossible d\'annuler une commande en cours de livraison',
+        'completed': 'Impossible d\'annuler une commande déjà terminée',
+        'cancelled': 'Cette commande a déjà été annulée',
+        'declined': 'Cette commande a été refusée',
+      };
+      Alert.alert('Annulation impossible', statusMessages[order.status] || 'Cette commande ne peut pas être annulée');
+      return;
+    }
+
     Alert.alert(
       'Annuler la commande',
       'Êtes-vous sûr de vouloir annuler cette commande ?',
@@ -312,7 +340,7 @@ export default function BoxPage() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const result = await userApiService.cancelOrder(orderId);
+              const result = await userApiService.cancelOrder(orderId, order?.status);
               if (result.success) {
                 Alert.alert('Succès', 'Commande annulée avec succès');
                 loadOrders(selectedFilter, 1);

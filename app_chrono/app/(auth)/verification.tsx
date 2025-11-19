@@ -25,14 +25,12 @@ export default function VerificationScreen() {
     newCode[index] = text;
     setCode(newCode);
 
-    // Auto-focus next input
     if (text && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
   const handleKeyPress = (key: string, index: number) => {
-    // Auto-focus previous input on backspace
     if (key === 'Backspace' && !code[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -47,9 +45,8 @@ export default function VerificationScreen() {
     }
 
     setIsLoading(true);
-    
+
     try {
-      // Appeler l'API backend pour vérifier l'OTP (email ou SMS)
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/verify-otp`, {
         method: 'POST',
         headers: {
@@ -71,12 +68,11 @@ export default function VerificationScreen() {
 
       console.log(`${otpMethod} OTP vérifié avec succès:`, data);
 
-      // Sauvegarder l'utilisateur dans le store
       const userData = {
         id: data.data.user.id,
         email: data.data.user.email,
         phone: data.data.user.phone,
-        isVerified: data.data.user.isVerified || true, // Par défaut true après vérification OTP
+        isVerified: data.data.user.isVerified || true, 
       };
       
       setUser(userData);
@@ -86,10 +82,8 @@ export default function VerificationScreen() {
         refreshToken: tokens.refreshToken ?? null,
       });
       
-      // Nettoyer les données temporaires
       clearTempData();
       
-      // Naviguer vers l'écran de succès
       router.push('./success' as any);
     } catch (error) {
       console.error('Erreur lors de la vérification:', error);
@@ -107,21 +101,18 @@ export default function VerificationScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header avec bouton retour */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
       </View>
 
-      {/* Contenu */}
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Verification Code</Text>
         <Text style={styles.subtitle}>
     Nous avons envoyé le code de vérification à votre {otpMethod === 'email' ? 'email address' : 'phone number'}
         </Text>
 
-        {/* Code Inputs */}
         <View style={styles.codeContainer}>
           {code.map((digit, index) => (
             <TextInput
@@ -141,7 +132,6 @@ export default function VerificationScreen() {
           ))}
         </View>
 
-        {/* Confirm Button */}
         <TouchableOpacity 
           style={[styles.confirmButton, isLoading && styles.buttonDisabled]}
           onPress={handleConfirm}
@@ -152,7 +142,6 @@ export default function VerificationScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Resend Code */}
         <View style={styles.resendContainer}>
           <Text style={styles.resendText}>Vous n&apos;avez pas reçu le code ? </Text>
           <TouchableOpacity>

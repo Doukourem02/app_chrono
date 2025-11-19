@@ -1,8 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 
-/**
- * Hook pour debouncer une valeur
- */
+
 export const useDebounce = <T>(value: T, delay: number): T => {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   const timerRef = useRef<number | undefined>(undefined);
@@ -26,9 +24,6 @@ export const useDebounce = <T>(value: T, delay: number): T => {
   return debouncedValue;
 };
 
-/**
- * Hook pour throttler une fonction
- */
 export const useThrottle = <T extends (...args: any[]) => any>(
   func: T,
   delay: number
@@ -58,9 +53,6 @@ export const useThrottle = <T extends (...args: any[]) => any>(
   );
 };
 
-/**
- * Hook pour les calculs lourds avec mise en cache
- */
 export const useMemoizedCalculation = <T>(
   calculation: () => T,
   dependencies: React.DependencyList
@@ -69,9 +61,6 @@ export const useMemoizedCalculation = <T>(
   return useMemo(() => calculation(), [...dependencies, calculation]);
 };
 
-/**
- * Hook pour gérer les états de chargement async
- */
 export const useAsyncState = <T>() => {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
@@ -108,9 +97,6 @@ export const useAsyncState = <T>() => {
   };
 };
 
-/**
- * Hook pour les coordonnées optimisé
- */
 export const useOptimizedCoordinates = (
   coords: { latitude: number; longitude: number } | null,
   precision: number = 6

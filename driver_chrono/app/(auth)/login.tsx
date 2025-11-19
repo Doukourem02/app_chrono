@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvo
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
+import { config } from '../../config/index';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -25,7 +26,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/send-otp`, {
+      const response = await fetch(`${config.apiUrl}/api/auth-simple/send-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,10 +39,16 @@ export default function Login() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
+        throw new Error(`Erreur serveur (${response.status}). Le backend est peut-être inaccessible.`);
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'envoi de l\'OTP');
+        throw new Error(data.error || data.message || 'Erreur lors de l\'envoi de l\'OTP');
       }
 
       setTempData(email, phone, 'email');
@@ -49,7 +56,16 @@ export default function Login() {
       
     } catch (error) {
       console.error('Erreur lors de l\'envoi OTP:', error);
-      Alert.alert('Erreur', (error as Error).message || 'Erreur lors de l\'envoi de l\'OTP');
+      
+      // Gérer spécifiquement les erreurs réseau
+      let errorMessage = 'Erreur lors de l\'envoi de l\'OTP';
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        errorMessage = 'Impossible de se connecter au serveur. Vérifiez que le backend est démarré et votre connexion internet.';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }

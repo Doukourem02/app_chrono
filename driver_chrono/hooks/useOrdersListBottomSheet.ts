@@ -2,15 +2,14 @@ import { useRef, useState } from 'react';
 import { Animated, Dimensions, PanResponder } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 const NAV_BAR_HEIGHT = 80;
 const NAV_BAR_BOTTOM = 25;
 const SPACING_ABOVE_NAV = 15;
 const BOTTOM_OFFSET = NAV_BAR_HEIGHT + NAV_BAR_BOTTOM + SPACING_ABOVE_NAV; 
-const BOTTOM_SHEET_MIN_HEIGHT = 120;
-const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT - BOTTOM_OFFSET - 500; 
+const BOTTOM_SHEET_MIN_HEIGHT = 300; 
+const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT - BOTTOM_OFFSET - 100; 
 
-export const useBottomSheet = () => {
+export const useOrdersListBottomSheet = () => {
   const animatedHeight = useRef(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT)).current;
   const [isExpanded, setIsExpanded] = useState(false);
   const currentAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -24,7 +23,6 @@ export const useBottomSheet = () => {
         return Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 4;
       },
       onPanResponderGrant: () => {
-        
         if (currentAnimationRef.current) {
           currentAnimationRef.current.stop();
           currentAnimationRef.current = null;
@@ -35,13 +33,14 @@ export const useBottomSheet = () => {
         });
       },
       onPanResponderMove: (_event, gestureState) => {
-      
         if (currentAnimationRef.current) {
           currentAnimationRef.current.stop();
           currentAnimationRef.current = null;
         }
         const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+        // Calculer la nouvelle hauteur basée sur la valeur de départ stockée
         const newHeight = clamp(startHeightRef.current - gestureState.dy, BOTTOM_SHEET_MIN_HEIGHT, BOTTOM_SHEET_MAX_HEIGHT);
+        // Utiliser setValue maintenant que l'animation est arrêtée
         animatedHeight.setValue(newHeight);
       },
       onPanResponderRelease: (_event, gestureState) => {
