@@ -658,6 +658,53 @@ export default function MapPage() {
     }
   }, [currentOrder?.status, cleanupOrderState]);
 
+  // 🆕 Vérifier si la commande est complétée et n'a pas encore été évaluée, puis afficher le RatingBottomSheet
+  useEffect(() => {
+    if (currentOrder && currentOrder.status === 'completed' && currentOrder.driverId) {
+      // Vérifier si le RatingBottomSheet n'est pas déjà affiché pour cette commande
+      if (!showRatingBottomSheet || ratingOrderId !== currentOrder.id) {
+        const checkAndShowRating = async () => {
+          try {
+            const ratingResult = await userApiService.getOrderRating(currentOrder.id);
+            // Si aucune évaluation n'existe, afficher le RatingBottomSheet
+            if (!ratingResult.success || !ratingResult.data) {
+              const driverId = currentOrder.driverId || currentOrder.driver?.id;
+              const driverName = currentOrder.driver?.name || 'Votre livreur';
+              
+              if (driverId) {
+                useRatingStore.getState().setRatingBottomSheet(
+                  true,
+                  currentOrder.id,
+                  driverId,
+                  driverName
+                );
+                logger.info('⭐ Affichage automatique RatingBottomSheet pour commande complétée', 'map.tsx', { 
+                  orderId: currentOrder.id 
+                });
+              }
+            }
+          } catch (error) {
+            logger.warn('Erreur vérification rating', 'map.tsx', error);
+            // En cas d'erreur, afficher quand même le RatingBottomSheet
+            const driverId = currentOrder.driverId || currentOrder.driver?.id;
+            const driverName = currentOrder.driver?.name || 'Votre livreur';
+            
+            if (driverId) {
+              useRatingStore.getState().setRatingBottomSheet(
+                true,
+                currentOrder.id,
+                driverId,
+                driverName
+              );
+            }
+          }
+        };
+        
+        checkAndShowRating();
+      }
+    }
+  }, [currentOrder?.status, currentOrder?.id, currentOrder?.driverId, showRatingBottomSheet, ratingOrderId]);
+
   // Gérer l'affichage du rating bottom sheet
   useEffect(() => {
     logger.debug('🔍 RatingBottomSheet state changed', 'map.tsx', { 
@@ -1231,10 +1278,12 @@ export default function MapPage() {
       />
 
       {/* Rating Bottom Sheet: Priorité la plus haute - s'affiche après qu'une commande soit complétée */}
-      {showRatingBottomSheet && ratingOrderId && (
+      {/* Afficher si showRatingBottomSheet est true OU si currentOrder est complétée et n'a pas encore été évaluée */}
+      {((showRatingBottomSheet && ratingOrderId) || 
+        (currentOrder?.status === 'completed' && currentOrder?.driverId)) && (
         <RatingBottomSheet
-          orderId={ratingOrderId}
-          driverName={ratingDriverName || undefined}
+          orderId={ratingOrderId || currentOrder?.id}
+          driverName={ratingDriverName || currentOrder?.driver?.name || undefined}
           panResponder={ratingPanResponder}
           animatedHeight={ratingAnimatedHeight}
           isExpanded={ratingIsExpanded}

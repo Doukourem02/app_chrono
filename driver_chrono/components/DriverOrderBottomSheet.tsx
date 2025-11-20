@@ -59,6 +59,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     const status = String(currentOrder.status);
     const actions = [];
     
+    // Étape 1: "Je pars" - disponible uniquement si statut est 'accepted'
     if (status === 'accepted') {
       actions.push({
         id: 'enroute',
@@ -69,7 +70,9 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
       });
     }
 
-    if (status === 'accepted' || status === 'enroute' || status === 'in_progress') {
+    // Étape 2: "Colis récupéré" - disponible uniquement si statut est 'enroute' (pas 'accepted')
+    // Cela force le livreur à cliquer sur "Je pars" avant de pouvoir récupérer le colis
+    if (status === 'enroute' || status === 'in_progress') {
       actions.push({
         id: 'picked_up',
         label: 'Colis récupéré',
@@ -79,7 +82,21 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
       });
     }
 
-    if (status === 'picked_up' || status === 'delivering' || status === 'in_progress') {
+    // Étape 3: "En cours de livraison" - disponible si statut est 'picked_up'
+    // Cette étape intermédiaire est nécessaire avant de terminer
+    if (status === 'picked_up') {
+      actions.push({
+        id: 'delivering',
+        label: 'En cours de livraison',
+        icon: 'bicycle-outline',
+        color: '#8B5CF6',
+        onPress: () => onUpdateStatus('delivering'),
+      });
+    }
+
+    // Étape 4: "Terminé" - disponible uniquement si statut est 'delivering'
+    // Cela force le livreur à passer par l'étape "En cours de livraison" avant de terminer
+    if (status === 'delivering' || status === 'in_progress') {
       actions.push({
         id: 'completed',
         label: 'Terminé',

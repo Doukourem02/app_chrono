@@ -220,13 +220,17 @@ class OrderSocketService {
       return;
     }
 
+    // Log pour debug
+    logger.info(`🔄 Mise à jour statut: ${orderId.slice(0, 8)}... → ${status}`, 'orderSocketService', { orderId, status, hasLocation: !!location });
+
+    // Émettre l'événement socket immédiatement
     this.socket.emit('update-delivery-status', {
       orderId,
       status,
       location
     });
 
-    // Mettre à jour le store local
+    // Mettre à jour le store local immédiatement pour une meilleure réactivité
     useOrderStore.getState().updateOrderStatus(orderId, status as any);
 
     // Si le driver marque la commande comme complétée, la déplacer vers l'historique / vider currentOrder

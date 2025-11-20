@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { userApiService } from "../services/userApiService";
 
 interface TrackingBottomSheetProps {
   currentOrder: any;
@@ -34,6 +35,61 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   activeOrdersCount = 0,
 }) => {
   const insets = useSafeAreaInsets();
+  
+  // État pour stocker le rating et commentaire
+  const [orderRating, setOrderRating] = useState<{ rating: number; comment: string | null } | null>(null);
+  const [isLoadingRating, setIsLoadingRating] = useState(false);
+
+  // Charger le rating et commentaire de la commande
+  const loadOrderRating = useCallback(async () => {
+    if (!currentOrder?.id) {
+      setOrderRating(null);
+      return;
+    }
+    
+    // Charger le rating même si la commande n'est pas encore marquée comme complétée
+    // (au cas où l'utilisateur a déjà soumis une évaluation)
+    setIsLoadingRating(true);
+    try {
+      const result = await userApiService.getOrderRating(currentOrder.id);
+      if (result.success && result.data) {
+        setOrderRating({
+          rating: result.data.rating,
+          comment: result.data.comment,
+        });
+        if (__DEV__) {
+          console.log(`✅ Rating chargé pour commande ${currentOrder.id.slice(0, 8)}...: ${result.data.rating}/5, comment: ${result.data.comment ? 'oui' : 'non'}`);
+        }
+      } else {
+        setOrderRating(null);
+        if (__DEV__) {
+          console.log(`ℹ️ Aucun rating trouvé pour commande ${currentOrder.id.slice(0, 8)}...`);
+        }
+      }
+    } catch (error) {
+      console.error('Erreur chargement rating:', error);
+      setOrderRating(null);
+    } finally {
+      setIsLoadingRating(false);
+    }
+  }, [currentOrder?.id]);
+
+  // Charger le rating quand la commande change ou est complétée
+  useEffect(() => {
+    if (currentOrder?.id) {
+      // Charger immédiatement
+      loadOrderRating();
+      
+      // Recharger périodiquement si la commande est complétée (au cas où l'utilisateur vient de soumettre une évaluation)
+      if (isCompleted) {
+        const interval = setInterval(() => {
+          loadOrderRating();
+        }, 3000); // Recharger toutes les 3 secondes si complétée
+        
+        return () => clearInterval(interval);
+      }
+    }
+  }, [currentOrder?.id, isCompleted, loadOrderRating]);
 
   // S'assurer que le statut est toujours à jour depuis currentOrder
   // Utiliser useMemo pour forcer le recalcul quand currentOrder change
@@ -285,6 +341,41 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
               <Text style={styles.proofText}>
                 Preuve de livraison reçue
               </Text>
+            </View>
+          )}
+
+          {/* Rating et commentaire si la commande est complétée */}
+          {isCompleted && (
+            <View style={styles.ratingSection}>
+              {isLoadingRating ? (
+                <Text style={styles.loadingText}>Chargement de l'évaluation...</Text>
+              ) : orderRating ? (
+                <>
+                  <View style={styles.ratingHeader}>
+                    <Ionicons name="star" size={18} color="#FBBF24" />
+                    <Text style={styles.ratingTitle}>Votre évaluation</Text>
+                  </View>
+                  <View style={styles.ratingStars}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Ionicons
+                        key={star}
+                        name={star <= orderRating.rating ? 'star' : 'star-outline'}
+                        size={20}
+                        color={star <= orderRating.rating ? '#FBBF24' : '#D1D5DB'}
+                      />
+                    ))}
+                    <Text style={styles.ratingValue}>{orderRating.rating}/5</Text>
+                  </View>
+                  {orderRating.comment && (
+                    <View style={styles.commentContainer}>
+                      <Text style={styles.commentLabel}>Votre commentaire :</Text>
+                      <Text style={styles.commentText}>{orderRating.comment}</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.noRatingText}>Aucune évaluation pour le moment</Text>
+              )}
             </View>
           )}
 
@@ -543,5 +634,65 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
+  },
+  ratingSection: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  ratingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ratingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginLeft: 8,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ratingValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  commentContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  commentLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+  noRatingText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingVertical: 8,
+    fontStyle: 'italic',
   },
 });

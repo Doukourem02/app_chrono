@@ -137,6 +137,7 @@ export default function OrderTrackingPage() {
     panResponder: ratingPanResponder,
     toggle: toggleRatingBottomSheet,
     expand: expandRatingBottomSheet,
+    collapse: collapseRatingBottomSheet,
   } = useBottomSheet();
 
   // Bottom sheet séparé pour la messagerie
@@ -171,6 +172,66 @@ export default function OrderTrackingPage() {
       }, 300);
     }
   }, [showRatingBottomSheet, ratingOrderId, orderId, ratingIsExpanded, expandRatingBottomSheet]);
+
+  // 🆕 Afficher automatiquement le RatingBottomSheet si la commande est complétée et n'a pas encore été évaluée
+  useEffect(() => {
+    if (currentOrder && currentOrder.status === 'completed' && currentOrder.id === orderId) {
+      // Vérifier si le RatingBottomSheet n'est pas déjà affiché
+      if (!showRatingBottomSheet || ratingOrderId !== orderId) {
+        // Vérifier si la commande a déjà été évaluée
+        const checkAndShowRating = async () => {
+          try {
+            const ratingResult = await userApiService.getOrderRating(currentOrder.id);
+            // Si aucune évaluation n'existe, afficher le RatingBottomSheet
+            if (!ratingResult.success || !ratingResult.data) {
+              const driverId = currentOrder.driverId || currentOrder.driver?.id;
+              const driverName = currentOrder.driver?.name || 'Votre livreur';
+              
+              if (driverId) {
+                useRatingStore.getState().setRatingBottomSheet(
+                  true,
+                  currentOrder.id,
+                  driverId,
+                  driverName
+                );
+                if (__DEV__) {
+                  console.log(`⭐ Affichage automatique RatingBottomSheet pour commande complétée ${currentOrder.id.slice(0, 8)}...`);
+                }
+                // Ouvrir automatiquement le bottom sheet après un court délai
+                setTimeout(() => {
+                  expandRatingBottomSheet();
+                }, 500);
+              }
+            } else {
+              if (__DEV__) {
+                console.log(`ℹ️ Commande ${currentOrder.id.slice(0, 8)}... déjà évaluée, pas d'affichage du RatingBottomSheet`);
+              }
+            }
+          } catch (error) {
+            console.error('Erreur vérification rating:', error);
+            // En cas d'erreur, afficher quand même le RatingBottomSheet
+            const driverId = currentOrder.driverId || currentOrder.driver?.id;
+            const driverName = currentOrder.driver?.name || 'Votre livreur';
+            
+            if (driverId) {
+              useRatingStore.getState().setRatingBottomSheet(
+                true,
+                currentOrder.id,
+                driverId,
+                driverName
+              );
+              // Ouvrir automatiquement le bottom sheet après un court délai
+              setTimeout(() => {
+                expandRatingBottomSheet();
+              }, 500);
+            }
+          }
+        };
+        
+        checkAndShowRating();
+      }
+    }
+  }, [currentOrder?.status, currentOrder?.id, orderId, showRatingBottomSheet, ratingOrderId, expandRatingBottomSheet]);
 
   // Charger la commande depuis l'API si elle n'est pas dans le store
   // Cette fonction peut être appelée plusieurs fois pour recharger la commande
@@ -362,27 +423,29 @@ export default function OrderTrackingPage() {
 
   // Gérer la soumission du rating
   const handleRatingSubmitted = useCallback(() => {
+    // Fermer le RatingBottomSheet mais rester sur la page pour voir le TrackingBottomSheet
     resetRatingBottomSheet();
-    // Retourner à la page principale après le rating
+    collapseRatingBottomSheet();
+    // S'assurer que le TrackingBottomSheet est visible après soumission
     setTimeout(() => {
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/(tabs)/box');
+      if (!isExpanded) {
+        expandBottomSheet();
       }
-    }, 500);
-  }, [resetRatingBottomSheet]);
+    }, 300);
+  }, [resetRatingBottomSheet, collapseRatingBottomSheet, expandBottomSheet, isExpanded]);
 
   // Gérer la fermeture du rating
   const handleRatingClose = useCallback(() => {
+    // Fermer le RatingBottomSheet mais rester sur la page pour voir le TrackingBottomSheet
     resetRatingBottomSheet();
-    // Retourner à la page principale après fermeture du rating
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(tabs)/box');
-    }
-  }, [resetRatingBottomSheet]);
+    collapseRatingBottomSheet();
+    // S'assurer que le TrackingBottomSheet est visible après fermeture
+    setTimeout(() => {
+      if (!isExpanded) {
+        expandBottomSheet();
+      }
+    }, 300);
+  }, [resetRatingBottomSheet, collapseRatingBottomSheet, expandBottomSheet, isExpanded]);
 
   // Gérer l'ouverture de la messagerie
   const handleOpenMessage = useCallback(() => {
@@ -570,21 +633,7 @@ export default function OrderTrackingPage() {
         }}
       />
 
-      {/* Rating Bottom Sheet */}
-      {showRatingBottomSheet && ratingOrderId === orderId && (
-        <RatingBottomSheet
-          orderId={ratingOrderId}
-          driverName={ratingDriverName}
-          panResponder={ratingPanResponder}
-          animatedHeight={ratingAnimatedHeight}
-          isExpanded={ratingIsExpanded}
-          onToggle={toggleRatingBottomSheet}
-          onRatingSubmitted={handleRatingSubmitted}
-          onClose={handleRatingClose}
-        />
-      )}
-
-      {/* Tracking Bottom Sheet */}
+      {/* Tracking Bottom Sheet - Rendu en premier (en dessous) */}
       {currentOrder && (
         <TrackingBottomSheet
           key={`tracking-${currentOrder.id}-${currentOrder.status}`} // 🆕 Forcer le re-render quand le statut change
@@ -603,7 +652,7 @@ export default function OrderTrackingPage() {
         />
       )}
 
-      {/* Message Bottom Sheet - Rendu en dernier pour être au-dessus */}
+      {/* Message Bottom Sheet - Rendu au milieu */}
       {showMessageBottomSheet && currentOrder?.driverId && (
         <MessageBottomSheet
           orderId={currentOrder.id}
@@ -615,6 +664,22 @@ export default function OrderTrackingPage() {
           isExpanded={messageIsExpanded}
           onToggle={toggleMessageBottomSheet}
           onClose={handleCloseMessage}
+        />
+      )}
+
+      {/* Rating Bottom Sheet - Rendu en dernier pour être au-dessus de tout (priorité la plus haute) */}
+      {/* Afficher si showRatingBottomSheet est true OU si la commande est complétée */}
+      {((showRatingBottomSheet && ratingOrderId === orderId) || 
+        (currentOrder?.status === 'completed' && currentOrder?.id === orderId && currentOrder?.driverId)) && (
+        <RatingBottomSheet
+          orderId={ratingOrderId || orderId}
+          driverName={ratingDriverName || currentOrder?.driver?.name || 'Votre livreur'}
+          panResponder={ratingPanResponder}
+          animatedHeight={ratingAnimatedHeight}
+          isExpanded={ratingIsExpanded}
+          onToggle={toggleRatingBottomSheet}
+          onRatingSubmitted={handleRatingSubmitted}
+          onClose={handleRatingClose}
         />
       )}
     </View>

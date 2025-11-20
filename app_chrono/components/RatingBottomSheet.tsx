@@ -167,6 +167,7 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
         {
           height: animatedHeight,
           bottom: insets.bottom + 25,
+          zIndex: 1001, // zIndex le plus élevé pour être au-dessus de tous les autres bottom sheets
         },
       ]}
     >
