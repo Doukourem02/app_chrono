@@ -12,6 +12,7 @@ import { useBottomSheet } from "../../hooks/useBottomSheet";
 import { useOrdersListBottomSheet } from "../../hooks/useOrdersListBottomSheet";
 import { useDriverStore } from "../../store/useDriverStore";
 import { useOrderStore } from "../../store/useOrderStore";
+import { useUIStore } from "../../store/useUIStore";
 import { apiService } from "../../services/apiService";
 import { orderSocketService } from "../../services/orderSocketService";
 import { driverMessageSocketService } from "../../services/driverMessageSocketService";
@@ -21,6 +22,7 @@ import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
 import MessageBottomSheet from "../../components/MessageBottomSheet";
 
 export default function Index() {
+  const { setHideTabBar } = useUIStore();
   const { 
     isOnline: storeIsOnline, 
     setOnlineStatus, 
@@ -169,6 +171,7 @@ export default function Index() {
     }
     
     setShowMessageBottomSheet(true);
+    setHideTabBar(true); // Cacher la barre de navigation
     setTimeout(() => {
       expandMessageBottomSheet();
     }, 300);
@@ -176,6 +179,7 @@ export default function Index() {
 
   const handleCloseMessage = () => {
     collapseMessageBottomSheet();
+    setHideTabBar(false); // Afficher la barre de navigation
     setTimeout(() => {
       setShowMessageBottomSheet(false);
     }, 300);

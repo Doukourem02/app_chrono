@@ -68,18 +68,36 @@ class UserApiService {
   }> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/drivers/${driverId}/details`);
+      
+      // Vérifier d'abord le status avant de parser le JSON
+      if (response.status === 404) {
+        // Si c'est une erreur 404 (driver non trouvé), c'est normal et ne doit pas être loggé comme une erreur critique
+        if (__DEV__) {
+          console.warn(`⚠️ Driver non trouvé: ${driverId}`);
+        }
+        return {
+          success: false,
+          message: 'Chauffeur non trouvé'
+        };
+      }
+      
       const result = await response.json();
       
       if (!response.ok) {
+        // Pour les autres erreurs, on les traite comme des erreurs réelles
         throw new Error(result.message || 'Erreur récupération détails chauffeur');
       }
       
       return result;
     } catch (error) {
-      console.error('❌ Erreur getDriverDetails:', error);
+      // Ne logger que les vraies erreurs (réseau, serveur, etc.), pas les 404
+      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      if (!errorMessage.includes('Chauffeur non trouvé') && !errorMessage.includes('404')) {
+        console.error('❌ Erreur getDriverDetails:', error);
+      }
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: errorMessage
       };
     }
   }

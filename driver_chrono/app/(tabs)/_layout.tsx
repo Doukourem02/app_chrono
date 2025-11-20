@@ -3,14 +3,17 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useUIStore } from '../../store/useUIStore';
 
 export default function TabLayout() {
+  const hideTabBar = useUIStore((state) => state.hideTabBar);
+  
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: styles.navBar,
+        tabBarStyle: hideTabBar ? { display: 'none' } : styles.navBar,
       }}
     >
         {/* ACCUEIL */}
