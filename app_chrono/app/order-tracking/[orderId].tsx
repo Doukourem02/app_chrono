@@ -15,6 +15,7 @@ import { userApiService } from '../../services/userApiService';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useRatingStore } from '../../store/useRatingStore';
 import { useBottomSheet } from '../../hooks/useBottomSheet';
+import { useMessageBottomSheet } from '../../hooks/useMessageBottomSheet';
 import { logger } from '../../utils/logger';
 import { locationService } from '../../services/locationService';
 
@@ -148,7 +149,7 @@ export default function OrderTrackingPage() {
     toggle: toggleMessageBottomSheet,
     expand: expandMessageBottomSheet,
     collapse: collapseMessageBottomSheet,
-  } = useBottomSheet();
+  } = useMessageBottomSheet();
 
   // État pour gérer l'affichage du bottom sheet de messagerie
   const [showMessageBottomSheet, setShowMessageBottomSheet] = React.useState(false);

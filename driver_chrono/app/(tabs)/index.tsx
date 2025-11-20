@@ -10,6 +10,7 @@ import DriverOrderBottomSheet from "../../components/DriverOrderBottomSheet";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
 import { useBottomSheet } from "../../hooks/useBottomSheet";
 import { useOrdersListBottomSheet } from "../../hooks/useOrdersListBottomSheet";
+import { useMessageBottomSheet } from "../../hooks/useMessageBottomSheet";
 import { useDriverStore } from "../../store/useDriverStore";
 import { useOrderStore } from "../../store/useOrderStore";
 import { useUIStore } from "../../store/useUIStore";
@@ -161,7 +162,7 @@ export default function Index() {
     expand: expandMessageBottomSheet,
     collapse: collapseMessageBottomSheet,
     toggle: toggleMessageBottomSheet,
-  } = useBottomSheet();
+  } = useMessageBottomSheet();
 
   const [showMessageBottomSheet, setShowMessageBottomSheet] = useState(false);
 

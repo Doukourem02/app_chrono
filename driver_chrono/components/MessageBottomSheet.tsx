@@ -295,7 +295,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
           styles.container,
           {
             height: animatedHeight,
-            bottom: insets.bottom + 25,
+            bottom: 0,
             opacity: isExpanded ? 1 : 0,
             pointerEvents: isExpanded ? 'auto' : 'none',
           },
@@ -357,7 +357,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
         />
 
         {/* Input Area */}
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(12, insets.bottom) }]}>
           <TextInput
             style={styles.input}
             placeholder="Tapez un message..."
@@ -541,7 +541,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
     backgroundColor: '#FFFFFF',
