@@ -35,9 +35,17 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
 
-  const status: string = currentOrder?.status || "accepted";
+  // S'assurer que le statut est toujours à jour depuis currentOrder
+  const status: string = String(currentOrder?.status || "accepted");
   const isCompleted = status === 'completed';
   const canCancel = (status === 'pending' || status === 'accepted') && onCancel;
+  
+  // Log pour debug (à retirer en production si nécessaire)
+  React.useEffect(() => {
+    if (__DEV__ && currentOrder?.id) {
+      console.log(`📊 TrackingBottomSheet - Statut mis à jour: ${status} pour commande ${currentOrder.id.slice(0, 8)}...`);
+    }
+  }, [status, currentOrder?.id]);
 
   // Séquence correcte des statuts :
   // 1. accepted → "Livreur assigné" (quand le driver accepte la commande)
@@ -61,6 +69,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       case 'enroute':
         return [0, 1]; // "Livreur assigné" + "Livreur en route pour récupérer le colis"
       case 'picked_up':
+      case 'delivering':
         // Quand le colis est récupéré, on active "Colis pris en charge" ET "En cours de livraison"
         return [0, 1, 2, 3]; // Toutes les étapes jusqu'à "En cours de livraison"
       case 'completed':
@@ -89,11 +98,15 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
   // Animer les transitions quand le statut change
   useEffect(() => {
+    // Recalculer activeIndexes à chaque fois que le statut change
+    const currentActiveIndexes = getActiveIndexes();
+    const currentActiveIndex = Math.max(...currentActiveIndexes, 0);
+    
     statusSteps.forEach((_, index) => {
-      const isActive = activeIndexes.includes(index);
+      const isActive = currentActiveIndexes.includes(index);
       const targetColor = isActive ? 1 : 0;
       const targetOpacity = isActive ? 1 : 0.5;
-      const isCurrentStep = index === activeIndex;
+      const isCurrentStep = index === currentActiveIndex;
 
       // 🔧 Arrêter les animations en cours pour éviter les conflits
       stepAnimations[index].color.stopAnimation();
@@ -144,7 +157,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         useNativeDriver: false, // Utiliser JS driver pour cohérence
       }).start();
     });
-  }, [activeIndex, activeIndexes, status, statusSteps, stepAnimations]);
+  }, [status, currentOrder?.status, statusSteps]); // Dépendre directement du statut pour forcer le re-render
 
   return (
     <Animated.View

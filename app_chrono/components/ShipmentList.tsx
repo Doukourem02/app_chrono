@@ -17,8 +17,8 @@ interface OrderWithDB extends OrderRequest {
 
 
 const getBackgroundColor = (status: OrderStatus): string => {
-  // Commandes en cours (violet) - UNIQUEMENT pending, accepted, enroute, picked_up
-  if (status === 'pending' || status === 'accepted' || status === 'enroute' || status === 'picked_up') {
+  // Commandes en cours (violet) - pending, accepted, enroute, picked_up, delivering
+  if (status === 'pending' || status === 'accepted' || status === 'enroute' || status === 'picked_up' || status === 'delivering') {
     return '#E5D5FF'; // Violet clair pour les commandes en cours
   }
   // Commandes terminées, annulées ou refusées (bleu clair d'origine)
@@ -28,8 +28,8 @@ const getBackgroundColor = (status: OrderStatus): string => {
 
 
 const getProgressColor = (status: OrderStatus): string => {
-  // Commandes en cours (violet) - UNIQUEMENT pending, accepted, enroute, picked_up
-  if (status === 'pending' || status === 'accepted' || status === 'enroute' || status === 'picked_up') {
+  // Commandes en cours (violet) - pending, accepted, enroute, picked_up, delivering
+  if (status === 'pending' || status === 'accepted' || status === 'enroute' || status === 'picked_up' || status === 'delivering') {
     return '#8B5CF6'; // Violet pour les commandes en cours
   }
   // Commandes terminées, annulées ou refusées (gris d'origine)
@@ -47,6 +47,7 @@ const getProgressPercentage = (status: OrderStatus): number => {
     case 'enroute':
       return 50;
     case 'picked_up':
+    case 'delivering':
       return 80;
     case 'completed':
       return 100;
@@ -301,7 +302,8 @@ export default function ShipmentList() {
           const isInProgress = order.status === 'pending' || 
                             order.status === 'accepted' || 
                             order.status === 'enroute' || 
-                            order.status === 'picked_up';
+                            order.status === 'picked_up' ||
+                            order.status === 'delivering';
           return isInProgress;
         });
 
@@ -492,7 +494,8 @@ export default function ShipmentList() {
             const wasInProgress = order.status === 'pending' || 
                                  order.status === 'accepted' || 
                                  order.status === 'enroute' || 
-                                 order.status === 'picked_up';
+                                 order.status === 'picked_up' ||
+                                 order.status === 'delivering';
             
             if (wasInProgress) {
               // Vérifier si elle devrait être annulée (pending depuis trop longtemps)
@@ -697,7 +700,8 @@ export default function ShipmentList() {
       order.status === 'pending' || 
       order.status === 'accepted' || 
       order.status === 'enroute' || 
-      order.status === 'picked_up'
+      order.status === 'picked_up' ||
+      order.status === 'delivering'
     );
 
     if (hasInProgressOrders) {

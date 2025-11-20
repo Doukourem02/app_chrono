@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'completed' | 'declined' | 'cancelled';
+export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'delivering' | 'completed' | 'declined' | 'cancelled';
 
 export interface OrderRequest {
   id: string;

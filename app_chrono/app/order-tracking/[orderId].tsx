@@ -36,11 +36,22 @@ export default function OrderTrackingPage() {
   const isLoadingOrderRef = useRef(false);
 
   // Trouver la commande correspondante (dans le store ou chargée depuis l'API)
+  // Utiliser le store directement pour avoir les mises à jour en temps réel
   const currentOrder = useMemo(() => {
     if (!orderId) return null;
-    // D'abord chercher dans le store
+    // D'abord chercher dans le store (priorité car c'est en temps réel)
     const storeOrder = activeOrders.find(o => o.id === orderId);
-    if (storeOrder) return storeOrder;
+    if (storeOrder) {
+      // Si on a une commande chargée depuis l'API, la fusionner avec le store pour avoir toutes les infos
+      if (loadedOrder) {
+        return {
+          ...loadedOrder,
+          ...storeOrder, // Le store a priorité pour le statut et les infos temps réel
+          status: storeOrder.status, // S'assurer que le statut vient du store
+        };
+      }
+      return storeOrder;
+    }
     // Sinon utiliser la commande chargée depuis l'API
     return loadedOrder || null;
   }, [orderId, activeOrders, loadedOrder]);
