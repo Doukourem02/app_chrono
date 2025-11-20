@@ -22,11 +22,17 @@ export default function OrderTrackingPage() {
   const { requireAuth } = useRequireAuth();
   const params = useLocalSearchParams<{ orderId: string }>();
   const { user } = useAuthStore();
-  const { activeOrders, driverCoords: orderDriverCoordsMap, setSelectedOrder } = useOrderStore();
+  const orderId = params.orderId;
+  
+  // 🆕 Utiliser un sélecteur Zustand pour que le composant se mette à jour automatiquement
+  // quand le statut de la commande change dans le store
+  const storeOrder = useOrderStore((state) => 
+    orderId ? state.activeOrders.find(o => o.id === orderId) : null
+  );
+  const { driverCoords: orderDriverCoordsMap, setSelectedOrder } = useOrderStore();
   const { showRatingBottomSheet, orderId: ratingOrderId, driverName: ratingDriverName, resetRatingBottomSheet } = useRatingStore();
   
   const mapRef = useRef<MapView | null>(null);
-  const orderId = params.orderId;
 
   // État local pour stocker la commande chargée depuis l'API si elle n'est pas dans le store
   const [loadedOrder, setLoadedOrder] = React.useState<any>(null);
@@ -40,21 +46,37 @@ export default function OrderTrackingPage() {
   const currentOrder = useMemo(() => {
     if (!orderId) return null;
     // D'abord chercher dans le store (priorité car c'est en temps réel)
-    const storeOrder = activeOrders.find(o => o.id === orderId);
     if (storeOrder) {
       // Si on a une commande chargée depuis l'API, la fusionner avec le store pour avoir toutes les infos
       if (loadedOrder) {
-        return {
+        const merged = {
           ...loadedOrder,
           ...storeOrder, // Le store a priorité pour le statut et les infos temps réel
           status: storeOrder.status, // S'assurer que le statut vient du store
         };
+        if (__DEV__) {
+          console.log(`🔄 currentOrder mis à jour (fusionné): ${merged.status} pour ${orderId.slice(0, 8)}...`);
+        }
+        return merged;
+      }
+      if (__DEV__) {
+        console.log(`🔄 currentOrder mis à jour (store): ${storeOrder.status} pour ${orderId.slice(0, 8)}...`);
       }
       return storeOrder;
     }
     // Sinon utiliser la commande chargée depuis l'API
+    if (loadedOrder && __DEV__) {
+      console.log(`🔄 currentOrder (API): ${loadedOrder.status} pour ${orderId.slice(0, 8)}...`);
+    }
     return loadedOrder || null;
-  }, [orderId, activeOrders, loadedOrder]);
+  }, [orderId, storeOrder, loadedOrder]);
+  
+  // Log pour debug quand le statut change
+  useEffect(() => {
+    if (currentOrder && __DEV__) {
+      console.log(`📊 OrderTrackingPage - Statut actuel: ${currentOrder.status} pour ${currentOrder.id.slice(0, 8)}...`);
+    }
+  }, [currentOrder?.status, currentOrder?.id]);
 
   // Récupérer les coordonnées du driver pour cette commande
   const orderDriverCoords = orderId ? orderDriverCoordsMap.get(orderId) || null : null;
@@ -192,9 +214,31 @@ export default function OrderTrackingPage() {
             createdAt: order.created_at,
           };
           
-          // Si la commande n'est pas dans un statut final, l'ajouter au store
-          if (!isFinalStatus) {
-            useOrderStore.getState().addOrder(formattedOrder as any);
+          // Toujours mettre à jour le store, même si la commande est terminée
+          // Cela permet de mettre à jour le statut en temps réel
+          const store = useOrderStore.getState();
+          const existingOrder = store.activeOrders.find(o => o.id === orderId);
+          
+          if (__DEV__) {
+            console.log(`📥 Commande chargée depuis l'API: ${orderId.slice(0, 8)}... - Statut: ${orderStatus} (existant: ${existingOrder?.status || 'aucun'})`);
+          }
+          
+          if (existingOrder) {
+            // Si le statut a changé, utiliser updateFromSocket pour forcer le re-render
+            if (existingOrder.status !== orderStatus) {
+              if (__DEV__) {
+                console.log(`🔄 Statut différent détecté: ${existingOrder.status} → ${orderStatus}, mise à jour du store`);
+              }
+              store.updateFromSocket({ order: formattedOrder as any });
+            } else {
+              // Mettre à jour les autres propriétés
+              store.updateOrder(orderId, formattedOrder as any);
+            }
+          } else {
+            // Si la commande n'est pas dans un statut final, l'ajouter au store
+            if (!isFinalStatus) {
+              store.addOrder(formattedOrder as any);
+            }
           }
           
           // Toujours stocker dans loadedOrder pour l'affichage
@@ -222,21 +266,22 @@ export default function OrderTrackingPage() {
       loadOrderFromAPI();
     }
     
-    // Recharger périodiquement (toutes les 30 secondes) si la commande n'est pas dans le store
-    // Cela garantit que même si elle disparaît du store, elle reste accessible
-    // On recharge aussi périodiquement pour mettre à jour le statut depuis l'API
+    // Recharger périodiquement (toutes les 5 secondes) si la commande est active
+    // Cela garantit que le statut est toujours à jour même si le socket rate une mise à jour
     const interval = setInterval(() => {
       if (orderId && user?.id) {
-        const storeOrder = activeOrders.find(o => o.id === orderId);
-        // Si pas dans le store OU si la commande est active (pour mettre à jour le statut)
-        if (!storeOrder || (currentOrder && currentOrder.status !== 'completed' && currentOrder.status !== 'cancelled' && currentOrder.status !== 'declined')) {
+        // Toujours recharger si la commande est active pour s'assurer que le statut est à jour
+        if (currentOrder && currentOrder.status !== 'completed' && currentOrder.status !== 'cancelled' && currentOrder.status !== 'declined') {
+          if (__DEV__) {
+            console.log(`🔄 Rafraîchissement périodique de la commande ${orderId.slice(0, 8)}... (statut actuel: ${currentOrder.status})`);
+          }
           loadOrderFromAPI();
         }
       }
-    }, 30000); // Toutes les 30 secondes
+    }, 5000); // Toutes les 5 secondes pour une meilleure réactivité
     
     return () => clearInterval(interval);
-  }, [orderId, user?.id, currentOrder, activeOrders, loadOrderFromAPI]);
+  }, [orderId, user?.id, currentOrder, storeOrder, loadOrderFromAPI]);
 
   // Mettre à jour la région de la map depuis la commande
   useEffect(() => {
@@ -542,6 +587,7 @@ export default function OrderTrackingPage() {
       {/* Tracking Bottom Sheet */}
       {currentOrder && (
         <TrackingBottomSheet
+          key={`tracking-${currentOrder.id}-${currentOrder.status}`} // 🆕 Forcer le re-render quand le statut change
           currentOrder={currentOrder}
           panResponder={panResponder}
           animatedHeight={animatedHeight}
@@ -553,7 +599,7 @@ export default function OrderTrackingPage() {
             // Rediriger vers la map principale pour créer une nouvelle commande
             router.push('/(tabs)/map');
           }}
-          activeOrdersCount={activeOrders.length}
+          activeOrdersCount={useOrderStore.getState().activeOrders.length}
         />
       )}
 

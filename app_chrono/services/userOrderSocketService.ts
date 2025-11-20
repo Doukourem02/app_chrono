@@ -244,10 +244,24 @@ class UserOrderSocketService {
     this.socket.on('order:status:update', (data) => {
       logger.info('🚛 order:status:update reçu', 'userOrderSocketService', { 
         orderId: data?.order?.id, 
-        status: data?.order?.status 
+        status: data?.order?.status,
+        fullData: data
       });
       try {
         const { order, location } = data || {};
+        
+        if (!order || !order.id) {
+          logger.warn('⚠️ order:status:update reçu sans order.id', 'userOrderSocketService', data);
+          return;
+        }
+        
+        // Vérifier le statut actuel dans le store avant la mise à jour
+        const storeBefore = useOrderStore.getState();
+        const existingOrder = storeBefore.activeOrders.find(o => o.id === order.id);
+        const oldStatus = existingOrder?.status || 'unknown';
+        const newStatus = order.status || 'unknown';
+        
+        logger.info(`🔄 order:status:update - ${order.id.slice(0, 8)}...: ${oldStatus} → ${newStatus}`, 'userOrderSocketService');
         
         // 🆕 Mettre à jour immédiatement les coordonnées du livreur si elles sont fournies
         // Cela évite que le polyline se dessine avec des coordonnées obsolètes
@@ -271,9 +285,22 @@ class UserOrderSocketService {
         // Mettre à jour le store immédiatement
         logger.info('🔄 Mise à jour du store avec nouveau statut', 'userOrderSocketService', { 
           orderId: order?.id, 
-          status: order?.status 
+          status: order?.status,
+          oldStatus,
+          newStatus
         });
         useOrderStore.getState().updateFromSocket({ order: order as any, location: normLocation });
+        
+        // Vérifier que la mise à jour a bien été appliquée
+        setTimeout(() => {
+          const storeAfter = useOrderStore.getState();
+          const updatedOrder = storeAfter.activeOrders.find(o => o.id === order.id);
+          if (updatedOrder) {
+            logger.info(`✅ Vérification post-update: ${order.id.slice(0, 8)}... a maintenant le statut ${updatedOrder.status}`, 'userOrderSocketService');
+          } else {
+            logger.warn(`⚠️ Commande ${order.id.slice(0, 8)}... n'a pas été trouvée dans le store après updateFromSocket`, 'userOrderSocketService');
+          }
+        }, 100);
 
         // Si la commande est complétée, afficher le bottom sheet d'évaluation
         if (order && order.status === 'completed' && order.id) {

@@ -36,16 +36,17 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const insets = useSafeAreaInsets();
 
   // S'assurer que le statut est toujours à jour depuis currentOrder
-  const status: string = String(currentOrder?.status || "accepted");
+  // Utiliser useMemo pour forcer le recalcul quand currentOrder change
+  const status: string = React.useMemo(() => {
+    const currentStatus = String(currentOrder?.status || "accepted");
+    if (__DEV__ && currentOrder?.id) {
+      console.log(`📊 TrackingBottomSheet - Statut calculé: ${currentStatus} pour commande ${currentOrder.id.slice(0, 8)}...`);
+    }
+    return currentStatus;
+  }, [currentOrder?.status, currentOrder?.id]);
+  
   const isCompleted = status === 'completed';
   const canCancel = (status === 'pending' || status === 'accepted') && onCancel;
-  
-  // Log pour debug (à retirer en production si nécessaire)
-  React.useEffect(() => {
-    if (__DEV__ && currentOrder?.id) {
-      console.log(`📊 TrackingBottomSheet - Statut mis à jour: ${status} pour commande ${currentOrder.id.slice(0, 8)}...`);
-    }
-  }, [status, currentOrder?.id]);
 
   // Séquence correcte des statuts :
   // 1. accepted → "Livreur assigné" (quand le driver accepte la commande)
@@ -79,10 +80,11 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
     }
   };
 
-  const activeIndexes = getActiveIndexes();
+  // Recalculer activeIndexes à chaque fois que le statut change
+  const activeIndexes = React.useMemo(() => getActiveIndexes(), [status]);
   
   // Pour la compatibilité avec l'ancien code, on garde activeIndex comme le dernier index actif
-  const activeIndex = Math.max(...activeIndexes, 0);
+  const activeIndex = React.useMemo(() => Math.max(...activeIndexes, 0), [activeIndexes]);
 
   // 🎨 Animations pour les transitions de statut
   const stepAnimations = useRef(

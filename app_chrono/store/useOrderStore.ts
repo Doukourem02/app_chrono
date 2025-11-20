@@ -159,29 +159,56 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         const existingOrder = state.activeOrders.find(o => o.id === order.id);
         const status: OrderStatus = (order.status as OrderStatus) || 'pending';
         
+        // Log pour debug
+        if (__DEV__) {
+          console.log(`🔄 updateFromSocket - Mise à jour commande ${order.id.slice(0, 8)}...: ${existingOrder?.status || 'nouvelle'} → ${status}`);
+        }
+        
         if (existingOrder) {
-          // Mettre à jour l'ordre avec le nouveau statut et toutes les autres propriétés
-          // Utiliser set directement pour garantir que les subscriptions sont déclenchées
-          set((currentState) => {
-            const updatedOrders = currentState.activeOrders.map((o) =>
-              o.id === order.id 
-                ? { 
-                    ...o, 
-                    ...order,
-                    status, // S'assurer que le statut est bien mis à jour
-                    // Ajouter completed_at si la commande est complétée
-                    ...(status === 'completed' && !o.completed_at 
-                      ? { completed_at: new Date().toISOString() }
-                      : {}),
-                    // Ajouter cancelled_at si la commande est annulée
-                    ...(status === 'cancelled' && !o.cancelled_at 
-                      ? { cancelled_at: new Date().toISOString() }
-                      : {}),
-                  }
-                : o
-            );
-            return { activeOrders: updatedOrders };
-          });
+          // Vérifier si le statut a vraiment changé
+          if (existingOrder.status === status) {
+            // Si le statut n'a pas changé, mettre à jour quand même les autres propriétés
+            // MAIS créer un nouvel objet pour forcer le re-render
+            set((currentState) => {
+              const updatedOrders = currentState.activeOrders.map((o) =>
+                o.id === order.id 
+                  ? { 
+                      ...o, 
+                      ...order,
+                      status, // Garder le statut actuel
+                    }
+                  : o
+              );
+              // Créer un nouveau tableau pour forcer le re-render même si le statut n'a pas changé
+              return { activeOrders: [...updatedOrders] };
+            });
+          } else {
+            // Le statut a changé, mettre à jour avec le nouveau statut
+            if (__DEV__) {
+              console.log(`✅ updateFromSocket - Changement de statut détecté: ${existingOrder.status} → ${status}`);
+            }
+            set((currentState) => {
+              const updatedOrders = currentState.activeOrders.map((o) =>
+                o.id === order.id 
+                  ? { 
+                      ...o, 
+                      ...order,
+                      status, // Nouveau statut
+                      // Ajouter completed_at si la commande est complétée
+                      ...(status === 'completed' && !o.completed_at 
+                        ? { completed_at: new Date().toISOString() }
+                        : {}),
+                      // Ajouter cancelled_at si la commande est annulée
+                      ...(status === 'cancelled' && !o.cancelled_at 
+                        ? { cancelled_at: new Date().toISOString() }
+                        : {}),
+                    }
+                  : o
+              );
+              // Créer un nouveau tableau pour forcer le re-render
+              return { activeOrders: [...updatedOrders] };
+            });
+          }
         } else {
           // Ajouter la nouvelle commande
           get().addOrder({
