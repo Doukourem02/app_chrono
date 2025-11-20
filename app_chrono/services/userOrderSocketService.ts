@@ -234,7 +234,10 @@ class UserOrderSocketService {
     // 🚛 Mise à jour statut livraison (et position)
     // Canonical status update event emitted by server
     this.socket.on('order:status:update', (data) => {
-      logger.debug('🚛 order:status:update', 'userOrderSocketService', data);
+      logger.info('🚛 order:status:update reçu', 'userOrderSocketService', { 
+        orderId: data?.order?.id, 
+        status: data?.order?.status 
+      });
       try {
         const { order, location } = data || {};
         
@@ -256,6 +259,12 @@ class UserOrderSocketService {
               longitude: location.longitude ?? location.lng ?? location.x ?? null,
             }
           : null;
+        
+        // Mettre à jour le store immédiatement
+        logger.info('🔄 Mise à jour du store avec nouveau statut', 'userOrderSocketService', { 
+          orderId: order?.id, 
+          status: order?.status 
+        });
         useOrderStore.getState().updateFromSocket({ order: order as any, location: normLocation });
 
         // Si la commande est complétée, afficher le bottom sheet d'évaluation

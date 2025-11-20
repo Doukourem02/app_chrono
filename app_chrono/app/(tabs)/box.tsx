@@ -342,8 +342,13 @@ export default function BoxPage() {
             try {
               const result = await userApiService.cancelOrder(orderId, order?.status);
               if (result.success) {
-                Alert.alert('Succès', 'Commande annulée avec succès');
+                // Mettre à jour le store immédiatement
+                useOrderStore.getState().updateOrderStatus(orderId, 'cancelled');
+                // Fermer le modal des détails si ouvert
+                setShowOrderDetails(false);
+                // Rafraîchir la liste depuis l'API
                 loadOrders(selectedFilter, 1);
+                Alert.alert('Succès', 'Commande annulée avec succès');
               } else {
                 Alert.alert('Erreur', result.message || 'Impossible d\'annuler la commande');
               }
@@ -668,7 +673,7 @@ export default function BoxPage() {
                     {selectedOrder.price ? `${selectedOrder.price} FCFA` : 'Non défini'}
                   </Text>
                 </View>
-                {selectedOrder.distance && (
+                {selectedOrder.distance != null && typeof selectedOrder.distance === 'number' && (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Distance</Text>
                     <Text style={styles.detailValue}>
@@ -783,8 +788,8 @@ export default function BoxPage() {
                 )}
               </View>
 
-              {/* Bouton Annuler pour les commandes en attente */}
-              {selectedOrder.status === 'pending' && (
+              {/* Bouton Annuler pour les commandes en attente ou acceptées */}
+              {(selectedOrder.status === 'pending' || selectedOrder.status === 'accepted') && (
                 <TouchableOpacity
                   style={styles.cancelButtonModal}
                   onPress={() => {

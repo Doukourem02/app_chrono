@@ -157,14 +157,48 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       if (order && order.id) {
         const state = get();
         const existingOrder = state.activeOrders.find(o => o.id === order.id);
+        const status: OrderStatus = (order.status as OrderStatus) || 'pending';
         
         if (existingOrder) {
-          get().updateOrder(order.id, order as Partial<OrderRequest>);
+          // Mettre à jour l'ordre avec le nouveau statut et toutes les autres propriétés
+          // Utiliser set directement pour garantir que les subscriptions sont déclenchées
+          set((currentState) => {
+            const updatedOrders = currentState.activeOrders.map((o) =>
+              o.id === order.id 
+                ? { 
+                    ...o, 
+                    ...order,
+                    status, // S'assurer que le statut est bien mis à jour
+                    // Ajouter completed_at si la commande est complétée
+                    ...(status === 'completed' && !o.completed_at 
+                      ? { completed_at: new Date().toISOString() }
+                      : {}),
+                    // Ajouter cancelled_at si la commande est annulée
+                    ...(status === 'cancelled' && !o.cancelled_at 
+                      ? { cancelled_at: new Date().toISOString() }
+                      : {}),
+                  }
+                : o
+            );
+            return { activeOrders: updatedOrders };
+          });
         } else {
-          get().addOrder(order as OrderRequest);
+          // Ajouter la nouvelle commande
+          get().addOrder({
+            ...order as OrderRequest,
+            status,
+            // Ajouter completed_at si la commande est complétée
+            ...(status === 'completed' 
+              ? { completed_at: new Date().toISOString() }
+              : {}),
+            // Ajouter cancelled_at si la commande est annulée
+            ...(status === 'cancelled' 
+              ? { cancelled_at: new Date().toISOString() }
+              : {}),
+          });
         }
         
-        const status: OrderStatus = (order.status as OrderStatus) || 'pending';
+        // Si la commande est dans un état final, la retirer après 2 secondes
         if (status === 'completed' || status === 'cancelled' || status === 'declined') {
           const orderId = order.id;
           if (orderId) {

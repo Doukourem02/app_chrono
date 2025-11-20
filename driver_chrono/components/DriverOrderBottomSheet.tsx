@@ -35,6 +35,7 @@ interface DriverOrderBottomSheetProps {
   onToggle: () => void;
   onUpdateStatus: (status: string) => void;
   location?: { latitude: number; longitude: number } | null;
+  onMessage?: () => void; // Callback pour ouvrir la messagerie
 }
 
 const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
@@ -45,6 +46,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   onToggle,
   onUpdateStatus,
   location,
+  onMessage,
 }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('details');
@@ -77,7 +79,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
       });
     }
 
-    if (status === 'picked_up' || status === 'in_progress') {
+    if (status === 'picked_up' || status === 'delivering' || status === 'in_progress') {
       actions.push({
         id: 'completed',
         label: 'Terminé',
@@ -122,12 +124,10 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   };
 
   const handleOpenMessage = () => {
-    // TODO: Implémenter l'ouverture de la messagerie
-    Alert.alert(
-      'Messagerie',
-      'La messagerie avec le client sera bientôt disponible !',
-      [{ text: 'OK' }]
-    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (onMessage) {
+      onMessage();
+    }
   };
 
   return (
@@ -209,7 +209,8 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                 style={[styles.tab, activeTab === 'messages' && styles.tabActive]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setActiveTab('messages');
+                  // Ouvrir directement la messagerie quand on clique sur l'onglet "Messages client"
+                  handleOpenMessage();
                 }}
               >
                 <Ionicons
@@ -362,13 +363,13 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   <Ionicons name="chatbubble-ellipses-outline" size={64} color="#D1D5DB" />
                   <Text style={styles.emptyMessagesTitle}>Messagerie</Text>
                   <Text style={styles.emptyMessagesText}>
-                    La messagerie avec le client sera bientôt disponible. Vous pourrez communiquer directement depuis ici.
+                    Communiquez directement avec le client depuis ici.
                   </Text>
                   <TouchableOpacity
                     style={styles.comingSoonButton}
                     onPress={handleOpenMessage}
                   >
-                    <Text style={styles.comingSoonButtonText}>En savoir plus</Text>
+                    <Text style={styles.comingSoonButtonText}>Ouvrir la messagerie</Text>
                   </TouchableOpacity>
                 </View>
               </View>

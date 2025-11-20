@@ -14,9 +14,11 @@ import { useDriverStore } from "../../store/useDriverStore";
 import { useOrderStore } from "../../store/useOrderStore";
 import { apiService } from "../../services/apiService";
 import { orderSocketService } from "../../services/orderSocketService";
+import { driverMessageSocketService } from "../../services/driverMessageSocketService";
 import { logger } from '../../utils/logger';
 import { useMapCamera } from '../../hooks/useMapCamera';
 import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
+import MessageBottomSheet from "../../components/MessageBottomSheet";
 
 export default function Index() {
   const { 
@@ -148,6 +150,36 @@ export default function Index() {
     collapse: collapseOrdersListSheet,
     toggle: toggleOrdersListSheet,
   } = useOrdersListBottomSheet();
+
+  // Bottom sheet pour la messagerie
+  const {
+    animatedHeight: messageAnimatedHeight,
+    panResponder: messagePanResponder,
+    isExpanded: messageIsExpanded,
+    expand: expandMessageBottomSheet,
+    collapse: collapseMessageBottomSheet,
+    toggle: toggleMessageBottomSheet,
+  } = useBottomSheet();
+
+  const [showMessageBottomSheet, setShowMessageBottomSheet] = useState(false);
+
+  const handleOpenMessage = () => {
+    if (!currentOrder || !currentOrder.user || !currentOrder.user.id) {
+      return;
+    }
+    
+    setShowMessageBottomSheet(true);
+    setTimeout(() => {
+      expandMessageBottomSheet();
+    }, 300);
+  };
+
+  const handleCloseMessage = () => {
+    collapseMessageBottomSheet();
+    setTimeout(() => {
+      setShowMessageBottomSheet(false);
+    }, 300);
+  };
   
   const userClosedBottomSheetRef = useRef(false);
   const lastOrderStatusRef = useRef<string | null>(null);
@@ -242,6 +274,16 @@ export default function Index() {
       orderSocketService.disconnect();
     };
   }, [isOnline, user?.id]);
+
+  // Connexion Socket pour la messagerie
+  useEffect(() => {
+    if (user?.id) {
+      driverMessageSocketService.connect(user.id);
+    }
+    return () => {
+      driverMessageSocketService.disconnect();
+    };
+  }, [user?.id]);
 
   const handleAcceptOrder = (orderId: string) => {
     orderSocketService.acceptOrder(orderId);
@@ -778,6 +820,7 @@ export default function Index() {
             }
           }}
           location={location}
+          onMessage={handleOpenMessage}
         />
       )}
 
@@ -790,6 +833,21 @@ export default function Index() {
           onOrderSelect={(orderId) => {
             logger.info('Commande sélectionnée', 'driver-index', { orderId });
           }}
+        />
+      )}
+
+      {/* Message Bottom Sheet - Rendu en dernier pour être au-dessus */}
+      {showMessageBottomSheet && currentOrder && currentOrder.user && currentOrder.user.id && (
+        <MessageBottomSheet
+          orderId={currentOrder.id}
+          clientId={currentOrder.user.id}
+          clientName={currentOrder.user.name}
+          clientAvatar={currentOrder.user.avatar}
+          panResponder={messagePanResponder}
+          animatedHeight={messageAnimatedHeight}
+          isExpanded={messageIsExpanded}
+          onToggle={toggleMessageBottomSheet}
+          onClose={handleCloseMessage}
         />
       )}
     </View>

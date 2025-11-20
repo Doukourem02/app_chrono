@@ -17,6 +17,28 @@ export const setupMessageSocket = (io: Server): void => {
     }
 
     /**
+     * Identification des clients (users)
+     */
+    socket.on('user-connect', (userId: string) => {
+      socket.userId = userId;
+      socket.userRole = 'client';
+      if (DEBUG) {
+        logger.debug(`[MessageSocket] User connecté: ${userId}`);
+      }
+    });
+
+    /**
+     * Identification des drivers
+     */
+    socket.on('driver-connect', (driverId: string) => {
+      socket.userId = driverId;
+      socket.userRole = 'driver';
+      if (DEBUG) {
+        logger.debug(`[MessageSocket] Driver connecté: ${driverId}`);
+      }
+    });
+
+    /**
      * Rejoindre une conversation (pour recevoir les messages en temps réel)
      */
     socket.on('join-conversation', async (data: { conversationId: string }) => {
