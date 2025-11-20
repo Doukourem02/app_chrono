@@ -13,7 +13,15 @@ class UserOrderSocketService {
   private retryCount: number = 0;
 
   connect(userId: string) {
-    if (this.socket && this.isConnected) {
+    // Si le socket existe mais n'est pas connecté, le déconnecter d'abord pour permettre une nouvelle connexion
+    if (this.socket && !this.isConnected) {
+      logger.info('🔄 Socket existe mais non connecté, déconnexion avant reconnexion', 'userOrderSocketService');
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    
+    // Si le socket est déjà connecté avec le même userId, ne rien faire
+    if (this.socket && this.isConnected && this.userId === userId) {
       return;
     }
 
@@ -454,8 +462,26 @@ class UserOrderSocketService {
     recipientIsRegistered?: boolean;
   }) {
     return new Promise<boolean>(async (resolve) => {
-      if (!this.socket || !this.userId) {
-        logger.error('❌ Socket non connecté');
+      // S'assurer que le socket est connecté avant de créer la commande
+      const connected = await this.ensureConnected();
+      if (!connected) {
+        Alert.alert(
+          'Erreur de connexion',
+          'Impossible de se connecter au serveur. Veuillez vérifier votre connexion internet et réessayer.',
+          [{ text: 'OK' }]
+        );
+        resolve(false);
+        return;
+      }
+      
+      // Double vérification après la reconnexion
+      if (!this.socket || !this.isConnected || !this.userId) {
+        logger.error('❌ Socket toujours non connecté après ensureConnected', 'userOrderSocketService');
+        Alert.alert(
+          'Erreur',
+          'Vous devez être connecté pour créer une commande. Veuillez vous reconnecter.',
+          [{ text: 'OK' }]
+        );
         resolve(false);
         return;
       }
@@ -571,9 +597,49 @@ class UserOrderSocketService {
     });
   }
 
-  // Vérifier la connexion
+  // Vérifier la connexion et se reconnecter si nécessaire
   isSocketConnected() {
-    return this.isConnected && this.socket?.connected;
+    const isConnected = this.isConnected && this.socket?.connected;
+    
+    // Si le socket existe mais n'est pas connecté, essayer de se reconnecter
+    if (this.socket && !isConnected && this.userId) {
+      logger.warn('⚠️ Socket existe mais non connecté, tentative de reconnexion...', 'userOrderSocketService');
+      this.connect(this.userId);
+    }
+    
+    return isConnected;
+  }
+  
+  // S'assurer que le socket est connecté avant une opération
+  async ensureConnected(): Promise<boolean> {
+    if (this.isSocketConnected()) {
+      return true;
+    }
+    
+    if (!this.userId) {
+      logger.error('❌ Impossible de se connecter : aucun userId', 'userOrderSocketService');
+      return false;
+    }
+    
+    logger.info('🔄 Tentative de connexion du socket...', 'userOrderSocketService');
+    this.connect(this.userId);
+    
+    // Attendre que la connexion s'établisse (maximum 3 secondes)
+    const maxWaitTime = 3000;
+    const checkInterval = 100;
+    let elapsed = 0;
+    
+    while (elapsed < maxWaitTime) {
+      if (this.isConnected && this.socket?.connected) {
+        logger.info('✅ Socket connecté avec succès', 'userOrderSocketService');
+        return true;
+      }
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+      elapsed += checkInterval;
+    }
+    
+    logger.error('❌ Impossible de connecter le socket après 3 secondes', 'userOrderSocketService');
+    return false;
   }
 }
 

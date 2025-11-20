@@ -283,8 +283,13 @@ export default function OrderTrackingPage() {
               const result = await userApiService.cancelOrder(orderIdToCancel, currentOrder?.status);
               if (result.success) {
                 logger.info('✅ Commande annulée', 'order-tracking', { orderId: orderIdToCancel });
-                // Retourner à la page précédente après annulation
-                router.back();
+                // Retourner à la page principale après annulation
+                // Utiliser replace pour éviter les problèmes de navigation
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/box');
+                }
               } else {
                 logger.error('❌ Erreur lors de l\'annulation', 'order-tracking', { message: result.message });
                 Alert.alert('Erreur', result.message || 'Impossible d\'annuler la commande');
@@ -302,16 +307,25 @@ export default function OrderTrackingPage() {
   // Gérer la soumission du rating
   const handleRatingSubmitted = useCallback(() => {
     resetRatingBottomSheet();
-    // Retourner à la page précédente après le rating
+    // Retourner à la page principale après le rating
     setTimeout(() => {
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/box');
+      }
     }, 500);
   }, [resetRatingBottomSheet]);
 
   // Gérer la fermeture du rating
   const handleRatingClose = useCallback(() => {
     resetRatingBottomSheet();
-    router.back();
+    // Retourner à la page principale après fermeture du rating
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)/box');
+    }
   }, [resetRatingBottomSheet]);
 
   // Gérer l'ouverture de la messagerie
@@ -369,7 +383,13 @@ export default function OrderTrackingPage() {
       <View style={styles.container}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/box');
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -390,7 +410,13 @@ export default function OrderTrackingPage() {
         <View style={styles.container}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)/box');
+              }
+            }}
           >
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
@@ -409,7 +435,13 @@ export default function OrderTrackingPage() {
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.backButtonText, { marginTop: 12, backgroundColor: '#F3F4F6' }]}
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tabs)/box');
+                }
+              }}
             >
               <Text style={[styles.backButtonTextLabel, { color: '#666' }]}>Retour</Text>
             </TouchableOpacity>
@@ -423,7 +455,13 @@ export default function OrderTrackingPage() {
       <View style={styles.container}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/box');
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -440,7 +478,13 @@ export default function OrderTrackingPage() {
       {/* Bouton Retour */}
       <TouchableOpacity 
         style={styles.backButton}
-        onPress={() => router.back()}
+        onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)/box');
+          }
+        }}
       >
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>

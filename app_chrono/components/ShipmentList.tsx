@@ -71,6 +71,23 @@ export default function ShipmentList() {
     const now = Date.now();
 
     for (const order of incomingOrders) {
+      // 🛡️ Vérifier d'abord dans le store si la commande a été acceptée
+      // Cela évite d'annuler une commande qui vient d'être acceptée par un livreur
+      const storeOrder = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
+      if (storeOrder) {
+        // Si la commande existe dans le store avec un statut accepté ou un driverId, ne pas l'annuler
+        if (storeOrder.status === 'accepted' || 
+            storeOrder.status === 'enroute' || 
+            storeOrder.status === 'picked_up' || 
+            storeOrder.status === 'delivering' ||
+            storeOrder.status === 'completed' ||
+            storeOrder.driverId || 
+            storeOrder.driver?.id) {
+          console.log(`✅ Commande ${order.id.slice(0, 8)}... acceptée dans le store, annulation ignorée`);
+          continue;
+        }
+      }
+      
       // Vérifier que la commande est bien en pending, sans driver, et pas déjà en cours d'annulation
       if (order.status !== 'pending' || order.driverId || autoCancelledPendingRef.current.has(order.id)) {
         continue;
@@ -86,6 +103,14 @@ export default function ShipmentList() {
 
       const age = now - createdTime;
       if (age < PENDING_AUTO_CANCEL_DELAY_MS) {
+        continue;
+      }
+
+      // 🛡️ Double vérification dans le store juste avant d'annuler
+      // (au cas où la commande aurait été acceptée entre-temps)
+      const finalStoreCheck = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
+      if (finalStoreCheck && (finalStoreCheck.status !== 'pending' || finalStoreCheck.driverId || finalStoreCheck.driver?.id)) {
+        console.log(`✅ Commande ${order.id.slice(0, 8)}... acceptée entre-temps, annulation annulée`);
         continue;
       }
 
@@ -574,6 +599,22 @@ export default function ShipmentList() {
       const ordersToCancel: OrderWithDB[] = [];
 
       for (const order of pendingOrders) {
+        // 🛡️ Vérifier d'abord dans le store si la commande a été acceptée
+        const storeOrder = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
+        if (storeOrder) {
+          // Si la commande existe dans le store avec un statut accepté ou un driverId, ne pas l'annuler
+          if (storeOrder.status === 'accepted' || 
+              storeOrder.status === 'enroute' || 
+              storeOrder.status === 'picked_up' || 
+              storeOrder.status === 'delivering' ||
+              storeOrder.status === 'completed' ||
+              storeOrder.driverId || 
+              storeOrder.driver?.id) {
+            console.log(`✅ Commande ${order.id.slice(0, 8)}... acceptée dans le store, annulation ignorée`);
+            continue;
+          }
+        }
+        
         const createdAt = order.created_at || (order as any).createdAt;
         const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
 
@@ -592,6 +633,13 @@ export default function ShipmentList() {
         console.log(`🔍 ${ordersToCancel.length} commande(s) à annuler automatiquement`);
         
         for (const order of ordersToCancel) {
+          // 🛡️ Double vérification dans le store juste avant d'annuler
+          const finalStoreCheck = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
+          if (finalStoreCheck && (finalStoreCheck.status !== 'pending' || finalStoreCheck.driverId || finalStoreCheck.driver?.id)) {
+            console.log(`✅ Commande ${order.id.slice(0, 8)}... acceptée entre-temps, annulation annulée`);
+            continue;
+          }
+          
           // Marquer comme en cours d'annulation AVANT l'appel API
           autoCancelledPendingRef.current.add(order.id);
           
