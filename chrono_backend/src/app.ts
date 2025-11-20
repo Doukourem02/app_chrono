@@ -11,6 +11,7 @@ import syncRoutes from './routes/syncRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSwagger } from './config/swagger.js';
 
@@ -110,6 +111,7 @@ app.use('/api/ratings', ratingRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/messages', messageRoutes);
 
 app.use(errorHandler);
 

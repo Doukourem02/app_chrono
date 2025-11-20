@@ -7,6 +7,7 @@ import app from './app.js';
 import deliverySocket from './sockets/deliverySocket.js';
 import { setupOrderSocket } from './sockets/orderSocket.js';
 import { setupAdminSocket } from './sockets/adminSocket.js';
+import { setupMessageSocket } from './sockets/messageSocket.js';
 import logger from './utils/logger.js';
 
 if (process.env.SENTRY_DSN) {
@@ -95,6 +96,7 @@ io.on('connection', (socket) => {
 
 setupOrderSocket(io);
 setupAdminSocket(io);
+setupMessageSocket(io);
 
 app.set('io', io);
 

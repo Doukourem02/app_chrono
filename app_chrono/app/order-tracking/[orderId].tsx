@@ -8,7 +8,9 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { DeliveryMapView } from '../../components/DeliveryMapView';
 import TrackingBottomSheet from '../../components/TrackingBottomSheet';
 import RatingBottomSheet from '../../components/RatingBottomSheet';
+import MessageBottomSheet from '../../components/MessageBottomSheet';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
+import { userMessageSocketService } from '../../services/userMessageSocketService';
 import { userApiService } from '../../services/userApiService';
 import { useOrderStore } from '../../store/useOrderStore';
 import { useRatingStore } from '../../store/useRatingStore';
@@ -51,13 +53,23 @@ export default function OrderTrackingPage() {
     requireAuth(() => {});
   }, [requireAuth]);
 
-  // Connexion Socket
+  // Connexion Socket pour les commandes
   useEffect(() => {
     if (user?.id) {
       userOrderSocketService.connect(user.id);
     }
     return () => {
       userOrderSocketService.disconnect();
+    };
+  }, [user?.id]);
+
+  // Connexion Socket pour la messagerie
+  useEffect(() => {
+    if (user?.id) {
+      userMessageSocketService.connect(user.id);
+    }
+    return () => {
+      userMessageSocketService.disconnect();
     };
   }, [user?.id]);
 
@@ -93,6 +105,19 @@ export default function OrderTrackingPage() {
     toggle: toggleRatingBottomSheet,
     expand: expandRatingBottomSheet,
   } = useBottomSheet();
+
+  // Bottom sheet séparé pour la messagerie
+  const {
+    animatedHeight: messageAnimatedHeight,
+    isExpanded: messageIsExpanded,
+    panResponder: messagePanResponder,
+    toggle: toggleMessageBottomSheet,
+    expand: expandMessageBottomSheet,
+    collapse: collapseMessageBottomSheet,
+  } = useBottomSheet();
+
+  // État pour gérer l'affichage du bottom sheet de messagerie
+  const [showMessageBottomSheet, setShowMessageBottomSheet] = React.useState(false);
 
   // Ouvrir automatiquement le bottom sheet au montage (une seule fois)
   const hasAutoExpandedRef = useRef(false);
@@ -291,14 +316,23 @@ export default function OrderTrackingPage() {
 
   // Gérer l'ouverture de la messagerie
   const handleOpenMessage = useCallback(() => {
-    // TODO: Implémenter l'ouverture du bottom sheet de messagerie
-    // Pour l'instant, afficher une alerte informant que la fonctionnalité arrive bientôt
-    Alert.alert(
-      'Messagerie',
-      'La messagerie avec le livreur sera bientôt disponible !',
-      [{ text: 'OK' }]
-    );
-  }, []);
+    if (!currentOrder?.driverId) {
+      Alert.alert('Information', 'Aucun livreur assigné à cette commande.');
+      return;
+    }
+    setShowMessageBottomSheet(true);
+    setTimeout(() => {
+      expandMessageBottomSheet();
+    }, 300);
+  }, [currentOrder?.driverId, expandMessageBottomSheet]);
+
+  // Gérer la fermeture de la messagerie
+  const handleCloseMessage = useCallback(() => {
+    collapseMessageBottomSheet();
+    setTimeout(() => {
+      setShowMessageBottomSheet(false);
+    }, 300);
+  }, [collapseMessageBottomSheet]);
 
   // Gérer l'affichage de l'erreur après un délai si la commande n'est pas trouvée
   // ⚠️ IMPORTANT: Ce hook doit être appelé AVANT tout return conditionnel
@@ -465,6 +499,21 @@ export default function OrderTrackingPage() {
             router.push('/(tabs)/map');
           }}
           activeOrdersCount={activeOrders.length}
+        />
+      )}
+
+      {/* Message Bottom Sheet - Rendu en dernier pour être au-dessus */}
+      {showMessageBottomSheet && currentOrder?.driverId && (
+        <MessageBottomSheet
+          orderId={currentOrder.id}
+          driverId={currentOrder.driverId}
+          driverName={currentOrder.driver?.name}
+          driverAvatar={currentOrder.driver?.avatar}
+          panResponder={messagePanResponder}
+          animatedHeight={messageAnimatedHeight}
+          isExpanded={messageIsExpanded}
+          onToggle={toggleMessageBottomSheet}
+          onClose={handleCloseMessage}
         />
       )}
     </View>

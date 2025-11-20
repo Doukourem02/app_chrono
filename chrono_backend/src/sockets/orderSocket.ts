@@ -395,6 +395,16 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       
       if (DEBUG) console.log(`Commande ${maskOrderId(orderId)} acceptée par driver ${maskUserId(driverId)}`);
       
+      // Créer automatiquement une conversation pour cette commande
+      try {
+        const { default: messageService } = await import('../services/messageService.js');
+        await messageService.createOrderConversation(orderId, order.user.id, driverId);
+        if (DEBUG) console.log(`Conversation créée pour la commande ${maskOrderId(orderId)}`);
+      } catch (convError: any) {
+        // Ne pas bloquer l'acceptation de la commande si la création de conversation échoue
+        console.warn(`Échec création conversation pour ${maskOrderId(orderId)}:`, convError.message);
+      }
+      
       socket.emit('order-accepted-confirmation', {
         success: true,
         order,

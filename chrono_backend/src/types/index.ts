@@ -114,3 +114,39 @@ export interface AppError extends Error {
   isOperational?: boolean;
 }
 
+// Types pour la messagerie
+export type ConversationType = 'order' | 'support' | 'admin';
+export type MessageType = 'text' | 'image' | 'system';
+
+export interface Conversation {
+  id: string;
+  type: ConversationType;
+  order_id?: string | null;
+  participant_1_id: string;
+  participant_2_id: string;
+  created_at?: Date;
+  updated_at?: Date;
+  last_message_at?: Date | null;
+  is_archived?: boolean;
+  // Champs calculés (avec JOIN)
+  participant_1?: User;
+  participant_2?: User;
+  order?: Order;
+  unread_count?: number;
+  last_message?: Message;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  message_type: MessageType;
+  is_read: boolean;
+  read_at?: Date | null;
+  created_at?: Date;
+  updated_at?: Date;
+  // Champs calculés (avec JOIN)
+  sender?: User;
+}
+
