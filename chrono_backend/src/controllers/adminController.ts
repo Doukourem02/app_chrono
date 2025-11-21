@@ -2,6 +2,10 @@ import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { formatDeliveryId } from '../utils/formatDeliveryId.js';
+import { v4 as uuidv4 } from 'uuid';
+import { saveOrder } from '../config/orderStorage.js';
+import { broadcastOrderUpdateToAdmins } from '../sockets/adminSocket.js';
+import { Server as SocketIOServer } from 'socket.io';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -3235,6 +3239,184 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
   } catch (error: any) {
     logger.error('Erreur getAdminAdminDetails:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
+  }
+};
+
+/**
+ * Crée une nouvelle commande (admin uniquement)
+ */
+export const createAdminOrder = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = (req as any).user;
+    if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'super_admin')) {
+      res.status(403).json({ success: false, message: 'Accès refusé - Rôle admin requis' });
+      return;
+    }
+
+    const {
+      userId,
+      pickup,
+      dropoff,
+      deliveryMethod,
+      paymentMethodType,
+      distance,
+      price,
+      notes,
+    } = req.body;
+
+    // Validation des champs obligatoires
+    if (!userId || !pickup || !dropoff || !deliveryMethod || !distance || !price) {
+      res.status(400).json({
+        success: false,
+        message: 'Champs obligatoires manquants: userId, pickup, dropoff, deliveryMethod, distance, price',
+      });
+      return;
+    }
+
+    if (!pickup.coordinates || !pickup.coordinates.latitude || !pickup.coordinates.longitude) {
+      res.status(400).json({
+        success: false,
+        message: 'Coordonnées de pickup manquantes',
+      });
+      return;
+    }
+
+    if (!dropoff.coordinates || !dropoff.coordinates.latitude || !dropoff.coordinates.longitude) {
+      res.status(400).json({
+        success: false,
+        message: 'Coordonnées de dropoff manquantes',
+      });
+      return;
+    }
+
+    // Récupérer les informations du client
+    const clientResult = await (pool as any).query(
+      'SELECT id, email, phone, first_name, last_name FROM users WHERE id = $1 AND role = $2',
+      [userId, 'client']
+    );
+
+    if (clientResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Client non trouvé',
+      });
+      return;
+    }
+
+    const client = clientResult.rows[0];
+    const clientName = client.first_name && client.last_name
+      ? `${client.first_name} ${client.last_name}`
+      : client.email;
+
+    // Calculer la durée estimée
+    const avgSpeeds: { [key: string]: number } = {
+      moto: 25,
+      vehicule: 20,
+      cargo: 18,
+    };
+    const speed = avgSpeeds[deliveryMethod] || avgSpeeds.vehicule;
+    const durationHours = distance / speed;
+    const minutes = Math.round(durationHours * 60);
+    const estimatedDuration = minutes < 60
+      ? `${minutes} min`
+      : `${Math.floor(minutes / 60)}h ${minutes % 60}min`;
+
+    // Créer l'objet order
+    const orderId = uuidv4();
+    const order = {
+      id: orderId,
+      user: {
+        id: client.id,
+        name: clientName,
+        phone: client.phone || undefined,
+        email: client.email,
+      },
+      pickup: {
+        address: pickup.address,
+        coordinates: {
+          latitude: pickup.coordinates.latitude,
+          longitude: pickup.coordinates.longitude,
+        },
+      },
+      dropoff: {
+        address: dropoff.address,
+        coordinates: {
+          latitude: dropoff.coordinates.latitude,
+          longitude: dropoff.coordinates.longitude,
+        },
+        details: dropoff.details || undefined,
+      },
+      recipient: dropoff.details?.phone ? { phone: dropoff.details.phone } : null,
+      packageImages: [],
+      price: Math.round(price),
+      deliveryMethod,
+      distance: Math.round(distance * 100) / 100,
+      estimatedDuration,
+      status: 'pending',
+      createdAt: new Date(),
+    };
+
+    // Ajouter les informations de paiement si fournies
+    (order as any).payment_method_type = paymentMethodType || 'cash';
+    (order as any).payment_status = paymentMethodType === 'deferred' ? 'delayed' : 'pending';
+    (order as any).payment_payer = 'client';
+
+    // Sauvegarder la commande en base de données
+    try {
+      await saveOrder(order);
+      logger.info(`[createAdminOrder] Commande ${orderId} créée par admin ${adminUser.id}`);
+
+      // Diffuser la nouvelle commande aux admins via Socket.IO
+      const io = (req.app as any).get('io') as SocketIOServer | undefined;
+      if (io) {
+        broadcastOrderUpdateToAdmins(io, 'order:created', { order });
+      }
+
+      // Optionnel: créer une transaction si paymentMethodType est fourni
+      if (paymentMethodType && price) {
+        try {
+          const { createTransactionAndInvoiceForOrder } = await import('../utils/createTransactionForOrder.js');
+          await createTransactionAndInvoiceForOrder(
+            orderId,
+            userId,
+            paymentMethodType,
+            price,
+            distance,
+            null,
+            0,
+            null,
+            false,
+            undefined,
+            undefined,
+            'client',
+            undefined,
+            null
+          );
+        } catch (transactionError: any) {
+          logger.warn(`[createAdminOrder] Échec création transaction pour ${orderId}:`, transactionError.message);
+        }
+      }
+
+      res.status(201).json({
+        success: true,
+        data: { id: orderId },
+        message: 'Commande créée avec succès',
+      });
+    } catch (dbError: any) {
+      logger.error('[createAdminOrder] Erreur sauvegarde DB:', dbError);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur lors de la sauvegarde de la commande',
+        error: dbError.message,
+      });
+    }
+  } catch (error: any) {
+    logger.error('Erreur createAdminOrder:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: error.message,
+    });
   }
 };
 

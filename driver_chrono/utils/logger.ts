@@ -20,7 +20,22 @@ export const logger = {
     console.error(format(message), extra ?? '');
   },
   userError: (message: string, title = 'Erreur') => {
+    // Logger l'erreur (dans les logs, pas visible à l'utilisateur en production)
     console.error(format(message));
-    try { Alert.alert(title, message); } catch {}
+    // En production, ne jamais afficher les détails techniques à l'utilisateur
+    // Utiliser un message générique
+    if (!__DEV__) {
+      try {
+        Alert.alert(
+          'Erreur',
+          'Une erreur s\'est produite. Veuillez réessayer ou contacter le support si le problème persiste.'
+        );
+      } catch {}
+    } else {
+      // En développement, afficher le message détaillé
+      try {
+        Alert.alert(title, message);
+      } catch {}
+    }
   }
 };

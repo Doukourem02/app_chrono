@@ -6,7 +6,7 @@ import ActivityTable from '@/components/dashboard/ActivityTable'
 import TrackerCard from '@/components/dashboard/TrackerCard'
 import QuickMessage from '@/components/dashboard/QuickMessage'
 import { useQuery } from '@tanstack/react-query'
-import React from 'react'
+import React, { useState } from 'react'
 import { getDashboardStats } from '@/lib/dashboardApi'
 import { adminApiService } from '@/lib/adminApiService'
 import { Truck, ShieldCheck, DollarSign, Calendar, Star, Clock, XCircle, Users, UserCheck } from 'lucide-react'
@@ -14,10 +14,12 @@ import { AnimatedButton } from '@/components/animations'
 import { ScreenTransition } from '@/components/animations'
 import { useDateFilter } from '@/contexts/DateFilterContext'
 import type { Delivery } from '@/hooks/types'
+import NewShippingModal from '@/components/orders/NewShippingModal'
 
 export default function DashboardPage() {
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
+  const [isNewShippingModalOpen, setIsNewShippingModalOpen] = useState(false)
   
 
   const getPeriodLabel = () => {
@@ -247,7 +249,7 @@ export default function DashboardPage() {
             </div>
           </AnimatedButton>
           <AnimatedButton
-            onClick={() => {}}
+            onClick={() => setIsNewShippingModalOpen(true)}
             variant="primary"
             style={newShippingButtonStyle}
           >
@@ -372,6 +374,11 @@ export default function DashboardPage() {
           <QuickMessage />
         </div>
       </div>
+
+      <NewShippingModal
+        isOpen={isNewShippingModalOpen}
+        onClose={() => setIsNewShippingModalOpen(false)}
+      />
     </div>
     </ScreenTransition>
   )

@@ -117,7 +117,17 @@ class Logger {
   // Méthode pour afficher une erreur à l'utilisateur
   userError(message: string, title = 'Erreur') {
     this.error(message, 'UserError');
-    Alert.alert(title, message);
+    // En production, ne jamais afficher les détails techniques à l'utilisateur
+    // Utiliser un message générique
+    if (!__DEV__) {
+      Alert.alert(
+        'Erreur',
+        'Une erreur s\'est produite. Veuillez réessayer ou contacter le support si le problème persiste.'
+      );
+    } else {
+      // En développement, afficher le message détaillé
+      Alert.alert(title, message);
+    }
   }
 
   // Récupérer les logs pour debugging ou envoi au serveur

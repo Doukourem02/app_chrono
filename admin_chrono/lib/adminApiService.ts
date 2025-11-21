@@ -1417,6 +1417,76 @@ class AdminApiService {
       return {}
     }
   }
+
+  /**
+   * Crée une nouvelle commande (admin uniquement)
+   */
+  async createOrder(orderData: {
+    userId: string
+    pickup: {
+      address: string
+      coordinates: { latitude: number; longitude: number }
+    }
+    dropoff: {
+      address: string
+      coordinates: { latitude: number; longitude: number }
+      details?: { phone?: string }
+    }
+    deliveryMethod: 'moto' | 'vehicule' | 'cargo'
+    paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred'
+    distance: number
+    price: number
+    notes?: string
+  }): Promise<{
+    success: boolean
+    data?: { id: string }
+    message?: string
+  }> {
+    try {
+      const url = `${API_BASE_URL}/api/admin/orders`
+      logger.debug('[adminApiService] Creating order:', url)
+
+      const response = await this.fetchWithAuth(url, {
+        method: 'POST',
+        body: JSON.stringify(orderData),
+      })
+
+      if (!response.ok) {
+        let errorMessage = 'Network error'
+        try {
+          const errorData = await response.json()
+          errorMessage = hasMessage(errorData) ? errorData.message : errorMessage
+        } catch {
+          const errorText = await response.text().catch(() => 'Unknown error')
+          errorMessage = errorText || errorMessage
+        }
+        logger.error('[adminApiService] Error creating order:', errorMessage)
+        return {
+          success: false,
+          message: errorMessage,
+        }
+      }
+
+      const result = await response.json()
+      if (isApiResponse(result) && result.data) {
+        return {
+          success: true,
+          data: result.data as { id: string },
+        }
+      }
+
+      return {
+        success: false,
+        message: result.message || 'Erreur lors de la création de la commande',
+      }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Unexpected error in createOrder:', getErrorMessage(error))
+      return {
+        success: false,
+        message: 'Erreur lors de la création de la commande',
+      }
+    }
+  }
 }
 
 // Export singleton

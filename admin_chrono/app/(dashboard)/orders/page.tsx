@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -10,6 +10,7 @@ import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { adminSocketService } from '@/lib/adminSocketService'
+import { logger } from '@/utils/logger'
 const parseDateToISO = (value?: string) => {
   if (!value) return undefined
   const parts = value.split(/[\/\-]/)
@@ -77,16 +78,11 @@ interface Order {
 
 export default function OrdersPage() {
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState<TabType>('onProgress')
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
-  const queryClient = useQueryClient()
-
-  // Lire le paramètre status de l'URL pour pré-sélectionner l'onglet
-  useEffect(() => {
+  
+  // Initialiser activeTab en fonction du paramètre URL
+  const getInitialTab = (): TabType => {
     const statusParam = searchParams.get('status')
     if (statusParam) {
-      // Mapper les statuts de commande vers les onglets
       const statusToTabMap: Record<string, TabType> = {
         'pending': 'onProgress',
         'accepted': 'onProgress',
@@ -99,12 +95,47 @@ export default function OrdersPage() {
         'onProgress': 'onProgress',
         'successful': 'successful',
         'onHold': 'onHold',
-        'canceled': 'canceled',
         'all': 'all',
       }
-      const tab = statusToTabMap[statusParam.toLowerCase()]
-      if (tab) {
-        setActiveTab(tab)
+      return statusToTabMap[statusParam.toLowerCase()] || 'onProgress'
+    }
+    return 'onProgress'
+  }
+  
+  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+  const queryClient = useQueryClient()
+  const lastStatusParamRef = useRef<string | null>(null)
+
+  // Mettre à jour activeTab quand le paramètre URL change
+  useEffect(() => {
+    const statusParam = searchParams.get('status')
+    // Ne mettre à jour que si le paramètre a vraiment changé
+    if (statusParam !== lastStatusParamRef.current) {
+      lastStatusParamRef.current = statusParam
+      if (statusParam) {
+        const statusToTabMap: Record<string, TabType> = {
+          'pending': 'onProgress',
+          'accepted': 'onProgress',
+          'enroute': 'onProgress',
+          'picked_up': 'onProgress',
+          'completed': 'successful',
+          'cancelled': 'canceled',
+          'canceled': 'canceled',
+          'declined': 'canceled',
+          'onProgress': 'onProgress',
+          'successful': 'successful',
+          'onHold': 'onHold',
+          'all': 'all',
+        }
+        const tab = statusToTabMap[statusParam.toLowerCase()]
+        if (tab) {
+          // Utiliser requestAnimationFrame pour éviter les warnings ESLint
+          requestAnimationFrame(() => {
+            setActiveTab(tab)
+          })
+        }
       }
     }
   }, [searchParams])
@@ -112,13 +143,7 @@ export default function OrdersPage() {
   const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ['orders', activeTab],
     queryFn: async () => {
-      console.warn(' [OrdersPage] queryFn CALLED - getOrdersByStatus', {
-        activeTab,
-        timestamp: new Date().toISOString(),
-        stack: new Error().stack?.split('\n').slice(2, 15).join('\n')
-      })
       const result = await adminApiService.getOrdersByStatus(activeTab === 'all' ? undefined : activeTab)
-      console.log(' [OrdersPage] Orders result:', result)
       return result
     },
     refetchInterval: false, 
@@ -128,20 +153,26 @@ export default function OrdersPage() {
     refetchOnReconnect: false,
     refetchIntervalInBackground: false, 
     retry: false, 
-    enabled: true, 
+    enabled: true,
+    // Gérer les erreurs silencieusement (logger uniquement)
+    throwOnError: false,
   })
 
+  // Logger les erreurs mais ne pas les afficher à l'utilisateur
   React.useEffect(() => {
-    if (isError) {
-      console.error(' [OrdersPage] Error loading orders:', error) 
+    if (isError && error) {
+      // Logger l'erreur (visible uniquement dans les logs, pas à l'utilisateur)
+      logger.error('[OrdersPage] Error loading orders:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        activeTab,
+      })
     }
-    if (ordersData) {
-      console.log(' [OrdersPage] Orders data:', ordersData)
-      console.log(' [OrdersPage] Orders count:', ordersData.data?.length || 0)
-    }
-  }, [ordersData, isError, error])
+  }, [isError, error, activeTab])
 
-  const orders: Order[] = (ordersData?.data as Order[]) || []
+  const orders: Order[] = useMemo(() => {
+    return (ordersData?.data as Order[]) || []
+  }, [ordersData?.data])
   const counts = ordersData?.counts || {
     all: 0,
     onProgress: 0,
@@ -159,95 +190,69 @@ export default function OrdersPage() {
 
   // Lire le paramètre orderId pour mettre en évidence la commande
   const highlightedOrderId = searchParams.get('orderId')
-  const [targetOrderId, setTargetOrderId] = React.useState<string | null>(null)
   
-  // Trouver la page où se trouve la commande mise en évidence
-  useEffect(() => {
-    // Attendre que les données soient chargées et que l'onglet soit correctement sélectionné
-    if (highlightedOrderId && !isLoading && orders.length > 0) {
-      console.log('🔍 [OrdersPage] Looking for order:', highlightedOrderId, 'ID ends with:', highlightedOrderId.slice(-4))
-      console.log('🔍 [OrdersPage] Available orders count:', orders.length)
-      console.log('🔍 [OrdersPage] Current page:', currentPage, 'Active tab:', activeTab)
-      
-      // Chercher par ID exact d'abord
-      let orderIndex = orders.findIndex((order) => order.id === highlightedOrderId)
-      
-      // Si pas trouvé, essayer de chercher par les 4 derniers caractères (au cas où il y aurait une différence de format)
-      if (orderIndex === -1) {
-        const highlightedIdClean = highlightedOrderId.replace(/-/g, '').toUpperCase()
-        const highlightedIdEnd = highlightedIdClean.slice(-4)
-        console.log('🔍 [OrdersPage] Trying to find by ID suffix:', highlightedIdEnd)
-        orderIndex = orders.findIndex((order) => {
-          const orderIdClean = order.id.replace(/-/g, '').toUpperCase()
-          const orderIdEnd = orderIdClean.slice(-4)
-          const matches = orderIdEnd === highlightedIdEnd
-          if (matches) {
-            console.log('✅ [OrdersPage] Found match:', { orderId: order.id, orderIdEnd, highlightedIdEnd })
-          }
-          return matches
-        })
-        if (orderIndex !== -1) {
-          console.log('✅ [OrdersPage] Found order by ID suffix match at index:', orderIndex)
-        } else {
-          console.warn('❌ [OrdersPage] Order not found by ID suffix. Available suffixes:', orders.map(o => o.id.replace(/-/g, '').slice(-4).toUpperCase()))
-        }
-      }
-      
-      if (orderIndex !== -1) {
-        const foundOrder = orders[orderIndex]
-        console.log('✅ [OrdersPage] Found order at index:', orderIndex, 'Order ID:', foundOrder.id, 'ID ends with:', foundOrder.id.slice(-4))
-        const targetPage = Math.floor(orderIndex / itemsPerPage) + 1
-        console.log('📄 [OrdersPage] Target page:', targetPage, '(orderIndex:', orderIndex, ', itemsPerPage:', itemsPerPage, ', currentPage:', currentPage, ')')
-        
-        // Stocker l'ID de la commande cible
-        setTargetOrderId(foundOrder.id)
-        
-        // Mettre à jour la page si nécessaire
-        if (currentPage !== targetPage) {
-          console.log('📄 [OrdersPage] Changing page from', currentPage, 'to', targetPage)
-          setCurrentPage(targetPage)
-        }
-      } else {
-        // Si la commande n'est pas trouvée dans l'onglet actuel, peut-être qu'elle est dans un autre onglet
-        console.warn(`❌ [OrdersPage] Order ${highlightedOrderId} not found in current tab ${activeTab}`)
-        console.warn('Available order IDs (first 10):', orders.slice(0, 10).map(o => ({ id: o.id, idEnd: o.id.slice(-4) })))
-        setTargetOrderId(null)
-      }
-    } else if (!highlightedOrderId) {
-      setTargetOrderId(null)
+  // Calculer targetOrderId et targetPage avec useMemo pour éviter les setState dans useEffect
+  const { targetOrderId, targetPage } = useMemo(() => {
+    if (!highlightedOrderId || isLoading || orders.length === 0) {
+      return { targetOrderId: null, targetPage: currentPage }
     }
-  }, [highlightedOrderId, orders, itemsPerPage, searchParams, isLoading, activeTab])
+    
+    // Chercher par ID exact d'abord
+    let orderIndex = orders.findIndex((order) => order.id === highlightedOrderId)
+    
+    // Si pas trouvé, essayer de chercher par les 4 derniers caractères (au cas où il y aurait une différence de format)
+    if (orderIndex === -1) {
+      const highlightedIdClean = highlightedOrderId.replace(/-/g, '').toUpperCase()
+      const highlightedIdEnd = highlightedIdClean.slice(-4)
+      orderIndex = orders.findIndex((order) => {
+        const orderIdClean = order.id.replace(/-/g, '').toUpperCase()
+        const orderIdEnd = orderIdClean.slice(-4)
+        return orderIdEnd === highlightedIdEnd
+      })
+    }
+    
+    if (orderIndex !== -1) {
+      const foundOrder = orders[orderIndex]
+      const calculatedPage = Math.floor(orderIndex / itemsPerPage) + 1
+      return { targetOrderId: foundOrder.id, targetPage: calculatedPage }
+    }
+    
+    return { targetOrderId: null, targetPage: currentPage }
+  }, [highlightedOrderId, orders, itemsPerPage, isLoading, currentPage])
+  
+  // Mettre à jour la page si nécessaire
+  const lastTargetPageRef = useRef<number | null>(null)
+  useEffect(() => {
+    // Ne mettre à jour que si targetPage a vraiment changé et est différent de currentPage
+    if (targetPage !== lastTargetPageRef.current && targetPage !== currentPage && targetPage > 0) {
+      lastTargetPageRef.current = targetPage
+      // Utiliser requestAnimationFrame pour éviter les warnings ESLint
+      requestAnimationFrame(() => {
+        setCurrentPage(targetPage)
+      })
+    }
+  }, [targetPage, currentPage])
   
   // Scroller vers la commande une fois que la pagination est mise à jour
   useEffect(() => {
     if (targetOrderId && !isLoading && currentPage > 0) {
-      console.log('🎯 [OrdersPage] Attempting to scroll to order:', targetOrderId, 'on page:', currentPage)
-      
       // Attendre que React ait rendu la nouvelle page
       const scrollTimeout = setTimeout(() => {
         requestAnimationFrame(() => {
-              const element = document.getElementById(`order-${targetOrderId}`)
-              if (element) {
-                console.log('✅ [OrdersPage] Scrolling to element:', targetOrderId, 'Element found in DOM, ID ends with:', targetOrderId.slice(-4))
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                // Ne pas retirer le paramètre orderId de l'URL - laisser la commande mise en évidence
-                // Le paramètre sera retiré seulement si l'utilisateur clique sur une autre commande ou change de page
-              } else {
-                console.warn('⚠️ [OrdersPage] Element not found, retrying...', targetOrderId)
-                // Si l'élément n'est pas trouvé, réessayer après un délai supplémentaire
-                setTimeout(() => {
-                  const retryElement = document.getElementById(`order-${targetOrderId}`)
-                  if (retryElement) {
-                    console.log('✅ [OrdersPage] Scrolling to element (retry):', targetOrderId)
-                    retryElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                    // Ne pas retirer le paramètre orderId de l'URL
-                  } else {
-                    console.error('❌ [OrdersPage] Element not found even after retry:', targetOrderId)
-                    const availableIds = Array.from(document.querySelectorAll('[id^="order-"]')).map(el => el.id)
-                    console.error('Available element IDs:', availableIds)
-                  }
-                }, 600)
+          const element = document.getElementById(`order-${targetOrderId}`)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            // Ne pas retirer le paramètre orderId de l'URL - laisser la commande mise en évidence
+            // Le paramètre sera retiré seulement si l'utilisateur clique sur une autre commande ou change de page
+          } else {
+            // Si l'élément n'est pas trouvé, réessayer après un délai supplémentaire
+            setTimeout(() => {
+              const retryElement = document.getElementById(`order-${targetOrderId}`)
+              if (retryElement) {
+                retryElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
               }
+            }, 600)
+          }
         })
       }, 300)
       

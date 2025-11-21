@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AppState } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 import { initSentry } from "../utils/sentry";
+import { ErrorBoundary } from "../components/error/ErrorBoundary";
 
 //  SENTRY: Initialiser le monitoring d'erreurs
 initSentry();
@@ -43,10 +44,12 @@ export default function RootLayout() {
   }, [user?.id, validateUserExists, logout]);
 
   return (
+    <ErrorBoundary>
       <Stack
-      screenOptions={{
-            headerShown: false,
-          }} />
-    
+        screenOptions={{
+          headerShown: false,
+        }}
+      />
+    </ErrorBoundary>
   );
 }
