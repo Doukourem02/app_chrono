@@ -18,6 +18,7 @@ import { useBottomSheet } from '../../hooks/useBottomSheet';
 import { useMessageBottomSheet } from '../../hooks/useMessageBottomSheet';
 import { logger } from '../../utils/logger';
 import { locationService } from '../../services/locationService';
+import { formatUserName } from '../../utils/formatName';
 
 export default function OrderTrackingPage() {
   const { requireAuth } = useRequireAuth();
@@ -144,7 +145,7 @@ export default function OrderTrackingPage() {
             const ratingResult = await userApiService.getOrderRating(currentOrder.id);
             if (!ratingResult.success || !ratingResult.data) {
               const driverId = currentOrder.driverId || currentOrder.driver?.id;
-              const driverName = currentOrder.driver?.name || 'Votre livreur';
+              const driverName = formatUserName(currentOrder.driver, 'Votre livreur');
               
               if (driverId) {
                 useRatingStore.getState().setRatingBottomSheet(
@@ -198,8 +199,8 @@ export default function OrderTrackingPage() {
           
           const formattedOrder = {
             id: order.id,
-            user: { id: order.user_id, name: order.user?.name || 'Client' },
-            driver: order.driver_id ? { id: order.driver_id, name: order.driver?.name || 'Livreur' } : undefined,
+            user: { id: order.user_id, name: formatUserName(order.user) },
+            driver: order.driver_id ? { id: order.driver_id, name: formatUserName(order.driver, 'Livreur') } : undefined,
             pickup: {
               address: order.pickup_address_text || (typeof order.pickup_address === 'string' ? JSON.parse(order.pickup_address) : order.pickup_address)?.address || '',
               coordinates: typeof order.pickup_address === 'string' 
@@ -551,7 +552,7 @@ export default function OrderTrackingPage() {
         <MessageBottomSheet
           orderId={currentOrder.id}
           driverId={currentOrder.driverId}
-          driverName={currentOrder.driver?.name}
+          driverName={formatUserName(currentOrder.driver, 'Livreur')}
           driverAvatar={currentOrder.driver?.avatar}
           panResponder={messagePanResponder}
           animatedHeight={messageAnimatedHeight}
@@ -566,7 +567,7 @@ export default function OrderTrackingPage() {
         (currentOrder?.status === 'completed' && currentOrder?.id === orderId && currentOrder?.driverId)) && (
         <RatingBottomSheet
           orderId={ratingOrderId || orderId}
-          driverName={ratingDriverName || currentOrder?.driver?.name || 'Votre livreur'}
+          driverName={ratingDriverName || formatUserName(currentOrder?.driver, 'Votre livreur')}
           panResponder={ratingPanResponder}
           animatedHeight={ratingAnimatedHeight}
           isExpanded={ratingIsExpanded}

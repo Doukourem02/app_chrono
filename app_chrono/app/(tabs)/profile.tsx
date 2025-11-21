@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
+import { formatUserName } from '../../utils/formatName';
 
 interface UserStatistics {
   completedOrders: number;
@@ -41,6 +42,35 @@ export default function ProfilePage() {
   useEffect(() => {
     setAvatarUrl((user as any)?.avatar_url || null);
   }, [user]);
+
+  // Charger les données utilisateur complètes si first_name/last_name manquent
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user?.id) return;
+      
+      // Si first_name et last_name sont déjà disponibles, ne pas recharger
+      if (user.first_name || user.last_name) return;
+
+      try {
+        const result = await userApiService.getUserProfile(user.id);
+        if (result.success && result.data) {
+          setUser({
+            ...user,
+            first_name: result.data.first_name,
+            last_name: result.data.last_name,
+            phone: result.data.phone || user.phone,
+            avatar_url: result.data.avatar_url || (user as any)?.avatar_url,
+          } as any);
+        }
+      } catch (error) {
+        console.error('Erreur chargement profil utilisateur:', error);
+      }
+    };
+
+    requireAuth(() => {
+      loadUserProfile();
+    });
+  }, [requireAuth, user?.id, user?.first_name, user?.last_name, setUser]);
 
   // Charger les statistiques depuis le backend
   useEffect(() => {
@@ -302,10 +332,7 @@ export default function ProfilePage() {
             
             <View style={styles.userInfo}>
               <Text style={styles.userName}>
-                {((user as any)?.first_name && (user as any)?.last_name)
-                  ? `${(user as any).first_name} ${(user as any).last_name}`
-                  : 'Client Chrono'
-                }
+                {formatUserName(user as any)}
               </Text>
               <Text style={styles.userEmail}>{user?.email}</Text>
               <Text style={styles.userPhone}>{user?.phone}</Text>

@@ -238,6 +238,29 @@ class DriverMessageService {
   }
 
   /**
+   * Créer une conversation de support avec l'admin
+   */
+  async createSupportConversation(): Promise<Conversation | null> {
+    try {
+      const result = await this.fetchWithAuth('/api/messages/conversations', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'support',
+        }),
+      });
+
+      if (result.success && result.data) {
+        return result.data;
+      }
+
+      return null;
+    } catch (error: any) {
+      logger.error('Erreur lors de la création de la conversation de support:', error);
+      return null;
+    }
+  }
+
+  /**
    * Récupérer les conversations du driver
    */
   async getConversations(type?: 'order' | 'support' | 'admin'): Promise<Conversation[]> {

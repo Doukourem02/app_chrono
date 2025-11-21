@@ -643,6 +643,59 @@ class ApiService {
   }
 
   /**
+   * 👤 Récupérer le profil utilisateur complet
+   */
+  async getUserProfile(userId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      id: string;
+      email: string;
+      phone: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      avatar_url: string | null;
+      role: string;
+      created_at: string;
+      updated_at: string;
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la récupération du profil');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur getUserProfile:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
    * 👤 Mettre à jour le profil utilisateur
    */
   async updateProfile(

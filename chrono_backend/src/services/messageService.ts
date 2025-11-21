@@ -1,5 +1,5 @@
 import pool from '../config/db.js';
-import { Conversation, Message, ConversationType, MessageType } from '../types/index.js';
+import { Conversation, Message, ConversationType, MessageType, User } from '../types/index.js';
 import logger from '../utils/logger.js';
 
 export class MessageService {
@@ -36,6 +36,21 @@ export class MessageService {
     } catch (error: any) {
       logger.error('Erreur lors de la création de la conversation:', error);
       throw new Error(`Impossible de créer la conversation: ${error.message}`);
+    }
+  }
+
+  /**
+   * Trouver un admin disponible pour le support
+   */
+  async findAvailableAdmin(): Promise<string | null> {
+    try {
+      const result = await pool.query(
+        `SELECT id FROM users WHERE role IN ('admin', 'super_admin') ORDER BY created_at ASC LIMIT 1`
+      );
+      return result.rows.length > 0 ? result.rows[0].id : null;
+    } catch (error: any) {
+      logger.error('Erreur lors de la recherche d\'un admin:', error);
+      return null;
     }
   }
 

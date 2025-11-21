@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Search, User, Truck, Package, MessageSquare } from 'lucide-react'
+import { Search, User, Truck, Package, MessageSquare, Plus } from 'lucide-react'
 import { Conversation } from '@/services/adminMessageService'
 
 interface ConversationListProps {
@@ -15,6 +15,7 @@ interface ConversationListProps {
   filterType?: 'all' | 'order' | 'support' | 'admin'
   onFilterChange?: (type: 'all' | 'order' | 'support' | 'admin') => void
   currentUserId?: string
+  onNewConversation?: () => void
 }
 
 export default function ConversationList({
@@ -28,6 +29,7 @@ export default function ConversationList({
   filterType = 'all',
   onFilterChange,
   currentUserId,
+  onNewConversation,
 }: ConversationListProps) {
   const getParticipantName = (conversation: Conversation): string => {
     if (!currentUserId) return 'Utilisateur'
@@ -306,6 +308,36 @@ export default function ConversationList({
             Admin
           </button>
         </div>
+      )}
+
+      {onNewConversation && (
+        <button
+          onClick={onNewConversation}
+          style={{
+            width: '100%',
+            padding: '12px',
+            borderRadius: '8px',
+            backgroundColor: '#8B5CF6',
+            color: '#FFFFFF',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#7C3AED'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#8B5CF6'
+          }}
+        >
+          <Plus size={18} />
+          Nouvelle conversation
+        </button>
       )}
 
       <div style={{ flex: 1, overflowY: 'auto' }}>

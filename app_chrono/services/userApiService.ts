@@ -621,6 +621,54 @@ class UserApiService {
   }
 
   /**
+   * 👤 Récupérer le profil utilisateur complet
+   */
+  async getUserProfile(userId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      id: string;
+      email: string;
+      phone: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      avatar_url: string | null;
+      role: string;
+      created_at: string;
+      updated_at: string;
+    };
+  }> {
+    try {
+      const token = await this.ensureAccessToken();
+      if (!token) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la récupération du profil');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur getUserProfile:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
    * 📸 Uploader un avatar
    */
   async uploadAvatar(

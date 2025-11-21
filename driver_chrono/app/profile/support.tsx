@@ -1,9 +1,14 @@
-import React from 'react';
-import {View,Text,StyleSheet,ScrollView, TouchableOpacity,Linking,} from 'react-native';
+import React, { useState } from 'react';
+import {View,Text,StyleSheet,ScrollView, TouchableOpacity,Linking,Alert,ActivityIndicator} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { driverMessageService } from '../../services/driverMessageService';
+import { useMessageStore } from '../../store/useMessageStore';
 
 export default function SupportPage() {
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const { setCurrentConversation } = useMessageStore();
+
   const handleContact = (method: string) => {
     switch (method) {
       case 'email':
@@ -15,6 +20,24 @@ export default function SupportPage() {
       case 'whatsapp':
         Linking.openURL('https://wa.me/2250000000000');
         break;
+    }
+  };
+
+  const handleContactSupport = async () => {
+    setIsCreatingConversation(true);
+    try {
+      const conversation = await driverMessageService.createSupportConversation();
+      if (conversation) {
+        setCurrentConversation(conversation);
+        // Rediriger directement vers la page de messagerie
+        router.push(`/messages/${conversation.id}`);
+      } else {
+        Alert.alert('Erreur', 'Impossible de créer la conversation de support. Veuillez réessayer.');
+      }
+    } catch {
+      Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
+    } finally {
+      setIsCreatingConversation(false);
     }
   };
 
@@ -31,6 +54,23 @@ export default function SupportPage() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contactez-nous</Text>
+          
+          <TouchableOpacity
+            style={[styles.contactItem, styles.supportChatItem]}
+            onPress={handleContactSupport}
+            disabled={isCreatingConversation}
+          >
+            <Ionicons name="chatbubble-ellipses" size={24} color="#8B5CF6" />
+            <View style={styles.contactInfo}>
+              <Text style={styles.contactTitle}>Contacter le support</Text>
+              <Text style={styles.contactSubtitle}>Envoyer un message à l&apos;équipe</Text>
+            </View>
+            {isCreatingConversation ? (
+              <ActivityIndicator size="small" color="#8B5CF6" />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            )}
+          </TouchableOpacity>
           
           <TouchableOpacity
             style={styles.contactItem}
@@ -173,6 +213,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     flex: 1,
+  },
+  supportChatItem: {
+    backgroundColor: '#F3E8FF',
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
 });
 

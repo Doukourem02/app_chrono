@@ -6,6 +6,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { OrderRequest, OrderStatus, useOrderStore } from "../store/useOrderStore";
 import { formatDurationLabel, estimateDurationMinutes } from "../services/orderApi";
 import { AnimatedCard, SkeletonLoader } from "./animations";
+import { formatUserName } from "../utils/formatName";
 
 interface OrderWithDB extends OrderRequest {
   created_at?: string;
@@ -186,12 +187,12 @@ export default function ShipmentList() {
             id: order.id,
             user: {
               id: order.user_id,
-              name: order.user?.name || 'Client',
+              name: formatUserName(order.user),
             },
             driver: order.driver_id
               ? {
                   id: order.driver_id,
-                  name: order.driver?.name || 'Livreur',
+                  name: formatUserName(order.driver, 'Livreur'),
                 }
               : undefined,
             pickup: {

@@ -7,6 +7,8 @@ import { driverMessageSocketService } from '../services/driverMessageSocketServi
 import { useMessageStore } from '../store/useMessageStore';
 import { useDriverStore } from '../store/useDriverStore';
 import { logger } from '../utils/logger';
+import { formatUserName } from '../utils/formatName';
+import { apiService } from '../services/apiService';
 
 interface MessageBottomSheetProps {
   orderId: string;
@@ -54,22 +56,11 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     avatar: initialClientAvatar,
   });
 
-  // Mettre à jour les infos du client si elles changent
-  useEffect(() => {
-    if (initialClientName && initialClientName !== clientInfo.name) {
-      setClientInfo((prev) => ({
-        ...prev,
-        name: initialClientName,
-        avatar: initialClientAvatar || prev.avatar,
-      }));
-    }
-  }, [initialClientName, initialClientAvatar, clientInfo.name]);
-
   const [isLoadingClient, setIsLoadingClient] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
-  // Mettre à jour les infos du client depuis la conversation
+  // Priorité 1: Charger depuis la conversation si disponible
   useEffect(() => {
     if (!currentConversation || !user?.id) return;
 
@@ -80,17 +71,97 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
         : currentConversation.participant_1;
 
     if (clientParticipant) {
-      const firstName = clientParticipant.first_name || '';
-      const lastName = clientParticipant.last_name || '';
-      const name = `${firstName} ${lastName}`.trim() || clientParticipant.email || 'Client';
+      const name = formatUserName(clientParticipant, 'Client');
       
-      setClientInfo({
-        name,
-        avatar: clientParticipant.avatar_url,
-      });
-      setIsLoadingClient(false);
+      // Ne mettre à jour que si on a un nom valide (pas un email)
+      if (name && name !== 'Client' && !name.includes('@')) {
+        setClientInfo({
+          name,
+          avatar: clientParticipant.avatar_url,
+        });
+        setIsLoadingClient(false);
+        return;
+      }
+      
+      // Si le nom est un email ou fallback, charger depuis l'API
+      if (clientId) {
+        const loadClientInfo = async () => {
+          setIsLoadingClient(true);
+          try {
+            const result = await apiService.getUserProfile(clientId);
+            if (result.success && result.data) {
+              const apiName = formatUserName(result.data, 'Client');
+              setClientInfo({
+                name: apiName,
+                avatar: result.data.avatar_url || undefined,
+              });
+            }
+          } catch {
+            // Fallback sur les données de la conversation même si c'est un email
+            setClientInfo({
+              name: formatUserName(clientParticipant, 'Client'),
+              avatar: clientParticipant.avatar_url,
+            });
+          } finally {
+            setIsLoadingClient(false);
+          }
+        };
+        loadClientInfo();
+      }
     }
-  }, [currentConversation, user?.id]);
+  }, [currentConversation, user?.id, clientId]);
+
+  // Priorité 2: Charger depuis l'API si pas de conversation et pas de nom valide
+  useEffect(() => {
+    if (currentConversation) return; // Déjà géré par l'effet précédent
+    
+    const hasValidName = clientInfo.name && 
+                        clientInfo.name !== 'Client' && 
+                        !clientInfo.name.includes('@');
+    
+    if (!clientId || hasValidName) return;
+
+    const loadClientInfo = async () => {
+      setIsLoadingClient(true);
+      try {
+        const result = await apiService.getUserProfile(clientId);
+        if (result.success && result.data) {
+          const name = formatUserName(result.data, 'Client');
+          setClientInfo({
+            name,
+            avatar: result.data.avatar_url || undefined,
+          });
+        }
+      } catch {
+        logger.warn('Impossible de charger les détails du client depuis l\'API', 'MessageBottomSheet');
+      } finally {
+        setIsLoadingClient(false);
+      }
+    };
+
+    loadClientInfo();
+  }, [clientId, currentConversation]);
+
+  // Priorité 3: Utiliser initialClientName seulement s'il est valide et pas encore chargé
+  useEffect(() => {
+    // Ne pas utiliser initialClientName s'il ressemble à un email ou si on a déjà un nom valide
+    const hasValidName = clientInfo.name && 
+                        clientInfo.name !== 'Client' && 
+                        !clientInfo.name.includes('@');
+    
+    if (hasValidName) return;
+    
+    if (initialClientName && 
+        initialClientName !== clientInfo.name && 
+        !initialClientName.includes('@') &&
+        initialClientName !== 'Client') {
+      setClientInfo((prev) => ({
+        ...prev,
+        name: initialClientName,
+        avatar: initialClientAvatar || prev.avatar,
+      }));
+    }
+  }, [initialClientName, initialClientAvatar, clientInfo.name]);
 
   // Charger ou créer la conversation
   useEffect(() => {

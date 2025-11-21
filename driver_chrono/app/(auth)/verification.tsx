@@ -77,6 +77,8 @@ export default function VerificationScreen() {
           phone: data.data.user.phone,
           role: data.data.user.role,
           created_at: data.data.user.created_at || new Date().toISOString(),
+          first_name: data.data.user.first_name || null,
+          last_name: data.data.user.last_name || null,
         });
       }
 

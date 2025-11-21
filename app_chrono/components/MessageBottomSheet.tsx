@@ -7,6 +7,7 @@ import { userMessageSocketService } from '../services/userMessageSocketService';
 import { useMessageStore } from '../store/useMessageStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { logger } from '../utils/logger';
+import { formatUserName } from '../utils/formatName';
 
 interface MessageBottomSheetProps {
   orderId: string;
@@ -54,48 +55,11 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     avatar: initialDriverAvatar,
   });
 
-  useEffect(() => {
-    if (initialDriverName && initialDriverName !== driverInfo.name) {
-      setDriverInfo((prev) => ({
-        ...prev,
-        name: initialDriverName,
-        avatar: initialDriverAvatar || prev.avatar,
-      }));
-    }
-  }, [initialDriverName, initialDriverAvatar, driverInfo.name]);
   const [isLoadingDriver, setIsLoadingDriver] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    const loadDriverInfo = async () => {
-      if (!driverId || (initialDriverName && initialDriverName !== 'Livreur')) return;
-      if (driverInfo.name && driverInfo.name !== 'Livreur') return;
-      if (currentConversation) return;
-
-      setIsLoadingDriver(true);
-      try {
-        const { userApiService } = await import('../services/userApiService');
-        const result = await userApiService.getDriverDetails(driverId);
-        if (result.success && result.data) {
-          const firstName = result.data.first_name || '';
-          const lastName = result.data.last_name || '';
-          const name = `${firstName} ${lastName}`.trim() || 'Livreur';
-          setDriverInfo({
-            name,
-            avatar: result.data.avatar_url || result.data.profile_image_url,
-          });
-        }
-      } catch {
-        logger.warn('Impossible de charger les détails du livreur depuis l\'API, utilisation des infos de la conversation', 'MessageBottomSheet');
-      } finally {
-        setIsLoadingDriver(false);
-      }
-    };
-
-    loadDriverInfo();
-  }, [driverId, initialDriverName, currentConversation, driverInfo.name]);
-
+  // Priorité 1: Charger depuis la conversation si disponible
   useEffect(() => {
     if (!currentConversation || !user?.id) return;
 
@@ -105,17 +69,99 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
         : currentConversation.participant_1;
 
     if (driverParticipant) {
-      const firstName = driverParticipant.first_name || '';
-      const lastName = driverParticipant.last_name || '';
-      const name = `${firstName} ${lastName}`.trim() || driverParticipant.email || 'Livreur';
+      const name = formatUserName(driverParticipant, 'Livreur');
       
-      setDriverInfo({
-        name,
-        avatar: driverParticipant.avatar_url,
-      });
-      setIsLoadingDriver(false);
+      // Ne mettre à jour que si on a un nom valide (pas un email)
+      if (name && name !== 'Livreur' && !name.includes('@')) {
+        setDriverInfo({
+          name,
+          avatar: driverParticipant.avatar_url,
+        });
+        setIsLoadingDriver(false);
+        return;
+      }
+      
+      // Si le nom est un email ou fallback, charger depuis l'API
+      if (driverId) {
+        const loadDriverInfo = async () => {
+          setIsLoadingDriver(true);
+          try {
+            const { userApiService } = await import('../services/userApiService');
+            const result = await userApiService.getDriverDetails(driverId);
+            if (result.success && result.data) {
+              const apiName = formatUserName(result.data, 'Livreur');
+              setDriverInfo({
+                name: apiName,
+                avatar: result.data.avatar_url || result.data.profile_image_url,
+              });
+            }
+          } catch {
+            // Fallback sur les données de la conversation même si c'est un email
+            setDriverInfo({
+              name: formatUserName(driverParticipant, 'Livreur'),
+              avatar: driverParticipant.avatar_url,
+            });
+          } finally {
+            setIsLoadingDriver(false);
+          }
+        };
+        loadDriverInfo();
+      }
     }
-  }, [currentConversation, user?.id]);
+  }, [currentConversation, user?.id, driverId]);
+
+  // Priorité 2: Charger depuis l'API si pas de conversation et pas de nom valide
+  useEffect(() => {
+    if (currentConversation) return; // Déjà géré par l'effet précédent
+    
+    const hasValidName = driverInfo.name && 
+                        driverInfo.name !== 'Livreur' && 
+                        !driverInfo.name.includes('@');
+    
+    if (!driverId || hasValidName) return;
+
+    const loadDriverInfo = async () => {
+      setIsLoadingDriver(true);
+      try {
+        const { userApiService } = await import('../services/userApiService');
+        const result = await userApiService.getDriverDetails(driverId);
+        if (result.success && result.data) {
+          const name = formatUserName(result.data, 'Livreur');
+          setDriverInfo({
+            name,
+            avatar: result.data.avatar_url || result.data.profile_image_url,
+          });
+        }
+      } catch {
+        logger.warn('Impossible de charger les détails du livreur depuis l\'API', 'MessageBottomSheet');
+      } finally {
+        setIsLoadingDriver(false);
+      }
+    };
+
+    loadDriverInfo();
+  }, [driverId, currentConversation]);
+
+  // Priorité 3: Utiliser initialDriverName seulement s'il est valide et pas encore chargé
+  useEffect(() => {
+    // Ne pas utiliser initialDriverName s'il ressemble à un email ou si on a déjà un nom valide
+    const hasValidName = driverInfo.name && 
+                        driverInfo.name !== 'Livreur' && 
+                        !driverInfo.name.includes('@');
+    
+    if (hasValidName) return;
+    
+    if (initialDriverName && 
+        initialDriverName !== driverInfo.name && 
+        !initialDriverName.includes('@') &&
+        initialDriverName !== 'Livreur') {
+      setDriverInfo((prev) => ({
+        ...prev,
+        name: initialDriverName,
+        avatar: initialDriverAvatar || prev.avatar,
+      }));
+    }
+  }, [initialDriverName, initialDriverAvatar, driverInfo.name]);
 
   useEffect(() => {
     if (!orderId || !isExpanded) return;

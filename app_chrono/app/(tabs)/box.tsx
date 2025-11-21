@@ -5,6 +5,7 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
 import { OrderRequest, OrderStatus, useOrderStore } from '../../store/useOrderStore';
+import { formatUserName } from '../../utils/formatName';
 
 interface OrderWithDB extends OrderRequest {
   created_at?: string;
@@ -159,12 +160,12 @@ export default function BoxPage() {
             id: order.id,
             user: {
               id: order.user_id,
-              name: order.user?.name || 'Client',
+              name: formatUserName(order.user),
             },
             driver: order.driver_id
               ? {
                   id: order.driver_id,
-                  name: order.driver?.name || 'Livreur',
+                  name: formatUserName(order.driver, 'Livreur'),
                 }
               : undefined,
             pickup: typeof order.pickup === 'string' ? JSON.parse(order.pickup) : order.pickup,

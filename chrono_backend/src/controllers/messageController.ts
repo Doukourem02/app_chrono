@@ -80,14 +80,6 @@ export const createConversation = async (req: AuthenticatedRequest, res: Respons
 
     const { type, participantId, orderId } = req.body;
 
-    // Seuls les admins peuvent créer des conversations de support/admin
-    if ((type === 'support' || type === 'admin') && userRole !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Seuls les admins peuvent créer des conversations de support/admin',
-      });
-    }
-
     let conversation;
     if (type === 'order' && orderId) {
       // Récupérer ou créer une conversation pour une commande
@@ -98,11 +90,48 @@ export const createConversation = async (req: AuthenticatedRequest, res: Respons
           message: 'Commande introuvable ou pas de livreur assigné',
         });
       }
-    } else if (type === 'support' || type === 'admin') {
+    } else if (type === 'support') {
+      // Les clients/livreurs peuvent créer des conversations de support
+      if (userRole === 'admin' || userRole === 'super_admin') {
+        // Admin crée avec un client/livreur
+        if (!participantId) {
+          return res.status(400).json({ success: false, message: 'participantId requis' });
+        }
+        conversation = await messageService.createSupportConversation(
+          userId,
+          participantId,
+          'support'
+        );
+      } else {
+        // Client/Livreur crée avec un admin (trouver un admin disponible)
+        const adminId = await messageService.findAvailableAdmin();
+        if (!adminId) {
+          return res.status(503).json({
+            success: false,
+            message: 'Aucun administrateur disponible pour le moment',
+          });
+        }
+        conversation = await messageService.createSupportConversation(
+          adminId,
+          userId,
+          'support'
+        );
+      }
+    } else if (type === 'admin') {
+      // Seuls les admins peuvent créer des conversations admin-livreur
+      if (userRole !== 'admin' && userRole !== 'super_admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Seuls les admins peuvent créer des conversations admin-livreur',
+        });
+      }
+      if (!participantId) {
+        return res.status(400).json({ success: false, message: 'participantId requis' });
+      }
       conversation = await messageService.createSupportConversation(
         userId,
         participantId,
-        type
+        'admin'
       );
     } else {
       return res.status(400).json({ success: false, message: 'Type de conversation invalide' });

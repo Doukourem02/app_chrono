@@ -937,6 +937,41 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
 };
 
 /**
+ * Récupère le profil utilisateur (first_name, last_name, phone, avatar_url)
+ */
+export const getUserProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+
+    const result = await (pool as any).query(
+      'SELECT id, email, phone, first_name, last_name, avatar_url, role, created_at, updated_at FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Profil récupéré avec succès',
+      data: result.rows[0],
+    });
+  } catch (error: any) {
+    logger.error('Erreur récupération profil utilisateur:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération du profil',
+      error: error.message,
+    });
+  }
+};
+
+/**
  * Upload un avatar vers Supabase Storage et met à jour le profil utilisateur
  */
 export const uploadAvatar = async (req: Request, res: Response): Promise<void> => {

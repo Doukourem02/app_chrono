@@ -72,7 +72,9 @@ export default function VerificationScreen() {
         id: data.data.user.id,
         email: data.data.user.email,
         phone: data.data.user.phone,
-        isVerified: data.data.user.isVerified || true, 
+        isVerified: data.data.user.isVerified || true,
+        first_name: data.data.user.first_name || null,
+        last_name: data.data.user.last_name || null,
       };
       
       setUser(userData);

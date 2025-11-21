@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useDriverStore } from '../../store/useDriverStore';
+import { formatUserName } from '../../utils/formatName';
 import { apiService } from '../../services/apiService';
 
 interface DriverStatistics {
@@ -63,6 +64,32 @@ export default function ProfilePage() {
   useEffect(() => {
     loadStatistics();
   }, [loadStatistics]);
+
+  // Charger les données utilisateur complètes si first_name/last_name manquent
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user?.id) return;
+      
+      // Si first_name et last_name sont déjà disponibles, ne pas recharger
+      if (user.first_name || user.last_name) return;
+
+      try {
+        const result = await apiService.getUserProfile(user.id);
+        if (result.success && result.data) {
+          setUser({
+            ...user,
+            first_name: result.data.first_name,
+            last_name: result.data.last_name,
+            phone: result.data.phone || user.phone,
+          });
+        }
+      } catch (error) {
+        console.error('Erreur chargement profil utilisateur:', error);
+      }
+    };
+
+    loadUserProfile();
+  }, [user?.id, user?.first_name, user?.last_name, setUser]);
 
   // Mettre à jour l'avatar quand l'utilisateur ou le profil change
   useEffect(() => {
@@ -284,12 +311,7 @@ export default function ProfilePage() {
           
           <View style={styles.userInfo}>
             <Text style={styles.userName}>
-              {((user as any)?.first_name && (user as any)?.last_name)
-                ? `${(user as any).first_name} ${(user as any).last_name}`
-                : (profile?.first_name && profile?.last_name)
-                  ? `${profile.first_name} ${profile.last_name}`
-                  : 'Livreur'
-              }
+              {formatUserName(user as any) || formatUserName(profile as any) || user?.email || 'Utilisateur'}
             </Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
             <Text style={styles.userPhone}>{user?.phone}</Text>

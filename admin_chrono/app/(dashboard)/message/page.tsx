@@ -4,10 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Bell } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useAdminMessageStore } from '@/stores/useAdminMessageStore'
-import { adminMessageService } from '@/services/adminMessageService'
+import { adminMessageService, Conversation, Message } from '@/services/adminMessageService'
 import { adminMessageSocketService } from '@/services/adminMessageSocketService'
 import ConversationList from '@/components/message/ConversationList'
 import ChatArea from '@/components/message/ChatArea'
+import NewConversationModal from '@/components/message/NewConversationModal'
 
 export default function MessagePage() {
   const { user } = useAuthStore()
@@ -29,6 +30,7 @@ export default function MessagePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'order' | 'support' | 'admin'>('all')
   const [selectedParticipantPair, setSelectedParticipantPair] = useState<{ participant1Id: string; participant2Id: string } | null>(null)
+  const [isNewConversationModalOpen, setIsNewConversationModalOpen] = useState(false)
 
   const containerStyle: React.CSSProperties = {
     display: 'flex',
@@ -100,7 +102,7 @@ export default function MessagePage() {
       })
 
       // Charger tous les messages de toutes ces conversations
-      const allMessages: Array<{ conversationId: string; message: any }> = []
+      const allMessages: Array<{ conversationId: string; message: Message }> = []
       for (const conv of pairConversations) {
         const messages = await adminMessageService.getMessages(conv.id)
         allMessages.push(...messages.map((msg) => ({ conversationId: conv.id, message: msg })))
@@ -260,13 +262,17 @@ export default function MessagePage() {
     } else if (currentConversation) {
       try {
         adminMessageSocketService.sendMessage(currentConversation.id, content)
-        await adminMessageService.sendMessage(currentConversation.id, content)
+        const sentMessage = await adminMessageService.sendMessage(currentConversation.id, content)
+        if (sentMessage) {
+          addMessage(currentConversation.id, sentMessage)
+        }
+        await loadMessages(currentConversation.id)
       } catch (error) {
         console.error('Error sending message:', error)
         throw error
       }
     }
-  }, [currentConversation, selectedParticipantPair, conversations, loadAllMessagesForPair, setMessages])
+  }, [currentConversation, selectedParticipantPair, conversations, loadAllMessagesForPair, setMessages, addMessage, loadMessages])
 
   useEffect(() => {
     if (!user?.id) return
@@ -315,11 +321,19 @@ export default function MessagePage() {
       }
       adminMessageSocketService.disconnect()
     }
-  }, [user?.id, loadConversations, loadUnreadCount, addMessage, markAsRead])
+  }, [user?.id, loadConversations, loadUnreadCount, addMessage, markAsRead, setMessages])
 
   useEffect(() => {
     loadConversations()
   }, [loadConversations])
+
+  const handleNewConversationCreated = useCallback(async (conversation: Conversation) => {
+    setCurrentConversation(conversation)
+    setSelectedParticipantPair(null)
+    await loadMessages(conversation.id)
+    adminMessageSocketService.joinConversation(conversation.id)
+    await loadConversations()
+  }, [setCurrentConversation, loadMessages, loadConversations])
 
   return (
     <div style={containerStyle}>
@@ -374,6 +388,7 @@ export default function MessagePage() {
           filterType={filterType}
           onFilterChange={setFilterType}
           currentUserId={user?.id}
+          onNewConversation={() => setIsNewConversationModalOpen(true)}
         />
 
         <ChatArea
@@ -391,6 +406,12 @@ export default function MessagePage() {
           currentUserId={user?.id}
         />
       </div>
+
+      <NewConversationModal
+        isOpen={isNewConversationModalOpen}
+        onClose={() => setIsNewConversationModalOpen(false)}
+        onConversationCreated={handleNewConversationCreated}
+      />
     </div>
   )
 }

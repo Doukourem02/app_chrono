@@ -21,6 +21,7 @@ import { logger } from '../../utils/logger';
 import { useMapCamera } from '../../hooks/useMapCamera';
 import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
 import MessageBottomSheet from "../../components/MessageBottomSheet";
+import { formatUserName } from '../../utils/formatName';
 
 export default function Index() {
   const { setHideTabBar } = useUIStore();
@@ -846,7 +847,7 @@ export default function Index() {
         <MessageBottomSheet
           orderId={currentOrder.id}
           clientId={currentOrder.user.id}
-          clientName={currentOrder.user.name}
+          clientName={formatUserName(currentOrder.user, 'Client')}
           clientAvatar={currentOrder.user.avatar}
           panResponder={messagePanResponder}
           animatedHeight={messageAnimatedHeight}
