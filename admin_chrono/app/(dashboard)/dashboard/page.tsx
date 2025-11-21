@@ -245,7 +245,11 @@ export default function DashboardPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Calendar size={16} style={{ color: '#6B7280' }} />
-              11 December 2024
+              {new Date().toLocaleDateString('fr-FR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
             </div>
           </AnimatedButton>
           <AnimatedButton
