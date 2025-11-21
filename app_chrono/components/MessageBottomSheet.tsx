@@ -140,6 +140,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     };
 
     loadDriverInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverId, currentConversation]);
 
   // Priorité 3: Utiliser initialDriverName seulement s'il est valide et pas encore chargé

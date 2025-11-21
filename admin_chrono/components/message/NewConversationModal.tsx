@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { X, User, Truck, Search } from 'lucide-react'
+import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
 import { adminMessageService } from '@/services/adminMessageService'
 import { Conversation } from '@/services/adminMessageService'
@@ -34,11 +35,29 @@ export default function NewConversationModal({
   const [isLoading, setIsLoading] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
 
+  const loadUsers = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const result = await adminApiService.getUsers()
+      if (result.success && result.data) {
+        const allUsers = result.data as UserData[]
+        const targetRole = conversationType === 'support' ? 'client' : 'driver'
+        const filtered = allUsers.filter((user) => user.role === targetRole)
+        setUsers(filtered)
+        setFilteredUsers(filtered)
+      }
+    } catch (error) {
+      console.error('Error loading users:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [conversationType])
+
   useEffect(() => {
     if (isOpen) {
       loadUsers()
     }
-  }, [isOpen, conversationType])
+  }, [isOpen, loadUsers])
 
   useEffect(() => {
     if (searchQuery) {
@@ -57,24 +76,6 @@ export default function NewConversationModal({
       setFilteredUsers(users)
     }
   }, [searchQuery, users])
-
-  const loadUsers = async () => {
-    setIsLoading(true)
-    try {
-      const result = await adminApiService.getUsers()
-      if (result.success && result.data) {
-        const allUsers = result.data as UserData[]
-        const targetRole = conversationType === 'support' ? 'client' : 'driver'
-        const filtered = allUsers.filter((user) => user.role === targetRole)
-        setUsers(filtered)
-        setFilteredUsers(filtered)
-      }
-    } catch (error) {
-      console.error('Error loading users:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleCreateConversation = async (userId: string) => {
     setIsCreating(true)
@@ -281,22 +282,28 @@ export default function NewConversationModal({
             filteredUsers.map((user) => (
               <div
                 key={user.id}
-                style={userItemStyle}
-                onClick={() => handleCreateConversation(user.id)}
+                style={{
+                  ...userItemStyle,
+                  opacity: isCreating ? 0.6 : 1,
+                  pointerEvents: isCreating ? 'none' : 'auto',
+                }}
+                onClick={() => !isCreating && handleCreateConversation(user.id)}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB'
+                  if (!isCreating) {
+                    e.currentTarget.style.backgroundColor = '#F9FAFB'
+                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent'
                 }}
               >
                 {user.avatar_url ? (
-                  <img
+                  <Image
                     src={user.avatar_url}
                     alt={getUserDisplayName(user)}
+                    width={40}
+                    height={40}
                     style={{
-                      width: '40px',
-                      height: '40px',
                       borderRadius: '50%',
                       objectFit: 'cover',
                     }}

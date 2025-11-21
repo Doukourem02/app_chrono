@@ -151,9 +151,9 @@ export default function MessagePage() {
         id: user.id,
         email: user.email || '',
         role: user.role || 'driver',
-        first_name: user.first_name,
-        last_name: user.last_name,
-        avatar_url: user.avatar_url,
+        first_name: user.first_name || undefined,
+        last_name: user.last_name || undefined,
+        avatar_url: undefined,
       },
     };
 

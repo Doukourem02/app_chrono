@@ -263,9 +263,9 @@ export default function MessagePage() {
             id: user.id,
             email: user.email || '',
             role: 'admin',
-            first_name: user.first_name,
-            last_name: user.last_name,
-            avatar_url: user.avatar_url,
+            first_name: (user as any).first_name || (user.user_metadata?.first_name),
+            last_name: (user as any).last_name || (user.user_metadata?.last_name),
+            avatar_url: (user as any).avatar_url || (user.user_metadata?.avatar_url),
           },
         }
         
