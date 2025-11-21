@@ -39,6 +39,17 @@ export const setupMessageSocket = (io: Server): void => {
     });
 
     /**
+     * Identification des admins
+     */
+    socket.on('admin-connect', (adminId: string) => {
+      socket.userId = adminId;
+      socket.userRole = 'admin';
+      if (DEBUG) {
+        logger.debug(`[MessageSocket] Admin connecté: ${adminId}`);
+      }
+    });
+
+    /**
      * Rejoindre une conversation (pour recevoir les messages en temps réel)
      */
     socket.on('join-conversation', async (data: { conversationId: string }) => {

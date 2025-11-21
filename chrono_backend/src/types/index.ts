@@ -3,7 +3,9 @@ export interface User {
   id: string;
   email: string;
   phone?: string;
-  role: 'client' | 'driver' | 'admin'; created_at?: Date; updated_at?: Date;
+  role: 'client' | 'driver' | 'admin' | 'super_admin';
+  created_at?: Date;
+  updated_at?: Date;
 } export interface UserProfile {
   id: string;
   user_id: string;
@@ -85,7 +87,10 @@ export interface Rating {
 } // Types pour l'authentification
 export interface JWTPayload {
   id: string;
-  role: 'client' | 'driver' | 'admin'; type: 'access' | 'refresh'; iat?: number; exp?: number;
+  role: 'client' | 'driver' | 'admin' | 'super_admin';
+  type: 'access' | 'refresh';
+  iat?: number;
+  exp?: number;
 } export interface OTPCode {
   email: string;
   phone: string;
@@ -105,7 +110,9 @@ export interface ApiResponse<T = any> {
 } // Types pour les requêtes Express
 import { Request, Response, NextFunction } from 'express'; export interface AuthenticatedRequest extends Request { user?: JWTPayload;
 } export type RequestHandler = (req: Request | AuthenticatedRequest, res: Response, next: NextFunction) => void | Promise<void>; // Types pour Socket.IO
-import { Socket } from 'socket.io'; export interface SocketWithUser extends Socket { userId?: string; userRole?: 'client' | 'driver' | 'admin';
+import { Socket } from 'socket.io'; export interface SocketWithUser extends Socket {
+  userId?: string;
+  userRole?: 'client' | 'driver' | 'admin' | 'super_admin';
 }
 
 // Types pour les erreurs

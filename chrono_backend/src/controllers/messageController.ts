@@ -5,16 +5,25 @@ import logger from '../utils/logger.js';
 
 /**
  * Récupérer toutes les conversations de l'utilisateur connecté
+ * Pour les admins, retourne toutes les conversations
  */
 export const getConversations = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
+    const userRole = req.user?.role;
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Non authentifié' });
     }
 
     const type = req.query.type as string | undefined;
-    const conversations = await messageService.getUserConversations(userId, type as any);
+    
+    // Si l'utilisateur est admin, retourner toutes les conversations
+    let conversations;
+    if (userRole === 'admin' || userRole === 'super_admin') {
+      conversations = await messageService.getAllConversations(type as any);
+    } else {
+      conversations = await messageService.getUserConversations(userId, type as any);
+    }
 
     return res.json({ success: true, data: conversations });
   } catch (error: any) {
@@ -205,17 +214,24 @@ export const markMessagesAsRead = async (req: AuthenticatedRequest, res: Respons
 
 /**
  * Récupérer le nombre de messages non lus
+ * Pour les admins, retourne le nombre total de messages non lus
  */
 export const getUnreadCount = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
+    const userRole = req.user?.role;
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Non authentifié' });
     }
 
-    const count = await messageService.getUnreadCount(userId);
+    let count;
+    if (userRole === 'admin' || userRole === 'super_admin') {
+      count = await messageService.getAllUnreadCount();
+    } else {
+      count = await messageService.getUnreadCount(userId);
+    }
 
-    return res.json({ success: true, data: { count } });
+    return res.json({ success: true, data: count });
   } catch (error: any) {
     logger.error('Erreur lors du comptage des messages non lus:', error);
     return res.status(500).json({ success: false, message: error.message });

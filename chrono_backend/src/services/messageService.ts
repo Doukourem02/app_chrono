@@ -153,6 +153,46 @@ export class MessageService {
   }
 
   /**
+   * Récupérer toutes les conversations (pour les admins)
+   */
+  async getAllConversations(type?: ConversationType): Promise<Conversation[]> {
+    try {
+      let query = `
+        SELECT c.*,
+               u1.id as p1_id, u1.email as p1_email, u1.role as p1_role,
+               u1.first_name as p1_first_name, u1.last_name as p1_last_name, u1.avatar_url as p1_avatar_url,
+               u2.id as p2_id, u2.email as p2_email, u2.role as p2_role,
+               u2.first_name as p2_first_name, u2.last_name as p2_last_name, u2.avatar_url as p2_avatar_url,
+               (SELECT COUNT(*) FROM messages m 
+                WHERE m.conversation_id = c.id 
+                AND m.is_read = FALSE) as unread_count,
+               (SELECT row_to_json(m.*) FROM messages m 
+                WHERE m.conversation_id = c.id 
+                ORDER BY m.created_at DESC LIMIT 1) as last_message
+        FROM conversations c
+        LEFT JOIN users u1 ON c.participant_1_id = u1.id
+        LEFT JOIN users u2 ON c.participant_2_id = u2.id
+        WHERE c.is_archived = FALSE
+      `;
+
+      const params: any[] = [];
+
+      if (type) {
+        query += ` AND c.type = $1`;
+        params.push(type);
+      }
+
+      query += ` ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC`;
+
+      const result = await pool.query(query, params);
+      return result.rows.map((row) => this.mapConversationFromRow(row));
+    } catch (error: any) {
+      logger.error('Erreur lors de la récupération de toutes les conversations:', error);
+      throw new Error(`Impossible de récupérer les conversations: ${error.message}`);
+    }
+  }
+
+  /**
    * Récupérer ou créer une conversation pour une commande
    */
   async getOrCreateOrderConversation(orderId: string): Promise<Conversation | null> {
@@ -244,16 +284,22 @@ export class MessageService {
       const offset = (page - 1) * limit;
 
       const result = await pool.query(
-        `SELECT m.*, u.id as sender_user_id, u.email as sender_email, u.role as sender_role
+        `SELECT m.*, 
+                u.id as sender_user_id, 
+                u.email as sender_email, 
+                u.role as sender_role,
+                u.first_name as sender_first_name,
+                u.last_name as sender_last_name,
+                u.avatar_url as sender_avatar_url
          FROM messages m
          LEFT JOIN users u ON m.sender_id = u.id
          WHERE m.conversation_id = $1
-         ORDER BY m.created_at DESC
+         ORDER BY m.created_at ASC
          LIMIT $2 OFFSET $3`,
         [conversationId, limit, offset]
       );
 
-      return result.rows.map((row) => this.mapMessageFromRow(row)).reverse(); // Reverse pour avoir les plus anciens en premier
+      return result.rows.map((row) => this.mapMessageFromRow(row));
     } catch (error: any) {
       logger.error('Erreur lors de la récupération des messages:', error);
       throw new Error(`Impossible de récupérer les messages: ${error.message}`);
@@ -299,6 +345,26 @@ export class MessageService {
       return parseInt(result.rows[0].count, 10);
     } catch (error: any) {
       logger.error('Erreur lors du comptage des messages non lus:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Récupérer le nombre total de messages non lus (pour les admins)
+   */
+  async getAllUnreadCount(): Promise<number> {
+    try {
+      const result = await pool.query(
+        `SELECT COUNT(*) as count
+         FROM messages m
+         INNER JOIN conversations c ON m.conversation_id = c.id
+         WHERE m.is_read = FALSE
+         AND c.is_archived = FALSE`
+      );
+
+      return parseInt(result.rows[0].count, 10);
+    } catch (error: any) {
+      logger.error('Erreur lors du comptage de tous les messages non lus:', error);
       return 0;
     }
   }
@@ -416,7 +482,10 @@ export class MessageService {
         id: row.sender_user_id,
         email: row.sender_email,
         role: row.sender_role,
-      };
+        first_name: row.sender_first_name,
+        last_name: row.sender_last_name,
+        avatar_url: row.sender_avatar_url,
+      } as User & { first_name?: string; last_name?: string; avatar_url?: string };
     }
 
     return message;
