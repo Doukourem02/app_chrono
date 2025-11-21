@@ -505,36 +505,120 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     }
 
     const searchTerm = `%${query.trim()}%`;
+    const exactSearchTerm = query.trim();
+    const upperQuery = query.trim().toUpperCase();
+    
+    // Détecter si c'est une recherche d'ID de commande (commence par CHL ou CHLV, ou pattern similaire)
+    // Le format est CHLV–YYMMDD-XXXX, donc on cherche si ça commence par CHL
+    const isDeliveryIdSearch = upperQuery.startsWith('CHL') || 
+                                /^[A-Z]{2,4}[\-–]?[0-9]{0,6}[\-–]?[A-Z0-9]{0,4}$/i.test(upperQuery) ||
+                                (upperQuery.length <= 8 && /^[A-Z0-9]+$/.test(upperQuery)); // Court et alphanumérique uniquement
+    
+    // Construire la condition de recherche pour l'ID formaté
+    // Le format est : CHLV–YYMMDD-XXXX où XXXX sont les 4 derniers caractères de l'ID UUID (sans tirets)
+    let deliveryIdCondition = '';
+    if (isDeliveryIdSearch) {
+      // Rechercher dans l'ID formaté : CHLV + date + suffixe
+      // On cherche dans : CHLV + date formatée + les 4 derniers caractères de l'ID
+      // Utiliser $4 pour le pattern de recherche spécifique qui commence par la requête (sera ajouté dans les params)
+      deliveryIdCondition = `
+        OR (
+          'CHLV' || '–' || 
+          TO_CHAR(o.created_at, 'YYMMDD') || '-' || 
+          UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), -4))
+        ) ILIKE $1
+        OR (
+          'CHLV' || '–' || 
+          TO_CHAR(o.created_at, 'YYMMDD') || '-' || 
+          UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), -4))
+        ) ILIKE $4
+        OR UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), 1, LENGTH($5))) = $5
+      `;
+    }
 
-    // Rechercher dans les commandes
+    // Rechercher dans les commandes avec plus de précision
     const ordersQuery = `
-      SELECT id, status, created_at, pickup_address, dropoff_address
-      FROM orders
+      SELECT 
+        o.id, 
+        o.status, 
+        o.created_at, 
+        o.pickup_address, 
+        o.dropoff_address,
+        o.user_id,
+        o.driver_id,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name,
+        u.email as user_email,
+        d.first_name as driver_first_name,
+        d.last_name as driver_last_name,
+        d.email as driver_email
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      LEFT JOIN users d ON o.driver_id = d.id
       WHERE 
-        id::text ILIKE $1 OR
-        status::text ILIKE $1 OR
-        pickup_address::text ILIKE $1 OR
-        dropoff_address::text ILIKE $1
-      ORDER BY created_at DESC
+        o.id::text ILIKE $1 OR
+        REPLACE(o.id::text, '-', '') ILIKE $1 OR
+        o.status::text ILIKE $1 OR
+        o.pickup_address::text ILIKE $1 OR
+        o.dropoff_address::text ILIKE $1 OR
+        u.email ILIKE $1 OR
+        u.phone ILIKE $1 OR
+        u.first_name ILIKE $1 OR
+        u.last_name ILIKE $1 OR
+        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) ILIKE $1 OR
+        d.email ILIKE $1 OR
+        d.phone ILIKE $1 OR
+        d.first_name ILIKE $1 OR
+        d.last_name ILIKE $1 OR
+        CONCAT(COALESCE(d.first_name, ''), ' ', COALESCE(d.last_name, '')) ILIKE $1
+        ${deliveryIdCondition}
+      ORDER BY 
+        CASE 
+          WHEN o.id::text = $2 THEN 1
+          WHEN REPLACE(o.id::text, '-', '') ILIKE $3 THEN 2
+          ${isDeliveryIdSearch ? `WHEN (
+            'CHLV' || '–' || 
+            TO_CHAR(o.created_at, 'YYMMDD') || '-' || 
+            UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), -4))
+          ) ILIKE $4 THEN 2` : ''}
+          ELSE 3
+        END,
+        o.created_at DESC
       LIMIT 10
     `;
 
-    // Rechercher dans les utilisateurs
+    // Rechercher dans les utilisateurs avec recherche par nom et prénom
     const usersQuery = `
-      SELECT id, email, phone, role, created_at
+      SELECT id, email, phone, role, first_name, last_name, created_at
       FROM users
       WHERE 
         email ILIKE $1 OR
         phone ILIKE $1 OR
-        role ILIKE $1
-      ORDER BY created_at DESC
+        role ILIKE $1 OR
+        first_name ILIKE $1 OR
+        last_name ILIKE $1 OR
+        CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) ILIKE $1
+      ORDER BY 
+        CASE 
+          WHEN email = $2 THEN 1
+          WHEN email ILIKE $3 THEN 2
+          WHEN CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) ILIKE $1 THEN 3
+          ELSE 4
+        END,
+        created_at DESC
       LIMIT 10
     `;
 
     let ordersResult, usersResult;
     try {
-      ordersResult = await (pool as any).query(ordersQuery, [searchTerm]);
-      usersResult = await (pool as any).query(usersQuery, [searchTerm]);
+      // Pour les commandes : searchTerm ($1), exactSearchTerm ($2), `${exactSearchTerm}%` ($3), et si deliveryIdSearch: `${upperQuery}%` ($4) et upperQuery ($5)
+      const ordersParams: any[] = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
+      if (isDeliveryIdSearch) {
+        ordersParams.push(`${upperQuery}%`, upperQuery);
+      }
+      ordersResult = await (pool as any).query(ordersQuery, ordersParams);
+      // Pour les utilisateurs : searchTerm, exactSearchTerm, searchTerm (pour le tri)
+      usersResult = await (pool as any).query(usersQuery, [searchTerm, exactSearchTerm, `${exactSearchTerm}%`]);
     } catch (queryError: any) {
       logger.error('❌ [getAdminGlobalSearch] Erreur lors de la requête SQL:', queryError);
       throw queryError;
@@ -559,23 +643,42 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       const idParts = order.id.replace(/-/g, '').substring(0, 9);
       const deliveryId = `${idParts.substring(0, 2)}-${idParts.substring(2, 7)}-${idParts.substring(7, 9)}`.toUpperCase();
 
+      const clientName = (order.user_first_name && order.user_last_name)
+        ? `${order.user_first_name} ${order.user_last_name}`
+        : order.user_email || 'N/A';
+      
+      const driverName = (order.driver_first_name && order.driver_last_name)
+        ? `${order.driver_first_name} ${order.driver_last_name}`
+        : order.driver_email || 'N/A';
+
       return {
         id: order.id,
         deliveryId,
         status: order.status,
         pickup: pickup?.address || pickup?.formatted_address || pickup?.name || 'Adresse inconnue',
         dropoff: dropoff?.address || dropoff?.formatted_address || dropoff?.name || 'Adresse inconnue',
+        clientName,
+        driverName,
         createdAt: new Date(order.created_at).toLocaleDateString('fr-FR'),
       };
     });
 
-    const formattedUsers = usersResult.rows.map((user: any) => ({
-      id: user.id,
-      email: user.email,
-      phone: user.phone || 'N/A',
-      role: user.role,
-      createdAt: new Date(user.created_at).toLocaleDateString('fr-FR'),
-    }));
+    const formattedUsers = usersResult.rows.map((user: any) => {
+      const fullName = (user.first_name && user.last_name)
+        ? `${user.first_name} ${user.last_name}`
+        : null;
+
+      return {
+        id: user.id,
+        email: user.email,
+        phone: user.phone || 'N/A',
+        role: user.role,
+        first_name: user.first_name || null,
+        last_name: user.last_name || null,
+        fullName,
+        createdAt: new Date(user.created_at).toLocaleDateString('fr-FR'),
+      };
+    });
 
     logger.info(`✅ [getAdminGlobalSearch] Résultats: ${formattedOrders.length} commandes, ${formattedUsers.length} utilisateurs`);
 
@@ -1430,9 +1533,14 @@ export const getAdminReportDeliveries = async (req: Request, res: Response): Pro
         u.first_name as user_first_name,
         u.last_name as user_last_name,
         u.email as user_email,
-        u.phone as user_phone
+        u.phone as user_phone,
+        d.first_name as driver_first_name,
+        d.last_name as driver_last_name,
+        d.email as driver_email,
+        d.phone as driver_phone
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
+      LEFT JOIN users d ON o.driver_id = d.id
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -1645,6 +1753,8 @@ export const getAdminReportDrivers = async (req: Request, res: Response): Promis
         u.id,
         u.email,
         u.phone,
+        u.first_name,
+        u.last_name,
         u.created_at,
         COUNT(DISTINCT o.id) as total_deliveries,
         COUNT(DISTINCT CASE WHEN o.status = 'completed' THEN o.id END) as completed_deliveries,
@@ -1668,7 +1778,7 @@ export const getAdminReportDrivers = async (req: Request, res: Response): Promis
       paramIndex++;
     }
 
-    query += ` GROUP BY u.id, u.email, u.phone, u.created_at ORDER BY total_revenue DESC`;
+    query += ` GROUP BY u.id, u.email, u.phone, u.first_name, u.last_name, u.created_at ORDER BY total_revenue DESC`;
 
     const result = await (pool as any).query(query, params);
 
@@ -2618,8 +2728,12 @@ export const getAdminRatings = async (req: Request, res: Response): Promise<void
         r.*,
         u.email as user_email,
         u.phone as user_phone,
+        u.first_name as user_first_name,
+        u.last_name as user_last_name,
         d.email as driver_email,
         d.phone as driver_phone,
+        d.first_name as driver_first_name,
+        d.last_name as driver_last_name,
         o.id as order_id_full
       FROM ratings r
       LEFT JOIN users u ON r.user_id = u.id

@@ -12,8 +12,12 @@ interface Rating {
   rating: string | number
   user_email?: string
   user_phone?: string
+  user_first_name?: string
+  user_last_name?: string
   driver_email?: string
   driver_phone?: string
+  driver_first_name?: string
+  driver_last_name?: string
   order_id?: string
   order_id_full?: string
   comment?: string
@@ -350,7 +354,11 @@ export default function RatingsPage() {
                       </td>
                       <td style={tdStyle}>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{rating.user_email || 'N/A'}</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {rating.user_first_name || rating.user_last_name
+                              ? `${rating.user_first_name || ''} ${rating.user_last_name || ''}`.trim()
+                              : rating.user_email || 'N/A'}
+                          </div>
                           <div style={{ fontSize: '12px', color: '#6B7280' }}>
                             {rating.user_phone || ''}
                           </div>
@@ -358,7 +366,11 @@ export default function RatingsPage() {
                       </td>
                       <td style={tdStyle}>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{rating.driver_email || 'N/A'}</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {rating.driver_first_name || rating.driver_last_name
+                              ? `${rating.driver_first_name || ''} ${rating.driver_last_name || ''}`.trim()
+                              : rating.driver_email || 'N/A'}
+                          </div>
                           <div style={{ fontSize: '12px', color: '#6B7280' }}>
                             {rating.driver_phone || ''}
                           </div>

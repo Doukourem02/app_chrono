@@ -1,37 +1,306 @@
 'use client'
 
+import React, { useMemo, useEffect, useCallback } from 'react'
 import { AnimatedCard } from '@/components/animations'
+import { useAdminMessageStore } from '@/stores/useAdminMessageStore'
+import { useDriversTracking } from '@/hooks/useDriversTracking'
+import { adminSocketService } from '@/lib/adminSocketService'
+import { adminMessageService } from '@/services/adminMessageService'
+import { adminMessageSocketService } from '@/services/adminMessageSocketService'
+import { Conversation } from '@/services/adminMessageService'
+import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/stores/authStore'
 
-interface MessageContact {
+export default function QuickMessage() {
+  const router = useRouter()
+  const { user } = useAuthStore()
+  const { conversations, setConversations } = useAdminMessageStore()
+  const isSocketConnected = adminSocketService.isConnected()
+  const { onlineDrivers } = useDriversTracking(isSocketConnected)
+
+  // Charger les conversations au montage et périodiquement
+  const loadConversations = useCallback(async () => {
+    if (!user?.id) return
+
+    try {
+      const data = await adminMessageService.getConversations()
+      setConversations(data)
+      
+      // Rejoindre automatiquement toutes les conversations pour recevoir les messages en temps réel
+      for (const conv of data) {
+        adminMessageSocketService.joinConversation(conv.id)
+      }
+    } catch (error) {
+      console.error('Error loading conversations in QuickMessage:', error)
+    }
+  }, [user?.id, setConversations])
+
+  // Charger les conversations au montage
+  useEffect(() => {
+    if (user?.id) {
+      // Connecter le socket si pas déjà connecté
+      if (!adminSocketService.isConnected()) {
+        adminMessageSocketService.connect(user.id)
+      }
+      
+      loadConversations()
+    }
+  }, [user?.id, loadConversations])
+
+  // Recharger les conversations périodiquement pour détecter les nouveaux messages et changements de statut
+  useEffect(() => {
+    if (!user?.id) return
+
+    const interval = setInterval(() => {
+      loadConversations()
+    }, 10000) // Recharger toutes les 10 secondes
+    
+    return () => clearInterval(interval)
+  }, [user?.id, loadConversations])
+
+  // Calculer le nombre total de personnes en ligne
+  const onlineCount = useMemo(() => {
+    let count = 0
+    
+    // Compter les drivers en ligne
+    const onlineDriversArray = Array.from(onlineDrivers.values())
+    const activeDrivers = onlineDriversArray.filter((driver) => {
+      if (driver.is_online !== true) return false
+      if (!driver.updated_at) return false
+      
+      const updatedAt = new Date(driver.updated_at)
+      const now = new Date()
+      const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60)
+      return diffInMinutes <= 5 // Actif si mis à jour dans les 5 dernières minutes
+    })
+    
+    count += activeDrivers.length
+    
+    // Compter les clients en ligne (basé sur la dernière activité dans les conversations)
+    // Un client est considéré en ligne s'il a envoyé un message dans les 5 dernières minutes
+    const now = new Date()
+    const activeClientIds = new Set<string>()
+    
+    conversations.forEach((conv) => {
+      if (conv.type === 'order') {
+        // Vérifier participant_1 (client ou driver)
+        if (conv.participant_1 && conv.participant_1.role === 'client') {
+          if (conv.last_message_at) {
+            const lastMessageAt = new Date(conv.last_message_at)
+            const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
+            if (diffInMinutes <= 5 && conv.last_message?.sender_id === conv.participant_1_id) {
+              activeClientIds.add(conv.participant_1_id)
+            }
+          }
+        }
+        
+        // Vérifier participant_2 (client ou driver)
+        if (conv.participant_2 && conv.participant_2.role === 'client') {
+          if (conv.last_message_at) {
+            const lastMessageAt = new Date(conv.last_message_at)
+            const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
+            if (diffInMinutes <= 5 && conv.last_message?.sender_id === conv.participant_2_id) {
+              activeClientIds.add(conv.participant_2_id)
+            }
+          }
+        }
+      } else if (conv.type === 'support' || conv.type === 'admin') {
+        // Pour support/admin, vérifier l'autre participant
+        const otherParticipant = conv.participant_1_id === user?.id ? conv.participant_2 : conv.participant_1
+        if (otherParticipant && conv.last_message_at) {
+          const lastMessageAt = new Date(conv.last_message_at)
+          const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
+          if (diffInMinutes <= 5 && conv.last_message?.sender_id === otherParticipant.id) {
+            activeClientIds.add(otherParticipant.id)
+          }
+        }
+      }
+    })
+    
+    count += activeClientIds.size
+    
+    return count
+  }, [conversations, onlineDrivers, user?.id])
+
+  // Préparer les contacts pour l'affichage (limiter à 2-3 contacts les plus récents)
+  const contacts = useMemo(() => {
+    const contactsMap = new Map<string, {
   id: string
   name: string
   avatar: string
   status: 'online' | 'offline'
   lastSeen: string
-  unreadCount?: number
-}
+      unreadCount: number
+      conversationId: string
+      isGroup: boolean
+      groupKey?: string
+    }>()
 
-const contacts: MessageContact[] = [
-  {
-    id: '1',
-    name: 'Ethan',
-    avatar: 'E',
-    status: 'online',
-    lastSeen: '12/12/24',
-    unreadCount: 2,
-  },
-  {
-    id: '2',
-    name: 'Ricky',
-    avatar: 'R',
-    status: 'offline',
-    lastSeen: '11/12/24',
-  },
-]
+    const now = new Date()
 
-const totalOnline = 24
+    conversations.forEach((conv) => {
+      if (conv.type === 'order') {
+        // Pour les conversations de commande, créer un contact groupé
+        const participantIds = [conv.participant_1_id, conv.participant_2_id].sort()
+        const groupKey = `order_${participantIds[0]}_${participantIds[1]}`
+        
+        if (!contactsMap.has(groupKey)) {
+          const p1 = conv.participant_1
+          const p2 = conv.participant_2
+          
+          const getName = (p: Conversation['participant_1']) => {
+            if (!p) return ''
+            const firstName = p.first_name || ''
+            const lastName = p.last_name || ''
+            if (firstName || lastName) {
+              return `${firstName} ${lastName}`.trim()
+            }
+            return p.email || ''
+          }
+          
+          const name1 = getName(p1)
+          const name2 = getName(p2)
+          
+          let displayName = 'Utilisateur'
+          if (name1 && name2) {
+            const client = p1?.role === 'client' ? name1 : (p2?.role === 'client' ? name2 : name1)
+            const driver = p1?.role === 'driver' ? name1 : (p2?.role === 'driver' ? name2 : name2)
+            displayName = `${client} ↔ ${driver}`
+          } else {
+            displayName = name1 || name2 || 'Utilisateur'
+          }
+          
+          // Déterminer le statut (online si au moins un participant est actif)
+          let isOnline = false
+          let lastSeenDate = conv.last_message_at ? new Date(conv.last_message_at) : new Date(conv.created_at || now)
+          
+          // Vérifier si le driver est en ligne
+          const driverId = p1?.role === 'driver' ? conv.participant_1_id : (p2?.role === 'driver' ? conv.participant_2_id : null)
+          if (driverId) {
+            const driver = onlineDrivers.get(driverId)
+            if (driver && driver.is_online === true && driver.updated_at) {
+              const updatedAt = new Date(driver.updated_at)
+              const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60)
+              if (diffInMinutes <= 5) {
+                isOnline = true
+              }
+            }
+          }
+          
+          // Vérifier si le client a été actif récemment
+          const clientId = p1?.role === 'client' ? conv.participant_1_id : (p2?.role === 'client' ? conv.participant_2_id : null)
+          if (clientId && conv.last_message_at && conv.last_message?.sender_id === clientId) {
+            const lastMessageAt = new Date(conv.last_message_at)
+            const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
+            if (diffInMinutes <= 5) {
+              isOnline = true
+            }
+          }
+          
+          // Calculer le nombre de messages non lus pour ce groupe
+          const groupConversations = conversations.filter((c) => {
+            if (c.type !== 'order') return false
+            const cIds = [c.participant_1_id, c.participant_2_id].sort()
+            return cIds[0] === participantIds[0] && cIds[1] === participantIds[1]
+          })
+          const totalUnread = groupConversations.reduce((sum, c) => sum + (c.unread_count || 0), 0)
+          
+          contactsMap.set(groupKey, {
+            id: groupKey,
+            name: displayName,
+            avatar: displayName.charAt(0).toUpperCase(),
+            status: isOnline ? 'online' : 'offline',
+            lastSeen: lastSeenDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }),
+            unreadCount: totalUnread,
+            conversationId: conv.id,
+            isGroup: true,
+            groupKey,
+          })
+        } else {
+          // Mettre à jour le nombre de messages non lus
+          const existing = contactsMap.get(groupKey)!
+          const groupConversations = conversations.filter((c) => {
+            if (c.type !== 'order') return false
+            const cIds = [c.participant_1_id, c.participant_2_id].sort()
+            return cIds[0] === participantIds[0] && cIds[1] === participantIds[1]
+          })
+          const totalUnread = groupConversations.reduce((sum, c) => sum + (c.unread_count || 0), 0)
+          existing.unreadCount = totalUnread
+        }
+      } else {
+        // Pour support/admin, créer un contact individuel
+        const otherParticipant = conv.participant_1_id === user?.id ? conv.participant_2 : conv.participant_1
+        
+        if (otherParticipant) {
+          const firstName = otherParticipant.first_name || ''
+          const lastName = otherParticipant.last_name || ''
+          const displayName = firstName || lastName 
+            ? `${firstName} ${lastName}`.trim() 
+            : otherParticipant.email || 'Utilisateur'
+          
+          // Déterminer le statut
+          let isOnline = false
+          let lastSeenDate = conv.last_message_at ? new Date(conv.last_message_at) : new Date(conv.created_at || now)
+          
+          // Si c'est un driver, vérifier dans onlineDrivers
+          if (otherParticipant.role === 'driver') {
+            const driver = onlineDrivers.get(otherParticipant.id)
+            if (driver && driver.is_online === true && driver.updated_at) {
+              const updatedAt = new Date(driver.updated_at)
+              const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60)
+              if (diffInMinutes <= 5) {
+                isOnline = true
+              }
+            }
+          } else {
+            // Pour les clients, vérifier la dernière activité
+            if (conv.last_message_at && conv.last_message?.sender_id === otherParticipant.id) {
+              const lastMessageAt = new Date(conv.last_message_at)
+              const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
+              if (diffInMinutes <= 5) {
+                isOnline = true
+              }
+            }
+          }
+          
+          contactsMap.set(conv.id, {
+            id: conv.id,
+            name: displayName,
+            avatar: displayName.charAt(0).toUpperCase(),
+            status: isOnline ? 'online' : 'offline',
+            lastSeen: lastSeenDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }),
+            unreadCount: conv.unread_count || 0,
+            conversationId: conv.id,
+            isGroup: false,
+          })
+        }
+      }
+    })
 
-export default function QuickMessage() {
+    // Trier par priorité (messages non lus d'abord, puis par dernière activité) et limiter à 2-3 contacts
+    const sortedContacts = Array.from(contactsMap.values()).sort((a, b) => {
+      // Priorité aux messages non lus
+      if (a.unreadCount > 0 && b.unreadCount === 0) return -1
+      if (a.unreadCount === 0 && b.unreadCount > 0) return 1
+      
+      // Ensuite par dernière activité
+      const dateA = conversations.find(c => c.id === a.conversationId)?.last_message_at
+      const dateB = conversations.find(c => c.id === b.conversationId)?.last_message_at
+      if (!dateA && !dateB) return 0
+      if (!dateA) return 1
+      if (!dateB) return -1
+      return new Date(dateB).getTime() - new Date(dateA).getTime()
+    })
+
+    // Limiter à 2 contacts maximum pour le dashboard
+    return sortedContacts.slice(0, 2)
+  }, [conversations, onlineDrivers, user?.id])
+
+  const handleContactClick = (contact: typeof contacts[0]) => {
+    // Naviguer vers la page de messages avec la conversation sélectionnée
+    router.push('/message')
+  }
+
   const cardStyle: React.CSSProperties = {
     backgroundColor: '#FFFFFF',
     borderRadius: '16px',
@@ -91,6 +360,7 @@ export default function QuickMessage() {
 
   const avatarContainerStyle: React.CSSProperties = {
     position: 'relative',
+    flexShrink: 0,
   }
 
   const avatarStyle: React.CSSProperties = {
@@ -127,12 +397,16 @@ export default function QuickMessage() {
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: '4px',
+    gap: '8px',
   }
 
   const contactNameStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
     color: '#111827',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   }
 
   const unreadBadgeStyle: React.CSSProperties = {
@@ -145,6 +419,7 @@ export default function QuickMessage() {
     fontSize: '12px',
     fontWeight: 600,
     borderRadius: '4px',
+    flexShrink: 0,
   }
 
   const contactStatusStyle: React.CSSProperties = {
@@ -157,15 +432,21 @@ export default function QuickMessage() {
       <div style={headerStyle}>
         <h2 style={titleStyle}>Quick Message</h2>
         <span style={onlineBadgeStyle}>
-          {totalOnline} Online
+          {onlineCount} Online
         </span>
       </div>
 
       <div style={contactsListStyle}>
-        {contacts.map((contact) => (
+        {contacts.length === 0 ? (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>
+            Aucune conversation
+          </div>
+        ) : (
+          contacts.map((contact) => (
           <div
             key={contact.id}
             style={contactItemStyle}
+              onClick={() => handleContactClick(contact)}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#F9FAFB'
             }}
@@ -183,10 +464,10 @@ export default function QuickMessage() {
             </div>
             <div style={contactInfoStyle}>
               <div style={contactHeaderStyle}>
-                <p style={contactNameStyle}>{contact.name}</p>
-                {contact.unreadCount && (
+                  <p style={contactNameStyle} title={contact.name}>{contact.name}</p>
+                  {contact.unreadCount > 0 && (
                   <span style={unreadBadgeStyle}>
-                    {contact.unreadCount} new message
+                      {contact.unreadCount} new message{contact.unreadCount > 1 ? 's' : ''}
                   </span>
                 )}
               </div>
@@ -195,9 +476,9 @@ export default function QuickMessage() {
               </p>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </AnimatedCard>
   )
 }
-

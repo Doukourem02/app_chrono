@@ -12,6 +12,10 @@ interface SearchOrder {
   deliveryId: string
   pickup: string
   dropoff: string
+  status: string
+  clientName?: string
+  driverName?: string
+  createdAt: string
 }
 
 interface SearchUser {
@@ -19,12 +23,17 @@ interface SearchUser {
   email: string
   role: string
   phone: string
+  first_name?: string | null
+  last_name?: string | null
+  fullName?: string | null
+  createdAt: string
 }
 
 export default function Header() {
   const router = useRouter()
   const { dateFilter, setDateFilter } = useDateFilter()
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -34,11 +43,20 @@ export default function Header() {
   const datePickerRef = useRef<HTMLDivElement>(null)
   const notificationsRef = useRef<HTMLDivElement>(null)
 
+  // Debounce pour éviter trop de requêtes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query)
+    }, 300) // Attendre 300ms après la dernière frappe
+
+    return () => clearTimeout(timer)
+  }, [query])
+
   const { data: searchResults, isLoading: isSearching } = useQuery({
-    queryKey: ['global-search', query],
-    queryFn: () => adminApiService.globalSearch(query),
-    enabled: query.trim().length > 2,
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    queryKey: ['global-search', debouncedQuery],
+    queryFn: () => adminApiService.globalSearch(debouncedQuery),
+    enabled: debouncedQuery.trim().length > 2,
+    staleTime: 30000, // Cache pendant 30 secondes
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -65,14 +83,60 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSearchResultClick = (type: 'order' | 'user') => {
-    if (type === 'order') {
+  const handleSearchResultClick = (type: 'order' | 'user', id?: string) => {
+    if (type === 'order' && id) {
       router.push(`/orders`)
-    } else if (type === 'user') {
-      router.push(`/users`)
+      // Optionnel : on pourrait ajouter un paramètre pour pré-sélectionner la commande
+    } else if (type === 'user' && id) {
+      router.push(`/users/${id}`)
+    } else {
+      if (type === 'order') {
+        router.push(`/orders`)
+      } else if (type === 'user') {
+        router.push(`/users`)
+      }
     }
     setShowSearchResults(false)
     setQuery('')
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return '#10B981'
+      case 'pending':
+        return '#F59E0B'
+      case 'accepted':
+        return '#3B82F6'
+      case 'cancelled':
+        return '#EF4444'
+      case 'enroute':
+      case 'picked_up':
+        return '#8B5CF6'
+      default:
+        return '#6B7280'
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      completed: 'Complété',
+      pending: 'En attente',
+      accepted: 'Accepté',
+      cancelled: 'Annulé',
+      enroute: 'En route',
+      picked_up: 'Récupéré',
+    }
+    return statusMap[status?.toLowerCase()] || status
+  }
+
+  const getRoleLabel = (role: string) => {
+    const roleMap: Record<string, string> = {
+      client: 'Client',
+      driver: 'Livreur',
+      admin: 'Admin',
+    }
+    return roleMap[role?.toLowerCase()] || role
   }
 
   const dateOptions: { value: DateFilterType; label: string }[] = [
@@ -149,7 +213,7 @@ export default function Header() {
     borderBottom: '1px solid #F3F4F6',
     cursor: 'pointer',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: '12px',
     transition: 'background-color 0.2s',
   }
@@ -255,7 +319,7 @@ export default function Header() {
           onFocus={(e) => {
             e.target.style.boxShadow = '0 0 0 2px rgba(139, 92, 246, 0.2)'
             e.target.style.backgroundColor = '#FFFFFF'
-            if (query.length > 2) {
+            if (debouncedQuery.length > 2 || query.length > 2) {
               setShowSearchResults(true)
             }
           }}
@@ -294,7 +358,7 @@ export default function Header() {
             <X size={16} style={{ color: '#6B7280' }} />
           </button>
         )}
-        {showSearchResults && query.length > 2 && (
+        {showSearchResults && (query.length > 2 || debouncedQuery.length > 2) && (
           <div style={searchResultsStyle}>
             {isSearching ? (
               <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>
@@ -311,7 +375,7 @@ export default function Header() {
                       <div
                         key={order.id}
                         style={searchResultItemStyle}
-                        onClick={() => handleSearchResultClick('order')}
+                        onClick={() => handleSearchResultClick('order', order.id)}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = '#F9FAFB'
                         }}
@@ -319,13 +383,37 @@ export default function Header() {
                           e.currentTarget.style.backgroundColor = 'transparent'
                         }}
                       >
-                        <Package size={20} style={{ color: '#8B5CF6' }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                            {order.deliveryId}
+                        <Package size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                              {order.deliveryId}
+                            </div>
+                            <span
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                backgroundColor: getStatusColor(order.status) + '20',
+                                color: getStatusColor(order.status),
+                              }}
+                            >
+                              {getStatusLabel(order.status)}
+                            </span>
                           </div>
-                          <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                          <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
                             {order.pickup} → {order.dropoff}
+                          </div>
+                          {(order.clientName || order.driverName) && (
+                            <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
+                              {order.clientName && `Client: ${order.clientName}`}
+                              {order.clientName && order.driverName && ' • '}
+                              {order.driverName && `Livreur: ${order.driverName}`}
+                            </div>
+                          )}
+                          <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                            {order.createdAt}
                           </div>
                         </div>
                       </div>
@@ -337,29 +425,57 @@ export default function Header() {
                     <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
                       Utilisateurs ({searchResults.data.users.length})
                     </div>
-                    {((searchResults.data.users as SearchUser[]) || []).map((user: SearchUser) => (
-                      <div
-                        key={user.id}
-                        style={searchResultItemStyle}
-                        onClick={() => handleSearchResultClick('user')}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#F9FAFB'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                      >
-                        <User size={20} style={{ color: '#10B981' }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                            {user.email}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#6B7280' }}>
-                            {user.role} • {user.phone}
+                    {((searchResults.data.users as SearchUser[]) || []).map((user: SearchUser) => {
+                      const displayName = user.fullName || user.email
+                      const roleColor = user.role === 'driver' ? '#8B5CF6' : user.role === 'admin' ? '#EF4444' : '#10B981'
+                      
+                      return (
+                        <div
+                          key={user.id}
+                          style={searchResultItemStyle}
+                          onClick={() => handleSearchResultClick('user', user.id)}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F9FAFB'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                        >
+                          <User size={20} style={{ color: roleColor, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {displayName}
+                              </div>
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  backgroundColor: roleColor + '20',
+                                  color: roleColor,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {getRoleLabel(user.role)}
+                              </span>
+                            </div>
+                            {user.fullName && (
+                              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                {user.email}
+                              </div>
+                            )}
+                            <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                              {user.phone}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                              Inscrit le {user.createdAt}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </>
                 )}
               </>

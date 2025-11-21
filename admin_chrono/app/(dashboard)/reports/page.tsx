@@ -34,6 +34,10 @@ interface Delivery {
   user_last_name?: string
   user_email?: string
   user_phone?: string
+  driver_first_name?: string
+  driver_last_name?: string
+  driver_email?: string
+  driver_phone?: string
 }
 
 interface Revenue {
@@ -58,6 +62,8 @@ interface Driver {
   id: string
   email?: string
   phone?: string
+  first_name?: string
+  last_name?: string
   created_at?: string
   total_deliveries?: number
   completed_deliveries?: number
@@ -230,12 +236,15 @@ export default function ReportsPage() {
               const clientName = (order.user_first_name && order.user_last_name)
                 ? `${order.user_first_name} ${order.user_last_name}`
                 : order.user_email || order.user_id?.slice(0, 8) + '...' || 'N/A'
+              const driverName = (order.driver_first_name && order.driver_last_name)
+                ? `${order.driver_first_name} ${order.driver_last_name}`
+                : order.driver_email || order.driver_id?.slice(0, 8) + '...' || 'N/A'
               return [
                 order.id.slice(0, 8) + '...',
                 formatDate(order.created_at || ''),
                 order.status || 'N/A',
                 clientName,
-                order.driver_id?.slice(0, 8) + '...' || 'N/A',
+                driverName,
                 typeof order.price === 'number'
                   ? order.price
                   : typeof order.price_cfa === 'number'
@@ -311,20 +320,26 @@ export default function ReportsPage() {
         exportData(
           {
             title: `Rapport des Drivers - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
-            headers: ['Email', 'Téléphone', "Date d'inscription", 'Livraisons totales', 'Livraisons complétées', 'Revenus totaux (FCFA)', 'Rating moyen'],
-            rows: drivers.map((driver: Driver) => [
-              driver.email || 'N/A',
-              driver.phone || 'N/A',
-              formatDate(driver.created_at || ''),
-              driver.total_deliveries || 0,
-              driver.completed_deliveries || 0,
-              typeof driver.total_revenue === 'number'
-                ? driver.total_revenue
-                : parseFloat(String(driver.total_revenue || 0)),
-              driver.averageRating
-                ? `${driver.averageRating.toFixed(1)} ⭐ (${driver.totalRatings || 0})`
-                : 'N/A',
-            ]),
+            headers: ['Nom et Prénom', 'Email', 'Téléphone', "Date d'inscription", 'Livraisons totales', 'Livraisons complétées', 'Revenus totaux (FCFA)', 'Rating moyen'],
+            rows: drivers.map((driver: Driver) => {
+              const driverName = (driver.first_name && driver.last_name)
+                ? `${driver.first_name} ${driver.last_name}`
+                : driver.email || 'N/A'
+              return [
+                driverName,
+                driver.email || 'N/A',
+                driver.phone || 'N/A',
+                formatDate(driver.created_at || ''),
+                driver.total_deliveries || 0,
+                driver.completed_deliveries || 0,
+                typeof driver.total_revenue === 'number'
+                  ? driver.total_revenue
+                  : parseFloat(String(driver.total_revenue || 0)),
+                driver.averageRating
+                  ? `${driver.averageRating.toFixed(1)} ⭐ (${driver.totalRatings || 0})`
+                  : 'N/A',
+              ]
+            }),
             filename: `rapport_drivers_${new Date().toISOString().split('T')[0]}`,
           }
         )
@@ -536,13 +551,16 @@ export default function ReportsPage() {
                     const clientName = (order.user_first_name && order.user_last_name)
                       ? `${order.user_first_name} ${order.user_last_name}`
                       : order.user_email || order.user_id?.slice(0, 8) + '...' || 'N/A'
+                    const driverName = (order.driver_first_name && order.driver_last_name)
+                      ? `${order.driver_first_name} ${order.driver_last_name}`
+                      : order.driver_email || order.driver_id?.slice(0, 8) + '...' || 'N/A'
                     return (
                       <tr key={order.id}>
                         <td style={tdStyle}>{order.id.slice(0, 8)}...</td>
                         <td style={tdStyle}>{formatDate(order.created_at || '')}</td>
                         <td style={tdStyle}>{order.status || 'N/A'}</td>
                         <td style={tdStyle}>{clientName}</td>
-                        <td style={tdStyle}>{order.driver_id?.slice(0, 8) || 'N/A'}...</td>
+                        <td style={tdStyle}>{driverName}</td>
                         <td style={tdStyle}>
                           {formatCurrency(
                             typeof order.price === 'number' 
@@ -684,6 +702,7 @@ export default function ReportsPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr>
+                    <th style={thStyle}>Nom et Prénom</th>
                     <th style={thStyle}>Email</th>
                     <th style={thStyle}>Téléphone</th>
                     <th style={thStyle}>Date d&apos;inscription</th>
@@ -694,27 +713,33 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {drivers.map((driver: Driver) => (
-                    <tr key={driver.id}>
-                      <td style={tdStyle}>{driver.email || 'N/A'}</td>
-                      <td style={tdStyle}>{driver.phone || 'N/A'}</td>
-                      <td style={tdStyle}>{formatDate(driver.created_at || '')}</td>
-                      <td style={tdStyle}>{driver.total_deliveries || 0}</td>
-                      <td style={tdStyle}>{driver.completed_deliveries || 0}</td>
-                      <td style={tdStyle}>
-                        {formatCurrency(
-                          typeof driver.total_revenue === 'number' 
-                            ? driver.total_revenue 
-                            : parseFloat(String(driver.total_revenue || 0))
-                        )}
-                      </td>
-                      <td style={tdStyle}>
-                        {driver.averageRating
-                          ? `${driver.averageRating.toFixed(1)} ⭐ (${driver.totalRatings || 0})`
-                          : 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
+                  {drivers.map((driver: Driver) => {
+                    const driverName = (driver.first_name && driver.last_name)
+                      ? `${driver.first_name} ${driver.last_name}`
+                      : driver.email || 'N/A'
+                    return (
+                      <tr key={driver.id}>
+                        <td style={tdStyle}>{driverName}</td>
+                        <td style={tdStyle}>{driver.email || 'N/A'}</td>
+                        <td style={tdStyle}>{driver.phone || 'N/A'}</td>
+                        <td style={tdStyle}>{formatDate(driver.created_at || '')}</td>
+                        <td style={tdStyle}>{driver.total_deliveries || 0}</td>
+                        <td style={tdStyle}>{driver.completed_deliveries || 0}</td>
+                        <td style={tdStyle}>
+                          {formatCurrency(
+                            typeof driver.total_revenue === 'number' 
+                              ? driver.total_revenue 
+                              : parseFloat(String(driver.total_revenue || 0))
+                          )}
+                        </td>
+                        <td style={tdStyle}>
+                          {driver.averageRating
+                            ? `${driver.averageRating.toFixed(1)} ⭐ (${driver.totalRatings || 0})`
+                            : 'N/A'}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             )}
