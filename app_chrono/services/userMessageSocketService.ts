@@ -68,8 +68,33 @@ class UserMessageSocketService {
    * Rejoindre une conversation (pour recevoir les messages en temps réel)
    */
   joinConversation(conversationId: string) {
-    if (!this.socket || !this.isConnected) {
-      logger.warn('Socket non connecté', 'userMessageSocketService');
+    if (!this.socket) {
+      logger.warn('Socket non initialisé', 'userMessageSocketService');
+      // Réessayer après un court délai si le socket n'est pas encore initialisé
+      setTimeout(() => {
+        if (this.socket && this.isConnected) {
+          this.socket.emit('join-conversation', { conversationId });
+          logger.info(`Rejoint la conversation ${conversationId} (retry)`, 'userMessageSocketService');
+        }
+      }, 1000);
+      return;
+    }
+
+    if (!this.isConnected) {
+      logger.warn('Socket non connecté, attente de la connexion...', 'userMessageSocketService');
+      // Attendre que le socket soit connecté
+      const checkConnection = setInterval(() => {
+        if (this.isConnected && this.socket) {
+          clearInterval(checkConnection);
+          this.socket.emit('join-conversation', { conversationId });
+          logger.info(`Rejoint la conversation ${conversationId} (après connexion)`, 'userMessageSocketService');
+        }
+      }, 100);
+      
+      // Arrêter après 5 secondes
+      setTimeout(() => {
+        clearInterval(checkConnection);
+      }, 5000);
       return;
     }
 

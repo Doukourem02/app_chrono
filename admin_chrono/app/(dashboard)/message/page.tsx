@@ -68,6 +68,12 @@ export default function MessagePage() {
     try {
       const data = await adminMessageService.getConversations(filterType === 'all' ? undefined : filterType)
       setConversations(data)
+      
+      // Rejoindre automatiquement toutes les conversations pour recevoir les messages en temps réel
+      // Particulièrement important pour les conversations de support et admin
+      for (const conv of data) {
+        adminMessageSocketService.joinConversation(conv.id)
+      }
     } catch (error) {
       console.error('Error loading conversations:', error)
     } finally {
@@ -444,7 +450,23 @@ export default function MessagePage() {
 
   useEffect(() => {
     loadConversations()
+    
+    // Recharger les conversations périodiquement pour détecter les nouvelles conversations de support
+    const interval = setInterval(() => {
+      loadConversations()
+    }, 5000) // Recharger toutes les 5 secondes pour détecter rapidement les nouvelles conversations
+    
+    return () => clearInterval(interval)
   }, [loadConversations])
+
+  // Rejoindre automatiquement les nouvelles conversations quand elles sont ajoutées
+  useEffect(() => {
+    if (conversations.length > 0) {
+      for (const conv of conversations) {
+        adminMessageSocketService.joinConversation(conv.id)
+      }
+    }
+  }, [conversations])
 
   const handleNewConversationCreated = useCallback(async (conversation: Conversation) => {
     setCurrentConversation(conversation)

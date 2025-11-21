@@ -51,7 +51,11 @@ export default function MessagePage() {
         const conversation = await userMessageService.getConversationById(conversationId);
         if (conversation) {
           setCurrentConversation(conversation);
-          userMessageSocketService.joinConversation(conversationId);
+          
+          // Attendre un peu pour s'assurer que le socket est connecté avant de rejoindre
+          setTimeout(() => {
+            userMessageSocketService.joinConversation(conversationId);
+          }, 500);
 
           const loadedMessages = await userMessageService.getMessages(conversationId);
           setMessages(conversationId, loadedMessages);
