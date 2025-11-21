@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import StatusKPICard from '@/components/orders/StatusKPICard'
@@ -75,10 +76,38 @@ interface Order {
 }
 
 export default function OrdersPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabType>('onProgress')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const queryClient = useQueryClient()
+
+  // Lire le paramètre status de l'URL pour pré-sélectionner l'onglet
+  useEffect(() => {
+    const statusParam = searchParams.get('status')
+    if (statusParam) {
+      // Mapper les statuts de commande vers les onglets
+      const statusToTabMap: Record<string, TabType> = {
+        'pending': 'onProgress',
+        'accepted': 'onProgress',
+        'enroute': 'onProgress',
+        'picked_up': 'onProgress',
+        'completed': 'successful',
+        'cancelled': 'canceled',
+        'canceled': 'canceled',
+        'declined': 'canceled',
+        'onProgress': 'onProgress',
+        'successful': 'successful',
+        'onHold': 'onHold',
+        'canceled': 'canceled',
+        'all': 'all',
+      }
+      const tab = statusToTabMap[statusParam.toLowerCase()]
+      if (tab) {
+        setActiveTab(tab)
+      }
+    }
+  }, [searchParams])
 
   const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ['orders', activeTab],
@@ -128,9 +157,110 @@ export default function OrdersPage() {
     },
   }
 
+  // Lire le paramètre orderId pour mettre en évidence la commande
+  const highlightedOrderId = searchParams.get('orderId')
+  const [targetOrderId, setTargetOrderId] = React.useState<string | null>(null)
+  
+  // Trouver la page où se trouve la commande mise en évidence
+  useEffect(() => {
+    // Attendre que les données soient chargées et que l'onglet soit correctement sélectionné
+    if (highlightedOrderId && !isLoading && orders.length > 0) {
+      console.log('🔍 [OrdersPage] Looking for order:', highlightedOrderId, 'ID ends with:', highlightedOrderId.slice(-4))
+      console.log('🔍 [OrdersPage] Available orders count:', orders.length)
+      console.log('🔍 [OrdersPage] Current page:', currentPage, 'Active tab:', activeTab)
+      
+      // Chercher par ID exact d'abord
+      let orderIndex = orders.findIndex((order) => order.id === highlightedOrderId)
+      
+      // Si pas trouvé, essayer de chercher par les 4 derniers caractères (au cas où il y aurait une différence de format)
+      if (orderIndex === -1) {
+        const highlightedIdClean = highlightedOrderId.replace(/-/g, '').toUpperCase()
+        const highlightedIdEnd = highlightedIdClean.slice(-4)
+        console.log('🔍 [OrdersPage] Trying to find by ID suffix:', highlightedIdEnd)
+        orderIndex = orders.findIndex((order) => {
+          const orderIdClean = order.id.replace(/-/g, '').toUpperCase()
+          const orderIdEnd = orderIdClean.slice(-4)
+          const matches = orderIdEnd === highlightedIdEnd
+          if (matches) {
+            console.log('✅ [OrdersPage] Found match:', { orderId: order.id, orderIdEnd, highlightedIdEnd })
+          }
+          return matches
+        })
+        if (orderIndex !== -1) {
+          console.log('✅ [OrdersPage] Found order by ID suffix match at index:', orderIndex)
+        } else {
+          console.warn('❌ [OrdersPage] Order not found by ID suffix. Available suffixes:', orders.map(o => o.id.replace(/-/g, '').slice(-4).toUpperCase()))
+        }
+      }
+      
+      if (orderIndex !== -1) {
+        const foundOrder = orders[orderIndex]
+        console.log('✅ [OrdersPage] Found order at index:', orderIndex, 'Order ID:', foundOrder.id, 'ID ends with:', foundOrder.id.slice(-4))
+        const targetPage = Math.floor(orderIndex / itemsPerPage) + 1
+        console.log('📄 [OrdersPage] Target page:', targetPage, '(orderIndex:', orderIndex, ', itemsPerPage:', itemsPerPage, ', currentPage:', currentPage, ')')
+        
+        // Stocker l'ID de la commande cible
+        setTargetOrderId(foundOrder.id)
+        
+        // Mettre à jour la page si nécessaire
+        if (currentPage !== targetPage) {
+          console.log('📄 [OrdersPage] Changing page from', currentPage, 'to', targetPage)
+          setCurrentPage(targetPage)
+        }
+      } else {
+        // Si la commande n'est pas trouvée dans l'onglet actuel, peut-être qu'elle est dans un autre onglet
+        console.warn(`❌ [OrdersPage] Order ${highlightedOrderId} not found in current tab ${activeTab}`)
+        console.warn('Available order IDs (first 10):', orders.slice(0, 10).map(o => ({ id: o.id, idEnd: o.id.slice(-4) })))
+        setTargetOrderId(null)
+      }
+    } else if (!highlightedOrderId) {
+      setTargetOrderId(null)
+    }
+  }, [highlightedOrderId, orders, itemsPerPage, searchParams, isLoading, activeTab])
+  
+  // Scroller vers la commande une fois que la pagination est mise à jour
+  useEffect(() => {
+    if (targetOrderId && !isLoading && currentPage > 0) {
+      console.log('🎯 [OrdersPage] Attempting to scroll to order:', targetOrderId, 'on page:', currentPage)
+      
+      // Attendre que React ait rendu la nouvelle page
+      const scrollTimeout = setTimeout(() => {
+        requestAnimationFrame(() => {
+              const element = document.getElementById(`order-${targetOrderId}`)
+              if (element) {
+                console.log('✅ [OrdersPage] Scrolling to element:', targetOrderId, 'Element found in DOM, ID ends with:', targetOrderId.slice(-4))
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                // Ne pas retirer le paramètre orderId de l'URL - laisser la commande mise en évidence
+                // Le paramètre sera retiré seulement si l'utilisateur clique sur une autre commande ou change de page
+              } else {
+                console.warn('⚠️ [OrdersPage] Element not found, retrying...', targetOrderId)
+                // Si l'élément n'est pas trouvé, réessayer après un délai supplémentaire
+                setTimeout(() => {
+                  const retryElement = document.getElementById(`order-${targetOrderId}`)
+                  if (retryElement) {
+                    console.log('✅ [OrdersPage] Scrolling to element (retry):', targetOrderId)
+                    retryElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    // Ne pas retirer le paramètre orderId de l'URL
+                  } else {
+                    console.error('❌ [OrdersPage] Element not found even after retry:', targetOrderId)
+                    const availableIds = Array.from(document.querySelectorAll('[id^="order-"]')).map(el => el.id)
+                    console.error('Available element IDs:', availableIds)
+                  }
+                }, 600)
+              }
+        })
+      }, 300)
+      
+      return () => clearTimeout(scrollTimeout)
+    }
+  }, [targetOrderId, currentPage, isLoading])
+
   React.useEffect(() => {
-    setCurrentPage(1)
-  }, [activeTab])
+    // Ne réinitialiser la page que si on ne cherche pas une commande spécifique
+    if (!highlightedOrderId) {
+      setCurrentPage(1)
+    }
+  }, [activeTab, highlightedOrderId])
 
   React.useEffect(() => {
     const unsubscribe = adminSocketService.on('order:status:update', () => {
@@ -279,19 +409,59 @@ export default function OrdersPage() {
                     backgroundColor: '#F3F4F6',
                     color: '#4B5563',
                   }
+                  
+                  // Vérifier si cette commande doit être mise en évidence
+                  // Comparer par ID exact d'abord, puis par les 4 derniers caractères si pas de match exact
+                  let isHighlighted = false
+                  if (highlightedOrderId) {
+                    // Comparaison exacte
+                    if (highlightedOrderId === order.id) {
+                      isHighlighted = true
+                    } else {
+                      // Comparaison par les 4 derniers caractères (sans tirets)
+                      const highlightedIdClean = highlightedOrderId.replace(/-/g, '').toUpperCase()
+                      const orderIdClean = order.id.replace(/-/g, '').toUpperCase()
+                      const highlightedIdEnd = highlightedIdClean.slice(-4)
+                      const orderIdEnd = orderIdClean.slice(-4)
+                      if (highlightedIdEnd === orderIdEnd && highlightedIdEnd.length === 4) {
+                        isHighlighted = true
+                      }
+                    }
+                  }
+                  
+                  // Gérer le clic sur une commande pour retirer la mise en évidence
+                  const handleOrderClick = () => {
+                    if (highlightedOrderId) {
+                      const url = new URL(window.location.href)
+                      url.searchParams.delete('orderId')
+                      window.history.replaceState({}, '', url.toString())
+                    }
+                  }
 
                   return (
                     <tr
                       key={order.id || idx}
+                      id={`order-${order.id}`}
+                      onClick={handleOrderClick}
                       style={{
                         borderBottom: '1px solid #F3F4F6',
-                        transition: 'background-color 0.2s',
+                        transition: 'background-color 0.2s, box-shadow 0.2s',
+                        backgroundColor: isHighlighted ? '#F3E8FF' : 'transparent',
+                        boxShadow: isHighlighted ? '0 0 0 2px #8B5CF6' : 'none',
+                        borderLeft: isHighlighted ? '4px solid #8B5CF6' : 'none',
+                        cursor: 'pointer',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB'
+                        if (!isHighlighted) {
+                          e.currentTarget.style.backgroundColor = '#F9FAFB'
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
+                        if (!isHighlighted) {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        } else {
+                          e.currentTarget.style.backgroundColor = '#F3E8FF'
+                        }
                       }}
                     >
                       <td style={{ padding: '12px' }}>

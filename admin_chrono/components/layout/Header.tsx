@@ -62,6 +62,19 @@ export default function Header() {
     refetchOnReconnect: false,
   })
 
+  // Log pour déboguer les résultats de recherche
+  useEffect(() => {
+    if (searchResults?.data) {
+      console.log('🔍 [Header] Résultats de recherche:', {
+        query: debouncedQuery,
+        ordersCount: searchResults.data.orders?.length || 0,
+        usersCount: searchResults.data.users?.length || 0,
+        orders: searchResults.data.orders?.slice(0, 3),
+        users: searchResults.data.users?.slice(0, 3),
+      })
+    }
+  }, [searchResults, debouncedQuery])
+
   // Fermer les menus quand on clique en dehors
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -83,10 +96,21 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSearchResultClick = (type: 'order' | 'user', id?: string) => {
+  const handleSearchResultClick = (type: 'order' | 'user', id?: string, orderStatus?: string) => {
     if (type === 'order' && id) {
-      router.push(`/orders`)
-      // Optionnel : on pourrait ajouter un paramètre pour pré-sélectionner la commande
+      // Mapper le statut de la commande vers le paramètre d'URL
+      const statusToUrlMap: Record<string, string> = {
+        'pending': 'onProgress',
+        'accepted': 'onProgress',
+        'enroute': 'onProgress',
+        'picked_up': 'onProgress',
+        'completed': 'successful',
+        'cancelled': 'canceled',
+        'canceled': 'canceled',
+        'declined': 'canceled',
+      }
+      const urlStatus = orderStatus ? (statusToUrlMap[orderStatus.toLowerCase()] || 'all') : 'all'
+      router.push(`/orders?status=${urlStatus}&orderId=${id}`)
     } else if (type === 'user' && id) {
       router.push(`/users/${id}`)
     } else {
@@ -366,118 +390,250 @@ export default function Header() {
               </div>
             ) : searchResults?.data && (searchResults.data.orders.length > 0 || searchResults.data.users.length > 0) ? (
               <>
-                {searchResults.data.orders.length > 0 && (
-                  <>
-                    <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
-                      Commandes ({searchResults.data.orders.length})
-                    </div>
-                    {((searchResults.data.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
-                      <div
-                        key={order.id}
-                        style={searchResultItemStyle}
-                        onClick={() => handleSearchResultClick('order', order.id)}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#F9FAFB'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                      >
-                        <Package size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                              {order.deliveryId}
+                {(() => {
+                  // Déterminer si c'est une recherche de commande (commence par CHL)
+                  const isOrderSearch = debouncedQuery.trim().toUpperCase().startsWith('CHL')
+                  
+                  // Si c'est une recherche de commande, afficher les commandes en premier
+                  // Sinon, afficher les utilisateurs en premier
+                  if (isOrderSearch) {
+                    // Ordre : Commandes puis Utilisateurs
+                    return (
+                      <>
+                        {searchResults.data.orders.length > 0 && (
+                          <>
+                            <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
+                              Commandes ({searchResults.data.orders.length})
                             </div>
-                            <span
-                              style={{
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                backgroundColor: getStatusColor(order.status) + '20',
-                                color: getStatusColor(order.status),
-                              }}
-                            >
-                              {getStatusLabel(order.status)}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                            {order.pickup} → {order.dropoff}
-                          </div>
-                          {(order.clientName || order.driverName) && (
-                            <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
-                              {order.clientName && `Client: ${order.clientName}`}
-                              {order.clientName && order.driverName && ' • '}
-                              {order.driverName && `Livreur: ${order.driverName}`}
-                            </div>
-                          )}
-                          <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                            {order.createdAt}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-                {searchResults.data.users.length > 0 && (
-                  <>
-                    <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
-                      Utilisateurs ({searchResults.data.users.length})
-                    </div>
-                    {((searchResults.data.users as SearchUser[]) || []).map((user: SearchUser) => {
-                      const displayName = user.fullName || user.email
-                      const roleColor = user.role === 'driver' ? '#8B5CF6' : user.role === 'admin' ? '#EF4444' : '#10B981'
-                      
-                      return (
-                        <div
-                          key={user.id}
-                          style={searchResultItemStyle}
-                          onClick={() => handleSearchResultClick('user', user.id)}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F9FAFB'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent'
-                          }}
-                        >
-                          <User size={20} style={{ color: roleColor, flexShrink: 0 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {displayName}
-                              </div>
-                              <span
-                                style={{
-                                  padding: '2px 8px',
-                                  borderRadius: '4px',
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  backgroundColor: roleColor + '20',
-                                  color: roleColor,
-                                  flexShrink: 0,
+                            {((searchResults.data.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
+                              <div
+                                key={order.id}
+                                style={searchResultItemStyle}
+                                onClick={() => handleSearchResultClick('order', order.id, order.status)}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#F9FAFB'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent'
                                 }}
                               >
-                                {getRoleLabel(user.role)}
-                              </span>
-                            </div>
-                            {user.fullName && (
-                              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                {user.email}
+                                <Package size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                                      {order.deliveryId || order.id.slice(0, 8) + '...'}
+                                    </div>
+                                    <span
+                                      style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        backgroundColor: getStatusColor(order.status) + '20',
+                                        color: getStatusColor(order.status),
+                                      }}
+                                    >
+                                      {getStatusLabel(order.status)}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                    {order.pickup} → {order.dropoff}
+                                  </div>
+                                  {(order.clientName || order.driverName) && (
+                                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
+                                      {order.clientName && `Client: ${order.clientName}`}
+                                      {order.clientName && order.driverName && ' • '}
+                                      {order.driverName && `Livreur: ${order.driverName}`}
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                                    {order.createdAt}
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                            <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                              {user.phone}
+                            ))}
+                          </>
+                        )}
+                        {searchResults.data.users.length > 0 && (
+                          <>
+                            <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', borderTop: searchResults.data.orders.length > 0 ? '1px solid #E5E7EB' : 'none', marginTop: searchResults.data.orders.length > 0 ? '8px' : '0' }}>
+                              Utilisateurs ({searchResults.data.users.length})
                             </div>
-                            <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                              Inscrit le {user.createdAt}
+                            {((searchResults.data.users as SearchUser[]) || []).map((user: SearchUser) => {
+                              const displayName = user.fullName || user.email
+                              const roleColor = user.role === 'driver' ? '#8B5CF6' : user.role === 'admin' ? '#EF4444' : '#10B981'
+                              
+                              return (
+                                <div
+                                  key={user.id}
+                                  style={searchResultItemStyle}
+                                  onClick={() => handleSearchResultClick('user', user.id)}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#F9FAFB'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent'
+                                  }}
+                                >
+                                  <User size={20} style={{ color: roleColor, flexShrink: 0 }} />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {displayName}
+                                      </div>
+                                      <span
+                                        style={{
+                                          padding: '2px 8px',
+                                          borderRadius: '4px',
+                                          fontSize: '11px',
+                                          fontWeight: 600,
+                                          backgroundColor: roleColor + '20',
+                                          color: roleColor,
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        {getRoleLabel(user.role)}
+                                      </span>
+                                    </div>
+                                    {user.fullName && (
+                                      <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                        {user.email}
+                                      </div>
+                                    )}
+                                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                      {user.phone}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                                      Inscrit le {user.createdAt}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </>
+                        )}
+                      </>
+                    )
+                  } else {
+                    // Ordre : Utilisateurs puis Commandes (pour les recherches de noms)
+                    return (
+                      <>
+                        {searchResults.data.users.length > 0 && (
+                          <>
+                            <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
+                              Utilisateurs ({searchResults.data.users.length})
                             </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </>
-                )}
+                            {((searchResults.data.users as SearchUser[]) || []).map((user: SearchUser) => {
+                              const displayName = user.fullName || user.email
+                              const roleColor = user.role === 'driver' ? '#8B5CF6' : user.role === 'admin' ? '#EF4444' : '#10B981'
+                              
+                              return (
+                                <div
+                                  key={user.id}
+                                  style={searchResultItemStyle}
+                                  onClick={() => handleSearchResultClick('user', user.id)}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#F9FAFB'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent'
+                                  }}
+                                >
+                                  <User size={20} style={{ color: roleColor, flexShrink: 0 }} />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {displayName}
+                                      </div>
+                                      <span
+                                        style={{
+                                          padding: '2px 8px',
+                                          borderRadius: '4px',
+                                          fontSize: '11px',
+                                          fontWeight: 600,
+                                          backgroundColor: roleColor + '20',
+                                          color: roleColor,
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        {getRoleLabel(user.role)}
+                                      </span>
+                                    </div>
+                                    {user.fullName && (
+                                      <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                        {user.email}
+                                      </div>
+                                    )}
+                                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                      {user.phone}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                                      Inscrit le {user.createdAt}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </>
+                        )}
+                        {searchResults.data.orders.length > 0 && (
+                          <>
+                            <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', borderTop: searchResults.data.users.length > 0 ? '1px solid #E5E7EB' : 'none', marginTop: searchResults.data.users.length > 0 ? '8px' : '0' }}>
+                              Commandes ({searchResults.data.orders.length})
+                            </div>
+                            {((searchResults.data.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
+                              <div
+                                key={order.id}
+                                style={searchResultItemStyle}
+                                onClick={() => handleSearchResultClick('order', order.id, order.status)}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#F9FAFB'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent'
+                                }}
+                              >
+                                <Package size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                                      {order.deliveryId || order.id.slice(0, 8) + '...'}
+                                    </div>
+                                    <span
+                                      style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        backgroundColor: getStatusColor(order.status) + '20',
+                                        color: getStatusColor(order.status),
+                                      }}
+                                    >
+                                      {getStatusLabel(order.status)}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                    {order.pickup} → {order.dropoff}
+                                  </div>
+                                  {(order.clientName || order.driverName) && (
+                                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
+                                      {order.clientName && `Client: ${order.clientName}`}
+                                      {order.clientName && order.driverName && ' • '}
+                                      {order.driverName && `Livreur: ${order.driverName}`}
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                                    {order.createdAt}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </>
+                    )
+                  }
+                })()}
               </>
             ) : (
               <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>

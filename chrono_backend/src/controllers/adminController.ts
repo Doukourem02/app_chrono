@@ -507,20 +507,15 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     const searchTerm = `%${query.trim()}%`;
     const exactSearchTerm = query.trim();
     const upperQuery = query.trim().toUpperCase();
+    const trimmedQuery = query.trim();
     
-    // Détecter si c'est une recherche d'ID de commande (commence par CHL ou CHLV, ou pattern similaire)
-    // Le format est CHLV–YYMMDD-XXXX, donc on cherche si ça commence par CHL
-    const isDeliveryIdSearch = upperQuery.startsWith('CHL') || 
-                                /^[A-Z]{2,4}[\-–]?[0-9]{0,6}[\-–]?[A-Z0-9]{0,4}$/i.test(upperQuery) ||
-                                (upperQuery.length <= 8 && /^[A-Z0-9]+$/.test(upperQuery)); // Court et alphanumérique uniquement
+    // Détecter si c'est une recherche d'ID de commande (commence par CHL)
+    // Si oui, on priorisera les commandes dans les résultats
+    const isOrderSearch = upperQuery.startsWith('CHL');
     
-    // Construire la condition de recherche pour l'ID formaté
-    // Le format est : CHLV–YYMMDD-XXXX où XXXX sont les 4 derniers caractères de l'ID UUID (sans tirets)
+    // Construire la condition de recherche pour l'ID formaté (si recherche de commande)
     let deliveryIdCondition = '';
-    if (isDeliveryIdSearch) {
-      // Rechercher dans l'ID formaté : CHLV + date + suffixe
-      // On cherche dans : CHLV + date formatée + les 4 derniers caractères de l'ID
-      // Utiliser $4 pour le pattern de recherche spécifique qui commence par la requête (sera ajouté dans les params)
+    if (isOrderSearch) {
       deliveryIdCondition = `
         OR (
           'CHLV' || '–' || 
@@ -535,6 +530,29 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         OR UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), 1, LENGTH($5))) = $5
       `;
     }
+
+    // Rechercher dans TOUTES les commandes (par ID, statut, adresses, emails/téléphones/noms des clients/livreurs)
+    // Améliorer la recherche pour mieux gérer tous les champs
+    const ordersWhereClause = `
+      (LOWER(o.id::text) ILIKE LOWER($1) OR
+      LOWER(REPLACE(o.id::text, '-', '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(o.status::text, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(o.pickup_address::text, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(o.dropoff_address::text, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(u.email, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(u.phone, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(u.first_name, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(u.last_name, '')) ILIKE LOWER($1) OR
+      LOWER(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) ILIKE LOWER($1) OR
+      LOWER(CONCAT(COALESCE(u.last_name, ''), ' ', COALESCE(u.first_name, ''))) ILIKE LOWER($1) OR
+      LOWER(COALESCE(d.email, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(d.phone, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(d.first_name, '')) ILIKE LOWER($1) OR
+      LOWER(COALESCE(d.last_name, '')) ILIKE LOWER($1) OR
+      LOWER(CONCAT(COALESCE(d.first_name, ''), ' ', COALESCE(d.last_name, ''))) ILIKE LOWER($1) OR
+      LOWER(CONCAT(COALESCE(d.last_name, ''), ' ', COALESCE(d.first_name, ''))) ILIKE LOWER($1)
+      ${deliveryIdCondition})
+    `;
 
     // Rechercher dans les commandes avec plus de précision
     const ordersQuery = `
@@ -555,39 +573,28 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN users d ON o.driver_id = d.id
-      WHERE 
-        o.id::text ILIKE $1 OR
-        REPLACE(o.id::text, '-', '') ILIKE $1 OR
-        o.status::text ILIKE $1 OR
-        o.pickup_address::text ILIKE $1 OR
-        o.dropoff_address::text ILIKE $1 OR
-        u.email ILIKE $1 OR
-        u.phone ILIKE $1 OR
-        u.first_name ILIKE $1 OR
-        u.last_name ILIKE $1 OR
-        CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) ILIKE $1 OR
-        d.email ILIKE $1 OR
-        d.phone ILIKE $1 OR
-        d.first_name ILIKE $1 OR
-        d.last_name ILIKE $1 OR
-        CONCAT(COALESCE(d.first_name, ''), ' ', COALESCE(d.last_name, '')) ILIKE $1
-        ${deliveryIdCondition}
+      WHERE ${ordersWhereClause}
       ORDER BY 
         CASE 
-          WHEN o.id::text = $2 THEN 1
-          WHEN REPLACE(o.id::text, '-', '') ILIKE $3 THEN 2
-          ${isDeliveryIdSearch ? `WHEN (
+          WHEN LOWER(o.id::text) = LOWER($2) THEN 1
+          WHEN LOWER(REPLACE(o.id::text, '-', '')) LIKE LOWER($3) THEN 2
+          ${isOrderSearch ? `WHEN (
             'CHLV' || '–' || 
             TO_CHAR(o.created_at, 'YYMMDD') || '-' || 
             UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), -4))
           ) ILIKE $4 THEN 2` : ''}
-          ELSE 3
+          WHEN LOWER(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) ILIKE LOWER($1) THEN 3
+          WHEN LOWER(CONCAT(COALESCE(d.first_name, ''), ' ', COALESCE(d.last_name, ''))) ILIKE LOWER($1) THEN 4
+          WHEN LOWER(COALESCE(u.email, '')) ILIKE LOWER($1) THEN 5
+          WHEN LOWER(COALESCE(d.email, '')) ILIKE LOWER($1) THEN 6
+          ELSE 7
         END,
         o.created_at DESC
       LIMIT 10
     `;
 
     // Rechercher dans les utilisateurs avec recherche par nom et prénom
+    // Simplifier la recherche pour qu'elle soit plus robuste
     const usersQuery = `
       SELECT id, email, phone, role, first_name, last_name, created_at
       FROM users
@@ -597,13 +604,18 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         role ILIKE $1 OR
         first_name ILIKE $1 OR
         last_name ILIKE $1 OR
-        CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) ILIKE $1
+        (first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(first_name, ' ', last_name) ILIKE $1) OR
+        (first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(last_name, ' ', first_name) ILIKE $1)
       ORDER BY 
         CASE 
           WHEN email = $2 THEN 1
           WHEN email ILIKE $3 THEN 2
-          WHEN CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) ILIKE $1 THEN 3
-          ELSE 4
+          WHEN role = $2 THEN 3
+          WHEN first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(first_name, ' ', last_name) ILIKE $1 THEN 4
+          WHEN first_name ILIKE $1 THEN 5
+          WHEN last_name ILIKE $1 THEN 6
+          WHEN phone ILIKE $1 THEN 7
+          ELSE 8
         END,
         created_at DESC
       LIMIT 10
@@ -611,14 +623,30 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
 
     let ordersResult, usersResult;
     try {
-      // Pour les commandes : searchTerm ($1), exactSearchTerm ($2), `${exactSearchTerm}%` ($3), et si deliveryIdSearch: `${upperQuery}%` ($4) et upperQuery ($5)
+      // Pour les commandes : searchTerm ($1), exactSearchTerm ($2), `${exactSearchTerm}%` ($3), et si orderSearch: `${upperQuery}%` ($4) et upperQuery ($5)
       const ordersParams: any[] = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
-      if (isDeliveryIdSearch) {
+      if (isOrderSearch) {
         ordersParams.push(`${upperQuery}%`, upperQuery);
       }
+      logger.info('🔍 [getAdminGlobalSearch] Exécution requête commandes avec params:', ordersParams);
       ordersResult = await (pool as any).query(ordersQuery, ordersParams);
+      logger.info(`✅ [getAdminGlobalSearch] Commandes trouvées: ${ordersResult.rows.length}`);
+      
       // Pour les utilisateurs : searchTerm, exactSearchTerm, searchTerm (pour le tri)
-      usersResult = await (pool as any).query(usersQuery, [searchTerm, exactSearchTerm, `${exactSearchTerm}%`]);
+      const usersParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
+      logger.info('🔍 [getAdminGlobalSearch] Exécution requête utilisateurs avec params:', usersParams);
+      logger.info('🔍 [getAdminGlobalSearch] Requête SQL utilisateurs:', usersQuery);
+      usersResult = await (pool as any).query(usersQuery, usersParams);
+      logger.info(`✅ [getAdminGlobalSearch] Utilisateurs trouvés: ${usersResult.rows.length}`);
+      if (usersResult.rows.length > 0) {
+        logger.info('📋 [getAdminGlobalSearch] Exemples utilisateurs:', usersResult.rows.slice(0, 3).map((u: any) => ({
+          id: u.id,
+          email: u.email,
+          first_name: u.first_name,
+          last_name: u.last_name,
+          role: u.role
+        })));
+      }
     } catch (queryError: any) {
       logger.error('❌ [getAdminGlobalSearch] Erreur lors de la requête SQL:', queryError);
       throw queryError;
@@ -640,8 +668,8 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     const formattedOrders = ordersResult.rows.map((order: any) => {
       const pickup = parseJsonField(order.pickup_address);
       const dropoff = parseJsonField(order.dropoff_address);
-      const idParts = order.id.replace(/-/g, '').substring(0, 9);
-      const deliveryId = `${idParts.substring(0, 2)}-${idParts.substring(2, 7)}-${idParts.substring(7, 9)}`.toUpperCase();
+      // Utiliser la fonction formatDeliveryId pour générer le format CHLV–YYMMDD-XXXX
+      const deliveryId = formatDeliveryId(order.id, order.created_at);
 
       const clientName = (order.user_first_name && order.user_last_name)
         ? `${order.user_first_name} ${order.user_last_name}`
