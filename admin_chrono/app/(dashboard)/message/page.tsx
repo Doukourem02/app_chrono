@@ -218,6 +218,8 @@ export default function MessagePage() {
   }, [conversations, setCurrentConversation, loadMessages, loadAllMessagesForPair])
 
   const handleSendMessage = useCallback(async (content: string) => {
+    if (!user?.id) return
+
     // Si on est dans un groupe, utiliser la conversation la plus récente
     if (selectedParticipantPair) {
       const pairConversations = conversations.filter((conv) => {
@@ -239,40 +241,102 @@ export default function MessagePage() {
       }
       
       if (targetConversation) {
-        adminMessageSocketService.sendMessage(targetConversation.id, content)
-        const sentMessage = await adminMessageService.sendMessage(targetConversation.id, content)
+        const groupKey = `order_${[selectedParticipantPair.participant1Id, selectedParticipantPair.participant2Id].sort().join('_')}`
         
-        // Ajouter le message au groupe immédiatement
-        if (sentMessage) {
-          const groupKey = `order_${[selectedParticipantPair.participant1Id, selectedParticipantPair.participant2Id].sort().join('_')}`
-          const currentMessages = useAdminMessageStore.getState().messages[groupKey] || []
-          if (!currentMessages.some((m) => m.id === sentMessage.id)) {
-            const updatedMessages = [...currentMessages, sentMessage].sort((a, b) => {
-              const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-              const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-              return dateA - dateB
-            })
-            setMessages(groupKey, updatedMessages)
-          }
+        // Créer un message optimiste
+        const tempMessageId = `temp-${Date.now()}`
+        const optimisticMessage: Message = {
+          id: tempMessageId,
+          conversation_id: targetConversation.id,
+          sender_id: user.id,
+          content,
+          message_type: 'text',
+          is_read: false,
+          created_at: new Date().toISOString(),
+          sender: {
+            id: user.id,
+            email: user.email || '',
+            role: 'admin',
+            first_name: user.first_name,
+            last_name: user.last_name,
+            avatar_url: user.avatar_url,
+          },
         }
         
-        // Recharger les messages du groupe pour être sûr d'avoir la dernière version
-        await loadAllMessagesForPair(selectedParticipantPair.participant1Id, selectedParticipantPair.participant2Id)
+        // Ajouter le message optimiste immédiatement
+        const currentMessages = useAdminMessageStore.getState().messages[groupKey] || []
+        const updatedMessages = [...currentMessages, optimisticMessage].sort((a, b) => {
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+          return dateA - dateB
+        })
+        setMessages(groupKey, updatedMessages)
+        
+        try {
+          // Envoyer via l'API REST (le socket diffusera automatiquement)
+          const sentMessage = await adminMessageService.sendMessage(targetConversation.id, content)
+          
+          if (sentMessage) {
+            // Remplacer le message optimiste par le vrai message
+            const finalMessages = useAdminMessageStore.getState().messages[groupKey] || []
+            const finalUpdatedMessages = finalMessages.map((m) =>
+              m.id === tempMessageId ? sentMessage : m
+            )
+            setMessages(groupKey, finalUpdatedMessages)
+          }
+        } catch (error) {
+          // Retirer le message optimiste en cas d'erreur
+          const finalMessages = useAdminMessageStore.getState().messages[groupKey] || []
+          const finalUpdatedMessages = finalMessages.filter((m) => m.id !== tempMessageId)
+          setMessages(groupKey, finalUpdatedMessages)
+          throw error
+        }
       }
     } else if (currentConversation) {
+      // Créer un message optimiste
+      const tempMessageId = `temp-${Date.now()}`
+      const optimisticMessage: Message = {
+        id: tempMessageId,
+        conversation_id: currentConversation.id,
+        sender_id: user.id,
+        content,
+        message_type: 'text',
+        is_read: false,
+        created_at: new Date().toISOString(),
+        sender: {
+          id: user.id,
+          email: user.email || '',
+          role: 'admin',
+          first_name: user.first_name,
+          last_name: user.last_name,
+          avatar_url: user.avatar_url,
+        },
+      }
+      
+      // Ajouter le message optimiste immédiatement
+      addMessage(currentConversation.id, optimisticMessage)
+      
       try {
-        adminMessageSocketService.sendMessage(currentConversation.id, content)
+        // Envoyer via l'API REST (le socket diffusera automatiquement)
         const sentMessage = await adminMessageService.sendMessage(currentConversation.id, content)
+        
         if (sentMessage) {
-          addMessage(currentConversation.id, sentMessage)
+          // Remplacer le message optimiste par le vrai message
+          const existingMessages = messages[currentConversation.id] || []
+          const updatedMessages = existingMessages.map((m) =>
+            m.id === tempMessageId ? sentMessage : m
+          )
+          setMessages(currentConversation.id, updatedMessages)
         }
-        await loadMessages(currentConversation.id)
       } catch (error) {
-        console.error('Error sending message:', error)
+        // Retirer le message optimiste en cas d'erreur
+        const existingMessages = messages[currentConversation.id] || []
+        const updatedMessages = existingMessages.filter((m) => m.id !== tempMessageId)
+        setMessages(currentConversation.id, updatedMessages)
         throw error
       }
     }
-  }, [currentConversation, selectedParticipantPair, conversations, loadAllMessagesForPair, setMessages, addMessage, loadMessages])
+  }, [currentConversation, selectedParticipantPair, conversations, setMessages, addMessage, messages, user])
 
   useEffect(() => {
     if (!user?.id) return
@@ -282,25 +346,80 @@ export default function MessagePage() {
     loadUnreadCount()
 
     const unsubscribe = adminMessageSocketService.onNewMessage((message, conversation) => {
-      addMessage(conversation.id, message)
-      
-      // Si on est dans un groupe et que ce message appartient au groupe, l'ajouter aussi au groupe
       const state = useAdminMessageStore.getState()
-      // Vérifier si ce message appartient à un groupe actuellement sélectionné
-      // En parcourant tous les groupes possibles
-      if (conversation.type === 'order') {
-        const participantIds = [conversation.participant_1_id, conversation.participant_2_id].sort()
-        const groupKey = `order_${participantIds[0]}_${participantIds[1]}`
-        const groupMessages = state.messages[groupKey]
-        if (groupMessages) {
-          // Ce groupe est actuellement chargé, ajouter le message
-          if (!groupMessages.some((m) => m.id === message.id)) {
-            const updatedMessages = [...groupMessages, message].sort((a, b) => {
-              const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
-              const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-              return dateA - dateB
-            })
-            setMessages(groupKey, updatedMessages)
+      
+      // Si c'est notre propre message, vérifier s'il y a un message optimiste à remplacer
+      if (message.sender_id === user?.id) {
+        // Vérifier dans la conversation actuelle
+        const currentConv = state.currentConversation
+        if (currentConv && conversation.id === currentConv.id) {
+          const existingMessages = state.messages[conversation.id] || []
+          const tempMessageIndex = existingMessages.findIndex((m) => 
+            m.id.startsWith('temp-') && 
+            m.content === message.content &&
+            m.sender_id === message.sender_id
+          )
+          
+          if (tempMessageIndex !== -1) {
+            // Remplacer le message optimiste par le vrai message
+            const updatedMessages = [...existingMessages]
+            updatedMessages[tempMessageIndex] = message
+            setMessages(conversation.id, updatedMessages)
+          } else {
+            // Ajouter normalement si pas de message optimiste correspondant
+            addMessage(conversation.id, message)
+          }
+        } else {
+          // Ajouter normalement si ce n'est pas la conversation actuelle
+          addMessage(conversation.id, message)
+        }
+        
+        // Vérifier dans les groupes
+        if (conversation.type === 'order') {
+          const participantIds = [conversation.participant_1_id, conversation.participant_2_id].sort()
+          const groupKey = `order_${participantIds[0]}_${participantIds[1]}`
+          const groupMessages = state.messages[groupKey]
+          if (groupMessages) {
+            const tempMessageIndex = groupMessages.findIndex((m) => 
+              m.id.startsWith('temp-') && 
+              m.content === message.content &&
+              m.sender_id === message.sender_id
+            )
+            
+            if (tempMessageIndex !== -1) {
+              // Remplacer le message optimiste par le vrai message
+              const updatedMessages = [...groupMessages]
+              updatedMessages[tempMessageIndex] = message
+              setMessages(groupKey, updatedMessages)
+            } else if (!groupMessages.some((m) => m.id === message.id)) {
+              // Ajouter normalement si pas de message optimiste et pas déjà présent
+              const updatedMessages = [...groupMessages, message].sort((a, b) => {
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+                return dateA - dateB
+              })
+              setMessages(groupKey, updatedMessages)
+            }
+          }
+        }
+      } else {
+        // Message d'un autre utilisateur, ajouter normalement
+        addMessage(conversation.id, message)
+        
+        // Si on est dans un groupe et que ce message appartient au groupe, l'ajouter aussi au groupe
+        if (conversation.type === 'order') {
+          const participantIds = [conversation.participant_1_id, conversation.participant_2_id].sort()
+          const groupKey = `order_${participantIds[0]}_${participantIds[1]}`
+          const groupMessages = state.messages[groupKey]
+          if (groupMessages) {
+            if (!groupMessages.some((m) => m.id === message.id)) {
+              const updatedMessages = [...groupMessages, message].sort((a, b) => {
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+                return dateA - dateB
+              })
+              setMessages(groupKey, updatedMessages)
+            }
           }
         }
       }

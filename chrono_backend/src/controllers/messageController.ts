@@ -213,6 +213,18 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
       messageType || 'text'
     );
 
+    // Récupérer la conversation mise à jour
+    const conversation = await messageService.getConversationById(conversationId);
+
+    // Diffuser le message via Socket.IO à tous les participants
+    const io = req.app.get('io');
+    if (io && conversation) {
+      io.to(`conversation:${conversationId}`).emit('new-message', {
+        message,
+        conversation,
+      });
+    }
+
     return res.status(201).json({ success: true, data: message });
   } catch (error: any) {
     logger.error('Erreur lors de l\'envoi du message:', error);
