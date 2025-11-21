@@ -1,14 +1,12 @@
-// Service API pour le dashboard admin - utilise le backend API comme les autres apps
 import { supabase } from './supabase'
 import { logger } from '@/utils/logger'
 
-// Utiliser EXPO_PUBLIC_API_URL si disponible (comme dans les autres apps), sinon NEXT_PUBLIC_API_URL
+
 const API_BASE_URL = 
   process.env.NEXT_PUBLIC_API_URL || 
   process.env.EXPO_PUBLIC_API_URL ||
   'http://localhost:4000'
 
-// Helper pour extraire le message d'erreur de manière type-safe
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
@@ -19,12 +17,10 @@ function getErrorMessage(error: unknown): string {
   return 'Unknown error'
 }
 
-// Helper pour vérifier si une erreur est une Error
 function isError(error: unknown): error is Error {
   return error instanceof Error
 }
 
-// Interface pour les réponses API génériques
 interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
@@ -38,17 +34,14 @@ interface ApiResponse<T = unknown> {
   }
 }
 
-// Type guard pour vérifier si un objet est une ApiResponse
 function isApiResponse(obj: unknown): obj is ApiResponse {
   return typeof obj === 'object' && obj !== null && 'success' in obj
 }
 
-// Type guard pour vérifier si un objet a une propriété message
 function hasMessage(obj: unknown): obj is { message: string } {
   return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as { message: unknown }).message === 'string'
 }
 
-// Log de la configuration au démarrage (uniquement côté client et en développement)
 if (typeof window !== 'undefined') {
   logger.debug('[adminApiService] API_BASE_URL configured:', API_BASE_URL)
 }
@@ -62,7 +55,6 @@ class AdminApiService {
       const { data: { session } } = await supabase.auth.getSession()
       return session?.access_token || null
     } catch (error) {
-      // Ne pas logger le token en production
       logger.error('[adminApiService] Error getting access token:', error)
       return null
     }

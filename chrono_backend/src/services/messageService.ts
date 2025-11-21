@@ -16,8 +16,11 @@ export class MessageService {
       );
 
       if (existing.rows.length > 0) {
-        // Retourner la conversation existante
-        return await this.getConversationById(existing.rows[0].id);
+        const conversation = await this.getConversationById(existing.rows[0].id);
+        if (!conversation) {
+          throw new Error('Conversation introuvable');
+        }
+        return conversation;
       }
 
       // Créer la nouvelle conversation
@@ -55,7 +58,11 @@ export class MessageService {
       );
 
       if (existing.rows.length > 0) {
-        return await this.getConversationById(existing.rows[0].id);
+        const conversation = await this.getConversationById(existing.rows[0].id);
+        if (!conversation) {
+          throw new Error('Conversation introuvable');
+        }
+        return conversation;
       }
 
       // Créer la nouvelle conversation
@@ -341,16 +348,15 @@ export class MessageService {
       is_archived: row.is_archived || false,
     };
 
-    // Ajouter les informations des participants si disponibles
     if (row.p1_id) {
       conversation.participant_1 = {
         id: row.p1_id,
         email: row.p1_email,
         role: row.p1_role,
-        first_name: row.p1_first_name,
-        last_name: row.p1_last_name,
-        avatar_url: row.p1_avatar_url,
-      };
+        ...(row.p1_first_name && { first_name: row.p1_first_name }),
+        ...(row.p1_last_name && { last_name: row.p1_last_name }),
+        ...(row.p1_avatar_url && { avatar_url: row.p1_avatar_url }),
+      } as any;
     }
 
     if (row.p2_id) {
@@ -358,10 +364,10 @@ export class MessageService {
         id: row.p2_id,
         email: row.p2_email,
         role: row.p2_role,
-        first_name: row.p2_first_name,
-        last_name: row.p2_last_name,
-        avatar_url: row.p2_avatar_url,
-      };
+        ...(row.p2_first_name && { first_name: row.p2_first_name }),
+        ...(row.p2_last_name && { last_name: row.p2_last_name }),
+        ...(row.p2_avatar_url && { avatar_url: row.p2_avatar_url }),
+      } as any;
     }
 
     // Ajouter le nombre de messages non lus

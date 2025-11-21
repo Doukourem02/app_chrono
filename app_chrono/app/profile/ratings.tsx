@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  TouchableOpacity,
-} from 'react-native';
+import {View,Text,StyleSheet,ScrollView,ActivityIndicator,TouchableOpacity} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -31,11 +24,7 @@ export default function RatingsPage() {
     
     setIsLoading(true);
     try {
-      // TODO: Créer l'endpoint pour récupérer les évaluations données par l'utilisateur
-      // const result = await userApiService.getUserRatings(user.id);
-      // setRatings(result.data || []);
-      
-      // Mock data pour l'instant
+  
       setRatings([]);
     } catch (error) {
       console.error('Erreur chargement évaluations:', error);

@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  Animated,
-  PanResponderInstance,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet,TextInput,ActivityIndicator,Alert} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userApiService } from '../services/userApiService';

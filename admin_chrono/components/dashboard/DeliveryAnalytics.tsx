@@ -2,16 +2,7 @@
 
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
+import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer,} from 'recharts'
 import { getDeliveryAnalytics } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
@@ -21,11 +12,7 @@ export default function DeliveryAnalytics() {
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   
-  // DÉSACTIVÉ : Log qui se déclenchait en boucle et causait des re-renders
-  // React.useEffect(() => {
-  //   console.log('🔄 [DeliveryAnalytics] Date range changed:', { dateFilter, startDate, endDate })
-  // }, [dateFilter, startDate, endDate])
-  
+
   const latestKey = React.useMemo(
     () =>
       ['delivery-analytics', dateFilter, startDate, endDate] as [

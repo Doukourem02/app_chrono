@@ -2,18 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  MapPin,
-  Package,
-  MessageSquare,
-  FileText,
-  Wallet,
-  Calendar,
-  Users,
-  Settings,
-  Star,
-} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Star,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -43,7 +32,6 @@ export default function Sidebar() {
   const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string; first_name?: string | null; last_name?: string | null } | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Fonction pour charger le profil utilisateur avec l'avatar
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
 
@@ -55,11 +43,8 @@ export default function Sidebar() {
         .eq('id', user.id)
         .single();
 
-      // PGRST116 = "No rows returned" - l'utilisateur n'existe pas encore dans la table users
-      // C'est normal, on utilise les données de user_metadata comme fallback
       if (error) {
         if (error.code === 'PGRST116') {
-          // Utilisateur n'existe pas dans la table users, utiliser user_metadata
           console.log(' [Sidebar] User not found in users table, using user_metadata');
           setAvatarUrl(null);
         setUserProfile({
@@ -69,14 +54,12 @@ export default function Sidebar() {
           last_name: undefined,
         });
         } else {
-          // Autre erreur (permissions, réseau, etc.)
           console.warn(' [Sidebar] Error loading profile from users table:', {
             code: error.code,
             message: error.message,
             details: error.details,
             hint: error.hint,
           });
-          // Fallback sur user_metadata même en cas d'erreur
           setAvatarUrl(null);
         setUserProfile({
           full_name: user?.user_metadata?.full_name || undefined,
@@ -86,7 +69,6 @@ export default function Sidebar() {
         });
         }
       } else if (userData) {
-        // Données trouvées dans la table users
         console.log(' [Sidebar] Profile loaded from database:', {
           avatar_url: userData.avatar_url,
           avatar_url_type: typeof userData.avatar_url,
@@ -120,13 +102,11 @@ export default function Sidebar() {
         });
       }
     } catch (error) {
-      // Erreur inattendue
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.warn(' [Sidebar] Unexpected error loading profile:', {
         message: errorMessage,
         error,
       });
-      // Fallback sur user_metadata
       setAvatarUrl(null);
         setUserProfile({
           full_name: user?.user_metadata?.full_name || undefined,
@@ -137,28 +117,23 @@ export default function Sidebar() {
     }
   }, [user]);
 
-  // Charger le profil utilisateur avec l'avatar au montage et quand l'utilisateur change
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProfile();
   }, [loadProfile]);
 
-  // Écouter les événements de mise à jour d'avatar et de profil depuis la page Settings
   useEffect(() => {
     const handleAvatarUpdate = (event: CustomEvent) => {
       const { avatarUrl: newAvatarUrl } = event.detail;
       console.log('📢 [Sidebar] Received avatar-updated event:', { newAvatarUrl });
       if (newAvatarUrl) {
-        // Corriger l'URL si elle contient un double "avatars/avatars"
         let correctedUrl = newAvatarUrl;
         if (newAvatarUrl.includes('/avatars/avatars/')) {
           correctedUrl = newAvatarUrl.replace('/avatars/avatars/', '/avatars/');
           console.log(' [Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
         }
         console.log(' [Sidebar] Setting avatar URL immediately:', correctedUrl);
-        // Mettre à jour immédiatement
         setAvatarUrl(correctedUrl);
-        // Recharger aussi le profil complet pour avoir les dernières données de la DB
         loadProfile();
       } else {
         console.warn(' [Sidebar] No avatar URL in event detail');
@@ -175,7 +150,6 @@ export default function Sidebar() {
         setUserProfile(prev => ({ ...prev, phone }));
       }
       if (newAvatarUrl) {
-        // Corriger l'URL si elle contient un double "avatars/avatars"
         let correctedUrl = newAvatarUrl;
         if (newAvatarUrl.includes('/avatars/avatars/')) {
           correctedUrl = newAvatarUrl.replace('/avatars/avatars/', '/avatars/');
@@ -184,10 +158,8 @@ export default function Sidebar() {
         console.log(' [Sidebar] Setting avatar URL from profile-updated:', correctedUrl);
         setAvatarUrl(correctedUrl);
       } else {
-        // Si pas d'avatarUrl dans l'événement, réinitialiser pour afficher les initiales
         setAvatarUrl(null);
       }
-      // Recharger le profil complet pour être sûr d'avoir toutes les données
       loadProfile();
     };
 
@@ -200,7 +172,6 @@ export default function Sidebar() {
     };
   }, [loadProfile]);
 
-  // Fermer le menu quand on clique en dehors
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
@@ -212,17 +183,13 @@ export default function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Récupérer les initiales et le nom de l'utilisateur
   const getUserInitials = () => {
-    // Priorité 1: Utiliser first_name et last_name depuis la base de données
     if (userProfile?.first_name && userProfile?.last_name) {
       return `${(userProfile.last_name[0] || '').toUpperCase()}${(userProfile.first_name[0] || '').toUpperCase()}`;
     }
-    // Priorité 2: Utiliser full_name (fallback)
     if (userProfile?.full_name) {
       const names = userProfile.full_name.split(' ');
       if (names.length >= 2) {
-        // Si on a un full_name, on suppose que c'est "Prénom Nom", donc on inverse pour les initiales
         return (names[names.length - 1][0] + names[0][0]).toUpperCase();
       }
       return userProfile.full_name.charAt(0).toUpperCase();
@@ -234,11 +201,10 @@ export default function Sidebar() {
   };
 
   const getUserName = () => {
-    // Priorité 1: Utiliser first_name et last_name depuis la base de données (format: "Nom Prénom")
+  
     if (userProfile?.first_name && userProfile?.last_name) {
       return `${userProfile.last_name} ${userProfile.first_name}`;
     }
-    // Priorité 2: Utiliser full_name (fallback)
     if (userProfile?.full_name) {
       return userProfile.full_name;
     }
@@ -567,7 +533,7 @@ export default function Sidebar() {
                   {console.log('[Sidebar] Rendering avatar with URL:', avatarUrl)}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    key={avatarUrl} // Force re-render quand l'URL change
+                    key={avatarUrl} 
                     src={avatarUrl}
                     alt="Avatar"
                     style={{

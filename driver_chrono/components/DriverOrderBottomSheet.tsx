@@ -1,16 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Animated,
-  PanResponderInstance,
-  Dimensions,
-  Alert,
-  Linking,
-} from 'react-native';
+import {View,Text,TouchableOpacity,ScrollView,StyleSheet,Animated,PanResponderInstance,Dimensions,Alert,Linking} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OrderRequest } from '../store/useOrderStore';

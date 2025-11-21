@@ -33,6 +33,8 @@ export interface OrderRequest {
   status: OrderStatus;
   driverId?: string;
   createdAt?: string | Date;
+  completed_at?: string;
+  cancelled_at?: string;
   proof?: {
     uploadedAt?: string | Date;
     url?: string;

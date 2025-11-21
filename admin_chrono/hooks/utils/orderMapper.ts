@@ -54,9 +54,6 @@ export interface OrderFromAPI {
   }
 }
 
-/**
- * Extrait les coordonnées d'un objet coordinates (gère les variations de format)
- */
 function extractCoordinates(
   coordinates?: {
     latitude?: number
@@ -77,9 +74,6 @@ function extractCoordinates(
   return { lat, lng }
 }
 
-/**
- * Convertit un Order de l'API en Delivery
- */
 export function mapOrderToDelivery(order: OrderFromAPI): Delivery {
   return {
     id: order.id,

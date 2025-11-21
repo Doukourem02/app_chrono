@@ -251,12 +251,9 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
       <div style={partnerSectionStyle}>
         <div style={partnerInfoStyle}>
           {(() => {
-            // Déterminer si on affiche le client ou le driver
-            // Si un driver est assigné, on affiche le driver, sinon le client
             const person = delivery.driver || delivery.client
             const isDriver = !!delivery.driver
             const displayName = person?.full_name || person?.email || (isDriver ? 'Jayson Tatum' : 'Client')
-            // Le label dépend du rôle : "Partners" pour les entreprises, "Client" pour les clients, "Drive" pour les drivers
             const displayLabel = isDriver 
               ? 'Drive' 
               : (delivery.client?.role === 'partner' || delivery.client?.role === 'Partner' ? 'Partners' : 'Client')

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Animated, Dimensions, PanResponder } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.85; // 85% de l'écran pour correspondre au style côté client
+const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.85;
 const BOTTOM_SHEET_MIN_HEIGHT = 100;
 
 export const useMessageBottomSheet = () => {

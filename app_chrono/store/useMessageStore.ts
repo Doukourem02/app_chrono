@@ -4,12 +4,11 @@ import { Conversation, Message } from '../services/userMessageService';
 interface MessageStore {
   conversations: Conversation[];
   currentConversation: Conversation | null;
-  messages: Record<string, Message[]>; // conversationId -> messages
+  messages: Record<string, Message[]>; 
   unreadCount: number;
   isLoading: boolean;
   error: string | null;
 
-  // Actions
   setConversations: (conversations: Conversation[]) => void;
   setCurrentConversation: (conversation: Conversation | null) => void;
   setMessages: (conversationId: string, messages: Message[]) => void;

@@ -10,7 +10,6 @@ import { AnimatedCard } from '@/components/animations'
 import type { Delivery } from '@/hooks/types'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 
-// Type pour l'API Google Maps dans window
 interface GoogleMapsWindow extends Window {
   google?: {
     maps?: {
@@ -50,13 +49,13 @@ interface LatLng {
 }
 
 const defaultCenter: LatLng = {
-  lat: 5.3600, // Abidjan, Côte d'Ivoire
+  lat: 5.3600, 
   lng: -4.0083,
 }
 
 const defaultRoutePath: LatLng[] = [
-  { lat: 5.3600, lng: -4.0083 }, // Abidjan (départ)
-  { lat: 5.3204, lng: -4.0267 }, // Abidjan (arrivée)
+  { lat: 5.3600, lng: -4.0083 }, 
+  { lat: 5.3204, lng: -4.0267 }, 
 ]
 
 const statusSteps: Array<{ key: string; label: string }> = [

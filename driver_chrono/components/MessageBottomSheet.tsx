@@ -1,18 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  FlatList,
-  Image,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
-  PanResponderInstance,
-} from 'react-native';
+import {View,Text,StyleSheet,TouchableOpacity,TextInput,FlatList,Image,ActivityIndicator,KeyboardAvoidingView,Platform,Animated,PanResponderInstance,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { driverMessageService, Message } from '../services/driverMessageService';

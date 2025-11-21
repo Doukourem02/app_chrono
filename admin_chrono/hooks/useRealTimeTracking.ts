@@ -5,7 +5,7 @@ import { useDeliveriesTracking } from './useDeliveriesTracking'
 import { debugError } from '@/utils/debug'
 import type { OnlineDriver, Delivery } from './types'
 
-// Réexporter les types pour compatibilité avec le code existant
+
 export type { OnlineDriver, Delivery }
 
 export interface UseRealTimeTrackingReturn {

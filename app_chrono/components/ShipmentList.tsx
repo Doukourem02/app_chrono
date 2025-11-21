@@ -6,7 +6,6 @@ import { useAuthStore } from "../store/useAuthStore";
 import { OrderRequest, OrderStatus, useOrderStore } from "../store/useOrderStore";
 import { formatDurationLabel, estimateDurationMinutes } from "../services/orderApi";
 import { AnimatedCard, SkeletonLoader } from "./animations";
-import { userOrderSocketService } from "../services/userOrderSocketService";
 
 interface OrderWithDB extends OrderRequest {
   created_at?: string;
@@ -17,24 +16,17 @@ interface OrderWithDB extends OrderRequest {
 
 
 const getBackgroundColor = (status: OrderStatus): string => {
-  // Commandes en cours (violet) - pending, accepted, enroute, picked_up, delivering
   if (status === 'pending' || status === 'accepted' || status === 'enroute' || status === 'picked_up' || status === 'delivering') {
-    return '#E5D5FF'; // Violet clair pour les commandes en cours
+    return '#E5D5FF';
   }
-  // Commandes terminées, annulées ou refusées (bleu clair d'origine)
-  // completed, cancelled, declined → toutes en bleu clair
-  return '#E8F0F4'; // Bleu clair pour les commandes terminées/annulées/refusées
+  return '#E8F0F4';
 };
 
-
 const getProgressColor = (status: OrderStatus): string => {
-  // Commandes en cours (violet) - pending, accepted, enroute, picked_up, delivering
   if (status === 'pending' || status === 'accepted' || status === 'enroute' || status === 'picked_up' || status === 'delivering') {
-    return '#8B5CF6'; // Violet pour les commandes en cours
+    return '#8B5CF6';
   }
-  // Commandes terminées, annulées ou refusées (gris d'origine)
-  // completed, cancelled, declined → toutes en gris
-  return '#999'; // Gris pour les commandes terminées/annulées/refusées
+  return '#999';
 };
 
 
@@ -56,11 +48,10 @@ const getProgressPercentage = (status: OrderStatus): number => {
   }
 };
 
-const PENDING_AUTO_CANCEL_DELAY_MS = 30 * 1000; // 30 secondes max en pending sans réponse
+const PENDING_AUTO_CANCEL_DELAY_MS = 30 * 1000;
 
 export default function ShipmentList() {
   const { user } = useAuthStore();
-  // 🆕 Utiliser les commandes actives depuis le store en priorité
   const activeOrdersFromStore = useOrderStore((s) => s.activeOrders);
   const [orders, setOrders] = useState<OrderWithDB[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,11 +63,8 @@ export default function ShipmentList() {
     const now = Date.now();
 
     for (const order of incomingOrders) {
-      // 🛡️ Vérifier d'abord dans le store si la commande a été acceptée
-      // Cela évite d'annuler une commande qui vient d'être acceptée par un livreur
       const storeOrder = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
       if (storeOrder) {
-        // Si la commande existe dans le store avec un statut accepté ou un driverId, ne pas l'annuler
         if (storeOrder.status === 'accepted' || 
             storeOrder.status === 'enroute' || 
             storeOrder.status === 'picked_up' || 
@@ -84,12 +72,10 @@ export default function ShipmentList() {
             storeOrder.status === 'completed' ||
             storeOrder.driverId || 
             storeOrder.driver?.id) {
-          console.log(`✅ Commande ${order.id.slice(0, 8)}... acceptée dans le store, annulation ignorée`);
           continue;
         }
       }
       
-      // Vérifier que la commande est bien en pending, sans driver, et pas déjà en cours d'annulation
       if (order.status !== 'pending' || order.driverId || autoCancelledPendingRef.current.has(order.id)) {
         continue;
       }
@@ -98,7 +84,7 @@ export default function ShipmentList() {
       const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
 
       if (!createdTime) {
-        console.warn('⚠️ Commande sans date de création:', order.id);
+        console.warn('Commande sans date de création:', order.id);
         continue;
       }
 
@@ -107,26 +93,19 @@ export default function ShipmentList() {
         continue;
       }
 
-      // 🛡️ Double vérification dans le store juste avant d'annuler
-      // (au cas où la commande aurait été acceptée entre-temps)
       const finalStoreCheck = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
       if (finalStoreCheck && (finalStoreCheck.status !== 'pending' || finalStoreCheck.driverId || finalStoreCheck.driver?.id)) {
-        console.log(`✅ Commande ${order.id.slice(0, 8)}... acceptée entre-temps, annulation annulée`);
         continue;
       }
 
-      // Marquer comme en cours d'annulation AVANT l'appel API
       autoCancelledPendingRef.current.add(order.id);
       
       try {
-        console.log(`⏰ Auto-annulation commande ${order.id.slice(0, 8)}... (en pending depuis ${Math.round(age / 1000)}s)`);
         const result = await userApiService.cancelOrder(order.id, order.status);
         
         if (result.success) {
-          // Mettre à jour le store immédiatement
           useOrderStore.getState().updateOrderStatus(order.id, 'cancelled');
           
-          // Mettre à jour l'état local immédiatement
           const targetIndex = updatedOrders.findIndex((o) => o.id === order.id);
           if (targetIndex !== -1) {
             updatedOrders[targetIndex] = {
@@ -135,16 +114,11 @@ export default function ShipmentList() {
               cancelled_at: new Date().toISOString(),
             };
           }
-          
-          console.log(`✅ Commande ${order.id.slice(0, 8)}... annulée automatiquement`);
         } else {
-          console.warn(`⚠️ Échec auto-annulation ${order.id.slice(0, 8)}...:`, result.message);
-          // Retirer du set pour permettre une nouvelle tentative
           autoCancelledPendingRef.current.delete(order.id);
         }
       } catch (err: any) {
-        console.error('❌ Erreur auto-cancel pending:', order.id, err);
-        // Retirer du set pour permettre une nouvelle tentative
+        console.error('Erreur auto-cancel pending:', order.id, err);
         autoCancelledPendingRef.current.delete(order.id);
       }
     }
@@ -166,9 +140,8 @@ export default function ShipmentList() {
       });
 
       if (result.success && result.data) {
-        // Log réduit pour éviter la pollution du terminal
         if (__DEV__ && result.data.length > 0) {
-          console.debug('📦 Commandes reçues:', result.data.length);
+          console.debug('Commandes reçues:', result.data.length);
         }
 
         const formattedOrders = result.data.map((order: any) => {
@@ -189,7 +162,7 @@ export default function ShipmentList() {
               pickup = { address: '', coordinates: { latitude: 0, longitude: 0 } };
             }
           } catch (e) {
-            console.warn('⚠️ Erreur parsing pickup:', e);
+            console.warn('Erreur parsing pickup:', e);
             pickup = { address: '', coordinates: { latitude: 0, longitude: 0 } };
           }
           
@@ -202,15 +175,12 @@ export default function ShipmentList() {
               dropoff = { address: '', coordinates: { latitude: 0, longitude: 0 } };
             }
           } catch (e) {
-            console.warn('⚠️ Erreur parsing dropoff:', e);
+            console.warn('Erreur parsing dropoff:', e);
             dropoff = { address: '', coordinates: { latitude: 0, longitude: 0 } };
           }
 
-          
           const pickupAddress = order.pickup_address_text || pickup?.address || '';
           const dropoffAddress = order.dropoff_address_text || dropoff?.address || '';
-
-          // Log supprimé pour réduire la pollution du terminal
 
           return {
             id: order.id,
@@ -237,12 +207,8 @@ export default function ShipmentList() {
             distance: order.distance || order.distance_km,
          
             estimatedDuration: (() => {
-              // 🆕 Priorité 1: Utiliser eta_minutes depuis la base de données
-              // Priorité 2: estimated_duration
-              // Priorité 3: Calculer à partir de distance et delivery_method
               let duration = order.eta_minutes || order.estimated_duration || order.estimatedDuration;
             
-              // Si on n'a pas de durée mais qu'on a distance et delivery_method, calculer
               if (!duration && order.distance && order.delivery_method) {
                 const distanceKm = order.distance || order.distance_km;
                 if (distanceKm) {
@@ -254,19 +220,15 @@ export default function ShipmentList() {
                 }
               }
             
-              // Si on a une durée (nombre ou string), la formater
               if (duration !== null && duration !== undefined && duration !== '') {
-                // Si c'est un nombre, le formater
                 if (typeof duration === 'number') {
                   return formatDurationLabel(duration) || `${duration} min`;
                 }
-                // Si c'est une string représentant un nombre, la parser et formater
                 if (typeof duration === 'string') {
                   const numericValue = parseFloat(duration);
                   if (!isNaN(numericValue) && isFinite(numericValue)) {
                     return formatDurationLabel(Math.round(numericValue)) || `${Math.round(numericValue)} min`;
                   }
-                  // Si c'est déjà une string formatée, l'utiliser directement
                   return duration;
                 }
               }
@@ -290,14 +252,12 @@ export default function ShipmentList() {
 
         const sanitizedOrders = await autoCancelPendingOrders(formattedOrders);
 
-        // Calculer les dates d'aujourd'hui
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Début de la journée
+        today.setHours(0, 0, 0, 0);
         
         const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1); // Début de demain
+        tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // Séparer les commandes en cours et terminées
         const inProgressOrders = sanitizedOrders.filter((order) => {
           const isInProgress = order.status === 'pending' || 
                             order.status === 'accepted' || 
@@ -311,7 +271,6 @@ export default function ShipmentList() {
           return order.status === 'completed';
         });
 
-        // Trier par date de création (plus récentes en premier)
         inProgressOrders.sort((a, b) => {
           const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
           const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -324,71 +283,35 @@ export default function ShipmentList() {
           return dateB - dateA;
         });
 
-        // Filtrer les commandes d'aujourd'hui
-        const todayInProgress = inProgressOrders.filter((order) => {
-          const orderDate = order.created_at ? new Date(order.created_at) : null;
-          if (!orderDate) return false;
-          // Comparer les dates en ignorant l'heure
-          const orderDateOnly = new Date(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate());
-          const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          return orderDateOnly.getTime() === todayOnly.getTime();
-        });
-
         const todayCompleted = completedOrders.filter((order) => {
           const orderDate = order.created_at ? new Date(order.created_at) : null;
           if (!orderDate) return false;
-          // Comparer les dates en ignorant l'heure
           const orderDateOnly = new Date(orderDate.getFullYear(), orderDate.getMonth(), orderDate.getDate());
           const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
           return orderDateOnly.getTime() === todayOnly.getTime();
         });
 
-        // Sélectionner les commandes à afficher
         const displayOrders: OrderWithDB[] = [];
 
-        // Debug: logger les filtres
-        console.log('🔍 Filtres:', {
-          total: sanitizedOrders.length,
-          inProgress: inProgressOrders.length,
-          completed: completedOrders.length,
-          todayInProgress: todayInProgress.length,
-          todayCompleted: todayCompleted.length,
-        });
-
-        // PRIORITÉ 1: Toujours afficher les commandes en cours (même si pas d'aujourd'hui)
-        // Les commandes en cours sont prioritaires car elles sont actives
         if (inProgressOrders.length > 0) {
-          // Prendre la commande en cours la plus récente (peu importe la date)
-          console.log('✅ Ajout commande en cours:', inProgressOrders[0].id, inProgressOrders[0].status);
           displayOrders.push(inProgressOrders[0]);
         }
 
-        // PRIORITÉ 2: Ajouter des commandes terminées pour avoir au minimum 2 commandes affichées
-        // Si on a des commandes d'aujourd'hui, prioriser celles d'aujourd'hui
         if (todayCompleted.length > 0) {
-          // Ajouter les commandes terminées d'aujourd'hui jusqu'à atteindre 2 commandes au total
           for (let i = 0; i < todayCompleted.length && displayOrders.length < 2; i++) {
-            console.log('✅ Ajout commande terminée d\'aujourd\'hui:', todayCompleted[i].id);
             displayOrders.push(todayCompleted[i]);
           }
         }
         
-        // Si on n'a pas encore 2 commandes, ajouter les commandes terminées les plus récentes (toutes dates confondues)
         if (displayOrders.length < 2 && completedOrders.length > 0) {
-          // Ajouter les commandes terminées les plus récentes jusqu'à atteindre 2 commandes au total
           for (let i = 0; i < completedOrders.length && displayOrders.length < 2; i++) {
-            // Vérifier qu'on n'ajoute pas une commande déjà présente
             const alreadyAdded = displayOrders.some(order => order.id === completedOrders[i].id);
             if (!alreadyAdded) {
-              console.log('✅ Ajout commande terminée:', completedOrders[i].id);
               displayOrders.push(completedOrders[i]);
             }
           }
         }
 
-        // 🆕 PRIORITÉ 0: Utiliser TOUTES les commandes depuis le store (actives ET terminées)
-        // Les commandes du store sont prioritaires car elles sont en temps réel
-        // On inclut toutes les commandes pour que les couleurs se mettent à jour dynamiquement
         const storeActiveOrders: OrderWithDB[] = activeOrdersFromStore
           .map(order => ({
             ...order,
@@ -398,99 +321,75 @@ export default function ShipmentList() {
             cancelled_at: (order as any).cancelledAt || (order as any).cancelled_at,
           }));
 
-        // Combiner les commandes du store avec celles de l'API
-        // Les commandes du store sont prioritaires
         const combinedOrders: OrderWithDB[] = [];
         
-        // Ajouter toutes les commandes actives du store
         storeActiveOrders.forEach(storeOrder => {
           if (!combinedOrders.find(o => o.id === storeOrder.id)) {
             combinedOrders.push(storeOrder);
           }
         });
 
-        // Ajouter les commandes de l'API qui ne sont pas déjà dans le store
         displayOrders.forEach(apiOrder => {
           if (!combinedOrders.find(o => o.id === apiOrder.id)) {
             combinedOrders.push(apiOrder);
           }
         });
 
-        // Toujours afficher au minimum 2 commandes si elles existent
-        // Limiter à maximum 2 commandes
         const finalOrders = combinedOrders.slice(0, 2);
-        // Log supprimé pour réduire la pollution du terminal
 
         setOrders(finalOrders);
       } else {
         setOrders([]);
       }
     } catch (error) {
-      console.error('❌ Erreur chargement commandes:', error);
+      console.error('Erreur chargement commandes:', error);
       setOrders([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, activeOrdersFromStore.length]); // activeOrdersFromStore.length pour éviter les re-renders infinis
+  }, [user?.id, activeOrdersFromStore.length]);
 
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
 
-  // 🆕 Synchroniser automatiquement les commandes du store avec l'affichage
-  // Mettre à jour les couleurs dynamiquement quand le statut change
   const lastActiveOrdersHashRef = React.useRef<string>('');
   
   useEffect(() => {
-    // Écouter les changements dans le store pour mettre à jour immédiatement les couleurs
     const unsubscribe = useOrderStore.subscribe((state) => {
       const storeActiveOrders = state.activeOrders;
       
-      // 🛡️ Protection contre les boucles infinies : créer un hash des commandes pour détecter les vrais changements
       const ordersHash = storeActiveOrders.map(o => `${o.id}:${o.status}`).join('|');
       
-      // Ne mettre à jour que si les commandes ou leurs statuts ont vraiment changé
-      // Ignorer les changements de selectedOrderId qui ne concernent pas les commandes elles-mêmes
       if (ordersHash === lastActiveOrdersHashRef.current) {
-        return; // Pas de changement réel, ignorer
+        return;
       }
       
       lastActiveOrdersHashRef.current = ordersHash;
       
-      // Mettre à jour les commandes dans l'état local avec les statuts du store
       setOrders((currentOrders) => {
         const updatedOrders = currentOrders.map((order) => {
-          // Trouver la commande correspondante dans le store
           const storeOrder = storeActiveOrders.find((so) => so.id === order.id);
           
-          // Si la commande existe dans le store, utiliser son statut à jour
-          // Cela permet de mettre à jour les couleurs dynamiquement
           if (storeOrder) {
-            // Ne mettre à jour que si le statut a vraiment changé
             if (order.status !== storeOrder.status) {
-              console.log(`🔄 Mise à jour statut commande ${order.id.slice(0, 8)}...: ${order.status} → ${storeOrder.status}`);
               return {
                 ...order,
-                status: storeOrder.status, // Mettre à jour le statut (et donc la couleur)
-                // Ajouter cancelled_at si la commande est annulée
+                status: storeOrder.status,
                 ...(storeOrder.status === 'cancelled' && !order.cancelled_at 
                   ? { cancelled_at: new Date().toISOString() }
                   : {}),
-                // Ajouter completed_at si la commande est complétée
                 ...(storeOrder.status === 'completed' && !order.completed_at 
                   ? { completed_at: new Date().toISOString() }
                   : {}),
               };
             }
-            return order; // Pas de changement, retourner l'ordre tel quel
+            return order;
           }
           
-          // Si la commande n'existe plus dans le store, vérifier si elle doit être marquée comme terminée/annulée
-          // Cela peut arriver si la commande a été complétée et retirée du store
           if (!storeOrder) {
-            // Si la commande était en cours et n'est plus dans le store, elle a probablement été complétée
             const wasInProgress = order.status === 'pending' || 
                                  order.status === 'accepted' || 
                                  order.status === 'enroute' || 
@@ -498,13 +397,11 @@ export default function ShipmentList() {
                                  order.status === 'delivering';
             
             if (wasInProgress) {
-              // Vérifier si elle devrait être annulée (pending depuis trop longtemps)
               if (order.status === 'pending') {
                 const createdAt = order.created_at || (order as any).createdAt;
                 const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
                 const now = Date.now();
                 if (createdTime && now - createdTime >= PENDING_AUTO_CANCEL_DELAY_MS) {
-                  console.log(`🔄 Commande ${order.id.slice(0, 8)}... retirée du store, marquage comme annulée`);
                   return {
                     ...order,
                     status: 'cancelled' as OrderStatus,
@@ -512,9 +409,6 @@ export default function ShipmentList() {
                   };
                 }
               } else {
-                // Si elle était en cours et n'est plus dans le store, elle a probablement été complétée
-                // On la marque comme complétée pour que la couleur change immédiatement
-                console.log(`✅ Commande ${order.id.slice(0, 8)}... retirée du store, marquage comme complétée`);
                 return {
                   ...order,
                   status: 'completed' as OrderStatus,
@@ -527,7 +421,6 @@ export default function ShipmentList() {
           return order;
         });
         
-        // Ajouter les nouvelles commandes du store qui ne sont pas encore dans la liste
         storeActiveOrders.forEach((storeOrder) => {
           if (!updatedOrders.find((o) => o.id === storeOrder.id)) {
             updatedOrders.push({
@@ -549,46 +442,14 @@ export default function ShipmentList() {
     };
   }, []);
 
-  // 🆕 Rafraîchir depuis l'API quand le nombre de commandes actives change
   useEffect(() => {
     if (activeOrdersFromStore.length > 0) {
-      // Rafraîchir la liste pour inclure les nouvelles commandes actives
       loadOrders();
     }
   }, [activeOrdersFromStore.length, loadOrders]);
 
-  // 🆕 Écouter les événements socket pour les annulations
-  useEffect(() => {
-    // Écouter les annulations via socket pour mettre à jour immédiatement
-    const handleOrderCancelled = (data: { orderId: string }) => {
-      if (data?.orderId) {
-        console.log(`📡 Événement socket: commande ${data.orderId.slice(0, 8)}... annulée`);
-        // Mettre à jour l'état local immédiatement pour changer la couleur
-        setOrders((prevOrders) =>
-          prevOrders.map((o) =>
-            o.id === data.orderId
-              ? { ...o, status: 'cancelled' as OrderStatus, cancelled_at: new Date().toISOString() }
-              : o
-          )
-        );
-        // Marquer comme déjà annulée pour éviter les tentatives d'auto-annulation
-        autoCancelledPendingRef.current.add(data.orderId);
-      }
-    };
-
-    // S'abonner à l'événement order-cancelled
-    // Note: userOrderSocketService gère déjà la mise à jour du store, on met juste à jour l'état local ici
-    // On peut écouter directement via le store ou ajouter un listener si disponible
-    
-    return () => {
-      // Nettoyage si nécessaire
-    };
-  }, []);
-
-  // 🆕 Vérifier périodiquement les commandes en pending et les annuler automatiquement
   useEffect(() => {
     const checkAndCancelPendingOrders = async () => {
-      // Filtrer uniquement les commandes vraiment en pending, sans driver, et pas déjà en cours d'annulation
       const pendingOrders = orders.filter(
         (order) => 
           order.status === 'pending' && 
@@ -602,10 +463,8 @@ export default function ShipmentList() {
       const ordersToCancel: OrderWithDB[] = [];
 
       for (const order of pendingOrders) {
-        // 🛡️ Vérifier d'abord dans le store si la commande a été acceptée
         const storeOrder = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
         if (storeOrder) {
-          // Si la commande existe dans le store avec un statut accepté ou un driverId, ne pas l'annuler
           if (storeOrder.status === 'accepted' || 
               storeOrder.status === 'enroute' || 
               storeOrder.status === 'picked_up' || 
@@ -613,7 +472,6 @@ export default function ShipmentList() {
               storeOrder.status === 'completed' ||
               storeOrder.driverId || 
               storeOrder.driver?.id) {
-            console.log(`✅ Commande ${order.id.slice(0, 8)}... acceptée dans le store, annulation ignorée`);
             continue;
           }
         }
@@ -622,7 +480,7 @@ export default function ShipmentList() {
         const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
 
         if (!createdTime) {
-          console.warn('⚠️ Commande sans date de création dans checkAndCancel:', order.id);
+          console.warn('Commande sans date de création dans checkAndCancel:', order.id);
           continue;
         }
 
@@ -633,33 +491,20 @@ export default function ShipmentList() {
       }
 
       if (ordersToCancel.length > 0) {
-        console.log(`🔍 ${ordersToCancel.length} commande(s) à annuler automatiquement`);
-        
         for (const order of ordersToCancel) {
-          // 🛡️ Double vérification dans le store juste avant d'annuler
           const finalStoreCheck = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
           if (finalStoreCheck && (finalStoreCheck.status !== 'pending' || finalStoreCheck.driverId || finalStoreCheck.driver?.id)) {
-            console.log(`✅ Commande ${order.id.slice(0, 8)}... acceptée entre-temps, annulation annulée`);
             continue;
           }
           
-          // Marquer comme en cours d'annulation AVANT l'appel API
           autoCancelledPendingRef.current.add(order.id);
           
           try {
-            const createdAt = order.created_at || (order as any).createdAt;
-            const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
-            const age = now - createdTime;
-            
-            console.log(`⏰ Auto-annulation commande ${order.id.slice(0, 8)}... (en pending depuis ${Math.round(age / 1000)}s)`);
-            
             const result = await userApiService.cancelOrder(order.id, order.status);
             
             if (result.success) {
-              // Mettre à jour le store immédiatement
               useOrderStore.getState().updateOrderStatus(order.id, 'cancelled');
               
-              // Mettre à jour l'état local immédiatement pour changer la couleur
               setOrders((prevOrders) =>
                 prevOrders.map((o) =>
                   o.id === order.id
@@ -667,26 +512,19 @@ export default function ShipmentList() {
                     : o
                 )
               );
-              
-              console.log(`✅ Commande ${order.id.slice(0, 8)}... annulée automatiquement`);
             } else {
-              console.warn(`⚠️ Échec auto-annulation ${order.id.slice(0, 8)}...:`, result.message);
-              // Retirer du set pour permettre une nouvelle tentative
               autoCancelledPendingRef.current.delete(order.id);
             }
           } catch (err: any) {
-            console.error('❌ Erreur auto-cancel pending:', order.id, err?.message || err);
-            // Retirer du set pour permettre une nouvelle tentative
+            console.error('Erreur auto-cancel pending:', order.id, err?.message || err);
             autoCancelledPendingRef.current.delete(order.id);
           }
         }
       }
     };
 
-    // Vérifier immédiatement
     checkAndCancelPendingOrders();
 
-    // Vérifier toutes les 3 secondes (plus fréquent pour une meilleure réactivité)
     const interval = setInterval(() => {
       checkAndCancelPendingOrders();
     }, 3000);
@@ -694,7 +532,6 @@ export default function ShipmentList() {
     return () => clearInterval(interval);
   }, [orders]);
 
-  // 🆕 Rafraîchir automatiquement la liste toutes les 3 secondes si on a des commandes en cours
   useEffect(() => {
     const hasInProgressOrders = orders.some(order => 
       order.status === 'pending' || 
@@ -707,7 +544,7 @@ export default function ShipmentList() {
     if (hasInProgressOrders) {
       const interval = setInterval(() => {
         loadOrders();
-      }, 3000); // Rafraîchir toutes les 3 secondes pour une meilleure réactivité
+      }, 3000);
 
       return () => clearInterval(interval);
     }

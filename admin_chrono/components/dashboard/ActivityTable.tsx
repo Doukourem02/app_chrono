@@ -98,24 +98,6 @@ export default function ActivityTable() {
     })
   }, [latestKey])
   
-  // DÉSACTIVÉ : Logs qui se déclenchaient en boucle et causaient des re-renders
-  // useEffect(() => {
-  //   console.warn('🔄🔄🔄 [ActivityTable] Date range changed:', { 
-  //     dateFilter, 
-  //     startDate, 
-  //     endDate,
-  //     timestamp: new Date().toISOString(),
-  //     stack: new Error().stack?.split('\n').slice(2, 10).join('\n')
-  //   })
-  // }, [dateFilter, startDate, endDate])
-  
-  // useEffect(() => {
-  //   console.warn('🔑🔑🔑 [ActivityTable] QueryKey changed:', {
-  //     queryKey,
-  //     timestamp: new Date().toISOString(),
-  //     stack: new Error().stack?.split('\n').slice(2, 10).join('\n')
-  //   })
-  // }, [queryKey])
   
   const { data: activities, isLoading, isError, error } = useQuery({
     queryKey,
@@ -134,9 +116,9 @@ export default function ActivityTable() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
-    refetchIntervalInBackground: false, // Désactiver complètement le refetch en arrière-plan
-    retry: false, // Ne pas réessayer en cas d'erreur (évite les requêtes supplémentaires)
-    enabled: true, // Toujours activé, mais les autres options empêchent le refetch
+    refetchIntervalInBackground: false, 
+    retry: false, 
+    enabled: true, 
     placeholderData: (previousData) => {
       if (previousData) {
         console.log('📦 [ActivityTable] Using cached data, skipping fetch')
@@ -158,7 +140,7 @@ export default function ActivityTable() {
     }
   }, [activities, isError, error])
 
-  // Utiliser les données réelles de l'API, ou un tableau vide si pas de données
+  // Utiliser les données réelles de l'API,  tableau vide si pas de données
   const displayData = Array.isArray(activities) ? activities : []
   const totalPages = Math.max(1, Math.ceil(displayData.length / itemsPerPage))
   const paginatedData = displayData.slice(

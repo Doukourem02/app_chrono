@@ -52,14 +52,12 @@ export interface OrderRequest {
 }
 
 interface OrderStore {
-  // États - Support pour plusieurs commandes actives
-  activeOrders: OrderRequest[]; // Toutes les commandes actives (accepted, in_progress)
-  pendingOrders: OrderRequest[]; // Commandes en attente de réponse du driver
-  selectedOrderId: string | null; // ID de la commande actuellement sélectionnée/affichée
+  activeOrders: OrderRequest[]; 
+  pendingOrders: OrderRequest[]; 
+  selectedOrderId: string | null; 
   orderHistory: OrderRequest[];
   isReceivingOrders: boolean;
   
-  // Actions
   addOrder: (order: OrderRequest) => void;
   addPendingOrder: (order: OrderRequest) => void;
   updateOrder: (orderId: string, updates: Partial<OrderRequest>) => void;
@@ -74,7 +72,6 @@ interface OrderStore {
   setReceivingOrders: (receiving: boolean) => void;
   clearAllOrders: () => void;
   
-  // Getters
   getOrderById: (orderId: string) => OrderRequest | undefined;
   getActiveOrder: () => OrderRequest | null;
   getActiveOrdersCount: () => number;
@@ -82,20 +79,17 @@ interface OrderStore {
   getTodayOrders: () => OrderRequest[];
   getTotalEarnings: (date?: Date) => number;
   
-  // Compatibilité avec l'ancien code
   setCurrentOrder: (order: OrderRequest | null) => void;
   setPendingOrder: (order: OrderRequest | null) => void;
 }
 
 export const useOrderStore = create<OrderStore>((set, get) => ({
-  // États initiaux
   activeOrders: [],
   pendingOrders: [],
   selectedOrderId: null,
   orderHistory: [],
   isReceivingOrders: true,
   
-  // Actions principales
   addOrder: (order) => set((state) => {
     const exists = state.activeOrders.some(o => o.id === order.id);
     if (exists) return state;
@@ -162,7 +156,6 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       order.id === orderId ? { ...order, status } : order
     );
     
-    // Retirer les commandes terminées/annulées des listes actives
     const filteredActive = updatedActive.filter(o => 
       o.id !== orderId || (status !== 'completed' && status !== 'cancelled' && status !== 'declined')
     );
@@ -181,7 +174,6 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   acceptOrder: (orderId, driverId) => set((state) => {
     const now = new Date();
     
-    // Chercher dans pendingOrders
     const pendingOrder = state.pendingOrders.find(o => o.id === orderId);
     if (pendingOrder) {
       const acceptedOrder = {
@@ -229,16 +221,10 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         completedAt: now,
       };
       
-      // 🆕 Filtrer les commandes actives pour obtenir les commandes restantes
       const remainingActiveOrders = state.activeOrders.filter(o => o.id !== orderId);
       
-      // 🆕 Déterminer la nouvelle commande sélectionnée :
-      // - Si la commande terminée était sélectionnée, sélectionner la première commande restante
-      // - Sinon, garder la sélection actuelle
       let newSelectedId = state.selectedOrderId;
       if (state.selectedOrderId === orderId) {
-        // Sélectionner automatiquement la prochaine commande active
-        // Priorité : commande en cours (picked_up, enroute) > première commande disponible
         const nextOrder = remainingActiveOrders.find(o => 
           o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
         ) || remainingActiveOrders[0] || null;

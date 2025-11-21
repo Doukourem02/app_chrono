@@ -13,7 +13,6 @@ interface GoogleMapsContextType {
 
 const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(undefined)
 
-// Définir les libraries comme constante en dehors du composant pour éviter les re-renders
 const GOOGLE_MAPS_LIBRARIES: Library[] = ['places']
 
 export function GoogleMapsProvider({ children }: { children: ReactNode }) {
@@ -49,14 +48,12 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
   
   const googleMapsApiKey = useMemo(() => directApiKey || googleConfig?.apiKey || '', [directApiKey, googleConfig?.apiKey])
 
-  // Charger Google Maps une seule fois avec un ID unique global
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: googleMapsApiKey || 'dummy-key-to-avoid-error',
-    libraries: GOOGLE_MAPS_LIBRARIES, // Utiliser la constante pour éviter les re-renders
-    id: 'google-maps-script-global', // ID unique global pour toute l'application
+    libraries: GOOGLE_MAPS_LIBRARIES, 
+    id: 'google-maps-script-global', 
   })
 
-  // Mémoriser la valeur du contexte pour éviter les re-renders inutiles
   const contextValue = useMemo(() => ({
     isLoaded,
     loadError

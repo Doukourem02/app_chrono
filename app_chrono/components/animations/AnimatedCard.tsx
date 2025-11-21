@@ -61,7 +61,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
         { translateY: translateY.value },
         { scale: scale.value },
       ],
-      opacity: opacity.value, // Toujours 1, donc toujours visible
+      opacity: opacity.value, 
     };
   });
 

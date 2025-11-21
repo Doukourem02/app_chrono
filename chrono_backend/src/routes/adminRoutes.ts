@@ -4,7 +4,7 @@ import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 
 const router: Router = express.Router();
 
-// Toutes les routes admin nécessitent une authentification Supabase avec rôle admin
+
 router.get('/dashboard-stats', verifyAdminSupabase, getAdminDashboardStats);
 router.get('/delivery-analytics', verifyAdminSupabase, getAdminDeliveryAnalytics);
 router.get('/recent-activities', verifyAdminSupabase, getAdminRecentActivities);

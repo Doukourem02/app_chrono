@@ -1,12 +1,5 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  Animated,
-  PanResponderInstance,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userApiService } from "../services/userApiService";
@@ -18,9 +11,9 @@ interface TrackingBottomSheetProps {
   isExpanded: boolean;
   onToggle: () => void;
   onCancel?: () => void;
-  onNewOrder?: () => void; // Callback pour créer une nouvelle commande
-  onMessage?: () => void; // Callback pour ouvrir la messagerie
-  activeOrdersCount?: number; // Nombre de commandes actives
+  onNewOrder?: () => void;
+  onMessage?: () => void;
+  activeOrdersCount?: number;
 }
 
 const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
@@ -36,19 +29,15 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   
-  // État pour stocker le rating et commentaire
   const [orderRating, setOrderRating] = useState<{ rating: number; comment: string | null } | null>(null);
   const [isLoadingRating, setIsLoadingRating] = useState(false);
 
-  // Charger le rating et commentaire de la commande
   const loadOrderRating = useCallback(async () => {
     if (!currentOrder?.id) {
       setOrderRating(null);
       return;
     }
     
-    // Charger le rating même si la commande n'est pas encore marquée comme complétée
-    // (au cas où l'utilisateur a déjà soumis une évaluation)
     setIsLoadingRating(true);
     try {
       const result = await userApiService.getOrderRating(currentOrder.id);
@@ -57,14 +46,8 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
           rating: result.data.rating,
           comment: result.data.comment,
         });
-        if (__DEV__) {
-          console.log(`✅ Rating chargé pour commande ${currentOrder.id.slice(0, 8)}...: ${result.data.rating}/5, comment: ${result.data.comment ? 'oui' : 'non'}`);
-        }
       } else {
         setOrderRating(null);
-        if (__DEV__) {
-          console.log(`ℹ️ Aucun rating trouvé pour commande ${currentOrder.id.slice(0, 8)}...`);
-        }
       }
     } catch (error) {
       console.error('Erreur chargement rating:', error);
@@ -74,75 +57,54 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
     }
   }, [currentOrder?.id]);
 
-  // Charger le rating quand la commande change ou est complétée
+  const status: string = React.useMemo(() => {
+    const currentStatus = String(currentOrder?.status || "accepted");
+    return currentStatus;
+  }, [currentOrder?.status]);
+  
+  const isCompleted = status === 'completed';
+
   useEffect(() => {
     if (currentOrder?.id) {
-      // Charger immédiatement
       loadOrderRating();
       
-      // Recharger périodiquement si la commande est complétée (au cas où l'utilisateur vient de soumettre une évaluation)
       if (isCompleted) {
         const interval = setInterval(() => {
           loadOrderRating();
-        }, 3000); // Recharger toutes les 3 secondes si complétée
+        }, 3000);
         
         return () => clearInterval(interval);
       }
     }
   }, [currentOrder?.id, isCompleted, loadOrderRating]);
-
-  // S'assurer que le statut est toujours à jour depuis currentOrder
-  // Utiliser useMemo pour forcer le recalcul quand currentOrder change
-  const status: string = React.useMemo(() => {
-    const currentStatus = String(currentOrder?.status || "accepted");
-    if (__DEV__ && currentOrder?.id) {
-      console.log(`📊 TrackingBottomSheet - Statut calculé: ${currentStatus} pour commande ${currentOrder.id.slice(0, 8)}...`);
-    }
-    return currentStatus;
-  }, [currentOrder?.status, currentOrder?.id]);
-  
-  const isCompleted = status === 'completed';
   const canCancel = (status === 'pending' || status === 'accepted') && onCancel;
 
-  // Séquence correcte des statuts :
-  // 1. accepted → "Livreur assigné" (quand le driver accepte la commande)
-  // 2. enroute → "Livreur en route pour récupérer le colis" (quand le driver clique sur "Je pars")
-  // 3. picked_up → "Colis pris en charge" (quand le driver clique sur "Colis récupéré")
-  // 4. picked_up (en route vers destination) → "En cours de livraison" (même statut, étape visuelle)
-  // 5. completed → "Colis livré" (quand le driver clique sur "Terminé")
   const statusSteps = useMemo(() => [
     { label: "Livreur assigné", key: "accepted" },
     { label: "Livreur en route pour récupérer le colis", key: "enroute" },
     { label: "Colis pris en charge", key: "picked_up" },
-    { label: "En cours de livraison", key: "delivering" }, // Étape visuelle pour picked_up
+    { label: "En cours de livraison", key: "delivering" },
     { label: "Colis livré", key: "completed" },
   ], []);
 
-  // Déterminer quels index sont actifs en fonction du statut
-  const getActiveIndexes = () => {
+  const getActiveIndexes = useCallback(() => {
     switch (status) {
       case 'accepted':
-        return [0]; // "Livreur assigné"
+        return [0];
       case 'enroute':
-        return [0, 1]; // "Livreur assigné" + "Livreur en route pour récupérer le colis"
+        return [0, 1];
       case 'picked_up':
       case 'delivering':
-        // Quand le colis est récupéré, on active "Colis pris en charge" ET "En cours de livraison"
-        return [0, 1, 2, 3]; // Toutes les étapes jusqu'à "En cours de livraison"
+        return [0, 1, 2, 3];
       case 'completed':
-        return [0, 1, 2, 3, 4]; // Toutes les étapes
+        return [0, 1, 2, 3, 4];
       default:
         return [0];
     }
-  };
+  }, [status]);
 
-  // Recalculer activeIndexes à chaque fois que le statut change
-  const activeIndexes = React.useMemo(() => getActiveIndexes(), [status]);
-  
-  // Pour la compatibilité avec l'ancien code, on garde activeIndex comme le dernier index actif
-  const activeIndex = React.useMemo(() => Math.max(...activeIndexes, 0), [activeIndexes]);
+  const activeIndexes = React.useMemo(() => getActiveIndexes(), [getActiveIndexes]);
 
-  // 🎨 Animations pour les transitions de statut
   const stepAnimations = useRef(
     statusSteps.map((_, index) => {
       const initialActive = activeIndexes.includes(index);
@@ -154,9 +116,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
     })
   ).current;
 
-  // Animer les transitions quand le statut change
   useEffect(() => {
-    // Recalculer activeIndexes à chaque fois que le statut change
     const currentActiveIndexes = getActiveIndexes();
     const currentActiveIndex = Math.max(...currentActiveIndexes, 0);
     
@@ -166,28 +126,22 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       const targetOpacity = isActive ? 1 : 0.5;
       const isCurrentStep = index === currentActiveIndex;
 
-      // 🔧 Arrêter les animations en cours pour éviter les conflits
       stepAnimations[index].color.stopAnimation();
       stepAnimations[index].scale.stopAnimation();
       stepAnimations[index].opacity.stopAnimation();
 
-      // Animation de couleur pour le cercle et la ligne (fluide)
-      // Utiliser uniquement JS driver pour éviter les conflits avec les autres animations
       Animated.spring(stepAnimations[index].color, {
         toValue: targetColor,
-        useNativeDriver: false, // Couleur nécessite le driver JS
+        useNativeDriver: false,
         tension: 65,
         friction: 8,
       }).start();
 
-      // Animation de scale avec pulse pour le statut actuel (effet visuel)
-      // Utiliser JS driver pour éviter les conflits avec l'animation de couleur
       if (isCurrentStep && isActive) {
-        // Petit pulse quand le statut devient actif
         Animated.sequence([
           Animated.spring(stepAnimations[index].scale, {
             toValue: 1.25,
-            useNativeDriver: false, // Utiliser JS driver pour cohérence
+            useNativeDriver: false,
             tension: 65,
             friction: 5,
           }),
@@ -207,15 +161,13 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         }).start();
       }
 
-      // Animation d'opacité pour le texte (transition douce)
-      // Utiliser JS driver pour éviter les conflits
       Animated.timing(stepAnimations[index].opacity, {
         toValue: targetOpacity,
         duration: 400,
-        useNativeDriver: false, // Utiliser JS driver pour cohérence
+        useNativeDriver: false,
       }).start();
     });
-  }, [status, currentOrder?.status, statusSteps]); // Dépendre directement du statut pour forcer le re-render
+  }, [status, currentOrder?.status, statusSteps, getActiveIndexes, stepAnimations]);
 
   return (
     <Animated.View
@@ -227,19 +179,16 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
           bottom: insets.bottom + 25,
         },
       ]}
-    >
-      {/* Handle */}
+      >
       <TouchableOpacity onPress={onToggle} style={styles.dragIndicator}>
         <View style={styles.dragHandle} />
       </TouchableOpacity>
 
-      {/* ✅ COLLAPSÉ */}
       {!isExpanded && (
         <View style={styles.collapsedWrapper}>
           <View style={styles.collapsedContainer}>
             <View style={styles.driverAvatar} />
 
-            {/* If completed, show a small badge so the user sees confirmation even when collapsed */}
             {isCompleted ? (
               <View style={styles.completedBadge}>
                 <Ionicons name="checkmark" size={16} color="#fff" />
@@ -262,12 +211,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         </View>
       )}
 
-      {/* ✅ EXPANDÉ */}
       {isExpanded && (
         <View style={styles.expandedCard}>
           <Text style={styles.title}>Statut de la commande</Text>
 
-          {/* Confirmation banner when order is completed */}
           {isCompleted && (
             <View style={styles.completedBanner}>
               <Ionicons name="checkmark-circle" size={20} color="#fff" />
@@ -277,12 +224,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
             </View>
           )}
 
-          {/* Timeline avec animations fluides */}
           <View style={styles.timelineContainer}>
             {statusSteps.map((step, index) => {
               const anim = stepAnimations[index];
               
-              // Interpolations pour les animations
               const circleColor = anim.color.interpolate({
                 inputRange: [0, 1],
                 outputRange: ['#E0E0E0', '#7C3AED'],
@@ -334,7 +279,6 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
             })}
           </View>
 
-          {/* Preuve de livraison si disponible */}
           {currentOrder?.proof?.uploadedAt && (
             <View style={styles.proofRow}>
               <Ionicons name="checkmark-circle" size={18} color="#10B981" />
@@ -344,11 +288,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
             </View>
           )}
 
-          {/* Rating et commentaire si la commande est complétée */}
           {isCompleted && (
             <View style={styles.ratingSection}>
               {isLoadingRating ? (
-                <Text style={styles.loadingText}>Chargement de l'évaluation...</Text>
+                <Text style={styles.loadingText}>Chargement de l&apos;évaluation...</Text>
               ) : orderRating ? (
                 <>
                   <View style={styles.ratingHeader}>
@@ -379,7 +322,6 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
             </View>
           )}
 
-          {/* Barre d'action */}
           <View style={styles.actionBar}>
             <View style={styles.driverAvatar} />
             <View style={styles.actionButtons}>
@@ -403,7 +345,6 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
             </View>
           </View>
 
-          {/* Bouton "Nouvelle commande" - Permet de créer une autre commande même avec des commandes actives */}
           {onNewOrder && (
             <TouchableOpacity 
               style={styles.newOrderButton}
@@ -487,7 +428,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // ✅ NOUVELLE PARTIE FIDÈLE AU FIGMA
   expandedCard: {
     width: "92%",
     backgroundColor: "#fff",

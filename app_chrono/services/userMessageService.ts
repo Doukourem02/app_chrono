@@ -165,7 +165,7 @@ class UserMessageService {
       const result = await response.json();
 
       if (!response.ok) {
-        logger.error('❌ Erreur HTTP lors du rafraîchissement:', response.status, result.message);
+        logger.error(`Erreur HTTP lors du rafraîchissement: ${response.status}`, result.message);
         return null;
       }
 

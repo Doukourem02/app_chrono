@@ -1,17 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  Alert, 
-  ScrollView,
-  Image,
-  Switch,
-  StatusBar,
-  ActivityIndicator
-} from 'react-native';
+import {StyleSheet, Text, View, TouchableOpacity, Alert, ScrollView,Image,Switch,StatusBar,ActivityIndicator} from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';

@@ -1,13 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import {View,Text,StyleSheet,TouchableOpacity,ScrollView,Alert,ActivityIndicator} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
@@ -29,11 +21,7 @@ export default function AddressesPage() {
   const loadAddresses = async () => {
     setIsLoading(true);
     try {
-      // TODO: Charger les adresses depuis l'API
-      // const result = await userApiService.getAddresses(user?.id);
-      // setAddresses(result.data || []);
-      
-      // Mock data pour l'instant
+    
       setAddresses([
         {
           id: '1',

@@ -1,21 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  FlatList,
-  Image,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Modal,
-} from 'react-native';
+import {View,Text,StyleSheet,TouchableOpacity,TextInput,FlatList,Image,ActivityIndicator,KeyboardAvoidingView,Platform,Animated,PanResponderInstance} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Animated, PanResponderInstance, Dimensions } from 'react-native';
-import { userMessageService, Message, Conversation } from '../services/userMessageService';
+import { userMessageService, Message } from '../services/userMessageService';
 import { userMessageSocketService } from '../services/userMessageSocketService';
 import { useMessageStore } from '../store/useMessageStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -67,7 +54,6 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     avatar: initialDriverAvatar,
   });
 
-  // Mettre à jour les infos du driver si elles changent
   useEffect(() => {
     if (initialDriverName && initialDriverName !== driverInfo.name) {
       setDriverInfo((prev) => ({
@@ -76,19 +62,15 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
         avatar: initialDriverAvatar || prev.avatar,
       }));
     }
-  }, [initialDriverName, initialDriverAvatar]);
+  }, [initialDriverName, initialDriverAvatar, driverInfo.name]);
   const [isLoadingDriver, setIsLoadingDriver] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
-  // Charger les informations du livreur depuis l'API seulement si nécessaire
   useEffect(() => {
     const loadDriverInfo = async () => {
-      // Si on a déjà un nom personnalisé (pas "Livreur"), ne pas recharger
       if (!driverId || (initialDriverName && initialDriverName !== 'Livreur')) return;
-      // Si on a déjà chargé les infos, ne pas recharger
       if (driverInfo.name && driverInfo.name !== 'Livreur') return;
-      // Si on a une conversation avec les infos, ne pas recharger
       if (currentConversation) return;
 
       setIsLoadingDriver(true);
@@ -104,9 +86,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
             avatar: result.data.avatar_url || result.data.profile_image_url,
           });
         }
-      } catch (error) {
-        // Ne pas logger l'erreur si c'est juste "Chauffeur non trouvé"
-        // Les infos seront récupérées depuis la conversation
+      } catch {
         logger.warn('Impossible de charger les détails du livreur depuis l\'API, utilisation des infos de la conversation', 'MessageBottomSheet');
       } finally {
         setIsLoadingDriver(false);
@@ -116,11 +96,9 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     loadDriverInfo();
   }, [driverId, initialDriverName, currentConversation, driverInfo.name]);
 
-  // Mettre à jour les infos du livreur depuis la conversation
   useEffect(() => {
     if (!currentConversation || !user?.id) return;
 
-    // Trouver le participant qui est le livreur (pas l'utilisateur actuel)
     const driverParticipant = 
       currentConversation.participant_1_id === user.id
         ? currentConversation.participant_2
@@ -139,7 +117,6 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     }
   }, [currentConversation, user?.id]);
 
-  // Charger ou créer la conversation
   useEffect(() => {
     if (!orderId || !isExpanded) return;
 
@@ -148,18 +125,14 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
       setError(null);
 
       try {
-        // Récupérer ou créer la conversation
         const conversation = await userMessageService.getOrCreateOrderConversation(orderId);
         setCurrentConversation(conversation);
 
-        // Rejoindre la conversation via Socket.IO
         userMessageSocketService.joinConversation(conversation.id);
 
-        // Charger les messages
         const loadedMessages = await userMessageService.getMessages(conversation.id);
         setMessages(conversation.id, loadedMessages);
 
-        // Marquer les messages comme lus
         await userMessageService.markAsRead(conversation.id);
         markAsRead(conversation.id);
       } catch (error: any) {
@@ -171,16 +144,14 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     };
 
     loadConversation();
-  }, [orderId, isExpanded]);
+  }, [orderId, isExpanded, setCurrentConversation, setMessages, setLoading, setError, markAsRead]);
 
-  // Écouter les nouveaux messages via Socket.IO
   useEffect(() => {
     if (!currentConversation) return;
 
     const unsubscribe = userMessageSocketService.onNewMessage((message, conversation) => {
       if (conversation.id === currentConversation.id) {
         addMessage(conversation.id, message);
-        // Scroll vers le bas
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -192,7 +163,6 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     };
   }, [currentConversation, addMessage]);
 
-  // Scroll vers le bas quand de nouveaux messages arrivent
   useEffect(() => {
     if (currentConversation && messages[currentConversation.id]) {
       setTimeout(() => {
@@ -201,7 +171,6 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     }
   }, [messages, currentConversation]);
 
-  // Envoyer un message
   const handleSendMessage = useCallback(async () => {
     if (!messageText.trim() || !currentConversation || isSending) return;
 
@@ -210,42 +179,34 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     setIsSending(true);
 
     try {
-      // Envoyer via Socket.IO (plus rapide)
       userMessageSocketService.sendMessage(currentConversation.id, content);
 
-      // Optionnel : aussi envoyer via API pour la persistance
-      // Le message sera ajouté automatiquement via le socket
       await userMessageService.sendMessage(currentConversation.id, content);
     } catch (error: any) {
       logger.error('Erreur envoi message', 'MessageBottomSheet', error);
       setError(error.message || 'Impossible d\'envoyer le message');
-      // Remettre le texte dans l'input en cas d'erreur
       setMessageText(content);
     } finally {
       setIsSending(false);
     }
-  }, [messageText, currentConversation, isSending]);
+  }, [messageText, currentConversation, isSending, setError]);
 
-  // Animation d'apparition/disparition de l'overlay
   useEffect(() => {
     if (isExpanded) {
-      // Apparition : overlay fade in
       Animated.timing(overlayOpacity, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }).start();
     } else {
-      // Disparition : overlay fade out
       Animated.timing(overlayOpacity, {
         toValue: 0,
         duration: 250,
         useNativeDriver: true,
       }).start();
     }
-  }, [isExpanded]);
+  }, [isExpanded, overlayOpacity]);
 
-  // Nettoyer à la fermeture
   useEffect(() => {
     if (!isExpanded && currentConversation) {
       userMessageSocketService.leaveConversation(currentConversation.id);
@@ -258,11 +219,6 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isMyMessage = item.sender_id === user?.id;
-    const senderName = item.sender
-      ? `${item.sender.first_name || ''} ${item.sender.last_name || ''}`.trim() || item.sender.email
-      : isMyMessage
-      ? 'Moi'
-      : driverInfo.name;
 
     return (
       <View
@@ -334,7 +290,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
         style={[
           styles.container,
           {
-            height: animatedHeight, // Utilise useNativeDriver: false (géré par useBottomSheet)
+            height: animatedHeight, 
             bottom: 0,
           },
         ]}
@@ -448,8 +404,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
-    elevation: 20, // Plus élevé que TrackingBottomSheet (elevation: 10)
-    zIndex: 1000, // Assure que le MessageBottomSheet est au-dessus
+    elevation: 20, 
+    zIndex: 1000, 
     overflow: 'hidden',
   },
   keyboardView: {

@@ -1,7 +1,6 @@
 import { Stack } from "expo-router";
 import { initSentry } from "../utils/sentry";
 
-// 🔍 SENTRY: Initialiser le monitoring d'erreurs
 initSentry();
 
 export default function RootLayout() {

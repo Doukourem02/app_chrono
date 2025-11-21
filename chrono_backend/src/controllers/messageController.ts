@@ -16,10 +16,10 @@ export const getConversations = async (req: AuthenticatedRequest, res: Response)
     const type = req.query.type as string | undefined;
     const conversations = await messageService.getUserConversations(userId, type as any);
 
-    res.json({ success: true, data: conversations });
+    return res.json({ success: true, data: conversations });
   } catch (error: any) {
     logger.error('Erreur lors de la récupération des conversations:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -51,10 +51,10 @@ export const getConversationById = async (req: AuthenticatedRequest, res: Respon
       return res.status(404).json({ success: false, message: 'Conversation introuvable' });
     }
 
-    res.json({ success: true, data: conversation });
+    return res.json({ success: true, data: conversation });
   } catch (error: any) {
     logger.error('Erreur lors de la récupération de la conversation:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -99,10 +99,10 @@ export const createConversation = async (req: AuthenticatedRequest, res: Respons
       return res.status(400).json({ success: false, message: 'Type de conversation invalide' });
     }
 
-    res.status(201).json({ success: true, data: conversation });
+    return res.status(201).json({ success: true, data: conversation });
   } catch (error: any) {
     logger.error('Erreur lors de la création de la conversation:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -133,10 +133,10 @@ export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
 
     const messages = await messageService.getMessages(conversationId, page, limit);
 
-    res.json({ success: true, data: messages });
+    return res.json({ success: true, data: messages });
   } catch (error: any) {
     logger.error('Erreur lors de la récupération des messages:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -175,10 +175,10 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
       messageType || 'text'
     );
 
-    res.status(201).json({ success: true, data: message });
+    return res.status(201).json({ success: true, data: message });
   } catch (error: any) {
     logger.error('Erreur lors de l\'envoi du message:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -196,10 +196,10 @@ export const markMessagesAsRead = async (req: AuthenticatedRequest, res: Respons
 
     await messageService.markAsRead(conversationId, userId);
 
-    res.json({ success: true, message: 'Messages marqués comme lus' });
+    return res.json({ success: true, message: 'Messages marqués comme lus' });
   } catch (error: any) {
     logger.error('Erreur lors du marquage des messages comme lus:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -215,10 +215,10 @@ export const getUnreadCount = async (req: AuthenticatedRequest, res: Response) =
 
     const count = await messageService.getUnreadCount(userId);
 
-    res.json({ success: true, data: { count } });
+    return res.json({ success: true, data: { count } });
   } catch (error: any) {
     logger.error('Erreur lors du comptage des messages non lus:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
