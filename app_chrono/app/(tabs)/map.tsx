@@ -63,12 +63,9 @@ export default function MapPage() {
     partialAmount?: number;
   }>({});
 
-  // Vérifier l'authentification dès l'accès à la page
-  useEffect(() => {
-    requireAuth(() => {
-      // L'utilisateur est connecté, ne rien faire
-    });
-  }, [requireAuth]);
+  // Ne plus rediriger automatiquement vers l'authentification
+  // L'utilisateur peut explorer la carte en mode invité
+  // L'authentification sera demandée seulement lors de la création d'une commande
 
   useEffect(() => {
     if (user?.id) {
@@ -847,7 +844,28 @@ export default function MapPage() {
     paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred',
     paymentMethodId?: string | null
   ) => {
-    if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && user && selectedMethod) {
+    // Vérifier l'authentification avant de créer la commande
+    if (!user) {
+      Alert.alert(
+        'Connexion requise',
+        'Vous devez vous connecter ou créer un compte pour passer une commande.',
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel',
+          },
+          {
+            text: 'Se connecter',
+            onPress: () => {
+              router.push('/(auth)/register' as any);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    if (pickupCoords && dropoffCoords && pickupLocation && deliveryLocation && selectedMethod) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       console.log('📦 Envoi commande avec détails...');
 

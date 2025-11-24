@@ -38,17 +38,15 @@ export default function ProfilePage() {
     return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
   };
 
-  // Mettre à jour l'avatar quand l'utilisateur change
+
   useEffect(() => {
     setAvatarUrl((user as any)?.avatar_url || null);
   }, [user]);
 
-  // Charger les données utilisateur complètes si first_name/last_name manquent
   useEffect(() => {
     const loadUserProfile = async () => {
       if (!user?.id) return;
       
-      // Si first_name et last_name sont déjà disponibles, ne pas recharger
       if (user.first_name || user.last_name) return;
 
       try {
@@ -67,12 +65,11 @@ export default function ProfilePage() {
       }
     };
 
-    requireAuth(() => {
+    if (user?.id) {
       loadUserProfile();
-    });
-  }, [requireAuth, user, setUser]);
+    }
+  }, [user, setUser]);
 
-  // Charger les statistiques depuis le backend
   useEffect(() => {
     const loadStatistics = async () => {
       if (!user?.id) return;
@@ -90,10 +87,17 @@ export default function ProfilePage() {
       }
     };
 
-    requireAuth(() => {
+    if (user?.id) {
       loadStatistics();
-    });
-  }, [requireAuth, user?.id]);
+    }
+  }, [user?.id]);
+
+  // Rediriger vers l'authentification si l'utilisateur n'est pas connecté
+  useEffect(() => {
+    if (!user) {
+      router.replace('/(auth)/register' as any);
+    }
+  }, [user]);
 
   const handleAvatarPress = async () => {
     if (!user?.id) {
@@ -102,14 +106,12 @@ export default function ProfilePage() {
     }
 
     try {
-      // Demander les permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission requise', 'Nous avons besoin de l\'accès à vos photos pour changer votre avatar');
         return;
       }
 
-      // Afficher les options
       Alert.alert(
         'Changer l\'avatar',
         'Choisissez une option',
@@ -159,20 +161,16 @@ export default function ProfilePage() {
     try {
       setUploadingAvatar(true);
 
-      // Lire l'image en base64 avec expo-file-system/legacy
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       const base64DataUri = `data:${mimeType};base64,${base64}`;
 
-      // Uploader vers le backend
       const result = await userApiService.uploadAvatar(user.id, base64DataUri, mimeType);
 
       if (result.success && result.data) {
-        // Mettre à jour l'avatar localement
         setAvatarUrl(result.data.avatar_url);
         
-        // Mettre à jour le store
         if (user) {
           setUser({
             ...user,
@@ -296,6 +294,11 @@ export default function ProfilePage() {
       onPress: () => router.push('/profile/about')
     }
   ];
+
+  // Ne rien afficher pendant la redirection
+  if (!user) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

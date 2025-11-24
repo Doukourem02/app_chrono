@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {StyleSheet,Text,View,ScrollView,TouchableOpacity,ActivityIndicator,RefreshControl,Alert,Image,Modal,FlatList} from 'react-native';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
@@ -256,20 +257,20 @@ export default function BoxPage() {
     selectedFilterRef.current = selectedFilter;
   }, [selectedFilter]);
 
-  // Vérifier l'authentification dès l'accès à la page
+  // Charger les commandes si l'utilisateur est connecté
   useEffect(() => {
-    // Vérifier si l'utilisateur est toujours connecté
-    if (!user?.id) {
-      return;
+    if (user?.id) {
+      loadOrders('all');
     }
-    requireAuth(() => {
-      // L'utilisateur est connecté, charger les commandes
-      if (user?.id) {
-        loadOrders('all');
-      }
-    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requireAuth, user?.id]);
+  }, [user?.id]);
+
+  // Rediriger vers l'authentification si l'utilisateur n'est pas connecté
+  useEffect(() => {
+    if (!user) {
+      router.replace('/(auth)/register' as any);
+    }
+  }, [user]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -550,6 +551,11 @@ export default function BoxPage() {
       </TouchableOpacity>
     );
   };
+
+  // Ne rien afficher pendant la redirection
+  if (!user) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

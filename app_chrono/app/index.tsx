@@ -11,6 +11,7 @@ export default function RootIndex() {
 
     const checkSession = async () => {
       if (isAuthenticated && user) {
+        // Si l'utilisateur est authentifié, valider sa session
         const validationResult = await validateUser();
 
         if (cancelled) {
@@ -18,19 +19,24 @@ export default function RootIndex() {
         }
 
         if (validationResult === true || validationResult === null || validationResult === 'not_found') {
+          // Session valide, rediriger vers l'application
           router.replace('/(tabs)' as any);
         } else {
+          // Session invalide, déconnecter et permettre l'accès en mode invité
           logout();
-          router.replace('/(auth)/register' as any);
+          router.replace('/(tabs)' as any);
         }
       } else {
-        router.replace('/(auth)/register' as any);
+        // Pas d'authentification : permettre l'accès en mode invité
+        // L'utilisateur pourra explorer l'application et s'inscrire quand il le souhaite
+        router.replace('/(tabs)' as any);
       }
     };
 
     const timer = setTimeout(() => {
       checkSession().catch(() => {
         if (!cancelled) {
+          // En cas d'erreur, permettre l'accès en mode invité
           router.replace('/(tabs)' as any);
         }
       });
@@ -52,7 +58,7 @@ export default function RootIndex() {
     }}>
       <ActivityIndicator size="large" color="#8B7CF6" />
       <Text style={{ marginTop: 20, color: '#6B7280', textAlign: 'center' }}>
-        Vérification...
+        Chargement...
       </Text>
     </View>
   );
