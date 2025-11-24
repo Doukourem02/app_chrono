@@ -13,13 +13,30 @@ class DriverMessageSocketService {
   private typingCallbacks: ((data: { userId: string; isTyping: boolean }) => void)[] = [];
 
   connect(driverId: string) {
-    if (this.socket && this.isConnected) {
+    // Si le socket est déjà connecté avec le même driverId, ne rien faire
+    if (this.socket && this.isConnected && this.socket.connected && this.driverId === driverId) {
       return;
+    }
+
+    // Nettoyer l'ancien socket s'il existe
+    if (this.socket) {
+      logger.info('Nettoyage de l\'ancien socket', 'driverMessageSocketService');
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
     }
 
     this.driverId = driverId;
     this.socket = io(SOCKET_URL, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
+      reconnectionAttempts: 5,
+      timeout: 20000,
+      forceNew: false,
+      upgrade: true,
+      autoConnect: true,
     });
 
     this.socket.on('connect', () => {
@@ -29,9 +46,24 @@ class DriverMessageSocketService {
       this.socket?.emit('driver-connect', driverId);
     });
 
-    this.socket.on('disconnect', () => {
-      logger.info('🔌 Socket déconnecté pour messagerie', 'driverMessageSocketService');
+    this.socket.on('disconnect', (reason) => {
+      logger.info('🔌 Socket déconnecté pour messagerie', 'driverMessageSocketService', { reason });
       this.isConnected = false;
+    });
+
+    this.socket.on('connect_error', (error) => {
+      this.isConnected = false;
+      // Ignorer les erreurs de polling temporaires
+      const isTemporaryPollError = error.message?.includes('xhr poll error') || 
+                                   error.message?.includes('poll error') ||
+                                   error.message?.includes('transport unknown');
+      
+      if (!isTemporaryPollError) {
+        logger.error('❌ Erreur connexion socket messagerie:', 'driverMessageSocketService', {
+          message: error.message,
+          type: error.type,
+        });
+      }
     });
 
     // Écouter les nouveaux messages

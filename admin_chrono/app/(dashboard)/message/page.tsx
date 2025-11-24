@@ -23,6 +23,7 @@ export default function MessagePage() {
     setMessages,
     addMessage,
     markAsRead,
+    updateConversationUnreadCount,
     setUnreadCount,
     setLoading,
   } = useAdminMessageStore()
@@ -81,19 +82,60 @@ export default function MessagePage() {
     }
   }, [user?.id, filterType, setConversations, setLoading])
 
+  const loadUnreadCount = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const count = await adminMessageService.getUnreadCount()
+      // Ne mettre à jour que si le compteur local n'est pas déjà à jour
+      // Cela évite d'écraser les mises à jour locales
+      const state = useAdminMessageStore.getState()
+      const localCount = state.conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0)
+      // Utiliser le compteur du backend seulement s'il est différent du local
+      // et si le local n'est pas 0 (car 0 signifie qu'on a marqué comme lu)
+      if (localCount === 0 && count > 0) {
+        // Si le local est 0 mais le backend dit qu'il y a des messages non lus,
+        // c'est probablement un délai de synchronisation, on garde le local
+        return
+      }
+      // Sinon, utiliser le compteur du backend pour la synchronisation
+      setUnreadCount(count)
+    } catch (error) {
+      console.error('Error loading unread count:', error)
+    }
+  }, [user?.id, setUnreadCount])
+
   const loadMessages = useCallback(async (conversationId: string) => {
     setLoading(true)
     try {
       const data = await adminMessageService.getMessages(conversationId)
       setMessages(conversationId, data)
+      // Marquer comme lus AVANT de recharger les conversations
       await adminMessageService.markAsRead(conversationId)
       markAsRead(conversationId)
+      // Mettre à jour le compteur de messages non lus de la conversation immédiatement
+      updateConversationUnreadCount(conversationId, 0)
+      
+      // Attendre un peu pour que le backend termine la mise à jour
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Recharger le compteur global et les conversations depuis le backend
+      // pour obtenir les unread_count mis à jour
+      await Promise.all([
+        loadUnreadCount(),
+        adminMessageService.getConversations(filterType === 'all' ? undefined : filterType)
+          .then((updatedConversations) => {
+            setConversations(updatedConversations)
+          })
+          .catch((error) => {
+            console.error('Error reloading conversations:', error)
+          })
+      ])
     } catch (error) {
       console.error('Error loading messages:', error)
     } finally {
       setLoading(false)
     }
-  }, [setMessages, markAsRead, setLoading])
+  }, [setMessages, markAsRead, updateConversationUnreadCount, loadUnreadCount, setConversations, filterType, setLoading])
 
   // Charger tous les messages d'un groupe de conversations (pour les conversations de type "order")
   const loadAllMessagesForPair = useCallback(async (participant1Id: string, participant2Id: string) => {
@@ -107,14 +149,20 @@ export default function MessagePage() {
         return p1Match && p2Match
       })
 
-      // Charger tous les messages de toutes ces conversations
-      const allMessages: Array<{ conversationId: string; message: Message }> = []
-      for (const conv of pairConversations) {
+      // Charger tous les messages en parallèle pour améliorer les performances
+      const messagePromises = pairConversations.map(async (conv) => {
         const messages = await adminMessageService.getMessages(conv.id)
-        allMessages.push(...messages.map((msg) => ({ conversationId: conv.id, message: msg })))
+        // Marquer comme lus AVANT de continuer
         await adminMessageService.markAsRead(conv.id)
         markAsRead(conv.id)
-      }
+        // Mettre à jour le compteur de messages non lus de chaque conversation immédiatement
+        updateConversationUnreadCount(conv.id, 0)
+        return messages.map((msg) => ({ conversationId: conv.id, message: msg }))
+      })
+
+      // Attendre que tous les messages soient chargés et marqués comme lus
+      const allMessagesArrays = await Promise.all(messagePromises)
+      const allMessages = allMessagesArrays.flat()
 
       // Trier tous les messages par date
       allMessages.sort((a, b) => {
@@ -126,22 +174,28 @@ export default function MessagePage() {
       // Stocker les messages dans le store avec une clé spéciale pour le groupe
       const groupKey = `group_${participant1Id}_${participant2Id}`
       setMessages(groupKey, allMessages.map((item) => item.message))
+      
+      // Attendre un peu pour que le backend termine la mise à jour
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Recharger le compteur global et les conversations depuis le backend
+      // pour obtenir les unread_count mis à jour
+      await Promise.all([
+        loadUnreadCount(),
+        adminMessageService.getConversations(filterType === 'all' ? undefined : filterType)
+          .then((updatedConversations) => {
+            setConversations(updatedConversations)
+          })
+          .catch((error) => {
+            console.error('Error reloading conversations:', error)
+          })
+      ])
     } catch (error) {
       console.error('Error loading messages for pair:', error)
     } finally {
       setLoading(false)
     }
-  }, [conversations, setMessages, markAsRead, setLoading])
-
-  const loadUnreadCount = useCallback(async () => {
-    if (!user?.id) return
-    try {
-      const count = await adminMessageService.getUnreadCount()
-      setUnreadCount(count)
-    } catch (error) {
-      console.error('Error loading unread count:', error)
-    }
-  }, [user?.id, setUnreadCount])
+  }, [conversations, setMessages, markAsRead, updateConversationUnreadCount, loadUnreadCount, setConversations, filterType, setLoading])
 
   // Grouper les conversations par paire de participants (pour type "order")
   const groupedConversations = React.useMemo(() => {
@@ -205,23 +259,38 @@ export default function MessagePage() {
         setCurrentConversation(pairConversations[0])
       }
       
+      // Mettre à jour immédiatement le unread_count à 0 pour toutes les conversations du groupe
+      // Cela fait disparaître le badge immédiatement
+      for (const conv of pairConversations) {
+        updateConversationUnreadCount(conv.id, 0)
+      }
+      
       // Rejoindre toutes les conversations du groupe
       for (const conv of pairConversations) {
         adminMessageSocketService.joinConversation(conv.id)
       }
       
-      await loadAllMessagesForPair(p1Id, p2Id)
+      // Charger les messages en arrière-plan (ne pas bloquer l'UI)
+      loadAllMessagesForPair(p1Id, p2Id).catch((error) => {
+        console.error('Error loading messages for pair:', error)
+      })
     } else {
       // Conversation normale
       const conversation = conversations.find((c) => c.id === conversationIdOrGroupKey)
       if (conversation) {
         setSelectedParticipantPair(null)
         setCurrentConversation(conversation)
+        // Mettre à jour immédiatement le unread_count à 0
+        // Cela fait disparaître le badge immédiatement
+        updateConversationUnreadCount(conversation.id, 0)
         adminMessageSocketService.joinConversation(conversation.id)
-        await loadMessages(conversation.id)
+        // Charger les messages (cela va aussi marquer comme lus et recharger les conversations)
+        loadMessages(conversation.id).catch((error) => {
+          console.error('Error loading messages:', error)
+        })
       }
     }
-  }, [conversations, setCurrentConversation, loadMessages, loadAllMessagesForPair])
+  }, [conversations, setCurrentConversation, loadMessages, loadAllMessagesForPair, updateConversationUnreadCount])
 
   const handleSendMessage = useCallback(async (content: string) => {
     if (!user?.id) return
@@ -431,11 +500,39 @@ export default function MessagePage() {
       }
       
       const currentConv = state.currentConversation
+      // Si c'est la conversation actuelle, marquer comme lue
       if (conversation.id === currentConv?.id) {
-        adminMessageService.markAsRead(conversation.id)
-        markAsRead(conversation.id)
+        // Mettre à jour immédiatement le compteur local pour que le badge disparaisse
+        updateConversationUnreadCount(conversation.id, 0)
+        
+        // Marquer comme lus côté backend
+        adminMessageService.markAsRead(conversation.id).then(() => {
+          markAsRead(conversation.id)
+          // Recharger le compteur global
+          loadUnreadCount()
+          // Recharger les conversations depuis le backend en arrière-plan
+          adminMessageService.getConversations(filterType === 'all' ? undefined : filterType)
+            .then((updatedConversations) => {
+              setConversations(updatedConversations)
+            })
+            .catch((error) => {
+              console.error('Error reloading conversations:', error)
+            })
+        }).catch((error) => {
+          console.error('Error marking as read:', error)
+        })
+      } else {
+        // Si ce n'est pas la conversation actuelle, mettre à jour le unread_count de la conversation
+        // et recalculer le compteur global localement
+        const state = useAdminMessageStore.getState()
+        const conversationInStore = state.conversations.find(c => c.id === conversation.id)
+        if (conversationInStore && conversationInStore.unread_count !== undefined) {
+          // Incrémenter le unread_count localement
+          updateConversationUnreadCount(conversation.id, (conversationInStore.unread_count || 0) + 1)
+        }
+        // Recharger le compteur global depuis le backend en arrière-plan
+        loadUnreadCount()
       }
-      loadUnreadCount()
     })
 
     return () => {
@@ -446,7 +543,7 @@ export default function MessagePage() {
       }
       adminMessageSocketService.disconnect()
     }
-  }, [user?.id, loadConversations, loadUnreadCount, addMessage, markAsRead, setMessages])
+  }, [user?.id, loadConversations, loadUnreadCount, addMessage, markAsRead, updateConversationUnreadCount, setMessages, filterType, setConversations])
 
   useEffect(() => {
     loadConversations()

@@ -128,6 +128,7 @@ function TrackingMap({
   adminLocation: { lat: number; lng: number }
 }) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
+  const [closedDriverInfoIds, setClosedDriverInfoIds] = useState<Set<string>>(new Set())
 
   // Trouver le livreur assigné à la livraison sélectionnée
   const assignedDriver = useMemo(() => {
@@ -502,13 +503,28 @@ function TrackingMap({
             }}
           />
           <InfoWindow position={routePathFallback[0]}>
-            <div style={{ padding: '4px' }}>
-              <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
+            <div style={{ padding: '8px 10px', maxWidth: '250px' }}>
+              <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', lineHeight: '1.4' }}>
                 {selectedDelivery.pickup?.name || 'Point de départ'}
               </div>
-              <div style={{ fontSize: '12px', color: '#6B7280' }}>
+              <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: selectedDelivery.driver ? '6px' : '0', lineHeight: '1.3' }}>
                 {selectedDelivery.pickup?.address || ''}
               </div>
+              {selectedDelivery.driver && (
+                <div style={{ 
+                  marginTop: '6px', 
+                  paddingTop: '6px', 
+                  borderTop: '1px solid #E5E7EB' 
+                }}>
+                  <div style={{ fontSize: '10px', color: '#9CA3AF', marginBottom: '2px', lineHeight: '1.2' }}>
+                    Livreur assigné
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: '12px', color: '#111827', lineHeight: '1.3' }}>
+                    {selectedDelivery.driver.full_name || 
+                     (selectedDelivery.driverId ? `Livreur ${selectedDelivery.driverId.substring(0, 8)}` : 'Livreur')}
+                  </div>
+                </div>
+              )}
             </div>
           </InfoWindow>
           
@@ -526,11 +542,11 @@ function TrackingMap({
             }}
           />
           <InfoWindow position={routePathFallback[1]}>
-            <div style={{ padding: '4px' }}>
-              <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
+            <div style={{ padding: '8px 10px', maxWidth: '250px' }}>
+              <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', lineHeight: '1.4' }}>
                 {selectedDelivery.dropoff?.name || 'Point d\'arrivée'}
               </div>
-              <div style={{ fontSize: '12px', color: '#6B7280' }}>
+              <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: '1.3' }}>
                 {selectedDelivery.dropoff?.address || ''}
               </div>
             </div>
@@ -551,6 +567,15 @@ function TrackingMap({
                   strokeColor: '#FFFFFF',
                   strokeWeight: 3,
                 }}
+                onClick={() => {
+                  if (selectedDelivery?.id) {
+                    setClosedDriverInfoIds(prev => {
+                      const newSet = new Set(prev)
+                      newSet.delete(selectedDelivery.id)
+                      return newSet
+                    })
+                  }
+                }}
               />
               {/* Cercle extérieur pulsant */}
               <Marker
@@ -565,21 +590,31 @@ function TrackingMap({
                   strokeWeight: 2,
                 }}
               />
-              {/* InfoWindow pour le livreur */}
-              <InfoWindow position={currentVehiclePosition}>
-                <div style={{ padding: '4px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
-                    {assignedDriver.userId ? `Livreur ${assignedDriver.userId.substring(0, 8)}` : 'Livreur'}
+              {/* InfoWindow pour le livreur en mouvement - toujours visible comme les autres marqueurs */}
+              {!closedDriverInfoIds.has(selectedDelivery.id) && (
+                <InfoWindow 
+                  position={currentVehiclePosition}
+                  onCloseClick={() => {
+                    if (selectedDelivery?.id) {
+                      setClosedDriverInfoIds(prev => new Set(prev).add(selectedDelivery.id))
+                    }
+                  }}
+                >
+                  <div style={{ padding: '8px 10px', maxWidth: '200px' }}>
+                    <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', color: '#111827', lineHeight: '1.4' }}>
+                      {selectedDelivery.driver?.full_name || 
+                       (assignedDriver?.userId ? `Livreur ${assignedDriver.userId.substring(0, 8)}` : 'Livreur')}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: '1.3' }}>
+                      {selectedDelivery.status === 'accepted' || selectedDelivery.status === 'enroute' 
+                        ? 'En route vers le point de collecte'
+                        : selectedDelivery.status === 'picked_up'
+                        ? 'En route vers la destination'
+                        : 'En livraison'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#6B7280' }}>
-                    {selectedDelivery.status === 'accepted' || selectedDelivery.status === 'enroute' 
-                      ? 'En route vers le point de collecte'
-                      : selectedDelivery.status === 'picked_up'
-                      ? 'En route vers la destination'
-                      : 'En livraison'}
-                  </div>
-                </div>
-              </InfoWindow>
+                </InfoWindow>
+              )}
             </>
           )}
         </>

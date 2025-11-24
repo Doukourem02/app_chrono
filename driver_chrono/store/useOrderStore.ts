@@ -156,9 +156,14 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       order.id === orderId ? { ...order, status } : order
     );
     
-    const filteredActive = updatedActive.filter(o => 
-      o.id !== orderId || (status !== 'completed' && status !== 'cancelled' && status !== 'declined')
-    );
+    // Ne retirer de activeOrders que si la commande est complétée
+    // Les commandes acceptées restent visibles même si elles sont annulées par le client
+    const filteredActive = updatedActive.filter(o => {
+      if (o.id !== orderId) return true; // Garder les autres commandes
+      // Retirer uniquement si complétée
+      // Les commandes annulées restent visibles si elles étaient acceptées
+      return status !== 'completed';
+    });
     
     const filteredPending = updatedPending.filter(o => 
       o.id !== orderId || (status !== 'pending')
@@ -246,10 +251,38 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   }),
   
   cancelOrder: (orderId) => set((state) => {
+    // Trouver la commande pour vérifier si elle était acceptée
+    const activeOrder = state.activeOrders.find(o => o.id === orderId);
+    const pendingOrder = state.pendingOrders.find(o => o.id === orderId);
+    
+    const wasAccepted = activeOrder && (
+      activeOrder.status === 'accepted' || 
+      activeOrder.status === 'enroute' || 
+      activeOrder.status === 'picked_up' || 
+      activeOrder.status === 'delivering' ||
+      activeOrder.status === 'in_progress'
+    );
+    
     const updatedHistory = state.orderHistory.map(order => 
       order.id === orderId ? { ...order, status: 'cancelled' as OrderStatus } : order
     );
     
+    // Si la commande était acceptée, la garder dans activeOrders avec le statut 'cancelled'
+    // pour que le livreur puisse toujours la voir
+    // Sinon, la retirer normalement
+    if (wasAccepted) {
+      const updatedActive = state.activeOrders.map(order =>
+        order.id === orderId ? { ...order, status: 'cancelled' as OrderStatus } : order
+      );
+      
+      return {
+        activeOrders: updatedActive,
+        pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
+        orderHistory: updatedHistory,
+      };
+    }
+    
+    // Si c'était une commande pending, la retirer normalement
     return {
       activeOrders: state.activeOrders.filter(o => o.id !== orderId),
       pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),

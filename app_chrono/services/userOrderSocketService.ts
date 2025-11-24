@@ -13,20 +13,31 @@ class UserOrderSocketService {
   private retryCount: number = 0;
 
   connect(userId: string) {
-    // Si le socket existe mais n'est pas connecté, le déconnecter d'abord pour permettre une nouvelle connexion
-    if (this.socket && !this.isConnected) {
-      logger.info('🔄 Socket existe mais non connecté, déconnexion avant reconnexion', 'userOrderSocketService');
-      this.socket.disconnect();
-      this.socket = null;
-    }
-    
     // Si le socket est déjà connecté avec le même userId, ne rien faire
-    if (this.socket && this.isConnected && this.userId === userId) {
+    if (this.socket && this.isConnected && this.socket.connected && this.userId === userId) {
       return;
     }
 
+    // Nettoyer l'ancien socket s'il existe
+    if (this.socket) {
+      logger.info('🔄 Nettoyage de l\'ancien socket', 'userOrderSocketService');
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
     this.userId = userId;
-    this.socket = io(process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000');
+    this.socket = io(process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
+      reconnectionAttempts: 5,
+      timeout: 20000,
+      forceNew: false,
+      upgrade: true,
+      autoConnect: true,
+    });
 
     this.socket.on('connect', () => {
       logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
@@ -46,17 +57,16 @@ class UserOrderSocketService {
       }
     });
 
-    this.socket.on('disconnect', () => {
-      logger.info('🔌 Socket user déconnecté', 'userOrderSocketService');
+    this.socket.on('disconnect', (reason) => {
+      logger.info('🔌 Socket user déconnecté', 'userOrderSocketService', { reason });
       this.isConnected = false;
       
-      // Auto-reconnect après 3 secondes
-      setTimeout(() => {
-        if (this.userId && !this.isConnected) {
-          logger.info('🔄 Tentative de reconnexion automatique...', 'userOrderSocketService');
-          this.connect(this.userId);
-        }
-      }, 3000);
+      // Laisser Socket.IO gérer la reconnexion automatique
+      // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
+      if (reason === 'io server disconnect') {
+        // Le serveur a forcé la déconnexion, laisser Socket.IO se reconnecter
+        logger.info('🔄 Le serveur a forcé la déconnexion, reconnexion automatique...', 'userOrderSocketService');
+      }
     });
 
     // 📦 Confirmation création commande
@@ -417,19 +427,26 @@ class UserOrderSocketService {
     });
 
     this.socket.on('connect_error', (error) => {
-      logger.error('❌ Erreur connexion socket user:', 'userOrderSocketService', error);
       this.isConnected = false;
       
-      // Retry avec backoff exponentiel (5, 10, 20 secondes)
-      const retryDelay = Math.min(5000 * Math.pow(2, this.retryCount || 0), 20000);
-      this.retryCount = (this.retryCount || 0) + 1;
+      // Ignorer les erreurs de polling temporaires (Socket.IO essaie plusieurs transports)
+      const isTemporaryPollError = error.message?.includes('xhr poll error') || 
+                                   error.message?.includes('poll error') ||
+                                   error.message?.includes('transport unknown');
       
-      setTimeout(() => {
-        if (this.userId && !this.isConnected) {
-          logger.info(`🔄 Reconnexion dans ${retryDelay / 1000}s...`, 'userOrderSocketService');
-          this.connect(this.userId);
-        }
-      }, retryDelay);
+      // Ne logger que les erreurs importantes
+      if (!isTemporaryPollError || this.retryCount >= 3) {
+        logger.error('❌ Erreur connexion socket user:', 'userOrderSocketService', {
+          message: error.message,
+          type: error.type,
+          description: error.description,
+          retryCount: this.retryCount,
+        });
+      }
+      
+      // Laisser Socket.IO gérer la reconnexion automatique
+      // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
+      this.retryCount = (this.retryCount || 0) + 1;
     });
   }
 

@@ -226,9 +226,12 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     setIsSending(true);
 
     try {
+      // Envoyer uniquement via Socket.IO (le serveur gère la persistance)
+      // Ne pas envoyer via l'API pour éviter les doublons
       userMessageSocketService.sendMessage(currentConversation.id, content);
-
-      await userMessageService.sendMessage(currentConversation.id, content);
+      
+      // Le message sera ajouté automatiquement via l'événement 'new-message' du socket
+      // Pas besoin d'appeler l'API car cela créerait un doublon
     } catch (error: any) {
       logger.error('Erreur envoi message', 'MessageBottomSheet', error);
       setError(error.message || 'Impossible d\'envoyer le message');

@@ -799,11 +799,18 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     if (userIds.length > 0) {
       try {
         const usersResult = await (pool as any).query(
-          `SELECT id, email, phone, full_name, avatar_url, role FROM users WHERE id = ANY($1)`,
+          `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
           [userIds]
         );
         usersResult.rows.forEach((user: any) => {
-          usersMap.set(user.id, user);
+          // Construire full_name à partir de first_name et last_name
+          const full_name = (user.first_name && user.last_name)
+            ? `${user.first_name} ${user.last_name}`
+            : (user.first_name || user.last_name || null);
+          usersMap.set(user.id, {
+            ...user,
+            full_name,
+          });
         });
       } catch (usersError) {
         logger.warn('Erreur lors de la récupération des utilisateurs:', usersError);
@@ -813,11 +820,18 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     if (driverIds.length > 0) {
       try {
         const driversResult = await (pool as any).query(
-          `SELECT id, email, phone, full_name, avatar_url, role FROM users WHERE id = ANY($1)`,
+          `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
           [driverIds]
         );
         driversResult.rows.forEach((driver: any) => {
-          driversMap.set(driver.id, driver);
+          // Construire full_name à partir de first_name et last_name
+          const full_name = (driver.first_name && driver.last_name)
+            ? `${driver.first_name} ${driver.last_name}`
+            : (driver.first_name || driver.last_name || null);
+          driversMap.set(driver.id, {
+            ...driver,
+            full_name,
+          });
         });
       } catch (driversError) {
         logger.warn('Erreur lors de la récupération des drivers:', driversError);

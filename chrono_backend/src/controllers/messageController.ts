@@ -238,13 +238,17 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
 export const markMessagesAsRead = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
+    const userRole = req.user?.role;
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Non authentifié' });
     }
 
     const { conversationId } = req.params;
 
-    await messageService.markAsRead(conversationId, userId);
+    // Pour les admins, marquer TOUS les messages comme lus
+    // Pour les autres utilisateurs, marquer seulement les messages qu'ils n'ont pas envoyés
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+    await messageService.markAsRead(conversationId, userId, isAdmin);
 
     return res.json({ success: true, message: 'Messages marqués comme lus' });
   } catch (error: any) {

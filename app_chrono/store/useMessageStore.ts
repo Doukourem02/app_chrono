@@ -46,7 +46,22 @@ export const useMessageStore = create<MessageStore>((set) => ({
     set((state) => {
       const existingMessages = state.messages[conversationId] || [];
       // Vérifier si le message existe déjà (éviter les doublons)
-      const messageExists = existingMessages.some((m) => m.id === message.id);
+      // Vérifier par ID, ou par contenu + timestamp si l'ID n'est pas encore disponible
+      const messageExists = existingMessages.some((m) => {
+        if (m.id === message.id) return true;
+        // Vérifier aussi par contenu + timestamp pour éviter les doublons même avec des IDs différents
+        if (m.content === message.content && 
+            m.sender_id === message.sender_id &&
+            m.created_at && message.created_at) {
+          const timeDiff = Math.abs(
+            new Date(m.created_at).getTime() - new Date(message.created_at).getTime()
+          );
+          // Si le contenu et l'expéditeur sont identiques et que les timestamps sont très proches (< 2 secondes)
+          // considérer comme un doublon
+          if (timeDiff < 2000) return true;
+        }
+        return false;
+      });
       if (messageExists) {
         return state;
       }

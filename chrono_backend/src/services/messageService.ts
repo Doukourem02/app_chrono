@@ -323,19 +323,35 @@ export class MessageService {
 
   /**
    * Marquer les messages comme lus
+   * @param conversationId - ID de la conversation
+   * @param userId - ID de l'utilisateur qui marque comme lu
+   * @param markAll - Si true (pour les admins), marque TOUS les messages comme lus. Sinon, marque seulement les messages qu'il n'a pas envoyés.
    */
-  async markAsRead(conversationId: string, userId: string): Promise<void> {
+  async markAsRead(conversationId: string, userId: string, markAll: boolean = false): Promise<void> {
     try {
-      await pool.query(
-        `UPDATE messages
-         SET is_read = TRUE, read_at = NOW()
-         WHERE conversation_id = $1
-         AND sender_id != $2
-         AND is_read = FALSE`,
-        [conversationId, userId]
-      );
+      let query: string;
+      let params: any[];
 
-      logger.info(`Messages marqués comme lus pour la conversation ${conversationId}`);
+      if (markAll) {
+        // Pour les admins : marquer TOUS les messages comme lus
+        query = `UPDATE messages
+                 SET is_read = TRUE, read_at = NOW()
+                 WHERE conversation_id = $1
+                 AND is_read = FALSE`;
+        params = [conversationId];
+      } else {
+        // Pour les utilisateurs normaux : marquer seulement les messages qu'ils n'ont pas envoyés
+        query = `UPDATE messages
+                 SET is_read = TRUE, read_at = NOW()
+                 WHERE conversation_id = $1
+                 AND sender_id != $2
+                 AND is_read = FALSE`;
+        params = [conversationId, userId];
+      }
+
+      await pool.query(query, params);
+
+      logger.info(`Messages marqués comme lus pour la conversation ${conversationId}${markAll ? ' (tous les messages)' : ''}`);
     } catch (error: any) {
       logger.error('Erreur lors du marquage des messages comme lus:', error);
       throw new Error(`Impossible de marquer les messages comme lus: ${error.message}`);

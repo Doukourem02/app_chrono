@@ -108,6 +108,20 @@ function getActiveOrdersCountByDriver(driverId: string): number {
   return count;
 }
 
+// Fonction pour compter les commandes entre un client et un driver spécifique
+// SUPPRIMÉE : Cette restriction a été supprimée pour permettre aux clients d'envoyer
+// un nombre illimité de commandes au même driver
+// function getOrdersCountByUserAndDriver(userId: string, driverId: string): number {
+//   let count = 0;
+//   for (const [, order] of activeOrders.entries()) {
+//     if (order.user.id === userId && order.driverId === driverId && 
+//         order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined') {
+//       count++;
+//     }
+//   }
+//   return count;
+// }
+
 // Extended Socket interface for custom properties
 interface ExtendedSocket extends Socket {
   driverId?: string;
@@ -165,6 +179,8 @@ function estimateDuration(distance: number, method: string): string {
 }
 
 // Fonction pour trouver les chauffeurs proches disponibles
+// IMPORTANT: Aucune restriction sur le nombre de commandes qu'un client peut envoyer au même driver
+// Les clients peuvent envoyer un nombre illimité de commandes au même driver
 async function findNearbyDrivers(
   pickupCoords: OrderCoordinates,
   deliveryMethod: string,
@@ -222,6 +238,9 @@ async function findNearbyDrivers(
   }
   
   // Trier par distance
+  // NOTE: Aucun filtrage basé sur le nombre de commandes précédentes entre le client et le driver
+  // Tous les drivers disponibles dans la zone sont retournés, même s'ils ont déjà reçu
+  // plusieurs commandes du même client
   return nearbyDrivers.sort((a, b) => a.distance - b.distance);
 }
 

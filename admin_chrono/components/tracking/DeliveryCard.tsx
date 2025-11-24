@@ -251,15 +251,59 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
       <div style={partnerSectionStyle}>
         <div style={partnerInfoStyle}>
           {(() => {
-            const person = delivery.driver || delivery.client
-            const isDriver = !!delivery.driver
-            const displayName = person?.full_name || person?.email || (isDriver ? 'Jayson Tatum' : 'Client')
+            // Priorité au client pour l'affichage
+            const person = delivery.client || delivery.driver
+            const isDriver = !!delivery.driver && !delivery.client
+            
+            // Debug: logger les données pour comprendre le problème
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[DeliveryCard] Delivery data:', {
+                deliveryId: delivery.id,
+                hasClient: !!delivery.client,
+                hasDriver: !!delivery.driver,
+                clientData: delivery.client,
+                driverData: delivery.driver,
+                person: person,
+                personFullName: person?.full_name,
+                personEmail: person?.email,
+                personAvatarUrl: person?.avatar_url,
+                displayName: (person?.full_name && person.full_name.trim()) 
+                  ? person.full_name.trim() 
+                  : (person?.email || (isDriver ? 'Livreur' : 'Client')),
+              })
+            }
+            
+            // Pour le client : utiliser full_name, sinon email, sinon "Client"
+            // Pour le driver : utiliser full_name, sinon email, sinon "Livreur"
+            // Si full_name existe mais est vide, utiliser email
+            const displayName = (person?.full_name && person.full_name.trim()) 
+              ? person.full_name.trim() 
+              : (person?.email || (isDriver ? 'Livreur' : 'Client'))
+            
             const displayLabel = isDriver 
               ? 'Drive' 
               : (delivery.client?.role === 'partner' || delivery.client?.role === 'Partner' ? 'Partners' : 'Client')
+            
             const displayAddress = delivery.dropoff.address || 'Adresse de Livraison'
             const avatarUrl = person?.avatar_url
-            const initial = displayName.charAt(0).toUpperCase()
+            
+            // Générer les initiales à partir du nom complet ou de l'email
+            const getInitials = (name: string | undefined, email: string | undefined): string => {
+              if (name && name.trim()) {
+                // Si c'est un nom complet, prendre les premières lettres de chaque mot
+                const parts = name.trim().split(/\s+/)
+                if (parts.length >= 2) {
+                  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+                }
+                return name.charAt(0).toUpperCase()
+              }
+              if (email) {
+                return email.charAt(0).toUpperCase()
+              }
+              return isDriver ? 'L' : 'C'
+            }
+            
+            const initial = getInitials(person?.full_name, person?.email)
 
             return (
               <>
@@ -278,7 +322,7 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
                   <div style={avatarStyle}>{initial}</div>
                 )}
                 <div style={partnerTextStyle}>
-                  <div style={{ ...partnerNameStyle, fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
+                  <div style={{ ...partnerNameStyle, fontSize: '12px', fontWeight: 600, marginBottom: '4px', color: '#6B7280' }}>
                     {displayLabel}
                   </div>
                   <div style={{ ...partnerNameStyle, fontSize: '14px', fontWeight: 600, marginBottom: '2px' }}>
