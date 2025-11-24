@@ -13,7 +13,7 @@ interface AdminMessageStore {
   setCurrentConversation: (conversation: Conversation | null) => void
   addMessage: (conversationId: string, message: Message) => void
   setMessages: (conversationId: string, messages: Message[]) => void
-  markAsRead: (conversationId: string) => void
+  markAsRead: (conversationId: string, currentUserId?: string) => void
   updateConversationUnreadCount: (conversationId: string, count: number) => void
   setUnreadCount: (count: number) => void
   setLoading: (loading: boolean) => void
@@ -66,10 +66,29 @@ export const useAdminMessageStore = create<AdminMessageStore>((set) => ({
   addMessage: (conversationId, message) =>
     set((state) => {
       const existingMessages = state.messages[conversationId] || []
-      const messageExists = existingMessages.some((m) => m.id === message.id)
-      if (messageExists) {
-        return state
+      const existingMessage = existingMessages.find((m) => m.id === message.id)
+      
+      // Si le message existe déjà, vérifier si on doit mettre à jour is_read
+      if (existingMessage) {
+        // Si c'est notre propre message et qu'il n'a pas encore été lu, ne pas mettre à jour is_read
+        // (garder is_read: false jusqu'à ce que le destinataire le lise vraiment)
+        if (existingMessage.sender_id === message.sender_id && !existingMessage.is_read && message.is_read) {
+          // Ne pas mettre à jour is_read pour nos propres messages non lus
+          return state
+        }
+        // Sinon, mettre à jour le message existant
+        const updatedMessages = existingMessages.map((m) =>
+          m.id === message.id ? message : m
+        )
+        return {
+          messages: {
+            ...state.messages,
+            [conversationId]: updatedMessages,
+          },
+        }
       }
+      
+      // Ajouter le nouveau message
       return {
         messages: {
           ...state.messages,
@@ -86,17 +105,26 @@ export const useAdminMessageStore = create<AdminMessageStore>((set) => ({
       },
     })),
 
-  markAsRead: (conversationId) =>
+  markAsRead: (conversationId, currentUserId?: string) =>
     set((state) => {
       const messages = state.messages[conversationId] || []
       return {
         messages: {
           ...state.messages,
-          [conversationId]: messages.map((msg) => ({
-            ...msg,
-            is_read: true,
-            read_at: new Date().toISOString(),
-          })),
+          [conversationId]: messages.map((msg) => {
+            // Ne marquer comme lus que les messages qu'on n'a pas envoyés
+            // Nos propres messages doivent rester avec is_read: false jusqu'à ce que le destinataire les lise
+            if (currentUserId && msg.sender_id === currentUserId) {
+              // Garder le statut is_read tel quel pour nos propres messages
+              return msg
+            }
+            // Marquer comme lus les messages des autres
+            return {
+              ...msg,
+              is_read: true,
+              read_at: new Date().toISOString(),
+            }
+          }),
         },
       }
     }),

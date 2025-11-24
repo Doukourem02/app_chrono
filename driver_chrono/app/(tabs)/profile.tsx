@@ -89,7 +89,7 @@ export default function ProfilePage() {
     };
 
     loadUserProfile();
-  }, [user?.id, user?.first_name, user?.last_name, setUser]);
+  }, [user, setUser]);
 
   // Mettre à jour l'avatar quand l'utilisateur ou le profil change
   useEffect(() => {

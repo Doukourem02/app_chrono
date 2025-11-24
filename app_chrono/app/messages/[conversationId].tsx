@@ -173,7 +173,9 @@ export default function MessagePage() {
       const realMessage = await userMessageService.sendMessage(conversationId, content);
       
       // Remplacer le message optimiste par le vrai message
-      const existingMessages = messages[conversationId] || [];
+      // Utiliser getState() pour obtenir les messages à jour depuis le store
+      const currentState = useMessageStore.getState();
+      const existingMessages = currentState.messages[conversationId] || [];
       const updatedMessages = existingMessages.map((msg) =>
         msg.id === tempMessageId ? realMessage : msg
       );
@@ -185,7 +187,9 @@ export default function MessagePage() {
     } catch (error: any) {
       logger.error('Erreur envoi message', 'MessagePage', error);
       // Retirer le message optimiste en cas d'erreur
-      const existingMessages = messages[conversationId] || [];
+      // Utiliser getState() pour obtenir les messages à jour depuis le store
+      const currentState = useMessageStore.getState();
+      const existingMessages = currentState.messages[conversationId] || [];
       const updatedMessages = existingMessages.filter((msg) => msg.id !== tempMessageId);
       setMessages(conversationId, updatedMessages);
       setMessageText(content);

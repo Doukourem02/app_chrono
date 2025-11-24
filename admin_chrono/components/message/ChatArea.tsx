@@ -309,8 +309,10 @@ export default function ChatArea({
                   <div style={messageTextStyle(isFromCurrentUser)}>{message.content}</div>
                   <div style={messageTimeStyle(isFromCurrentUser)}>
                     {formatMessageTime(message.created_at)}
-                    {isFromCurrentUser && message.is_read && (
-                      <span style={{ marginLeft: '8px' }}>✓✓</span>
+                    {isFromCurrentUser && (
+                      <span style={{ marginLeft: '8px' }}>
+                        {message.is_read ? '✓✓' : '✓'}
+                      </span>
                     )}
                   </div>
                 </div>

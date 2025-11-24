@@ -58,78 +58,15 @@ export default function QuickMessage() {
     return () => clearInterval(interval)
   }, [user?.id, loadConversations])
 
-  // Calculer le nombre total de personnes en ligne
-  const onlineCount = useMemo(() => {
-    let count = 0
-    
-    // Compter les drivers en ligne
-    const onlineDriversArray = Array.from(onlineDrivers.values())
-    const activeDrivers = onlineDriversArray.filter((driver) => {
-      if (driver.is_online !== true) return false
-      if (!driver.updated_at) return false
-      
-      const updatedAt = new Date(driver.updated_at)
-      const now = new Date()
-      const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60)
-      return diffInMinutes <= 5 // Actif si mis à jour dans les 5 dernières minutes
-    })
-    
-    count += activeDrivers.length
-    
-    // Compter les clients en ligne (basé sur la dernière activité dans les conversations)
-    // Un client est considéré en ligne s'il a envoyé un message dans les 5 dernières minutes
-    const now = new Date()
-    const activeClientIds = new Set<string>()
-    
-    conversations.forEach((conv) => {
-      if (conv.type === 'order') {
-        // Vérifier participant_1 (client ou driver)
-        if (conv.participant_1 && conv.participant_1.role === 'client') {
-          if (conv.last_message_at) {
-            const lastMessageAt = new Date(conv.last_message_at)
-            const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
-            if (diffInMinutes <= 5 && conv.last_message?.sender_id === conv.participant_1_id) {
-              activeClientIds.add(conv.participant_1_id)
-            }
-          }
-        }
-        
-        // Vérifier participant_2 (client ou driver)
-        if (conv.participant_2 && conv.participant_2.role === 'client') {
-          if (conv.last_message_at) {
-            const lastMessageAt = new Date(conv.last_message_at)
-            const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
-            if (diffInMinutes <= 5 && conv.last_message?.sender_id === conv.participant_2_id) {
-              activeClientIds.add(conv.participant_2_id)
-            }
-          }
-        }
-      } else if (conv.type === 'support' || conv.type === 'admin') {
-        // Pour support/admin, vérifier l'autre participant
-        const otherParticipant = conv.participant_1_id === user?.id ? conv.participant_2 : conv.participant_1
-        if (otherParticipant && conv.last_message_at) {
-          const lastMessageAt = new Date(conv.last_message_at)
-          const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
-          if (diffInMinutes <= 5 && conv.last_message?.sender_id === otherParticipant.id) {
-            activeClientIds.add(otherParticipant.id)
-          }
-        }
-      }
-    })
-    
-    count += activeClientIds.size
-    
-    return count
-  }, [conversations, onlineDrivers, user?.id])
-
-  // Préparer les contacts pour l'affichage (limiter à 2-3 contacts les plus récents)
+  // Calculer le nombre total de personnes en ligne parmi les contacts affichés
+  // On calcule d'abord les contacts, puis on compte ceux qui sont en ligne
   const contacts = useMemo(() => {
     const contactsMap = new Map<string, {
-  id: string
-  name: string
-  avatar: string
-  status: 'online' | 'offline'
-  lastSeen: string
+      id: string
+      name: string
+      avatar: string
+      status: 'online' | 'offline'
+      lastSeen: string
       unreadCount: number
       conversationId: string
       isGroup: boolean
@@ -172,7 +109,7 @@ export default function QuickMessage() {
           
           // Déterminer le statut (online si au moins un participant est actif)
           let isOnline = false
-          let lastSeenDate = conv.last_message_at ? new Date(conv.last_message_at) : new Date(conv.created_at || now)
+          const lastSeenDate = conv.last_message_at ? new Date(conv.last_message_at) : new Date(conv.created_at || now)
           
           // Vérifier si le driver est en ligne
           const driverId = p1?.role === 'driver' ? conv.participant_1_id : (p2?.role === 'driver' ? conv.participant_2_id : null)
@@ -187,7 +124,7 @@ export default function QuickMessage() {
             }
           }
           
-          // Vérifier si le client a été actif récemment
+          // Vérifier si le client a été actif récemment (a envoyé un message dans les 5 dernières minutes)
           const clientId = p1?.role === 'client' ? conv.participant_1_id : (p2?.role === 'client' ? conv.participant_2_id : null)
           if (clientId && conv.last_message_at && conv.last_message?.sender_id === clientId) {
             const lastMessageAt = new Date(conv.last_message_at)
@@ -240,23 +177,25 @@ export default function QuickMessage() {
           
           // Déterminer le statut
           let isOnline = false
-          let lastSeenDate = conv.last_message_at ? new Date(conv.last_message_at) : new Date(conv.created_at || now)
+          const lastSeenDate = conv.last_message_at ? new Date(conv.last_message_at) : new Date(conv.created_at || now)
           
-          // Si c'est un driver, vérifier dans onlineDrivers
-          if (otherParticipant.role === 'driver') {
+          // Pour tous les participants (drivers et clients), vérifier la dernière activité dans cette conversation
+          // Un utilisateur est considéré en ligne seulement s'il a envoyé un message dans les 5 dernières minutes
+          if (conv.last_message_at && conv.last_message?.sender_id === otherParticipant.id) {
+            const lastMessageAt = new Date(conv.last_message_at)
+            const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
+            if (diffInMinutes <= 5) {
+              isOnline = true
+            }
+          }
+          
+          // Pour les drivers, on peut aussi vérifier dans onlineDrivers comme indicateur supplémentaire
+          // mais seulement si le driver est vraiment actif (mis à jour dans les 5 dernières minutes)
+          if (!isOnline && otherParticipant.role === 'driver') {
             const driver = onlineDrivers.get(otherParticipant.id)
             if (driver && driver.is_online === true && driver.updated_at) {
               const updatedAt = new Date(driver.updated_at)
               const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60)
-              if (diffInMinutes <= 5) {
-                isOnline = true
-              }
-            }
-          } else {
-            // Pour les clients, vérifier la dernière activité
-            if (conv.last_message_at && conv.last_message?.sender_id === otherParticipant.id) {
-              const lastMessageAt = new Date(conv.last_message_at)
-              const diffInMinutes = (now.getTime() - lastMessageAt.getTime()) / (1000 * 60)
               if (diffInMinutes <= 5) {
                 isOnline = true
               }
@@ -296,6 +235,13 @@ export default function QuickMessage() {
     return sortedContacts.slice(0, 2)
   }, [conversations, onlineDrivers, user?.id])
 
+  // Calculer le nombre total de personnes en ligne parmi les contacts affichés
+  const onlineCount = useMemo(() => {
+    return contacts.filter(contact => contact.status === 'online').length
+  }, [contacts])
+
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleContactClick = (contact: typeof contacts[0]) => {
     // Naviguer vers la page de messages avec la conversation sélectionnée
     router.push('/message')

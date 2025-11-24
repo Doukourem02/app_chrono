@@ -70,7 +70,7 @@ export default function ProfilePage() {
     requireAuth(() => {
       loadUserProfile();
     });
-  }, [requireAuth, user?.id, user?.first_name, user?.last_name, setUser]);
+  }, [requireAuth, user, setUser]);
 
   // Charger les statistiques depuis le backend
   useEffect(() => {

@@ -111,7 +111,7 @@ export default function MessagePage() {
       setMessages(conversationId, data)
       // Marquer comme lus AVANT de recharger les conversations
       await adminMessageService.markAsRead(conversationId)
-      markAsRead(conversationId)
+      markAsRead(conversationId, user?.id)
       // Mettre à jour le compteur de messages non lus de la conversation immédiatement
       updateConversationUnreadCount(conversationId, 0)
       
@@ -135,7 +135,7 @@ export default function MessagePage() {
     } finally {
       setLoading(false)
     }
-  }, [setMessages, markAsRead, updateConversationUnreadCount, loadUnreadCount, setConversations, filterType, setLoading])
+  }, [setMessages, markAsRead, updateConversationUnreadCount, loadUnreadCount, setConversations, filterType, setLoading, user?.id])
 
   // Charger tous les messages d'un groupe de conversations (pour les conversations de type "order")
   const loadAllMessagesForPair = useCallback(async (participant1Id: string, participant2Id: string) => {
@@ -154,7 +154,7 @@ export default function MessagePage() {
         const messages = await adminMessageService.getMessages(conv.id)
         // Marquer comme lus AVANT de continuer
         await adminMessageService.markAsRead(conv.id)
-        markAsRead(conv.id)
+        markAsRead(conv.id, user?.id)
         // Mettre à jour le compteur de messages non lus de chaque conversation immédiatement
         updateConversationUnreadCount(conv.id, 0)
         return messages.map((msg) => ({ conversationId: conv.id, message: msg }))
@@ -195,7 +195,7 @@ export default function MessagePage() {
     } finally {
       setLoading(false)
     }
-  }, [conversations, setMessages, markAsRead, updateConversationUnreadCount, loadUnreadCount, setConversations, filterType, setLoading])
+  }, [conversations, setMessages, markAsRead, updateConversationUnreadCount, loadUnreadCount, setConversations, filterType, setLoading, user?.id])
 
   // Grouper les conversations par paire de participants (pour type "order")
   const groupedConversations = React.useMemo(() => {
@@ -353,9 +353,15 @@ export default function MessagePage() {
           
           if (sentMessage) {
             // Remplacer le message optimiste par le vrai message
+            // S'assurer que is_read est false pour nos propres messages (ils ne peuvent pas être lus immédiatement)
+            const finalMessage = {
+              ...sentMessage,
+              is_read: false, // Un message qu'on vient d'envoyer ne peut pas être lu immédiatement
+              read_at: null,
+            }
             const finalMessages = useAdminMessageStore.getState().messages[groupKey] || []
             const finalUpdatedMessages = finalMessages.map((m) =>
-              m.id === tempMessageId ? sentMessage : m
+              m.id === tempMessageId ? finalMessage : m
             )
             setMessages(groupKey, finalUpdatedMessages)
           }
@@ -397,21 +403,30 @@ export default function MessagePage() {
         
         if (sentMessage) {
           // Remplacer le message optimiste par le vrai message
-          const existingMessages = messages[currentConversation.id] || []
+          // S'assurer que is_read est false pour nos propres messages (ils ne peuvent pas être lus immédiatement)
+          const finalMessage = {
+            ...sentMessage,
+            is_read: false, // Un message qu'on vient d'envoyer ne peut pas être lu immédiatement
+            read_at: null,
+          }
+          const currentState = useAdminMessageStore.getState()
+          const existingMessages = currentState.messages[currentConversation.id] || []
           const updatedMessages = existingMessages.map((m) =>
-            m.id === tempMessageId ? sentMessage : m
+            m.id === tempMessageId ? finalMessage : m
           )
           setMessages(currentConversation.id, updatedMessages)
         }
       } catch (error) {
         // Retirer le message optimiste en cas d'erreur
-        const existingMessages = messages[currentConversation.id] || []
+        // Utiliser getState() pour obtenir les messages à jour depuis le store
+        const currentState = useAdminMessageStore.getState()
+        const existingMessages = currentState.messages[currentConversation.id] || []
         const updatedMessages = existingMessages.filter((m) => m.id !== tempMessageId)
         setMessages(currentConversation.id, updatedMessages)
         throw error
       }
     }
-  }, [currentConversation, selectedParticipantPair, conversations, setMessages, addMessage, messages, user])
+  }, [currentConversation, selectedParticipantPair, conversations, setMessages, addMessage, user])
 
   useEffect(() => {
     if (!user?.id) return
@@ -437,16 +452,34 @@ export default function MessagePage() {
           
           if (tempMessageIndex !== -1) {
             // Remplacer le message optimiste par le vrai message
+            // S'assurer que is_read est false pour nos propres messages
+            const finalMessage = {
+              ...message,
+              is_read: false, // Un message qu'on vient d'envoyer ne peut pas être lu immédiatement
+              read_at: null,
+            }
             const updatedMessages = [...existingMessages]
-            updatedMessages[tempMessageIndex] = message
+            updatedMessages[tempMessageIndex] = finalMessage
             setMessages(conversation.id, updatedMessages)
           } else {
             // Ajouter normalement si pas de message optimiste correspondant
-            addMessage(conversation.id, message)
+            // S'assurer que is_read est false pour nos propres messages
+            const finalMessage = {
+              ...message,
+              is_read: false,
+              read_at: null,
+            }
+            addMessage(conversation.id, finalMessage)
           }
         } else {
           // Ajouter normalement si ce n'est pas la conversation actuelle
-          addMessage(conversation.id, message)
+          // S'assurer que is_read est false pour nos propres messages
+          const finalMessage = {
+            ...message,
+            is_read: false,
+            read_at: null,
+          }
+          addMessage(conversation.id, finalMessage)
         }
         
         // Vérifier dans les groupes
@@ -463,12 +496,24 @@ export default function MessagePage() {
             
             if (tempMessageIndex !== -1) {
               // Remplacer le message optimiste par le vrai message
+              // S'assurer que is_read est false pour nos propres messages
+              const finalMessage = {
+                ...message,
+                is_read: false, // Un message qu'on vient d'envoyer ne peut pas être lu immédiatement
+                read_at: null,
+              }
               const updatedMessages = [...groupMessages]
-              updatedMessages[tempMessageIndex] = message
+              updatedMessages[tempMessageIndex] = finalMessage
               setMessages(groupKey, updatedMessages)
             } else if (!groupMessages.some((m) => m.id === message.id)) {
               // Ajouter normalement si pas de message optimiste et pas déjà présent
-              const updatedMessages = [...groupMessages, message].sort((a, b) => {
+              // S'assurer que is_read est false pour nos propres messages
+              const finalMessage = {
+                ...message,
+                is_read: false,
+                read_at: null,
+              }
+              const updatedMessages = [...groupMessages, finalMessage].sort((a, b) => {
                 const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
                 const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
                 return dateA - dateB
@@ -507,7 +552,7 @@ export default function MessagePage() {
         
         // Marquer comme lus côté backend
         adminMessageService.markAsRead(conversation.id).then(() => {
-          markAsRead(conversation.id)
+          markAsRead(conversation.id, user?.id)
           // Recharger le compteur global
           loadUnreadCount()
           // Recharger les conversations depuis le backend en arrière-plan
