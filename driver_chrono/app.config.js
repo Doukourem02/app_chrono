@@ -11,9 +11,11 @@ module.exports = {
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     ios: {
+      bundleIdentifier: "com.anonymous.driver-chrono",
       supportsTablet: true
     },
     android: {
+      package: "com.anonymous.driver_chrono",
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
