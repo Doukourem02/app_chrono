@@ -2,23 +2,23 @@ require('dotenv').config({ path: '.env' });
 
 module.exports = {
   expo: {
-    name: "driver_chrono",
-    slug: "driver_chrono",
+    name: "app_chrono",
+    slug: "app_chrono",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
-    scheme: "driverchrono",
+    scheme: "appchrono",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     ios: {
-      bundleIdentifier: "com.anonymous.driver-chrono",
+      bundleIdentifier: "com.anonymous.app-chrono",
       supportsTablet: true,
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
       },
     },
     android: {
-      package: "com.anonymous.driver_chrono",
+      package: "com.anonymous.app_chrono",
       adaptiveIcon: {
         backgroundColor: "#E6F4FE",
         foregroundImage: "./assets/images/android-icon-foreground.png",
