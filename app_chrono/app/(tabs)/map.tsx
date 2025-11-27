@@ -9,7 +9,6 @@ import { useMapLogic } from '../../hooks/useMapLogic';
 import { useDriverSearch } from '../../hooks/useDriverSearch';
 import { useOnlineDrivers } from '../../hooks/useOnlineDrivers';
 import { useBottomSheet } from '../../hooks/useBottomSheet';
-import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { DeliveryMapView } from '../../components/DeliveryMapView';
 import { DeliveryBottomSheet } from '../../components/DeliveryBottomSheet';
@@ -17,6 +16,7 @@ import { DeliveryMethodBottomSheet } from '../../components/DeliveryMethodBottom
 import { OrderDetailsSheet } from '../../components/OrderDetailsSheet';
 import RatingBottomSheet from '../../components/RatingBottomSheet';
 import PaymentBottomSheet from '../../components/PaymentBottomSheet';
+import { DriverSearchBottomSheet } from '../../components/DriverSearchBottomSheet';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { useOrderStore } from '../../store/useOrderStore';
 import type { OrderStatus } from '../../store/useOrderStore';
@@ -36,7 +36,6 @@ type Coordinates = {
 };
 
 export default function MapPage() {
-  const { requireAuth } = useRequireAuth();
   
 
   const [isCreatingNewOrder, setIsCreatingNewOrder] = React.useState(false);
@@ -424,6 +423,9 @@ export default function MapPage() {
           orderId: pendingOrder.id,
         });
         startDriverSearch();
+        // Réduire automatiquement le bottom sheet "Envoyer un colis" quand la recherche commence
+        collapseBottomSheet();
+        userManuallyClosedRef.current = false;
       }
     } else if (isSearchingDriver && pendingOrder && pendingOrder.status !== PENDING_STATUS) {
       logger.info('📡 Arrêt animation radar (commande plus en attente)', 'map.tsx', {
@@ -432,7 +434,7 @@ export default function MapPage() {
       });
       stopDriverSearch();
     }
-  }, [pendingOrder?.id, pendingOrder?.status, isSearchingDriver, startDriverSearch, stopDriverSearch, pendingOrder]);
+  }, [pendingOrder?.id, pendingOrder?.status, isSearchingDriver, startDriverSearch, stopDriverSearch, pendingOrder, collapseBottomSheet]);
 
   useEffect(() => {
     if (orderDriverCoords && displayedRouteCoords.length > 0) {
@@ -989,8 +991,6 @@ export default function MapPage() {
     }
   }, [pickupCoords, dropoffCoords, pickupLocation, deliveryLocation, user, selectedMethod, collapseOrderDetailsSheet, collapseDeliveryMethodSheet, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation, setSelectedMethod, setIsCreatingNewOrder, animateToCoordinate, region, scheduleBottomSheetOpen, recipientInfo.isRegistered, recipientInfo.userId, stopDriverSearch, resetAfterDriverSearch]);
 
-  
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleCancelOrder = useCallback(async (orderId: string) => {
     const currentOrder = useOrderStore.getState().activeOrders.find(o => o.id === orderId);
     if (currentOrder && currentOrder.status !== 'pending' && currentOrder.status !== 'accepted') {
@@ -1095,6 +1095,23 @@ export default function MapPage() {
         }}
       />
 
+      {/* Bouton retour flottant pour la recherche de livreur ou driver accepté - au-dessus du bottom sheet */}
+      {(isSearchingDriver || (currentOrder?.status === 'accepted' && currentOrder?.driver)) && (
+        <TouchableOpacity 
+          style={styles.driverSearchBackButton}
+          onPress={async () => {
+            // Nettoyer l'état et afficher le bottom sheet "Envoyer un colis" pour créer une nouvelle commande
+            await cleanupOrderState();
+            setIsCreatingNewOrder(true);
+            userManuallyClosedRef.current = false;
+            expandBottomSheet();
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color="#111827" />
+        </TouchableOpacity>
+      )}
+
       {((showRatingBottomSheet && ratingOrderId) || 
         (currentOrder?.status === 'completed' && currentOrder?.driverId)) && (
         <RatingBottomSheet
@@ -1126,7 +1143,7 @@ export default function MapPage() {
 
         return (
           <>
-            {!deliveryMethodIsExpanded && !orderDetailsIsExpanded && isCreatingNewOrder && (
+            {!deliveryMethodIsExpanded && !orderDetailsIsExpanded && isCreatingNewOrder && !isSearchingDriver && !pendingOrder && !currentOrder && (
               <DeliveryBottomSheet
                 animatedHeight={animatedHeight}
                 panResponder={panResponder}
@@ -1238,6 +1255,37 @@ export default function MapPage() {
                 />
               );
             })()}
+
+            {/* Bottom sheet de recherche de livreur */}
+            {((isSearchingDriver || (pendingOrder && !isCreatingNewOrder)) || 
+              (currentOrder?.status === 'accepted' && currentOrder?.driver && !showPaymentSheet)) && !showPaymentSheet && (
+              <DriverSearchBottomSheet
+                isSearching={isSearchingDriver}
+                searchSeconds={searchSeconds}
+                driver={currentOrder?.status === 'accepted' && currentOrder?.driver ? currentOrder.driver : null}
+                onCancel={() => {
+                  if (pendingOrder) {
+                    _handleCancelOrder(pendingOrder.id);
+                  } else if (currentOrder) {
+                    _handleCancelOrder(currentOrder.id);
+                  }
+                }}
+                onDetails={() => {
+                  if (pendingOrder) {
+                    router.push(`/order-tracking/${pendingOrder.id}` as any);
+                  } else if (currentOrder) {
+                    router.push(`/order-tracking/${currentOrder.id}` as any);
+                  }
+                }}
+                onBack={async () => {
+                  // Nettoyer l'état et afficher le bottom sheet "Envoyer un colis" pour créer une nouvelle commande
+                  await cleanupOrderState();
+                  setIsCreatingNewOrder(true);
+                  userManuallyClosedRef.current = false;
+                  expandBottomSheet();
+                }}
+              />
+            )}
           </>
         );
       })()}
@@ -1289,5 +1337,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  driverSearchBackButton: {
+    position: 'absolute',
+    bottom: 220, // Positionné au-dessus du bottom sheet de recherche (environ 200px de hauteur + padding)
+    left: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
 });

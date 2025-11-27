@@ -11,20 +11,18 @@
 
 ## 📋 Cas d'Usage des QR Codes
 
-### 1. **QR Code de Récupération (Pickup QR Code)**
-**Quand** : Lorsque le livreur arrive au point de collecte  
-**Qui scanne** : Le livreur scanne le QR code du client  
-**Objectif** : Confirmer que le livreur est bien au bon endroit et que le client a bien préparé le colis
+### **QR Code de Livraison (Delivery QR Code) - UN SEUL QR CODE**
 
-### 2. **QR Code de Livraison (Delivery QR Code)**
-**Quand** : Lorsque le livreur arrive au point de livraison  
-**Qui scanne** : Le livreur scanne le QR code du destinataire  
+**Quand** : Généré automatiquement lors de la création de la commande  
+**Qui utilise** : Le destinataire (reçoit le QR code automatiquement via SMS/WhatsApp)  
+**Qui scanne** : Le livreur scanne le QR code du destinataire à la livraison  
 **Objectif** : Confirmer que le colis a été livré à la bonne personne
 
-### 3. **QR Code de Commande (Order QR Code)**
-**Quand** : Généré dès la création de la commande  
-**Qui utilise** : Le client et le destinataire  
-**Objectif** : Permettre au client/destinataire de générer un QR code à montrer au livreur
+**Flux simplifié** :
+1. **Création de commande** → QR code généré automatiquement
+2. **Notification automatique** → QR code envoyé au destinataire via SMS/WhatsApp
+3. **Récupération** → Le livreur récupère le colis (sans scan)
+4. **Livraison** → Le livreur scanne le QR code du destinataire
 
 ---
 
@@ -37,15 +35,11 @@
 ```sql
 -- Migration : 020_add_qr_codes_to_orders.sql
 
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_qr_code TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_qr_code TEXT;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_qr_scanned_at TIMESTAMP;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_qr_scanned_at TIMESTAMP;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_qr_scanned_by UUID REFERENCES users(id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_qr_scanned_by UUID REFERENCES users(id);
 
 -- Index pour les recherches rapides
-CREATE INDEX IF NOT EXISTS idx_orders_pickup_qr ON orders(pickup_qr_code) WHERE pickup_qr_code IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_orders_delivery_qr ON orders(delivery_qr_code) WHERE delivery_qr_code IS NOT NULL;
 ```
 
@@ -57,7 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_delivery_qr ON orders(delivery_qr_code) WH
 CREATE TABLE IF NOT EXISTS qr_code_scans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  qr_code_type TEXT NOT NULL CHECK (qr_code_type IN ('pickup', 'delivery')),
+  qr_code_type TEXT NOT NULL DEFAULT 'delivery' CHECK (qr_code_type = 'delivery'),
   scanned_by UUID NOT NULL REFERENCES users(id),
   scanned_at TIMESTAMP DEFAULT NOW(),
   location JSONB, -- { latitude, longitude } au moment du scan
@@ -65,7 +59,7 @@ CREATE TABLE IF NOT EXISTS qr_code_scans (
   is_valid BOOLEAN DEFAULT TRUE,
   validation_error TEXT, -- Si le scan est invalide, raison
   
-  CONSTRAINT unique_scan_per_type UNIQUE(order_id, qr_code_type, scanned_by)
+  CONSTRAINT unique_scan_per_order UNIQUE(order_id, scanned_by)
 );
 
 CREATE INDEX IF NOT EXISTS idx_qr_scans_order ON qr_code_scans(order_id);
@@ -82,38 +76,44 @@ CREATE INDEX IF NOT EXISTS idx_qr_scans_type ON qr_code_scans(qr_code_type);
 **Fichier** : `chrono_backend/src/services/qrCodeService.ts`
 
 **Fonctionnalités** :
-- Générer un QR code unique pour chaque commande (pickup et delivery)
+- Générer un QR code unique pour chaque commande (delivery uniquement)
 - Format du QR code : JSON avec signature cryptographique
 - Structure du QR code :
   ```json
   {
     "orderId": "uuid",
-    "type": "pickup" | "delivery",
+    "orderNumber": "string",
+    "recipientName": "string",
+    "recipientPhone": "string",
+    "creatorName": "string",
     "timestamp": "2025-11-24T20:00:00Z",
-    "signature": "hash_cryptographique"
+    "signature": "hash_cryptographique",
+    "expiresAt": "2025-11-26T20:00:00Z"
   }
   ```
 
 **Sécurité** :
 - Utiliser un secret partagé pour signer les QR codes
-- Expiration des QR codes (ex: 24h pour pickup, 48h pour delivery)
+- Expiration des QR codes : 48h après création
 - Vérification de la signature lors du scan
 
 #### 2.2 Endpoints API
 
 **POST `/api/orders/:orderId/qr-codes/generate`**
-- Génère les QR codes pickup et delivery
-- Retourne les QR codes en base64 (pour affichage dans l'app)
+- Génère le QR code de livraison
+- Envoie automatiquement le QR code au destinataire via SMS/WhatsApp
+- Retourne le QR code en base64 (pour affichage dans l'app)
 
 **GET `/api/orders/:orderId/qr-codes`**
-- Récupère les QR codes d'une commande
-- Retourne les images QR code en base64
+- Récupère le QR code de livraison d'une commande
+- Retourne l'image QR code en base64
 
 **POST `/api/qr-codes/scan`**
 - Endpoint pour scanner un QR code
-- Valide le QR code
+- Valide le QR code (signature, expiration)
+- Affiche les informations du destinataire et du créateur
 - Enregistre le scan dans la base de données
-- Met à jour le statut de la commande si nécessaire
+- Met à jour le statut de la commande à `completed`
 
 ---
 
@@ -121,48 +121,51 @@ CREATE INDEX IF NOT EXISTS idx_qr_scans_type ON qr_code_scans(qr_code_type);
 
 #### 3.1 Validation des Scans
 
-**Règles de validation** :
-1. **Pickup QR Code** :
-   - Le livreur doit être assigné à la commande
-   - Le statut doit être `enroute` ou `accepted`
-   - Le QR code doit être valide (signature + expiration)
-   - Le livreur doit être proche du point de pickup (géolocalisation)
-
-2. **Delivery QR Code** :
-   - Le livreur doit être assigné à la commande
-   - Le statut doit être `picked_up` ou `delivering`
-   - Le QR code doit être valide (signature + expiration)
-   - Le livreur doit être proche du point de dropoff (géolocalisation)
+**Règles de validation pour le QR Code de Livraison** :
+- Le livreur doit être assigné à la commande
+- Le statut doit être `picked_up` ou `delivering`
+- Le QR code doit être valide (signature + expiration)
+- Le QR code ne doit pas avoir été déjà scanné
+- Le livreur doit être proche du point de dropoff (géolocalisation - optionnel)
 
 #### 3.2 Mise à jour automatique du statut
 
-- **Après scan du Pickup QR** : `enroute` → `picked_up`
-- **Après scan du Delivery QR** : `delivering` → `completed`
+- **Après scan du Delivery QR** : `delivering` ou `picked_up` → `completed`
+
+#### 3.3 Affichage après scan
+
+Après un scan réussi, le livreur voit :
+- **Nom du destinataire**
+- **Téléphone du destinataire**
+- **Nom du créateur de commande** (pour confirmation)
+- **Numéro de commande**
 
 ---
 
 ### Phase 4 : Application Client (app_chrono)
 
-#### 4.1 Affichage des QR Codes
+#### 4.1 Affichage du QR Code de Livraison
 
 **Écran** : Page de suivi de commande (`app/order-tracking/[orderId].tsx`)
 
 **Fonctionnalités** :
-- Afficher le QR code de pickup quand la commande est `pending` ou `accepted`
-- Afficher le QR code de delivery quand la commande est `picked_up` ou `delivering`
+- Afficher le QR code de livraison dès la création de la commande
+- Le QR code est automatiquement envoyé au destinataire via SMS/WhatsApp
 - Bouton "Afficher QR Code" avec modal plein écran
-- Option de partage du QR code (SMS, WhatsApp, etc.)
+- Option de partage du QR code (SMS, WhatsApp, etc.) si nécessaire
 
 **Composant** : `components/QRCodeDisplay.tsx`
 - Affichage du QR code avec logo Chrono au centre
-- Instructions claires pour le client/destinataire
-- Compte à rebours si expiration proche
+- Instructions claires pour le destinataire
+- Compte à rebours si expiration proche (48h)
+- Affichage de l'expiration
 
 #### 4.2 Génération des QR Codes
 
-- Générer automatiquement les QR codes lors de la création de la commande
-- Stocker les QR codes dans le store Zustand
-- Rafraîchir les QR codes si expiration proche
+- Générer automatiquement le QR code lors de la création de la commande
+- Envoyer automatiquement le QR code au destinataire via SMS/WhatsApp
+- Stocker le QR code dans le store Zustand
+- Rafraîchir le QR code si expiration proche
 
 ---
 
@@ -174,8 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_qr_scans_type ON qr_code_scans(qr_code_type);
 
 **Fonctionnalités** :
 - Bouton "Scanner QR Code" visible quand :
-  - Statut `enroute` → Scanner QR pickup
-  - Statut `picked_up` ou `delivering` → Scanner QR delivery
+  - Statut `picked_up` ou `delivering` → Scanner QR de livraison
 - Utiliser `expo-camera` ou `expo-barcode-scanner` pour scanner
 - Validation en temps réel
 - Feedback visuel (succès/erreur)
@@ -186,13 +188,24 @@ CREATE INDEX IF NOT EXISTS idx_qr_scans_type ON qr_code_scans(qr_code_type);
 - Instructions contextuelles
 - Vibration/feedback haptique lors du scan réussi
 
-#### 5.2 Validation et Mise à Jour
+#### 5.2 Affichage après scan
+
+**Composant** : `components/QRCodeScanResult.tsx`
+
+Après un scan réussi, afficher :
+- **Nom du destinataire**
+- **Téléphone du destinataire**
+- **Nom du créateur de commande** (pour confirmation)
+- **Numéro de commande**
+- Bouton "Confirmer la livraison"
+
+#### 5.3 Validation et Mise à Jour
 
 - Après scan réussi :
-  - Mettre à jour le statut automatiquement
-  - Afficher une confirmation
+  - Afficher les informations du destinataire et du créateur
+  - Confirmer la livraison → Mettre à jour le statut à `completed`
   - Enregistrer la localisation GPS au moment du scan
-  - Notifier le client en temps réel
+  - Notifier le client et le destinataire en temps réel
 
 ---
 
@@ -212,7 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_qr_scans_type ON qr_code_scans(qr_code_type);
 
 - Nombre de scans par jour/semaine
 - Taux de scans réussis vs échoués
-- Temps moyen entre scan pickup et scan delivery
+- Temps moyen entre création de commande et scan de livraison
 
 ---
 
@@ -226,14 +239,14 @@ CREATE INDEX IF NOT EXISTS idx_qr_scans_type ON qr_code_scans(qr_code_type);
 
 ### 2. Expiration des QR Codes
 
-- **Pickup QR** : Valide 24h après création
 - **Delivery QR** : Valide 48h après création
 - Vérifier l'expiration lors du scan
 
-### 3. Validation Géolocalisation
+### 3. Validation Géolocalisation (Optionnel)
 
-- Vérifier que le livreur est à moins de 50m du point de pickup/dropoff
+- Vérifier que le livreur est à moins de 50m du point de dropoff
 - Tolérance configurable selon le contexte (bâtiment, zone rurale, etc.)
+- Peut être désactivée si nécessaire
 
 ### 4. Protection contre la Réutilisation
 
@@ -281,29 +294,25 @@ CREATE INDEX IF NOT EXISTS idx_qr_scans_type ON qr_code_scans(qr_code_type);
 
 ## 📱 Flux Utilisateur Détaillé
 
-### Scénario 1 : Récupération du Colis
+### Scénario : Création et Livraison du Colis
 
-1. **Client** : Crée une commande → QR code pickup généré automatiquement
-2. **Client** : Reçoit notification avec QR code
-3. **Client** : Affiche le QR code sur son téléphone (ou l'imprime)
-4. **Livreur** : Arrive au point de pickup
-5. **Livreur** : Clique sur "Scanner QR Code" dans l'app
-6. **Livreur** : Scanne le QR code du client
-7. **Système** : Valide le QR code (signature, expiration, géolocalisation)
-8. **Système** : Met à jour le statut à `picked_up`
-9. **Client** : Reçoit notification "Colis récupéré"
-10. **Livreur** : Peut maintenant partir pour la livraison
-
-### Scénario 2 : Livraison du Colis
-
-1. **Destinataire** : Reçoit notification avec QR code de livraison (ou le client le partage)
-2. **Livreur** : Arrive au point de dropoff
-3. **Livreur** : Clique sur "Scanner QR Code" dans l'app
-4. **Livreur** : Scanne le QR code du destinataire
-5. **Système** : Valide le QR code (signature, expiration, géolocalisation)
-6. **Système** : Met à jour le statut à `completed`
-7. **Client & Destinataire** : Reçoivent notification "Colis livré"
-8. **Livreur** : Peut maintenant accepter une nouvelle commande
+1. **Client** : Crée une commande → QR code de livraison généré automatiquement
+2. **Système** : Envoie automatiquement le QR code au destinataire via SMS/WhatsApp
+3. **Destinataire** : Reçoit le QR code sur son téléphone
+4. **Livreur** : Récupère le colis (sans scan nécessaire)
+5. **Livreur** : Arrive au point de dropoff
+6. **Livreur** : Clique sur "Scanner QR Code" dans l'app
+7. **Livreur** : Scanne le QR code du destinataire
+8. **Système** : Valide le QR code (signature, expiration)
+9. **Système** : Affiche les informations au livreur :
+   - Nom du destinataire
+   - Téléphone du destinataire
+   - Nom du créateur de commande
+   - Numéro de commande
+10. **Livreur** : Confirme la livraison
+11. **Système** : Met à jour le statut à `completed`
+12. **Client & Destinataire** : Reçoivent notification "Colis livré"
+13. **Livreur** : Peut maintenant accepter une nouvelle commande
 
 ---
 
@@ -333,10 +342,13 @@ CREATE INDEX IF NOT EXISTS idx_qr_scans_type ON qr_code_scans(qr_code_type);
 ```typescript
 interface QRCodeData {
   orderId: string;
-  type: 'pickup' | 'delivery';
+  orderNumber: string;
+  recipientName: string;
+  recipientPhone: string;
+  creatorName: string;
   timestamp: string; // ISO 8601
   signature: string; // HMAC-SHA256
-  expiresAt?: string; // ISO 8601 (optionnel)
+  expiresAt: string; // ISO 8601 (48h après création)
 }
 ```
 
@@ -346,10 +358,10 @@ interface QRCodeData {
 interface QRCodeScan {
   id: string;
   orderId: string;
-  qrCodeType: 'pickup' | 'delivery';
+  qrCodeType: 'delivery';
   scannedBy: string; // userId du livreur
   scannedAt: Date;
-  location: {
+  location?: {
     latitude: number;
     longitude: number;
   };
@@ -360,6 +372,13 @@ interface QRCodeScan {
   isValid: boolean;
   validationError?: string;
 }
+
+interface QRCodeScanResult {
+  recipientName: string;
+  recipientPhone: string;
+  creatorName: string;
+  orderNumber: string;
+}
 ```
 
 ---
@@ -369,21 +388,22 @@ interface QRCodeScan {
 ### Modifications Nécessaires
 
 1. **Création de commande** (`create-order` socket event)
-   - Générer automatiquement les QR codes pickup et delivery
-   - Stocker les QR codes dans la base de données
+   - Générer automatiquement le QR code de livraison
+   - Envoyer automatiquement le QR code au destinataire via SMS/WhatsApp
+   - Stocker le QR code dans la base de données
 
 2. **Mise à jour de statut** (`update-delivery-status` socket event)
-   - Vérifier si un scan QR code est requis avant de changer le statut
-   - Pour `picked_up` : Require pickup QR scan
    - Pour `completed` : Require delivery QR scan
+   - Afficher les informations du destinataire après scan
 
 3. **Interface livreur** (`DriverOrderBottomSheet.tsx`)
-   - Ajouter bouton "Scanner QR Code" conditionnel
+   - Ajouter bouton "Scanner QR Code" visible quand statut `picked_up` ou `delivering`
    - Intégrer le scanner de QR code
+   - Afficher les informations du destinataire après scan réussi
 
 4. **Interface client** (`order-tracking/[orderId].tsx`)
-   - Afficher les QR codes selon le statut
-   - Permettre le partage des QR codes
+   - Afficher le QR code de livraison dès la création
+   - Permettre le partage du QR code si nécessaire
 
 ---
 

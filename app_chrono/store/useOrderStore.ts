@@ -14,8 +14,12 @@ export interface OrderRequest {
   driver?: {
     id?: string;
     name?: string;
+    first_name?: string;
+    last_name?: string;
     phone?: string;
     avatar?: string;
+    avatar_url?: string;
+    profile_image_url?: string;
     rating?: number;
   };
   pickup: {

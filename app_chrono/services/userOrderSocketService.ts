@@ -170,8 +170,12 @@ class UserOrderSocketService {
                 driver: {
                   id: driverInfo.id,
                   name: driverInfo.first_name ? `${driverInfo.first_name} ${driverInfo.last_name || ''}`.trim() : undefined,
+                  first_name: driverInfo.first_name || undefined,
+                  last_name: driverInfo.last_name || undefined,
                   phone: driverInfo.phone || undefined,
                   avatar: driverInfo.profile_image_url || undefined,
+                  avatar_url: driverInfo.profile_image_url || driverInfo.avatar_url || undefined,
+                  profile_image_url: driverInfo.profile_image_url || undefined,
                   rating: driverInfo.rating || undefined,
                 }
               } as any);
