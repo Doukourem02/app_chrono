@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Animated, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { formatUserName } from '../utils/formatName';
 
 interface DriverInfo {
   id?: string;
@@ -13,6 +12,7 @@ interface DriverInfo {
   profile_image_url?: string;
   rating?: number;
   phone?: string;
+  email?: string;
 }
 
 interface DriverSearchBottomSheetProps {
@@ -211,13 +211,11 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Recherche d'un livreur</Text>
+          <Text style={styles.title}>Recherche d&apos;un livreur</Text>
           <Text style={styles.timer}>{formatTime(searchSeconds)}</Text>
         </View>
         <View style={styles.progressBarWrapper}>
-          <Animated.View style={[styles.progressBarContainer, { width: progressWidth }]}>
-            <View style={styles.progressBar} />
-          </Animated.View>
+          <Animated.View style={[styles.progressBarContainer, { width: progressWidth }]} />
         </View>
       </View>
 

@@ -4,11 +4,11 @@ import { useAuthStore } from '../store/useAuthStore';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? 'http://localhost:4000' : 'https://votre-api.com');
 
 class UserApiService {
-  
+
   /**
    * 🚗 GESTION DES CHAUFFEURS
    */
-  
+
   // Récupérer tous les chauffeurs online
   async getOnlineDrivers(userLocation?: {
     latitude: number;
@@ -33,21 +33,21 @@ class UserApiService {
   }> {
     try {
       console.log('🔍 Récupération chauffeurs online...');
-      
+
       let url = `${API_BASE_URL}/api/drivers/online`;
-      
+
       // Ajouter la position utilisateur si fournie
       if (userLocation) {
         url += `?latitude=${userLocation.latitude}&longitude=${userLocation.longitude}`;
       }
-      
+
       const response = await fetch(url);
       const result = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(result.message || 'Erreur récupération chauffeurs');
       }
-      
+
       console.log(`✅ ${result.data?.length || 0} chauffeurs online trouvés`);
       return result;
     } catch (error) {
@@ -60,65 +60,6 @@ class UserApiService {
     }
   }
 
-  // Récupérer les détails d'un utilisateur depuis la table users (plus fiable)
-  async getUserProfile(userId: string): Promise<{
-    success: boolean;
-    message?: string;
-    data?: {
-      id: string;
-      email: string;
-      phone?: string;
-      first_name?: string;
-      last_name?: string;
-      avatar_url?: string;
-      role?: string;
-    };
-  }> {
-    try {
-      const token = await this.ensureAccessToken();
-      if (!token) {
-        return {
-          success: false,
-          message: 'Session expirée. Veuillez vous reconnecter.'
-        };
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.status === 404) {
-        if (__DEV__) {
-          console.warn(`⚠️ Utilisateur non trouvé: ${userId}`);
-        }
-        return {
-          success: false,
-          message: 'Utilisateur non trouvé'
-        };
-      }
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.message || 'Erreur récupération profil utilisateur');
-      }
-      
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
-      if (!errorMessage.includes('Utilisateur non trouvé') && !errorMessage.includes('404')) {
-        console.error('❌ Erreur getUserProfile:', error);
-      }
-      return {
-        success: false,
-        message: errorMessage
-      };
-    }
-  }
-
   // Récupérer les détails d'un chauffeur spécifique (deprecated - utiliser getUserProfile)
   async getDriverDetails(driverId: string): Promise<{
     success: boolean;
@@ -127,7 +68,7 @@ class UserApiService {
   }> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/drivers/${driverId}/details`);
-      
+
       // Vérifier d'abord le status avant de parser le JSON
       if (response.status === 404) {
         // Si c'est une erreur 404 (driver non trouvé), c'est normal et ne doit pas être loggé comme une erreur critique
@@ -139,14 +80,14 @@ class UserApiService {
           message: 'Chauffeur non trouvé'
         };
       }
-      
+
       const result = await response.json();
-      
+
       if (!response.ok) {
         // Pour les autres erreurs, on les traite comme des erreurs réelles
         throw new Error(result.message || 'Erreur récupération détails chauffeur');
       }
-      
+
       return result;
     } catch (error) {
       // Ne logger que les vraies erreurs (réseau, serveur, etc.), pas les 404
@@ -164,7 +105,7 @@ class UserApiService {
   /**
    * 📦 GESTION DES COMMANDES
    */
-  
+
   // Récupérer l'historique des commandes de l'utilisateur
   async getUserDeliveries(
     userId: string,
@@ -188,12 +129,12 @@ class UserApiService {
       const page = options?.page || 1;
       const limit = options?.limit || 20;
       const status = options?.status;
-      
+
       let url = `${API_BASE_URL}/api/deliveries/${userId}?page=${page}&limit=${limit}`;
       if (status) {
         url += `&status=${status}`;
       }
-      
+
       const token = await this.ensureAccessToken();
       if (!token) {
         // Retourner une erreur gracieuse sans lancer d'exception
@@ -203,7 +144,7 @@ class UserApiService {
           data: []
         };
       }
-      
+
       let response: Response;
       try {
         response = await fetch(url, {
@@ -224,7 +165,7 @@ class UserApiService {
         }
         throw fetchError;
       }
-      
+
       let result: any;
       try {
         result = await response.json();
@@ -237,7 +178,7 @@ class UserApiService {
           data: []
         };
       }
-      
+
       if (!response.ok) {
         // Si l'erreur est 401 (non autorisé), c'est probablement un token expiré
         if (response.status === 401) {
@@ -253,11 +194,11 @@ class UserApiService {
           data: []
         };
       }
-      
+
       return result;
     } catch (error) {
       console.error('❌ Erreur getUserDeliveries:', error);
-      
+
       // Gérer spécifiquement les erreurs réseau
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         return {
@@ -266,7 +207,7 @@ class UserApiService {
           data: []
         };
       }
-      
+
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -291,7 +232,7 @@ class UserApiService {
           'cancelled': 'Cette commande a déjà été annulée',
           'declined': 'Cette commande a été refusée',
         };
-        
+
         return {
           success: false,
           message: statusMessages[currentStatus] || `Impossible d'annuler une commande avec le statut: ${currentStatus}`,
@@ -309,13 +250,13 @@ class UserApiService {
           'Content-Type': 'application/json',
         },
       });
-      
+
       const result = await response.json();
-      
+
       if (!response.ok) {
         // Améliorer les messages d'erreur du backend
         let errorMessage = result.message || 'Erreur lors de l\'annulation de la commande';
-        
+
         if (errorMessage.includes('Cannot cancel order with status')) {
           const statusMatch = errorMessage.match(/status: (\w+)/);
           if (statusMatch) {
@@ -330,23 +271,23 @@ class UserApiService {
             errorMessage = statusMessages[status] || errorMessage;
           }
         }
-        
+
         throw new Error(errorMessage);
       }
-      
+
       return result;
     } catch (error) {
       // Ne logger comme erreur que les vraies erreurs (réseau, serveur, etc.)
       // Pas les messages d'information attendus (statut invalide, etc.)
       const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
-      const isExpectedError = errorMessage.includes('Impossible d\'annuler') || 
-                             errorMessage.includes('déjà été') ||
-                             errorMessage.includes('Session expirée');
-      
+      const isExpectedError = errorMessage.includes('Impossible d\'annuler') ||
+        errorMessage.includes('déjà été') ||
+        errorMessage.includes('Session expirée');
+
       if (!isExpectedError) {
         console.error('❌ Erreur cancelOrder:', error);
       }
-      
+
       return {
         success: false,
         message: errorMessage
@@ -426,12 +367,12 @@ class UserApiService {
         const expirationTime = payload.exp * 1000; // Convertir en millisecondes
         const now = Date.now();
         const isExpired = now >= expirationTime;
-        
+
         if (isExpired) {
           console.log('⚠️ Token expiré, expiration:', new Date(expirationTime).toISOString());
           return false;
         }
-        
+
         // Token valide si pas expiré
         return true;
       }
@@ -449,7 +390,7 @@ class UserApiService {
   private async refreshAccessToken(refreshToken: string): Promise<string | null> {
     try {
       console.log('🔄 Tentative de rafraîchissement du token...');
-      
+
       const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
         method: 'POST',
         headers: {
@@ -711,6 +652,16 @@ class UserApiService {
         },
       });
 
+      if (response.status === 404) {
+        if (__DEV__) {
+          console.warn(`⚠️ Utilisateur non trouvé: ${userId}`);
+        }
+        return {
+          success: false,
+          message: 'Utilisateur non trouvé'
+        };
+      }
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -719,10 +670,13 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur getUserProfile:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      if (!errorMessage.includes('Utilisateur non trouvé') && !errorMessage.includes('404')) {
+        console.error('❌ Erreur getUserProfile:', error);
+      }
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: errorMessage
       };
     }
   }

@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
-import { useOrderStore, OrderRequest } from '../store/useOrderStore';
-import { logger } from '../utils/logger';
 import { config } from '../config/index';
+import { OrderRequest, useOrderStore } from '../store/useOrderStore';
+import { logger } from '../utils/logger';
 
 class OrderSocketService {
   private socket: Socket | null = null;
@@ -40,7 +40,7 @@ class OrderSocketService {
       logger.info('Socket connecté pour commandes');
       this.isConnected = true;
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
-      
+
       // S'identifier comme driver
       logger.info('Identification comme driver', undefined, { driverId });
       this.socket?.emit('driver-connect', driverId);
@@ -55,7 +55,7 @@ class OrderSocketService {
     this.socket.on('disconnect', (reason) => {
       logger.info('Socket déconnecté', undefined, { reason });
       this.isConnected = false;
-      
+
       // Laisser Socket.IO gérer la reconnexion automatique
       // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
       if (reason === 'io server disconnect') {
@@ -128,7 +128,7 @@ class OrderSocketService {
         logger.info('Resync order state reçu', undefined, data);
         const { pendingOrders, activeOrders, pendingOrder, currentOrder } = data || {};
         const store = useOrderStore.getState();
-        
+
         // Ajouter toutes les commandes en attente (nouveau format avec tableaux)
         if (Array.isArray(pendingOrders)) {
           pendingOrders.forEach((order: any) => {
@@ -140,7 +140,7 @@ class OrderSocketService {
           // Compatibilité avec l'ancien format
           store.addPendingOrder(pendingOrder as any);
         }
-        
+
         // Ajouter toutes les commandes actives
         if (Array.isArray(activeOrders)) {
           activeOrders.forEach((order: any) => {
@@ -174,22 +174,22 @@ class OrderSocketService {
 
     this.socket.on('connect_error', (error) => {
       this.isConnected = false;
-      
+
       // Ignorer les erreurs de polling temporaires (Socket.IO essaie plusieurs transports)
-      const isTemporaryPollError = error.message?.includes('xhr poll error') || 
-                                   error.message?.includes('poll error') ||
-                                   error.message?.includes('transport unknown');
-      
+      const isTemporaryPollError = error.message?.includes('xhr poll error') ||
+        error.message?.includes('poll error') ||
+        error.message?.includes('transport unknown');
+
       // Ne logger que les erreurs importantes
       if (!isTemporaryPollError || this.retryCount >= 3) {
         logger.error('Erreur connexion socket:', undefined, {
           message: error.message,
-          type: error.type,
-          description: error.description,
+          type: (error as any).type,
+          description: (error as any).description,
           retryCount: this.retryCount,
         });
       }
-      
+
       // Laisser Socket.IO gérer la reconnexion automatique
       // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
       this.retryCount = (this.retryCount || 0) + 1;

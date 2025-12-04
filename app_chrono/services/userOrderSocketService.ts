@@ -1,10 +1,10 @@
+import { Alert } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import { useOrderStore } from '../store/useOrderStore';
 import { useRatingStore } from '../store/useRatingStore';
-import { userApiService } from './userApiService';
 import { logger } from '../utils/logger';
-import { Alert } from 'react-native';
 import { createOrderRecord } from './orderApi';
+import { userApiService } from './userApiService';
 
 class UserOrderSocketService {
   private socket: Socket | null = null;
@@ -43,7 +43,7 @@ class UserOrderSocketService {
       logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
       this.isConnected = true;
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
-      
+
       // S'identifier comme user
       logger.info('👤 Identification comme user', 'userOrderSocketService', { userId });
       this.socket?.emit('user-connect', userId);
@@ -60,7 +60,7 @@ class UserOrderSocketService {
     this.socket.on('disconnect', (reason) => {
       logger.info('🔌 Socket user déconnecté', 'userOrderSocketService', { reason });
       this.isConnected = false;
-      
+
       // Laisser Socket.IO gérer la reconnexion automatique
       // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
       if (reason === 'io server disconnect') {
@@ -85,10 +85,12 @@ class UserOrderSocketService {
             'Erreur enregistrement',
             `${message}\nVoulez-vous réessayer ?`,
             [
-              { text: 'Réessayer', onPress: () => {
-                // Keep UI simple: clear pending so user can recreate or retry flow
-                useOrderStore.getState().clear();
-              }},
+              {
+                text: 'Réessayer', onPress: () => {
+                  // Keep UI simple: clear pending so user can recreate or retry flow
+                  useOrderStore.getState().clear();
+                }
+              },
               { text: 'OK', style: 'cancel' }
             ]
           );
@@ -101,7 +103,7 @@ class UserOrderSocketService {
     // ❌ Aucun chauffeur disponible
     this.socket.on('no-drivers-available', (data) => {
       logger.info('❌ Aucun chauffeur disponible', 'userOrderSocketService', data);
-      
+
       // Réinitialiser l'état pour permettre une nouvelle commande
       try {
         // Forcer la commande à passer en "cancelled" pour déclencher les effets de nettoyage côté UI
@@ -115,7 +117,7 @@ class UserOrderSocketService {
           // Fallback si aucun orderId n'est fourni
           useOrderStore.getState().clear();
         }
-        
+
         // Afficher une alerte à l'utilisateur
         Alert.alert(
           'Aucun chauffeur disponible',
@@ -127,7 +129,7 @@ class UserOrderSocketService {
             }
           ]
         );
-        
+
         logger.info('✅ État réinitialisé après aucun chauffeur disponible', 'userOrderSocketService');
       } catch (err) {
         logger.warn('Erreur lors de la réinitialisation après aucun chauffeur', 'userOrderSocketService', err);
@@ -162,9 +164,9 @@ class UserOrderSocketService {
         // par le socket), on les utilise directement sans appeler l'API.
         // MAIS si first_name est 'Livreur' (fallback du backend), on récupère les vraies données
         if (driverInfo && order?.id) {
-          const isFallbackName = driverInfo.first_name === 'Livreur' || 
-                                 (driverInfo.first_name === 'Livreur' && driverInfo.last_name && driverInfo.last_name.length === 8);
-          
+          const isFallbackName = driverInfo.first_name === 'Livreur' ||
+            (driverInfo.first_name === 'Livreur' && driverInfo.last_name && driverInfo.last_name.length === 8);
+
           if (isFallbackName && driverInfo.id) {
             // Le backend a envoyé des valeurs par défaut, récupérer les vraies données depuis la table users
             (async () => {
@@ -174,12 +176,12 @@ class UserOrderSocketService {
                   const store = useOrderStore.getState();
                   const existingOrder = store.activeOrders.find(o => o.id === order.id);
                   if (existingOrder) {
-                    store.updateOrder(order.id, { 
+                    store.updateOrder(order.id, {
                       driver: {
                         id: res.data.id,
                         first_name: res.data.first_name,
                         last_name: res.data.last_name,
-                        name: res.data.first_name && res.data.last_name 
+                        name: res.data.first_name && res.data.last_name
                           ? `${res.data.first_name} ${res.data.last_name}`.trim()
                           : res.data.first_name || res.data.last_name || undefined,
                         phone: res.data.phone,
@@ -228,12 +230,12 @@ class UserOrderSocketService {
                     const store = useOrderStore.getState();
                     const existingOrder = store.activeOrders.find(o => o.id === order.id);
                     if (existingOrder) {
-                      store.updateOrder(order.id, { 
+                      store.updateOrder(order.id, {
                         driver: {
                           id: res.data.id,
                           first_name: res.data.first_name,
                           last_name: res.data.last_name,
-                          name: res.data.first_name && res.data.last_name 
+                          name: res.data.first_name && res.data.last_name
                             ? `${res.data.first_name} ${res.data.last_name}`.trim()
                             : res.data.first_name || res.data.last_name || undefined,
                           phone: res.data.phone,
@@ -265,7 +267,7 @@ class UserOrderSocketService {
       try {
         const { pendingOrders, activeOrders, pendingOrder, currentOrder, driverCoords } = data || {};
         const store = useOrderStore.getState();
-        
+
         // Ajouter toutes les commandes actives (nouveau format avec tableaux)
         if (Array.isArray(activeOrders)) {
           activeOrders.forEach((order: any) => {
@@ -277,7 +279,7 @@ class UserOrderSocketService {
           // Compatibilité avec l'ancien format
           store.addOrder(currentOrder as any);
         }
-        
+
         // Ajouter toutes les commandes en attente
         if (Array.isArray(pendingOrders)) {
           pendingOrders.forEach((order: any) => {
@@ -289,7 +291,7 @@ class UserOrderSocketService {
           // Compatibilité avec l'ancien format
           store.addOrder(pendingOrder as any);
         }
-        
+
         // Mettre à jour les coordonnées du livreur si disponibles
         if (driverCoords && driverCoords.latitude && driverCoords.longitude) {
           const orderId = currentOrder?.id || pendingOrder?.id;
@@ -308,27 +310,27 @@ class UserOrderSocketService {
     // 🚛 Mise à jour statut livraison (et position)
     // Canonical status update event emitted by server
     this.socket.on('order:status:update', (data) => {
-      logger.info('🚛 order:status:update reçu', 'userOrderSocketService', { 
-        orderId: data?.order?.id, 
+      logger.info('🚛 order:status:update reçu', 'userOrderSocketService', {
+        orderId: data?.order?.id,
         status: data?.order?.status,
         fullData: data
       });
       try {
         const { order, location } = data || {};
-        
+
         if (!order || !order.id) {
           logger.warn('⚠️ order:status:update reçu sans order.id', 'userOrderSocketService', data);
           return;
         }
-        
+
         // Vérifier le statut actuel dans le store avant la mise à jour
         const storeBefore = useOrderStore.getState();
         const existingOrder = storeBefore.activeOrders.find(o => o.id === order.id);
         const oldStatus = existingOrder?.status || 'unknown';
         const newStatus = order.status || 'unknown';
-        
+
         logger.info(`🔄 order:status:update - ${order.id.slice(0, 8)}...: ${oldStatus} → ${newStatus}`, 'userOrderSocketService');
-        
+
         // 🆕 Mettre à jour immédiatement les coordonnées du livreur si elles sont fournies
         // Cela évite que le polyline se dessine avec des coordonnées obsolètes
         // Cela corrige le problème où le polyline rouge est "n'importe quoi au départ"
@@ -339,24 +341,24 @@ class UserOrderSocketService {
           };
           useOrderStore.getState().setDriverCoordsForOrder(order.id, normLocation);
         }
-        
+
         // Normalize location keys to { latitude, longitude }
         const normLocation = location
           ? {
-              latitude: location.latitude ?? location.lat ?? location.y ?? null,
-              longitude: location.longitude ?? location.lng ?? location.x ?? null,
-            }
+            latitude: location.latitude ?? location.lat ?? location.y ?? null,
+            longitude: location.longitude ?? location.lng ?? location.x ?? null,
+          }
           : null;
-        
+
         // Mettre à jour le store immédiatement
-        logger.info('🔄 Mise à jour du store avec nouveau statut', 'userOrderSocketService', { 
-          orderId: order?.id, 
+        logger.info('🔄 Mise à jour du store avec nouveau statut', 'userOrderSocketService', {
+          orderId: order?.id,
           status: order?.status,
           oldStatus,
           newStatus
         });
         useOrderStore.getState().updateFromSocket({ order: order as any, location: normLocation });
-        
+
         // Vérifier que la mise à jour a bien été appliquée
         setTimeout(() => {
           const storeAfter = useOrderStore.getState();
@@ -375,29 +377,29 @@ class UserOrderSocketService {
             const store = useOrderStore.getState();
             const orderInStore = store.activeOrders.find(o => o.id === order.id);
             const driverId = order.driver?.id || order.driverId || orderInStore?.driver?.id || orderInStore?.driverId;
-            
+
             if (driverId) {
               // Récupérer le nom du livreur
-              const driverName = order.driver?.name || 
-                                (order.driver?.first_name ? `${order.driver.first_name || ''} ${order.driver.last_name || ''}`.trim() : null) ||
-                                orderInStore?.driver?.name ||
-                                'Votre livreur';
-              
-              logger.info('⭐ Déclenchement RatingBottomSheet pour commande complétée', 'userOrderSocketService', { 
-                orderId: order.id, 
+              const driverName = order.driver?.name ||
+                (order.driver?.first_name ? `${order.driver.first_name || ''} ${order.driver.last_name || ''}`.trim() : null) ||
+                orderInStore?.driver?.name ||
+                'Votre livreur';
+
+              logger.info('⭐ Déclenchement RatingBottomSheet pour commande complétée', 'userOrderSocketService', {
+                orderId: order.id,
                 driverId,
                 driverName,
                 orderHasDriver: !!order.driver?.id,
                 orderInStoreHasDriver: !!orderInStore?.driver?.id
               });
-              
+
               useRatingStore.getState().setRatingBottomSheet(
                 true,
                 order.id,
                 driverId,
                 driverName || 'Votre livreur'
               );
-              
+
               logger.info('✅ RatingBottomSheet déclenché avec succès', 'userOrderSocketService', { orderId: order.id });
             } else {
               logger.warn('⚠️ Impossible de déclencher RatingBottomSheet : driverId manquant', 'userOrderSocketService', {
@@ -463,9 +465,9 @@ class UserOrderSocketService {
         const { order, location } = data || {};
         const normLocation = location
           ? {
-              latitude: location.latitude ?? location.lat ?? location.y ?? null,
-              longitude: location.longitude ?? location.lng ?? location.x ?? null,
-            }
+            latitude: location.latitude ?? location.lat ?? location.y ?? null,
+            longitude: location.longitude ?? location.lng ?? location.x ?? null,
+          }
           : null;
         useOrderStore.getState().updateFromSocket({ order: order as any, location: normLocation });
       } catch (err) {
@@ -479,27 +481,27 @@ class UserOrderSocketService {
       // Nettoyer complètement l'état pour revenir au formulaire initial
       try {
         useOrderStore.getState().clear();
-      } catch {}
+      } catch { }
     });
 
     this.socket.on('connect_error', (error) => {
       this.isConnected = false;
-      
+
       // Ignorer les erreurs de polling temporaires (Socket.IO essaie plusieurs transports)
-      const isTemporaryPollError = error.message?.includes('xhr poll error') || 
-                                   error.message?.includes('poll error') ||
-                                   error.message?.includes('transport unknown');
-      
+      const isTemporaryPollError = error.message?.includes('xhr poll error') ||
+        error.message?.includes('poll error') ||
+        error.message?.includes('transport unknown');
+
       // Ne logger que les erreurs importantes
       if (!isTemporaryPollError || this.retryCount >= 3) {
         logger.error('❌ Erreur connexion socket user:', 'userOrderSocketService', {
           message: error.message,
-          type: error.type,
-          description: error.description,
+          type: (error as any).type,
+          description: (error as any).description,
           retryCount: this.retryCount,
         });
       }
-      
+
       // Laisser Socket.IO gérer la reconnexion automatique
       // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
       this.retryCount = (this.retryCount || 0) + 1;
@@ -573,7 +575,7 @@ class UserOrderSocketService {
         resolve(false);
         return;
       }
-      
+
       // Double vérification après la reconnexion
       if (!this.socket || !this.isConnected || !this.userId) {
         logger.error('❌ Socket toujours non connecté après ensureConnected', 'userOrderSocketService');
@@ -604,7 +606,7 @@ class UserOrderSocketService {
         const errorMessage = error?.message ?? String(error);
         const errorCode = error?.code ?? null;
 
-  if (errorCode === 'PO001' || errorCode === 'MISSING_PROFILE' || /does not exist|profiles?/i.test(errorMessage)) {
+        if (errorCode === 'PO001' || errorCode === 'MISSING_PROFILE' || /does not exist|profiles?/i.test(errorMessage)) {
           Alert.alert(
             'Compte incomplet',
             'Votre compte n\'est pas totalement configuré sur le serveur (profil manquant). Veuillez vous reconnecter pour synchroniser votre profil ou contacter le support.',
@@ -700,35 +702,35 @@ class UserOrderSocketService {
   // Vérifier la connexion et se reconnecter si nécessaire
   isSocketConnected() {
     const isConnected = this.isConnected && this.socket?.connected;
-    
+
     // Si le socket existe mais n'est pas connecté, essayer de se reconnecter
     if (this.socket && !isConnected && this.userId) {
       logger.warn('⚠️ Socket existe mais non connecté, tentative de reconnexion...', 'userOrderSocketService');
       this.connect(this.userId);
     }
-    
+
     return isConnected;
   }
-  
+
   // S'assurer que le socket est connecté avant une opération
   async ensureConnected(): Promise<boolean> {
     if (this.isSocketConnected()) {
       return true;
     }
-    
+
     if (!this.userId) {
       logger.error('❌ Impossible de se connecter : aucun userId', 'userOrderSocketService');
       return false;
     }
-    
+
     logger.info('🔄 Tentative de connexion du socket...', 'userOrderSocketService');
     this.connect(this.userId);
-    
+
     // Attendre que la connexion s'établisse (maximum 3 secondes)
     const maxWaitTime = 3000;
     const checkInterval = 100;
     let elapsed = 0;
-    
+
     while (elapsed < maxWaitTime) {
       if (this.isConnected && this.socket?.connected) {
         logger.info('✅ Socket connecté avec succès', 'userOrderSocketService');
@@ -737,7 +739,7 @@ class UserOrderSocketService {
       await new Promise(resolve => setTimeout(resolve, checkInterval));
       elapsed += checkInterval;
     }
-    
+
     logger.error('❌ Impossible de connecter le socket après 3 secondes', 'userOrderSocketService');
     return false;
   }

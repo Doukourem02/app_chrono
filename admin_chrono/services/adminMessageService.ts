@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { logger } from '@/utils/logger'
 
-const API_BASE_URL = 
-  process.env.NEXT_PUBLIC_API_URL || 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
   process.env.EXPO_PUBLIC_API_URL ||
   'http://localhost:4000'
 
@@ -106,7 +106,7 @@ class AdminMessageService {
       }
 
       return await response.json()
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[adminMessageService] Fetch error:', error)
       throw error
     }
@@ -119,13 +119,13 @@ class AdminMessageService {
     try {
       const query = type ? `?type=${type}` : ''
       const result = await this.fetchWithAuth(`/api/admin/messages/conversations${query}`)
-      
+
       if (result.success && Array.isArray(result.data)) {
         return result.data as Conversation[]
       }
-      
+
       return []
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[adminMessageService] Error fetching conversations:', error)
       return []
     }
@@ -137,13 +137,13 @@ class AdminMessageService {
   async getConversationById(conversationId: string): Promise<Conversation | null> {
     try {
       const result = await this.fetchWithAuth(`/api/admin/messages/conversations/${conversationId}`)
-      
+
       if (result.success && result.data) {
         return result.data as Conversation
       }
-      
+
       return null
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[adminMessageService] Error fetching conversation:', error)
       return null
     }
@@ -164,13 +164,13 @@ class AdminMessageService {
           participantId: userId,
         }),
       })
-      
+
       if (result.success && result.data) {
         return result.data as Conversation
       }
-      
+
       return null
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[adminMessageService] Error creating conversation:', error)
       return null
     }
@@ -188,13 +188,13 @@ class AdminMessageService {
       const result = await this.fetchWithAuth(
         `/api/admin/messages/conversations/${conversationId}/messages?page=${page}&limit=${limit}`
       )
-      
+
       if (result.success && Array.isArray(result.data)) {
         return result.data as Message[]
       }
-      
+
       return []
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[adminMessageService] Error fetching messages:', error)
       return []
     }
@@ -219,13 +219,13 @@ class AdminMessageService {
           }),
         }
       )
-      
+
       if (result.success && result.data) {
         return result.data as Message
       }
-      
+
       return null
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[adminMessageService] Error sending message:', error)
       throw error
     }
@@ -239,7 +239,7 @@ class AdminMessageService {
       await this.fetchWithAuth(`/api/admin/messages/conversations/${conversationId}/read`, {
         method: 'PUT',
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[adminMessageService] Error marking as read:', error)
     }
   }
@@ -250,13 +250,13 @@ class AdminMessageService {
   async getUnreadCount(): Promise<number> {
     try {
       const result = await this.fetchWithAuth('/api/admin/messages/unread-count')
-      
+
       if (result.success && typeof result.data === 'number') {
         return result.data
       }
-      
+
       return 0
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[adminMessageService] Error fetching unread count:', error)
       return 0
     }

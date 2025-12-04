@@ -70,13 +70,13 @@ class ErrorHandler {
     this.reportError(error);
   }
 
-  private reportError(error: AppError) {
+  private async reportError(error: AppError) {
     // En production, envoyer l'erreur à un service de monitoring
     if (!__DEV__) {
       // L'erreur est déjà capturée par Sentry via l'ErrorBoundary
       // Ici on peut ajouter d'autres services de monitoring si nécessaire
       try {
-        const { captureError } = require('./sentry');
+        const { captureError } = await import('./sentry');
         if (error.originalError instanceof Error) {
           captureError(error.originalError, {
             type: error.type,
@@ -84,7 +84,7 @@ class ErrorHandler {
             userMessage: error.userMessage,
           });
         }
-      } catch (e) {
+      } catch {
         // Ignorer si Sentry n'est pas disponible
       }
     }

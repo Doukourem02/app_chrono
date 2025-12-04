@@ -61,7 +61,7 @@ class DriverMessageSocketService {
       if (!isTemporaryPollError) {
         logger.error('❌ Erreur connexion socket messagerie:', 'driverMessageSocketService', {
           message: error.message,
-          type: error.type,
+          type: (error as any).type,
         });
       }
     });

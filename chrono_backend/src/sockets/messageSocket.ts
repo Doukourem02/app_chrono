@@ -202,7 +202,7 @@ export const setupMessageSocket = (io: Server): void => {
 
         // Marquer les messages comme lus
         // Pour les admins, marquer TOUS les messages comme lus
-        const isAdmin = socket.userRole === 'admin' || socket.userRole === 'super_admin';
+        const isAdmin = socket.userRole === 'admin';
         await messageService.markAsRead(conversationId, userId, isAdmin);
 
         // Récupérer la conversation mise à jour

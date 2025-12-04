@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { logger } from '../utils/logger';
-import { Message, Conversation } from './userMessageService';
+import { Conversation, Message } from './userMessageService';
 
 const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000';
 
@@ -53,14 +53,14 @@ class UserMessageSocketService {
     this.socket.on('connect_error', (error) => {
       this.isConnected = false;
       // Ignorer les erreurs de polling temporaires
-      const isTemporaryPollError = error.message?.includes('xhr poll error') || 
-                                   error.message?.includes('poll error') ||
-                                   error.message?.includes('transport unknown');
-      
+      const isTemporaryPollError = error.message?.includes('xhr poll error') ||
+        error.message?.includes('poll error') ||
+        error.message?.includes('transport unknown');
+
       if (!isTemporaryPollError) {
         logger.error('❌ Erreur connexion socket messagerie:', 'userMessageSocketService', {
           message: error.message,
-          type: error.type,
+          type: (error as any).type,
         });
       }
     });
@@ -122,7 +122,7 @@ class UserMessageSocketService {
           logger.info(`Rejoint la conversation ${conversationId} (après connexion)`, 'userMessageSocketService');
         }
       }, 100);
-      
+
       // Arrêter après 5 secondes
       setTimeout(() => {
         clearInterval(checkConnection);

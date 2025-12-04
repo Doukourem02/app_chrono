@@ -226,7 +226,8 @@ export default function NewShippingModal({
   }
 
   // Geocoding function (simplified - in production, use Google Geocoding API)
-  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _geocodeAddress = async (_address: string): Promise<{ lat: number; lng: number } | null> => {
     // For now, return null - admin will need to manually enter coordinates
     // In production, integrate with Google Geocoding API
     return null
