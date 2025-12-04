@@ -1,13 +1,23 @@
-import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
-import {StyleSheet, Text, View, TouchableOpacity, Alert, ScrollView,Image,Switch,StatusBar,ActivityIndicator} from 'react-native';
-import { router } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import { useRequireAuth } from '../../hooks/useRequireAuth';
-import { useAuthStore } from '../../store/useAuthStore';
-import { userApiService } from '../../services/userApiService';
-import { formatUserName } from '../../utils/formatName';
+import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { userApiService } from "../../services/userApiService";
+import { useAuthStore } from "../../store/useAuthStore";
+import { formatUserName } from "../../utils/formatName";
 
 interface UserStatistics {
   completedOrders: number;
@@ -16,28 +26,28 @@ interface UserStatistics {
 }
 
 export default function ProfilePage() {
-  const { requireAuth } = useRequireAuth();
   const { user, logout, setUser } = useAuthStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
   const [statistics, setStatistics] = useState<UserStatistics>({
     completedOrders: 0,
     loyaltyPoints: 0,
-    totalSaved: 0
+    totalSaved: 0,
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>((user as any)?.avatar_url || null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    (user as any)?.avatar_url || null
+  );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const formatCurrency = (amount: number) => {
-    const formatted = new Intl.NumberFormat('fr-FR', {
+    const formatted = new Intl.NumberFormat("fr-FR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount ?? 0);
 
-    return `${formatted.replace(/\u00A0/g, ' ')} FCFA`;
+    return `${formatted.replace(/\u00A0/g, " ")} FCFA`;
   };
-
 
   useEffect(() => {
     setAvatarUrl((user as any)?.avatar_url || null);
@@ -46,7 +56,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const loadUserProfile = async () => {
       if (!user?.id) return;
-      
+
       if (user.first_name || user.last_name) return;
 
       try {
@@ -61,7 +71,7 @@ export default function ProfilePage() {
           } as any);
         }
       } catch (error) {
-        console.error('Erreur chargement profil utilisateur:', error);
+        console.error("Erreur chargement profil utilisateur:", error);
       }
     };
 
@@ -81,7 +91,7 @@ export default function ProfilePage() {
           setStatistics(result.data);
         }
       } catch (error) {
-        console.error('Erreur chargement statistiques:', error);
+        console.error("Erreur chargement statistiques:", error);
       } finally {
         setIsLoadingStats(false);
       }
@@ -95,63 +105,72 @@ export default function ProfilePage() {
   // Rediriger vers l'authentification si l'utilisateur n'est pas connecté
   useEffect(() => {
     if (!user) {
-      router.replace('/(auth)/register' as any);
+      router.replace("/(auth)/register" as any);
     }
   }, [user]);
 
   const handleAvatarPress = async () => {
     if (!user?.id) {
-      Alert.alert('Erreur', 'Vous devez être connecté pour changer votre avatar');
+      Alert.alert(
+        "Erreur",
+        "Vous devez être connecté pour changer votre avatar"
+      );
       return;
     }
 
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission requise', 'Nous avons besoin de l\'accès à vos photos pour changer votre avatar');
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission requise",
+          "Nous avons besoin de l'accès à vos photos pour changer votre avatar"
+        );
         return;
       }
 
-      Alert.alert(
-        'Changer l\'avatar',
-        'Choisissez une option',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Prendre une photo',
-            onPress: async () => {
-              const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
-              });
+      Alert.alert("Changer l'avatar", "Choisissez une option", [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Prendre une photo",
+          onPress: async () => {
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
 
-              if (!result.canceled && result.assets[0]) {
-                await uploadAvatar(result.assets[0].uri, result.assets[0].mimeType || 'image/jpeg');
-              }
-            },
+            if (!result.canceled && result.assets[0]) {
+              await uploadAvatar(
+                result.assets[0].uri,
+                result.assets[0].mimeType || "image/jpeg"
+              );
+            }
           },
-          {
-            text: 'Choisir depuis la galerie',
-            onPress: async () => {
-              const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
-              });
+        },
+        {
+          text: "Choisir depuis la galerie",
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
 
-              if (!result.canceled && result.assets[0]) {
-                await uploadAvatar(result.assets[0].uri, result.assets[0].mimeType || 'image/jpeg');
-              }
-            },
+            if (!result.canceled && result.assets[0]) {
+              await uploadAvatar(
+                result.assets[0].uri,
+                result.assets[0].mimeType || "image/jpeg"
+              );
+            }
           },
-        ]
-      );
+        },
+      ]);
     } catch (error) {
-      console.error('Erreur sélection image:', error);
-      Alert.alert('Erreur', 'Impossible d\'accéder à vos photos');
+      console.error("Erreur sélection image:", error);
+      Alert.alert("Erreur", "Impossible d'accéder à vos photos");
     }
   };
 
@@ -166,11 +185,15 @@ export default function ProfilePage() {
       });
       const base64DataUri = `data:${mimeType};base64,${base64}`;
 
-      const result = await userApiService.uploadAvatar(user.id, base64DataUri, mimeType);
+      const result = await userApiService.uploadAvatar(
+        user.id,
+        base64DataUri,
+        mimeType
+      );
 
       if (result.success && result.data) {
         setAvatarUrl(result.data.avatar_url);
-        
+
         if (user) {
           setUser({
             ...user,
@@ -178,121 +201,120 @@ export default function ProfilePage() {
           } as any);
         }
 
-        Alert.alert('Succès', 'Votre avatar a été mis à jour');
+        Alert.alert("Succès", "Votre avatar a été mis à jour");
       } else {
-        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour l\'avatar');
+        Alert.alert(
+          "Erreur",
+          result.message || "Impossible de mettre à jour l'avatar"
+        );
       }
     } catch (error) {
-      console.error('Erreur upload avatar:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour l\'avatar');
+      console.error("Erreur upload avatar:", error);
+      Alert.alert("Erreur", "Impossible de mettre à jour l'avatar");
     } finally {
       setUploadingAvatar(false);
     }
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
-      [
-        {
-          text: 'Annuler',
-          style: 'cancel',
+    Alert.alert("Déconnexion", "Êtes-vous sûr de vouloir vous déconnecter ?", [
+      {
+        text: "Annuler",
+        style: "cancel",
+      },
+      {
+        text: "Déconnecter",
+        style: "destructive",
+        onPress: () => {
+          logout();
+          router.replace("/(auth)/register" as any);
         },
-        {
-          text: 'Déconnecter',
-          style: 'destructive',
-          onPress: () => {
-            logout();
-            router.replace('/(auth)/register' as any);
-          },
-        },
-      ]
-    );
+      },
+    ]);
   };
 
   const menuItems = [
     {
-      icon: 'person-outline',
-      title: 'Informations personnelles',
-      subtitle: 'Nom, téléphone, email',
-      onPress: () => router.push('/profile/personal-info'),
-      color: '#8B5CF6'
+      icon: "person-outline",
+      title: "Informations personnelles",
+      subtitle: "Nom, téléphone, email",
+      onPress: () => router.push("/profile/personal-info"),
+      color: "#8B5CF6",
     },
     {
-      icon: 'location-outline',
-      title: 'Mes adresses',
-      subtitle: 'Domicile, bureau, favoris',
-      onPress: () => router.push('/profile/addresses'),
-      color: '#10B981'
+      icon: "location-outline",
+      title: "Mes adresses",
+      subtitle: "Domicile, bureau, favoris",
+      onPress: () => router.push("/profile/addresses"),
+      color: "#10B981",
     },
     {
-      icon: 'card-outline',
-      title: 'Moyens de paiement',
-      subtitle: 'Cartes, portefeuille mobile',
-      onPress: () => router.push('/profile/payment-methods'),
-      color: '#F59E0B'
+      icon: "card-outline",
+      title: "Moyens de paiement",
+      subtitle: "Cartes, portefeuille mobile",
+      onPress: () => router.push("/profile/payment-methods"),
+      color: "#F59E0B",
     },
     {
-      icon: 'time-outline',
-      title: 'Historique des commandes',
-      subtitle: 'Voir toutes vos livraisons',
-      onPress: () => router.push('/profile/order-history'),
-      color: '#3B82F6'
+      icon: "time-outline",
+      title: "Historique des commandes",
+      subtitle: "Voir toutes vos livraisons",
+      onPress: () => router.push("/profile/order-history"),
+      color: "#3B82F6",
     },
     {
-      icon: 'star-outline',
-      title: 'Mes évaluations',
-      subtitle: 'Évaluations et commentaires',
-      onPress: () => router.push('/profile/ratings'),
-      color: '#EF4444'
+      icon: "star-outline",
+      title: "Mes évaluations",
+      subtitle: "Évaluations et commentaires",
+      onPress: () => router.push("/profile/ratings"),
+      color: "#EF4444",
     },
     {
-      icon: 'gift-outline',
-      title: 'Codes promo',
-      subtitle: 'Mes réductions et offres',
-      onPress: () => router.push('/profile/promo-codes'),
-      color: '#EC4899'
+      icon: "gift-outline",
+      title: "Codes promo",
+      subtitle: "Mes réductions et offres",
+      onPress: () => router.push("/profile/promo-codes"),
+      color: "#EC4899",
     },
     {
-      icon: 'trophy-outline',
-      title: 'Points de fidélité',
-      subtitle: 'Utilisez vos points pour des avantages',
+      icon: "trophy-outline",
+      title: "Points de fidélité",
+      subtitle: "Utilisez vos points pour des avantages",
       onPress: () => {
         Alert.alert(
-          'Points de fidélité',
+          "Points de fidélité",
           `Vous avez ${statistics.loyaltyPoints} points.\n\n` +
-          `• 1 point par commande complétée\n` +
-          `• 5 points bonus toutes les 10 commandes\n\n` +
-          `Utilisez vos points pour obtenir des réductions et des avantages exclusifs !`,
-          [{ text: 'OK' }]
+            `• 1 point par commande complétée\n` +
+            `• 5 points bonus toutes les 10 commandes\n\n` +
+            `Utilisez vos points pour obtenir des réductions et des avantages exclusifs !`,
+          [{ text: "OK" }]
         );
       },
-      color: '#F59E0B'
-    }
+      color: "#F59E0B",
+    },
   ];
 
   const supportItems = [
     {
-      icon: 'settings-outline',
-      title: 'Paramètres',
-      onPress: () => router.push('/profile/settings')
+      icon: "settings-outline",
+      title: "Paramètres",
+      onPress: () => router.push("/profile/settings"),
     },
     {
-      icon: 'help-circle-outline',
-      title: 'Aide & Support',
-      onPress: () => router.push('/profile/support')
+      icon: "help-circle-outline",
+      title: "Aide & Support",
+      onPress: () => router.push("/profile/support"),
     },
     {
-      icon: 'shield-checkmark-outline',
-      title: 'Politique de confidentialité',
-      onPress: () => router.push('/profile/privacy')
+      icon: "shield-checkmark-outline",
+      title: "Politique de confidentialité",
+      onPress: () => router.push("/profile/privacy"),
     },
     {
-      icon: 'information-circle-outline',
-      title: 'À propos',
-      onPress: () => router.push('/profile/about')
-    }
+      icon: "information-circle-outline",
+      title: "À propos",
+      onPress: () => router.push("/profile/about"),
+    },
   ];
 
   // Ne rien afficher pendant la redirection
@@ -303,7 +325,7 @@ export default function ProfilePage() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header avec profil utilisateur */}
         <View style={styles.header}>
@@ -320,7 +342,7 @@ export default function ProfilePage() {
                   <Ionicons name="person" size={40} color="#8B5CF6" />
                 </View>
               )}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.cameraButton}
                 onPress={handleAvatarPress}
                 disabled={uploadingAvatar}
@@ -332,11 +354,9 @@ export default function ProfilePage() {
                 )}
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>
-                {formatUserName(user as any)}
-              </Text>
+              <Text style={styles.userName}>{formatUserName(user as any)}</Text>
               <Text style={styles.userEmail}>{user?.email}</Text>
               <Text style={styles.userPhone}>{user?.phone}</Text>
             </View>
@@ -346,21 +366,21 @@ export default function ProfilePage() {
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>
-                {isLoadingStats ? '...' : statistics.completedOrders}
+                {isLoadingStats ? "..." : statistics.completedOrders}
               </Text>
               <Text style={styles.statLabel}>Commandes</Text>
               <Text style={styles.statSubLabel}>Complétées</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>
-                {isLoadingStats ? '...' : formatCurrency(statistics.totalSaved)}
+                {isLoadingStats ? "..." : formatCurrency(statistics.totalSaved)}
               </Text>
               <Text style={styles.statLabel}>Reste à payer</Text>
               <Text style={styles.statSubLabel}>Paiement différé</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>
-                {isLoadingStats ? '...' : statistics.loyaltyPoints}
+                {isLoadingStats ? "..." : statistics.loyaltyPoints}
               </Text>
               <Text style={styles.statLabel}>Points</Text>
               <Text style={styles.statSubLabel}>Fidélité</Text>
@@ -375,14 +395,16 @@ export default function ProfilePage() {
               <Ionicons name="notifications" size={24} color="#8B5CF6" />
               <View style={styles.quickSettingText}>
                 <Text style={styles.quickSettingTitle}>Notifications</Text>
-                <Text style={styles.quickSettingSubtitle}>Recevoir les alertes</Text>
+                <Text style={styles.quickSettingSubtitle}>
+                  Recevoir les alertes
+                </Text>
               </View>
             </View>
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              trackColor={{ false: '#E5E7EB', true: '#8B5CF6' }}
-              thumbColor={notificationsEnabled ? '#FFFFFF' : '#9CA3AF'}
+              trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+              thumbColor={notificationsEnabled ? "#FFFFFF" : "#9CA3AF"}
             />
           </View>
 
@@ -391,14 +413,16 @@ export default function ProfilePage() {
               <Ionicons name="location" size={24} color="#10B981" />
               <View style={styles.quickSettingText}>
                 <Text style={styles.quickSettingTitle}>Localisation</Text>
-                <Text style={styles.quickSettingSubtitle}>Partager ma position</Text>
+                <Text style={styles.quickSettingSubtitle}>
+                  Partager ma position
+                </Text>
               </View>
             </View>
             <Switch
               value={locationEnabled}
               onValueChange={setLocationEnabled}
-              trackColor={{ false: '#E5E7EB', true: '#10B981' }}
-              thumbColor={locationEnabled ? '#FFFFFF' : '#9CA3AF'}
+              trackColor={{ false: "#E5E7EB", true: "#10B981" }}
+              thumbColor={locationEnabled ? "#FFFFFF" : "#9CA3AF"}
             />
           </View>
         </View>
@@ -413,8 +437,17 @@ export default function ProfilePage() {
               onPress={item.onPress}
             >
               <View style={styles.menuItemLeft}>
-                <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
-                  <Ionicons name={item.icon as any} size={24} color={item.color} />
+                <View
+                  style={[
+                    styles.menuIcon,
+                    { backgroundColor: `${item.color}15` },
+                  ]}
+                >
+                  <Ionicons
+                    name={item.icon as any}
+                    size={24}
+                    color={item.color}
+                  />
                 </View>
                 <View style={styles.menuItemText}>
                   <Text style={styles.menuItemTitle}>{item.title}</Text>
@@ -464,22 +497,22 @@ export default function ProfilePage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
     marginBottom: 10,
   },
   profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 20,
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
     marginRight: 15,
   },
   avatar: {
@@ -491,88 +524,88 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#F3F0FF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#F3F0FF",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#8B5CF6',
+    borderColor: "#8B5CF6",
   },
   cameraButton: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#8B5CF6',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#8B5CF6",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: "#FFFFFF",
   },
   userInfo: {
     flex: 1,
   },
   userName: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontWeight: "700",
+    color: "#1F2937",
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
     marginBottom: 2,
   },
   userPhone: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: "#E5E7EB",
   },
   statItem: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   statNumber: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#8B5CF6',
+    fontWeight: "700",
+    color: "#8B5CF6",
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    fontWeight: '500',
+    color: "#6B7280",
+    textTransform: "uppercase",
+    fontWeight: "500",
     marginTop: 2,
   },
   statSubLabel: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginTop: 2,
   },
   quickSettings: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
     marginBottom: 10,
     borderRadius: 12,
     paddingVertical: 8,
   },
   quickSettingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   quickSettingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   quickSettingText: {
@@ -581,16 +614,16 @@ const styles = StyleSheet.create({
   },
   quickSettingTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: "600",
+    color: "#1F2937",
     marginBottom: 2,
   },
   quickSettingSubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   menuContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
     borderRadius: 12,
     marginBottom: 20,
@@ -598,33 +631,33 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontWeight: "700",
+    color: "#1F2937",
     marginHorizontal: 20,
     marginBottom: 12,
     marginTop: 8,
   },
   menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: "#F3F4F6",
   },
   menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   menuIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   menuItemText: {
@@ -632,44 +665,44 @@ const styles = StyleSheet.create({
   },
   menuItemTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: "600",
+    color: "#1F2937",
     marginBottom: 2,
   },
   menuItemSubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: "#6B7280",
   },
   logoutButton: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: "#FEF2F2",
     marginHorizontal: 20,
     padding: 16,
     borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 20,
   },
   logoutText: {
     marginLeft: 8,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#EF4444',
+    fontWeight: "600",
+    color: "#EF4444",
   },
   versionContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingBottom: 40,
   },
   versionText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: "#9CA3AF",
   },
   // Anciens styles conservés pour compatibilité
   headerTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
-    textAlign: 'center',
+    fontWeight: "700",
+    color: "#1F2937",
+    textAlign: "center",
   },
   content: {
     flex: 1,
@@ -677,10 +710,10 @@ const styles = StyleSheet.create({
     paddingTop: 30,
   },
   optionsContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     marginBottom: 30,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -690,29 +723,29 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   option: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: "#F3F4F6",
   },
   optionText: {
     flex: 1,
     fontSize: 16,
-    color: '#1F2937',
+    color: "#1F2937",
     marginLeft: 12,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginTop: 20,
     marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
   },
 });
