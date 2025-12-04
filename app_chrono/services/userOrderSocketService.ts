@@ -160,42 +160,94 @@ class UserOrderSocketService {
 
         // Si driverInfo contient déjà des informations exploitables (transmises
         // par le socket), on les utilise directement sans appeler l'API.
+        // MAIS si first_name est 'Livreur' (fallback du backend), on récupère les vraies données
         if (driverInfo && order?.id) {
-          const hasUsefulInfo = !!(driverInfo.current_latitude || driverInfo.phone || driverInfo.profile_image_url || driverInfo.first_name);
-          if (hasUsefulInfo) {
-            const store = useOrderStore.getState();
-            const existingOrder = store.activeOrders.find(o => o.id === order.id);
-            if (existingOrder) {
-              store.updateOrder(order.id, {
-                driver: {
-                  id: driverInfo.id,
-                  name: driverInfo.first_name ? `${driverInfo.first_name} ${driverInfo.last_name || ''}`.trim() : undefined,
-                  first_name: driverInfo.first_name || undefined,
-                  last_name: driverInfo.last_name || undefined,
-                  phone: driverInfo.phone || undefined,
-                  avatar: driverInfo.profile_image_url || undefined,
-                  avatar_url: driverInfo.profile_image_url || driverInfo.avatar_url || undefined,
-                  profile_image_url: driverInfo.profile_image_url || undefined,
-                  rating: driverInfo.rating || undefined,
-                }
-              } as any);
-            }
-          } else if (driverInfo.id) {
-            // Fallback : si le socket n'a fourni que l'id, tenter de récupérer les détails via l'API
+          const isFallbackName = driverInfo.first_name === 'Livreur' || 
+                                 (driverInfo.first_name === 'Livreur' && driverInfo.last_name && driverInfo.last_name.length === 8);
+          
+          if (isFallbackName && driverInfo.id) {
+            // Le backend a envoyé des valeurs par défaut, récupérer les vraies données depuis la table users
             (async () => {
               try {
-                const res = await userApiService.getDriverDetails(driverInfo.id);
+                const res = await userApiService.getUserProfile(driverInfo.id);
                 if (res && res.success && res.data && order?.id) {
                   const store = useOrderStore.getState();
                   const existingOrder = store.activeOrders.find(o => o.id === order.id);
                   if (existingOrder) {
-                    store.updateOrder(order.id, { driver: res.data } as any);
+                    store.updateOrder(order.id, { 
+                      driver: {
+                        id: res.data.id,
+                        first_name: res.data.first_name,
+                        last_name: res.data.last_name,
+                        name: res.data.first_name && res.data.last_name 
+                          ? `${res.data.first_name} ${res.data.last_name}`.trim()
+                          : res.data.first_name || res.data.last_name || undefined,
+                        phone: res.data.phone,
+                        email: res.data.email,
+                        avatar_url: res.data.avatar_url,
+                        // Garder les coordonnées du socket si disponibles
+                        ...(driverInfo.current_latitude && driverInfo.current_longitude ? {
+                          current_latitude: driverInfo.current_latitude,
+                          current_longitude: driverInfo.current_longitude,
+                        } : {}),
+                      }
+                    } as any);
                   }
                 }
               } catch (err) {
                 logger.warn('Impossible de récupérer les détails du chauffeur', 'userOrderSocketService', err);
               }
             })();
+          } else {
+            // Utiliser les données du socket directement
+            const hasUsefulInfo = !!(driverInfo.current_latitude || driverInfo.phone || driverInfo.profile_image_url || driverInfo.first_name);
+            if (hasUsefulInfo) {
+              const store = useOrderStore.getState();
+              const existingOrder = store.activeOrders.find(o => o.id === order.id);
+              if (existingOrder) {
+                store.updateOrder(order.id, {
+                  driver: {
+                    id: driverInfo.id,
+                    name: driverInfo.first_name ? `${driverInfo.first_name} ${driverInfo.last_name || ''}`.trim() : undefined,
+                    first_name: driverInfo.first_name || undefined,
+                    last_name: driverInfo.last_name || undefined,
+                    phone: driverInfo.phone || undefined,
+                    avatar: driverInfo.profile_image_url || undefined,
+                    avatar_url: driverInfo.profile_image_url || driverInfo.avatar_url || undefined,
+                    profile_image_url: driverInfo.profile_image_url || undefined,
+                    rating: driverInfo.rating || undefined,
+                  }
+                } as any);
+              }
+            } else if (driverInfo.id) {
+              // Fallback : si le socket n'a fourni que l'id, récupérer les détails depuis la table users
+              (async () => {
+                try {
+                  const res = await userApiService.getUserProfile(driverInfo.id);
+                  if (res && res.success && res.data && order?.id) {
+                    const store = useOrderStore.getState();
+                    const existingOrder = store.activeOrders.find(o => o.id === order.id);
+                    if (existingOrder) {
+                      store.updateOrder(order.id, { 
+                        driver: {
+                          id: res.data.id,
+                          first_name: res.data.first_name,
+                          last_name: res.data.last_name,
+                          name: res.data.first_name && res.data.last_name 
+                            ? `${res.data.first_name} ${res.data.last_name}`.trim()
+                            : res.data.first_name || res.data.last_name || undefined,
+                          phone: res.data.phone,
+                          email: res.data.email,
+                          avatar_url: res.data.avatar_url,
+                        }
+                      } as any);
+                    }
+                  }
+                } catch (err) {
+                  logger.warn('Impossible de récupérer les détails du chauffeur', 'userOrderSocketService', err);
+                }
+              })();
+            }
           }
         }
         // If DB persistence failed for the assignment, notify user

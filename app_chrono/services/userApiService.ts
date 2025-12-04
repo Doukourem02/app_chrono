@@ -60,7 +60,66 @@ class UserApiService {
     }
   }
 
-  // Récupérer les détails d'un chauffeur spécifique
+  // Récupérer les détails d'un utilisateur depuis la table users (plus fiable)
+  async getUserProfile(userId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      id: string;
+      email: string;
+      phone?: string;
+      first_name?: string;
+      last_name?: string;
+      avatar_url?: string;
+      role?: string;
+    };
+  }> {
+    try {
+      const token = await this.ensureAccessToken();
+      if (!token) {
+        return {
+          success: false,
+          message: 'Session expirée. Veuillez vous reconnecter.'
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.status === 404) {
+        if (__DEV__) {
+          console.warn(`⚠️ Utilisateur non trouvé: ${userId}`);
+        }
+        return {
+          success: false,
+          message: 'Utilisateur non trouvé'
+        };
+      }
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur récupération profil utilisateur');
+      }
+      
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      if (!errorMessage.includes('Utilisateur non trouvé') && !errorMessage.includes('404')) {
+        console.error('❌ Erreur getUserProfile:', error);
+      }
+      return {
+        success: false,
+        message: errorMessage
+      };
+    }
+  }
+
+  // Récupérer les détails d'un chauffeur spécifique (deprecated - utiliser getUserProfile)
   async getDriverDetails(driverId: string): Promise<{
     success: boolean;
     message?: string;

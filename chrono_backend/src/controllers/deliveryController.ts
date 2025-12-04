@@ -139,12 +139,26 @@ export const getUserDeliveries = async (
       return;
     }
 
-    let query = `SELECT * FROM orders WHERE user_id = $1`;
+    // Récupérer les commandes avec les informations du driver depuis la table users
+    let query = `
+      SELECT 
+        o.*,
+        d.id as driver_user_id,
+        d.email as driver_email,
+        d.phone as driver_phone,
+        d.first_name as driver_first_name,
+        d.last_name as driver_last_name,
+        d.avatar_url as driver_avatar_url,
+        d.role as driver_role
+      FROM orders o
+      LEFT JOIN users d ON o.driver_id = d.id
+      WHERE o.user_id = $1
+    `;
     let countQuery = 'SELECT COUNT(*) FROM orders WHERE user_id = $1';
     const queryParams: any[] = [userId];
 
     if (status && status !== 'all') {
-      query += ` AND status = $2`;
+      query += ` AND o.status = $2`;
       countQuery += ` AND status = $2`;
       queryParams.push(status);
     }
@@ -198,6 +212,17 @@ export const getUserDeliveries = async (
           }
         }
 
+        // Construire l'objet driver avec les données de la table users
+        const driver = order.driver_user_id ? {
+          id: order.driver_user_id,
+          first_name: order.driver_first_name,
+          last_name: order.driver_last_name,
+          email: order.driver_email,
+          phone: order.driver_phone,
+          avatar_url: order.driver_avatar_url,
+          role: order.driver_role,
+        } : null;
+
         return {
           ...order,
           pickup: pickup || order.pickup,
@@ -205,6 +230,7 @@ export const getUserDeliveries = async (
           pickup_address: pickup,
           dropoff_address: dropoff,
           proof: proof || null,
+          driver: driver,
         };
       }),
       pagination: {

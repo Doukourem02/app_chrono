@@ -250,7 +250,18 @@ export default function ShipmentList() {
             driver: order.driver_id
               ? {
                   id: order.driver_id,
-                  name: formatUserName(order.driver, "Livreur"),
+                  first_name: order.driver?.first_name,
+                  last_name: order.driver?.last_name,
+                  name:
+                    order.driver?.first_name && order.driver?.last_name
+                      ? `${order.driver.first_name} ${order.driver.last_name}`.trim()
+                      : order.driver?.first_name ||
+                        order.driver?.last_name ||
+                        formatUserName(order.driver, "Livreur"),
+                  phone: order.driver?.phone,
+                  email: order.driver?.email,
+                  avatar_url: order.driver?.avatar_url,
+                  rating: order.driver?.rating,
                 }
               : undefined,
             pickup: {

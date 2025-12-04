@@ -200,7 +200,20 @@ export default function OrderTrackingPage() {
           const formattedOrder = {
             id: order.id,
             user: { id: order.user_id, name: formatUserName(order.user) },
-            driver: order.driver_id ? { id: order.driver_id, name: formatUserName(order.driver, 'Livreur') } : undefined,
+            driver: order.driver_id
+              ? {
+                  id: order.driver_id,
+                  first_name: order.driver?.first_name,
+                  last_name: order.driver?.last_name,
+                  name: order.driver?.first_name && order.driver?.last_name
+                    ? `${order.driver.first_name} ${order.driver.last_name}`.trim()
+                    : order.driver?.first_name || order.driver?.last_name || formatUserName(order.driver, 'Livreur'),
+                  phone: order.driver?.phone,
+                  email: order.driver?.email,
+                  avatar_url: order.driver?.avatar_url,
+                  rating: order.driver?.rating,
+                }
+              : undefined,
             pickup: {
               address: order.pickup_address_text || (typeof order.pickup_address === 'string' ? JSON.parse(order.pickup_address) : order.pickup_address)?.address || '',
               coordinates: typeof order.pickup_address === 'string' 
