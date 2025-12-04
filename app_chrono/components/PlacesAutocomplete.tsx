@@ -26,6 +26,84 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
   // Utilisation de la configuration centralisée
   const GOOGLE_API_KEY = config.googleApiKey;
 
+  // Fonction pour détecter si une valeur est un Plus Code
+  const isPlusCode = (value: string): boolean => {
+    // Format Plus Code: généralement "XXXX+XX" ou "XXXX+XX, Lieu"
+    const plusCodePattern = /^[A-Z0-9]{4,8}\+[A-Z0-9]{2,6}/i;
+    return plusCodePattern.test(value);
+  };
+
+  // Fonction pour convertir un Plus Code en adresse lisible
+  const convertPlusCodeToAddress = async (plusCode: string): Promise<string | null> => {
+    if (!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('<')) {
+      return null;
+    }
+
+    try {
+      // Utiliser l'API Geocoding pour convertir le Plus Code en coordonnées puis en adresse
+      const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+      url.searchParams.append('address', plusCode);
+      url.searchParams.append('key', GOOGLE_API_KEY);
+      url.searchParams.append('language', 'fr');
+      url.searchParams.append('region', 'ci');
+
+      const response = await fetch(url.toString());
+      const data = await response.json();
+
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        // Prendre le premier résultat et faire un reverse geocoding pour obtenir une vraie adresse
+        const location = data.results[0].geometry.location;
+        
+        // Faire un reverse geocoding pour obtenir une adresse lisible
+        const reverseUrl = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+        reverseUrl.searchParams.append('latlng', `${location.lat},${location.lng}`);
+        reverseUrl.searchParams.append('key', GOOGLE_API_KEY);
+        reverseUrl.searchParams.append('language', 'fr');
+        reverseUrl.searchParams.append('region', 'ci');
+
+        const reverseResponse = await fetch(reverseUrl.toString());
+        const reverseData = await reverseResponse.json();
+
+        if (reverseData.status === 'OK' && reverseData.results && reverseData.results.length > 0) {
+          // Filtrer les résultats pour exclure les Plus Codes
+          const realAddressResults = reverseData.results.filter((result: any) => {
+            const address = result.formatted_address || '';
+            return !isPlusCode(address) && address.length > 10;
+          });
+
+          if (realAddressResults.length > 0) {
+            let bestAddress = realAddressResults[0].formatted_address;
+            
+            // Chercher une adresse avec route ou street_address
+            const streetAddress = realAddressResults.find((result: any) => 
+              result.types.includes('street_address') || result.types.includes('route')
+            );
+            
+            if (streetAddress) {
+              bestAddress = streetAddress.formatted_address;
+            }
+
+            // Nettoyer l'adresse
+            bestAddress = bestAddress
+              .replace(/, Côte d'Ivoire$/, '')
+              .replace(/,\s*Abidjan,\s*Abidjan/g, ', Abidjan')
+              .replace(/^Unnamed Road,?\s*/, '')
+              .replace(/^Route sans nom,?\s*/, '')
+              .trim();
+
+            if (bestAddress && !isPlusCode(bestAddress)) {
+              return bestAddress;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to convert Plus Code to address', 'PlacesAutocomplete', { plusCode, error });
+    }
+
+    return null;
+  };
+
   useEffect(() => {
     return () => {
       if (timer.current) clearTimeout(timer.current);
@@ -33,7 +111,25 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
   }, []);
 
   useEffect(() => {
-    setQuery(initialValue || '');
+    // Si initialValue est un Plus Code, le convertir en adresse lisible
+    if (initialValue && isPlusCode(initialValue)) {
+      setLoading(true);
+      convertPlusCodeToAddress(initialValue).then((address) => {
+        if (address) {
+          setQuery(address);
+          // Optionnel: obtenir les coordonnées pour la nouvelle adresse
+          // On ne notifie pas automatiquement pour éviter les boucles infinies
+        } else {
+          setQuery(initialValue);
+        }
+        setLoading(false);
+      }).catch(() => {
+        setQuery(initialValue);
+        setLoading(false);
+      });
+    } else {
+      setQuery(initialValue || '');
+    }
   }, [initialValue]);
 
   const fetchSuggestions = async (input: string) => {

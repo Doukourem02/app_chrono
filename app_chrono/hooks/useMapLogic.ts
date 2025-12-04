@@ -400,43 +400,73 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         if (!isMounted) return;
 
         if (data.status === 'OK' && data.results && data.results.length > 0) {
-          // Chercher l'adresse la plus précise
-          let bestAddress = '';
+          // Fonction pour détecter si une adresse contient un Plus Code
+          const isPlusCode = (address: string): boolean => {
+            const plusCodePattern = /^[A-Z0-9]{4,8}\+[A-Z0-9]{2,6}/i;
+            return plusCodePattern.test(address);
+          };
+
+          // Fonction pour vérifier si un résultat contient une vraie adresse (pas un Plus Code)
+          const hasRealAddress = (result: any): boolean => {
+            const address = result.formatted_address || '';
+            return !isPlusCode(address) && address.length > 10;
+          };
+
+          // Filtrer les résultats pour exclure les Plus Codes
+          const realAddressResults = data.results.filter(hasRealAddress);
           
-          // Priorité 1: Rechercher une adresse avec numéro de rue
-          const streetAddress = data.results.find((result: any) => 
-            result.types.includes('street_address') || 
-            result.types.includes('premise')
+          // Chercher l'adresse la plus précise (exclure les Plus Codes)
+          let bestAddress = '';
+          let bestResult: any = null;
+          
+          // Priorité 1: Rechercher une adresse avec numéro de rue (exclure les Plus Codes)
+          const streetAddress = realAddressResults.find((result: any) => 
+            (result.types.includes('street_address') || 
+             result.types.includes('premise')) && hasRealAddress(result)
           );
           
           if (streetAddress) {
-            bestAddress = streetAddress.formatted_address;
+            bestResult = streetAddress;
           } else {
-            // Priorité 2: Rechercher un point d'intérêt proche
-            const poi = data.results.find((result: any) => 
-              result.types.includes('point_of_interest') ||
-              result.types.includes('establishment')
+            // Priorité 2: Rechercher une route (nom de rue)
+            const route = realAddressResults.find((result: any) => 
+              result.types.includes('route') && hasRealAddress(result)
             );
             
-            if (poi) {
-              bestAddress = poi.formatted_address;
+            if (route) {
+              bestResult = route;
             } else {
-              // Priorité 3: Prendre le premier résultat détaillé
-              bestAddress = data.results[0].formatted_address;
+              // Priorité 3: Rechercher un point d'intérêt proche (exclure les Plus Codes)
+              const poi = realAddressResults.find((result: any) => 
+                (result.types.includes('point_of_interest') ||
+                 result.types.includes('establishment')) && hasRealAddress(result)
+              );
+              
+              if (poi) {
+                bestResult = poi;
+              } else if (realAddressResults.length > 0) {
+                // Priorité 4: Prendre le premier résultat valide (pas un Plus Code)
+                bestResult = realAddressResults[0];
+              }
             }
           }
 
+          if (bestResult) {
+            bestAddress = bestResult.formatted_address;
+          }
+
           // Nettoyer l'adresse pour la Côte d'Ivoire
-          if (bestAddress) {
+          if (bestAddress && !isPlusCode(bestAddress)) {
             // Supprimer les informations redondantes et garder les plus pertinentes
             bestAddress = bestAddress
               .replace(/, Côte d'Ivoire$/, '') // Supprimer le pays à la fin
               .replace(/,\s*Abidjan,\s*Abidjan/g, ', Abidjan') // Supprimer doublons
               .replace(/^Unnamed Road,?\s*/, '') // Supprimer "Unnamed Road"
+              .replace(/^Route sans nom,?\s*/, '') // Supprimer "Route sans nom"
               .trim();
             
-            if (isMounted) {
-              useShipmentStore.getState().setPickupLocation(bestAddress + ', Abidjan');
+            if (bestAddress && bestAddress.length > 5 && isMounted) {
+              useShipmentStore.getState().setPickupLocation(bestAddress);
               logger.info('Precise location found', 'useMapLogic', { address: bestAddress });
             }
           }
