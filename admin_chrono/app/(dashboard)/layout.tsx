@@ -1,98 +1,104 @@
-'use client'
+"use client";
 
-import { useAuthStore } from '@/stores/authStore'
-import { supabase } from '@/lib/supabase'
-import { useRouter, usePathname } from 'next/navigation'
-import { useEffect } from 'react'
-import Sidebar from '@/components/layout/Sidebar'
-import Header from '@/components/layout/Header'
-import { GoogleMapsProvider } from '@/contexts/GoogleMapsContext'
-import { DateFilterProvider } from '@/contexts/DateFilterContext'
-import { SkeletonLoader } from '@/components/animations'
+import { SkeletonLoader } from "@/components/animations";
+import Header from "@/components/layout/Header";
+import Sidebar from "@/components/layout/Sidebar";
+import { DateFilterProvider } from "@/contexts/DateFilterContext";
+import { GoogleMapsProvider } from "@/contexts/GoogleMapsContext";
+import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/stores/authStore";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const { user, loading, setUser, setLoading, checkAdminRole } = useAuthStore()
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, loading, setUser, setLoading, checkAdminRole } = useAuthStore();
 
   useEffect(() => {
     const load = async () => {
-      setLoading(true)
-      const { data } = await supabase.auth.getSession()
+      setLoading(true);
+      const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        setLoading(false)
-        return router.push('/login')
+        setLoading(false);
+        return router.push("/login");
       }
 
-      setUser(data.session.user)
+      setUser(data.session.user);
 
-      const isAdmin = await checkAdminRole()
+      const isAdmin = await checkAdminRole();
       if (!isAdmin) {
-        setLoading(false)
-        return router.push('/login')
+        setLoading(false);
+        return router.push("/login");
       }
 
-      setLoading(false)
-    }
+      setLoading(false);
+    };
 
-    load()
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Les fonctions du store sont stables, pas besoin de les inclure
+  }, []); // Les fonctions du store sont stables, pas besoin de les inclure
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '16px',
-      }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "16px",
+        }}
+      >
         <SkeletonLoader width={200} height={40} borderRadius={8} />
         <SkeletonLoader width={300} height={20} borderRadius={4} />
       </div>
-    )
+    );
   }
 
-  if (!user) return null
+  if (!user) return null;
 
   const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    height: '100vh',
-    backgroundColor: '#F5F6FA',
-  }
+    display: "flex",
+    height: "100vh",
+    backgroundColor: "#F5F6FA",
+  };
 
   const contentWrapperStyle: React.CSSProperties = {
     flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-  }
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  };
 
   const scrollableStyle: React.CSSProperties = {
     flex: 1,
-    overflowY: 'auto',
-  }
+    overflowY: "auto",
+  };
 
   const innerContainerStyle: React.CSSProperties = {
-    paddingLeft: '16px',
-    paddingRight: '24px',
-    paddingTop: '16px',
-    paddingBottom: '16px',
-    minHeight: '100%',
-  }
+    paddingLeft: "16px",
+    paddingRight: "24px",
+    paddingTop: "16px",
+    paddingBottom: "16px",
+    minHeight: "100%",
+  };
 
   const maxWidthContainerStyle: React.CSSProperties = {
-    maxWidth: '1152px',
-    margin: '0 auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-  }
+    maxWidth: "1152px",
+    margin: "0 auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  };
 
   // Vérifier si on est sur la page tracking pour ajuster le layout
-  const isTrackingPage = pathname?.includes('/tracking')
+  const isTrackingPage = pathname?.includes("/tracking");
 
   return (
     <DateFilterProvider>
@@ -102,16 +108,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div style={contentWrapperStyle}>
             <div style={scrollableStyle}>
               {isTrackingPage ? (
-                <main style={{ height: '100%', padding: 0 }}>
-                  {children}
-                </main>
+                <main style={{ height: "100%", padding: 0 }}>{children}</main>
               ) : (
                 <div style={innerContainerStyle}>
                   <div style={maxWidthContainerStyle}>
                     <Header />
-                    <main>
-                      {children}
-                    </main>
+                    <main>{children}</main>
                   </div>
                 </div>
               )}
@@ -120,5 +122,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </GoogleMapsProvider>
     </DateFilterProvider>
-  )
+  );
 }

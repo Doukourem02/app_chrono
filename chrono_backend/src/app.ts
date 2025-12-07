@@ -14,6 +14,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSwagger } from './config/swagger.js';
+import { isOriginAllowed } from './config/cors.js';
 
 const app: Express = express();
 
@@ -53,31 +54,10 @@ app.use(
   })
 );
 
-const allowedOrigins =
-  process.env.ALLOWED_ORIGINS?.split(',') || [
-    'http://localhost:808',
-    'http://localhost:9006',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://192.168.1.85:3000',
-    'exp://localhost:808',
-  ];
-
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      // En développement (ou si NODE_ENV n'est pas défini), accepter toutes les origines localhost et 192.168.*
-      if (process.env.NODE_ENV !== 'production') {
-        if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.')) {
-          return callback(null, true);
-        }
-      }
-
-      if (allowedOrigins.includes(origin)) {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
         console.warn(`CORS bloqué pour origin: ${origin}`);

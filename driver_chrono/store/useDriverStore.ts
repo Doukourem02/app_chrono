@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { config } from '../config/index';
 
 export interface DriverProfile {
@@ -43,23 +43,23 @@ interface DriverStore {
   profile: DriverProfile | null;
   accessToken: string | null;
   refreshToken: string | null;
-  
+
   // État de l'application
   isOnline: boolean;
   currentLocation: { latitude: number; longitude: number } | null;
-  
+
   // Actions d'authentification
   setUser: (user: DriverUser) => void;
   setProfile: (profile: DriverProfile) => void;
   setTokens: (tokens: { accessToken: string; refreshToken: string }) => void;
   logout: () => void;
   validateUserExists: () => Promise<boolean | 'not_found' | null>;
-  
+
   // Actions driver
   setOnlineStatus: (isOnline: boolean) => void;
   setLocation: (location: { latitude: number; longitude: number }) => void;
   updateProfile: (updates: Partial<DriverProfile>) => void;
-  
+
   // Statistiques
   todayStats: {
     deliveries: number;
@@ -88,9 +88,9 @@ export const useDriverStore = create<DriverStore>()(
 
       // Actions d'authentification
       setUser: (user) => {
-        set({ 
-          user, 
-          isAuthenticated: true 
+        set({
+          user,
+          isAuthenticated: true
         });
       },
 
@@ -99,7 +99,7 @@ export const useDriverStore = create<DriverStore>()(
       },
 
       setTokens: (tokens) => {
-        set({ 
+        set({
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken
         });

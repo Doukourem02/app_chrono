@@ -1,6 +1,8 @@
 import { Stack } from "expo-router";
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
+// Validation des variables d'environnement au démarrage
+import "../config/envCheck";
 
 initSentry();
 

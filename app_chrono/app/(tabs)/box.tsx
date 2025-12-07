@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {StyleSheet,Text,View,ScrollView,TouchableOpacity,ActivityIndicator,RefreshControl,Alert,Image,Modal,FlatList} from 'react-native';
-import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
 import { OrderRequest, OrderStatus, useOrderStore } from '../../store/useOrderStore';
@@ -103,7 +102,6 @@ const createInitialPagination = (): PaginationState => ({
 });
 
 export default function BoxPage() {
-  const { requireAuth } = useRequireAuth();
   const { user } = useAuthStore();
   const activeOrders = useOrderStore((state) => state.activeOrders);
   const [orders, setOrders] = useState<OrderWithDB[]>([]);

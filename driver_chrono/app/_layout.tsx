@@ -4,6 +4,8 @@ import { AppState } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
+// Validation des variables d'environnement au démarrage
+import "../config/envCheck";
 
 //  SENTRY: Initialiser le monitoring d'erreurs
 initSentry();

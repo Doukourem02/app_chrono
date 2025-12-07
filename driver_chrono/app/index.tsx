@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
-import { router } from 'expo-router';
-import { View, ActivityIndicator, Text } from 'react-native';
-import { useDriverStore } from '../store/useDriverStore';
+import { router } from "expo-router";
+import { useEffect } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
+import { useDriverStore } from "../store/useDriverStore";
 
 export default function RootIndex() {
-  const { isAuthenticated, user, accessToken, validateUserExists, logout } = useDriverStore();
+  const { isAuthenticated, user, accessToken, validateUserExists, logout } =
+    useDriverStore();
 
   useEffect(() => {
     let cancelled = false;
@@ -17,15 +18,19 @@ export default function RootIndex() {
           return;
         }
 
-        if (validationResult === true || validationResult === null || validationResult === 'not_found') {
-          router.replace('/(tabs)' as any);
+        if (
+          validationResult === true ||
+          validationResult === null ||
+          validationResult === "not_found"
+        ) {
+          router.replace("/(tabs)" as any);
         } else {
           // validationResult === false : suppression explicite côté backend
           logout();
-          router.replace('/(auth)/register' as any);
+          router.replace("/(auth)/register" as any);
         }
       } else {
-        router.replace('/(auth)/register' as any);
+        router.replace("/(auth)/register" as any);
       }
     };
 
@@ -33,7 +38,7 @@ export default function RootIndex() {
     const timer = setTimeout(() => {
       checkSession().catch(() => {
         if (!cancelled) {
-          router.replace('/(tabs)' as any);
+          router.replace("/(tabs)" as any);
         }
       });
     }, 800);
@@ -45,15 +50,17 @@ export default function RootIndex() {
   }, [isAuthenticated, user, accessToken, validateUserExists, logout]);
 
   return (
-    <View style={{ 
-      flex: 1, 
-      backgroundColor: '#FFFFFF',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-    }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: "#FFFFFF",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+      }}
+    >
       <ActivityIndicator size="large" color="#8B5CF6" />
-      <Text style={{ marginTop: 20, color: '#6B7280', textAlign: 'center' }}>
+      <Text style={{ marginTop: 20, color: "#6B7280", textAlign: "center" }}>
         Vérification de la session...
       </Text>
     </View>

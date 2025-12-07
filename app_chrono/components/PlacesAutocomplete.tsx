@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { logger } from '../utils/logger';
 import { useErrorHandler } from '../utils/errorHandler';
@@ -34,7 +34,7 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
   };
 
   // Fonction pour convertir un Plus Code en adresse lisible
-  const convertPlusCodeToAddress = async (plusCode: string): Promise<string | null> => {
+  const convertPlusCodeToAddress = useCallback(async (plusCode: string): Promise<string | null> => {
     if (!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('<')) {
       return null;
     }
@@ -102,7 +102,7 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
     }
 
     return null;
-  };
+  }, [GOOGLE_API_KEY]);
 
   useEffect(() => {
     return () => {
@@ -130,7 +130,7 @@ export default function PlacesAutocomplete({ placeholder, onPlaceSelected, initi
     } else {
       setQuery(initialValue || '');
     }
-  }, [initialValue]);
+  }, [initialValue, convertPlusCodeToAddress]);
 
   const fetchSuggestions = async (input: string) => {
     if (!input || input.length < 2) {
