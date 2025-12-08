@@ -556,18 +556,20 @@ export const getUserStatistics = async (
 
       let remainingAmount = 0;
       try {
-        const remainingAmountResult = await (pool as any).query(
-          `SELECT COALESCE(SUM(remaining_amount), 0) as total 
+        // Calculer le montant total des dettes différées non payées
+        // (même logique que getDeferredDebts pour cohérence)
+        const deferredDebtsResult = await (pool as any).query(
+          `SELECT COALESCE(SUM(amount), 0) as total 
            FROM transactions 
            WHERE user_id = $1 
-             AND is_partial = true 
-             AND remaining_amount > 0
-             AND status NOT IN ('paid', 'refunded', 'cancelled')`,
+             AND payment_method_type = 'deferred'
+             AND payer_type = 'client'
+             AND status = 'delayed'`,
           [userId]
         );
-        remainingAmount = parseFloat(remainingAmountResult.rows[0]?.total || '0');
+        remainingAmount = parseFloat(deferredDebtsResult.rows[0]?.total || '0');
       } catch (remainingError: any) {
-        logger.warn('Erreur calcul montant restant:', remainingError.message);
+        logger.warn('Erreur calcul montant dettes différées:', remainingError.message);
         remainingAmount = 0;
       }
 

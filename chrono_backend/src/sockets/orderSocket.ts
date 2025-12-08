@@ -5,6 +5,7 @@ import { saveOrder, updateOrderStatus as updateOrderStatusDB, saveDeliveryProofR
 import { maskOrderId, maskUserId, sanitizeObject } from '../utils/maskSensitiveData.js';
 import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionForOrder.js';
 import { broadcastOrderUpdateToAdmins } from './adminSocket.js';
+import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
 import pool from '../config/db.js'; // Interfaces for order data
 interface OrderCoordinates { latitude: number; longitude: number;
 }
@@ -278,6 +279,29 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         const price = providedPrice ?? calculatePrice(distance, deliveryMethod);
         const estimatedDuration = providedEta ?? estimateDuration(distance, deliveryMethod);
 
+        // Valider les limites de paiement différé si c'est un paiement différé par le client
+        if (paymentMethodType === 'deferred' && (paymentPayerType === 'client' || !paymentPayerType)) {
+          const validation = await canUseDeferredPayment(userId, price);
+          if (!validation.canUse) {
+            const errorMsg = validation.reason || 'Paiement différé non autorisé';
+            if (DEBUG) {
+              console.log(`❌ Paiement différé refusé pour ${maskUserId(userId)}: ${errorMsg}`);
+            }
+            socket.emit('order-error', { 
+              success: false, 
+              message: errorMsg,
+              code: 'DEFERRED_PAYMENT_LIMIT_EXCEEDED'
+            });
+            if (typeof ack === 'function') {
+              ack({ success: false, message: errorMsg });
+            }
+            return;
+          }
+          if (DEBUG) {
+            console.log(`✅ Paiement différé autorisé pour ${maskUserId(userId)} - Montant: ${price} FCFA`);
+          }
+        }
+
        let initialPaymentStatus: 'pending' | 'delayed' = 'pending'; if (paymentMethodType === 'deferred') { initialPaymentStatus = 'delayed'; } const order: Order = { id: providedOrderId || uuidv4(),
           user: {
             id: userId,
@@ -546,6 +570,57 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           });
           dbSavedStatus = true;
           if (DEBUG) console.log(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
+          
+          // Si le livreur marque "picked_up" et que c'est un paiement en espèces par le client,
+          // marquer automatiquement le paiement comme payé
+          if (status === 'picked_up') {
+            try {
+              // Récupérer les informations de paiement depuis la base de données
+              const paymentInfoResult = await (pool as any).query(
+                `SELECT payment_method_type, payment_payer, payment_status 
+                 FROM orders 
+                 WHERE id = $1`,
+                [orderId]
+              );
+              
+              if (paymentInfoResult.rows.length > 0) {
+                const paymentInfo = paymentInfoResult.rows[0];
+                const paymentMethodType = paymentInfo.payment_method_type;
+                const paymentPayer = paymentInfo.payment_payer;
+                const currentPaymentStatus = paymentInfo.payment_status;
+                
+                // Vérifier si c'est un paiement en espèces par le client et qu'il n'est pas déjà payé
+                if (
+                  paymentMethodType === 'cash' &&
+                  paymentPayer === 'client' &&
+                  currentPaymentStatus !== 'paid'
+                ) {
+                  // Mettre à jour le statut de paiement dans orders
+                  await (pool as any).query(
+                    `UPDATE orders 
+                     SET payment_status = 'paid', updated_at = NOW() 
+                     WHERE id = $1`,
+                    [orderId]
+                  );
+                  
+                  // Mettre à jour le statut de paiement dans transactions
+                  await (pool as any).query(
+                    `UPDATE transactions 
+                     SET status = 'paid', updated_at = NOW() 
+                     WHERE order_id = $1 AND payer_type = 'client' AND status != 'paid'`,
+                    [orderId]
+                  );
+                  
+                  if (DEBUG) {
+                    console.log(`✅ Paiement en espèces marqué comme payé pour commande ${maskOrderId(orderId)}`);
+                  }
+                }
+              }
+            } catch (paymentError: any) {
+              // Ne pas bloquer la mise à jour du statut de livraison si la mise à jour du paiement échoue
+              console.warn(`⚠️ Échec mise à jour paiement pour ${maskOrderId(orderId)}:`, paymentError.message);
+            }
+          }
         } catch (dbError: any) {
           dbSavedStatus = false;
           dbErrorStatus = dbError && dbError.message ? dbError.message : String(dbError);

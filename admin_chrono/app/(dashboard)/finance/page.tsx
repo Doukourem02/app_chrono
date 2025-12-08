@@ -534,7 +534,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={kpiValueStyle}>
-                {stats?.paymentStatus.paid || 0} / {Object.values(stats?.paymentStatus || {}).reduce((a: number, b: number) => a + b, 0)}
+                {(stats?.paymentStatus.paid || 0) + (stats?.paymentStatus.delayed || 0)} / {Object.values(stats?.paymentStatus || {}).reduce((a: number, b: number) => a + b, 0)}
               </div>
               <div style={kpiLabelStyle}>Paiements complétés</div>
             </div>

@@ -8,6 +8,7 @@ import {
   checkPaymentStatus,
 } from '../services/mobileMoneyService.js';
 import { maskOrderId, maskUserId, maskPhoneNumber } from '../utils/maskSensitiveData.js';
+import { getDeferredPaymentInfo } from '../utils/deferredPaymentLimits.js';
 
 interface RequestWithUser extends Request {
   user?: {
@@ -572,6 +573,116 @@ export const createDispute = async (req: RequestWithUser, res: Response): Promis
     });
   } catch (error: any) {
     logger.error('Erreur création litige:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+};
+
+/**
+ * Récupère les limites et informations de paiement différé pour l'utilisateur connecté
+ */
+export const getDeferredPaymentLimits = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+
+    const deferredInfo = await getDeferredPaymentInfo(userId);
+
+    logger.debug(`Limites paiement différé récupérées pour ${maskUserId(userId)}`, {
+      canUse: deferredInfo.canUse,
+      monthlyRemaining: deferredInfo.monthlyRemaining,
+      annualRemaining: deferredInfo.annualRemaining,
+    });
+
+    res.json({
+      success: true,
+      data: deferredInfo,
+    });
+  } catch (error: any) {
+    logger.error('Erreur récupération limites paiement différé:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+};
+
+/**
+ * Récupère toutes les dettes différées de l'utilisateur connecté
+ */
+export const getDeferredDebts = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+
+    // Récupérer toutes les transactions avec paiement différé non payées
+    // Inclure 'delayed' et 'pending' au cas où certaines transactions auraient été créées avec 'pending'
+    const result = await (pool as any).query(
+      `SELECT 
+        t.id,
+        t.order_id,
+        t.amount,
+        t.status,
+        t.created_at,
+        t.updated_at,
+        o.id as order_id_full,
+        o.pickup_address,
+        o.dropoff_address,
+        o.status as order_status,
+        o.created_at as order_created_at
+      FROM transactions t
+      LEFT JOIN orders o ON t.order_id = o.id
+      WHERE t.user_id = $1
+        AND t.payment_method_type = 'deferred'
+        AND t.payer_type = 'client'
+        AND t.status IN ('delayed', 'pending')
+      ORDER BY t.created_at DESC`,
+      [userId]
+    );
+
+    logger.debug(`Requête dettes différées pour ${maskUserId(userId)}`, {
+      count: result.rows.length,
+      statuses: result.rows.map((r: any) => r.status),
+    });
+
+    const debts = result.rows.map((row: any) => {
+      // Calculer la date d'échéance (7 jours après la création)
+      const createdAt = new Date(row.created_at);
+      const deadline = new Date(createdAt);
+      deadline.setDate(deadline.getDate() + 7);
+      
+      const now = new Date();
+      const isOverdue = deadline < now;
+      const daysUntilDeadline = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      return {
+        id: row.id,
+        orderId: row.order_id || row.order_id_full,
+        amount: parseFloat(row.amount || '0'),
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        orderStatus: row.order_status,
+        pickupAddress: row.pickup_address,
+        dropoffAddress: row.dropoff_address,
+        deadline: deadline.toISOString(),
+        isOverdue,
+        daysUntilDeadline: isOverdue ? -Math.abs(daysUntilDeadline) : daysUntilDeadline,
+      };
+    });
+
+    logger.debug(`Dettes différées récupérées pour ${maskUserId(userId)}`, {
+      count: debts.length,
+    });
+
+    res.json({
+      success: true,
+      data: debts,
+    });
+  } catch (error: any) {
+    logger.error('Erreur récupération dettes différées:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };

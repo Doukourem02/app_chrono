@@ -80,6 +80,26 @@ export interface PriceCalculation {
   };
 }
 
+export interface DeferredPaymentInfo {
+  annualLimit: number;
+  annualUsed: number;
+  annualRemaining: number;
+  monthlyLimit: number;
+  monthlyUsed: number;
+  monthlyRemaining: number;
+  monthlyUsages: number;
+  maxUsagesPerMonth: number;
+  usagesRemaining: number;
+  canUse: boolean;
+  reason?: string;
+  cooldownDaysRemaining?: number;
+  nextAvailableDate?: string;
+  latePaymentsCount: number;
+  creditReduced: boolean;
+  blocked: boolean;
+  blockEndDate?: string;
+}
+
 class PaymentApiService {
   /**
    * Obtenir le token d'authentification
@@ -398,6 +418,91 @@ class PaymentApiService {
       };
     } catch (error) {
       console.error('❌ Erreur createDispute:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion',
+      };
+    }
+  }
+
+  /**
+   * Récupérer les limites et informations de paiement différé
+   */
+  async getDeferredPaymentLimits(): Promise<{
+    success: boolean;
+    data?: DeferredPaymentInfo;
+    message?: string;
+  }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/payments/deferred/limits`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: data.message || 'Erreur lors de la récupération des limites',
+        };
+      }
+
+      return {
+        success: true,
+        data: data.data,
+      };
+    } catch (error) {
+      console.error('❌ Erreur getDeferredPaymentLimits:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion',
+      };
+    }
+  }
+
+  /**
+   * Récupérer toutes les dettes différées de l'utilisateur
+   */
+  async getDeferredDebts(): Promise<{
+    success: boolean;
+    data?: Array<{
+      id: string;
+      orderId: string;
+      amount: number;
+      status: string;
+      createdAt: string;
+      updatedAt: string;
+      orderStatus: string;
+      pickupAddress?: string;
+      dropoffAddress?: string;
+      deadline: string;
+      isOverdue: boolean;
+      daysUntilDeadline: number;
+    }>;
+    message?: string;
+  }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/payments/deferred/debts`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: data.message || 'Erreur lors de la récupération des dettes',
+        };
+      }
+
+      return {
+        success: true,
+        data: data.data || [],
+      };
+    } catch (error) {
+      console.error('❌ Erreur getDeferredDebts:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',

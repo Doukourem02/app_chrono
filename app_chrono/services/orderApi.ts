@@ -84,29 +84,6 @@ export async function createOrderInDatabase(params: {
   return data as string; // order_id
 }
 
-/**
- * Vérifier si un profil Supabase existe pour l'utilisateur donné.
- * Retourne true si le profil existe, false si non, ou lève en cas d'erreur réseau.
- */
-export async function ensureProfileExists(userId: string): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .limit(1);
-
-    if (error) {
-      // Propager l'erreur pour que l'appelant sache qu'il s'agit d'un problème réseau/permission
-      throw error;
-    }
-
-    return Array.isArray(data) && data.length > 0;
-  } catch (err) {
-    throw err;
-  }
-}
-
 export async function createOrderRecord(options: {
   userId: string;
   pickup: { address: string; coordinates: { latitude: number; longitude: number } };

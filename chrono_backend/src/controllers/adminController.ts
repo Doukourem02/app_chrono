@@ -1341,13 +1341,15 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     });
 
     // Statut des paiements
+    // Compter les paiements différés séparément pour les statistiques
     const paymentStatusQuery = `
       SELECT 
         status,
+        payment_method_type,
         COUNT(*) as count
       FROM transactions
       WHERE created_at >= $1
-      GROUP BY status
+      GROUP BY status, payment_method_type
     `;
 
     const paymentStatusResult = await (pool as any).query(paymentStatusQuery, [
@@ -1355,11 +1357,23 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     ]);
 
     const paymentStatus: Record<string, number> = { pending: 0, paid: 0, refused: 0, delayed: 0 };
+    let deferredPendingCount = 0; // Compter les paiements différés en 'pending'
+    
     paymentStatusResult.rows.forEach((row: any) => {
       if (row.status) {
-        paymentStatus[row.status] = parseInt(row.count || '0');
+        // Si c'est un paiement différé avec statut 'pending', le compter comme 'delayed'
+        if (row.payment_method_type === 'deferred' && row.status === 'pending') {
+          deferredPendingCount += parseInt(row.count || '0');
+        } else {
+          paymentStatus[row.status] = (paymentStatus[row.status] || 0) + parseInt(row.count || '0');
+        }
       }
     });
+    
+    // Ajouter les paiements différés en 'pending' aux 'delayed'
+    paymentStatus.delayed = (paymentStatus.delayed || 0) + deferredPendingCount;
+    // Retirer les paiements différés en 'pending' du compteur 'pending' général
+    paymentStatus.pending = Math.max(0, (paymentStatus.pending || 0) - deferredPendingCount);
 
     // Taux de conversion
     const totalTransactions = paymentStatus.pending + paymentStatus.paid + paymentStatus.refused + paymentStatus.delayed;

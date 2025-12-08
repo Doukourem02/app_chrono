@@ -256,6 +256,13 @@ export default function ProfilePage() {
       color: "#F59E0B",
     },
     {
+      icon: "receipt-outline",
+      title: "Mes dettes",
+      subtitle: "Gérer mes paiements différés",
+      onPress: () => router.push("/profile/debts"),
+      color: "#EF4444",
+    },
+    {
       icon: "time-outline",
       title: "Historique des commandes",
       subtitle: "Voir toutes vos livraisons",

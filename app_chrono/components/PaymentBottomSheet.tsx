@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {View,Text,StyleSheet,TouchableOpacity,ActivityIndicator,Alert,ScrollView,TextInput,Switch} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { paymentApi, PaymentMethodType } from '../services/paymentApi';
+import { paymentApi, PaymentMethodType, DeferredPaymentInfo } from '../services/paymentApi';
 import { usePaymentStore } from '../store/usePaymentStore';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import PriceCalculationCard from './PriceCalculationCard';
@@ -52,6 +52,8 @@ export default function PaymentBottomSheet({
   const [partialAmount, setPartialAmount] = useState<string>(
     initialPartialAmount ? initialPartialAmount.toString() : ''
   );
+  const [deferredInfo, setDeferredInfo] = useState<DeferredPaymentInfo | null>(null);
+  const [loadingDeferredInfo, setLoadingDeferredInfo] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -64,8 +66,27 @@ export default function PaymentBottomSheet({
         const defaultMethod = paymentMethods.find((m) => m.is_default) || paymentMethods[0];
         setSelectedMethodType(defaultMethod.method_type);
       }
+
+      // Charger les limites de paiement différé si le payer est le client
+      if (payerType === 'client') {
+        loadDeferredInfo();
+      }
     }
-  }, [visible, loadPaymentMethods, selectedPaymentMethod, paymentMethods, preselectedPaymentMethod]);
+  }, [visible, loadPaymentMethods, selectedPaymentMethod, paymentMethods, preselectedPaymentMethod, payerType]);
+
+  const loadDeferredInfo = async () => {
+    setLoadingDeferredInfo(true);
+    try {
+      const result = await paymentApi.getDeferredPaymentLimits();
+      if (result.success && result.data) {
+        setDeferredInfo(result.data);
+      }
+    } catch (error) {
+      console.error('Erreur chargement limites paiement différé:', error);
+    } finally {
+      setLoadingDeferredInfo(false);
+    }
+  };
 
   const handleSelectMethod = (methodType: PaymentMethodType) => {
     setSelectedMethodType(methodType);
@@ -99,6 +120,34 @@ export default function PaymentBottomSheet({
         'Le destinataire non enregistré ne peut pas opter pour le paiement différé. Veuillez choisir une autre méthode.'
       );
       return;
+    }
+
+    // Valider les limites de paiement différé si c'est un paiement différé par le client
+    if (selectedMethodType === 'deferred' && payerType === 'client') {
+      if (!deferredInfo) {
+        // Recharger les infos si elles ne sont pas disponibles
+        await loadDeferredInfo();
+        Alert.alert('Erreur', 'Impossible de vérifier les limites de paiement différé. Veuillez réessayer.');
+        return;
+      }
+
+      if (!deferredInfo.canUse) {
+        Alert.alert(
+          'Paiement différé non disponible',
+          deferredInfo.reason || 'Vous ne pouvez pas utiliser le paiement différé pour le moment.'
+        );
+        return;
+      }
+
+      // Vérifier que le montant ne dépasse pas le crédit disponible
+      const amountToCheck = isPartial && partialAmount ? parseFloat(partialAmount) : price;
+      if (amountToCheck > deferredInfo.monthlyRemaining) {
+        Alert.alert(
+          'Crédit insuffisant',
+          `Votre crédit mensuel disponible est de ${deferredInfo.monthlyRemaining.toLocaleString()} FCFA. Le montant demandé est de ${amountToCheck.toLocaleString()} FCFA.`
+        );
+        return;
+      }
     }
 
     setIsProcessing(true);
