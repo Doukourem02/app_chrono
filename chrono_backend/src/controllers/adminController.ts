@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import pool from '../config/db.js';
-import logger from '../utils/logger.js';
-import { formatDeliveryId } from '../utils/formatDeliveryId.js';
+import { Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
+import pool from '../config/db.js';
 import { saveOrder } from '../config/orderStorage.js';
 import { broadcastOrderUpdateToAdmins } from '../sockets/adminSocket.js';
-import { Server as SocketIOServer } from 'socket.io';
+import { formatDeliveryId } from '../utils/formatDeliveryId.js';
+import logger from '../utils/logger.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -179,7 +179,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     // Temps moyen de livraison (en minutes)
     let averageDeliveryTime = 0;
     try {
-    const deliveryTimeResult = await (pool as any).query(
+      const deliveryTimeResult = await (pool as any).query(
         `SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 60) as avg_time
          FROM orders 
          WHERE status = 'completed' 
@@ -384,7 +384,7 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
       logger.error('❌ [getAdminRecentActivities] Erreur lors de la requête SQL:', queryError);
       throw queryError;
     }
-    
+
     if (result.rows.length > 0) {
       logger.debug('Première commande récupérée:', {
         id: result.rows[0].id,
@@ -441,7 +441,7 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
     });
 
     logger.info(`✅ [getAdminRecentActivities] Données formatées: ${formatted.length} activités`);
-    
+
     if (formatted.length > 0) {
       logger.debug('📋 [getAdminRecentActivities] Exemple de données formatées:', JSON.stringify(formatted[0], null, 2));
     } else {
@@ -452,13 +452,13 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
       success: true,
       data: formatted,
     };
-    
+
     logger.debug('📤 [getAdminRecentActivities] Sending response:', JSON.stringify(response, null, 2));
-    
+
     res.json(response);
   } catch (error: any) {
     logger.error('Erreur getAdminRecentActivities:', error);
-    
+
     // Gérer les erreurs de connexion DB comme dans getDriverRevenues
     if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
       logger.warn('Erreur de connexion DB, retour de données vides');
@@ -468,7 +468,7 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
       });
       return;
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',
@@ -512,11 +512,11 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     const exactSearchTerm = query.trim();
     const upperQuery = query.trim().toUpperCase();
     const trimmedQuery = query.trim();
-    
+
     // Détecter si c'est une recherche d'ID de commande (commence par CHL)
     // Si oui, on priorisera les commandes dans les résultats
     const isOrderSearch = upperQuery.startsWith('CHL');
-    
+
     // Construire la condition de recherche pour l'ID formaté (si recherche de commande)
     let deliveryIdCondition = '';
     if (isOrderSearch) {
@@ -635,7 +635,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       logger.info('🔍 [getAdminGlobalSearch] Exécution requête commandes avec params:', ordersParams);
       ordersResult = await (pool as any).query(ordersQuery, ordersParams);
       logger.info(`✅ [getAdminGlobalSearch] Commandes trouvées: ${ordersResult.rows.length}`);
-      
+
       // Pour les utilisateurs : searchTerm, exactSearchTerm, searchTerm (pour le tri)
       const usersParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
       logger.info('🔍 [getAdminGlobalSearch] Exécution requête utilisateurs avec params:', usersParams);
@@ -678,7 +678,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       const clientName = (order.user_first_name && order.user_last_name)
         ? `${order.user_first_name} ${order.user_last_name}`
         : order.user_email || 'N/A';
-      
+
       const driverName = (order.driver_first_name && order.driver_last_name)
         ? `${order.driver_first_name} ${order.driver_last_name}`
         : order.driver_email || 'N/A';
@@ -723,7 +723,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     });
   } catch (error: any) {
     logger.error('Erreur getAdminGlobalSearch:', error);
-    
+
     if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
       logger.warn('Erreur de connexion DB, retour de données vides');
       res.json({
@@ -735,7 +735,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       });
       return;
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',
@@ -792,7 +792,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     // Récupérer les informations des clients et drivers en une seule requête
     const userIds = [...new Set(result.rows.map((o: any) => o.user_id).filter(Boolean))];
     const driverIds = [...new Set(result.rows.map((o: any) => o.driver_id).filter(Boolean))];
-    
+
     let usersMap = new Map();
     let driversMap = new Map();
 
@@ -914,7 +914,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     });
   } catch (error: any) {
     logger.error('Erreur getAdminOngoingDeliveries:', error);
-    
+
     if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
       logger.warn('Erreur de connexion DB, retour de données vides');
       res.json({
@@ -923,7 +923,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
       });
       return;
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',
@@ -1110,7 +1110,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
     });
   } catch (error: any) {
     logger.error('Erreur getAdminOrdersByStatus:', error);
-    
+
     if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
       logger.warn('Erreur de connexion DB, retour de données vides');
       res.json({
@@ -1133,7 +1133,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
       });
       return;
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',
@@ -1217,7 +1217,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
     });
   } catch (error: any) {
     logger.error('Erreur getAdminUsers:', error);
-    
+
     if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
       logger.warn('Erreur de connexion DB, retour de données vides');
       res.json({
@@ -1232,7 +1232,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
       });
       return;
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',
@@ -2080,17 +2080,17 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         LIMIT 500
       `;
       const allCompletedOrdersResult = await (pool as any).query(allCompletedOrdersQuery, [driverId]);
-      
+
       logger.info(`[getAdminDriverDetails] Récupéré ${allCompletedOrdersResult.rows.length} orders complétées pour driver ${driverId}`);
-      
+
       // Pour chaque order, récupérer toutes ses transactions et déterminer si elle est en attente de paiement
       const pendingPaymentResult = {
         rows: [] as any[]
       };
-      
+
       for (const orderRow of allCompletedOrdersResult.rows) {
         const orderId = orderRow.order_id;
-        
+
         // Récupérer toutes les transactions pour cette order
         const transactionsQuery = `
           SELECT 
@@ -2108,40 +2108,40 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         `;
         const transactionsResult = await (pool as any).query(transactionsQuery, [orderId]);
         const transactions = transactionsResult.rows || [];
-        
+
         // Calculer le montant total payé
         let totalPaid = 0;
         let latestRemaining = 0;
         let latestTransaction: any = null;
-        
+
         if (transactions.length > 0) {
           // Utiliser la transaction la plus récente pour les infos de statut
           latestTransaction = transactions[0];
-          
+
           // Calculer le total payé en additionnant toutes les transactions
           for (const tx of transactions) {
-            const paidAmount = tx.partial_amount && tx.partial_amount > 0 
-              ? parseFloat(tx.partial_amount) 
+            const paidAmount = tx.partial_amount && tx.partial_amount > 0
+              ? parseFloat(tx.partial_amount)
               : parseFloat(tx.amount || '0');
             totalPaid += paidAmount;
           }
-          
+
           latestRemaining = parseFloat(latestTransaction.remaining_amount || '0');
         }
-        
+
         const orderAmount = parseFloat(orderRow.order_amount || '0');
-        const remainingAmount = latestRemaining > 0 
-          ? latestRemaining 
+        const remainingAmount = latestRemaining > 0
+          ? latestRemaining
           : Math.max(0, orderAmount - totalPaid);
-        
+
         // Déterminer si cette order est en attente de paiement
-        const isPendingPayment = 
+        const isPendingPayment =
           transactions.length === 0 || // Pas de transaction = en attente
           latestTransaction?.is_partial === true || // Paiement partiel
           latestTransaction?.payment_method_type === 'deferred' || // Paiement différé
           remainingAmount > 0 || // Montant restant > 0
           (latestTransaction?.status && latestTransaction.status !== 'paid'); // Transaction non payée
-        
+
         if (isPendingPayment) {
           pendingPaymentResult.rows.push({
             order_id: orderId,
@@ -2164,9 +2164,9 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
           });
         }
       }
-      
+
       logger.info(`[getAdminDriverDetails] ${pendingPaymentResult.rows.length} orders en attente de paiement pour driver ${driverId}`);
-      
+
       // Mapper les résultats au format attendu
       pendingPaymentOrders = pendingPaymentResult.rows.map((row: any) => ({
         orderId: row.order_id,
@@ -2232,14 +2232,14 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         LIMIT 200
       `;
       const recentOrdersResult = await (pool as any).query(recentOrdersQuery, [driverId]);
-      
+
       logger.info(`[getAdminDriverDetails] Récupéré ${recentOrdersResult.rows.length} orders pour l'historique du driver ${driverId}`);
-      
+
       // Pour chaque order, calculer correctement le montant payé et restant en tenant compte de toutes les transactions
       recentOrders = await Promise.all(recentOrdersResult.rows.map(async (row: any) => {
         const orderId = row.id;
         const orderAmount = parseFloat(row.price || '0');
-        
+
         // Récupérer toutes les transactions pour cette order
         const allTransactionsQuery = `
           SELECT 
@@ -2257,30 +2257,30 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         `;
         const transactionsResult = await (pool as any).query(allTransactionsQuery, [orderId]);
         const transactions = transactionsResult.rows || [];
-        
+
         // Calculer le montant total payé
         let totalPaid = 0;
         let latestRemaining = 0;
         let latestTransaction: any = null;
-        
+
         if (transactions.length > 0) {
           latestTransaction = transactions[0];
-          
+
           // Calculer le total payé en additionnant toutes les transactions
           for (const tx of transactions) {
-            const paidAmount = tx.partial_amount && tx.partial_amount > 0 
-              ? parseFloat(tx.partial_amount) 
+            const paidAmount = tx.partial_amount && tx.partial_amount > 0
+              ? parseFloat(tx.partial_amount)
               : parseFloat(tx.amount || '0');
             totalPaid += paidAmount;
           }
-          
+
           latestRemaining = parseFloat(latestTransaction.remaining_amount || '0');
         }
-        
-        const remainingAmount = latestRemaining > 0 
-          ? latestRemaining 
+
+        const remainingAmount = latestRemaining > 0
+          ? latestRemaining
           : (row.status === 'completed' ? Math.max(0, orderAmount - totalPaid) : 0);
-        
+
         // Déterminer le statut de paiement
         let paymentStatus: 'paid' | 'partial' | 'pending' | 'none' = 'none';
         if (row.status === 'completed') {
@@ -2296,7 +2296,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
             paymentStatus = 'pending';
           }
         }
-        
+
         return {
           id: row.id,
           status: row.status,
@@ -2321,7 +2321,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
           },
         };
       }));
-      
+
       logger.info(`[getAdminDriverDetails] ${recentOrders.length} orders mappées pour l'historique du driver ${driverId}`);
     } catch (recentOrdersError) {
       logger.warn('Erreur récupération historique courses:', recentOrdersError);
@@ -2340,18 +2340,18 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         // Profil driver
         profile: driverProfile
           ? {
-              vehicleType: driverProfile.vehicle_type,
-              vehiclePlate: driverProfile.vehicle_plate,
-              vehicleBrand: driverProfile.vehicle_brand,
-              vehicleModel: driverProfile.vehicle_model,
-              vehicleColor: driverProfile.vehicle_color,
-              licenseNumber: driverProfile.license_number,
-              isOnline: driverProfile.is_online || false,
-              isAvailable: driverProfile.is_available || false,
-              currentLatitude: driverProfile.current_latitude,
-              currentLongitude: driverProfile.current_longitude,
-              lastLocationUpdate: driverProfile.last_location_update,
-            }
+            vehicleType: driverProfile.vehicle_type,
+            vehiclePlate: driverProfile.vehicle_plate,
+            vehicleBrand: driverProfile.vehicle_brand,
+            vehicleModel: driverProfile.vehicle_model,
+            vehicleColor: driverProfile.vehicle_color,
+            licenseNumber: driverProfile.license_number,
+            isOnline: driverProfile.is_online || false,
+            isAvailable: driverProfile.is_available || false,
+            currentLatitude: driverProfile.current_latitude,
+            currentLongitude: driverProfile.current_longitude,
+            lastLocationUpdate: driverProfile.last_location_update,
+          }
           : null,
         // Statistiques
         statistics: {
@@ -2562,7 +2562,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
       transactions.forEach((tx: any) => {
         const partialAmount = parseFloat(tx.partial_amount || tx.amount || '0');
         const remainingAmount = parseFloat(tx.remaining_amount || '0');
-        
+
         totalPaid += partialAmount;
         totalRemaining += remainingAmount;
       });
@@ -3209,7 +3209,7 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
         ORDER BY MAX(o.created_at) DESC
         LIMIT 50
       `;
-      
+
       const partialPaymentsResult = await (pool as any).query(partialPaymentsQuery);
       clientsWithPartialPayments = partialPaymentsResult.rows.map((row: any) => ({
         clientId: row.client_id,
@@ -3224,7 +3224,7 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
           ? `${row.last_driver_first_name} ${row.last_driver_last_name}`
           : null,
       }));
-      
+
       logger.info(`[getAdminAdminDetails] ${clientsWithPartialPayments.length} clients en paiement partiel`);
     } catch (partialPaymentsError) {
       logger.warn('Erreur récupération clients en paiement partiel:', partialPaymentsError);
@@ -3426,6 +3426,113 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     }
   } catch (error: any) {
     logger.error('Erreur createAdminOrder:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Annule une commande depuis l'admin (pour les commandes orphelines ou bloquées)
+ */
+export const cancelAdminOrder = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+
+    if (!orderId) {
+      res.status(400).json({
+        success: false,
+        message: 'orderId est requis'
+      });
+      return;
+    }
+
+    logger.info(`🔧 [cancelAdminOrder] Tentative d'annulation de la commande ${orderId} par l'admin`);
+
+    // Vérifier si la commande existe dans la base de données
+    const dbResult = await (pool as any).query(
+      'SELECT * FROM orders WHERE id = $1',
+      [orderId]
+    );
+
+    if (!dbResult.rows || dbResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Commande non trouvée'
+      });
+      return;
+    }
+
+    const dbOrder = dbResult.rows[0];
+    const currentStatus = dbOrder.status;
+
+    // Permettre l'annulation pour les statuts pending, accepted, enroute
+    const cancellableStatuses = ['pending', 'accepted', 'enroute'];
+    if (!cancellableStatuses.includes(currentStatus)) {
+      res.status(400).json({
+        success: false,
+        message: `Impossible d'annuler une commande avec le statut: ${currentStatus}`,
+      });
+      return;
+    }
+
+    // Mettre à jour le statut dans la base de données
+    await (pool as any).query(
+      'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
+      ['cancelled', orderId]
+    );
+
+    logger.info(`✅ [cancelAdminOrder] Commande ${orderId} annulée avec succès par l'admin`);
+
+    // Notifier via WebSocket si disponible
+    try {
+      const io = req.app.get('io') as SocketIOServer | undefined;
+      if (io) {
+        // Notifier le client si connecté
+        if (dbOrder.user_id) {
+          const { connectedUsers } = await import('../sockets/orderSocket.js');
+          const userSocketId = connectedUsers.get(dbOrder.user_id);
+          if (userSocketId) {
+            io.to(userSocketId).emit('order:cancelled', {
+              orderId,
+              reason: reason || 'admin_cancelled',
+            });
+          }
+        }
+
+        // Notifier le livreur si assigné et connecté
+        if (dbOrder.driver_id) {
+          const { connectedUsers } = await import('../sockets/orderSocket.js');
+          const driverSocketId = connectedUsers.get(dbOrder.driver_id);
+          if (driverSocketId) {
+            io.to(driverSocketId).emit('order:cancelled', {
+              orderId,
+              reason: reason || 'admin_cancelled',
+            });
+          }
+        }
+
+        // Notifier les admins
+        broadcastOrderUpdateToAdmins(io, 'order:cancelled', {
+          orderId,
+          status: 'cancelled',
+          reason: reason || 'admin_cancelled',
+        });
+      }
+    } catch (socketError: any) {
+      logger.warn('⚠️ [cancelAdminOrder] Erreur lors de la notification WebSocket:', socketError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Commande annulée avec succès',
+      order: { ...dbOrder, status: 'cancelled' },
+    });
+  } catch (error: any) {
+    logger.error('❌ [cancelAdminOrder] Erreur lors de l\'annulation:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',

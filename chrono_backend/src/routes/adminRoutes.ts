@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminRecentActivities, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminUsers, getAdminGlobalSearch, getAdminFinancialStats, getAdminTransactions, getAdminReportDeliveries, getAdminReportRevenues, getAdminReportClients, getAdminReportDrivers, getAdminReportPayments, getAdminDriverDetails, updateAdminDriverStatus, getAdminClientDetails, getAdminClientStatistics, getAdminRatings, deleteAdminRating, getAdminPromoCodes, createAdminPromoCode, getAdminDisputes, updateAdminDispute, getAdminAdminDetails, createAdminOrder } from '../controllers/adminController.js';
+import { getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminRecentActivities, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminUsers, getAdminGlobalSearch, getAdminFinancialStats, getAdminTransactions, getAdminReportDeliveries, getAdminReportRevenues, getAdminReportClients, getAdminReportDrivers, getAdminReportPayments, getAdminDriverDetails, updateAdminDriverStatus, getAdminClientDetails, getAdminClientStatistics, getAdminRatings, deleteAdminRating, getAdminPromoCodes, createAdminPromoCode, getAdminDisputes, updateAdminDispute, getAdminAdminDetails, createAdminOrder, cancelAdminOrder } from '../controllers/adminController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { getConversations, getConversationById, createConversation, getMessages, sendMessage, markMessagesAsRead, getUnreadCount } from '../controllers/messageController.js';
 
@@ -12,6 +12,7 @@ router.get('/recent-activities', verifyAdminSupabase, getAdminRecentActivities);
 router.get('/ongoing-deliveries', verifyAdminSupabase, getAdminOngoingDeliveries);
 router.get('/orders', verifyAdminSupabase, getAdminOrdersByStatus);
 router.post('/orders', verifyAdminSupabase, createAdminOrder);
+router.post('/orders/:orderId/cancel', verifyAdminSupabase, cancelAdminOrder);
 router.get('/users', verifyAdminSupabase, getAdminUsers);
 router.get('/search', verifyAdminSupabase, getAdminGlobalSearch);
 router.get('/financial-stats', verifyAdminSupabase, getAdminFinancialStats);

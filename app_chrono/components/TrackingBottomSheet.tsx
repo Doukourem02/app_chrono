@@ -58,9 +58,17 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   }, [currentOrder?.id]);
 
   const status: string = React.useMemo(() => {
-    const currentStatus = String(currentOrder?.status || "accepted");
+    // Ne pas utiliser de valeur par défaut, utiliser le statut réel de la commande
+    const currentStatus = currentOrder?.status ? String(currentOrder.status) : "pending";
+    if (__DEV__) {
+      console.log('🔍 TrackingBottomSheet status:', {
+        orderId: currentOrder?.id,
+        status: currentStatus,
+        rawStatus: currentOrder?.status,
+      });
+    }
     return currentStatus;
-  }, [currentOrder?.status]);
+  }, [currentOrder?.status, currentOrder?.id]);
   
   const isCompleted = status === 'completed';
 
@@ -77,7 +85,19 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       }
     }
   }, [currentOrder?.id, isCompleted, loadOrderRating]);
-  const canCancel = (status === 'pending' || status === 'accepted') && onCancel;
+  
+  // Permettre l'annulation pour les commandes en pending ou accepted
+  const canCancel = React.useMemo(() => {
+    const canCancelOrder = (status === 'pending' || status === 'accepted') && onCancel;
+    if (__DEV__) {
+      console.log('🔍 TrackingBottomSheet canCancel:', {
+        status,
+        hasOnCancel: !!onCancel,
+        canCancel: canCancelOrder,
+      });
+    }
+    return canCancelOrder;
+  }, [status, onCancel]);
 
   const statusSteps = useMemo(() => [
     { label: "Livreur assigné", key: "accepted" },
@@ -196,6 +216,14 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
               </View>
             ) : (
               <View style={styles.actionButtonsCollapsed}>
+                {canCancel && (
+                  <TouchableOpacity 
+                    style={[styles.iconCircle, styles.cancelIconCircle]}
+                    onPress={onCancel}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#fff" />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity 
                   style={styles.iconCircle}
                   onPress={onMessage}
@@ -426,6 +454,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
+  },
+  cancelIconCircle: {
+    backgroundColor: "#EF4444",
   },
 
   expandedCard: {

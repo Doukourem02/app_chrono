@@ -108,6 +108,27 @@ export default function OrdersPage() {
   const queryClient = useQueryClient()
   const lastStatusParamRef = useRef<string | null>(null)
 
+  // Fonction pour annuler une commande
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+      return
+    }
+
+    try {
+      const result = await adminApiService.cancelOrder(orderId, 'admin_cancelled')
+      if (result.success) {
+        // Rafraîchir la liste des commandes
+        queryClient.invalidateQueries({ queryKey: ['orders', activeTab] })
+        alert('Commande annulée avec succès')
+      } else {
+        alert(`Erreur: ${result.message || 'Impossible d\'annuler la commande'}`)
+      }
+    } catch (error) {
+      logger.error('[OrdersPage] Error cancelling order:', error)
+      alert('Erreur lors de l\'annulation de la commande')
+    }
+  }
+
   // Mettre à jour activeTab quand le paramètre URL change
   useEffect(() => {
     const statusParam = searchParams.get('status')
@@ -405,6 +426,7 @@ export default function OrdersPage() {
                   <th style={{ textAlign: 'left', padding: '12px', fontSize: '12px', fontWeight: 600, color: '#4B5563', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>Departure</th>
                   <th style={{ textAlign: 'left', padding: '12px', fontSize: '12px', fontWeight: 600, color: '#4B5563', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>Destination</th>
                   <th style={{ textAlign: 'left', padding: '12px', fontSize: '12px', fontWeight: 600, color: '#4B5563', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>Status</th>
+                  <th style={{ textAlign: 'left', padding: '12px', fontSize: '12px', fontWeight: 600, color: '#4B5563', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -503,6 +525,35 @@ export default function OrdersPage() {
                         >
                           {status.label}
                         </span>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        {(['pending', 'accepted', 'enroute'].includes(order.status.toLowerCase())) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCancelOrder(order.id)
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#EF4444',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#DC2626'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#EF4444'
+                            }}
+                          >
+                            Annuler
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )

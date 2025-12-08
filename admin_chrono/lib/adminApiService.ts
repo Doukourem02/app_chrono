@@ -1487,6 +1487,61 @@ class AdminApiService {
       }
     }
   }
+
+  /**
+   * Annule une commande depuis l'admin
+   */
+  async cancelOrder(orderId: string, reason?: string): Promise<{
+    success: boolean
+    message?: string
+    order?: unknown
+  }> {
+    try {
+      const url = `${API_BASE_URL}/api/admin/orders/${orderId}/cancel`
+      logger.debug('[adminApiService] Cancelling order:', url)
+
+      const response = await this.fetchWithAuth(url, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      })
+
+      if (!response.ok) {
+        let errorMessage = 'Network error'
+        try {
+          const errorData = await response.json()
+          errorMessage = hasMessage(errorData) ? errorData.message : errorMessage
+        } catch {
+          const errorText = await response.text().catch(() => 'Unknown error')
+          errorMessage = errorText || errorMessage
+        }
+        logger.error('[adminApiService] Error cancelling order:', errorMessage)
+        return {
+          success: false,
+          message: errorMessage,
+        }
+      }
+
+      const result = await response.json()
+      if (isApiResponse(result)) {
+        return {
+          success: true,
+          message: result.message || 'Commande annulée avec succès',
+          order: result.data,
+        }
+      }
+
+      return {
+        success: false,
+        message: result.message || 'Erreur lors de l\'annulation de la commande',
+      }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Unexpected error in cancelOrder:', getErrorMessage(error))
+      return {
+        success: false,
+        message: 'Erreur lors de l\'annulation de la commande',
+      }
+    }
+  }
 }
 
 // Export singleton
