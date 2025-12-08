@@ -353,27 +353,88 @@ export default function MapPage() {
   
   useEffect(() => {
     const orderStatus = currentOrder?.status || pendingOrder?.status;
+    const order = currentOrder || pendingOrder;
     
-    if (orderStatus === 'accepted' && !showPaymentSheet && (currentOrder || pendingOrder)) {
-      const order = currentOrder || pendingOrder;
-      const paymentStatus = (order as any)?.payment_status;
-      
-      if (paymentStatus !== 'paid') {
-        if (selectedPaymentMethodType === 'cash' || selectedPaymentMethodType === 'deferred') {
-          console.log('✅ Paiement en espèces ou différé - pas de paiement électronique requis');
-          return;
-        }
-        
-          if (selectedPaymentMethodType === 'orange_money' || selectedPaymentMethodType === 'wave' || !selectedPaymentMethodType) {
-          const timer = setTimeout(() => {
-            setShowPaymentSheet(true);
-          }, 500);
-          
-          return () => clearTimeout(timer);
-        }
-      }
+    if (__DEV__) {
+      console.log('🔍 PaymentBottomSheet useEffect:', {
+        orderStatus,
+        hasCurrentOrder: !!currentOrder,
+        hasPendingOrder: !!pendingOrder,
+        paymentPayerType,
+        selectedPaymentMethodType,
+        showPaymentSheet,
+        orderId: order?.id,
+        paymentStatus: (order as any)?.payment_status,
+      });
     }
-  }, [currentOrder?.status, pendingOrder?.status, showPaymentSheet, currentOrder, pendingOrder, selectedPaymentMethodType]);
+    
+    // Ne pas afficher le PaymentBottomSheet si c'est le destinataire qui paie
+    if (paymentPayerType === 'recipient') {
+      if (__DEV__) {
+        console.log('⏭️ PaymentBottomSheet: destinataire paie, on ne l\'affiche pas');
+      }
+      return;
+    }
+    
+    // Ne pas afficher si on n'a pas de commande ou si le statut n'est pas 'accepted'
+    if (orderStatus !== 'accepted' || !order) {
+      if (__DEV__) {
+        console.log('⏭️ PaymentBottomSheet: statut pas accepted ou pas de commande', { orderStatus, hasOrder: !!order });
+      }
+      return;
+    }
+    
+    // S'assurer qu'on a bien une commande avec le bon statut
+    if (order.status !== 'accepted') {
+      if (__DEV__) {
+        console.log('⏭️ PaymentBottomSheet: commande pas accepted', { orderStatus: order.status });
+      }
+      return;
+    }
+    
+    // Ne pas afficher si déjà affiché ou si déjà payé
+    if (showPaymentSheet) {
+      if (__DEV__) {
+        console.log('⏭️ PaymentBottomSheet: déjà affiché');
+      }
+      return;
+    }
+    
+    const paymentStatus = (order as any)?.payment_status;
+    if (paymentStatus === 'paid') {
+      if (__DEV__) {
+        console.log('⏭️ PaymentBottomSheet: déjà payé');
+      }
+      return;
+    }
+    
+    // Pour les paiements en espèces ou différé, pas besoin d'afficher le PaymentBottomSheet
+    if (selectedPaymentMethodType === 'cash' || selectedPaymentMethodType === 'deferred') {
+      if (__DEV__) {
+        console.log('✅ Paiement en espèces ou différé - pas de paiement électronique requis');
+      }
+      return;
+    }
+    
+    // Afficher le PaymentBottomSheet pour Orange Money, Wave, ou si aucune méthode n'est sélectionnée
+    if (selectedPaymentMethodType === 'orange_money' || selectedPaymentMethodType === 'wave' || !selectedPaymentMethodType) {
+      if (__DEV__) {
+        console.log('✅ Affichage du PaymentBottomSheet dans 500ms');
+      }
+      const timer = setTimeout(() => {
+        setShowPaymentSheet(true);
+        if (__DEV__) {
+          console.log('✅ PaymentBottomSheet affiché');
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+    
+    if (__DEV__) {
+      console.log('⏭️ PaymentBottomSheet: aucune condition remplie pour afficher');
+    }
+  }, [currentOrder?.status, pendingOrder?.status, showPaymentSheet, currentOrder, pendingOrder, selectedPaymentMethodType, paymentPayerType]);
 
   useEffect(() => {
     if (pendingOrder && !isSearchingDriver && !currentOrder) {
@@ -481,6 +542,13 @@ export default function MapPage() {
     }
     
     useOrderStore.getState().clear();
+    
+    // Réinitialiser les états de paiement
+    setShowPaymentSheet(false);
+    setPaymentPayerType('client');
+    setSelectedPaymentMethodType(null);
+    setRecipientInfo({});
+    setPaymentPartialInfo({});
     
     const ratingStore = useRatingStore.getState();
     if (ratingStore.showRatingBottomSheet) {
@@ -906,39 +974,42 @@ export default function MapPage() {
         recipientIsRegistered: recipientInfo.isRegistered,
       };
       
+      // Définir les états de paiement AVANT de créer la commande pour qu'ils soient disponibles quand le useEffect se déclenche
+      let recipientIsRegistered = false;
+      let recipientUserId: string | undefined;
+      
+      if (payerType === 'recipient' && dropoffDetails.phone) {
+        try {
+          recipientIsRegistered = false;
+        } catch (error) {
+          console.error('Erreur vérification destinataire:', error);
+          recipientIsRegistered = false;
+        }
+      }
+      
+      // Réinitialiser le PaymentBottomSheet et définir les nouveaux états AVANT la création
+      setShowPaymentSheet(false);
+      setPaymentPayerType(payerType || 'client');
+      setSelectedPaymentMethodType(paymentMethodType || null);
+      setRecipientInfo({
+        phone: dropoffDetails.phone,
+        userId: recipientUserId,
+        isRegistered: recipientIsRegistered,
+      });
+      
+      if (isPartialPayment && partialAmount) {
+        setPaymentPartialInfo({
+          isPartial: true,
+          partialAmount: partialAmount,
+        });
+      } else {
+        setPaymentPartialInfo({});
+      }
+      
       const success = await userOrderSocketService.createOrder(orderData);
       if (success) {
         collapseOrderDetailsSheet();
         collapseDeliveryMethodSheet();
-        
-        let recipientIsRegistered = false;
-        let recipientUserId: string | undefined;
-        
-        if (payerType === 'recipient' && dropoffDetails.phone) {
-          try {
-            recipientIsRegistered = false;
-          } catch (error) {
-            console.error('Erreur vérification destinataire:', error);
-            recipientIsRegistered = false;
-          }
-        }
-        
-        setPaymentPayerType(payerType || 'client');
-        setSelectedPaymentMethodType(paymentMethodType || null);
-        setRecipientInfo({
-          phone: dropoffDetails.phone,
-          userId: recipientUserId,
-          isRegistered: recipientIsRegistered,
-        });
-        
-        if (isPartialPayment && partialAmount) {
-          setPaymentPartialInfo({
-            isPartial: true,
-            partialAmount: partialAmount,
-          });
-        } else {
-          setPaymentPartialInfo({});
-        }
         
         setTimeout(() => {
           try {
@@ -1219,7 +1290,8 @@ export default function MapPage() {
               );
             })()}
 
-            {showPaymentSheet && pendingOrder && (() => {
+            {/* Afficher le PaymentBottomSheet uniquement si c'est le client qui paie */}
+            {showPaymentSheet && pendingOrder && paymentPayerType === 'client' && (() => {
               const { price } = getPriceAndTime();
               const distance = pickupCoords && dropoffCoords 
                 ? getDistanceInKm(pickupCoords, dropoffCoords)

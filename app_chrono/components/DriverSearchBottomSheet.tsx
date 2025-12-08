@@ -184,17 +184,6 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
         </View>
 
         <View style={styles.driverActions}>
-          {/* Bouton Annuler pour les commandes en pending */}
-          {onCancel && (
-            <TouchableOpacity 
-              style={[styles.actionButtonSecondary, styles.cancelButtonSecondary]} 
-              onPress={onCancel}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close-circle" size={20} color="#EF4444" />
-              <Text style={[styles.actionButtonSecondaryText, styles.cancelButtonText]}>Annuler</Text>
-            </TouchableOpacity>
-          )}
           <TouchableOpacity 
             style={styles.actionButtonSecondary} 
             onPress={onDetails}
@@ -434,21 +423,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    marginBottom: 8,
   },
   actionButtonSecondaryText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#8B5CF6',
     marginLeft: 8,
-  },
-  cancelButtonSecondary: {
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-  },
-  cancelButtonText: {
-    color: '#EF4444',
   },
 });
 
