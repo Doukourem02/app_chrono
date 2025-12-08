@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
-import { getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminRecentActivities, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminUsers, getAdminGlobalSearch, getAdminFinancialStats, getAdminTransactions, getAdminReportDeliveries, getAdminReportRevenues, getAdminReportClients, getAdminReportDrivers, getAdminReportPayments, getAdminDriverDetails, updateAdminDriverStatus, getAdminClientDetails, getAdminClientStatistics, getAdminRatings, deleteAdminRating, getAdminPromoCodes, createAdminPromoCode, getAdminDisputes, updateAdminDispute, getAdminAdminDetails, createAdminOrder, cancelAdminOrder } from '../controllers/adminController.js';
+import { cancelAdminOrder, createAdminOrder, createAdminPromoCode, deleteAdminRating, getAdminAdminDetails, getAdminClientDetails, getAdminClientStatistics, getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminDisputes, getAdminDriverDetails, getAdminFinancialStats, getAdminGlobalSearch, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminPromoCodes, getAdminRatings, getAdminRecentActivities, getAdminReportClients, getAdminReportDeliveries, getAdminReportDrivers, getAdminReportPayments, getAdminReportRevenues, getAdminTransactions, getAdminUsers, updateAdminDispute, updateAdminDriverStatus } from '../controllers/adminController.js';
+import { createConversation, getConversationById, getMessages, getUnreadCount, markMessagesAsRead, sendMessage } from '../controllers/messageController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
-import { getConversations, getConversationById, createConversation, getMessages, sendMessage, markMessagesAsRead, getUnreadCount } from '../controllers/messageController.js';
 
 const router: Router = express.Router();
 
@@ -33,9 +33,6 @@ router.get('/promo-codes', verifyAdminSupabase, getAdminPromoCodes);
 router.post('/promo-codes', verifyAdminSupabase, createAdminPromoCode);
 router.get('/disputes', verifyAdminSupabase, getAdminDisputes);
 router.put('/disputes/:disputeId', verifyAdminSupabase, updateAdminDispute);
-
-// Routes messages pour l'admin (utilisent verifyAdminSupabase au lieu de verifyJWT)
-router.get('/messages/conversations', verifyAdminSupabase, getConversations);
 router.get('/messages/conversations/:conversationId', verifyAdminSupabase, getConversationById);
 router.post('/messages/conversations', verifyAdminSupabase, createConversation);
 router.get('/messages/conversations/:conversationId/messages', verifyAdminSupabase, getMessages);

@@ -99,7 +99,7 @@ export default function PaymentMethodSelector({
           const isSelected = selectedMethod === method.type;
           const hasMethod = paymentMethods.some((m) => m.method_type === method.type);
           const isDeferred = method.type === 'deferred';
-          const isDeferredDisabled = isDeferred && deferredInfo && !deferredInfo.canUse;
+          const isDeferredDisabled = !!(isDeferred && deferredInfo && !deferredInfo.canUse);
           const isDisabled = (!hasMethod && method.type !== 'cash' && method.type !== 'deferred') || isDeferredDisabled;
 
           return (

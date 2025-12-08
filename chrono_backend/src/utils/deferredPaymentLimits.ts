@@ -330,7 +330,7 @@ export async function calculateMonthlyCreditAvailable(
   }
 
   // Appliquer les restrictions selon le nombre de retards
-  let reducedCredit = baseCredit;
+  let reducedCredit: number = baseCredit;
   let reason: string | undefined;
 
   if (latePayments.totalCount >= 3) {
@@ -547,6 +547,9 @@ export async function getDeferredPaymentInfo(
       usagesRemaining: DEFERRED_PAYMENT_LIMITS.MAX_USAGES_PER_MONTH,
       canUse: false,
       reason: 'Erreur lors de la récupération des informations',
+      latePaymentsCount: 0,
+      creditReduced: false,
+      blocked: false,
     };
   }
 }

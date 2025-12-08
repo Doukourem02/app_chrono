@@ -53,7 +53,6 @@ export default function PaymentBottomSheet({
     initialPartialAmount ? initialPartialAmount.toString() : ''
   );
   const [deferredInfo, setDeferredInfo] = useState<DeferredPaymentInfo | null>(null);
-  const [loadingDeferredInfo, setLoadingDeferredInfo] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -75,7 +74,6 @@ export default function PaymentBottomSheet({
   }, [visible, loadPaymentMethods, selectedPaymentMethod, paymentMethods, preselectedPaymentMethod, payerType]);
 
   const loadDeferredInfo = async () => {
-    setLoadingDeferredInfo(true);
     try {
       const result = await paymentApi.getDeferredPaymentLimits();
       if (result.success && result.data) {
@@ -83,8 +81,6 @@ export default function PaymentBottomSheet({
       }
     } catch (error) {
       console.error('Erreur chargement limites paiement différé:', error);
-    } finally {
-      setLoadingDeferredInfo(false);
     }
   };
 

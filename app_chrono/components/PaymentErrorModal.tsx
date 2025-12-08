@@ -68,6 +68,7 @@ export const PaymentErrorModal: React.FC<PaymentErrorModalProps> = ({
       modalTranslateY.value = withTiming(50, { duration: 200 });
       iconScale.value = withTiming(0, { duration: 200 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const overlayStyle = useAnimatedStyle(() => ({
@@ -229,7 +230,7 @@ export const PaymentErrorModal: React.FC<PaymentErrorModalProps> = ({
                   onPress={onClose}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.primaryButtonText}>J'ai compris</Text>
+                  <Text style={styles.primaryButtonText}>J&apos;ai compris</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>

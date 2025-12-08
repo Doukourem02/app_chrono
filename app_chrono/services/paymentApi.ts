@@ -466,7 +466,7 @@ class PaymentApiService {
    */
   async getDeferredDebts(): Promise<{
     success: boolean;
-    data?: Array<{
+    data?: {
       id: string;
       orderId: string;
       amount: number;
@@ -479,7 +479,7 @@ class PaymentApiService {
       deadline: string;
       isOverdue: boolean;
       daysUntilDeadline: number;
-    }>;
+    }[];
     message?: string;
   }> {
     try {
