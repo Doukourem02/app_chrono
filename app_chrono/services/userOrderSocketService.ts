@@ -1,6 +1,7 @@
 import { Alert } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import { useOrderStore } from '../store/useOrderStore';
+import { usePaymentErrorStore } from '../store/usePaymentErrorStore';
 import { useRatingStore } from '../store/useRatingStore';
 import { logger } from '../utils/logger';
 import { createOrderRecord } from './orderApi';
@@ -476,8 +477,35 @@ class UserOrderSocketService {
     });
 
     // ❌ Erreur commande
-    this.socket.on('order-error', (data) => {
-      logger.error('❌ Erreur commande:', 'userOrderSocketService', data);
+    this.socket.on('order-error', (data: { success?: boolean; message?: string; code?: string }) => {
+      // Pour les erreurs de paiement différé, utiliser warn() au lieu de error()
+      // car ce sont des erreurs métier attendues et gérées par le modal personnalisé
+      // Cela évite d'afficher l'écran d'erreur de la console React Native
+      const isDeferredPaymentError = data.code === 'DEFERRED_PAYMENT_LIMIT_EXCEEDED' ||
+        data.code === 'MONTHLY_LIMIT_EXCEEDED' ||
+        data.code === 'ANNUAL_LIMIT_EXCEEDED' ||
+        data.code === 'MAX_MONTHLY_USAGES_EXCEEDED' ||
+        data.code === 'COOLDOWN_ACTIVE' ||
+        data.code === 'DEFERRED_PAYMENT_BLOCKED';
+
+      if (isDeferredPaymentError) {
+        logger.warn('⚠️ Erreur paiement différé (gérée par modal):', 'userOrderSocketService', data);
+      } else {
+        logger.error('❌ Erreur commande:', 'userOrderSocketService', data);
+      }
+
+      // Afficher le modal d'erreur avec le message d'erreur
+      const errorMessage = data.message || 'Une erreur est survenue lors de la création de la commande';
+
+      // Titre différent selon le type d'erreur
+      let title = 'Erreur de commande';
+      if (isDeferredPaymentError) {
+        title = 'Paiement différé non disponible';
+      }
+
+      // Afficher le modal d'erreur via le store
+      usePaymentErrorStore.getState().showError(title, errorMessage, data.code || undefined);
+
       // Nettoyer complètement l'état pour revenir au formulaire initial
       try {
         useOrderStore.getState().clear();

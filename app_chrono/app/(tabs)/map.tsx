@@ -17,11 +17,13 @@ import { OrderDetailsSheet } from '../../components/OrderDetailsSheet';
 import RatingBottomSheet from '../../components/RatingBottomSheet';
 import PaymentBottomSheet from '../../components/PaymentBottomSheet';
 import { DriverSearchBottomSheet } from '../../components/DriverSearchBottomSheet';
+import { PaymentErrorModal } from '../../components/PaymentErrorModal';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { useOrderStore } from '../../store/useOrderStore';
 import type { OrderStatus } from '../../store/useOrderStore';
 import { useRatingStore } from '../../store/useRatingStore';
 import { usePaymentStore } from '../../store/usePaymentStore';
+import { usePaymentErrorStore } from '../../store/usePaymentErrorStore';
 import { logger } from '../../utils/logger';
 import { calculatePrice, estimateDurationMinutes, formatDurationLabel, getDistanceInKm } from '../../services/orderApi';
 import { locationService } from '../../services/locationService';
@@ -42,6 +44,12 @@ export default function MapPage() {
   const { setSelectedMethod } = useShipmentStore();
   const { user } = useAuthStore();
   const { loadPaymentMethods } = usePaymentStore();
+  // Utiliser des sélecteurs séparés pour éviter les boucles infinies
+  const paymentErrorVisible = usePaymentErrorStore((s) => s.visible);
+  const paymentErrorTitle = usePaymentErrorStore((s) => s.title);
+  const paymentErrorMessage = usePaymentErrorStore((s) => s.message);
+  const paymentErrorCode = usePaymentErrorStore((s) => s.errorCode);
+  const hidePaymentError = usePaymentErrorStore((s) => s.hideError);
   
   const mapRef = useRef<MapView | null>(null);
   const hasInitializedRef = useRef<boolean>(false);
@@ -334,7 +342,18 @@ export default function MapPage() {
     }
     return s.activeOrders.find(o => o.status !== 'pending') || s.activeOrders[0] || null;
   });
-  const pendingOrder = useOrderStore((s) => s.activeOrders.find(o => o.status === PENDING_STATUS) || null);
+  // Récupérer la commande en attente la plus récente (pour l'affichage)
+  const pendingOrder = useOrderStore((s) => {
+    const pending = s.activeOrders.filter(o => o.status === PENDING_STATUS);
+    if (pending.length === 0) return null;
+    // Trier par date de création (la plus récente en premier)
+    pending.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    return pending[0];
+  });
 
   const radarPulseCoords = useMemo(() => {
     if (pickupCoords) {
@@ -437,19 +456,28 @@ export default function MapPage() {
   }, [currentOrder?.status, pendingOrder?.status, showPaymentSheet, currentOrder, pendingOrder, selectedPaymentMethodType, paymentPayerType]);
 
   useEffect(() => {
+    // Ne nettoyer les routes/coordonnées que si c'est la commande sélectionnée ou s'il n'y a qu'une seule commande
     if (pendingOrder && !isSearchingDriver && !currentOrder) {
       const orderAge = pendingOrder.createdAt
         ? new Date().getTime() - new Date(pendingOrder.createdAt).getTime()
         : Infinity;
 
-      if (orderAge > 30000) {
+      // Ne nettoyer que si c'est la commande sélectionnée ou la seule commande en attente
+      const isSelectedOrder = selectedOrderId === pendingOrder.id || selectedOrderId === null;
+      
+      if (orderAge > 30000 && isSelectedOrder) {
         logger.info('🧹 Nettoyage commande bloquée en attente', 'map.tsx', { orderId: pendingOrder.id, orderAge });
-        useOrderStore.getState().removeOrder(pendingOrder.id);
-        clearRoute();
-        setPickupCoords(null);
-        setDropoffCoords(null);
-        setPickupLocation('');
-        setDeliveryLocation('');
+        const store = useOrderStore.getState();
+        const remainingOrdersCount = store.activeOrders.length;
+        store.removeOrder(pendingOrder.id);
+        // Ne nettoyer les routes/coordonnées que si c'était la seule commande ou la commande sélectionnée
+        if (remainingOrdersCount <= 1 || selectedOrderId === pendingOrder.id) {
+          clearRoute();
+          setPickupCoords(null);
+          setDropoffCoords(null);
+          setPickupLocation('');
+          setDeliveryLocation('');
+        }
       }
     }
 
@@ -470,32 +498,61 @@ export default function MapPage() {
     }
   }, [pendingOrder, isSearchingDriver, currentOrder, selectedOrderId, orderDriverCoordsMap, clearRoute, setPickupCoords, setDropoffCoords, setPickupLocation, setDeliveryLocation]);
 
+  // Gérer la recherche de livreur pour plusieurs commandes en attente
+  // Utiliser un sélecteur pour obtenir le nombre de commandes en attente
+  const pendingOrdersCount = useOrderStore((s) => 
+    s.activeOrders.filter(o => o.status === PENDING_STATUS).length
+  );
+  
   useEffect(() => {
-    if (!pendingOrder && isSearchingDriver) {
-      stopDriverSearch();
-      logger.info('🛑 Recherche de chauffeur arrêtée (aucun chauffeur disponible)', 'map.tsx');
-    }
-  }, [pendingOrder, isSearchingDriver, stopDriverSearch]);
-
-  useEffect(() => {
-    if (pendingOrder?.status === PENDING_STATUS) {
+    const store = useOrderStore.getState();
+    const allPendingOrders = store.activeOrders.filter(o => o.status === PENDING_STATUS);
+    
+    // S'il y a au moins une commande en attente, démarrer/continuer la recherche
+    if (allPendingOrders.length > 0) {
       if (!isSearchingDriver) {
-        logger.info('📡 Démarrage animation radar (commande en attente)', 'map.tsx', {
-          orderId: pendingOrder.id,
+        logger.info('📡 Démarrage animation radar (commande(s) en attente)', 'map.tsx', {
+          pendingCount: allPendingOrders.length,
+          orderIds: allPendingOrders.map(o => o.id),
         });
         startDriverSearch();
         // Réduire automatiquement le bottom sheet "Envoyer un colis" quand la recherche commence
         collapseBottomSheet();
         userManuallyClosedRef.current = false;
       }
-    } else if (isSearchingDriver && pendingOrder && pendingOrder.status !== PENDING_STATUS) {
-      logger.info('📡 Arrêt animation radar (commande plus en attente)', 'map.tsx', {
-        orderId: pendingOrder.id,
-        status: pendingOrder.status,
-      });
-      stopDriverSearch();
+    } else {
+      // Aucune commande en attente, arrêter la recherche
+      if (isSearchingDriver) {
+        stopDriverSearch();
+        logger.info('🛑 Recherche de chauffeur arrêtée (aucune commande en attente)', 'map.tsx');
+      }
     }
-  }, [pendingOrder?.id, pendingOrder?.status, isSearchingDriver, startDriverSearch, stopDriverSearch, pendingOrder, collapseBottomSheet]);
+  }, [isSearchingDriver, startDriverSearch, stopDriverSearch, collapseBottomSheet, pendingOrdersCount]);
+
+  // Arrêter la recherche uniquement si TOUTES les commandes en attente sont acceptées
+  // Ne pas arrêter si d'autres commandes sont encore en attente
+  useEffect(() => {
+    const store = useOrderStore.getState();
+    const allPendingOrders = store.activeOrders.filter(o => o.status === PENDING_STATUS);
+    
+    // Si une commande est acceptée mais qu'il reste des commandes en attente, continuer la recherche
+    if (currentOrder?.status === 'accepted' && currentOrder?.driver && isSearchingDriver) {
+      if (allPendingOrders.length === 0) {
+        // Aucune autre commande en attente, arrêter la recherche
+        stopDriverSearch();
+        logger.info('🛑 Recherche de chauffeur arrêtée (commande acceptée, aucune autre en attente)', 'map.tsx', {
+          orderId: currentOrder.id,
+          driverId: currentOrder.driver?.id,
+        });
+      } else {
+        // Il reste des commandes en attente, continuer la recherche
+        logger.info('📡 Recherche de chauffeur continue (d\'autres commandes en attente)', 'map.tsx', {
+          acceptedOrderId: currentOrder.id,
+          remainingPendingCount: allPendingOrders.length,
+        });
+      }
+    }
+  }, [currentOrder?.status, currentOrder?.driver, isSearchingDriver, stopDriverSearch, currentOrder?.id, pendingOrdersCount]);
 
   useEffect(() => {
     if (orderDriverCoords && displayedRouteCoords.length > 0) {
@@ -1050,7 +1107,8 @@ export default function MapPage() {
         }, 300);
         
       } else {
-        Alert.alert('❌ Erreur', 'Impossible d\'envoyer la commande');
+        // L'erreur sera gérée par le socket 'order-error' qui affichera le modal d'erreur
+        // Pas besoin d'afficher un Alert ici car le modal personnalisé s'en charge
         setIsCreatingNewOrder(true);
         collapseOrderDetailsSheet();
         collapseDeliveryMethodSheet();
@@ -1338,38 +1396,69 @@ export default function MapPage() {
             })()}
 
             {/* Bottom sheet de recherche de livreur */}
-            {((isSearchingDriver || (pendingOrder && !isCreatingNewOrder)) || 
-              (currentOrder?.status === 'accepted' && currentOrder?.driver && !showPaymentSheet)) && !showPaymentSheet && (
-              <DriverSearchBottomSheet
-                isSearching={isSearchingDriver}
-                searchSeconds={searchSeconds}
-                driver={currentOrder?.status === 'accepted' && currentOrder?.driver ? currentOrder.driver : null}
-                onCancel={() => {
-                  if (pendingOrder) {
-                    _handleCancelOrder(pendingOrder.id);
-                  } else if (currentOrder) {
-                    _handleCancelOrder(currentOrder.id);
-                  }
-                }}
-                onDetails={() => {
-                  if (pendingOrder) {
-                    router.push(`/order-tracking/${pendingOrder.id}` as any);
-                  } else if (currentOrder) {
-                    router.push(`/order-tracking/${currentOrder.id}` as any);
-                  }
-                }}
-                onBack={async () => {
-                  // Nettoyer l'état et afficher le bottom sheet "Envoyer un colis" pour créer une nouvelle commande
-                  await cleanupOrderState();
-                  setIsCreatingNewOrder(true);
-                  userManuallyClosedRef.current = false;
-                  expandBottomSheet();
-                }}
-              />
-            )}
+            {/* Afficher si :
+                - On recherche un livreur (isSearchingDriver)
+                - OU il y a une commande en attente (pendingOrder) et on ne crée pas une nouvelle commande
+                - OU la commande sélectionnée/actuelle est acceptée avec un driver
+            */}
+            {(() => {
+              // Déterminer quelle commande afficher : priorité à la commande sélectionnée, sinon la plus récente
+              const store = useOrderStore.getState();
+              const orderToDisplay = selectedOrderId 
+                ? store.activeOrders.find(o => o.id === selectedOrderId)
+                : (currentOrder || pendingOrder);
+              
+              const shouldShowSearch = isSearchingDriver || (pendingOrder && !isCreatingNewOrder);
+              const shouldShowAccepted = orderToDisplay?.status === 'accepted' && orderToDisplay?.driver && !showPaymentSheet;
+              
+              if ((shouldShowSearch || shouldShowAccepted) && !showPaymentSheet) {
+                return (
+                  <DriverSearchBottomSheet
+                    isSearching={isSearchingDriver && orderToDisplay?.status === PENDING_STATUS}
+                    searchSeconds={searchSeconds}
+                    driver={orderToDisplay?.status === 'accepted' && orderToDisplay?.driver ? orderToDisplay.driver : null}
+                    onCancel={() => {
+                      if (orderToDisplay) {
+                        _handleCancelOrder(orderToDisplay.id);
+                      }
+                    }}
+                    onDetails={() => {
+                      if (orderToDisplay) {
+                        router.push(`/order-tracking/${orderToDisplay.id}` as any);
+                      }
+                    }}
+                    onBack={async () => {
+                      // Nettoyer l'état et afficher le bottom sheet "Envoyer un colis" pour créer une nouvelle commande
+                      await cleanupOrderState();
+                      setIsCreatingNewOrder(true);
+                      userManuallyClosedRef.current = false;
+                      expandBottomSheet();
+                    }}
+                  />
+                );
+              }
+              return null;
+            })()}
           </>
         );
       })()}
+
+      {/* Modal d'erreur de paiement différé */}
+      <PaymentErrorModal
+        visible={paymentErrorVisible}
+        title={paymentErrorTitle || undefined}
+        message={paymentErrorMessage || ''}
+        errorCode={paymentErrorCode || undefined}
+        onClose={() => {
+          hidePaymentError();
+        }}
+        onAction={() => {
+          // Rediriger vers la page des dettes pour voir les détails
+          router.push('/profile/debts');
+          hidePaymentError();
+        }}
+        actionLabel="Voir mes dettes"
+      />
 
     </View>
   );

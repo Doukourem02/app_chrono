@@ -66,6 +66,8 @@ export interface DeferredPaymentInfo {
 
 /**
  * Calcule le crédit annuel utilisé pour un utilisateur
+ * Compte TOUTES les transactions différées créées dans l'année, peu importe leur statut actuel
+ * (même si elles ont été remboursées, elles comptent dans la limite annuelle)
  */
 export async function calculateAnnualCreditUsed(
   userId: string,
@@ -81,7 +83,6 @@ export async function calculateAnnualCreditUsed(
        WHERE user_id = $1
          AND payment_method_type = 'deferred'
          AND payer_type = 'client'
-         AND status IN ('delayed', 'pending')
          AND created_at >= $2
          AND created_at <= $3`,
       [userId, startOfYear, endOfYear]
@@ -100,6 +101,9 @@ export async function calculateAnnualCreditUsed(
 
 /**
  * Calcule le crédit mensuel utilisé pour un utilisateur dans le mois en cours
+ * Compte TOUTES les transactions différées créées dans le mois, peu importe leur statut actuel
+ * (même si elles ont été remboursées, elles comptent dans la limite mensuelle)
+ * Cela garantit qu'un client ne peut utiliser que 5,000 FCFA par mois maximum, même s'il rembourse
  */
 export async function calculateMonthlyCreditUsed(
   userId: string,
@@ -122,7 +126,6 @@ export async function calculateMonthlyCreditUsed(
        WHERE user_id = $1
          AND payment_method_type = 'deferred'
          AND payer_type = 'client'
-         AND status IN ('delayed', 'pending')
          AND created_at >= $2
          AND created_at <= $3`,
       [userId, startOfMonth, endOfMonth]
@@ -141,6 +144,8 @@ export async function calculateMonthlyCreditUsed(
 
 /**
  * Récupère le nombre d'utilisations de paiement différé dans le mois en cours
+ * Compte TOUTES les transactions différées créées dans le mois, peu importe leur statut actuel
+ * (même si elles ont été remboursées, elles comptent dans la limite de 2 utilisations par mois)
  */
 export async function getDeferredPaymentUsageCount(
   userId: string,
@@ -163,7 +168,6 @@ export async function getDeferredPaymentUsageCount(
        WHERE user_id = $1
          AND payment_method_type = 'deferred'
          AND payer_type = 'client'
-         AND status IN ('delayed', 'pending')
          AND created_at >= $2
          AND created_at <= $3`,
       [userId, startOfMonth, endOfMonth]
@@ -181,6 +185,8 @@ export async function getDeferredPaymentUsageCount(
 
 /**
  * Récupère la date du dernier paiement différé pour vérifier la période de refroidissement
+ * Compte TOUTES les transactions différées, peu importe leur statut actuel
+ * (même si elles ont été remboursées, la période de refroidissement s'applique)
  */
 export async function getLastDeferredPaymentDate(
   userId: string
@@ -191,8 +197,7 @@ export async function getLastDeferredPaymentDate(
        FROM transactions
        WHERE user_id = $1
          AND payment_method_type = 'deferred'
-         AND payer_type = 'client'
-         AND status IN ('delayed', 'pending')`,
+         AND payer_type = 'client'`,
       [userId]
     );
 
@@ -386,7 +391,7 @@ export async function canUseDeferredPayment(
     if (amount > monthlyRemaining) {
       return {
         canUse: false,
-        reason: `Crédit mensuel insuffisant. Disponible : ${monthlyRemaining.toLocaleString()} FCFA, Requis : ${amount.toLocaleString()} FCFA`,
+        reason: `Vous avez atteint votre quota de paiement différé.`,
       };
     }
 
@@ -395,7 +400,7 @@ export async function canUseDeferredPayment(
     if (monthlyUsages >= DEFERRED_PAYMENT_LIMITS.MAX_USAGES_PER_MONTH) {
       return {
         canUse: false,
-        reason: `Limite d'utilisations mensuelles atteinte (${DEFERRED_PAYMENT_LIMITS.MAX_USAGES_PER_MONTH} utilisations maximum)`,
+        reason: `Vous avez atteint votre quota de paiement différé.`,
       };
     }
 
@@ -422,7 +427,7 @@ export async function canUseDeferredPayment(
     if (amount > annualRemaining) {
       return {
         canUse: false,
-        reason: `Crédit annuel insuffisant. Disponible : ${annualRemaining.toLocaleString()} FCFA, Requis : ${amount.toLocaleString()} FCFA`,
+        reason: `Vous avez atteint votre quota annuel de paiement différé. Vous pourrez utiliser cette option à nouveau l'année prochaine.`,
       };
     }
 

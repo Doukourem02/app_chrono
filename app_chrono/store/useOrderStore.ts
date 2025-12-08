@@ -70,6 +70,7 @@ interface OrderStore {
   
   getCurrentOrder: () => OrderRequest | null;
   getPendingOrder: () => OrderRequest | null;
+  getAllPendingOrders: () => OrderRequest[];
   getActiveOrdersCount: () => number;
 }
 
@@ -84,9 +85,12 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       return state;
     }
     const newOrders = [...state.activeOrders, order];
+    // Ne pas changer selectedOrderId automatiquement si l'utilisateur suit déjà une commande
+    // Seulement si aucune commande n'est sélectionnée
+    const newSelectedId = state.selectedOrderId || order.id;
     return {
       activeOrders: newOrders,
-      selectedOrderId: state.selectedOrderId || order.id,
+      selectedOrderId: newSelectedId,
     };
   }),
 
@@ -279,7 +283,21 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
 
   getPendingOrder: () => {
     const state = get();
-    return state.activeOrders.find(o => o.status === 'pending') || null;
+    // Retourner la commande en attente la plus récente
+    const pendingOrders = state.activeOrders.filter(o => o.status === 'pending');
+    if (pendingOrders.length === 0) return null;
+    // Trier par date de création (la plus récente en premier)
+    pendingOrders.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    return pendingOrders[0];
+  },
+
+  getAllPendingOrders: () => {
+    const state = get();
+    return state.activeOrders.filter(o => o.status === 'pending');
   },
 
   getActiveOrdersCount: () => {

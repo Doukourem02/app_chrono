@@ -3483,8 +3483,8 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
     const dbOrder = dbResult.rows[0];
     const currentStatus = dbOrder.status;
 
-    // Permettre l'annulation pour les statuts pending, accepted, enroute
-    const cancellableStatuses = ['pending', 'accepted', 'enroute'];
+    // Permettre l'annulation pour les statuts pending, accepted, enroute, picked_up
+    const cancellableStatuses = ['pending', 'accepted', 'enroute', 'picked_up'];
     if (!cancellableStatuses.includes(currentStatus)) {
       res.status(400).json({
         success: false,
