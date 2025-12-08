@@ -1096,7 +1096,8 @@ export default function MapPage() {
       />
 
       {/* Bouton retour flottant pour la recherche de livreur ou driver accepté - au-dessus du bottom sheet */}
-      {(isSearchingDriver || (currentOrder?.status === 'accepted' && currentOrder?.driver)) && (
+      {/* Ne pas afficher le bouton retour si on est en train de créer une nouvelle commande */}
+      {(isSearchingDriver || (currentOrder?.status === 'accepted' && currentOrder?.driver)) && !isCreatingNewOrder && (
         <TouchableOpacity 
           style={styles.driverSearchBackButton}
           onPress={async () => {
@@ -1143,7 +1144,15 @@ export default function MapPage() {
 
         return (
           <>
-            {!deliveryMethodIsExpanded && !orderDetailsIsExpanded && isCreatingNewOrder && !isSearchingDriver && !pendingOrder && !currentOrder && (
+            {/* Afficher le DeliveryBottomSheet UNIQUEMENT quand on crée une nouvelle commande ET qu'il n'y a PAS de livreur assigné */}
+            {/* Ne pas afficher si DriverSearchBottomSheet est visible (livreur assigné ou recherche en cours) */}
+            {/* Si selectedOrderId est null, on ignore currentOrder pour permettre la création d'une nouvelle commande */}
+            {!deliveryMethodIsExpanded && 
+             !orderDetailsIsExpanded && 
+             isCreatingNewOrder && 
+             !isSearchingDriver && 
+             !pendingOrder && 
+             (selectedOrderId === null || !(currentOrder?.status === 'accepted' && currentOrder?.driver)) && (
               <DeliveryBottomSheet
                 animatedHeight={animatedHeight}
                 panResponder={panResponder}

@@ -555,6 +555,8 @@ export default function OrderTrackingPage() {
           onCancel={() => handleCancelOrder(currentOrder.id)}
           onMessage={handleOpenMessage}
           onNewOrder={() => {
+            // Nettoyer la sélection de commande pour permettre la création d'une nouvelle commande
+            useOrderStore.getState().setSelectedOrder(null);
             router.push('/(tabs)/map');
           }}
           activeOrdersCount={useOrderStore.getState().activeOrders.length}
