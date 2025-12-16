@@ -92,11 +92,29 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
 
   addOrder: (order) => set((state) => {
     const exists = state.activeOrders.some(o => o.id === order.id);
-    if (exists) return state;
+    if (exists) {
+      // Si la commande existe déjà, la mettre à jour plutôt que de la dupliquer
+      const updatedActive = state.activeOrders.map(o =>
+        o.id === order.id ? { ...o, ...order } : o
+      );
+      return {
+        activeOrders: updatedActive,
+      };
+    }
+    
     const newOrders = [...state.activeOrders, order];
+    
+    // Si aucune commande n'est sélectionnée, ou si la nouvelle commande a un statut actif prioritaire,
+    // la sélectionner automatiquement pour qu'elle s'affiche immédiatement
+    const shouldSelectNewOrder = !state.selectedOrderId || 
+      order.status === 'picked_up' || 
+      order.status === 'delivering' || 
+      order.status === 'enroute' || 
+      order.status === 'in_progress';
+    
     return {
       activeOrders: newOrders,
-      selectedOrderId: state.selectedOrderId || order.id,
+      selectedOrderId: shouldSelectNewOrder ? order.id : state.selectedOrderId,
     };
   }),
 
@@ -188,11 +206,32 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         acceptedAt: now,
       };
 
+      // Toujours sélectionner la nouvelle commande acceptée pour qu'elle s'affiche immédiatement
+      // C'est important pour que le tracking order apparaisse automatiquement
       return {
         activeOrders: [...state.activeOrders, acceptedOrder],
         pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
-        selectedOrderId: state.selectedOrderId || acceptedOrder.id,
+        selectedOrderId: acceptedOrder.id, // Sélectionner automatiquement la nouvelle commande
         orderHistory: [acceptedOrder, ...state.orderHistory],
+      };
+    }
+
+    // Si la commande n'est pas dans pendingOrders, elle pourrait venir directement du serveur
+    // Vérifier si elle existe déjà dans activeOrders
+    const existingOrder = state.activeOrders.find(o => o.id === orderId);
+    if (!existingOrder) {
+      // Si elle n'existe pas, l'ajouter directement (cas où le serveur envoie directement une commande acceptée)
+      const newAcceptedOrder = {
+        id: orderId,
+        status: 'accepted' as OrderStatus,
+        driverId,
+        acceptedAt: now,
+        createdAt: now,
+      } as OrderRequest;
+      
+      return {
+        activeOrders: [...state.activeOrders, newAcceptedOrder],
+        selectedOrderId: newAcceptedOrder.id, // Sélectionner automatiquement
       };
     }
 

@@ -5,6 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OrderRequest } from '../store/useOrderStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { QRCodeScanner } from './QRCodeScanner';
+import { QRCodeScanResult } from './QRCodeScanResult';
+import { qrCodeService, QRCodeScanResult as QRCodeScanResultType } from '../services/qrCodeService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -39,6 +42,40 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('details');
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [scanResult, setScanResult] = useState<QRCodeScanResultType['data'] | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Handler pour scanner le QR code
+  const handleScanQRCode = async (qrCodeData: string) => {
+    setIsScanning(true);
+    try {
+      const result = await qrCodeService.scanQRCode(qrCodeData, location || undefined);
+      
+      if (result.success && result.isValid && result.data) {
+        setScanResult(result.data);
+        setShowQRScanner(false);
+      } else {
+        Alert.alert(
+          'QR Code invalide',
+          result.error || 'Le QR code scanné n\'est pas valide pour cette commande',
+          [{ text: 'OK', onPress: () => setShowQRScanner(false) }]
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Erreur', error.message || 'Erreur lors du scan du QR code');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Handler pour confirmer la livraison après scan
+  const handleConfirmDelivery = () => {
+    if (scanResult) {
+      setScanResult(null);
+      onUpdateStatus('completed');
+    }
+  };
 
   // Déterminer les actions disponibles selon le statut
   // Doit être appelé avant tout return conditionnel pour respecter les règles des hooks
@@ -83,8 +120,23 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
       });
     }
 
+    // Scanner QR Code - disponible si statut est 'picked_up' ou 'delivering'
+    if (status === 'picked_up' || status === 'delivering') {
+      actions.push({
+        id: 'scan_qr',
+        label: 'Scanner QR Code',
+        icon: 'qr-code-outline',
+        color: '#6366F1',
+        onPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setShowQRScanner(true);
+        },
+      });
+    }
+
     // Étape 4: "Terminé" - disponible uniquement si statut est 'delivering'
     // Cela force le livreur à passer par l'étape "En cours de livraison" avant de terminer
+    // Note: Le scan QR code met automatiquement le statut à 'completed'
     if (status === 'delivering' || status === 'in_progress') {
       actions.push({
         id: 'completed',
@@ -383,6 +435,21 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
           </ScrollView>
         </View>
       )}
+
+      {/* Scanner QR Code */}
+      <QRCodeScanner
+        visible={showQRScanner}
+        onScan={handleScanQRCode}
+        onClose={() => setShowQRScanner(false)}
+      />
+
+      {/* Résultat du scan QR Code */}
+      <QRCodeScanResult
+        visible={!!scanResult}
+        data={scanResult}
+        onConfirm={handleConfirmDelivery}
+        onClose={() => setScanResult(null)}
+      />
     </Animated.View>
   );
 };

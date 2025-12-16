@@ -78,7 +78,26 @@ class OrderSocketService {
         const { order } = data || {};
         if (order && order.id) {
           const store = useOrderStore.getState();
-          store.acceptOrder(order.id, this.driverId || '');
+          
+          // Si la commande complète est fournie, l'ajouter directement au store
+          if (order && typeof order === 'object' && order.id) {
+            // Vérifier si elle est déjà dans pendingOrders
+            const pendingOrder = store.pendingOrders.find(o => o.id === order.id);
+            if (pendingOrder) {
+              // Utiliser acceptOrder qui gère la transition de pending vers active
+              store.acceptOrder(order.id, this.driverId || '');
+            } else {
+              // Si elle n'est pas dans pendingOrders, l'ajouter directement comme active
+              // Cela peut arriver si le serveur assigne directement une commande au driver
+              store.addOrder(order as OrderRequest);
+              // Sélectionner automatiquement cette nouvelle commande
+              store.setSelectedOrder(order.id);
+              logger.info('Commande acceptée ajoutée directement (pas dans pending)', undefined, { orderId: order.id });
+            }
+          } else {
+            // Fallback : utiliser seulement l'ID
+            store.acceptOrder(order.id, this.driverId || '');
+          }
         }
       } catch (err) {
         logger.warn('Error handling order-accepted-confirmation', undefined, err);
@@ -156,6 +175,51 @@ class OrderSocketService {
         }
       } catch (err) {
         logger.warn('Error handling resync-order-state (driver)', undefined, err);
+      }
+    });
+
+    // Mise à jour du statut de commande (canonique event)
+    this.socket.on('order:status:update', (data) => {
+      try {
+        logger.info('🔄 order:status:update reçu (driver)', undefined, data);
+        const { order, location } = data || {};
+        
+        if (!order || !order.id) {
+          logger.warn('⚠️ order:status:update reçu sans order.id', undefined, data);
+          return;
+        }
+
+        const store = useOrderStore.getState();
+        const existingOrder = store.activeOrders.find(o => o.id === order.id);
+        
+        // Si la commande n'existe pas encore dans activeOrders mais a un statut actif, l'ajouter
+        if (!existingOrder && (
+          order.status === 'accepted' || 
+          order.status === 'in_progress' || 
+          order.status === 'enroute' || 
+          order.status === 'picked_up' || 
+          order.status === 'delivering'
+        )) {
+          logger.info('📦 Commande active reçue via order:status:update, ajout au store', undefined, { orderId: order.id, status: order.status });
+          store.addOrder(order as OrderRequest);
+          // Sélectionner automatiquement cette nouvelle commande active
+          store.setSelectedOrder(order.id);
+        } else if (existingOrder) {
+          // Mettre à jour la commande existante
+          store.updateOrder(order.id, order as Partial<OrderRequest>);
+          // Si c'est une commande active et qu'aucune n'est sélectionnée, la sélectionner
+          if (!store.selectedOrderId && (
+            order.status === 'accepted' || 
+            order.status === 'in_progress' || 
+            order.status === 'enroute' || 
+            order.status === 'picked_up' || 
+            order.status === 'delivering'
+          )) {
+            store.setSelectedOrder(order.id);
+          }
+        }
+      } catch (err) {
+        logger.warn('Error handling order:status:update', undefined, err);
       }
     });
 

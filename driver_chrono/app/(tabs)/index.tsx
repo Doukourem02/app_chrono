@@ -99,11 +99,19 @@ export default function Index() {
     });
   }, [activeOrders, location, calculateDistanceToPickup]);
 
-  const currentOrder = useOrderStore((s) => {
-    if (s.selectedOrderId) {
-      return s.activeOrders.find(o => o.id === s.selectedOrderId) || null;
+  // Sélection automatique de la commande la plus prioritaire si aucune n'est sélectionnée
+  useEffect(() => {
+    const store = useOrderStore.getState();
+    
+    // Si une commande est déjà sélectionnée et existe toujours, ne rien faire
+    if (store.selectedOrderId) {
+      const selectedOrderExists = store.activeOrders.some(o => o.id === store.selectedOrderId);
+      if (selectedOrderExists) {
+        return;
+      }
     }
     
+    // Sinon, sélectionner automatiquement la commande la plus prioritaire
     if (location && sortedActiveOrdersByDistance.length > 0) {
       const inProgressOrder = sortedActiveOrdersByDistance.find(o => 
         o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
@@ -111,30 +119,33 @@ export default function Index() {
       
       const orderToSelect = inProgressOrder || sortedActiveOrdersByDistance[0];
       if (orderToSelect) {
-        setTimeout(() => {
-          s.setSelectedOrder(orderToSelect.id);
-        }, 100);
-        return orderToSelect;
+        store.setSelectedOrder(orderToSelect.id);
+        return;
       }
     }
     
-    const priorityOrder = s.activeOrders.find(o => 
+    const priorityOrder = store.activeOrders.find(o => 
       o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
     );
     if (priorityOrder) {
-      setTimeout(() => {
-        s.setSelectedOrder(priorityOrder.id);
-      }, 100);
-      return priorityOrder;
+      store.setSelectedOrder(priorityOrder.id);
+      return;
     }
-    const firstOrder = s.activeOrders[0];
+    
+    const firstOrder = store.activeOrders[0];
     if (firstOrder) {
-      setTimeout(() => {
-        s.setSelectedOrder(firstOrder.id);
-      }, 100);
-      return firstOrder;
+      store.setSelectedOrder(firstOrder.id);
     }
-    return null;
+  }, [activeOrders, sortedActiveOrdersByDistance, location]);
+
+  const currentOrder = useOrderStore((s) => {
+    if (s.selectedOrderId) {
+      return s.activeOrders.find(o => o.id === s.selectedOrderId) || null;
+    }
+    
+    // Fallback : retourner la première commande active si aucune n'est sélectionnée
+    // (la sélection automatique sera gérée par le useEffect ci-dessus)
+    return s.activeOrders[0] || null;
   });
   
   // Bottom sheet pour les détails de la commande (remplace RecipientDetailsSheet)

@@ -3,6 +3,8 @@ import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet} fro
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userApiService } from "../services/userApiService";
+import { QRCodeDisplay } from "./QRCodeDisplay";
+import { qrCodeService } from "../services/qrCodeService";
 
 interface TrackingBottomSheetProps {
   currentOrder: any;
@@ -31,6 +33,9 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   
   const [orderRating, setOrderRating] = useState<{ rating: number; comment: string | null } | null>(null);
   const [isLoadingRating, setIsLoadingRating] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState<{ qrCodeImage: string; qrCodeData?: { expiresAt: string; orderNumber: string } } | null>(null);
+  const [isLoadingQRCode, setIsLoadingQRCode] = useState(false);
 
   const loadOrderRating = useCallback(async () => {
     if (!currentOrder?.id) {
@@ -230,6 +235,12 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                 >
                   <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
                 </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.iconCircle}
+                  onPress={() => setShowQRCode(true)}
+                >
+                  <Ionicons name="qr-code-outline" size={20} color="#fff" />
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.iconCircle}>
                   <Ionicons name="call-outline" size={20} color="#fff" />
                 </TouchableOpacity>
@@ -367,6 +378,12 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
               >
                 <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
               </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => setShowQRCode(true)}
+              >
+                <Ionicons name="qr-code-outline" size={20} color="#fff" />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton}>
                 <Ionicons name="call-outline" size={20} color="#fff" />
               </TouchableOpacity>
@@ -386,6 +403,18 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
           )}
         </View>
       )}
+
+      {/* QR Code Display */}
+      <QRCodeDisplay
+        visible={showQRCode}
+        qrCodeImage={qrCodeData?.qrCodeImage || null}
+        orderNumber={qrCodeData?.qrCodeData?.orderNumber}
+        expiresAt={qrCodeData?.qrCodeData?.expiresAt}
+        onClose={() => {
+          setShowQRCode(false);
+          setQrCodeData(null); // Réinitialiser pour recharger au prochain affichage
+        }}
+      />
     </Animated.View>
   );
 };

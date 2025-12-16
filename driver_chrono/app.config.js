@@ -39,6 +39,7 @@ module.exports = {
     },
     plugins: [
       "expo-router",
+      "expo-barcode-scanner",
       [
         "expo-splash-screen",
         {

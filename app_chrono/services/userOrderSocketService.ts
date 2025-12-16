@@ -13,19 +13,27 @@ class UserOrderSocketService {
   private userId: string | null = null;
   private isConnected = false;
   private retryCount: number = 0;
+  private isCreatingOrder = false; // Protection contre les appels multiples
+  private listenersSetup = false; // Flag pour éviter les listeners multiples
 
   connect(userId: string) {
     // Si le socket est déjà connecté avec le même userId, ne rien faire
-    if (this.socket && this.isConnected && this.socket.connected && this.userId === userId) {
+    if (this.socket && this.isConnected && this.socket.connected && this.userId === userId && this.listenersSetup) {
+      logger.debug('🔌 Socket déjà connecté avec le même userId, ignoré', 'userOrderSocketService');
       return;
     }
 
     // Nettoyer l'ancien socket s'il existe
     if (this.socket) {
       logger.info('🔄 Nettoyage de l\'ancien socket', 'userOrderSocketService');
-      this.socket.removeAllListeners();
-      this.socket.disconnect();
+      try {
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch (err) {
+        logger.warn('Erreur lors du nettoyage du socket', 'userOrderSocketService', err);
+      }
       this.socket = null;
+      this.listenersSetup = false;
     }
 
     this.userId = userId;
@@ -43,6 +51,16 @@ class UserOrderSocketService {
       upgrade: true,
       autoConnect: true,
     });
+
+    // S'assurer que les listeners ne sont ajoutés qu'une seule fois
+    if (!this.listenersSetup) {
+      this.setupSocketListeners(userId);
+      this.listenersSetup = true;
+    }
+  }
+
+  private setupSocketListeners(userId: string) {
+    if (!this.socket) return;
 
     this.socket.on('connect', () => {
       logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
@@ -513,6 +531,8 @@ class UserOrderSocketService {
       // Nettoyer complètement l'état pour revenir au formulaire initial
       try {
         useOrderStore.getState().clear();
+        // Réinitialiser le flag pour permettre une nouvelle tentative
+        this.isCreatingOrder = false;
       } catch { }
     });
 
@@ -596,6 +616,25 @@ class UserOrderSocketService {
     recipientIsRegistered?: boolean;
   }) {
     return new Promise<boolean>(async (resolve) => {
+      // Protection contre les appels multiples simultanés
+      if (this.isCreatingOrder) {
+        logger.warn('⚠️ Tentative de création de commande alors qu\'une création est déjà en cours', 'userOrderSocketService');
+        resolve(false);
+        return;
+      }
+
+      // Vérifier que l'utilisateur est connecté avant de créer la commande
+      if (!this.userId) {
+        logger.warn('⚠️ Tentative de création de commande sans userId', 'userOrderSocketService');
+        Alert.alert(
+          'Erreur',
+          'Vous devez être connecté pour créer une commande. Veuillez vous connecter.',
+          [{ text: 'OK' }]
+        );
+        resolve(false);
+        return;
+      }
+
       // S'assurer que le socket est connecté avant de créer la commande
       const connected = await this.ensureConnected();
       if (!connected) {
@@ -608,6 +647,15 @@ class UserOrderSocketService {
         return;
       }
 
+      // Marquer qu'une création est en cours
+      this.isCreatingOrder = true;
+
+      // Helper pour réinitialiser le flag et résoudre la promesse
+      const finishOrderCreation = (success: boolean) => {
+        this.isCreatingOrder = false;
+        resolve(success);
+      };
+
       // Double vérification après la reconnexion
       if (!this.socket || !this.isConnected || !this.userId) {
         logger.error('❌ Socket toujours non connecté après ensureConnected', 'userOrderSocketService');
@@ -616,7 +664,7 @@ class UserOrderSocketService {
           'Vous devez être connecté pour créer une commande. Veuillez vous reconnecter.',
           [{ text: 'OK' }]
         );
-        resolve(false);
+        finishOrderCreation(false);
         return;
       }
 
@@ -665,7 +713,7 @@ class UserOrderSocketService {
           Alert.alert('Erreur', 'Impossible d\'enregistrer la commande. Merci de réessayer.');
         }
 
-        resolve(false);
+        finishOrderCreation(false);
         return;
       }
 
@@ -686,7 +734,7 @@ class UserOrderSocketService {
         if (!settled) {
           settled = true;
           logger.warn('⚠️ createOrder ack timeout');
-          resolve(false);
+          finishOrderCreation(false);
         }
       }, 10000); // 10s timeout
 
@@ -708,25 +756,25 @@ class UserOrderSocketService {
                     { text: 'OK', style: 'cancel' }
                   ]
                 );
-                resolve(false);
+                finishOrderCreation(false);
                 return;
               }
 
               // server persisted the order
-              resolve(true);
+              finishOrderCreation(true);
             } else {
               logger.warn('❌ createOrder rejected by server', ackResponse);
-              resolve(false);
+              finishOrderCreation(false);
             }
           } catch (err) {
             logger.warn('Error parsing createOrder ack', 'userOrderSocketService', err);
-            resolve(false);
+            finishOrderCreation(false);
           }
         });
       } catch (err) {
         clearTimeout(timeout);
         logger.error('❌ Error emitting create-order', 'userOrderSocketService', err);
-        resolve(false);
+        finishOrderCreation(false);
       }
     });
   }
@@ -751,7 +799,9 @@ class UserOrderSocketService {
     }
 
     if (!this.userId) {
-      logger.error('❌ Impossible de se connecter : aucun userId', 'userOrderSocketService');
+      // Ce n'est pas une erreur critique, juste un avertissement
+      // car ensureConnected() peut être appelé avant que l'utilisateur soit connecté
+      logger.debug('⚠️ ensureConnected appelé sans userId (utilisateur non connecté)', 'userOrderSocketService');
       return false;
     }
 

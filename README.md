@@ -34,12 +34,12 @@ PROJET_CHRONO/
 
 ## 🏗️ Architecture
 
-| Composant | Stack | Description |
-| --- | --- | --- |
-| `chrono_backend/` | Node.js + Express + Socket.IO | API REST, WebSocket, migrations SQL |
-| `admin_chrono/` | Next.js 16, React Query, Socket.IO client | Dashboard web pour les ops/admin |
-| `app_chrono/` | Expo, React Native, Expo Router | Application client (commande / tracking) |
-| `driver_chrono/` | Expo, React Native | Application chauffeur |
+| Composant         | Stack                                     | Description                              |
+| ----------------- | ----------------------------------------- | ---------------------------------------- |
+| `chrono_backend/` | Node.js + Express + Socket.IO             | API REST, WebSocket, migrations SQL      |
+| `admin_chrono/`   | Next.js 16, React Query, Socket.IO client | Dashboard web pour les ops/admin         |
+| `app_chrono/`     | Expo, React Native, Expo Router           | Application client (commande / tracking) |
+| `driver_chrono/`  | Expo, React Native                        | Application chauffeur                    |
 
 ---
 
@@ -94,6 +94,7 @@ cp chrono_backend/.env.example chrono_backend/.env
 ```
 
 Variables clés :
+
 - `DATABASE_URL`
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 - `JWT_SECRET`
@@ -106,9 +107,13 @@ cp admin_chrono/.env.example admin_chrono/.env.local
 ```
 
 Variables clés :
-- `NEXT_PUBLIC_API_URL` (ex: `http://localhost:4000`)
-- `NEXT_PUBLIC_SOCKET_URL`
+
+- `NEXT_PUBLIC_API_URL` (ex: `http://localhost:4000` ou `http://192.168.1.96:4000` pour réseau local)
+- `NEXT_PUBLIC_SOCKET_URL` (même URL que API_URL)
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_GOOGLE_API_KEY` (pour Google Maps)
+
+**Important :** Le CSP (Content Security Policy) est configuré automatiquement dans `next.config.ts` pour autoriser l'URL définie dans `NEXT_PUBLIC_API_URL`. Redémarrez le serveur après modification.
 
 #### Apps mobiles (`app_chrono/.env`, `driver_chrono/.env`)
 
@@ -118,10 +123,13 @@ cp driver_chrono/.env.example driver_chrono/.env
 ```
 
 Variables clés :
-- `EXPO_PUBLIC_API_URL`
-- `EXPO_PUBLIC_SOCKET_URL`
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_GOOGLE_API_KEY`
+
+- `EXPO_PUBLIC_API_URL` (ex: `http://localhost:4000` ou `http://192.168.1.96:4000` pour réseau local)
+- `EXPO_PUBLIC_SOCKET_URL` (même URL que API_URL)
+- `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_GOOGLE_API_KEY` (pour les cartes)
+
+**Note pour iOS Simulator :** Utilisez `localhost` au lieu de l'IP locale.
 
 ---
 
@@ -200,18 +208,22 @@ app_chrono/
 ## 🔌 Documentation API (extraits)
 
 ### Auth
+
 - `POST /api/auth-simple/send-otp`
 - `POST /api/auth-simple/verify-otp`
 - `GET /api/auth-simple/check/:email`
 
 ### Commandes
+
 - Socket `create-order`, `accept-order`, `update-order-status`
 
 ### Chauffeurs
+
 - `GET /api/drivers/nearby`
 - `POST /api/drivers/update-location`
 
 ### WebSocket (Server → Client)
+
 - `order:status:update`
 - `driver:location:update`
 - `new-order-request`
@@ -221,23 +233,28 @@ app_chrono/
 ## 🧰 Technologies
 
 ### Backend
+
 - Node.js / Express
 - Socket.IO
 - PostgreSQL / Supabase
 - JWT, Joi, Winston, Nodemailer
 
 ### Dashboard (`admin_chrono`)
+
 - Next.js 16 (App Router)
 - React Query + Zustand
 - Socket.IO client
 - Google Maps JS API
+- Content Security Policy (CSP) configuré dynamiquement
 
 ### Apps mobiles
+
 - Expo + React Native
 - Expo Router
 - Zustand
 - Socket.IO client
 - React Native Maps
+- Expo Barcode Scanner (nécessite développement build pour `driver_chrono`)
 
 ---
 
@@ -261,6 +278,45 @@ npm run lint
 
 ---
 
+## ✨ Fonctionnalités principales
+
+### Dashboard Admin (`admin_chrono`)
+
+- 📊 Tableau de bord avec statistiques en temps réel
+- 🗺️ Suivi des livraisons en direct sur carte Google Maps
+- 👥 Gestion des chauffeurs et clients
+- 📈 Analytics et rapports
+- 💬 Système de messagerie intégré
+- 🔐 Authentification sécurisée avec Supabase
+
+### App Client (`app_chrono`)
+
+- 📦 Création de commandes de livraison
+- 🗺️ Suivi en temps réel de la livraison
+- 💳 Paiement intégré (Orange Money, Wave, Cash, Paiement différé)
+- 💬 Messagerie avec le chauffeur
+- ⭐ Système d'évaluation
+- 📍 Géolocalisation automatique
+
+### App Driver (`driver_chrono`)
+
+- 📱 Acceptation/refus de commandes
+- 🗺️ Navigation avec carte interactive
+- 📸 Scanner QR code pour validation (nécessite développement build)
+- 💬 Messagerie avec les clients
+- 📊 Statistiques personnelles
+- 📍 Partage de position en temps réel
+
+## 🔧 Améliorations récentes
+
+### Corrections importantes
+
+1. **Content Security Policy (CSP)** - Configuration dynamique pour autoriser le backend
+2. **Gestion des erreurs Google Maps** - Détection et messages d'erreur améliorés
+3. **Protection contre les crashes** - Gestion améliorée des appels multiples à `createOrder()`
+4. **Nettoyage des sockets** - Prévention des listeners dupliqués
+5. **Scanner QR code** - Gestion gracieuse de l'absence du module natif
+
 ## 🧪 Tests
 
 Tests automatisés à venir (TODO commun aux 4 projets).
@@ -269,14 +325,121 @@ Tests automatisés à venir (TODO commun aux 4 projets).
 
 ## 🐛 Dépannage rapide
 
-| Problème | Pistes |
-| --- | --- |
-| WebSocket indisponible | Vérifier backend, `*_SOCKET_URL`, CORS |
-| DB inaccessible | Migrations exécutées ? `DATABASE_URL` correct ? |
-| Google Maps vide | Permissions + `EXPO/NEXT_PUBLIC_GOOGLE_API_KEY` |
-| Dashboard boucle de fetch | Tenir compte des instructions dans `admin_chrono/README` local (filtres de dates, query keys stabilisés) |
+| Problème                                 | Solution                                                                                                 |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| WebSocket indisponible                   | Vérifier backend, `*_SOCKET_URL`, CORS                                                                   |
+| DB inaccessible                          | Migrations exécutées ? `DATABASE_URL` correct ?                                                          |
+| Google Maps vide                         | Permissions + `EXPO/NEXT_PUBLIC_GOOGLE_API_KEY`                                                          |
+| Dashboard boucle de fetch                | Tenir compte des instructions dans `admin_chrono/README` local (filtres de dates, query keys stabilisés) |
+| **Erreur CSP (Content Security Policy)** | Voir [Configuration CSP](#configuration-csp-pour-admin_chrono)                                           |
+| **Erreur Google Maps Billing**           | Voir [Guide Google Maps](#google-maps-configuration)                                                     |
+| **Erreur DeletedApiProjectMapError**     | Voir [Guide Google Maps](#google-maps-configuration)                                                     |
+| **Scanner QR code ne fonctionne pas**    | Nécessite un développement build (voir [Apps mobiles](#apps-mobiles))                                    |
+| **Crash lors de la 2ème commande**       | Vérifier que le backend est à jour avec les dernières corrections                                        |
+| **Erreur "aucun userId"**                | L'utilisateur doit être connecté avant de créer une commande                                             |
+
+### Configuration CSP pour `admin_chrono`
+
+Le dashboard admin utilise Content Security Policy (CSP) pour la sécurité. Si vous voyez des erreurs CSP bloquant les connexions au backend :
+
+1. Vérifiez que `NEXT_PUBLIC_API_URL` est correctement défini dans `.env.local`
+2. Le fichier `next.config.ts` configure automatiquement le CSP avec l'URL du backend
+3. Redémarrez le serveur Next.js après modification de `.env.local`
+
+**Note :** Le CSP est configuré dynamiquement pour autoriser l'URL du backend définie dans `NEXT_PUBLIC_API_URL`.
+
+### Google Maps Configuration
+
+#### Erreurs de facturation (`BillingNotEnabledMapError`)
+
+Même si vous avez configuré un compte de facturation, cette erreur peut survenir si :
+
+1. **Les APIs ne sont pas activées** dans Google Cloud Console :
+
+   - Maps JavaScript API (obligatoire)
+   - Places API (obligatoire)
+   - Geocoding API (recommandé)
+
+2. **Le projet n'est pas lié au compte de facturation**
+
+3. **La clé API n'est pas correctement configurée**
+
+**Guide complet :** Voir `admin_chrono/docs/GOOGLE_MAPS_BILLING_FIX.md`
+
+#### Erreur projet supprimé (`DeletedApiProjectMapError`)
+
+Si vous voyez cette erreur, le projet Google Cloud associé à votre clé API a été supprimé. Vous devez :
+
+1. Créer un nouveau projet Google Cloud
+2. Activer les APIs nécessaires
+3. Créer une nouvelle clé API
+4. Mettre à jour `NEXT_PUBLIC_GOOGLE_API_KEY` dans `.env.local`
+
+**Guide complet :** Voir `admin_chrono/docs/GOOGLE_MAPS_BILLING_FIX.md`
+
+### Apps mobiles - Développement Build
+
+Certaines fonctionnalités nécessitent un **développement build** (pas Expo Go) :
+
+- **Scanner QR code** (`expo-barcode-scanner`) dans `driver_chrono`
+
+Pour créer un développement build :
+
+```bash
+# iOS
+cd driver_chrono
+npx expo run:ios
+
+# Android
+npx expo run:android
+```
+
+**Guide complet :** Voir `driver_chrono/docs/TROUBLESHOOTING.md`
 
 ---
+
+## 📚 Documentation supplémentaire
+
+### Guides de configuration
+
+- **Variables d'environnement** : `docs/ENV_VARIABLES_GUIDE.md`
+
+  - Où configurer Redis et PostgreSQL Pool
+  - Configuration par projet (backend, admin, apps)
+  - Checklist de configuration
+
+- **Scaling et production** : `chrono_backend/docs/SCALING_SETUP.md`
+  - Configuration Redis Adapter pour Socket.IO
+  - Configuration PostgreSQL Pool
+  - Tests et vérification
+
+### Guides de dépannage
+
+- **Google Maps (Admin)** : `admin_chrono/docs/GOOGLE_MAPS_BILLING_FIX.md`
+
+  - Résolution des erreurs de facturation
+  - Résolution de l'erreur `DeletedApiProjectMapError`
+  - Configuration des APIs Google Cloud
+
+- **Scanner QR Code (Driver)** : `driver_chrono/docs/TROUBLESHOOTING.md`
+  - Configuration du développement build
+  - Résolution des erreurs de modules natifs
+  - Problèmes courants avec Expo
+
+### Structure des docs
+
+```
+PROJET_CHRONO/
+├── docs/
+│   └── ENV_VARIABLES_GUIDE.md          # Guide des variables d'environnement
+├── admin_chrono/docs/
+│   └── GOOGLE_MAPS_BILLING_FIX.md
+├── driver_chrono/docs/
+│   └── TROUBLESHOOTING.md
+└── chrono_backend/docs/
+    ├── SCALING_SETUP.md                # Configuration Redis et PostgreSQL Pool
+    └── BACKUP_RECOVERY.md
+```
 
 ## 📚 Ressources
 
@@ -285,6 +448,7 @@ Tests automatisés à venir (TODO commun aux 4 projets).
 - [Socket.IO docs](https://socket.io/docs/)
 - [Next.js docs](https://nextjs.org/docs)
 - [React Query docs](https://tanstack.com/query)
+- [Google Maps Platform](https://developers.google.com/maps)
 
 ---
 
@@ -305,301 +469,3 @@ Tests automatisés à venir (TODO commun aux 4 projets).
 ## 👥 Auteurs & Remerciements
 
 À compléter.
-
-## 📦 Prérequis
-
-- **Node.js** >= 18.x
-- **npm** ou **yarn**
-- **PostgreSQL** >= 14 (ou Supabase)
-- **Expo CLI** (pour les apps mobiles)
-- **Supabase** compte (pour la base de données)
-- **Google Maps API Key** (pour les cartes)
-- **Compte Vonage/Nexmo** (optionnel, pour SMS)
-
-## 🚀 Installation
-
-### 1. Cloner le projet
-
-```bash
-git clone <votre-repo>
-cd PROJET_CHRONO
-```
-
-### 2. Installer les dépendances
-
-#### Backend
-
-```bash
-cd chrono_backend
-npm install
-```
-
-#### App Client
-
-```bash
-cd app_chrono
-npm install
-```
-
-#### App Driver
-
-```bash
-cd driver_chrono
-npm install
-```
-
-### 3. Configuration de la base de données
-
-1. Créez un projet Supabase ou utilisez votre propre instance PostgreSQL
-2. Exécutez les migrations dans l'ordre :
-   ```bash
-   cd chrono_backend/migrations
-   # Voir README.md dans le dossier migrations pour l'ordre d'exécution
-   ```
-
-## ⚙️ Configuration
-
-### Variables d'environnement
-
-Copiez les fichiers `.env.example` et remplissez les valeurs :
-
-#### Backend (`chrono_backend/.env`)
-
-```bash
-cp chrono_backend/.env.example chrono_backend/.env
-# Modifiez chrono_backend/.env avec vos valeurs
-```
-
-Variables importantes :
-- `DATABASE_URL` - URL de connexion PostgreSQL
-- `SUPABASE_URL` - URL de votre projet Supabase
-- `SUPABASE_SERVICE_ROLE_KEY` - Clé service role Supabase
-- `JWT_SECRET` - Secret pour signer les tokens JWT
-- `EMAIL_USER` / `EMAIL_PASS` - Credentials email (Nodemailer)
-
-#### App Client (`app_chrono/.env`)
-
-```bash
-cp app_chrono/.env.example app_chrono/.env
-# Modifiez app_chrono/.env avec vos valeurs
-```
-
-Variables importantes :
-- `EXPO_PUBLIC_API_URL` - URL de l'API backend
-- `EXPO_PUBLIC_SOCKET_URL` - URL du serveur WebSocket
-- `EXPO_PUBLIC_SUPABASE_URL` - URL Supabase
-- `EXPO_PUBLIC_GOOGLE_API_KEY` - Clé API Google Maps
-
-#### App Driver (`driver_chrono/.env`)
-
-```bash
-cp driver_chrono/.env.example driver_chrono/.env
-# Modifiez driver_chrono/.env avec vos valeurs
-```
-
-Mêmes variables que l'app client.
-
-## 🎯 Démarrage
-
-### Backend
-
-```bash
-cd chrono_backend
-npm run dev
-```
-
-Le serveur démarre sur `http://localhost:4000`
-
-### App Client
-
-```bash
-cd app_chrono
-npm start
-```
-
-Puis choisissez :
-- `i` pour iOS Simulator
-- `a` pour Android Emulator
-- Scanner le QR code avec Expo Go
-
-### App Driver
-
-```bash
-cd driver_chrono
-npm start
-```
-
-Même processus que l'app client.
-
-## 📁 Structure du projet
-
-### Backend (`chrono_backend/`)
-
-```
-chrono_backend/
-├── src/
-│   ├── controllers/      # Contrôleurs (auth, delivery, driver, etc.)
-│   ├── routes/          # Routes Express
-│   ├── middleware/     # Middleware (auth, validation, etc.)
-│   ├── services/       # Services métier (OTP, email)
-│   ├── sockets/        # Handlers WebSocket
-│   ├── config/         # Configuration (DB, Supabase)
-│   └── utils/          # Utilitaires (logger, JWT, etc.)
-├── migrations/         # Migrations SQL
-├── scripts/           # Scripts utilitaires
-└── logs/             # Logs de l'application
-```
-
-### App Client (`app_chrono/`)
-
-```
-app_chrono/
-├── app/               # Routes (Expo Router)
-│   ├── (auth)/        # Routes d'authentification
-│   └── (tabs)/        # Routes principales (tabs)
-├── components/        # Composants React Native
-├── store/            # Stores Zustand
-├── services/         # Services API et WebSocket
-├── hooks/            # Hooks personnalisés
-├── utils/            # Utilitaires
-└── types/            # Types TypeScript
-```
-
-### App Driver (`driver_chrono/`)
-
-Structure similaire à `app_chrono/` mais adaptée pour les chauffeurs.
-
-## 🔌 API Documentation
-
-### Endpoints principaux
-
-#### Authentification
-- `POST /api/auth-simple/send-otp` - Envoyer un code OTP
-- `POST /api/auth-simple/verify-otp` - Vérifier un code OTP
-- `GET /api/auth-simple/check/:email` - Vérifier si un email existe
-
-#### Commandes
-- WebSocket : `create-order` - Créer une nouvelle commande
-- WebSocket : `accept-order` - Accepter une commande (chauffeur)
-- WebSocket : `update-order-status` - Mettre à jour le statut
-
-#### Chauffeurs
-- `GET /api/drivers/nearby` - Trouver les chauffeurs à proximité
-- `POST /api/drivers/update-location` - Mettre à jour la position
-
-#### Notes
-- `POST /api/ratings` - Créer une note
-
-### WebSocket Events
-
-#### Client → Server
-- `create-order` - Créer une commande
-- `cancel-order` - Annuler une commande
-
-#### Server → Client
-- `order:status:update` - Mise à jour du statut de commande
-- `driver:location:update` - Mise à jour de la position du chauffeur
-- `new-order-request` - Nouvelle commande disponible (chauffeur)
-- `order:accepted` - Commande acceptée
-- `order:declined` - Commande refusée
-
-## 🛠️ Technologies utilisées
-
-### Backend
-- **Node.js** + **Express** - Framework web
-- **Socket.IO** - Communication temps réel
-- **PostgreSQL** / **Supabase** - Base de données
-- **JWT** - Authentification
-- **Winston** - Logging
-- **Joi** - Validation
-- **Nodemailer** - Envoi d'emails
-- **Vonage/Nexmo** - SMS (optionnel)
-
-### Frontend (Mobile)
-- **React Native** - Framework mobile
-- **Expo** - Plateforme de développement
-- **Expo Router** - Navigation basée sur les fichiers
-- **Zustand** - Gestion d'état
-- **React Native Maps** - Cartes
-- **Socket.IO Client** - WebSocket client
-
-## 🔒 Sécurité
-
-- Authentification par OTP (One-Time Password)
-- Tokens JWT pour l'authentification
-- Rate limiting sur les endpoints sensibles
-- Validation des entrées avec Joi
-- Row Level Security (RLS) activé sur Supabase
-
-## 📝 Scripts utiles
-
-### Backend
-
-```bash
-npm run dev          # Démarrage en mode développement
-npm run simulate     # Simuler un flow de commande
-```
-
-### Apps
-
-```bash
-npm start           # Démarrer Expo
-npm run android     # Démarrer sur Android
-npm run ios         # Démarrer sur iOS
-npm run lint        # Linter le code
-```
-
-## 🧪 Tests
-
-Les tests sont à venir. Voir [TODO](#todo) pour les prochaines étapes.
-
-## 🐛 Dépannage
-
-### Problème de connexion WebSocket
-
-Vérifiez que :
-- Le backend est démarré
-- `EXPO_PUBLIC_SOCKET_URL` est correctement configuré
-- Les CORS sont correctement configurés dans le backend
-
-### Problème de base de données
-
-Vérifiez que :
-- Les migrations ont été exécutées
-- `DATABASE_URL` est correct
-- Supabase RLS est correctement configuré
-
-### Problème de localisation
-
-Vérifiez que :
-- Les permissions de localisation sont accordées
-- `EXPO_PUBLIC_GOOGLE_API_KEY` est correct
-- Les services de localisation sont activés sur l'appareil
-
-## 📚 Ressources
-
-- [Documentation Expo](https://docs.expo.dev/)
-- [Documentation Supabase](https://supabase.com/docs)
-- [Documentation Socket.IO](https://socket.io/docs/)
-- [Documentation React Native](https://reactnative.dev/)
-
-## 🤝 Contribution
-
-1. Fork le projet
-2. Créez votre branche (`git checkout -b feature/AmazingFeature`)
-3. Committez vos changements (`git commit -m 'Add some AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
-5. Ouvrez une Pull Request
-
-## 📄 Licence
-
-[À définir]
-
-## 👥 Auteurs
-
-[À compléter]
-
-## 🙏 Remerciements
-
-[À compléter]
-

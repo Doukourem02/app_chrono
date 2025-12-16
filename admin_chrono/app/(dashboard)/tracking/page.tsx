@@ -9,6 +9,8 @@ import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
 import { useRealTimeTracking } from '@/hooks/useRealTimeTracking'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
+import { GoogleMapsDeletedProjectError } from '@/components/error/GoogleMapsDeletedProjectError'
 
 const DEFAULT_CENTER = { lat: 5.3600, lng: -4.0083 } 
 const DELIVERY_ZOOM = 12.8
@@ -112,6 +114,7 @@ function TrackingMap({
   isLoaded, 
   loadError,
   billingError,
+  deletedProjectError,
   onlineDrivers,
   adminLocation,
 }: { 
@@ -119,6 +122,7 @@ function TrackingMap({
   isLoaded: boolean
   loadError: Error | undefined
   billingError?: boolean
+  deletedProjectError?: boolean
   onlineDrivers: Array<{
     userId: string
     is_online: boolean
@@ -452,35 +456,20 @@ function TrackingMap({
   if (loadError) {
     return (
       <div style={mapPlaceholderStyle}>
-        <div style={{ textAlign: 'center', padding: '20px', maxWidth: '500px' }}>
-          {billingError ? (
-            <>
-              <p style={{ ...mapPlaceholderTextStyle, fontWeight: 'bold', marginBottom: '12px', color: '#EF4444', fontSize: '16px' }}>
-                ⚠️ Facturation Google Maps non activée
-              </p>
-              <p style={{ ...mapPlaceholderTextStyle, fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
-                Pour utiliser Google Maps, vous devez activer la facturation dans Google Cloud Console.
-                <br />
-                Google Maps offre un crédit gratuit de $200 par mois qui couvre généralement un usage modéré.
-              </p>
-              <a 
-                href="https://console.cloud.google.com/billing" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ 
-                  color: '#2563eb', 
-                  textDecoration: 'underline', 
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
-                Activer la facturation dans Google Cloud Console →
-              </a>
-            </>
-          ) : (
+        {deletedProjectError ? (
+          <GoogleMapsDeletedProjectError />
+        ) : billingError ? (
+          <GoogleMapsBillingError />
+        ) : (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
             <p style={mapPlaceholderTextStyle}>Erreur de chargement de la carte</p>
-          )}
-        </div>
+            {loadError.message && (
+              <p style={{ ...mapPlaceholderTextStyle, fontSize: '12px', marginTop: '8px', color: '#6B7280' }}>
+                {loadError.message}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -732,7 +721,7 @@ export default function TrackingPage() {
   const hasLoadedRef = useRef(false)
 
   // Utiliser le contexte Google Maps partagé
-  const { isLoaded, loadError, billingError } = useGoogleMaps()
+  const { isLoaded, loadError, billingError, deletedProjectError } = useGoogleMaps()
 
   // Utiliser le suivi en temps réel
   const { onlineDrivers, ongoingDeliveries, isLoading, reloadData } = useRealTimeTracking()
@@ -1101,6 +1090,7 @@ export default function TrackingPage() {
           isLoaded={isLoaded}
           loadError={loadError}
           billingError={billingError}
+          deletedProjectError={deletedProjectError}
           onlineDrivers={onlineDriversArray}
           adminLocation={adminLocation}
         />

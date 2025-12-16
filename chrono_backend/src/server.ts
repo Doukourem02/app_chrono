@@ -2,6 +2,7 @@ import 'dotenv/config';
 import * as Sentry from '@sentry/node';
 import http from 'http';
 import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { validateEnvironment } from './config/envCheck.js';
 import app from './app.js';
 import deliverySocket from './sockets/deliverySocket.js';
@@ -9,6 +10,7 @@ import { setupOrderSocket } from './sockets/orderSocket.js';
 import { setupAdminSocket } from './sockets/adminSocket.js';
 import { setupMessageSocket } from './sockets/messageSocket.js';
 import logger from './utils/logger.js';
+import { initializeRedis, closeRedis, pubClient, subClient } from './config/redis.js';
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -85,6 +87,25 @@ const io = new Server(server, {
   },
 });
 
+// Initialiser Redis Adapter pour le scaling horizontal (optionnel)
+// Si Redis n'est pas disponible, Socket.IO fonctionnera en mode standalone
+(async () => {
+  const { pubClient: redisPub, subClient: redisSub, isAvailable } = await initializeRedis();
+  
+  if (isAvailable && redisPub && redisSub) {
+    try {
+      io.adapter(createAdapter(redisPub, redisSub));
+      logger.info('✅ Socket.IO Redis Adapter activé - Scaling horizontal disponible');
+    } catch (error: any) {
+      logger.error('❌ Erreur lors de l\'activation du Redis Adapter:', error.message);
+      logger.warn('⚠️  Socket.IO fonctionnera en mode standalone');
+    }
+  } else {
+    logger.info('ℹ️  Socket.IO fonctionne en mode standalone (Redis non disponible)');
+    logger.info('💡 Pour activer le scaling horizontal, configurez REDIS_URL');
+  }
+})();
+
 io.on('connection', (socket) => {
   console.log('🟢 Client connecté :', socket.id);
   deliverySocket(io, socket);
@@ -113,4 +134,23 @@ server.listen(PORT, HOST, () => {
   if (process.env.SENTRY_DSN) {
     logger.info('Monitoring Sentry actif');
   }
+});
+
+// Nettoyage propre à l'arrêt du serveur
+process.on('SIGTERM', async () => {
+  logger.info('🛑 SIGTERM reçu, fermeture propre du serveur...');
+  await closeRedis();
+  server.close(() => {
+    logger.info('✅ Serveur fermé proprement');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', async () => {
+  logger.info('🛑 SIGINT reçu, fermeture propre du serveur...');
+  await closeRedis();
+  server.close(() => {
+    logger.info('✅ Serveur fermé proprement');
+    process.exit(0);
+  });
 });

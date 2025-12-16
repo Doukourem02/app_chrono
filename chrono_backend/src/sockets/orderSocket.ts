@@ -6,7 +6,8 @@ import { maskOrderId, maskUserId, sanitizeObject } from '../utils/maskSensitiveD
 import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionForOrder.js';
 import { broadcastOrderUpdateToAdmins } from './adminSocket.js';
 import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
-import pool from '../config/db.js'; // Interfaces for order data
+import pool from '../config/db.js';
+import qrCodeService from '../services/qrCodeService.js'; // Interfaces for order data
 interface OrderCoordinates { latitude: number; longitude: number;
 }
 
@@ -331,7 +332,34 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         try {
           await saveOrder(order);
           dbSaved = true;
-         if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} sauvegardée en DB`); if (paymentMethodType && price) { try { const { transactionId, invoiceId } = await createTransactionAndInvoiceForOrder(
+         if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} sauvegardée en DB`);
+          
+          // Générer automatiquement le QR code de livraison
+          try {
+            const orderNumber = `CMD-${order.id.substring(0, 8).toUpperCase()}`;
+            const recipientName = order.recipient?.phone 
+              ? `Destinataire (${order.recipient.phone})` 
+              : order.dropoff.details?.phone 
+                ? `Destinataire (${order.dropoff.details.phone})`
+                : 'Destinataire';
+            const recipientPhone = order.recipient?.phone || order.dropoff.details?.phone || '';
+            const creatorName = order.user.name || 'Client';
+            
+            await qrCodeService.generateDeliveryQRCode(
+              order.id,
+              orderNumber,
+              recipientName,
+              recipientPhone,
+              creatorName
+            );
+            
+            if (DEBUG) console.log(`QR code généré pour commande ${maskOrderId(order.id)}`);
+          } catch (qrError: any) {
+            console.warn(`Échec génération QR code pour ${maskOrderId(order.id)}:`, qrError.message);
+            // Ne pas bloquer la création de commande si le QR code échoue
+          }
+          
+          if (paymentMethodType && price) { try { const { transactionId, invoiceId } = await createTransactionAndInvoiceForOrder(
                 order.id,
                 userId,
                 paymentMethodType,

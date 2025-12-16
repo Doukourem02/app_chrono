@@ -9,6 +9,8 @@ import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
 import { AnimatedCard } from '@/components/animations'
 import type { Delivery } from '@/hooks/types'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
+import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
+import { GoogleMapsDeletedProjectError } from '@/components/error/GoogleMapsDeletedProjectError'
 
 interface GoogleMapsWindow extends Window {
   google?: {
@@ -67,7 +69,7 @@ const statusSteps: Array<{ key: string; label: string }> = [
 ]
 
 function MapComponent({ routePath }: { routePath?: LatLng[] }) {
-  const { isLoaded, loadError, billingError } = useGoogleMaps()
+  const { isLoaded, loadError, billingError, deletedProjectError } = useGoogleMaps()
 
   const computedRoute = routePath && routePath.length >= 2 ? routePath : defaultRoutePath
   const computedCenter = computedRoute[0] ?? defaultCenter
@@ -110,29 +112,20 @@ function MapComponent({ routePath }: { routePath?: LatLng[] }) {
   if (loadError) {
     return (
       <div style={mapPlaceholderStyle}>
-        <div style={{ textAlign: 'center', padding: '20px', maxWidth: '400px' }}>
-          {billingError ? (
-            <>
-              <p style={{ ...mapPlaceholderErrorStyle, fontWeight: 'bold', marginBottom: '12px' }}>
-                ⚠️ Facturation Google Maps non activée
-              </p>
-              <p style={{ ...mapPlaceholderTextStyle, fontSize: '12px', lineHeight: '1.5' }}>
-                Pour utiliser Google Maps, vous devez activer la facturation dans Google Cloud Console.
-                <br />
-                <a 
-                  href="https://console.cloud.google.com/billing" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: '#2563eb', textDecoration: 'underline', marginTop: '8px', display: 'inline-block' }}
-                >
-                  Activer la facturation →
-                </a>
-              </p>
-            </>
-          ) : (
+        {deletedProjectError ? (
+          <GoogleMapsDeletedProjectError style={{ padding: '16px', maxWidth: '500px' }} />
+        ) : billingError ? (
+          <GoogleMapsBillingError style={{ padding: '16px', maxWidth: '500px' }} />
+        ) : (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
             <p style={mapPlaceholderErrorStyle}>Erreur de chargement de la carte</p>
-          )}
-        </div>
+            {loadError.message && (
+              <p style={{ ...mapPlaceholderTextStyle, fontSize: '11px', marginTop: '8px', color: '#6B7280' }}>
+                {loadError.message}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     )
   }

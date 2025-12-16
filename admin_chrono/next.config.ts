@@ -80,6 +80,40 @@ const nextConfig: NextConfig = {
       })
     }
 
+    // Extraire l'URL de l'API depuis les variables d'environnement
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || apiUrl
+    
+    // Construire les directives connect-src pour l'API backend
+    const connectSrcDirectives = [
+      "'self'",
+      "http://localhost:*",
+      "ws://localhost:*",
+      "wss://localhost:*",
+      "https://*.supabase.co",
+      "wss://*.supabase.co",
+      "https://maps.googleapis.com",
+    ]
+    
+    // Ajouter l'URL de l'API backend si elle n'est pas localhost
+    if (apiUrl && !apiUrl.includes('localhost')) {
+      try {
+        const apiUrlObj = new URL(apiUrl)
+        const apiHost = `${apiUrlObj.protocol}//${apiUrlObj.host}`
+        connectSrcDirectives.push(apiHost)
+        
+        // Ajouter aussi les versions WebSocket
+        if (apiUrlObj.protocol === 'http:') {
+          connectSrcDirectives.push(apiHost.replace('http://', 'ws://'))
+        } else if (apiUrlObj.protocol === 'https:') {
+          connectSrcDirectives.push(apiHost.replace('https://', 'wss://'))
+        }
+      } catch (e) {
+        // Si l'URL n'est pas valide, on continue sans l'ajouter
+        console.warn('Invalid API URL in CSP configuration:', apiUrl)
+      }
+    }
+    
     // CSP avec ou sans upgrade-insecure-requests selon l'environnement
     const cspDirectives = [
       "default-src 'self'",
@@ -87,7 +121,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https: blob: http://maps.google.com http://maps.gstatic.com",
       "font-src 'self' data: https://fonts.gstatic.com",
-      "connect-src 'self' http://localhost:* ws://localhost:* wss://localhost:* http://192.168.0.0/16 ws://192.168.0.0/16 wss://192.168.0.0/16 https://*.supabase.co https://maps.googleapis.com wss://*.supabase.co",
+      `connect-src ${connectSrcDirectives.join(' ')}`,
       "frame-src 'self' https://maps.googleapis.com",
       "object-src 'none'",
       "base-uri 'self'",
