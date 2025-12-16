@@ -6,6 +6,7 @@ import { useRatingStore } from '../store/useRatingStore';
 import { logger } from '../utils/logger';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
+import { config } from '../config';
 
 class UserOrderSocketService {
   private socket: Socket | null = null;
@@ -28,7 +29,10 @@ class UserOrderSocketService {
     }
 
     this.userId = userId;
-    this.socket = io(process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000', {
+    // Utiliser la configuration centralisée qui fonctionne avec Expo Go
+    const socketUrl = config.socketUrl;
+    logger.info('🔌 Connexion au socket...', 'userOrderSocketService', { socketUrl });
+    this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 2000,

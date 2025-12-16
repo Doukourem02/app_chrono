@@ -404,11 +404,25 @@ class LocationService {
           }
         }
       } else {
-        logger.warn('Google Geocoding API failed', 'locationService', {
-          status: data.status,
-          errorMessage: data.error_message,
-          coords: `${coords.latitude}, ${coords.longitude}`,
-        });
+        // Si l'API n'est pas activée (REQUEST_DENIED), ne pas logger de warning
+        // C'est un cas attendu si la facturation n'est pas activée
+        const isApiNotEnabled = data.status === 'REQUEST_DENIED' || 
+                                data.error_message?.includes('not authorized') ||
+                                data.error_message?.includes('not enabled');
+        
+        if (!isApiNotEnabled) {
+          logger.warn('Google Geocoding API failed', 'locationService', {
+            status: data.status,
+            errorMessage: data.error_message,
+            coords: `${coords.latitude}, ${coords.longitude}`,
+          });
+        } else {
+          // Logger en debug seulement pour éviter le spam
+          logger.debug('Google Geocoding API not enabled, using fallback', 'locationService', {
+            status: data.status,
+            coords: `${coords.latitude}, ${coords.longitude}`,
+          });
+        }
       }
 
       // Fallback sur Expo Location si Google API échoue

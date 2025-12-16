@@ -67,7 +67,7 @@ const statusSteps: Array<{ key: string; label: string }> = [
 ]
 
 function MapComponent({ routePath }: { routePath?: LatLng[] }) {
-  const { isLoaded, loadError } = useGoogleMaps()
+  const { isLoaded, loadError, billingError } = useGoogleMaps()
 
   const computedRoute = routePath && routePath.length >= 2 ? routePath : defaultRoutePath
   const computedCenter = computedRoute[0] ?? defaultCenter
@@ -110,7 +110,29 @@ function MapComponent({ routePath }: { routePath?: LatLng[] }) {
   if (loadError) {
     return (
       <div style={mapPlaceholderStyle}>
-        <p style={mapPlaceholderErrorStyle}>Erreur de chargement de la carte</p>
+        <div style={{ textAlign: 'center', padding: '20px', maxWidth: '400px' }}>
+          {billingError ? (
+            <>
+              <p style={{ ...mapPlaceholderErrorStyle, fontWeight: 'bold', marginBottom: '12px' }}>
+                ⚠️ Facturation Google Maps non activée
+              </p>
+              <p style={{ ...mapPlaceholderTextStyle, fontSize: '12px', lineHeight: '1.5' }}>
+                Pour utiliser Google Maps, vous devez activer la facturation dans Google Cloud Console.
+                <br />
+                <a 
+                  href="https://console.cloud.google.com/billing" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: '#2563eb', textDecoration: 'underline', marginTop: '8px', display: 'inline-block' }}
+                >
+                  Activer la facturation →
+                </a>
+              </p>
+            </>
+          ) : (
+            <p style={mapPlaceholderErrorStyle}>Erreur de chargement de la carte</p>
+          )}
+        </div>
       </div>
     )
   }

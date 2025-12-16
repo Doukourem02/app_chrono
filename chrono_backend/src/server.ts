@@ -100,8 +100,15 @@ setupMessageSocket(io);
 
 app.set('io', io);
 
-server.listen(PORT, () => {
-  logger.info(`🚀 Serveur lancé sur le port ${PORT}`);
+// Écouter sur toutes les interfaces (0.0.0.0) pour permettre les connexions depuis Expo Go
+// En production, cela permet aussi les connexions depuis n'importe quelle interface réseau
+const HOST = process.env.HOST || '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+  logger.info(`🚀 Serveur lancé sur ${HOST}:${PORT}`);
+  if (isDevelopment) {
+    logger.info(`📱 Accessible depuis Expo Go via: http://192.168.1.96:${PORT}`);
+  }
 
   if (process.env.SENTRY_DSN) {
     logger.info('Monitoring Sentry actif');

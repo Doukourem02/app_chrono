@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 interface GoogleMapsContextType {
   isLoaded: boolean
   loadError: Error | undefined
+  billingError?: boolean
 }
 
 const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(undefined)
@@ -54,10 +55,20 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
     id: 'google-maps-script-global', 
   })
 
+  // Détecter l'erreur de facturation spécifiquement
+  const billingError = useMemo(() => {
+    if (!loadError) return false
+    const errorMessage = loadError.message || ''
+    return errorMessage.includes('BillingNotEnabled') || 
+           errorMessage.includes('billing-not-enabled') ||
+           errorMessage.includes('BillingNotEnabledMapError')
+  }, [loadError])
+
   const contextValue = useMemo(() => ({
     isLoaded,
-    loadError
-  }), [isLoaded, loadError])
+    loadError,
+    billingError
+  }), [isLoaded, loadError, billingError])
 
   return (
     <GoogleMapsContext.Provider value={contextValue}>

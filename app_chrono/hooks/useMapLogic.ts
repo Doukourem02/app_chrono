@@ -471,10 +471,18 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
             }
           }
         } else {
-          logger.warn('Google Geocoding API failed', 'useMapLogic', { 
-            status: data.status,
-            errorMessage: data.error_message 
-          });
+          // Si l'API n'est pas activée (REQUEST_DENIED), ne pas logger de warning
+          // C'est un cas attendu si la facturation n'est pas activée
+          const isApiNotEnabled = data.status === 'REQUEST_DENIED' || 
+                                  data.error_message?.includes('not authorized') ||
+                                  data.error_message?.includes('not enabled');
+          
+          if (!isApiNotEnabled) {
+            logger.warn('Google Geocoding API failed', 'useMapLogic', { 
+              status: data.status,
+              errorMessage: data.error_message 
+            });
+          }
           
           // Fallback sur l'API Expo
           const geocoded = await Location.reverseGeocodeAsync({ latitude, longitude });

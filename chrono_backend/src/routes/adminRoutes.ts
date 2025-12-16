@@ -1,6 +1,6 @@
 import express, { Router } from 'express';
 import { cancelAdminOrder, createAdminOrder, createAdminPromoCode, deleteAdminRating, getAdminAdminDetails, getAdminClientDetails, getAdminClientStatistics, getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminDisputes, getAdminDriverDetails, getAdminFinancialStats, getAdminGlobalSearch, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminPromoCodes, getAdminRatings, getAdminRecentActivities, getAdminReportClients, getAdminReportDeliveries, getAdminReportDrivers, getAdminReportPayments, getAdminReportRevenues, getAdminTransactions, getAdminUsers, updateAdminDispute, updateAdminDriverStatus } from '../controllers/adminController.js';
-import { createConversation, getConversationById, getMessages, getUnreadCount, markMessagesAsRead, sendMessage } from '../controllers/messageController.js';
+import { createConversation, getConversationById, getConversations, getMessages, getUnreadCount, markMessagesAsRead, sendMessage } from '../controllers/messageController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 
 const router: Router = express.Router();
@@ -33,6 +33,7 @@ router.get('/promo-codes', verifyAdminSupabase, getAdminPromoCodes);
 router.post('/promo-codes', verifyAdminSupabase, createAdminPromoCode);
 router.get('/disputes', verifyAdminSupabase, getAdminDisputes);
 router.put('/disputes/:disputeId', verifyAdminSupabase, updateAdminDispute);
+router.get('/messages/conversations', verifyAdminSupabase, getConversations);
 router.get('/messages/conversations/:conversationId', verifyAdminSupabase, getConversationById);
 router.post('/messages/conversations', verifyAdminSupabase, createConversation);
 router.get('/messages/conversations/:conversationId/messages', verifyAdminSupabase, getMessages);

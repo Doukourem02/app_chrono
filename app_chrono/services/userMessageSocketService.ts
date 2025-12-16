@@ -1,8 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { logger } from '../utils/logger';
 import { Conversation, Message } from './userMessageService';
-
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+import { config } from '../config';
 
 class UserMessageSocketService {
   private socket: Socket | null = null;
@@ -26,7 +25,10 @@ class UserMessageSocketService {
     }
 
     this.userId = userId;
-    this.socket = io(SOCKET_URL, {
+    // Utiliser la configuration centralisée qui fonctionne avec Expo Go
+    const socketUrl = config.socketUrl;
+    logger.info('🔌 Connexion au socket de messagerie...', 'userMessageSocketService', { socketUrl });
+    this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 2000,

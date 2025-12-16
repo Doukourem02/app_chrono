@@ -111,12 +111,14 @@ function TrackingMap({
   selectedDelivery, 
   isLoaded, 
   loadError,
+  billingError,
   onlineDrivers,
   adminLocation,
 }: { 
   selectedDelivery: Delivery | null
   isLoaded: boolean
   loadError: Error | undefined
+  billingError?: boolean
   onlineDrivers: Array<{
     userId: string
     is_online: boolean
@@ -450,7 +452,35 @@ function TrackingMap({
   if (loadError) {
     return (
       <div style={mapPlaceholderStyle}>
-        <p style={mapPlaceholderTextStyle}>Erreur de chargement de la carte</p>
+        <div style={{ textAlign: 'center', padding: '20px', maxWidth: '500px' }}>
+          {billingError ? (
+            <>
+              <p style={{ ...mapPlaceholderTextStyle, fontWeight: 'bold', marginBottom: '12px', color: '#EF4444', fontSize: '16px' }}>
+                ⚠️ Facturation Google Maps non activée
+              </p>
+              <p style={{ ...mapPlaceholderTextStyle, fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
+                Pour utiliser Google Maps, vous devez activer la facturation dans Google Cloud Console.
+                <br />
+                Google Maps offre un crédit gratuit de $200 par mois qui couvre généralement un usage modéré.
+              </p>
+              <a 
+                href="https://console.cloud.google.com/billing" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ 
+                  color: '#2563eb', 
+                  textDecoration: 'underline', 
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Activer la facturation dans Google Cloud Console →
+              </a>
+            </>
+          ) : (
+            <p style={mapPlaceholderTextStyle}>Erreur de chargement de la carte</p>
+          )}
+        </div>
       </div>
     )
   }
@@ -702,7 +732,7 @@ export default function TrackingPage() {
   const hasLoadedRef = useRef(false)
 
   // Utiliser le contexte Google Maps partagé
-  const { isLoaded, loadError } = useGoogleMaps()
+  const { isLoaded, loadError, billingError } = useGoogleMaps()
 
   // Utiliser le suivi en temps réel
   const { onlineDrivers, ongoingDeliveries, isLoading, reloadData } = useRealTimeTracking()
@@ -1070,6 +1100,7 @@ export default function TrackingPage() {
           selectedDelivery={selectedDelivery} 
           isLoaded={isLoaded}
           loadError={loadError}
+          billingError={billingError}
           onlineDrivers={onlineDriversArray}
           adminLocation={adminLocation}
         />
