@@ -108,7 +108,7 @@ export default function Index() {
       const selectedOrderExists = store.activeOrders.some(o => o.id === store.selectedOrderId);
       if (selectedOrderExists) {
         return;
-      }
+    }
     }
     
     // Sinon, sélectionner automatiquement la commande la plus prioritaire

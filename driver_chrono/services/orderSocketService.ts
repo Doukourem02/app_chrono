@@ -96,7 +96,7 @@ class OrderSocketService {
             }
           } else {
             // Fallback : utiliser seulement l'ID
-            store.acceptOrder(order.id, this.driverId || '');
+          store.acceptOrder(order.id, this.driverId || '');
           }
         }
       } catch (err) {

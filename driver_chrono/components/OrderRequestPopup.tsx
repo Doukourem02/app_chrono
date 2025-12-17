@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {View,Text,TouchableOpacity,StyleSheet,Animated,Dimensions,Image,StatusBar,} from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
 
 interface OrderRequest {
   id: string;
@@ -33,6 +34,7 @@ interface OrderRequestPopupProps {
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const ORDER_SOUND = require('../assets/sound/chronopopus.wav');
 
 export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   order,
@@ -46,9 +48,36 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const timerAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const soundRef = useRef<Audio.Sound | null>(null);
   
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [timeLeft, setTimeLeft] = React.useState(autoDeclineTimer);
+
+  // Charger le son une fois
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(ORDER_SOUND);
+        if (!isMounted) {
+          await sound.unloadAsync();
+          return;
+        }
+        soundRef.current = sound;
+        await sound.setVolumeAsync(1);
+        await sound.setPositionAsync(0);
+      } catch (err) {
+        console.warn('[OrderRequestPopup] Impossible de charger le son', err);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
 
   // Animation d'entrée
   useEffect(() => {
@@ -62,6 +91,18 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
 
       // Haptic feedback
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      // Lecture du son de notification
+      (async () => {
+        try {
+          const sound = soundRef.current;
+          if (!sound) return;
+          await sound.stopAsync().catch(() => undefined);
+          await sound.setPositionAsync(0);
+          await sound.playAsync();
+        } catch (err) {
+          console.warn('[OrderRequestPopup] Lecture son échouée', err);
+        }
+      })();
 
       // Animation d'entrée sophistiquée
       Animated.parallel([

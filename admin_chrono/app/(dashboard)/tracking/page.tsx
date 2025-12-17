@@ -462,13 +462,13 @@ function TrackingMap({
           <GoogleMapsBillingError />
         ) : (
           <div style={{ textAlign: 'center', padding: '20px' }}>
-            <p style={mapPlaceholderTextStyle}>Erreur de chargement de la carte</p>
+        <p style={mapPlaceholderTextStyle}>Erreur de chargement de la carte</p>
             {loadError.message && (
               <p style={{ ...mapPlaceholderTextStyle, fontSize: '12px', marginTop: '8px', color: '#6B7280' }}>
                 {loadError.message}
               </p>
-            )}
-          </div>
+          )}
+        </div>
         )}
       </div>
     )

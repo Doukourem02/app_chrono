@@ -123,8 +123,8 @@ function MapComponent({ routePath }: { routePath?: LatLng[] }) {
               <p style={{ ...mapPlaceholderTextStyle, fontSize: '11px', marginTop: '8px', color: '#6B7280' }}>
                 {loadError.message}
               </p>
-            )}
-          </div>
+          )}
+        </div>
         )}
       </div>
     )

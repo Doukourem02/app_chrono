@@ -1,12 +1,10 @@
 import { Alert } from 'react-native';
 import { io, Socket } from 'socket.io-client';
+import { config } from '../config';
 import { useOrderStore } from '../store/useOrderStore';
-import { usePaymentErrorStore } from '../store/usePaymentErrorStore';
-import { useRatingStore } from '../store/useRatingStore';
 import { logger } from '../utils/logger';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
-import { config } from '../config';
 
 class UserOrderSocketService {
   private socket: Socket | null = null;
@@ -27,8 +25,8 @@ class UserOrderSocketService {
     if (this.socket) {
       logger.info('🔄 Nettoyage de l\'ancien socket', 'userOrderSocketService');
       try {
-        this.socket.removeAllListeners();
-        this.socket.disconnect();
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
       } catch (err) {
         logger.warn('Erreur lors du nettoyage du socket', 'userOrderSocketService', err);
       }
@@ -52,45 +50,20 @@ class UserOrderSocketService {
       autoConnect: true,
     });
 
-    // S'assurer que les listeners ne sont ajoutés qu'une seule fois
+    // Toujours installer les listeners (ils seront réinstallés à chaque reconnexion dans setupSocketListeners)
+    // Mais marquer comme setup pour éviter les appels multiples lors de la première connexion
     if (!this.listenersSetup) {
       this.setupSocketListeners(userId);
       this.listenersSetup = true;
+    } else {
+      // Si les listeners sont déjà setup mais qu'on recrée le socket, réinstaller les listeners
+      this.setupSocketListeners(userId);
     }
   }
 
-  private setupSocketListeners(userId: string) {
+  // Méthode séparée pour installer uniquement les listeners d'événements (pas connect/disconnect)
+  private installEventListeners(userId: string) {
     if (!this.socket) return;
-
-    this.socket.on('connect', () => {
-      logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
-      this.isConnected = true;
-      this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
-
-      // S'identifier comme user
-      logger.info('👤 Identification comme user', 'userOrderSocketService', { userId });
-      this.socket?.emit('user-connect', userId);
-
-      // Ask server to resync any existing order state for this user
-      // (backend should reply with an event like `resync-order-state`)
-      try {
-        this.socket?.emit('user-reconnect', { userId });
-      } catch (err) {
-        logger.warn('Resync emit failed', 'userOrderSocketService', err);
-      }
-    });
-
-    this.socket.on('disconnect', (reason) => {
-      logger.info('🔌 Socket user déconnecté', 'userOrderSocketService', { reason });
-      this.isConnected = false;
-
-      // Laisser Socket.IO gérer la reconnexion automatique
-      // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
-      if (reason === 'io server disconnect') {
-        // Le serveur a forcé la déconnexion, laisser Socket.IO se reconnecter
-        logger.info('🔄 Le serveur a forcé la déconnexion, reconnexion automatique...', 'userOrderSocketService');
-      }
-    });
 
     // 📦 Confirmation création commande
     this.socket.on('order-created', (data) => {
@@ -160,19 +133,95 @@ class UserOrderSocketService {
     });
 
     // ✅ Commande acceptée par un driver
+    // IMPORTANT : Ce listener doit être réinstallé à chaque reconnexion
     this.socket.on('order-accepted', (data) => {
-      logger.info('✅ Commande acceptée par driver', 'userOrderSocketService', data);
+      logger.info('✅ Commande acceptée par driver - ÉVÉNEMENT REÇU', 'userOrderSocketService', {
+        orderId: data?.order?.id,
+        hasOrder: !!data?.order,
+        hasDriverInfo: !!data?.driverInfo,
+        orderStatus: data?.order?.status,
+      });
       try {
         const { order, driverInfo } = data || {};
         if (order && order.id) {
+          // FORCER le statut à 'accepted' - c'est l'événement order-accepted, donc le statut doit être 'accepted'
+          const orderWithStatus = {
+            ...order,
+            status: 'accepted' as const, // Forcer explicitement le statut à 'accepted'
+            driver: driverInfo,
+          };
+
+          logger.info('🔄 Mise à jour du store avec order-accepted', 'userOrderSocketService', {
+            orderId: order.id,
+            status: orderWithStatus.status,
+            hasDriver: !!driverInfo,
+          });
+
           // Ajouter ou mettre à jour la commande dans le store
           const store = useOrderStore.getState();
           const existingOrder = store.activeOrders.find(o => o.id === order.id);
+
+          logger.info('📦 État actuel du store', 'userOrderSocketService', {
+            existingOrderFound: !!existingOrder,
+            existingOrderStatus: existingOrder?.status,
+            totalActiveOrders: store.activeOrders.length,
+          });
+
           if (existingOrder) {
-            store.updateOrder(order.id, { ...order, driver: driverInfo } as any);
+            // Utiliser updateFromSocket pour garantir que le statut est bien propagé et déclenche les effets
+            logger.info('🔄 Utilisation de updateFromSocket pour commande existante', 'userOrderSocketService', {
+              orderId: order.id,
+              oldStatus: existingOrder.status,
+              newStatus: orderWithStatus.status,
+            });
+            store.updateFromSocket({ order: orderWithStatus as any });
+            // Mettre à jour aussi avec updateOrder pour les autres propriétés
+            store.updateOrder(order.id, orderWithStatus as any);
           } else {
-            store.addOrder({ ...order, driver: driverInfo } as any);
+            logger.info('➕ Ajout de nouvelle commande au store', 'userOrderSocketService', {
+              orderId: order.id,
+              status: orderWithStatus.status,
+            });
+            store.addOrder(orderWithStatus as any);
           }
+
+          // Vérifier que la mise à jour a bien eu lieu
+          const updatedStore = useOrderStore.getState();
+          const updatedOrder = updatedStore.activeOrders.find(o => o.id === order.id);
+          logger.info('✅ Commande mise à jour dans le store avec statut accepted', 'userOrderSocketService', {
+            orderId: order.id,
+            status: orderWithStatus.status,
+            hasDriver: !!driverInfo,
+            storeUpdated: !!updatedOrder,
+            storeStatus: updatedOrder?.status,
+            storeHasDriver: !!updatedOrder?.driver,
+          });
+
+          // IMPORTANT : Sélectionner automatiquement la commande acceptée pour qu'elle soit affichée
+          // Cela garantit que même avec plusieurs commandes actives, la commande acceptée est visible
+          if (updatedOrder && updatedOrder.status === 'accepted' && updatedOrder.driver) {
+            const currentSelectedId = updatedStore.selectedOrderId;
+            // Sélectionner cette commande si aucune n'est sélectionnée, ou si la commande sélectionnée n'est pas acceptée
+            if (!currentSelectedId) {
+              logger.info('🎯 Sélection automatique de la commande acceptée (aucune sélection)', 'userOrderSocketService', {
+                orderId: order.id,
+              });
+              updatedStore.setSelectedOrder(order.id);
+            } else {
+              const selectedOrder = updatedStore.activeOrders.find(o => o.id === currentSelectedId);
+              // Si la commande sélectionnée n'est pas acceptée, sélectionner la nouvelle commande acceptée
+              if (!selectedOrder || selectedOrder.status !== 'accepted' || !selectedOrder.driver) {
+                logger.info('🎯 Sélection automatique de la commande acceptée (remplacement)', 'userOrderSocketService', {
+                  orderId: order.id,
+                  previousSelectedId: currentSelectedId,
+                  previousStatus: selectedOrder?.status,
+                });
+                updatedStore.setSelectedOrder(order.id);
+              }
+            }
+          }
+        } else {
+          logger.warn('⚠️ order-accepted reçu mais order.id manquant', 'userOrderSocketService', { data });
         }
 
         // Si backend fournit position dans driverInfo, l'utiliser
@@ -330,234 +379,125 @@ class UserOrderSocketService {
       }
     });
 
-    // 🚛 Mise à jour statut livraison (et position)
-    // Canonical status update event emitted by server
-    this.socket.on('order:status:update', (data) => {
-      logger.info('🚛 order:status:update reçu', 'userOrderSocketService', {
-        orderId: data?.order?.id,
-        status: data?.order?.status,
-        fullData: data
-      });
-      try {
-        const { order, location } = data || {};
-
-        if (!order || !order.id) {
-          logger.warn('⚠️ order:status:update reçu sans order.id', 'userOrderSocketService', data);
-          return;
-        }
-
-        // Vérifier le statut actuel dans le store avant la mise à jour
-        const storeBefore = useOrderStore.getState();
-        const existingOrder = storeBefore.activeOrders.find(o => o.id === order.id);
-        const oldStatus = existingOrder?.status || 'unknown';
-        const newStatus = order.status || 'unknown';
-
-        logger.info(`🔄 order:status:update - ${order.id.slice(0, 8)}...: ${oldStatus} → ${newStatus}`, 'userOrderSocketService');
-
-        // 🆕 Mettre à jour immédiatement les coordonnées du livreur si elles sont fournies
-        // Cela évite que le polyline se dessine avec des coordonnées obsolètes
-        // Cela corrige le problème où le polyline rouge est "n'importe quoi au départ"
-        if (location && (location.latitude || location.lat || location.y) && (location.longitude || location.lng || location.x) && order?.id) {
-          const normLocation = {
-            latitude: location.latitude ?? location.lat ?? location.y,
-            longitude: location.longitude ?? location.lng ?? location.x,
-          };
-          useOrderStore.getState().setDriverCoordsForOrder(order.id, normLocation);
-        }
-
-        // Normalize location keys to { latitude, longitude }
-        const normLocation = location
-          ? {
-            latitude: location.latitude ?? location.lat ?? location.y ?? null,
-            longitude: location.longitude ?? location.lng ?? location.x ?? null,
-          }
-          : null;
-
-        // Mettre à jour le store immédiatement
-        logger.info('🔄 Mise à jour du store avec nouveau statut', 'userOrderSocketService', {
-          orderId: order?.id,
-          status: order?.status,
-          oldStatus,
-          newStatus
-        });
-        useOrderStore.getState().updateFromSocket({ order: order as any, location: normLocation });
-
-        // Vérifier que la mise à jour a bien été appliquée
-        setTimeout(() => {
-          const storeAfter = useOrderStore.getState();
-          const updatedOrder = storeAfter.activeOrders.find(o => o.id === order.id);
-          if (updatedOrder) {
-            logger.info(`✅ Vérification post-update: ${order.id.slice(0, 8)}... a maintenant le statut ${updatedOrder.status}`, 'userOrderSocketService');
-          } else {
-            logger.warn(`⚠️ Commande ${order.id.slice(0, 8)}... n'a pas été trouvée dans le store après updateFromSocket`, 'userOrderSocketService');
-          }
-        }, 100);
-
-        // Si la commande est complétée, afficher le bottom sheet d'évaluation
-        if (order && order.status === 'completed' && order.id) {
-          try {
-            // Récupérer le driver_id depuis l'order ou depuis le store
-            const store = useOrderStore.getState();
-            const orderInStore = store.activeOrders.find(o => o.id === order.id);
-            const driverId = order.driver?.id || order.driverId || orderInStore?.driver?.id || orderInStore?.driverId;
-
-            if (driverId) {
-              // Récupérer le nom du livreur
-              const driverName = order.driver?.name ||
-                (order.driver?.first_name ? `${order.driver.first_name || ''} ${order.driver.last_name || ''}`.trim() : null) ||
-                orderInStore?.driver?.name ||
-                'Votre livreur';
-
-              logger.info('⭐ Déclenchement RatingBottomSheet pour commande complétée', 'userOrderSocketService', {
-                orderId: order.id,
-                driverId,
-                driverName,
-                orderHasDriver: !!order.driver?.id,
-                orderInStoreHasDriver: !!orderInStore?.driver?.id
-              });
-
-              useRatingStore.getState().setRatingBottomSheet(
-                true,
-                order.id,
-                driverId,
-                driverName || 'Votre livreur'
-              );
-
-              logger.info('✅ RatingBottomSheet déclenché avec succès', 'userOrderSocketService', { orderId: order.id });
-            } else {
-              logger.warn('⚠️ Impossible de déclencher RatingBottomSheet : driverId manquant', 'userOrderSocketService', {
-                orderId: order.id,
-                orderDriver: order.driver,
-                orderDriverId: order.driverId,
-                orderInStoreDriver: orderInStore?.driver,
-                orderInStoreDriverId: orderInStore?.driverId
-              });
-            }
-          } catch (err) {
-            logger.error('❌ Erreur déclenchement bottom sheet évaluation', 'userOrderSocketService', err);
-          }
-        }
-
-        // If DB persistence for this status update failed, notify the user
-        if (data && data.dbSaved === false) {
-          const msg = data.dbError || 'Impossible d\'enregistrer la mise à jour du statut en base.';
-          logger.warn('DB persistence failed for status update', 'userOrderSocketService', data.dbError);
-          Alert.alert('Erreur base de données', msg);
-        }
-      } catch (err) {
-        logger.warn('Error handling order:status:update', 'userOrderSocketService', err);
-      }
-    });
-
-    // ❌ Commande annulée
+    // Autres listeners...
     this.socket.on('order-cancelled', (data) => {
+      logger.info('❌ Commande annulée', 'userOrderSocketService', data);
       try {
-        logger.info('❌ Commande annulée reçue', 'userOrderSocketService', data);
-        const { orderId } = data || {};
-        if (orderId) {
-          // Mettre à jour le store pour refléter l'annulation
+        if (data?.orderId) {
           const store = useOrderStore.getState();
-          store.updateOrderStatus(orderId, 'cancelled');
-          // Le nettoyage complet sera fait automatiquement après 2 secondes
+          store.updateOrderStatus(data.orderId, 'cancelled');
         }
       } catch (err) {
         logger.warn('Error handling order-cancelled', 'userOrderSocketService', err);
       }
     });
 
-    // Proof uploaded notification
-    this.socket.on('order:proof:uploaded', (data) => {
-      logger.info('🧾 order:proof:uploaded', 'userOrderSocketService', data);
+    this.socket.on('order-error', (data) => {
+      logger.warn('❌ Erreur commande', 'userOrderSocketService', data);
+      if (data?.message) {
+        Alert.alert('Erreur', data.message);
+      }
+    });
+
+    this.socket.on('order:status:update', (data) => {
+      logger.info('🔄 Mise à jour statut commande', 'userOrderSocketService', data);
       try {
-        const { orderId, proof, uploadedAt } = data || {};
-        // Attach proof metadata to current order if matches
-        useOrderStore.getState().updateFromSocket({ order: { id: orderId } as any, proof: { uploadedAt, ...proof } as any });
-        if (data && data.dbSaved === false) {
-          const msg = data.dbError || 'La preuve n\'a pas été sauvegardée en base.';
-          Alert.alert('Erreur base de données', msg);
+        const { order } = data || {};
+        if (order && order.id) {
+          const store = useOrderStore.getState();
+          store.updateFromSocket({ order: order as any });
         }
       } catch (err) {
-        logger.warn('Error handling order:proof:uploaded', 'userOrderSocketService', err);
+        logger.warn('Error handling order:status:update', 'userOrderSocketService', err);
       }
     });
 
-    // Backwards-compatible event name (older code)
-    this.socket.on('delivery-status-update', (data) => {
-      logger.debug('🚛 delivery-status-update (legacy)', 'userOrderSocketService', data);
+    this.socket.on('driver:location:update', (data) => {
       try {
-        const { order, location } = data || {};
-        const normLocation = location
-          ? {
-            latitude: location.latitude ?? location.lat ?? location.y ?? null,
-            longitude: location.longitude ?? location.lng ?? location.x ?? null,
-          }
-          : null;
-        useOrderStore.getState().updateFromSocket({ order: order as any, location: normLocation });
+        const { orderId, latitude, longitude } = data || {};
+        if (orderId && latitude && longitude) {
+          const store = useOrderStore.getState();
+          store.setDriverCoordsForOrder(orderId, { latitude, longitude });
+        }
       } catch (err) {
-        logger.warn('Error handling legacy delivery-status-update', 'userOrderSocketService', err);
+        logger.warn('Error handling driver:location:update', 'userOrderSocketService', err);
       }
     });
+  }
 
-    // ❌ Erreur commande
-    this.socket.on('order-error', (data: { success?: boolean; message?: string; code?: string }) => {
-      // Pour les erreurs de paiement différé, utiliser warn() au lieu de error()
-      // car ce sont des erreurs métier attendues et gérées par le modal personnalisé
-      // Cela évite d'afficher l'écran d'erreur de la console React Native
-      const isDeferredPaymentError = data.code === 'DEFERRED_PAYMENT_LIMIT_EXCEEDED' ||
-        data.code === 'MONTHLY_LIMIT_EXCEEDED' ||
-        data.code === 'ANNUAL_LIMIT_EXCEEDED' ||
-        data.code === 'MAX_MONTHLY_USAGES_EXCEEDED' ||
-        data.code === 'COOLDOWN_ACTIVE' ||
-        data.code === 'DEFERRED_PAYMENT_BLOCKED';
+  private setupSocketListeners(userId: string, skipConnectDisconnect = false) {
+    if (!this.socket) return;
 
-      if (isDeferredPaymentError) {
-        logger.warn('⚠️ Erreur paiement différé (gérée par modal):', 'userOrderSocketService', data);
-      } else {
-        logger.error('❌ Erreur commande:', 'userOrderSocketService', data);
-      }
+    // IMPORTANT : Retirer les anciens listeners avant d'en ajouter de nouveaux
+    // Cela évite les listeners dupliqués lors des reconnexions
+    // Ne pas retirer 'connect' et 'disconnect' si on est déjà dans le listener connect
+    if (!skipConnectDisconnect) {
+      this.socket.removeAllListeners('connect');
+      this.socket.removeAllListeners('disconnect');
+    }
+    this.socket.removeAllListeners('order-accepted');
+    this.socket.removeAllListeners('order-created');
+    this.socket.removeAllListeners('order-cancelled');
+    this.socket.removeAllListeners('order-error');
+    this.socket.removeAllListeners('no-drivers-available');
+    this.socket.removeAllListeners('order:status:update');
+    this.socket.removeAllListeners('driver:location:update');
+    this.socket.removeAllListeners('resync-order-state');
 
-      // Afficher le modal d'erreur avec le message d'erreur
-      const errorMessage = data.message || 'Une erreur est survenue lors de la création de la commande';
+    this.socket.on('connect', () => {
+      logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
+      this.isConnected = true;
+      this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
 
-      // Titre différent selon le type d'erreur
-      let title = 'Erreur de commande';
-      if (isDeferredPaymentError) {
-        title = 'Paiement différé non disponible';
-      }
+      // CRITIQUE : Installer les listeners AVANT d'émettre user-connect
+      // Cela garantit que si le serveur envoie un événement immédiatement après user-connect,
+      // le listener est déjà en place pour le recevoir
+      logger.info('🔄 Réinstallation des listeners après reconnexion (AVANT user-connect)', 'userOrderSocketService');
+      // Installer tous les listeners sauf connect/disconnect (pour éviter la récursion)
+      this.socket.removeAllListeners('order-accepted');
+      this.socket.removeAllListeners('order-created');
+      this.socket.removeAllListeners('order-cancelled');
+      this.socket.removeAllListeners('order-error');
+      this.socket.removeAllListeners('no-drivers-available');
+      this.socket.removeAllListeners('order:status:update');
+      this.socket.removeAllListeners('driver:location:update');
+      this.socket.removeAllListeners('resync-order-state');
 
-      // Afficher le modal d'erreur via le store
-      usePaymentErrorStore.getState().showError(title, errorMessage, data.code || undefined);
+      // Réinstaller les listeners (sauf connect/disconnect pour éviter la récursion)
+      this.installEventListeners(userId);
 
-      // Nettoyer complètement l'état pour revenir au formulaire initial
-      try {
-        useOrderStore.getState().clear();
-        // Réinitialiser le flag pour permettre une nouvelle tentative
-        this.isCreatingOrder = false;
-      } catch { }
+      // S'identifier comme user - IMPORTANT : Toujours ré-émettre même si déjà connecté
+      // Cela garantit que le serveur a bien le userId associé au socket actuel
+      logger.info('👤 Identification comme user', 'userOrderSocketService', { userId });
+      this.socket?.emit('user-connect', userId);
+
+      // Attendre un peu pour s'assurer que le serveur a bien enregistré l'association
+      setTimeout(() => {
+        // Ask server to resync any existing order state for this user
+        // (backend should reply with an event like `resync-order-state`)
+        try {
+          this.socket?.emit('user-reconnect', { userId });
+          logger.debug('🔄 user-reconnect émis', 'userOrderSocketService', { userId });
+        } catch (err) {
+          logger.warn('Resync emit failed', 'userOrderSocketService', err);
+        }
+      }, 100);
     });
 
-    this.socket.on('connect_error', (error) => {
+    this.socket.on('disconnect', (reason) => {
+      logger.info('🔌 Socket user déconnecté', 'userOrderSocketService', { reason });
       this.isConnected = false;
-
-      // Ignorer les erreurs de polling temporaires (Socket.IO essaie plusieurs transports)
-      const isTemporaryPollError = error.message?.includes('xhr poll error') ||
-        error.message?.includes('poll error') ||
-        error.message?.includes('transport unknown');
-
-      // Ne logger que les erreurs importantes
-      if (!isTemporaryPollError || this.retryCount >= 3) {
-        logger.error('❌ Erreur connexion socket user:', 'userOrderSocketService', {
-          message: error.message,
-          type: (error as any).type,
-          description: (error as any).description,
-          retryCount: this.retryCount,
-        });
-      }
 
       // Laisser Socket.IO gérer la reconnexion automatique
       // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
-      this.retryCount = (this.retryCount || 0) + 1;
+      if (reason === 'io server disconnect') {
+        // Le serveur a forcé la déconnexion, laisser Socket.IO se reconnecter
+        logger.info('🔄 Le serveur a forcé la déconnexion, reconnexion automatique...', 'userOrderSocketService');
+      }
     });
+
+    // Installer tous les listeners d'événements (pas connect/disconnect)
+    this.installEventListeners(userId);
   }
 
   disconnect() {
@@ -608,13 +548,9 @@ class UserOrderSocketService {
     packageImages?: string[];
     // Informations de paiement
     paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred';
-    paymentMethodId?: string | null; // ID de la méthode de paiement depuis payment_methods
-    paymentPayerType?: 'client' | 'recipient';
-    isPartialPayment?: boolean;
-    partialAmount?: number;
-    recipientUserId?: string;
-    recipientIsRegistered?: boolean;
-  }) {
+    paymentPhone?: string;
+    estimatedPrice?: number;
+  }): Promise<boolean> {
     return new Promise<boolean>(async (resolve) => {
       // Protection contre les appels multiples simultanés
       if (this.isCreatingOrder) {

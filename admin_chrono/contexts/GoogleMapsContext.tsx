@@ -110,7 +110,7 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: googleMapsApiKey || 'dummy-key-to-avoid-error',
     libraries: GOOGLE_MAPS_LIBRARIES, 
-    id: 'google-maps-script-global',
+    id: 'google-maps-script-global', 
     onError: (error) => {
       // Capturer les erreurs de chargement
       if (isBillingError(error) || isDeletedProjectError(error)) {
