@@ -37,7 +37,7 @@ interface OrderRequestPopupProps {
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const ORDER_SOUND = require('../assets/sound/chronopopus.wav');
+const ORDER_SOUND = require('../assets/sounds/chronopopus.wav');
 
 export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   order,

@@ -400,7 +400,13 @@ class ApiService {
           };
         }
         
-        if (__DEV__) {
+        // Pour les erreurs 500 (problèmes serveur/DB), logger en debug pour éviter le spam
+        // Ces erreurs sont souvent temporaires (connexion DB, réseau, etc.)
+        if (response.status === 500) {
+          if (__DEV__) {
+            console.debug('⚠️ [apiService.getDriverRevenues] Erreur serveur (500):', result.message || 'Erreur serveur');
+          }
+        } else if (__DEV__) {
           console.error(' [apiService.getDriverRevenues] Erreur HTTP:', response.status, result);
         }
         return {
@@ -433,12 +439,11 @@ class ApiService {
       
       return result;
     } catch (error) {
-      if (__DEV__) {
-        console.error(' Erreur getDriverRevenues:', error);
-      }
-      
       // Gérer spécifiquement les erreurs réseau
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        if (__DEV__) {
+          console.debug('⚠️ [apiService.getDriverRevenues] Erreur réseau (backend inaccessible)');
+        }
         return {
           success: false,
           message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
@@ -455,6 +460,11 @@ class ApiService {
             orders: [],
           },
         };
+      }
+      
+      // Pour les autres erreurs, logger en debug pour éviter le spam
+      if (__DEV__) {
+        console.debug('⚠️ [apiService.getDriverRevenues] Erreur:', error instanceof Error ? error.message : 'Erreur inconnue');
       }
       
       return {

@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SOUND_ENABLED_KEY = '@chrono_sound_enabled';
 
 // Son disponible
-const ORDER_COMPLETED_SOUND = require('../assets/sound/ordercompleted.wav');
+const ORDER_COMPLETED_SOUND = require('../assets/sounds/ordercompleted.wav');
 
 class SoundService {
   private orderCompletedSound: Audio.Sound | null = null;
