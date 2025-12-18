@@ -72,7 +72,15 @@ class UserOrderSocketService {
       try {
         const order = data?.order;
         if (order && order.id) {
-          useOrderStore.getState().addOrder(order as any);
+          const store = useOrderStore.getState();
+          store.addOrder(order as any);
+          // IMPORTANT : Sélectionner automatiquement la nouvelle commande créée
+          // Cela garantit que la recherche de livreur se fait pour la nouvelle commande, pas pour l'ancienne
+          logger.info('🎯 Sélection automatique de la nouvelle commande créée', 'userOrderSocketService', {
+            orderId: order.id,
+            previousSelectedId: store.selectedOrderId,
+          });
+          store.setSelectedOrder(order.id);
         }
         // If backend reported persistence failure, inform the user
         if (data && data.dbSaved === false) {
@@ -174,9 +182,10 @@ class UserOrderSocketService {
               oldStatus: existingOrder.status,
               newStatus: orderWithStatus.status,
             });
+            // Mettre à jour avec updateFromSocket qui gère correctement le changement de statut
             store.updateFromSocket({ order: orderWithStatus as any });
-            // Mettre à jour aussi avec updateOrder pour les autres propriétés
-            store.updateOrder(order.id, orderWithStatus as any);
+            // Forcer aussi la mise à jour du statut avec updateOrderStatus pour garantir la cohérence
+            store.updateOrderStatus(order.id, 'accepted');
           } else {
             logger.info('➕ Ajout de nouvelle commande au store', 'userOrderSocketService', {
               orderId: order.id,
