@@ -4,7 +4,9 @@ import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/db.js';
 import { saveOrder } from '../config/orderStorage.js';
 import { broadcastOrderUpdateToAdmins } from '../sockets/adminSocket.js';
+import { notifyDriversForOrder } from '../sockets/orderSocket.js';
 import { formatDeliveryId } from '../utils/formatDeliveryId.js';
+import { geocodeAddress } from '../utils/geocodeService.js';
 import logger from '../utils/logger.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -3290,6 +3292,8 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       distance,
       price,
       notes,
+      isPhoneOrder,
+      driverNotes,
     } = req.body;
 
     // Validation des champs obligatoires
@@ -3301,20 +3305,26 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    if (!pickup.coordinates || !pickup.coordinates.latitude || !pickup.coordinates.longitude) {
-      res.status(400).json({
-        success: false,
-        message: 'Coordonnées de pickup manquantes',
-      });
-      return;
-    }
+    // Pour les commandes téléphoniques, les coordonnées GPS sont optionnelles
+    const isPhoneOrderBool = isPhoneOrder === true;
+    
+    if (!isPhoneOrderBool) {
+      // Pour les commandes normales, les coordonnées GPS sont obligatoires
+      if (!pickup.coordinates || !pickup.coordinates.latitude || !pickup.coordinates.longitude) {
+        res.status(400).json({
+          success: false,
+          message: 'Coordonnées de pickup manquantes',
+        });
+        return;
+      }
 
-    if (!dropoff.coordinates || !dropoff.coordinates.latitude || !dropoff.coordinates.longitude) {
-      res.status(400).json({
-        success: false,
-        message: 'Coordonnées de dropoff manquantes',
-      });
-      return;
+      if (!dropoff.coordinates || !dropoff.coordinates.latitude || !dropoff.coordinates.longitude) {
+        res.status(400).json({
+          success: false,
+          message: 'Coordonnées de dropoff manquantes',
+        });
+        return;
+      }
     }
 
     // Récupérer les informations du client
@@ -3335,6 +3345,39 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     const clientName = client.first_name && client.last_name
       ? `${client.first_name} ${client.last_name}`
       : client.email;
+
+    // Géocoder les adresses si les coordonnées ne sont pas fournies
+    let pickupCoords = pickup.coordinates && pickup.coordinates.latitude && pickup.coordinates.longitude
+      ? { latitude: pickup.coordinates.latitude, longitude: pickup.coordinates.longitude }
+      : null;
+    
+    let dropoffCoords = dropoff.coordinates && dropoff.coordinates.latitude && dropoff.coordinates.longitude
+      ? { latitude: dropoff.coordinates.latitude, longitude: dropoff.coordinates.longitude }
+      : null;
+
+    // Géocoder l'adresse de pickup si nécessaire
+    if (!pickupCoords && pickup.address) {
+      logger.info(`[createAdminOrder] Géocodage de l'adresse pickup: ${pickup.address}`);
+      const geocoded = await geocodeAddress(pickup.address);
+      if (geocoded) {
+        pickupCoords = geocoded;
+        logger.info(`[createAdminOrder] Pickup géocodé: ${geocoded.latitude}, ${geocoded.longitude}`);
+      } else {
+        logger.warn(`[createAdminOrder] Échec du géocodage pour pickup: ${pickup.address}`);
+      }
+    }
+
+    // Géocoder l'adresse de dropoff si nécessaire
+    if (!dropoffCoords && dropoff.address) {
+      logger.info(`[createAdminOrder] Géocodage de l'adresse dropoff: ${dropoff.address}`);
+      const geocoded = await geocodeAddress(dropoff.address);
+      if (geocoded) {
+        dropoffCoords = geocoded;
+        logger.info(`[createAdminOrder] Dropoff géocodé: ${geocoded.latitude}, ${geocoded.longitude}`);
+      } else {
+        logger.warn(`[createAdminOrder] Échec du géocodage pour dropoff: ${dropoff.address}`);
+      }
+    }
 
     // Calculer la durée estimée
     const avgSpeeds: { [key: string]: number } = {
@@ -3361,17 +3404,11 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       },
       pickup: {
         address: pickup.address,
-        coordinates: {
-          latitude: pickup.coordinates.latitude,
-          longitude: pickup.coordinates.longitude,
-        },
+        coordinates: pickupCoords || undefined,
       },
       dropoff: {
         address: dropoff.address,
-        coordinates: {
-          latitude: dropoff.coordinates.latitude,
-          longitude: dropoff.coordinates.longitude,
-        },
+        coordinates: dropoffCoords || undefined,
         details: dropoff.details || undefined,
       },
       recipient: dropoff.details?.phone ? { phone: dropoff.details.phone } : null,
@@ -3388,6 +3425,14 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     (order as any).payment_method_type = paymentMethodType || 'cash';
     (order as any).payment_status = paymentMethodType === 'deferred' ? 'delayed' : 'pending';
     (order as any).payment_payer = 'client';
+    
+    // Ajouter les informations pour les commandes téléphoniques
+    if (isPhoneOrderBool) {
+      (order as any).is_phone_order = true;
+    }
+    if (driverNotes) {
+      (order as any).driver_notes = driverNotes;
+    }
 
     // Sauvegarder la commande en base de données
     try {
@@ -3398,6 +3443,18 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       const io = (req.app as any).get('io') as SocketIOServer | undefined;
       if (io) {
         broadcastOrderUpdateToAdmins(io, 'order:created', { order });
+        
+        // Rechercher et notifier les livreurs proches (comme pour les commandes client)
+        // Seulement si les coordonnées GPS sont disponibles
+        const finalPickupCoords = order.pickup.coordinates;
+        if (finalPickupCoords && finalPickupCoords.latitude && finalPickupCoords.longitude) {
+          logger.info(`[createAdminOrder] Notification des livreurs pour commande ${orderId} avec coordonnées: ${finalPickupCoords.latitude}, ${finalPickupCoords.longitude}`);
+          notifyDriversForOrder(io, order, finalPickupCoords, deliveryMethod).catch((error) => {
+            logger.warn(`[createAdminOrder] Erreur notification livreurs pour commande ${orderId}:`, error);
+          });
+        } else {
+          logger.info(`[createAdminOrder] Commande ${orderId} créée sans coordonnées GPS - pas de recherche de livreurs (commande téléphonique ou géocodage échoué)`);
+        }
       }
 
       // Optionnel: créer une transaction si paymentMethodType est fourni

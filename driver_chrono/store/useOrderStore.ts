@@ -13,7 +13,7 @@ export interface OrderRequest {
   };
   pickup: {
     address: string;
-    coordinates: { latitude: number; longitude: number };
+    coordinates?: { latitude: number; longitude: number };
     details?: {
       entrance?: string;
       apartment?: string;
@@ -24,7 +24,7 @@ export interface OrderRequest {
   };
   dropoff: {
     address: string;
-    coordinates: { latitude: number; longitude: number };
+    coordinates?: { latitude: number; longitude: number };
     details?: {
       phone?: string;
       entrance?: string;
@@ -49,6 +49,8 @@ export interface OrderRequest {
   acceptedAt?: Date;
   completedAt?: Date;
   notes?: string;
+  isPhoneOrder?: boolean;
+  driverNotes?: string;
 }
 
 interface OrderStore {

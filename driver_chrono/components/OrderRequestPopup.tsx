@@ -8,7 +8,7 @@ interface OrderRequest {
   user: {
     name: string;
     avatar?: string;
-    rating: number;
+    rating?: number; // Rating optionnel car peut ne pas être présent pour les commandes admin
   };
   pickup: {
     address: string;
@@ -309,7 +309,9 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
                 <Text style={styles.userName}>{order.user.name}</Text>
                 <View style={styles.ratingContainer}>
                   <Text style={styles.starIcon}>⭐</Text>
-                  <Text style={styles.rating}>{order.user.rating.toFixed(1)}</Text>
+                  <Text style={styles.rating}>
+                    {(order.user.rating ?? 0).toFixed(1)}
+                  </Text>
                 </View>
               </View>
             </View>

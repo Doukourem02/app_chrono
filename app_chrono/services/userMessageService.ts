@@ -182,9 +182,14 @@ class UserMessageService {
       logger.info('✅ Token rafraîchi avec succès');
       return result.data.accessToken as string;
     } catch (error: any) {
-      logger.error('❌ Erreur réseau lors du rafraîchissement:', error);
+      // Ne logger les erreurs réseau que si ce n'est pas une erreur de connexion temporaire
+      // (backend inaccessible en développement)
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        logger.error('❌ Impossible de se connecter au serveur. Vérifiez que le backend est démarré sur', API_BASE_URL);
+        // Logger seulement en mode debug pour éviter le bruit dans les logs
+        logger.debug('⚠️ Backend inaccessible lors du rafraîchissement du token', API_BASE_URL);
+      } else {
+        // Pour les autres erreurs, logger normalement
+        logger.warn('⚠️ Erreur lors du rafraîchissement du token', undefined, error);
       }
       return null;
     }

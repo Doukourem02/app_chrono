@@ -5,6 +5,7 @@ import { X, User, Search, MapPin, Package, DollarSign } from 'lucide-react'
 import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
 import { useRouter } from 'next/navigation'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface UserData {
   id: string
@@ -36,15 +37,15 @@ export default function NewShippingModal({
   // Form data
   const [selectedClient, setSelectedClient] = useState<UserData | null>(null)
   const [pickupAddress, setPickupAddress] = useState('')
-  const [pickupLat, setPickupLat] = useState<number | null>(null)
-  const [pickupLng, setPickupLng] = useState<number | null>(null)
+  const [pickupCoordinates, setPickupCoordinates] = useState<{ latitude: number; longitude: number } | undefined>(undefined)
   const [dropoffAddress, setDropoffAddress] = useState('')
-  const [dropoffLat, setDropoffLat] = useState<number | null>(null)
-  const [dropoffLng, setDropoffLng] = useState<number | null>(null)
+  const [dropoffCoordinates, setDropoffCoordinates] = useState<{ latitude: number; longitude: number } | undefined>(undefined)
   const [deliveryMethod, setDeliveryMethod] = useState<'moto' | 'vehicule' | 'cargo'>('moto')
   const [recipientPhone, setRecipientPhone] = useState('')
   const [notes, setNotes] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'orange_money' | 'wave' | 'cash' | 'deferred'>('cash')
+  const [isPhoneOrder, setIsPhoneOrder] = useState(false)
+  const [driverNotes, setDriverNotes] = useState('')
 
   // Calculated values
   const [distance, setDistance] = useState<number | null>(null)
@@ -91,29 +92,15 @@ export default function NewShippingModal({
     }
   }, [searchQuery, users])
 
-  // Calculate distance and price when coordinates are available
+  // Calculate distance and price - utilise une distance estimée par défaut
+  // Le backend pourra géocoder les adresses et calculer la distance exacte
   useEffect(() => {
-    if (pickupLat !== null && pickupLng !== null && dropoffLat !== null && dropoffLng !== null) {
-      const calculatedDistance = calculateDistance(pickupLat, pickupLng, dropoffLat, dropoffLng)
-      setDistance(calculatedDistance)
-      const calculatedPrice = calculatePrice(calculatedDistance, deliveryMethod)
-      setPrice(calculatedPrice)
-    }
-  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, deliveryMethod])
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371 // Rayon de la Terre en km
-    const dLat = ((lat2 - lat1) * Math.PI) / 180
-    const dLon = ((lon2 - lon1) * Math.PI) / 180
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return Math.round(R * c * 100) / 100
-  }
+    // Distance estimée par défaut (le backend calculera la distance exacte via géocodage)
+    const estimatedDistance = 5 // 5 km par défaut
+    setDistance(estimatedDistance)
+    const calculatedPrice = calculatePrice(estimatedDistance, deliveryMethod)
+    setPrice(calculatedPrice)
+  }, [deliveryMethod])
 
   const calculatePrice = (distance: number, method: string): number => {
     const basePrices: { [key: string]: { base: number; perKm: number } } = {
@@ -133,13 +120,13 @@ export default function NewShippingModal({
   }
 
   const handlePickupNext = () => {
-    if (pickupAddress && pickupLat !== null && pickupLng !== null) {
+    if (pickupAddress) {
       setStep('dropoff')
     }
   }
 
   const handleDropoffNext = () => {
-    if (dropoffAddress && dropoffLat !== null && dropoffLng !== null) {
+    if (dropoffAddress) {
       setStep('details')
     }
   }
@@ -147,15 +134,15 @@ export default function NewShippingModal({
   const resetForm = useCallback(() => {
     setSelectedClient(null)
     setPickupAddress('')
-    setPickupLat(null)
-    setPickupLng(null)
+    setPickupCoordinates(undefined)
     setDropoffAddress('')
-    setDropoffLat(null)
-    setDropoffLng(null)
+    setDropoffCoordinates(undefined)
     setRecipientPhone('')
     setNotes('')
     setDeliveryMethod('moto')
     setPaymentMethod('cash')
+    setIsPhoneOrder(false)
+    setDriverNotes('')
     setDistance(null)
     setPrice(null)
     setStep('client')
@@ -169,8 +156,8 @@ export default function NewShippingModal({
   }, [isOpen, resetForm])
 
   const handleCreateOrder = async () => {
-    if (!selectedClient || !pickupAddress || pickupLat === null || pickupLng === null || 
-        !dropoffAddress || dropoffLat === null || dropoffLng === null || !distance || !price) {
+    // Validation
+    if (!selectedClient || !pickupAddress || !dropoffAddress || !distance || !price) {
       alert('Veuillez remplir tous les champs obligatoires')
       return
     }
@@ -181,17 +168,11 @@ export default function NewShippingModal({
         userId: selectedClient.id,
         pickup: {
           address: pickupAddress,
-          coordinates: {
-            latitude: pickupLat,
-            longitude: pickupLng,
-          },
+          coordinates: pickupCoordinates, // Coordonnées depuis l'autocomplétion
         },
         dropoff: {
           address: dropoffAddress,
-          coordinates: {
-            latitude: dropoffLat,
-            longitude: dropoffLng,
-          },
+          coordinates: dropoffCoordinates, // Coordonnées depuis l'autocomplétion
           details: recipientPhone ? { phone: recipientPhone } : undefined,
         },
         deliveryMethod,
@@ -199,6 +180,8 @@ export default function NewShippingModal({
         distance,
         price,
         notes: notes || undefined,
+        isPhoneOrder: isPhoneOrder || undefined,
+        driverNotes: driverNotes || undefined,
       })
 
       if (result.success && result.data) {
@@ -508,42 +491,20 @@ export default function NewShippingModal({
               )}
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>
-                  <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280' }} />
-                  Adresse de pickup
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Cocody, Abidjan"
-                  style={inputStyle}
+                <AddressAutocomplete
                   value={pickupAddress}
-                  onChange={(e) => setPickupAddress(e.target.value)}
+                  onChange={(address, coordinates) => {
+                    setPickupAddress(address)
+                    setPickupCoordinates(coordinates)
+                  }}
+                  placeholder="Ex: Cocody, Abidjan"
+                  label={
+                    <span>
+                      <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280', verticalAlign: 'middle' }} />
+                      Adresse de pickup
+                    </span>
+                  }
                 />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <label style={labelStyle}>Latitude</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="5.3600"
-                    style={inputStyle}
-                    value={pickupLat ?? ''}
-                    onChange={(e) => setPickupLat(e.target.value ? parseFloat(e.target.value) : null)}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Longitude</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="-4.0083"
-                    style={inputStyle}
-                    value={pickupLng ?? ''}
-                    onChange={(e) => setPickupLng(e.target.value ? parseFloat(e.target.value) : null)}
-                  />
-                </div>
               </div>
             </>
           )}
@@ -551,42 +512,20 @@ export default function NewShippingModal({
           {step === 'dropoff' && (
             <>
               <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>
-                  <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280' }} />
-                  Adresse de livraison
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Yopougon, Abidjan"
-                  style={inputStyle}
+                <AddressAutocomplete
                   value={dropoffAddress}
-                  onChange={(e) => setDropoffAddress(e.target.value)}
+                  onChange={(address, coordinates) => {
+                    setDropoffAddress(address)
+                    setDropoffCoordinates(coordinates)
+                  }}
+                  placeholder="Ex: Yopougon, Abidjan"
+                  label={
+                    <span>
+                      <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280', verticalAlign: 'middle' }} />
+                      Adresse de livraison
+                    </span>
+                  }
                 />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <label style={labelStyle}>Latitude</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="5.3204"
-                    style={inputStyle}
-                    value={dropoffLat ?? ''}
-                    onChange={(e) => setDropoffLat(e.target.value ? parseFloat(e.target.value) : null)}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Longitude</label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="-4.0267"
-                    style={inputStyle}
-                    value={dropoffLng ?? ''}
-                    onChange={(e) => setDropoffLng(e.target.value ? parseFloat(e.target.value) : null)}
-                  />
-                </div>
               </div>
 
               {distance !== null && price !== null && (
@@ -678,6 +617,66 @@ export default function NewShippingModal({
                   onChange={(e) => setNotes(e.target.value)}
                 />
               </div>
+
+              {/* Toggle Commande téléphonique / Hors ligne */}
+              <div style={{ 
+                marginBottom: '16px', 
+                padding: '16px', 
+                backgroundColor: isPhoneOrder ? '#FEF3C7' : '#F3F4F6', 
+                borderRadius: '8px',
+                border: `1px solid ${isPhoneOrder ? '#F59E0B' : '#E5E7EB'}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isPhoneOrder ? '12px' : '0' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ ...labelStyle, marginBottom: '4px', cursor: 'pointer' }}>
+                      Commande téléphonique / Hors ligne
+                    </label>
+                    <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                      Cochez si le client a appelé pour créer cette commande
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isPhoneOrder}
+                    onChange={(e) => setIsPhoneOrder(e.target.checked)}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      cursor: 'pointer',
+                      marginLeft: '12px',
+                    }}
+                  />
+                </div>
+                {isPhoneOrder && (
+                  <>
+                    <div style={{ 
+                      padding: '8px 12px', 
+                      backgroundColor: '#FFFFFF', 
+                      borderRadius: '6px', 
+                      marginTop: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#F59E0B' }}>⚠️</span>
+                      <span style={{ fontSize: '12px', color: '#92400E' }}>
+                        Commande hors ligne - Les coordonnées GPS ne sont pas nécessaires. Le livreur appellera le client pour obtenir la position exacte.
+                      </span>
+                    </div>
+                    <div style={{ marginTop: '12px' }}>
+                      <label style={{ ...labelStyle, marginBottom: '4px' }}>
+                        Notes pour le livreur (optionnel)
+                      </label>
+                      <textarea
+                        placeholder="Instructions spéciales pour le livreur (ex: Appeler le client pour position exacte)..."
+                        style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
+                        value={driverNotes}
+                        onChange={(e) => setDriverNotes(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -723,13 +722,13 @@ export default function NewShippingModal({
             <button
               type="button"
               onClick={handlePickupNext}
-              disabled={!pickupAddress || pickupLat === null || pickupLng === null}
+              disabled={!pickupAddress}
               style={{
                 ...buttonStyle,
                 backgroundColor: '#8B5CF6',
                 color: '#FFFFFF',
-                opacity: !pickupAddress || pickupLat === null || pickupLng === null ? 0.5 : 1,
-                cursor: !pickupAddress || pickupLat === null || pickupLng === null ? 'not-allowed' : 'pointer',
+                opacity: !pickupAddress ? 0.5 : 1,
+                cursor: !pickupAddress ? 'not-allowed' : 'pointer',
               }}
             >
               Suivant
@@ -739,13 +738,13 @@ export default function NewShippingModal({
             <button
               type="button"
               onClick={handleDropoffNext}
-              disabled={!dropoffAddress || dropoffLat === null || dropoffLng === null}
+              disabled={!dropoffAddress}
               style={{
                 ...buttonStyle,
                 backgroundColor: '#8B5CF6',
                 color: '#FFFFFF',
-                opacity: !dropoffAddress || dropoffLat === null || dropoffLng === null ? 0.5 : 1,
-                cursor: !dropoffAddress || dropoffLat === null || dropoffLng === null ? 'not-allowed' : 'pointer',
+                opacity: !dropoffAddress ? 0.5 : 1,
+                cursor: !dropoffAddress ? 'not-allowed' : 'pointer',
               }}
             >
               Suivant

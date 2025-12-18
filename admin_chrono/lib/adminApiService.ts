@@ -1425,11 +1425,11 @@ class AdminApiService {
     userId: string
     pickup: {
       address: string
-      coordinates: { latitude: number; longitude: number }
+      coordinates?: { latitude: number; longitude: number }
     }
     dropoff: {
       address: string
-      coordinates: { latitude: number; longitude: number }
+      coordinates?: { latitude: number; longitude: number }
       details?: { phone?: string }
     }
     deliveryMethod: 'moto' | 'vehicule' | 'cargo'
@@ -1437,6 +1437,8 @@ class AdminApiService {
     distance: number
     price: number
     notes?: string
+    isPhoneOrder?: boolean
+    driverNotes?: string
   }): Promise<{
     success: boolean
     data?: { id: string }

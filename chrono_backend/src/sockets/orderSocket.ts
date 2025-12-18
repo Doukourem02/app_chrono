@@ -254,6 +254,104 @@ async function findNearbyDrivers(
   return nearbyDrivers.sort((a, b) => a.distance - b.distance);
 }
 
+/**
+ * Fonction utilitaire pour rechercher et notifier les livreurs d'une nouvelle commande
+ * Peut être utilisée depuis adminController pour les commandes créées par l'admin
+ */
+async function notifyDriversForOrder(
+  io: SocketIOServer,
+  order: Order,
+  pickupCoords: OrderCoordinates | undefined,
+  deliveryMethod: string
+): Promise<void> {
+  const DEBUG = process.env.DEBUG_SOCKETS === 'true';
+  
+  // Si pas de coordonnées (commande téléphonique), ne pas chercher de livreurs pour l'instant
+  if (!pickupCoords || !pickupCoords.latitude || !pickupCoords.longitude) {
+    if (DEBUG) {
+      console.log(`[notifyDriversForOrder] Commande ${maskOrderId(order.id)} sans coordonnées GPS - pas de recherche de livreurs`);
+    }
+    return;
+  }
+
+  try {
+    // Ajouter la commande à activeOrders pour le suivi
+    activeOrders.set(order.id, order);
+
+    // Chercher les livreurs proches
+    const nearbyDrivers = await findNearbyDrivers(pickupCoords, deliveryMethod);
+    
+    if (DEBUG) {
+      console.log(`[notifyDriversForOrder] ${nearbyDrivers.length} livreurs trouvés pour commande ${maskOrderId(order.id)}`);
+    }
+
+    if (nearbyDrivers.length === 0) {
+      if (DEBUG) {
+        console.log(`[notifyDriversForOrder] Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`);
+      }
+      return;
+    }
+
+    // Envoyer la commande aux livreurs proches
+    let driverIndex = 0;
+    const tryNextDriver = async (): Promise<void> => {
+      if (driverIndex >= nearbyDrivers.length) {
+        if (DEBUG) {
+          console.log(`[notifyDriversForOrder] Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)}`);
+        }
+        // Ne pas annuler automatiquement, laisser la commande en pending
+        activeOrders.delete(order.id);
+        return;
+      }
+
+      const driver = nearbyDrivers[driverIndex];
+      const driverSocketId = connectedDrivers.get(driver.driverId);
+
+      if (DEBUG) {
+        console.log(`[notifyDriversForOrder] Tentative envoi à livreur ${maskUserId(driver.driverId)}: socket=${driverSocketId || 'NON CONNECTÉ'}, distance=${driver.distance.toFixed(2)}km`);
+      }
+
+      if (driverSocketId) {
+        const assignedAt = new Date();
+        order.assignedAt = assignedAt;
+        
+        // Enregistrer l'assignation
+        await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => {});
+        
+        // Envoyer la commande au livreur
+        io.to(driverSocketId).emit('new-order-request', order);
+        
+        if (DEBUG) {
+          console.log(`[notifyDriversForOrder] Événement 'new-order-request' émis vers socket ${driverSocketId}`);
+        }
+
+        // Timeout de 20 secondes pour la réponse du livreur
+        setTimeout(async () => {
+          const currentOrder = activeOrders.get(order.id);
+          if (currentOrder && currentOrder.status === 'pending') {
+            if (DEBUG) {
+              console.log(`[notifyDriversForOrder] Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`);
+            }
+            await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => {});
+            driverIndex++;
+            tryNextDriver().catch(() => {});
+          }
+        }, 20000);
+      } else {
+        if (DEBUG) {
+          console.log(`[notifyDriversForOrder] Chauffeur ${maskUserId(driver.driverId)} trouvé mais socket non connecté`);
+        }
+        driverIndex++;
+        tryNextDriver().catch(() => {});
+      }
+    };
+
+    tryNextDriver().catch(() => {});
+  } catch (error: any) {
+    console.error(`[notifyDriversForOrder] Erreur notification livreurs pour commande ${maskOrderId(order.id)}:`, error);
+  }
+}
+
 const setupOrderSocket = (io: SocketIOServer): void => {
   const DEBUG = process.env.DEBUG_SOCKETS === 'true'; io.on('connection', (socket: ExtendedSocket) => {
     if (DEBUG) console.log(`Nouvelle connexion Socket: ${socket.id}`); socket.on('driver-connect', (driverId: string) => { connectedDrivers.set(driverId, socket.id); socket.driverId = driverId; console.log(`[DIAGNOSTIC] Driver connecté: ${maskUserId(driverId)} (socket: ${socket.id})`); console.log(` - Total drivers connectés: ${connectedDrivers.size}`); }); socket.on('user-connect', (userId: string) => {
@@ -976,6 +1074,6 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 export {
   activeOrders, calculatePrice, connectedDrivers,
   connectedUsers, estimateDuration,
-  findNearbyDrivers, setupOrderSocket
+  findNearbyDrivers, setupOrderSocket, notifyDriversForOrder
 };
 

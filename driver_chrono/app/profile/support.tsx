@@ -12,13 +12,19 @@ export default function SupportPage() {
   const handleContact = (method: string) => {
     switch (method) {
       case 'email':
-        Linking.openURL('mailto:support@chrono.com');
+        Linking.openURL('mailto:support@chrono.com').catch(() => {
+          Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application email');
+        });
         break;
       case 'phone':
-        Linking.openURL('tel:+2250000000000');
+        Linking.openURL('tel:+2250000000000').catch(() => {
+          Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application téléphone');
+        });
         break;
       case 'whatsapp':
-        Linking.openURL('https://wa.me/2250000000000');
+        Linking.openURL('https://wa.me/2250000000000').catch(() => {
+          Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp');
+        });
         break;
     }
   };

@@ -243,14 +243,16 @@ class OrderSocketService {
       // Ignorer les erreurs de polling temporaires (Socket.IO essaie plusieurs transports)
       const isTemporaryPollError = error.message?.includes('xhr poll error') ||
         error.message?.includes('poll error') ||
-        error.message?.includes('transport unknown');
+        error.message?.includes('transport unknown') ||
+        error.message?.includes('websocket error') ||
+        (error as any).type === 'TransportError';
 
-      // Ne logger que les erreurs importantes
-      if (!isTemporaryPollError || this.retryCount >= 3) {
-        logger.error('Erreur connexion socket:', undefined, {
+      // Ne logger que les erreurs importantes après plusieurs tentatives
+      // Ignorer les erreurs si le backend est simplement inaccessible (normal en développement)
+      if (!isTemporaryPollError && this.retryCount >= 3) {
+        logger.warn('Erreur connexion socket persistante:', undefined, {
           message: error.message,
           type: (error as any).type,
-          description: (error as any).description,
           retryCount: this.retryCount,
         });
       }

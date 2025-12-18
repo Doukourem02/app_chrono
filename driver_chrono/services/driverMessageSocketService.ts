@@ -53,16 +53,23 @@ class DriverMessageSocketService {
 
     this.socket.on('connect_error', (error) => {
       this.isConnected = false;
-      // Ignorer les erreurs de polling temporaires
+      // Ignorer les erreurs de polling temporaires et WebSocket
       const isTemporaryPollError = error.message?.includes('xhr poll error') || 
                                    error.message?.includes('poll error') ||
-                                   error.message?.includes('transport unknown');
+                                   error.message?.includes('transport unknown') ||
+                                   error.message?.includes('websocket error') ||
+                                   (error as any).type === 'TransportError';
       
+      // Ne logger que les erreurs non-temporaires (après plusieurs tentatives)
+      // Ignorer les erreurs si le backend est simplement inaccessible
       if (!isTemporaryPollError) {
-        logger.error('❌ Erreur connexion socket messagerie:', 'driverMessageSocketService', {
-          message: error.message,
-          type: (error as any).type,
-        });
+        // Logger seulement en mode debug ou après plusieurs tentatives
+        if (__DEV__) {
+          logger.debug('Erreur connexion socket messagerie (tentative de reconnexion en cours)', 'driverMessageSocketService', {
+            message: error.message,
+            type: (error as any).type,
+          });
+        }
       }
     });
 

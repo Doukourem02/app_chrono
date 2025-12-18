@@ -152,17 +152,21 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
 
   if (!currentOrder) return null;
 
-  const recipientPhone = currentOrder?.recipient?.phone || currentOrder?.dropoff?.details?.phone || null;
+  const recipientPhone = currentOrder?.recipient?.phone || currentOrder?.dropoff?.details?.phone || currentOrder?.user?.phone || null;
   const dropoffDetails = currentOrder?.dropoff?.details || {};
   const packageImages = currentOrder?.packageImages || currentOrder?.dropoff?.details?.photos || [];
+  const isPhoneOrder = currentOrder?.isPhoneOrder || false;
+  const driverNotes = currentOrder?.driverNotes || '';
 
   const handleCall = () => {
-    if (!recipientPhone) {
+    if (!recipientPhone && !currentOrder?.user?.phone) {
       Alert.alert('Information', 'Numéro de téléphone non disponible');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const phoneNumber = recipientPhone.startsWith('+') ? recipientPhone : `+${recipientPhone}`;
+    const phoneNumber = (recipientPhone || currentOrder?.user?.phone || '').startsWith('+') 
+      ? (recipientPhone || currentOrder?.user?.phone || '') 
+      : `+${recipientPhone || currentOrder?.user?.phone || ''}`;
     Linking.openURL(`tel:${phoneNumber}`).catch(() => {
       Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application téléphone');
     });
@@ -243,7 +247,15 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
         <View style={styles.expandedCard}>
           {/* Header avec onglets */}
           <View style={styles.header}>
-            <Text style={styles.title}>Commande en cours</Text>
+            <View style={styles.titleContainer}>
+              <Text style={styles.title}>Commande en cours</Text>
+              {isPhoneOrder && (
+                <View style={styles.offlineBadge}>
+                  <Ionicons name="phone-portrait-outline" size={14} color="#F59E0B" />
+                  <Text style={styles.offlineBadgeText}>Hors ligne</Text>
+                </View>
+              )}
+            </View>
             <View style={styles.tabsContainer}>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'details' && styles.tabActive]}
@@ -293,6 +305,33 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
           >
             {activeTab === 'details' ? (
               <View style={styles.detailsContent}>
+                {/* Badge et bouton pour commandes hors ligne */}
+                {isPhoneOrder && (
+                  <View style={styles.offlineSection}>
+                    <View style={styles.offlineAlert}>
+                      <Ionicons name="warning-outline" size={20} color="#F59E0B" />
+                      <View style={styles.offlineAlertText}>
+                        <Text style={styles.offlineAlertTitle}>Commande hors ligne</Text>
+                        <Text style={styles.offlineAlertSubtitle}>
+                          Cette commande a été créée par téléphone. Les coordonnées GPS peuvent être approximatives.
+                        </Text>
+                        {driverNotes && (
+                          <Text style={styles.driverNotesText}>
+                            <Text style={styles.driverNotesLabel}>Note: </Text>
+                            {driverNotes}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <TouchableOpacity style={styles.callClientButton} onPress={handleCall}>
+                      <Ionicons name="call" size={20} color="#FFFFFF" />
+                      <Text style={styles.callClientButtonText}>
+                        Appeler le client pour position exacte
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* Actions de statut */}
                 {availableActions.length > 0 && (
                   <View style={styles.section}>
@@ -325,17 +364,26 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   <View style={styles.addressCard}>
                     <Text style={styles.addressText}>{currentOrder.dropoff.address}</Text>
                   </View>
-                  <TouchableOpacity style={styles.navigateButton} onPress={handleNavigate}>
-                    <LinearGradient
-                      colors={['#7C3AED', '#6366F1']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.navigateButtonGradient}
-                    >
-                      <Ionicons name="navigate" size={20} color="#fff" />
-                      <Text style={styles.navigateButtonText}>Ouvrir la navigation</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                  {currentOrder.dropoff.coordinates ? (
+                    <TouchableOpacity style={styles.navigateButton} onPress={handleNavigate}>
+                      <LinearGradient
+                        colors={['#7C3AED', '#6366F1']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.navigateButtonGradient}
+                      >
+                        <Ionicons name="navigate" size={20} color="#fff" />
+                        <Text style={styles.navigateButtonText}>Ouvrir la navigation</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  ) : isPhoneOrder ? (
+                    <View style={styles.noCoordinatesWarning}>
+                      <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
+                      <Text style={styles.noCoordinatesText}>
+                        Coordonnées GPS non disponibles. Appelez le client pour obtenir sa position exacte.
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {/* Téléphone */}
@@ -548,11 +596,32 @@ const styles = StyleSheet.create({
     marginTop: 16, // Ajouté pour compenser le paddingTop supprimé
     marginBottom: 20,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
   title: {
     fontSize: 20,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 16,
+  },
+  offlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  offlineBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -691,6 +760,73 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  offlineSection: {
+    marginBottom: 24,
+  },
+  offlineAlert: {
+    flexDirection: 'row',
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    marginBottom: 12,
+    gap: 12,
+  },
+  offlineAlertText: {
+    flex: 1,
+  },
+  offlineAlertTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  offlineAlertSubtitle: {
+    fontSize: 13,
+    color: '#78350F',
+    lineHeight: 18,
+  },
+  driverNotesText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#78350F',
+    lineHeight: 18,
+  },
+  driverNotesLabel: {
+    fontWeight: '600',
+  },
+  callClientButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F59E0B',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  callClientButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  noCoordinatesWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  noCoordinatesText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 18,
   },
   detailsCard: {
     backgroundColor: '#F9FAFB',
