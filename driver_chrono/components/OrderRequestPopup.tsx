@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import {View,Text,TouchableOpacity,StyleSheet,Animated,Dimensions,Image,StatusBar,} from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
+import { AdminOrderInfo } from './AdminOrderInfo';
 
 interface OrderRequest {
   id: string;
@@ -23,6 +24,8 @@ interface OrderRequest {
   distance: number;
   estimatedDuration: string;
   createdAt: Date;
+  isPhoneOrder?: boolean; // Indique si la commande a été créée par téléphone/admin
+  driverNotes?: string; // Notes spéciales pour le livreur
 }
 
 interface OrderRequestPopupProps {
@@ -321,6 +324,12 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
               <Text style={styles.priceLabel}>Prix Course</Text>
             </View>
           </View>
+
+          {/* Informations spéciales pour les commandes admin/téléphoniques */}
+          <AdminOrderInfo
+            isPhoneOrder={order.isPhoneOrder || false}
+            driverNotes={order.driverNotes}
+          />
 
           {/* Info de livraison */}
           <View style={styles.deliveryInfo}>

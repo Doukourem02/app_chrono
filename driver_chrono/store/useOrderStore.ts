@@ -94,37 +94,53 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
 
   addOrder: (order) => set((state) => {
     const exists = state.activeOrders.some(o => o.id === order.id);
+    
+    // Mapper les champs du backend (snake_case) vers le format frontend (camelCase)
+    const mappedOrder: OrderRequest = {
+      ...order,
+      isPhoneOrder: (order as any).is_phone_order ?? (order as any).isPhoneOrder ?? false,
+      driverNotes: (order as any).driver_notes ?? (order as any).driverNotes ?? undefined,
+    };
+    
     if (exists) {
       // Si la commande existe déjà, la mettre à jour plutôt que de la dupliquer
       const updatedActive = state.activeOrders.map(o =>
-        o.id === order.id ? { ...o, ...order } : o
+        o.id === order.id ? { ...o, ...mappedOrder } : o
       );
       return {
         activeOrders: updatedActive,
       };
     }
     
-    const newOrders = [...state.activeOrders, order];
+    const newOrders = [...state.activeOrders, mappedOrder];
     
     // Si aucune commande n'est sélectionnée, ou si la nouvelle commande a un statut actif prioritaire,
     // la sélectionner automatiquement pour qu'elle s'affiche immédiatement
     const shouldSelectNewOrder = !state.selectedOrderId || 
-      order.status === 'picked_up' || 
-      order.status === 'delivering' || 
-      order.status === 'enroute' || 
-      order.status === 'in_progress';
+      mappedOrder.status === 'picked_up' || 
+      mappedOrder.status === 'delivering' || 
+      mappedOrder.status === 'enroute' || 
+      mappedOrder.status === 'in_progress';
     
     return {
       activeOrders: newOrders,
-      selectedOrderId: shouldSelectNewOrder ? order.id : state.selectedOrderId,
+      selectedOrderId: shouldSelectNewOrder ? mappedOrder.id : state.selectedOrderId,
     };
   }),
 
   addPendingOrder: (order) => set((state) => {
     const exists = state.pendingOrders.some(o => o.id === order.id);
     if (exists) return state;
+    
+    // Mapper les champs du backend (snake_case) vers le format frontend (camelCase)
+    const mappedOrder: OrderRequest = {
+      ...order,
+      isPhoneOrder: (order as any).is_phone_order ?? (order as any).isPhoneOrder ?? false,
+      driverNotes: (order as any).driver_notes ?? (order as any).driverNotes ?? undefined,
+    };
+    
     return {
-      pendingOrders: [...state.pendingOrders, order],
+      pendingOrders: [...state.pendingOrders, mappedOrder],
     };
   }),
 
