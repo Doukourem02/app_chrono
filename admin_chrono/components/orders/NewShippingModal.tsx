@@ -184,12 +184,20 @@ export default function NewShippingModal({
         driverNotes: driverNotes || undefined,
       })
 
-      if (result.success && result.data) {
-        const orderId = (result.data as { id: string }).id
-        resetForm()
-        onClose()
-        // Navigate to orders page with the new order
-        router.push(`/orders?status=onProgress&orderId=${orderId}`)
+        if (result.success && result.data) {
+          const orderId = (result.data as { id: string }).id
+          // Jouer le son de succès
+          const { soundService } = await import('@/utils/soundService')
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[NewShippingModal] 🔊 Tentative de jouer le son de succès')
+          }
+          soundService.playSuccess().catch((err) => {
+            console.warn('[NewShippingModal] Erreur lecture son succès:', err)
+          })
+          resetForm()
+          onClose()
+          // Navigate to orders page with the new order
+          router.push(`/orders?status=onProgress&orderId=${orderId}`)
       } else {
         alert(result.message || 'Impossible de créer la commande')
       }

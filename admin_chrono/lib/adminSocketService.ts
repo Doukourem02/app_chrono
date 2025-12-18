@@ -193,7 +193,61 @@ class AdminSocketService {
         if (process.env.NODE_ENV === 'development') {
           logger.debug('[adminSocketService] Mise à jour de commande:', data.order?.id)
         }
+        
+        // Détecter les nouvelles commandes créées par les clients (status='pending')
+        // Ne pas jouer le son si c'est une commande créée par l'admin
+        if (data.order?.status === 'pending' && typeof window !== 'undefined') {
+          // Vérifier si c'est une nouvelle commande (pas une mise à jour)
+          // On joue le son uniquement pour les commandes client (pas is_phone_order)
+          const order = data.order as any
+          console.log('[adminSocketService] 📦 Commande avec status pending détectée:', {
+            orderId: data.order?.id,
+            isPhoneOrder: order.is_phone_order,
+            order: data.order,
+          })
+          if (!order.is_phone_order) {
+            console.log('[adminSocketService] 🔊 Tentative de jouer le son pour nouvelle commande:', data.order?.id)
+            import('@/utils/soundService').then(({ soundService }) => {
+              soundService.playNewOrder().catch((err) => {
+                console.warn('[adminSocketService] Erreur lecture son nouvelle commande:', err)
+              })
+            }).catch((err) => {
+              console.warn('[adminSocketService] Erreur chargement soundService:', err)
+            })
+          } else {
+            console.log('[adminSocketService] ⏭️ Commande téléphonique, son ignoré')
+          }
+        }
+        
         this.emit('order:status:update', data)
+      })
+
+      // Écouter les nouvelles commandes créées (si l'événement existe)
+      this.socket.on('order:created', (data: { order: any }) => {
+        if (process.env.NODE_ENV === 'development') {
+          logger.debug('[adminSocketService] Nouvelle commande créée:', data.order?.id)
+        }
+        
+        // Jouer le son uniquement pour les commandes créées par les clients
+        // (pas les commandes téléphoniques créées par l'admin)
+        console.log('[adminSocketService] 📦 Événement order:created reçu:', {
+          orderId: data.order?.id,
+          isPhoneOrder: data.order?.is_phone_order,
+        })
+        if (data.order && !data.order.is_phone_order && typeof window !== 'undefined') {
+          console.log('[adminSocketService] 🔊 Tentative de jouer le son pour order:created:', data.order?.id)
+          import('@/utils/soundService').then(({ soundService }) => {
+            soundService.playNewOrder().catch((err) => {
+              console.warn('[adminSocketService] Erreur lecture son order:created:', err)
+            })
+          }).catch((err) => {
+            console.warn('[adminSocketService] Erreur chargement soundService:', err)
+          })
+        } else {
+          console.log('[adminSocketService] ⏭️ Commande téléphonique ou window undefined, son ignoré')
+        }
+        
+        this.emit('order:created', data)
       })
 
       // Écouter les erreurs
