@@ -68,12 +68,14 @@ if (process.env.DATABASE_URL) {
     // Monitoring du pool (optionnel, seulement en développement)
     if (process.env.NODE_ENV === 'development' && process.env.DEBUG_DB_POOL === 'true') {
       setInterval(() => {
-        const poolStats = {
-          totalCount: pool.totalCount,
-          idleCount: pool.idleCount,
-          waitingCount: pool.waitingCount,
-        };
-        logger.debug('📊 Pool PostgreSQL stats:', poolStats);
+        if (pool) {
+          const poolStats = {
+            totalCount: pool.totalCount,
+            idleCount: pool.idleCount,
+            waitingCount: pool.waitingCount,
+          };
+          logger.debug('📊 Pool PostgreSQL stats:', poolStats);
+        }
       }, 30000); // Toutes les 30 secondes
     }
 

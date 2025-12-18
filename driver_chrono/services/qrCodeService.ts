@@ -64,8 +64,9 @@ class QRCodeService {
       const deviceInfo = {
         platform: Platform.OS,
         model: Platform.select({
-          ios: Platform.constants.systemName,
-          android: Platform.constants.Manufacturer,
+          ios: (Platform.constants as any).systemName || 'iOS',
+          android: (Platform.constants as any).Manufacturer || 'Android',
+          default: Platform.OS,
         }),
       };
 

@@ -25,8 +25,8 @@ class UserOrderSocketService {
     if (this.socket) {
       logger.info('🔄 Nettoyage de l\'ancien socket', 'userOrderSocketService');
       try {
-      this.socket.removeAllListeners();
-      this.socket.disconnect();
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
       } catch (err) {
         logger.warn('Erreur lors du nettoyage du socket', 'userOrderSocketService', err);
       }
@@ -195,6 +195,12 @@ class UserOrderSocketService {
             storeUpdated: !!updatedOrder,
             storeStatus: updatedOrder?.status,
             storeHasDriver: !!updatedOrder?.driver,
+            totalActiveOrders: updatedStore.activeOrders.length,
+            allOrdersStatuses: updatedStore.activeOrders.map(o => ({
+              id: o.id.slice(0, 8),
+              status: o.status,
+              hasDriver: !!o.driver,
+            })),
           });
 
           // IMPORTANT : Sélectionner automatiquement la commande acceptée pour qu'elle soit affichée
@@ -454,14 +460,16 @@ class UserOrderSocketService {
       // le listener est déjà en place pour le recevoir
       logger.info('🔄 Réinstallation des listeners après reconnexion (AVANT user-connect)', 'userOrderSocketService');
       // Installer tous les listeners sauf connect/disconnect (pour éviter la récursion)
-      this.socket.removeAllListeners('order-accepted');
-      this.socket.removeAllListeners('order-created');
-      this.socket.removeAllListeners('order-cancelled');
-      this.socket.removeAllListeners('order-error');
-      this.socket.removeAllListeners('no-drivers-available');
-      this.socket.removeAllListeners('order:status:update');
-      this.socket.removeAllListeners('driver:location:update');
-      this.socket.removeAllListeners('resync-order-state');
+      if (this.socket) {
+        this.socket.removeAllListeners('order-accepted');
+        this.socket.removeAllListeners('order-created');
+        this.socket.removeAllListeners('order-cancelled');
+        this.socket.removeAllListeners('order-error');
+        this.socket.removeAllListeners('no-drivers-available');
+        this.socket.removeAllListeners('order:status:update');
+        this.socket.removeAllListeners('driver:location:update');
+        this.socket.removeAllListeners('resync-order-state');
+      }
 
       // Réinstaller les listeners (sauf connect/disconnect pour éviter la récursion)
       this.installEventListeners(userId);

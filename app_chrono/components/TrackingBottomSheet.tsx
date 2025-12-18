@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userApiService } from "../services/userApiService";
 import { QRCodeDisplay } from "./QRCodeDisplay";
-import { qrCodeService } from "../services/qrCodeService";
 
 interface TrackingBottomSheetProps {
   currentOrder: any;
@@ -35,7 +34,6 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const [isLoadingRating, setIsLoadingRating] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<{ qrCodeImage: string; qrCodeData?: { expiresAt: string; orderNumber: string } } | null>(null);
-  const [isLoadingQRCode, setIsLoadingQRCode] = useState(false);
 
   const loadOrderRating = useCallback(async () => {
     if (!currentOrder?.id) {

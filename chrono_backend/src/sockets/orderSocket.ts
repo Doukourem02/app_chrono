@@ -596,6 +596,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               console.log(`[RETRY ${retryCount + 1}/3] Socket déconnecté juste avant l'envoi, nouvelle tentative...`);
               setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
               return;
+            } else {
+              console.error(`❌ Impossible d'envoyer order-accepted: socket déconnecté après ${retryCount} tentatives`);
+              return;
             }
           }
 

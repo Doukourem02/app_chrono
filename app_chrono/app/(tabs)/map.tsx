@@ -2,15 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import {
-  Alert,
-  Animated,
-  Dimensions,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import {Alert,Animated,Dimensions,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
 import MapView from "react-native-maps";
 import { DeliveryBottomSheet } from "../../components/DeliveryBottomSheet";
 import { DeliveryMapView } from "../../components/DeliveryMapView";
@@ -25,12 +17,7 @@ import { useDriverSearch } from "../../hooks/useDriverSearch";
 import { useMapLogic } from "../../hooks/useMapLogic";
 import { useOnlineDrivers } from "../../hooks/useOnlineDrivers";
 import { locationService } from "../../services/locationService";
-import {
-  calculatePrice,
-  estimateDurationMinutes,
-  formatDurationLabel,
-  getDistanceInKm,
-} from "../../services/orderApi";
+import {calculatePrice,estimateDurationMinutes,formatDurationLabel,getDistanceInKm,} from "../../services/orderApi";
 import { userApiService } from "../../services/userApiService";
 import { userOrderSocketService } from "../../services/userOrderSocketService";
 import { useAuthStore } from "../../store/useAuthStore";
@@ -61,13 +48,13 @@ export default function MapPage() {
   const paymentErrorMessage = usePaymentErrorStore((s) => s.message);
   const paymentErrorCode = usePaymentErrorStore((s) => s.errorCode);
   const hidePaymentError = usePaymentErrorStore((s) => s.hideError);
-  
+
   const mapRef = useRef<MapView | null>(null);
   const hasInitializedRef = useRef<boolean>(false);
-  const isResettingRef = useRef<boolean>(false); 
-  const isUserTypingRef = useRef<boolean>(false); 
-  const lastFocusTimeRef = useRef<number>(0); 
-  
+  const isResettingRef = useRef<boolean>(false);
+  const isUserTypingRef = useRef<boolean>(false);
+  const lastFocusTimeRef = useRef<number>(0);
+
   const [showPaymentSheet, setShowPaymentSheet] = React.useState(false);
   const [paymentPayerType, setPaymentPayerType] = React.useState<
     "client" | "recipient"
@@ -106,7 +93,7 @@ export default function MapPage() {
 
   useEffect(() => {
     locationService.startWatching();
-    
+
     return () => {};
   }, []);
 
@@ -137,13 +124,13 @@ export default function MapPage() {
   useEffect(() => {
     if (hasInitializedRef.current) return;
     hasInitializedRef.current = true;
-    
+
     const store = useOrderStore.getState();
     const ratingStore = useRatingStore.getState();
-    
+
     const currentOrder = store.getCurrentOrder();
     const pendingOrder = store.getPendingOrder();
-    
+
     if (
       currentOrder &&
       (currentOrder.status === "cancelled" ||
@@ -154,7 +141,7 @@ export default function MapPage() {
         "map.tsx",
         { status: currentOrder.status }
       );
-      
+
       if (ratingStore.showRatingBottomSheet) {
         logger.info(
           "🧹 Fermeture RatingBottomSheet au montage initial (commande terminée)",
@@ -162,9 +149,9 @@ export default function MapPage() {
         );
         ratingStore.resetRatingBottomSheet();
       }
-      
+
       store.removeOrder(currentOrder.id);
-      
+
       try {
         clearRoute();
       } catch {}
@@ -180,14 +167,14 @@ export default function MapPage() {
           hasRatingBottomSheet: ratingStore.showRatingBottomSheet,
         }
       );
-      
+
       const completedAt =
         (currentOrder as any)?.completed_at ||
         (currentOrder as any)?.completedAt;
-      const orderAge = completedAt 
+      const orderAge = completedAt
         ? new Date().getTime() - new Date(completedAt).getTime()
         : Infinity;
-      
+
       if (!ratingStore.showRatingBottomSheet && orderAge > 60000) {
         logger.info(
           "🧹 Nettoyage commande complétée ancienne au montage initial",
@@ -204,12 +191,12 @@ export default function MapPage() {
         setDeliveryLocation("");
       }
     }
-    
+
     if (pendingOrder) {
-      const orderAge = pendingOrder.createdAt 
+      const orderAge = pendingOrder.createdAt
         ? new Date().getTime() - new Date(pendingOrder.createdAt).getTime()
         : Infinity;
-      
+
       if (orderAge > 10000) {
         logger.info(
           "🧹 Nettoyage pendingOrder bloqué au montage initial",
@@ -219,7 +206,7 @@ export default function MapPage() {
         store.removeOrder(pendingOrder.id);
       }
     }
-    
+
     if (ratingStore.showRatingBottomSheet && !currentOrder) {
       logger.info(
         "🧹 Fermeture RatingBottomSheet au montage initial (pas de commande active)",
@@ -232,7 +219,7 @@ export default function MapPage() {
   const stableUserLocation = useMemo(() => {
     if (!region?.latitude || !region?.longitude) return undefined;
     return {
-      latitude: Math.round(region.latitude * 10000) / 10000, 
+      latitude: Math.round(region.latitude * 10000) / 10000,
       longitude: Math.round(region.longitude * 10000) / 10000,
     };
   }, [region?.latitude, region?.longitude]);
@@ -256,7 +243,7 @@ export default function MapPage() {
     driverCoords: orderDriverCoordsMap,
     setSelectedOrder,
   } = useOrderStore();
-  
+
   const {
     animatedHeight,
     isExpanded,
@@ -274,31 +261,31 @@ export default function MapPage() {
 
   const scheduleBottomSheetOpen = useCallback(
     (delay = 0) => {
-    if (userManuallyClosedRef.current) {
-      return;
-    }
-    if (autoOpenTimeoutRef.current) {
-      clearTimeout(autoOpenTimeoutRef.current);
-    }
-    autoOpenTimeoutRef.current = setTimeout(() => {
-      if (!userManuallyClosedRef.current) {
-        expandBottomSheet();
+      if (userManuallyClosedRef.current) {
+        return;
       }
-      autoOpenTimeoutRef.current = null;
-    }, delay);
+      if (autoOpenTimeoutRef.current) {
+        clearTimeout(autoOpenTimeoutRef.current);
+      }
+      autoOpenTimeoutRef.current = setTimeout(() => {
+        if (!userManuallyClosedRef.current) {
+          expandBottomSheet();
+        }
+        autoOpenTimeoutRef.current = null;
+      }, delay);
     },
     [expandBottomSheet]
   );
-  
+
   useFocusEffect(
     useCallback(() => {
       const now = Date.now();
       lastFocusTimeRef.current = now;
-      
+
       if (isResettingRef.current) {
         return;
       }
-      
+
       if (isUserTypingRef.current) {
         logger.info(
           "📍 Réinitialisation ignorée - utilisateur en train de saisir",
@@ -306,19 +293,19 @@ export default function MapPage() {
         );
         return;
       }
-      
+
       const currentPickup = pickupLocation;
       const currentDelivery = deliveryLocation;
       const hasFilledFields =
         currentPickup.trim().length > 0 || currentDelivery.trim().length > 0;
-      
+
       if (hasFilledFields) {
         logger.info(
           "📍 Réinitialisation partielle - champs déjà remplis, conservation des données",
           "map.tsx",
           {
-          pickup: currentPickup.substring(0, 30),
-          delivery: currentDelivery.substring(0, 30),
+            pickup: currentPickup.substring(0, 30),
+            delivery: currentDelivery.substring(0, 30),
           }
         );
         const currentSelectedId = useOrderStore.getState().selectedOrderId;
@@ -328,24 +315,24 @@ export default function MapPage() {
         setIsCreatingNewOrder(true);
         return;
       }
-      
+
       isResettingRef.current = true;
       lastFocusTimeRef.current = now;
       logger.info(
         "📍 Arrivée sur map - réinitialisation complète pour nouvelle commande",
         "map.tsx"
       );
-      
+
       const currentSelectedId = useOrderStore.getState().selectedOrderId;
       if (currentSelectedId !== null) {
         setSelectedOrder(null);
       }
-      
-            setIsCreatingNewOrder(true);
-      
+
+      setIsCreatingNewOrder(true);
+
       hasAutoOpenedRef.current = false;
       userManuallyClosedRef.current = false;
-      
+
       try {
         clearRoute();
       } catch {}
@@ -354,33 +341,33 @@ export default function MapPage() {
       setPickupLocation("");
       setDeliveryLocation("");
       setSelectedMethod("moto");
-      
+
       setTimeout(() => {
         locationService
           .getCurrentPosition()
           .then((coords) => {
-          if (coords) {
+            if (coords) {
               animateToCoordinate(
                 { latitude: coords.latitude, longitude: coords.longitude },
                 0.01
               );
-          } else if (region) {
+            } else if (region) {
               animateToCoordinate(
                 { latitude: region.latitude, longitude: region.longitude },
                 0.01
               );
-          }
+            }
           })
           .catch(() => {
-          if (region) {
+            if (region) {
               animateToCoordinate(
                 { latitude: region.latitude, longitude: region.longitude },
                 0.01
               );
-          }
-        });
+            }
+          });
       }, 200);
-      
+
       scheduleBottomSheetOpen(400);
       const resetTimer = setTimeout(() => {
         isResettingRef.current = false;
@@ -409,19 +396,19 @@ export default function MapPage() {
     const hasFilledFields =
       pickupLocation.trim().length > 0 || deliveryLocation.trim().length > 0;
     isUserTypingRef.current = hasFilledFields;
-    
+
     if (hasFilledFields) {
       logger.debug(
         "📍 Champs remplis détectés - protection activée",
         "map.tsx",
         {
-        pickup: pickupLocation.substring(0, 20),
-        delivery: deliveryLocation.substring(0, 20),
+          pickup: pickupLocation.substring(0, 20),
+          delivery: deliveryLocation.substring(0, 20),
         }
       );
     }
   }, [pickupLocation, deliveryLocation]);
-  
+
   const currentOrder = useOrderStore((s) => {
     if (s.selectedOrderId) {
       return s.activeOrders.find((o) => o.id === s.selectedOrderId) || null;
@@ -461,11 +448,11 @@ export default function MapPage() {
   const orderDriverCoords = selectedOrderId
     ? orderDriverCoordsMap.get(selectedOrderId) || null
     : null;
-  
+
   useEffect(() => {
     const orderStatus = currentOrder?.status || pendingOrder?.status;
     const order = currentOrder || pendingOrder;
-    
+
     if (__DEV__) {
       console.log("🔍 PaymentBottomSheet useEffect:", {
         orderStatus,
@@ -478,7 +465,7 @@ export default function MapPage() {
         paymentStatus: (order as any)?.payment_status,
       });
     }
-    
+
     // Ne pas afficher le PaymentBottomSheet si c'est le destinataire qui paie
     if (paymentPayerType === "recipient") {
       if (__DEV__) {
@@ -488,7 +475,7 @@ export default function MapPage() {
       }
       return;
     }
-    
+
     // Ne pas afficher si on n'a pas de commande ou si le statut n'est pas 'accepted'
     if (orderStatus !== "accepted" || !order) {
       if (__DEV__) {
@@ -499,7 +486,7 @@ export default function MapPage() {
       }
       return;
     }
-    
+
     // S'assurer qu'on a bien une commande avec le bon statut
     if (order.status !== "accepted") {
       if (__DEV__) {
@@ -509,7 +496,7 @@ export default function MapPage() {
       }
       return;
     }
-    
+
     // Ne pas afficher si déjà affiché ou si déjà payé
     if (showPaymentSheet) {
       if (__DEV__) {
@@ -517,7 +504,7 @@ export default function MapPage() {
       }
       return;
     }
-    
+
     const paymentStatus = (order as any)?.payment_status;
     if (paymentStatus === "paid") {
       if (__DEV__) {
@@ -525,7 +512,7 @@ export default function MapPage() {
       }
       return;
     }
-    
+
     // Pour les paiements en espèces ou différé, pas besoin d'afficher le PaymentBottomSheet
     if (
       selectedPaymentMethodType === "cash" ||
@@ -538,7 +525,7 @@ export default function MapPage() {
       }
       return;
     }
-    
+
     // Afficher le PaymentBottomSheet pour Orange Money, Wave, ou si aucune méthode n'est sélectionnée
     if (
       selectedPaymentMethodType === "orange_money" ||
@@ -554,10 +541,10 @@ export default function MapPage() {
           console.log("✅ PaymentBottomSheet affiché");
         }
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
-    
+
     if (__DEV__) {
       console.log(
         "⏭️ PaymentBottomSheet: aucune condition remplie pour afficher"
@@ -583,7 +570,7 @@ export default function MapPage() {
       // Ne nettoyer que si c'est la commande sélectionnée ou la seule commande en attente
       const isSelectedOrder =
         selectedOrderId === pendingOrder.id || selectedOrderId === null;
-      
+
       if (orderAge > 30000 && isSelectedOrder) {
         logger.info("🧹 Nettoyage commande bloquée en attente", "map.tsx", {
           orderId: pendingOrder.id,
@@ -611,13 +598,13 @@ export default function MapPage() {
         const orderAge = currentOrder.createdAt
           ? new Date().getTime() - new Date(currentOrder.createdAt).getTime()
           : Infinity;
-        
+
         if (orderAge > 60000) {
           logger.warn(
             "⚠️ Commande acceptée sans driver connecté depuis trop longtemps",
             "map.tsx",
             {
-            orderId: currentOrder.id, 
+              orderId: currentOrder.id,
               orderAge,
             }
           );
@@ -638,14 +625,9 @@ export default function MapPage() {
   ]);
 
   // Gérer la recherche de livreur pour plusieurs commandes en attente
-  // Utiliser un sélecteur pour obtenir le nombre de commandes en attente
-  const pendingOrdersCount = useOrderStore(
-    (s) => s.activeOrders.filter((o) => o.status === PENDING_STATUS).length
-  );
-
-  // Surveiller directement les activeOrders pour réagir immédiatement aux changements
+  // Un seul useEffect pour éviter les conflits et boucles
   const activeOrders = useOrderStore((s) => s.activeOrders);
-  
+
   useEffect(() => {
     const allPendingOrders = activeOrders.filter(
       (o) => o.status === PENDING_STATUS
@@ -665,7 +647,7 @@ export default function MapPage() {
         hasDriver: !!o.driver,
       })),
     });
-    
+
     // S'il y a au moins une commande en attente, démarrer/continuer la recherche
     if (allPendingOrders.length > 0) {
       if (!isSearchingDriver) {
@@ -673,7 +655,7 @@ export default function MapPage() {
           "📡 Démarrage animation radar (commande(s) en attente)",
           "map.tsx",
           {
-          pendingCount: allPendingOrders.length,
+            pendingCount: allPendingOrders.length,
             orderIds: allPendingOrders.map((o) => o.id),
           }
         );
@@ -691,6 +673,7 @@ export default function MapPage() {
           "map.tsx",
           {
             acceptedOrdersCount: allAcceptedOrders.length,
+            acceptedOrderIds: allAcceptedOrders.map((o) => o.id),
           }
         );
       }
@@ -701,86 +684,6 @@ export default function MapPage() {
     stopDriverSearch,
     collapseBottomSheet,
     activeOrders,
-  ]);
-
-  // Arrêter la recherche uniquement si TOUTES les commandes en attente sont acceptées
-  // Ne pas arrêter si d'autres commandes sont encore en attente
-  // Utiliser activeOrders comme dépendance pour réagir immédiatement aux changements
-  useEffect(() => {
-    const allPendingOrders = activeOrders.filter(
-      (o) => o.status === PENDING_STATUS
-    );
-    const allAcceptedOrders = activeOrders.filter(
-      (o) => o.status === "accepted" && o.driver
-    );
-
-    logger.debug("🔍 Vérification arrêt recherche", "map.tsx", {
-      isSearchingDriver,
-      allPendingOrdersCount: allPendingOrders.length,
-      allAcceptedOrdersCount: allAcceptedOrders.length,
-      currentOrderStatus: currentOrder?.status,
-      currentOrderId: currentOrder?.id,
-      totalActiveOrders: activeOrders.length,
-      activeOrdersStatuses: activeOrders.map((o) => ({
-        id: o.id.slice(0, 8),
-        status: o.status,
-        hasDriver: !!o.driver,
-      })),
-    });
-
-    // Si on recherche un livreur mais qu'il n'y a plus de commandes en attente
-    // (toutes sont acceptées ou dans un autre statut), arrêter la recherche
-    if (isSearchingDriver && allPendingOrders.length === 0) {
-      // Vérifier qu'au moins une commande est acceptée pour confirmer qu'on peut arrêter
-      if (allAcceptedOrders.length > 0) {
-        stopDriverSearch();
-        logger.info(
-          "🛑 Recherche de chauffeur arrêtée (toutes les commandes acceptées)",
-          "map.tsx",
-          {
-            acceptedOrdersCount: allAcceptedOrders.length,
-            acceptedOrderIds: allAcceptedOrders.map((o) => o.id),
-          }
-        );
-      } else {
-        // Aucune commande en attente ET aucune acceptée - arrêter quand même
-        stopDriverSearch();
-        logger.info(
-          "🛑 Recherche de chauffeur arrêtée (aucune commande en attente)",
-          "map.tsx"
-        );
-      }
-    }
-
-    // Si une commande spécifique est acceptée, logger pour debug
-    if (currentOrder?.status === "accepted" && currentOrder?.driver) {
-      if (allPendingOrders.length === 0) {
-        logger.info(
-          "✅ Commande acceptée - aucune autre en attente",
-          "map.tsx",
-          {
-          orderId: currentOrder.id,
-          driverId: currentOrder.driver?.id,
-          }
-        );
-      } else {
-        logger.info(
-          "✅ Commande acceptée - d'autres commandes en attente",
-          "map.tsx",
-          {
-          acceptedOrderId: currentOrder.id,
-          remainingPendingCount: allPendingOrders.length,
-          }
-        );
-      }
-    }
-  }, [
-    isSearchingDriver,
-    stopDriverSearch,
-    activeOrders,
-    currentOrder?.status,
-    currentOrder?.driver,
-    currentOrder?.id,
   ]);
 
   useEffect(() => {
@@ -829,20 +732,20 @@ export default function MapPage() {
 
   const cleanupOrderState = useCallback(async () => {
     logger.info("🧹 Nettoyage complet de l'état de commande", "map.tsx");
-    
+
     if (isSearchingDriver) {
       stopDriverSearch();
     }
-    
+
     useOrderStore.getState().clear();
-    
+
     // Réinitialiser les états de paiement
     setShowPaymentSheet(false);
     setPaymentPayerType("client");
     setSelectedPaymentMethodType(null);
     setRecipientInfo({});
     setPaymentPartialInfo({});
-    
+
     const ratingStore = useRatingStore.getState();
     if (ratingStore.showRatingBottomSheet) {
       logger.info(
@@ -852,23 +755,23 @@ export default function MapPage() {
       ratingStore.resetRatingBottomSheet();
       collapseRatingBottomSheet();
     }
-    
+
     try {
       clearRoute();
     } catch {}
-    
+
     setPickupCoords(null);
     setDropoffCoords(null);
-    
+
     setPickupLocation("");
     setDeliveryLocation("");
-    
+
     try {
       const coords = await locationService.getCurrentPosition();
-      
+
       if (coords) {
         const { latitude, longitude } = coords;
-        
+
         setPickupCoords({ latitude, longitude });
 
         try {
@@ -877,7 +780,7 @@ export default function MapPage() {
             longitude,
             timestamp: Date.now(),
           });
-          
+
           if (refreshedAddress) {
             setPickupLocation(refreshedAddress);
           } else {
@@ -895,7 +798,7 @@ export default function MapPage() {
             `Ma position (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`
           );
         }
-        
+
         setTimeout(() => {
           animateToCoordinate({ latitude, longitude }, 0.01);
         }, 100);
@@ -945,7 +848,7 @@ export default function MapPage() {
 
   useEffect(() => {
     const status = currentOrder?.status;
-    
+
     if (status === "cancelled" || status === "declined") {
       logger.info("🧹 Nettoyage commande terminée/annulée/refusée", "map.tsx", {
         status,
@@ -974,16 +877,16 @@ export default function MapPage() {
             if (!ratingResult.success || !ratingResult.data) {
               const driverId = currentOrder.driverId || currentOrder.driver?.id;
               const driverName = currentOrder.driver?.name || "Votre livreur";
-              
+
               if (driverId) {
                 useRatingStore
                   .getState()
                   .setRatingBottomSheet(
-                  true,
-                  currentOrder.id,
-                  driverId,
-                  driverName
-                );
+                    true,
+                    currentOrder.id,
+                    driverId,
+                    driverName
+                  );
                 logger.info(
                   "⭐ Affichage automatique RatingBottomSheet pour commande complétée",
                   "map.tsx",
@@ -997,20 +900,20 @@ export default function MapPage() {
             logger.warn("Erreur vérification rating", "map.tsx", error);
             const driverId = currentOrder.driverId || currentOrder.driver?.id;
             const driverName = currentOrder.driver?.name || "Votre livreur";
-            
+
             if (driverId) {
               useRatingStore
                 .getState()
                 .setRatingBottomSheet(
-                true,
-                currentOrder.id,
-                driverId,
-                driverName
-              );
+                  true,
+                  currentOrder.id,
+                  driverId,
+                  driverName
+                );
             }
           }
         };
-        
+
         checkAndShowRating();
       }
     }
@@ -1018,17 +921,17 @@ export default function MapPage() {
 
   useEffect(() => {
     logger.debug("🔍 RatingBottomSheet state changed", "map.tsx", {
-      showRatingBottomSheet, 
+      showRatingBottomSheet,
       ratingOrderId,
       isExpanded: ratingIsExpanded,
     });
-    
+
     if (showRatingBottomSheet && ratingOrderId) {
       logger.info("⭐ Ouverture automatique rating bottom sheet", "map.tsx", {
         orderId: ratingOrderId,
         driverName: ratingDriverName,
       });
-      
+
       setTimeout(() => {
         expandRatingBottomSheet();
         logger.info("✅ RatingBottomSheet ouvert", "map.tsx", {
@@ -1090,19 +993,19 @@ export default function MapPage() {
   useEffect(() => {
     if (!currentOrder) return;
 
-    const orderAge = currentOrder.createdAt 
+    const orderAge = currentOrder.createdAt
       ? new Date().getTime() - new Date(currentOrder.createdAt).getTime()
       : Infinity;
-    
-        const MAX_ORDER_AGE = 1000 * 60 * 30;
-    
+
+    const MAX_ORDER_AGE = 1000 * 60 * 30;
+
     if (orderAge > MAX_ORDER_AGE) {
       logger.info(
         "🧹 Nettoyage commande trop ancienne (oubli de finalisation)",
         "map.tsx",
         {
-        orderId: currentOrder.id, 
-        status: currentOrder.status, 
+          orderId: currentOrder.id,
+          status: currentOrder.status,
           age: `${Math.round(orderAge / 1000 / 60)} minutes`,
         }
       );
@@ -1118,8 +1021,8 @@ export default function MapPage() {
             "🧹 Nettoyage périodique commande trop ancienne",
             "map.tsx",
             {
-            orderId: currentOrder.id, 
-            status: currentOrder.status, 
+              orderId: currentOrder.id,
+              status: currentOrder.status,
               age: `${Math.round(age / 1000 / 60)} minutes`,
             }
           );
@@ -1170,13 +1073,13 @@ export default function MapPage() {
     const hasOrderInProgress = Boolean(pendingOrder || isActiveOrder);
 
     const shouldShowCreationForm = !hasOrderInProgress || isCreatingNewOrder;
-    
+
     if (
       shouldShowCreationForm &&
-        !isExpanded && 
-        !showRatingBottomSheet && 
-        !userManuallyClosedRef.current &&
-        !deliveryMethodIsExpanded &&
+      !isExpanded &&
+      !showRatingBottomSheet &&
+      !userManuallyClosedRef.current &&
+      !deliveryMethodIsExpanded &&
       !orderDetailsIsExpanded
     ) {
       if (!hasAutoOpenedRef.current) {
@@ -1204,7 +1107,7 @@ export default function MapPage() {
       currentOrder.status !== "cancelled" &&
       currentOrder.status !== "declined";
     const hasOrderInProgress = Boolean(pendingOrder || isActiveOrder);
-    
+
     if (
       !hasOrderInProgress &&
       !currentOrder &&
@@ -1260,7 +1163,7 @@ export default function MapPage() {
     if (coords) {
       setDropoffCoords(coords);
       if (pickupCoords) fetchRoute(pickupCoords, coords);
-    } 
+    }
     setTimeout(() => {
       isUserTypingRef.current = false;
     }, 2000);
@@ -1276,14 +1179,14 @@ export default function MapPage() {
     collapseBottomSheet();
     setTimeout(() => {
       const MAX_HEIGHT = SCREEN_HEIGHT * 0.85;
-      
+
       Animated.spring(deliveryMethodAnimatedHeight, {
         toValue: MAX_HEIGHT,
         useNativeDriver: false,
         tension: 65,
         friction: 8,
       }).start();
-      
+
       expandDeliveryMethodSheet();
     }, 300);
   }, [
@@ -1340,34 +1243,34 @@ export default function MapPage() {
 
   const handleOrderDetailsConfirm = useCallback(
     async (
-    pickupDetails: any,
-    dropoffDetails: any,
+      pickupDetails: any,
+      dropoffDetails: any,
       payerType?: "client" | "recipient",
-    isPartialPayment?: boolean,
-    partialAmount?: number,
+      isPartialPayment?: boolean,
+      partialAmount?: number,
       paymentMethodType?: "orange_money" | "wave" | "cash" | "deferred",
-    paymentMethodId?: string | null
-  ) => {
-    // Vérifier l'authentification avant de créer la commande
-    if (!user) {
-      Alert.alert(
+      paymentMethodId?: string | null
+    ) => {
+      // Vérifier l'authentification avant de créer la commande
+      if (!user) {
+        Alert.alert(
           "Connexion requise",
           "Vous devez vous connecter ou créer un compte pour passer une commande.",
-        [
-          {
+          [
+            {
               text: "Annuler",
               style: "cancel",
-          },
-          {
-              text: "Se connecter",
-            onPress: () => {
-                router.push("/(auth)/register" as any);
             },
-          },
-        ]
-      );
-      return;
-    }
+            {
+              text: "Se connecter",
+              onPress: () => {
+                router.push("/(auth)/register" as any);
+              },
+            },
+          ]
+        );
+        return;
+      }
 
       if (
         pickupCoords &&
@@ -1376,99 +1279,99 @@ export default function MapPage() {
         deliveryLocation &&
         selectedMethod
       ) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         console.log("📦 Envoi commande avec détails...");
 
-      try {
-        stopDriverSearch();
-        resetAfterDriverSearch();
-      } catch {}
-      
-      const orderData = {
-        pickup: {
-          address: pickupLocation,
-          coordinates: pickupCoords,
-          details: pickupDetails,
-        },
-        dropoff: {
-          address: deliveryLocation,
-          coordinates: dropoffCoords,
-          details: dropoffDetails,
-        },
+        try {
+          stopDriverSearch();
+          resetAfterDriverSearch();
+        } catch {}
+
+        const orderData = {
+          pickup: {
+            address: pickupLocation,
+            coordinates: pickupCoords,
+            details: pickupDetails,
+          },
+          dropoff: {
+            address: deliveryLocation,
+            coordinates: dropoffCoords,
+            details: dropoffDetails,
+          },
           deliveryMethod: selectedMethod as "moto" | "vehicule" | "cargo",
-        userInfo: {
+          userInfo: {
             name: user.email?.split("@")[0] || "Client",
-          rating: 4.5,
+            rating: 4.5,
             phone: user.phone,
-        },
-        recipient: {
-          phone: dropoffDetails.phone,
-        },
-        packageImages: dropoffDetails.photos || [],
-        paymentMethodType: paymentMethodType,
-        paymentMethodId: paymentMethodId || null,
-        paymentPayerType: payerType,
-        isPartialPayment: isPartialPayment,
+          },
+          recipient: {
+            phone: dropoffDetails.phone,
+          },
+          packageImages: dropoffDetails.photos || [],
+          paymentMethodType: paymentMethodType,
+          paymentMethodId: paymentMethodId || null,
+          paymentPayerType: payerType,
+          isPartialPayment: isPartialPayment,
           partialAmount:
             isPartialPayment && partialAmount ? partialAmount : undefined,
-        recipientUserId: recipientInfo.userId,
-        recipientIsRegistered: recipientInfo.isRegistered,
-      };
-      
-      // Définir les états de paiement AVANT de créer la commande pour qu'ils soient disponibles quand le useEffect se déclenche
-      let recipientIsRegistered = false;
-      let recipientUserId: string | undefined;
-      
+          recipientUserId: recipientInfo.userId,
+          recipientIsRegistered: recipientInfo.isRegistered,
+        };
+
+        // Définir les états de paiement AVANT de créer la commande pour qu'ils soient disponibles quand le useEffect se déclenche
+        let recipientIsRegistered = false;
+        let recipientUserId: string | undefined;
+
         if (payerType === "recipient" && dropoffDetails.phone) {
-        try {
-          recipientIsRegistered = false;
-        } catch (error) {
-            console.error("Erreur vérification destinataire:", error);
-          recipientIsRegistered = false;
-        }
-      }
-      
-      // Réinitialiser le PaymentBottomSheet et définir les nouveaux états AVANT la création
-      setShowPaymentSheet(false);
-        setPaymentPayerType(payerType || "client");
-      setSelectedPaymentMethodType(paymentMethodType || null);
-      setRecipientInfo({
-        phone: dropoffDetails.phone,
-        userId: recipientUserId,
-        isRegistered: recipientIsRegistered,
-      });
-      
-      if (isPartialPayment && partialAmount) {
-        setPaymentPartialInfo({
-          isPartial: true,
-          partialAmount: partialAmount,
-        });
-      } else {
-        setPaymentPartialInfo({});
-      }
-      
-      const success = await userOrderSocketService.createOrder(orderData);
-      if (success) {
-        collapseOrderDetailsSheet();
-        collapseDeliveryMethodSheet();
-        
-        setTimeout(() => {
           try {
-            clearRoute();
-          } catch {}
-          setPickupCoords(null);
-          setDropoffCoords(null);
+            recipientIsRegistered = false;
+          } catch (error) {
+            console.error("Erreur vérification destinataire:", error);
+            recipientIsRegistered = false;
+          }
+        }
+
+        // Réinitialiser le PaymentBottomSheet et définir les nouveaux états AVANT la création
+        setShowPaymentSheet(false);
+        setPaymentPayerType(payerType || "client");
+        setSelectedPaymentMethodType(paymentMethodType || null);
+        setRecipientInfo({
+          phone: dropoffDetails.phone,
+          userId: recipientUserId,
+          isRegistered: recipientIsRegistered,
+        });
+
+        if (isPartialPayment && partialAmount) {
+          setPaymentPartialInfo({
+            isPartial: true,
+            partialAmount: partialAmount,
+          });
+        } else {
+          setPaymentPartialInfo({});
+        }
+
+        const success = await userOrderSocketService.createOrder(orderData);
+        if (success) {
+          collapseOrderDetailsSheet();
+          collapseDeliveryMethodSheet();
+
+          setTimeout(() => {
+            try {
+              clearRoute();
+            } catch {}
+            setPickupCoords(null);
+            setDropoffCoords(null);
             setPickupLocation("");
             setDeliveryLocation("");
             setSelectedMethod("moto");
-          
-          setIsCreatingNewOrder(true);
-          
+
+            setIsCreatingNewOrder(true);
+
             locationService
               .getCurrentPosition()
               .then((coords) => {
-            if (coords && region) {
-              setTimeout(() => {
+                if (coords && region) {
+                  setTimeout(() => {
                     animateToCoordinate(
                       {
                         latitude: coords.latitude,
@@ -1476,9 +1379,9 @@ export default function MapPage() {
                       },
                       0.01
                     );
-              }, 100);
-            } else if (region) {
-              setTimeout(() => {
+                  }, 100);
+                } else if (region) {
+                  setTimeout(() => {
                     animateToCoordinate(
                       {
                         latitude: region.latitude,
@@ -1486,12 +1389,12 @@ export default function MapPage() {
                       },
                       0.01
                     );
-              }, 100);
-            }
+                  }, 100);
+                }
               })
               .catch(() => {
-            if (region) {
-              setTimeout(() => {
+                if (region) {
+                  setTimeout(() => {
                     animateToCoordinate(
                       {
                         latitude: region.latitude,
@@ -1499,29 +1402,29 @@ export default function MapPage() {
                       },
                       0.01
                     );
-              }, 100);
-            }
-          });
+                  }, 100);
+                }
+              });
 
+            setTimeout(() => {
+              userManuallyClosedRef.current = false;
+              hasAutoOpenedRef.current = false;
+              setIsCreatingNewOrder(true);
+              scheduleBottomSheetOpen();
+            }, 500);
+          }, 300);
+        } else {
+          // L'erreur sera gérée par le socket 'order-error' qui affichera le modal d'erreur
+          // Pas besoin d'afficher un Alert ici car le modal personnalisé s'en charge
+          setIsCreatingNewOrder(true);
+          collapseOrderDetailsSheet();
+          collapseDeliveryMethodSheet();
+          // Réouvrir le bottom sheet de création
           setTimeout(() => {
-            userManuallyClosedRef.current = false;
-            hasAutoOpenedRef.current = false;
-            setIsCreatingNewOrder(true);
             scheduleBottomSheetOpen();
-          }, 500);
-        }, 300);
-      } else {
-        // L'erreur sera gérée par le socket 'order-error' qui affichera le modal d'erreur
-        // Pas besoin d'afficher un Alert ici car le modal personnalisé s'en charge
-        setIsCreatingNewOrder(true);
-        collapseOrderDetailsSheet();
-        collapseDeliveryMethodSheet();
-        // Réouvrir le bottom sheet de création
-        setTimeout(() => {
-          scheduleBottomSheetOpen();
-        }, 300);
+          }, 300);
+        }
       }
-    }
     },
     [
       pickupCoords,
@@ -1559,55 +1462,55 @@ export default function MapPage() {
         currentOrder.status !== "pending" &&
         currentOrder.status !== "accepted"
       ) {
-      const statusMessages: Record<string, string> = {
+        const statusMessages: Record<string, string> = {
           picked_up:
             "Impossible d'annuler une commande dont le colis a déjà été récupéré",
           enroute: "Impossible d'annuler une commande en cours de livraison",
           completed: "Impossible d'annuler une commande déjà terminée",
           cancelled: "Cette commande a déjà été annulée",
           declined: "Cette commande a été refusée",
-      };
+        };
         Alert.alert(
           "Annulation impossible",
           statusMessages[currentOrder.status] ||
             "Cette commande ne peut pas être annulée"
         );
-      return;
-    }
+        return;
+      }
 
-    Alert.alert(
+      Alert.alert(
         "Annuler la commande",
         "Êtes-vous sûr de vouloir annuler cette commande ?",
-      [
+        [
           { text: "Non", style: "cancel" },
-        {
+          {
             text: "Oui",
             style: "destructive",
-          onPress: async () => {
-            try {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onPress: async () => {
+              try {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 logger.info("🔄 Annulation commande...", "map.tsx", {
                   orderId,
                 });
-              
+
                 const result = await userApiService.cancelOrder(
                   orderId,
                   currentOrder?.status
                 );
-              if (result.success) {
-                useOrderStore.getState().clear();
-                clearRoute();
-                setPickupCoords(null);
-                setDropoffCoords(null);
+                if (result.success) {
+                  useOrderStore.getState().clear();
+                  clearRoute();
+                  setPickupCoords(null);
+                  setDropoffCoords(null);
                   setPickupLocation("");
                   setDeliveryLocation("");
                   setSelectedMethod("moto");
-                
+
                   logger.info("✅ Commande annulée avec succès", "map.tsx", {
                     orderId,
                   });
                   Alert.alert("Succès", "Commande annulée avec succès");
-              } else {
+                } else {
                   logger.warn("❌ Erreur annulation commande", "map.tsx", {
                     message: result.message,
                   });
@@ -1615,15 +1518,15 @@ export default function MapPage() {
                     "Erreur",
                     result.message || "Impossible d'annuler la commande"
                   );
-              }
-            } catch (error) {
+                }
+              } catch (error) {
                 logger.error("❌ Erreur annulation commande", "map.tsx", error);
                 Alert.alert("Erreur", "Impossible d'annuler la commande");
-            }
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
     },
     [
       clearRoute,
@@ -1646,7 +1549,7 @@ export default function MapPage() {
   return (
     <View style={styles.container}>
       {/* Bouton Retour */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.backButton}
         onPress={() => router.push("/(tabs)")}
       >
@@ -1679,7 +1582,7 @@ export default function MapPage() {
             currentOrder.status !== "completed" &&
             currentOrder.status !== "cancelled" &&
             currentOrder.status !== "declined";
-          
+
           if (!isActiveOrder) {
             userManuallyClosedRef.current = false;
             expandBottomSheet();
@@ -1692,22 +1595,22 @@ export default function MapPage() {
       {(isSearchingDriver ||
         (currentOrder?.status === "accepted" && currentOrder?.driver)) &&
         !isCreatingNewOrder && (
-        <TouchableOpacity 
-          style={styles.driverSearchBackButton}
-          onPress={async () => {
-            // Nettoyer l'état et afficher le bottom sheet "Envoyer un colis" pour créer une nouvelle commande
-            await cleanupOrderState();
-            setIsCreatingNewOrder(true);
-            userManuallyClosedRef.current = false;
-            expandBottomSheet();
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-      )}
+          <TouchableOpacity
+            style={styles.driverSearchBackButton}
+            onPress={async () => {
+              // Nettoyer l'état et afficher le bottom sheet "Envoyer un colis" pour créer une nouvelle commande
+              await cleanupOrderState();
+              setIsCreatingNewOrder(true);
+              userManuallyClosedRef.current = false;
+              expandBottomSheet();
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </TouchableOpacity>
+        )}
 
-      {((showRatingBottomSheet && ratingOrderId) || 
+      {((showRatingBottomSheet && ratingOrderId) ||
         (currentOrder?.status === "completed" && currentOrder?.driverId)) && (
         <RatingBottomSheet
           orderId={ratingOrderId || currentOrder?.id || null}
@@ -1731,168 +1634,168 @@ export default function MapPage() {
             currentOrder.status !== "cancelled" &&
             currentOrder.status !== "declined";
 
-        if (__DEV__) {
+          if (__DEV__) {
             logger.debug("Bottom Sheet Debug", "map.tsx", {
-            isActiveOrder,
-            currentOrderStatus: currentOrder?.status,
-            pendingOrder: !!pendingOrder,
-            showRatingBottomSheet,
-          });
-        }
+              isActiveOrder,
+              currentOrderStatus: currentOrder?.status,
+              pendingOrder: !!pendingOrder,
+              showRatingBottomSheet,
+            });
+          }
 
-        return (
-          <>
-            {/* Afficher le DeliveryBottomSheet UNIQUEMENT quand on crée une nouvelle commande ET qu'il n'y a PAS de livreur assigné */}
-            {/* Ne pas afficher si DriverSearchBottomSheet est visible (livreur assigné ou recherche en cours) */}
-            {/* Si selectedOrderId est null, on ignore currentOrder pour permettre la création d'une nouvelle commande */}
-            {!deliveryMethodIsExpanded && 
-             !orderDetailsIsExpanded && 
-             isCreatingNewOrder && 
-             !isSearchingDriver && 
-             !pendingOrder && 
+          return (
+            <>
+              {/* Afficher le DeliveryBottomSheet UNIQUEMENT quand on crée une nouvelle commande ET qu'il n'y a PAS de livreur assigné */}
+              {/* Ne pas afficher si DriverSearchBottomSheet est visible (livreur assigné ou recherche en cours) */}
+              {/* Si selectedOrderId est null, on ignore currentOrder pour permettre la création d'une nouvelle commande */}
+              {!deliveryMethodIsExpanded &&
+                !orderDetailsIsExpanded &&
+                isCreatingNewOrder &&
+                !isSearchingDriver &&
+                !pendingOrder &&
                 (selectedOrderId === null ||
                   !(
                     currentOrder?.status === "accepted" && currentOrder?.driver
                   )) && (
-              <DeliveryBottomSheet
-                animatedHeight={animatedHeight}
-                panResponder={panResponder}
-                isExpanded={isExpanded}
-                onToggle={() => {
-                  if (isExpanded) {
-                    userManuallyClosedRef.current = true;
-                    isProgrammaticCloseRef.current = false;
-                  } else {
-                    userManuallyClosedRef.current = false;
-                  }
-                  toggleBottomSheet();
-                }}
-                pickupLocation={pickupLocation}
-                deliveryLocation={deliveryLocation}
-                selectedMethod={selectedMethod}
-                onPickupSelected={handlePickupSelected}
-                onDeliverySelected={handleDeliverySelected}
-                onMethodSelected={handleMethodSelected}
-                onConfirm={handleConfirm}
-              />
-            )}
+                  <DeliveryBottomSheet
+                    animatedHeight={animatedHeight}
+                    panResponder={panResponder}
+                    isExpanded={isExpanded}
+                    onToggle={() => {
+                      if (isExpanded) {
+                        userManuallyClosedRef.current = true;
+                        isProgrammaticCloseRef.current = false;
+                      } else {
+                        userManuallyClosedRef.current = false;
+                      }
+                      toggleBottomSheet();
+                    }}
+                    pickupLocation={pickupLocation}
+                    deliveryLocation={deliveryLocation}
+                    selectedMethod={selectedMethod}
+                    onPickupSelected={handlePickupSelected}
+                    onDeliverySelected={handleDeliverySelected}
+                    onMethodSelected={handleMethodSelected}
+                    onConfirm={handleConfirm}
+                  />
+                )}
 
               {deliveryMethodIsExpanded &&
                 (() => {
-              const { price, estimatedTime } = getPriceAndTime();
-              return (
-                <DeliveryMethodBottomSheet
-                  animatedHeight={deliveryMethodAnimatedHeight}
-                  panResponder={deliveryMethodPanResponder}
-                  isExpanded={deliveryMethodIsExpanded}
-                  onToggle={toggleDeliveryMethodSheet}
+                  const { price, estimatedTime } = getPriceAndTime();
+                  return (
+                    <DeliveryMethodBottomSheet
+                      animatedHeight={deliveryMethodAnimatedHeight}
+                      panResponder={deliveryMethodPanResponder}
+                      isExpanded={deliveryMethodIsExpanded}
+                      onToggle={toggleDeliveryMethodSheet}
                       selectedMethod={selectedMethod || "moto"}
-                  pickupLocation={pickupLocation}
-                  deliveryLocation={deliveryLocation}
-                  price={price}
-                  estimatedTime={estimatedTime}
-                  pickupCoords={pickupCoords ?? undefined}
-                  dropoffCoords={dropoffCoords ?? undefined}
-                  onMethodSelected={handleMethodSelected}
-                  onConfirm={handleDeliveryMethodConfirm}
-                  onBack={handleDeliveryMethodBack}
-                />
-              );
-            })()}
+                      pickupLocation={pickupLocation}
+                      deliveryLocation={deliveryLocation}
+                      price={price}
+                      estimatedTime={estimatedTime}
+                      pickupCoords={pickupCoords ?? undefined}
+                      dropoffCoords={dropoffCoords ?? undefined}
+                      onMethodSelected={handleMethodSelected}
+                      onConfirm={handleDeliveryMethodConfirm}
+                      onBack={handleDeliveryMethodBack}
+                    />
+                  );
+                })()}
 
               {orderDetailsIsExpanded &&
                 (() => {
-              const { price } = getPriceAndTime();
-              return (
-                <OrderDetailsSheet
-                  animatedHeight={orderDetailsAnimatedHeight}
-                  panResponder={orderDetailsPanResponder}
-                  isExpanded={orderDetailsIsExpanded}
-                  onToggle={toggleOrderDetailsSheet}
-                  pickupLocation={pickupLocation}
-                  deliveryLocation={deliveryLocation}
+                  const { price } = getPriceAndTime();
+                  return (
+                    <OrderDetailsSheet
+                      animatedHeight={orderDetailsAnimatedHeight}
+                      panResponder={orderDetailsPanResponder}
+                      isExpanded={orderDetailsIsExpanded}
+                      onToggle={toggleOrderDetailsSheet}
+                      pickupLocation={pickupLocation}
+                      deliveryLocation={deliveryLocation}
                       selectedMethod={selectedMethod || "moto"}
-                  price={price}
-                  onBack={() => {
-                    collapseOrderDetailsSheet();
-                    expandDeliveryMethodSheet();
-                  }}
-                  onConfirm={handleOrderDetailsConfirm}
-                />
-              );
-            })()}
+                      price={price}
+                      onBack={() => {
+                        collapseOrderDetailsSheet();
+                        expandDeliveryMethodSheet();
+                      }}
+                      onConfirm={handleOrderDetailsConfirm}
+                    />
+                  );
+                })()}
 
-            {/* Afficher le PaymentBottomSheet uniquement si c'est le client qui paie */}
+              {/* Afficher le PaymentBottomSheet uniquement si c'est le client qui paie */}
               {showPaymentSheet &&
                 pendingOrder &&
                 paymentPayerType === "client" &&
                 (() => {
-              const { price } = getPriceAndTime();
+                  const { price } = getPriceAndTime();
                   const distance =
                     pickupCoords && dropoffCoords
-                ? getDistanceInKm(pickupCoords, dropoffCoords)
-                : 0;
-              
-              return (
-                <PaymentBottomSheet
-                  orderId={pendingOrder.id}
-                  distance={distance}
+                      ? getDistanceInKm(pickupCoords, dropoffCoords)
+                      : 0;
+
+                  return (
+                    <PaymentBottomSheet
+                      orderId={pendingOrder.id}
+                      distance={distance}
                       deliveryMethod={selectedMethod || "moto"}
-                  price={pendingOrder.price || price}
-                  isUrgent={false}
-                  visible={showPaymentSheet}
-                  payerType={paymentPayerType}
-                  recipientUserId={recipientInfo.userId}
-                  recipientPhone={recipientInfo.phone}
+                      price={pendingOrder.price || price}
+                      isUrgent={false}
+                      visible={showPaymentSheet}
+                      payerType={paymentPayerType}
+                      recipientUserId={recipientInfo.userId}
+                      recipientPhone={recipientInfo.phone}
                       recipientIsRegistered={
                         recipientInfo.isRegistered || false
                       }
-                  initialIsPartial={paymentPartialInfo.isPartial}
-                  initialPartialAmount={paymentPartialInfo.partialAmount}
+                      initialIsPartial={paymentPartialInfo.isPartial}
+                      initialPartialAmount={paymentPartialInfo.partialAmount}
                       preselectedPaymentMethod={
                         selectedPaymentMethodType || undefined
                       }
-                  onClose={() => {
-                    setShowPaymentSheet(false);
-                    Alert.alert(
+                      onClose={() => {
+                        setShowPaymentSheet(false);
+                        Alert.alert(
                           "Paiement requis",
                           "Le paiement est requis pour continuer. Voulez-vous payer maintenant ?",
-                      [
+                          [
                             {
                               text: "Annuler",
                               style: "cancel",
                               onPress: () => {
-                          useOrderStore.getState().clear();
+                                useOrderStore.getState().clear();
                               },
                             },
                             {
                               text: "Payer",
                               onPress: () => setShowPaymentSheet(true),
                             },
-                      ]
-                    );
-                  }}
-                  onPaymentSuccess={(transactionId) => {
+                          ]
+                        );
+                      }}
+                      onPaymentSuccess={(transactionId) => {
                         console.log("✅ Paiement réussi:", transactionId);
-                    setShowPaymentSheet(false);
-                  }}
-                  onPaymentError={(error) => {
+                        setShowPaymentSheet(false);
+                      }}
+                      onPaymentError={(error) => {
                         console.error("❌ Erreur paiement:", error);
                         Alert.alert("Erreur de paiement", error);
-                  }}
-                />
-              );
-            })()}
+                      }}
+                    />
+                  );
+                })()}
 
-            {/* Bottom sheet de recherche de livreur */}
-            {/* Afficher si :
+              {/* Bottom sheet de recherche de livreur */}
+              {/* Afficher si :
                 - On recherche un livreur (isSearchingDriver)
                 - OU il y a une commande en attente (pendingOrder) et on ne crée pas une nouvelle commande
                 - OU la commande sélectionnée/actuelle est acceptée avec un driver
             */}
-            {(() => {
-              // Déterminer quelle commande afficher : priorité à la commande sélectionnée, sinon la plus récente
-              const store = useOrderStore.getState();
+              {(() => {
+                // Déterminer quelle commande afficher : priorité à la commande sélectionnée, sinon la plus récente
+                const store = useOrderStore.getState();
 
                 // Si une commande est sélectionnée, l'utiliser
                 // Sinon, chercher une commande acceptée avec driver, puis une commande en attente
@@ -1912,14 +1815,14 @@ export default function MapPage() {
                     orderToDisplay = currentOrder || pendingOrder;
                   }
                 }
-              
+
                 const shouldShowSearch =
                   isSearchingDriver || (pendingOrder && !isCreatingNewOrder);
                 const shouldShowAccepted =
                   orderToDisplay?.status === "accepted" &&
                   orderToDisplay?.driver &&
                   !showPaymentSheet;
-              
+
                 // Log pour debug
                 if (__DEV__ && (shouldShowSearch || shouldShowAccepted)) {
                   logger.debug(
@@ -1942,46 +1845,46 @@ export default function MapPage() {
                   (shouldShowSearch || shouldShowAccepted) &&
                   !showPaymentSheet
                 ) {
-                return (
-                  <DriverSearchBottomSheet
+                  return (
+                    <DriverSearchBottomSheet
                       isSearching={
                         isSearchingDriver &&
                         orderToDisplay?.status === PENDING_STATUS
                       }
-                    searchSeconds={searchSeconds}
+                      searchSeconds={searchSeconds}
                       driver={
                         orderToDisplay?.status === "accepted" &&
                         orderToDisplay?.driver
                           ? orderToDisplay.driver
                           : null
                       }
-                    onCancel={() => {
-                      if (orderToDisplay) {
-                        _handleCancelOrder(orderToDisplay.id);
-                      }
-                    }}
-                    onDetails={() => {
-                      if (orderToDisplay) {
+                      onCancel={() => {
+                        if (orderToDisplay) {
+                          _handleCancelOrder(orderToDisplay.id);
+                        }
+                      }}
+                      onDetails={() => {
+                        if (orderToDisplay) {
                           router.push(
                             `/order-tracking/${orderToDisplay.id}` as any
                           );
-                      }
-                    }}
-                    onBack={async () => {
-                      // Nettoyer l'état et afficher le bottom sheet "Envoyer un colis" pour créer une nouvelle commande
-                      await cleanupOrderState();
-                      setIsCreatingNewOrder(true);
-                      userManuallyClosedRef.current = false;
-                      expandBottomSheet();
-                    }}
-                  />
-                );
-              }
-              return null;
-            })()}
-          </>
-        );
-      })()}
+                        }
+                      }}
+                      onBack={async () => {
+                        // Nettoyer l'état et afficher le bottom sheet "Envoyer un colis" pour créer une nouvelle commande
+                        await cleanupOrderState();
+                        setIsCreatingNewOrder(true);
+                        userManuallyClosedRef.current = false;
+                        expandBottomSheet();
+                      }}
+                    />
+                  );
+                }
+                return null;
+              })()}
+            </>
+          );
+        })()}
 
       {/* Modal d'erreur de paiement différé */}
       <PaymentErrorModal

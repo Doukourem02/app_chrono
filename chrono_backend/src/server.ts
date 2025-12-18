@@ -42,7 +42,7 @@ try {
   process.exit(1);
 }
 
-const PORT = process.env.PORT || 4000;
+const PORT = parseInt(process.env.PORT || '4000', 10);
 const server = http.createServer(app);
 
 const allowedOrigins =

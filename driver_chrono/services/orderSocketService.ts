@@ -182,7 +182,7 @@ class OrderSocketService {
     this.socket.on('order:status:update', (data) => {
       try {
         logger.info('🔄 order:status:update reçu (driver)', undefined, data);
-        const { order, location } = data || {};
+        const { order } = data || {};
         
         if (!order || !order.id) {
           logger.warn('⚠️ order:status:update reçu sans order.id', undefined, data);
