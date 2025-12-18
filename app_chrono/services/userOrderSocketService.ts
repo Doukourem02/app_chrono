@@ -5,6 +5,7 @@ import { useOrderStore } from '../store/useOrderStore';
 import { logger } from '../utils/logger';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
+import { soundService } from './soundService';
 
 class UserOrderSocketService {
   private socket: Socket | null = null;
@@ -210,6 +211,13 @@ class UserOrderSocketService {
               status: o.status,
               hasDriver: !!o.driver,
             })),
+          });
+
+          // Jouer le son de commande acceptée
+          soundService.initialize().then(() => {
+            soundService.playOrderAccepted();
+          }).catch((err) => {
+            console.warn('[userOrderSocketService] Erreur lecture son:', err);
           });
 
           // IMPORTANT : Sélectionner automatiquement la commande acceptée pour qu'elle soit affichée

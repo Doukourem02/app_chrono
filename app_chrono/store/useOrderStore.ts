@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { soundService } from '../services/soundService';
 
 export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'delivering' | 'completed' | 'declined' | 'cancelled';
 
@@ -197,6 +198,16 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
             if (__DEV__) {
               console.log(`✅ updateFromSocket - Changement de statut détecté: ${existingOrder.status} → ${status}`);
             }
+            
+            // Jouer le son si la commande est complétée
+            if (status === 'completed' && existingOrder.status !== 'completed') {
+              soundService.initialize().then(() => {
+                soundService.playOrderCompleted();
+              }).catch((err) => {
+                console.warn('[useOrderStore] Erreur lecture son:', err);
+              });
+            }
+            
             set((currentState) => {
               const updatedOrders = currentState.activeOrders.map((o) =>
                 o.id === order.id 
@@ -221,6 +232,15 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
           }
         } else {
           // Ajouter la nouvelle commande
+          // Jouer le son si la commande est complétée
+          if (status === 'completed') {
+            soundService.initialize().then(() => {
+              soundService.playOrderCompleted();
+            }).catch((err) => {
+              console.warn('[useOrderStore] Erreur lecture son:', err);
+            });
+          }
+          
           get().addOrder({
             ...order as OrderRequest,
             status,

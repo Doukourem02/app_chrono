@@ -1,12 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {View,Text,StyleSheet,ScrollView,Switch,TouchableOpacity} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { soundService } from '../../services/soundService';
 
 export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
+
+  useEffect(() => {
+    // Charger la préférence de son au montage
+    soundService.isSoundEnabled().then((enabled) => {
+      setSoundEnabled(enabled);
+    });
+  }, []);
+
+  const handleSoundToggle = async (value: boolean) => {
+    setSoundEnabled(value);
+    await soundService.setSoundEnabled(value);
+  };
 
   return (
     <View style={styles.container}>
@@ -48,7 +61,7 @@ export default function SettingsPage() {
             </View>
             <Switch
               value={soundEnabled}
-              onValueChange={setSoundEnabled}
+              onValueChange={handleSoundToggle}
               trackColor={{ false: '#E5E7EB', true: '#8B5CF6' }}
               thumbColor={soundEnabled ? '#FFFFFF' : '#9CA3AF'}
             />

@@ -4,6 +4,7 @@ import { AppState } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
+import { soundService } from "../services/soundService";
 // Validation des variables d'environnement au démarrage
 import "../config/envCheck";
 
@@ -44,6 +45,13 @@ export default function RootLayout() {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
   }, [user?.id, validateUserExists, logout]);
+
+  useEffect(() => {
+    // Initialiser le service de son au démarrage
+    soundService.initialize().catch((err) => {
+      console.warn('[RootLayout] Erreur initialisation service son:', err);
+    });
+  }, []);
 
   return (
     <ErrorBoundary>

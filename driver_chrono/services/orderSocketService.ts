@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { config } from '../config/index';
 import { OrderRequest, useOrderStore } from '../store/useOrderStore';
 import { logger } from '../utils/logger';
+import { soundService } from './soundService';
 
 class OrderSocketService {
   private socket: Socket | null = null;
@@ -326,6 +327,13 @@ class OrderSocketService {
     if (String(status) === 'completed') {
       try {
         useOrderStore.getState().completeOrder(orderId);
+        
+        // Jouer le son de commande complétée
+        soundService.initialize().then(() => {
+          soundService.playOrderCompleted();
+        }).catch((err) => {
+          console.warn('[orderSocketService] Erreur lecture son:', err);
+        });
       } catch (err) {
         logger.warn('Failed to complete order locally', undefined, err);
       }
