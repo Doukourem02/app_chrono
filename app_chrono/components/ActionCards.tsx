@@ -1,5 +1,6 @@
 import React from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import { AnimatedCard } from "./animations";
 
@@ -8,17 +9,13 @@ export default function ActionCards() {
 
   const handleNewDelivery = () => {
     requireAuth(() => {
-      
-      console.log('Naviguer vers nouvelle livraison');
-    
+      router.push("/(tabs)/map" as any);
     });
   };
 
   const handleTrackPackage = () => {
     requireAuth(() => {
-      
-      console.log('Naviguer vers suivi de colis');
-    
+      router.push("/(tabs)/box" as any);
     });
   };
 
