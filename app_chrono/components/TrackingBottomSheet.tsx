@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
-import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet} from "react-native";
+import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet,Image} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userApiService } from "../services/userApiService";
 import { QRCodeDisplay } from "./QRCodeDisplay";
+import { formatUserName } from "../utils/formatName";
 
 interface TrackingBottomSheetProps {
   currentOrder: any;
@@ -34,6 +35,23 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const [isLoadingRating, setIsLoadingRating] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<{ qrCodeImage: string; qrCodeData?: { expiresAt: string; orderNumber: string } } | null>(null);
+
+  // Helper pour obtenir les initiales du livreur
+  const getDriverInitials = useCallback(() => {
+    if (!currentOrder?.driver) return 'L';
+    const driverName = formatUserName(currentOrder.driver, 'Livreur');
+    return driverName
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || 'L';
+  }, [currentOrder?.driver]);
+
+  // Helper pour obtenir l'avatar du livreur
+  const getDriverAvatar = useCallback(() => {
+    return currentOrder?.driver?.avatar || currentOrder?.driver?.avatar_url || null;
+  }, [currentOrder?.driver]);
 
   const loadOrderRating = useCallback(async () => {
     if (!currentOrder?.id) {
@@ -101,6 +119,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
     }
     return canCancelOrder;
   }, [status, onCancel]);
+
 
   const statusSteps = useMemo(() => [
     { label: "Livreur assigné", key: "accepted" },
@@ -210,39 +229,73 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       {!isExpanded && (
         <View style={styles.collapsedWrapper}>
           <View style={styles.collapsedContainer}>
-            <View style={styles.driverAvatar} />
-
             {isCompleted ? (
               <View style={styles.completedBadge}>
                 <Ionicons name="checkmark" size={16} color="#fff" />
                 <Text style={styles.completedBadgeText}>Livré</Text>
               </View>
             ) : (
-              <View style={styles.actionButtonsCollapsed}>
-                {canCancel && (
-                  <TouchableOpacity 
-                    style={[styles.iconCircle, styles.cancelIconCircle]}
-                    onPress={onCancel}
-                  >
-                    <Ionicons name="close-circle" size={20} color="#fff" />
-                  </TouchableOpacity>
+              <>
+                {/* Avatar du livreur à l'extrémité gauche */}
+                {currentOrder?.driver && (
+                  <View style={styles.driverAvatarContainer}>
+                    {getDriverAvatar() ? (
+                      <Image 
+                        source={{ uri: getDriverAvatar() }} 
+                        style={styles.driverAvatar}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.driverAvatarPlaceholder}>
+                        <Text style={styles.driverAvatarText}>{getDriverInitials()}</Text>
+                      </View>
+                    )}
+                  </View>
                 )}
-                <TouchableOpacity 
-                  style={styles.iconCircle}
-                  onPress={onMessage}
-                >
-                  <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.iconCircle}
-                  onPress={() => setShowQRCode(true)}
-                >
-                  <Ionicons name="qr-code-outline" size={20} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconCircle}>
-                  <Ionicons name="call-outline" size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
+                {/* Actions contextuelles selon le statut - version collapsed */}
+                <View style={styles.actionButtonsCollapsed}>
+                  {status === 'pending' || status === 'accepted' ? (
+                    <>
+                      {canCancel && (
+                        <TouchableOpacity 
+                          style={[styles.iconCircle, styles.cancelIconCircle]}
+                          onPress={onCancel}
+                        >
+                          <Ionicons name="close-circle" size={20} color="#fff" />
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity 
+                        style={styles.iconCircle}
+                        onPress={onMessage}
+                      >
+                        <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </>
+                  ) : status === 'enroute' || status === 'picked_up' || status === 'delivering' ? (
+                    <>
+                      <TouchableOpacity 
+                        style={styles.iconCircle}
+                        onPress={onMessage}
+                      >
+                        <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.iconCircle}
+                        onPress={() => setShowQRCode(true)}
+                      >
+                        <Ionicons name="qr-code-outline" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.iconCircle}
+                      onPress={onMessage}
+                    >
+                      <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
             )}
           </View>
         </View>
@@ -360,31 +413,67 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
           )}
 
           <View style={styles.actionBar}>
-            <View style={styles.driverAvatar} />
+            {/* Avatar du livreur à l'extrémité gauche */}
+            {currentOrder?.driver && (
+              <View style={styles.driverAvatarContainer}>
+                {getDriverAvatar() ? (
+                  <Image 
+                    source={{ uri: getDriverAvatar() }} 
+                    style={styles.driverAvatar}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.driverAvatarPlaceholder}>
+                    <Text style={styles.driverAvatarText}>{getDriverInitials()}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+            {/* Actions contextuelles selon le statut */}
             <View style={styles.actionButtons}>
-              {canCancel && (
+              {status === 'pending' || status === 'accepted' ? (
+                // Pending/Accepted : Annuler + Message
+                <>
+                  {canCancel && (
+                    <TouchableOpacity 
+                      style={[styles.actionButton, styles.cancelButton]} 
+                      onPress={onCancel}
+                    >
+                      <Ionicons name="close-circle" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={onMessage}
+                  >
+                    <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </>
+              ) : status === 'enroute' || status === 'picked_up' || status === 'delivering' ? (
+                // En route/Picked up/Delivering : Message + QR code (moment critique)
+                <>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={onMessage}
+                  >
+                    <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => setShowQRCode(true)}
+                  >
+                    <Ionicons name="qr-code-outline" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                // Completed : Message uniquement
                 <TouchableOpacity 
-                  style={[styles.actionButton, styles.cancelButton]} 
-                  onPress={onCancel}
+                  style={styles.actionButton}
+                  onPress={onMessage}
                 >
-                  <Ionicons name="close-circle" size={20} color="#fff" />
+                  <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
                 </TouchableOpacity>
               )}
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={onMessage}
-              >
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => setShowQRCode(true)}
-              >
-                <Ionicons name="qr-code-outline" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="call-outline" size={20} color="#fff" />
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -457,21 +546,44 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-  },
-
-  driverAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#d1d5db",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
 
   actionButtonsCollapsed: {
     flexDirection: "row",
-    marginLeft: "auto",
+    alignItems: "center",
     gap: 12,
+    marginLeft: "auto",
+  },
+
+  driverAvatarContainer: {
+    marginRight: 0,
+  },
+
+  driverAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "transparent",
+  },
+
+  driverAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+
+  driverAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 
   iconCircle: {
@@ -549,7 +661,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 18,
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     shadowColor: "#7C3AED",
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -560,6 +672,9 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     gap: 12,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginLeft: "auto",
   },
 
   actionButton: {

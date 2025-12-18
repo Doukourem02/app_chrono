@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {View,Text,StyleSheet,TouchableOpacity,TextInput,FlatList,Image,ActivityIndicator,KeyboardAvoidingView,Platform,Animated,PanResponderInstance} from 'react-native';
+import {View,Text,StyleSheet,TouchableOpacity,TextInput,FlatList,Image,ActivityIndicator,KeyboardAvoidingView,Platform,Animated,PanResponderInstance,Linking,Alert} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userMessageService, Message } from '../services/userMessageService';
@@ -50,9 +50,11 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
   const [driverInfo, setDriverInfo] = useState<{
     name: string;
     avatar?: string;
+    phone?: string;
   }>({
     name: initialDriverName || 'Livreur',
     avatar: initialDriverAvatar,
+    phone: undefined,
   });
 
   const [isLoadingDriver, setIsLoadingDriver] = useState(false);
@@ -68,7 +70,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
         ? currentConversation.participant_2
         : currentConversation.participant_1;
 
-    if (driverParticipant) {
+      if (driverParticipant) {
       const name = formatUserName(driverParticipant, 'Livreur');
       
       // Ne mettre à jour que si on a un nom valide (pas un email)
@@ -76,6 +78,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
         setDriverInfo({
           name,
           avatar: driverParticipant.avatar_url,
+          phone: (driverParticipant as any).phone || (driverParticipant as any).phone_number,
         });
         setIsLoadingDriver(false);
         return;
@@ -93,6 +96,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
               setDriverInfo({
                 name: apiName,
                 avatar: result.data.avatar_url || result.data.profile_image_url,
+                phone: result.data.phone || result.data.phone_number,
               });
             }
           } catch {
@@ -100,6 +104,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
             setDriverInfo({
               name: formatUserName(driverParticipant, 'Livreur'),
               avatar: driverParticipant.avatar_url,
+              phone: (driverParticipant as any).phone || (driverParticipant as any).phone_number,
             });
           } finally {
             setIsLoadingDriver(false);
@@ -130,6 +135,7 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
           setDriverInfo({
             name,
             avatar: result.data.avatar_url || result.data.profile_image_url,
+            phone: result.data.phone || result.data.phone_number,
           });
         }
       } catch {
@@ -267,6 +273,19 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
     ? messages[currentConversation.id] || []
     : [];
 
+  const handleCall = useCallback(() => {
+    const driverPhone = driverInfo.phone;
+    if (!driverPhone) {
+      Alert.alert('Information', 'Numéro de téléphone du livreur non disponible');
+      return;
+    }
+    
+    const phoneNumber = driverPhone.startsWith('+') ? driverPhone : `+${driverPhone}`;
+    Linking.openURL(`tel:${phoneNumber}`).catch(() => {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application d\'appel');
+    });
+  }, [driverInfo.phone]);
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isMyMessage = item.sender_id === user?.id;
 
@@ -352,36 +371,42 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#111827" />
-          </TouchableOpacity>
-
-          <View style={styles.headerInfo}>
+          {/* Avatar à l'extrémité gauche - toujours affiché */}
+          <View style={styles.headerAvatarPlaceholder}>
             {isLoadingDriver ? (
-              <ActivityIndicator size="small" color="#7C3AED" />
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : driverInfo.avatar ? (
+              <Image source={{ uri: driverInfo.avatar }} style={StyleSheet.absoluteFillObject} />
             ) : (
-              <>
-                {driverInfo.avatar ? (
-                  <Image source={{ uri: driverInfo.avatar }} style={styles.avatar} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarText}>
-                      {driverInfo.name
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')
-                        .toUpperCase()
-                        .slice(0, 2)}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.headerText}>
-                  <Text style={styles.driverName}>{driverInfo.name}</Text>
-                  <Text style={styles.headerSubtitle}>Messages</Text>
-                </View>
-              </>
+              <Text style={styles.headerAvatarText}>
+                {(driverInfo.name || 'L')
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2) || 'L'}
+              </Text>
             )}
           </View>
+
+          {/* Texte au centre */}
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.driverName}>{driverInfo.name}</Text>
+            <Text style={styles.headerSubtitle}>Messages</Text>
+          </View>
+
+          {/* Bouton Appel à droite */}
+          <TouchableOpacity 
+            style={styles.callButton}
+            onPress={handleCall}
+          >
+            <Ionicons name="call-outline" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          {/* Bouton Close à droite après le bouton appel */}
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={20} color="#6B7280" />
+          </TouchableOpacity>
         </View>
 
         {/* Messages List */}
@@ -468,13 +493,57 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
+    minHeight: 64,
+  },
+  headerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  headerAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    overflow: 'hidden',
+  },
+  headerAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  avatarLoader: {
+    marginRight: 12,
+  },
+  headerTextContainer: {
+    flex: 1,
+    marginLeft: 4,
+  },
+  callButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   closeButton: {
     width: 32,
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginLeft: 8,
   },
   headerInfo: {
     flexDirection: 'row',
