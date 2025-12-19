@@ -6,18 +6,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { Download, TrendingUp, Users, Truck, CreditCard, LucideIcon } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { exportData } from '@/utils/exportUtils'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-} from 'recharts'
+import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer,LineChart,Line,} from 'recharts'
 
 type ReportType = 'deliveries' | 'revenues' | 'clients' | 'drivers' | 'payments'
 type PeriodPreset = 'today' | 'week' | 'month' | 'year' | 'custom'

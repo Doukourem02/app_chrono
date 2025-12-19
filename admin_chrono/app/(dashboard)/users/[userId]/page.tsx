@@ -5,19 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
-import {
-  ArrowLeft,
-  Mail,
-  Phone,
-  Calendar,
-  Truck,
-  MapPin,
-  Power,
-  User,
-  Shield,
-  CreditCard,
-  Download,
-} from 'lucide-react'
+import {ArrowLeft,Mail,Phone,Calendar,Truck,MapPin,Power,User,Shield,CreditCard,Download,} from 'lucide-react'
 import { exportData } from '@/utils/exportUtils'
 
 interface User {

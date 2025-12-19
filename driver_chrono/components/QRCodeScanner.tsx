@@ -5,13 +5,12 @@ import * as Haptics from 'expo-haptics';
 
 // Import conditionnel du scanner QR code
 let BarCodeScanner: any = null;
-let BarCodeScannerResult: any = null;
 
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const barcodeModule = require('expo-barcode-scanner');
   BarCodeScanner = barcodeModule.BarCodeScanner;
-  BarCodeScannerResult = barcodeModule.BarCodeScannerResult;
-} catch (error) {
+} catch {
   console.warn('expo-barcode-scanner non disponible. Un développement build est requis.');
 }
 
@@ -134,7 +133,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           <Ionicons name="camera-outline" size={64} color="#EF4444" />
           <Text style={styles.permissionText}>Permission caméra refusée</Text>
           <Text style={styles.permissionSubtext}>
-            Veuillez autoriser l'accès à la caméra dans les paramètres de l'appareil
+            Veuillez autoriser l&apos;accès à la caméra dans les paramètres de l&apos;appareil
           </Text>
           <TouchableOpacity
             style={styles.permissionButton}

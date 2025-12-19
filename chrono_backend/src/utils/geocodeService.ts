@@ -7,6 +7,18 @@ interface GeocodeResult {
   longitude: number;
 }
 
+interface GoogleGeocodeResponse {
+  status: string;
+  results?: Array<{
+    geometry: {
+      location: {
+        lat: number;
+        lng: number;
+      };
+    };
+  }>;
+}
+
 /**
  * Géocode une adresse en coordonnées GPS
  * @param address - L'adresse à géocoder
@@ -25,7 +37,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${googleApiKey}&language=fr&region=ci`;
     
     const response = await fetch(url);
-    const data = await response.json();
+    const data = await response.json() as GoogleGeocodeResponse;
 
     if (data.status === 'OK' && data.results && data.results.length > 0) {
       const location = data.results[0].geometry.location;

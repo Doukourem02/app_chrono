@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { QRCodeScanner } from './QRCodeScanner';
 import { QRCodeScanResult } from './QRCodeScanResult';
-import { qrCodeService, QRCodeScanResult as QRCodeScanResultType } from '../services/qrCodeService';
+import { qrCodeService } from '../services/qrCodeService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -43,17 +43,22 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('details');
   const [showQRScanner, setShowQRScanner] = useState(false);
-  const [scanResult, setScanResult] = useState<QRCodeScanResultType['data'] | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{
+    recipientName: string;
+    recipientPhone: string;
+    creatorName: string;
+    orderNumber: string;
+  } | null>(null);
 
   // Handler pour scanner le QR code
   const handleScanQRCode = async (qrCodeData: string) => {
-    setIsScanning(true);
     try {
       const result = await qrCodeService.scanQRCode(qrCodeData, location || undefined);
       
       if (result.success && result.isValid && result.data) {
-        setScanResult(result.data);
+        // Extraire uniquement les champs nécessaires pour le composant QRCodeScanResult
+        const { orderId, ...scanData } = result.data;
+        setScanResult(scanData);
         setShowQRScanner(false);
       } else {
         Alert.alert(
@@ -64,8 +69,6 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
       }
     } catch (error: any) {
       Alert.alert('Erreur', error.message || 'Erreur lors du scan du QR code');
-    } finally {
-      setIsScanning(false);
     }
   };
 

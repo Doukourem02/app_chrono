@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {View,Text,StyleSheet,TextInput,TouchableOpacity,ScrollView,Alert,ActivityIndicator,
-} from 'react-native';
+import {View,Text,StyleSheet,TextInput,TouchableOpacity,ScrollView,Alert,ActivityIndicator,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';

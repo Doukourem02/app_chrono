@@ -8,7 +8,7 @@ interface AddressAutocompleteProps {
   value: string
   onChange: (address: string, coordinates?: { latitude: number; longitude: number }) => void
   placeholder?: string
-  label?: string
+  label?: React.ReactNode
 }
 
 export default function AddressAutocomplete({

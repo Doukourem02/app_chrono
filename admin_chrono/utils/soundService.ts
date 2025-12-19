@@ -23,49 +23,15 @@ class SoundService {
         this.volume = parseFloat(savedVolume)
       }
       
-      // Précharger les sons après une première interaction utilisateur
-      // Cela permet de contourner les restrictions de lecture automatique
-      const preloadSounds = async () => {
-        if (this.soundEnabled) {
-          try {
-            // Précharger tous les sons
-            const newOrder = this.loadSound('newOrder', '/sounds/new-order.wav')
-            const newMessage = this.loadSound('newMessage', '/sounds/new-message.wav')
-            const success = this.loadSound('success', '/sounds/success.wav')
-            
-            // Essayer de jouer et arrêter immédiatement pour "débloquer" l'autoplay
-            // Cela permet au navigateur de savoir que l'utilisateur a interagi
-            try {
-              await newOrder.play()
-              newOrder.pause()
-              newOrder.currentTime = 0
-            } catch {}
-            
-            try {
-              await newMessage.play()
-              newMessage.pause()
-              newMessage.currentTime = 0
-            } catch {}
-            
-            try {
-              await success.play()
-              success.pause()
-              success.currentTime = 0
-            } catch {}
-            
-            this.userInteracted = true
-            console.log('🔊 [SoundService] Sons préchargés et débloqués après interaction')
-          } catch (error) {
-            console.warn('🔊 [SoundService] Erreur préchargement:', error)
-          }
-        }
-      }
+      // Précharger les sons dès le chargement de la page
+      // On essaie de débloquer l'autoplay en créant un bouton invisible qui se déclenche automatiquement
+      this.attemptAutoPreload()
       
-      // Précharger au premier clic/interaction
+      // Aussi précharger au premier clic/interaction (au cas où l'auto-preload échoue)
       const events = ['click', 'touchstart', 'keydown', 'mousedown']
       const preloadOnce = () => {
         if (!this.userInteracted) {
-          preloadSounds()
+          this.forcePreload()
           events.forEach(event => {
             window.removeEventListener(event, preloadOnce)
           })
@@ -75,6 +41,133 @@ class SoundService {
       events.forEach(event => {
         window.addEventListener(event, preloadOnce, { once: true, passive: true })
       })
+    }
+  }
+
+  /**
+   * Tente de précharger automatiquement les sons dès le chargement
+   * Utilise une technique avec un bouton invisible pour contourner les restrictions
+   */
+  private attemptAutoPreload(): void {
+    if (this.userInteracted || typeof window === 'undefined' || !this.soundEnabled) {
+      return
+    }
+
+    // Attendre que le DOM soit prêt
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        this.tryAutoPreloadWithButton()
+      })
+    } else {
+      // DOM déjà chargé
+      this.tryAutoPreloadWithButton()
+    }
+  }
+
+  /**
+   * Tente de précharger en créant un bouton invisible qui se déclenche automatiquement
+   */
+  private tryAutoPreloadWithButton(): void {
+    if (this.userInteracted || typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      // Créer un bouton invisible
+      const button = document.createElement('button')
+      button.style.position = 'fixed'
+      button.style.top = '-9999px'
+      button.style.left = '-9999px'
+      button.style.width = '1px'
+      button.style.height = '1px'
+      button.style.opacity = '0'
+      button.style.pointerEvents = 'none'
+      button.setAttribute('aria-hidden', 'true')
+      button.setAttribute('tabindex', '-1')
+      
+      // Ajouter le bouton au DOM
+      document.body.appendChild(button)
+      
+      // Simuler un clic programmatique (ne fonctionne pas toujours à cause des restrictions)
+      // Mais on peut essayer de précharger directement
+      button.addEventListener('click', async () => {
+        await this.forcePreload()
+        document.body.removeChild(button)
+      }, { once: true })
+      
+      // Essayer de déclencher le clic (peut ne pas fonctionner à cause des restrictions)
+      try {
+        button.click()
+      } catch {
+        // Si le clic programmatique ne fonctionne pas, essayer de précharger directement
+        // avec un volume très faible
+        this.forcePreloadSilent().catch(() => {
+          // Si ça échoue, on attendra une vraie interaction
+        })
+      }
+      
+      // Nettoyer après un délai
+      setTimeout(() => {
+        if (document.body.contains(button)) {
+          document.body.removeChild(button)
+        }
+      }, 1000)
+    } catch {
+      // Si la création du bouton échoue, essayer le préchargement silencieux
+      this.forcePreloadSilent().catch(() => {
+        // Ignorer les erreurs
+      })
+    }
+  }
+
+  /**
+   * Précharge les sons avec un volume très faible (presque inaudible)
+   * pour débloquer l'autoplay sans déranger l'utilisateur
+   */
+  private async forcePreloadSilent(): Promise<void> {
+    if (this.userInteracted || typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      const sounds = [
+        { name: 'newOrder', path: '/sounds/new-order.wav' },
+        { name: 'newMessage', path: '/sounds/new-message.wav' },
+        { name: 'success', path: '/sounds/success.wav' },
+      ]
+
+      let preloadSuccess = false
+      for (const sound of sounds) {
+        try {
+          const audio = new Audio(sound.path)
+          audio.volume = 0.001 // Volume extrêmement faible (presque inaudible)
+          audio.preload = 'auto'
+          
+          // Essayer de jouer et pauser immédiatement
+          const playPromise = audio.play()
+          if (playPromise !== undefined) {
+            await playPromise
+            audio.pause()
+            audio.currentTime = 0
+            audio.volume = this.volume // Remettre le volume normal
+            
+            // Stocker dans le cache
+            this.sounds.set(sound.name, audio)
+            preloadSuccess = true
+          }
+        } catch {
+          // Ignorer les erreurs silencieusement
+        }
+      }
+
+      if (preloadSuccess) {
+        this.userInteracted = true
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔊 [SoundService] ✅ Préchargement silencieux réussi, userInteracted = true')
+        }
+      }
+    } catch {
+      // Ignorer les erreurs silencieusement
     }
   }
 
@@ -138,12 +231,11 @@ class SoundService {
       return
     }
 
+    const audio = this.loadSound(name, path)
+    audio.volume = this.volume
+    audio.currentTime = 0
+
     try {
-      const audio = this.loadSound(name, path)
-      audio.volume = this.volume
-      // Réinitialiser la position pour rejouer depuis le début
-      audio.currentTime = 0
-      
       // Tenter de jouer le son
       const playPromise = audio.play()
       
@@ -154,43 +246,49 @@ class SoundService {
         }
         // Marquer que l'utilisateur a interagi (via le son qui joue)
         this.userInteracted = true
+        return
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Les navigateurs bloquent souvent la lecture automatique
-      // Si c'est une erreur de permission, essayer de précharger pour la prochaine fois
-      if (error?.name === 'NotAllowedError' || error?.code === 0) {
+      const err = error as { name?: string; code?: number; message?: string };
+      if (err?.name === 'NotAllowedError' || err?.code === 0) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn(`🔊 [SoundService] ⚠️ Lecture automatique bloquée pour ${name}. L'utilisateur doit interagir avec la page d'abord.`)
+          console.warn(`🔊 [SoundService] ⚠️ Lecture automatique bloquée pour ${name}. userInteracted: ${this.userInteracted}`)
         }
         
-        // Si l'utilisateur n'a pas encore interagi, essayer de précharger maintenant
+        // Si l'utilisateur n'a pas encore interagi, on ne peut rien faire
+        // Le son sera joué après la prochaine interaction (déjà géré dans initialize)
         if (!this.userInteracted) {
-          // Déclencher le préchargement en simulant une interaction
-          // (mais seulement si on est dans le contexte d'une vraie interaction)
-          const events = ['click', 'touchstart', 'keydown']
-          const tryPreload = () => {
-            if (!this.userInteracted) {
-              const audio = this.loadSound(name, path)
-              audio.play().then(() => {
-                audio.pause()
-                audio.currentTime = 0
-                this.userInteracted = true
-              }).catch(() => {})
-            }
-            events.forEach(event => {
-              window.removeEventListener(event, tryPreload)
-            })
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`🔊 [SoundService] ⚠️ En attente d'interaction utilisateur pour débloquer l'autoplay`)
+          }
+          return
+        }
+        
+        // Si userInteracted est true mais que ça ne joue toujours pas,
+        // essayer de recharger l'audio et réessayer
+        try {
+          // Créer un nouvel élément audio
+          const newAudio = new Audio(path)
+          newAudio.volume = this.volume
+          newAudio.currentTime = 0
+          
+          await newAudio.play()
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`🔊 [SoundService] ✅ Son ${name} joué avec nouvel élément audio`)
           }
           
-          // Écouter la prochaine interaction pour débloquer
-          events.forEach(event => {
-            window.addEventListener(event, tryPreload, { once: true, passive: true })
-          })
+          // Mettre à jour le cache
+          this.sounds.set(name, newAudio)
+        } catch (retryError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`🔊 [SoundService] ⚠️ Échec relecture avec nouvel audio:`, retryError)
+          }
         }
       } else {
         // Autre type d'erreur
         if (process.env.NODE_ENV === 'development') {
-          console.warn(`🔊 [SoundService] ❌ Erreur lecture ${name}:`, error?.message || error)
+          console.warn(`🔊 [SoundService] ❌ Erreur lecture ${name}:`, err?.message || error)
         }
       }
     }
@@ -215,6 +313,50 @@ class SoundService {
    */
   async playSuccess(): Promise<void> {
     await this.playSound('success', '/sounds/success.wav')
+  }
+
+  /**
+   * Force le préchargement des sons (à appeler après une interaction utilisateur)
+   * Cette méthode peut être appelée manuellement pour s'assurer que les sons sont prêts
+   */
+  async forcePreload(): Promise<void> {
+    if (this.userInteracted || typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      const sounds = [
+        { name: 'newOrder', path: '/sounds/new-order.wav' },
+        { name: 'newMessage', path: '/sounds/new-message.wav' },
+        { name: 'success', path: '/sounds/success.wav' },
+      ]
+
+      let preloadSuccess = false
+      for (const sound of sounds) {
+        try {
+          const audio = this.loadSound(sound.name, sound.path)
+          audio.volume = 0.01 // Volume très faible pour ne pas déranger
+          await audio.play()
+          audio.pause()
+          audio.currentTime = 0
+          audio.volume = this.volume // Remettre le volume normal
+          preloadSuccess = true
+        } catch {
+          // Ignorer les erreurs silencieusement pour ce son
+        }
+      }
+
+      if (preloadSuccess) {
+        this.userInteracted = true
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔊 [SoundService] ✅ Préchargement forcé réussi, userInteracted = true')
+        }
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('🔊 [SoundService] Erreur préchargement forcé:', error)
+      }
+    }
   }
 
   /**

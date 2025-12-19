@@ -6,11 +6,11 @@ import { maskUserId } from './maskSensitiveData.js';
  * Constantes pour les limites de paiement différé
  */
 const DEFERRED_PAYMENT_LIMITS = {
-  ANNUAL_LIMIT: 20000, // 20 000 FCFA par an
-  MONTHLY_LIMIT: 5000, // 5 000 FCFA par mois
-  MAX_USAGES_PER_MONTH: 2, // Maximum 2 paiements différés par mois
-  COOLDOWN_DAYS: 7, // 7 jours entre chaque utilisation
-  MIN_AMOUNT: 2000, // Montant minimum : 2 000 FCFA
+  ANNUAL_LIMIT: 20000, 
+  MONTHLY_LIMIT: 5000, 
+  MAX_USAGES_PER_MONTH: 2, 
+  COOLDOWN_DAYS: 7, 
+  MIN_AMOUNT: 2000, 
 } as const;
 
 /**

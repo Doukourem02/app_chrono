@@ -1,21 +1,7 @@
 import React, { useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  ScrollView,
-} from 'react-native';
+import {View,Text,StyleSheet,Modal,TouchableOpacity,ScrollView,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withSequence,
-  withDelay,
-} from 'react-native-reanimated';
+import Animated, {useSharedValue,useAnimatedStyle,withSpring,withTiming,withSequence,withDelay,} from 'react-native-reanimated';
 
 interface PaymentErrorModalProps {
   visible: boolean;

@@ -13,11 +13,11 @@ interface OrderRequest {
   };
   pickup: {
     address: string;
-    coordinates: { latitude: number; longitude: number };
+    coordinates?: { latitude: number; longitude: number }; // Optionnel pour les commandes téléphoniques
   };
   dropoff: {
     address: string;
-    coordinates: { latitude: number; longitude: number };
+    coordinates?: { latitude: number; longitude: number }; // Optionnel pour les commandes téléphoniques
   };
   price: number;
   deliveryMethod: 'moto' | 'vehicule' | 'cargo';

@@ -9,6 +9,8 @@ import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useSocketConnection } from "@/hooks/useSocketConnection";
+import { soundService } from "@/utils/soundService";
 
 export default function DashboardLayout({
   children,
@@ -18,6 +20,9 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading, setUser, setLoading, checkAdminRole } = useAuthStore();
+  
+  // Initialiser la connexion Socket.IO pour recevoir les événements en temps réel
+  const { isConnected } = useSocketConnection();
 
   useEffect(() => {
     const load = async () => {
@@ -42,6 +47,52 @@ export default function DashboardLayout({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Les fonctions du store sont stables, pas besoin de les inclure
+
+  // Initialiser le soundService dès le chargement et précharger les sons
+  useEffect(() => {
+    if (user && !loading && typeof window !== 'undefined') {
+      // Initialiser le service de sons (essaie de précharger automatiquement)
+      soundService.initialize().catch((error) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[DashboardLayout] Erreur initialisation soundService:', error);
+        }
+      });
+      
+      // Forcer le préchargement dès qu'il y a une interaction (backup si auto-preload échoue)
+      const handleFirstInteraction = () => {
+        soundService.forcePreload().catch(() => {
+          // Ignorer les erreurs silencieusement
+        });
+        
+        // Nettoyer les listeners après la première interaction
+        ['click', 'touchstart', 'keydown', 'mousedown'].forEach(event => {
+          window.removeEventListener(event, handleFirstInteraction);
+        });
+      };
+      
+      // Écouter la première interaction pour forcer le préchargement (backup)
+      ['click', 'touchstart', 'keydown', 'mousedown'].forEach(event => {
+        window.addEventListener(event, handleFirstInteraction, { once: true, passive: true });
+      });
+      
+      // Précharger le module soundService pour éviter le délai d'import dynamique
+      // Cela garantit que le module est prêt quand une commande arrive
+      import('@/utils/soundService').catch(() => {
+        // Ignorer les erreurs silencieusement
+      });
+    }
+  }, [user, loading]);
+
+  // Logger l'état de connexion socket pour déboguer
+  useEffect(() => {
+    if (user && !loading) {
+      console.log('[DashboardLayout] 🔌 État connexion socket:', {
+        isConnected,
+        userId: user.id,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [isConnected, user, loading]);
 
   if (loading) {
     return (

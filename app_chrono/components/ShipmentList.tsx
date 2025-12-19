@@ -1,22 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import {
-  estimateDurationMinutes,
-  formatDurationLabel,
-} from "../services/orderApi";
+import {RefreshControl,ScrollView,StyleSheet,Text,View,} from "react-native";
+import {estimateDurationMinutes,formatDurationLabel,} from "../services/orderApi";
 import { userApiService } from "../services/userApiService";
 import { useAuthStore } from "../store/useAuthStore";
-import {
-  OrderRequest,
-  OrderStatus,
-  useOrderStore,
-} from "../store/useOrderStore";
+import {OrderRequest,OrderStatus,useOrderStore,} from "../store/useOrderStore";
 import { formatUserName } from "../utils/formatName";
 import { AnimatedCard, SkeletonLoader } from "./animations";
 import ShipmentCard from "./ShipmentCard";

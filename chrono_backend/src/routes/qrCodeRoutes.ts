@@ -1,10 +1,5 @@
 import express, { Router } from 'express';
-import {
-  generateQRCode,
-  getQRCode,
-  scanQRCode,
-  getScanHistory,
-} from '../controllers/qrCodeController.js';
+import {generateQRCode,getQRCode,scanQRCode,getScanHistory,} from '../controllers/qrCodeController.js';
 import { verifyJWT } from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();

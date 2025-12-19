@@ -17,7 +17,7 @@ interface OrderCoordinates {
 
 interface OrderLocation {
   address: string;
-  coordinates: OrderCoordinates;
+  coordinates?: OrderCoordinates; // Optionnel pour les commandes téléphoniques
   details?: {
     entrance?: string;
     apartment?: string;
@@ -118,19 +118,6 @@ function getActiveOrdersCountByDriver(driverId: string): number {
   return count;
 }
 
-// Fonction pour compter les commandes entre un client et un driver spécifique
-// SUPPRIMÉE : Cette restriction a été supprimée pour permettre aux clients d'envoyer
-// un nombre illimité de commandes au même driver
-// function getOrdersCountByUserAndDriver(userId: string, driverId: string): number {
-//   let count = 0;
-//   for (const [, order] of activeOrders.entries()) {
-//     if (order.user.id === userId && order.driverId === driverId && 
-//         order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined') {
-//       count++;
-//     }
-//   }
-//   return count;
-// }
 
 // Extended Socket interface for custom properties
 interface ExtendedSocket extends Socket {

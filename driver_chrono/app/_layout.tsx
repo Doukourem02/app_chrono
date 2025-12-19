@@ -5,7 +5,6 @@ import { useDriverStore } from "../store/useDriverStore";
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { soundService } from "../services/soundService";
-// Validation des variables d'environnement au démarrage
 import "../config/envCheck";
 
 //  SENTRY: Initialiser le monitoring d'erreurs

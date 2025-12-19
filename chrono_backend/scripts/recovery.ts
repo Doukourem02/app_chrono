@@ -138,7 +138,7 @@ async function validateBackup(filePath: string): Promise<boolean> {
       // Décompresser temporairement pour vérifier
       const tempPath = await decompressBackup(filePath);
       try {
-        const content = await fs.readFile(tempPath, 'utf-8', { encoding: 'utf-8' });
+        const content = await fs.readFile(tempPath, { encoding: 'utf-8' });
         if (!content.includes('PostgreSQL database dump') && !content.includes('CREATE TABLE')) {
           console.error('❌ Le backup ne semble pas être un dump PostgreSQL valide');
           // Nettoyer le fichier temporaire
