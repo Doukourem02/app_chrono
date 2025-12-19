@@ -167,8 +167,34 @@ export default function BoxPage() {
                   name: formatUserName(order.driver, 'Livreur'),
                 }
               : undefined,
-            pickup: typeof order.pickup === 'string' ? JSON.parse(order.pickup) : order.pickup,
-            dropoff: typeof order.dropoff === 'string' ? JSON.parse(order.dropoff) : order.dropoff,
+            pickup: (() => {
+              try {
+                if (typeof order.pickup === 'string') {
+                  return JSON.parse(order.pickup);
+                } else if (order.pickup && typeof order.pickup === 'object') {
+                  return order.pickup;
+                } else {
+                  return { address: '', coordinates: { latitude: 0, longitude: 0 } };
+                }
+              } catch (e) {
+                console.warn('Erreur parsing pickup:', e);
+                return { address: '', coordinates: { latitude: 0, longitude: 0 } };
+              }
+            })(),
+            dropoff: (() => {
+              try {
+                if (typeof order.dropoff === 'string') {
+                  return JSON.parse(order.dropoff);
+                } else if (order.dropoff && typeof order.dropoff === 'object') {
+                  return order.dropoff;
+                } else {
+                  return { address: '', coordinates: { latitude: 0, longitude: 0 } };
+                }
+              } catch (e) {
+                console.warn('Erreur parsing dropoff:', e);
+                return { address: '', coordinates: { latitude: 0, longitude: 0 } };
+              }
+            })(),
             price: order.price,
             deliveryMethod: order.delivery_method as 'moto' | 'vehicule' | 'cargo',
             distance: order.distance,
@@ -177,9 +203,20 @@ export default function BoxPage() {
             driverId: order.driver_id,
             createdAt: order.created_at || order.createdAt,
             proof: order.proof
-              ? typeof order.proof === 'string'
-                ? JSON.parse(order.proof)
-                : order.proof
+              ? (() => {
+                  try {
+                    if (typeof order.proof === 'string') {
+                      return JSON.parse(order.proof);
+                    } else if (order.proof && typeof order.proof === 'object') {
+                      return order.proof;
+                    } else {
+                      return undefined;
+                    }
+                  } catch (e) {
+                    console.warn('Erreur parsing proof:', e);
+                    return undefined;
+                  }
+                })()
               : undefined,
             created_at: order.created_at,
             accepted_at: order.accepted_at,

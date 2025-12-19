@@ -1,4 +1,3 @@
-import { Alert } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
 import { useOrderStore } from '../store/useOrderStore';
@@ -7,6 +6,7 @@ import { logger } from '../utils/logger';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
 import { soundService } from './soundService';
+import { UserFriendlyError } from '../utils/userFriendlyError';
 
 class UserOrderSocketService {
   private socket: Socket | null = null;
@@ -87,9 +87,7 @@ class UserOrderSocketService {
         // If backend reported persistence failure, inform the user
         if (data && data.dbSaved === false) {
           const message = data.dbError || 'La commande n\'a pas pu être enregistrée en base de données.';
-          Alert.alert(
-            'Erreur enregistrement',
-            `${message}\nVoulez-vous réessayer ?`,
+          UserFriendlyError.showSaveError('la commande', () => {
             [
               {
                 text: 'Réessayer', onPress: () => {
@@ -125,15 +123,9 @@ class UserOrderSocketService {
         }
 
         // Afficher une alerte à l'utilisateur
-        Alert.alert(
+        UserFriendlyError.showInfo(
           'Aucun chauffeur disponible',
-          data?.message || 'Aucun chauffeur n\'est disponible dans votre zone pour le moment. Vous pouvez réessayer plus tard.',
-          [
-            {
-              text: 'OK',
-              style: 'default'
-            }
-          ]
+          'Aucun chauffeur n\'est disponible dans votre zone pour le moment. Vous pouvez réessayer plus tard.'
         );
 
         logger.info('✅ État réinitialisé après aucun chauffeur disponible', 'userOrderSocketService');
@@ -350,8 +342,7 @@ class UserOrderSocketService {
         }
         // If DB persistence failed for the assignment, notify user
         if (data && data.dbSaved === false) {
-          const msg = data.dbError || 'Impossible d\'enregistrer l\'affectation en base.';
-          Alert.alert('Erreur base de données', msg);
+          UserFriendlyError.showSaveError('l\'affectation du livreur');
         }
       } catch (err) {
         logger.warn('Error handling order-accepted', 'userOrderSocketService', err);
@@ -419,7 +410,13 @@ class UserOrderSocketService {
     this.socket.on('order-error', (data) => {
       logger.warn('❌ Erreur commande', 'userOrderSocketService', data);
       if (data?.message) {
-        Alert.alert('Erreur', data.message);
+        UserFriendlyError.handleUnknownError(
+          new Error(data.message),
+          'order-error',
+          () => {
+            // Retry logic si nécessaire
+          }
+        );
       }
     });
 
@@ -588,11 +585,7 @@ class UserOrderSocketService {
       // Vérifier que l'utilisateur est connecté avant de créer la commande
       if (!this.userId) {
         logger.warn('⚠️ Tentative de création de commande sans userId', 'userOrderSocketService');
-        Alert.alert(
-          'Erreur',
-          'Vous devez être connecté pour créer une commande. Veuillez vous connecter.',
-          [{ text: 'OK' }]
-        );
+        UserFriendlyError.showLoginRequired();
         resolve(false);
         return;
       }
@@ -605,11 +598,7 @@ class UserOrderSocketService {
           logger.warn('⚠️ Token d\'authentification invalide ou expiré', 'userOrderSocketService');
           const { user } = useAuthStore.getState();
           if (!user) {
-            Alert.alert(
-              'Session expirée',
-              'Votre session a expiré. Veuillez vous reconnecter.',
-              [{ text: 'OK' }]
-            );
+            UserFriendlyError.showSessionExpired();
             resolve(false);
             return;
           }
@@ -625,11 +614,9 @@ class UserOrderSocketService {
       // S'assurer que le socket est connecté avant de créer la commande
       const connected = await this.ensureConnected();
       if (!connected) {
-        Alert.alert(
-          'Erreur de connexion',
-          'Impossible de se connecter au serveur. Veuillez vérifier votre connexion internet et réessayer.',
-          [{ text: 'OK' }]
-        );
+        UserFriendlyError.showNetworkError(() => {
+          // Retry logic si nécessaire
+        });
         resolve(false);
         return;
       }
@@ -646,11 +633,7 @@ class UserOrderSocketService {
       // Double vérification après la reconnexion
       if (!this.socket || !this.isConnected || !this.userId) {
         logger.error('❌ Socket toujours non connecté après ensureConnected', 'userOrderSocketService');
-        Alert.alert(
-          'Erreur',
-          'Vous devez être connecté pour créer une commande. Veuillez vous reconnecter.',
-          [{ text: 'OK' }]
-        );
+        UserFriendlyError.showLoginRequired();
         finishOrderCreation(false);
         return;
       }
@@ -674,30 +657,22 @@ class UserOrderSocketService {
         const errorCode = error?.code ?? null;
 
         if (errorCode === 'PO001' || errorCode === 'MISSING_PROFILE' || /does not exist|profiles?/i.test(errorMessage)) {
-          Alert.alert(
-            'Compte incomplet',
-            'Votre compte n\'est pas totalement configuré sur le serveur (profil manquant). Veuillez vous reconnecter pour synchroniser votre profil ou contacter le support.',
-            [
-              {
-                text: 'Se reconnecter',
-                onPress: () => {
-                  // Try to trigger a logout so the app returns to auth flow and
-                  // re-creates any missing server profile on next sign-in.
-                  (async () => {
-                    try {
-                      const mod = await import('../store/useAuthStore');
-                      mod.useAuthStore.getState().logout && mod.useAuthStore.getState().logout();
-                    } catch (e) {
-                      logger.warn('Unable to trigger logout after missing profile error', 'userOrderSocketService', e);
-                    }
-                  })();
-                },
-              },
-              { text: 'OK', style: 'cancel' },
-            ],
-          );
+          UserFriendlyError.showIncompleteAccount(() => {
+            // Try to trigger a logout so the app returns to auth flow and
+            // re-creates any missing server profile on next sign-in.
+            (async () => {
+              try {
+                const mod = await import('../store/useAuthStore');
+                mod.useAuthStore.getState().logout && mod.useAuthStore.getState().logout();
+              } catch (e) {
+                logger.warn('Unable to trigger logout after missing profile error', 'userOrderSocketService', e);
+              }
+            })();
+          });
         } else {
-          Alert.alert('Erreur', 'Impossible d\'enregistrer la commande. Merci de réessayer.');
+          UserFriendlyError.showSaveError('la commande', () => {
+            // Retry logic si nécessaire
+          });
         }
 
         finishOrderCreation(false);
@@ -734,15 +709,9 @@ class UserOrderSocketService {
             if (ackResponse && ackResponse.success) {
               // If server reports DB persistence failed, inform the user
               if (ackResponse.dbSaved === false) {
-                const msg = ackResponse.dbError || 'La commande n\'a pas pu être enregistrée en base.';
-                Alert.alert(
-                  'Erreur enregistrement',
-                  `${msg}\nVoulez-vous réessayer ?`,
-                  [
-                    { text: 'Réessayer', onPress: () => { useOrderStore.getState().clear(); } },
-                    { text: 'OK', style: 'cancel' }
-                  ]
-                );
+                UserFriendlyError.showSaveError('la commande', () => {
+                  useOrderStore.getState().clear();
+                });
                 finishOrderCreation(false);
                 return;
               }

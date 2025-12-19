@@ -1,11 +1,13 @@
 'use client'
 
-import { Search, Bell, SlidersHorizontal, X, Package, User, ChevronDown } from 'lucide-react'
+import { Search, Bell, SlidersHorizontal, X, Package, User, ChevronDown, CheckCheck } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { useDateFilter, type DateFilterType } from '@/contexts/DateFilterContext'
+import { useNotificationStore } from '@/stores/useNotificationStore'
+import { useNotifications } from '@/hooks/useNotifications'
 
 interface SearchOrder {
   id: string
@@ -42,6 +44,10 @@ export default function Header() {
   const filtersRef = useRef<HTMLDivElement>(null)
   const datePickerRef = useRef<HTMLDivElement>(null)
   const notificationsRef = useRef<HTMLDivElement>(null)
+
+  // Notifications
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore()
+  useNotifications() // Active l'écoute des événements Socket.IO
 
   // Debounce pour éviter trop de requêtes
   useEffect(() => {
@@ -285,14 +291,68 @@ export default function Header() {
     color: '#4B5563',
   }
 
-  const notificationDotStyle: React.CSSProperties = {
+  const notificationBadgeStyle: React.CSSProperties = {
     position: 'absolute',
-    top: '4px',
-    right: '4px',
-    width: '10px',
-    height: '10px',
+    top: '-4px',
+    right: '-4px',
+    minWidth: '18px',
+    height: '18px',
+    padding: unreadCount > 9 ? '0 4px' : '0 6px',
     backgroundColor: '#EF4444',
-    borderRadius: '50%',
+    color: '#FFFFFF',
+    borderRadius: '9px',
+    fontSize: '11px',
+    fontWeight: 600,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '2px solid #FFFFFF',
+    transition: 'all 0.2s',
+  }
+
+  const handleNotificationClick = (notification: typeof notifications[0]) => {
+    markAsRead(notification.id)
+    if (notification.link) {
+      router.push(notification.link)
+      setShowNotifications(false)
+    }
+  }
+
+  const formatNotificationTime = (createdAt: string) => {
+    const date = new Date(createdAt)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) {
+      return 'À l\'instant'
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60)
+      return `Il y a ${minutes} min`
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600)
+      return `Il y a ${hours}h`
+    } else if (diffInSeconds < 604800) {
+      const days = Math.floor(diffInSeconds / 86400)
+      return `Il y a ${days}j`
+    } else {
+      return date.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: 'short',
+      })
+    }
+  }
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'order':
+        return <Package size={16} style={{ color: '#8B5CF6' }} />
+      case 'message':
+        return <User size={16} style={{ color: '#3B82F6' }} />
+      case 'dispute':
+        return <X size={16} style={{ color: '#EF4444' }} />
+      default:
+        return <Bell size={16} style={{ color: '#6B7280' }} />
+    }
   }
 
   const dropdownStyle: React.CSSProperties = {
@@ -793,38 +853,138 @@ export default function Header() {
             }}
           >
             <Bell size={20} />
-            <span style={notificationDotStyle}></span>
+            {unreadCount > 0 && (
+              <span style={notificationBadgeStyle}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
           {showNotifications && (
-            <div style={{ ...dropdownStyle, minWidth: '320px', maxHeight: '400px', overflowY: 'auto' }}>
-              <div style={{ padding: '12px', fontSize: '14px', fontWeight: 600, color: '#111827', borderBottom: '1px solid #E5E7EB', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Notifications</span>
-                <button
-                  onClick={() => setShowNotifications(false)}
-                  style={{
-                    padding: '4px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6'
-                    e.currentTarget.style.borderRadius = '4px'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
-                >
-                  <X size={16} style={{ color: '#6B7280' }} />
-                </button>
+            <div style={{ ...dropdownStyle, minWidth: '360px', maxHeight: '500px', overflowY: 'auto', padding: 0 }}>
+              <div style={{ padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: '#111827', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: '#FFFFFF', zIndex: 10 }}>
+                <span>Notifications {unreadCount > 0 && `(${unreadCount})`}</span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={() => {
+                        markAllAsRead()
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '12px',
+                        color: '#6B7280',
+                        borderRadius: '4px',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#F3F4F6'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <CheckCheck size={14} />
+                      Tout marquer comme lu
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowNotifications(false)}
+                    style={{
+                      padding: '4px',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#F3F4F6'
+                      e.currentTarget.style.borderRadius = '4px'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    <X size={16} style={{ color: '#6B7280' }} />
+                  </button>
+                </div>
               </div>
-              <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>
-                <Bell size={32} style={{ color: '#D1D5DB', margin: '0 auto 12px' }} />
-                <div style={{ fontSize: '14px' }}>Aucune notification</div>
-              </div>
+              {notifications.length === 0 ? (
+                <div style={{ padding: '48px 24px', textAlign: 'center', color: '#6B7280' }}>
+                  <Bell size={48} style={{ color: '#D1D5DB', margin: '0 auto 16px', opacity: 0.5 }} />
+                  <div style={{ fontSize: '14px', fontWeight: 500 }}>Aucune notification</div>
+                  <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '4px' }}>
+                    Vous serez notifié des nouvelles activités
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      style={{
+                        padding: '12px 16px',
+                        borderBottom: '1px solid #F3F4F6',
+                        cursor: 'pointer',
+                        backgroundColor: notification.read ? '#FFFFFF' : '#F9FAFB',
+                        transition: 'background-color 0.2s',
+                        display: 'flex',
+                        gap: '12px',
+                        alignItems: 'flex-start',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#F3F4F6'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = notification.read ? '#FFFFFF' : '#F9FAFB'
+                      }}
+                    >
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        backgroundColor: notification.read ? '#F3F4F6' : '#EEF2FF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                          <div style={{ fontSize: '13px', fontWeight: notification.read ? 500 : 600, color: '#111827' }}>
+                            {notification.title}
+                          </div>
+                          {!notification.read && (
+                            <div style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              backgroundColor: '#3B82F6',
+                              flexShrink: 0,
+                              marginTop: '4px',
+                            }} />
+                          )}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#6B7280', lineHeight: '1.4', marginBottom: '4px' }}>
+                          {notification.message}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                          {formatNotificationTime(notification.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

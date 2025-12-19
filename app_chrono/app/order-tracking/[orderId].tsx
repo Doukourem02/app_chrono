@@ -214,18 +214,46 @@ export default function OrderTrackingPage() {
                   rating: order.driver?.rating,
                 }
               : undefined,
-            pickup: {
-              address: order.pickup_address_text || (typeof order.pickup_address === 'string' ? JSON.parse(order.pickup_address) : order.pickup_address)?.address || '',
-              coordinates: typeof order.pickup_address === 'string' 
-                ? JSON.parse(order.pickup_address).coordinates 
-                : order.pickup_address?.coordinates || { latitude: 0, longitude: 0 },
-            },
-            dropoff: {
-              address: order.dropoff_address_text || (typeof order.dropoff_address === 'string' ? JSON.parse(order.dropoff_address) : order.dropoff_address)?.address || '',
-              coordinates: typeof order.dropoff_address === 'string'
-                ? JSON.parse(order.dropoff_address).coordinates
-                : order.dropoff_address?.coordinates || { latitude: 0, longitude: 0 },
-            },
+            pickup: (() => {
+              let parsedPickup;
+              try {
+                if (typeof order.pickup_address === 'string') {
+                  parsedPickup = JSON.parse(order.pickup_address);
+                } else if (order.pickup_address && typeof order.pickup_address === 'object') {
+                  parsedPickup = order.pickup_address;
+                } else {
+                  parsedPickup = null;
+                }
+              } catch (e) {
+                console.warn('Erreur parsing pickup_address:', e);
+                parsedPickup = null;
+              }
+              
+              return {
+                address: order.pickup_address_text || parsedPickup?.address || '',
+                coordinates: parsedPickup?.coordinates || { latitude: 0, longitude: 0 },
+              };
+            })(),
+            dropoff: (() => {
+              let parsedDropoff;
+              try {
+                if (typeof order.dropoff_address === 'string') {
+                  parsedDropoff = JSON.parse(order.dropoff_address);
+                } else if (order.dropoff_address && typeof order.dropoff_address === 'object') {
+                  parsedDropoff = order.dropoff_address;
+                } else {
+                  parsedDropoff = null;
+                }
+              } catch (e) {
+                console.warn('Erreur parsing dropoff_address:', e);
+                parsedDropoff = null;
+              }
+              
+              return {
+                address: order.dropoff_address_text || parsedDropoff?.address || '',
+                coordinates: parsedDropoff?.coordinates || { latitude: 0, longitude: 0 },
+              };
+            })(),
             price: order.price || order.price_cfa,
             deliveryMethod: order.delivery_method as 'moto' | 'vehicule' | 'cargo',
             distance: order.distance || order.distance_km,

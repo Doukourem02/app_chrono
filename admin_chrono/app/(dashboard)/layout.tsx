@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
+import { useNotifications } from "@/hooks/useNotifications";
 import { soundService } from "@/utils/soundService";
 
 export default function DashboardLayout({
@@ -23,6 +24,9 @@ export default function DashboardLayout({
   
   // Initialiser la connexion Socket.IO pour recevoir les événements en temps réel
   const { isConnected } = useSocketConnection();
+  
+  // Activer les notifications en temps réel
+  useNotifications();
 
   useEffect(() => {
     const load = async () => {
