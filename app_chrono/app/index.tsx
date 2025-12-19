@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { router } from 'expo-router';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
+import { userApiService } from '../services/userApiService';
 
 export default function RootIndex() {
   const { isAuthenticated, user, validateUser, logout } = useAuthStore();
@@ -11,6 +12,23 @@ export default function RootIndex() {
 
     const checkSession = async () => {
       if (isAuthenticated && user) {
+        // Vérifier et rafraîchir le token si nécessaire avant de valider la session
+        // Cela évite les problèmes de session expirée après une longue période d'inactivité
+        try {
+          const token = await userApiService.ensureAccessToken();
+          if (!token) {
+            // Token invalide ou impossible à rafraîchir, déconnecter
+            if (!cancelled) {
+              logout();
+              router.replace('/(tabs)' as any);
+            }
+            return;
+          }
+        } catch (error) {
+          // En cas d'erreur, continuer avec la validation normale
+          console.warn('Erreur lors de la vérification du token:', error);
+        }
+
         // Si l'utilisateur est authentifié, valider sa session
         const validationResult = await validateUser();
 

@@ -149,7 +149,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
                 <Ionicons name="person" size={32} color="#8B5CF6" />
               </View>
             )}
-            {driverRating > 0 && (
+            {driverRating > 0 && typeof driverRating === 'number' && (
               <View style={styles.ratingBadge}>
                 <Ionicons name="star" size={12} color="#FFFFFF" />
                 <Text style={styles.ratingBadgeText}>{driverRating.toFixed(1)}</Text>
@@ -160,7 +160,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
           <View style={styles.driverDetails}>
             <Text style={styles.driverName}>{driverName}</Text>
             
-            {driverRating > 0 && (
+            {driverRating > 0 && typeof driverRating === 'number' && (
               <View style={styles.ratingContainer}>
                 {[...Array(5)].map((_, i) => (
                   <Ionicons

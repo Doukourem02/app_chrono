@@ -148,23 +148,18 @@ export default function ErrorScreen({
 
             <TouchableOpacity
               style={[styles.button, styles.secondaryButton]}
-              onPress={handleGoBack}
+              onPress={router.canGoBack() ? handleGoBack : handleGoHome}
               activeOpacity={0.8}
             >
-              <Ionicons name="arrow-back" size={20} color="#374151" />
-              <Text style={styles.secondaryButtonText}>Retour</Text>
+              <Ionicons 
+                name={router.canGoBack() ? "arrow-back" : "home"} 
+                size={18} 
+                color="#6B7280" 
+              />
+              <Text style={styles.secondaryButtonText}>
+                {router.canGoBack() ? 'Retour' : 'Accueil'}
+              </Text>
             </TouchableOpacity>
-
-            {showHome && (
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton]}
-                onPress={handleGoHome}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="home" size={20} color="#374151" />
-                <Text style={styles.secondaryButtonText}>Accueil</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </Animated.View>
       </ScrollView>
@@ -196,66 +191,66 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 600,
+    maxWidth: 400,
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 48,
+    borderRadius: 20,
+    padding: 32,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 8,
   },
   statusCode: {
-    fontSize: 72,
+    fontSize: 64,
     fontWeight: '700',
     color: '#FEE2E2',
-    marginBottom: 24,
-    lineHeight: 72,
+    marginBottom: 16,
+    lineHeight: 64,
   },
   iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#FEE2E2',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#FEF2F2',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 16,
+    color: '#111827',
+    marginBottom: 12,
     textAlign: 'center',
   },
   message: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 32,
-    lineHeight: 24,
+    lineHeight: 22,
+    paddingHorizontal: 8,
   },
   buttonsContainer: {
     width: '100%',
-    flexDirection: 'row',
     gap: 12,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+    marginTop: 8,
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: 12,
-    minWidth: 120,
+    minHeight: 52,
+    width: '100%',
   },
   primaryButton: {
     backgroundColor: '#8B5CF6',
@@ -274,12 +269,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   secondaryButtonText: {
-    color: '#374151',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
 

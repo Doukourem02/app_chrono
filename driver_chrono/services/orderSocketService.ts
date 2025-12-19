@@ -1,8 +1,11 @@
+import { Alert } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import { config } from '../config/index';
 import { OrderRequest, useOrderStore } from '../store/useOrderStore';
+import { useDriverStore } from '../store/useDriverStore';
 import { logger } from '../utils/logger';
 import { soundService } from './soundService';
+import { apiService } from './apiService';
 
 class OrderSocketService {
   private socket: Socket | null = null;
@@ -273,10 +276,34 @@ class OrderSocketService {
   }
 
   // Accepter une commande
-  acceptOrder(orderId: string) {
+  async acceptOrder(orderId: string) {
     if (!this.socket || !this.driverId) {
       logger.error('Socket non connecté');
       return;
+    }
+
+    // Vérifier et rafraîchir le token d'authentification avant d'accepter la commande
+    // Cela évite les erreurs de session expirée après une longue période d'inactivité
+    try {
+      const tokenResult = await apiService.ensureAccessToken();
+      if (!tokenResult.token) {
+        logger.warn('⚠️ Token d\'authentification invalide ou expiré lors de l\'acceptation', undefined, { orderId });
+        const { user } = useDriverStore.getState();
+        if (!user) {
+          Alert.alert(
+            'Session expirée',
+            'Votre session a expiré. Veuillez vous reconnecter.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        // Si l'utilisateur existe mais le token ne peut pas être rafraîchi, 
+        // essayer de continuer quand même (le backend pourra rejeter si nécessaire)
+        logger.warn('⚠️ Impossible de rafraîchir le token, continuation avec les données existantes', undefined);
+      }
+    } catch (error) {
+      logger.error('❌ Erreur lors de la vérification du token', undefined, error);
+      // Continuer quand même, le backend pourra rejeter si nécessaire
     }
 
     logger.info('Acceptation commande', undefined, { orderId });
@@ -289,10 +316,21 @@ class OrderSocketService {
   }
 
   // Décliner une commande
-  declineOrder(orderId: string) {
+  async declineOrder(orderId: string) {
     if (!this.socket || !this.driverId) {
       logger.error('Socket non connecté');
       return;
+    }
+
+    // Vérifier et rafraîchir le token d'authentification avant de refuser la commande
+    try {
+      const tokenResult = await apiService.ensureAccessToken();
+      if (!tokenResult.token) {
+        logger.warn('⚠️ Token d\'authentification invalide ou expiré lors du refus', undefined, { orderId });
+        // Pour le refus, on peut continuer même sans token valide (moins critique)
+      }
+    } catch (error) {
+      logger.error('❌ Erreur lors de la vérification du token', undefined, error);
     }
 
     logger.info('Déclinaison commande', undefined, { orderId });

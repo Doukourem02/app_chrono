@@ -295,7 +295,11 @@ class UserApiService {
     }
   }
 
-  private async ensureAccessToken(): Promise<string | null> {
+  /**
+   * Vérifie et rafraîchit le token d'accès si nécessaire
+   * Méthode publique pour permettre la vérification de session avant des actions critiques
+   */
+  async ensureAccessToken(): Promise<string | null> {
     try {
       const {
         accessToken,

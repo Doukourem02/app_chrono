@@ -56,7 +56,11 @@ class ApiService {
     }
   }
 
-  private async ensureAccessToken(): Promise<{ token: string | null; reason?: 'missing' | 'refresh_failed' }> {
+  /**
+   * Vérifie et rafraîchit le token d'accès si nécessaire
+   * Méthode publique pour permettre la vérification de session avant des actions critiques
+   */
+  async ensureAccessToken(): Promise<{ token: string | null; reason?: 'missing' | 'refresh_failed' }> {
     const { accessToken, refreshToken, setTokens, logout } = useDriverStore.getState();
 
     // Vérifier si le token existe et s'il n'est pas expiré

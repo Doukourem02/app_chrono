@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
+import { apiService } from "../services/apiService";
 
 export default function RootIndex() {
   const { isAuthenticated, user, accessToken, validateUserExists, logout } =
@@ -12,6 +13,23 @@ export default function RootIndex() {
 
     const checkSession = async () => {
       if (isAuthenticated && user) {
+        // Vérifier et rafraîchir le token si nécessaire avant de valider la session
+        // Cela évite les problèmes de session expirée après une longue période d'inactivité
+        try {
+          const tokenResult = await apiService.ensureAccessToken();
+          if (!tokenResult.token) {
+            // Token invalide ou impossible à rafraîchir, déconnecter
+            if (!cancelled) {
+              logout();
+              router.replace("/(auth)/register" as any);
+            }
+            return;
+          }
+        } catch (error) {
+          // En cas d'erreur, continuer avec la validation normale
+          console.warn('Erreur lors de la vérification du token:', error);
+        }
+
         const validationResult = await validateUserExists();
 
         if (cancelled) {

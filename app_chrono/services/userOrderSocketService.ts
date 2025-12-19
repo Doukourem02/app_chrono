@@ -2,6 +2,7 @@ import { Alert } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
 import { useOrderStore } from '../store/useOrderStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { logger } from '../utils/logger';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
@@ -594,6 +595,31 @@ class UserOrderSocketService {
         );
         resolve(false);
         return;
+      }
+
+      // Vérifier et rafraîchir le token d'authentification avant de créer la commande
+      // Cela évite les erreurs de session expirée après une longue période d'inactivité
+      try {
+        const token = await userApiService.ensureAccessToken();
+        if (!token) {
+          logger.warn('⚠️ Token d\'authentification invalide ou expiré', 'userOrderSocketService');
+          const { user } = useAuthStore.getState();
+          if (!user) {
+            Alert.alert(
+              'Session expirée',
+              'Votre session a expiré. Veuillez vous reconnecter.',
+              [{ text: 'OK' }]
+            );
+            resolve(false);
+            return;
+          }
+          // Si l'utilisateur existe mais le token ne peut pas être rafraîchi, 
+          // essayer de continuer quand même (le backend pourra rejeter si nécessaire)
+          logger.warn('⚠️ Impossible de rafraîchir le token, continuation avec les données existantes', 'userOrderSocketService');
+        }
+      } catch (error) {
+        logger.error('❌ Erreur lors de la vérification du token', 'userOrderSocketService', error);
+        // Continuer quand même, le backend pourra rejeter si nécessaire
       }
 
       // S'assurer que le socket est connecté avant de créer la commande

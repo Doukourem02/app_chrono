@@ -716,11 +716,11 @@ export default function BoxPage() {
                     {selectedOrder.driver.phone && (
                       <Text style={styles.driverPhone}>{selectedOrder.driver.phone}</Text>
                     )}
-                    {selectedOrder.driver.rating && (
+                    {selectedOrder.driver.rating !== undefined && selectedOrder.driver.rating !== null && (
                       <View style={styles.driverRating}>
                         <Ionicons name="star" size={16} color="#F59E0B" />
                         <Text style={styles.driverRatingText}>
-                          {selectedOrder.driver.rating.toFixed(1)}
+                          {(selectedOrder.driver.rating ?? 0).toFixed(1)}
                         </Text>
                       </View>
                     )}
