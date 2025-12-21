@@ -2,10 +2,12 @@
 
 import React, { useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import NewShippingModal from '@/components/orders/NewShippingModal'
 
 export default function PlanningPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week')
+  const [isNewShippingModalOpen, setIsNewShippingModalOpen] = useState(false)
 
   const containerStyle: React.CSSProperties = {
     display: 'flex',
@@ -157,6 +159,7 @@ export default function PlanningPage() {
             </button>
           </div>
           <button
+            onClick={() => setIsNewShippingModalOpen(true)}
             style={{
               padding: '10px 20px',
               borderRadius: '8px',
@@ -169,6 +172,13 @@ export default function PlanningPage() {
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#7C3AED'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#8B5CF6'
             }}
           >
             <Plus size={16} />
@@ -294,6 +304,11 @@ export default function PlanningPage() {
           </div>
         )}
       </div>
+
+      <NewShippingModal
+        isOpen={isNewShippingModalOpen}
+        onClose={() => setIsNewShippingModalOpen(false)}
+      />
     </div>
   )
 }

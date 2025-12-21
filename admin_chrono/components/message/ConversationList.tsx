@@ -182,21 +182,113 @@ export default function ConversationList({
     return groupConversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0)
   }
 
+  // Fonction helper pour normaliser le texte de recherche (insensible à la casse et aux accents)
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Supprimer les accents
+      .trim()
+  }
+
+  // Fonction helper pour obtenir toutes les informations de recherche d'un participant
+  const getParticipantSearchText = (participant: Conversation['participant_1']): string => {
+    if (!participant) return ''
+    const parts: string[] = []
+    if (participant.first_name) parts.push(participant.first_name)
+    if (participant.last_name) parts.push(participant.last_name)
+    if (participant.email) {
+      parts.push(participant.email)
+      // Ajouter aussi la partie avant @ pour une recherche plus flexible
+      const emailPrefix = participant.email.split('@')[0]
+      if (emailPrefix) parts.push(emailPrefix)
+    }
+    // Note: phone peut être ajouté ici si disponible dans le type Conversation à l'avenir
+    // if (participant.phone) parts.push(participant.phone)
+    return parts.join(' ')
+  }
+
+  // Fonction de recherche améliorée pour une conversation individuelle
+  const matchesSearchQuery = (conversation: Conversation, query: string): boolean => {
+    if (!query) return true
+    
+    const normalizedQuery = normalizeText(query)
+    
+    // 1. Recherche dans les noms des participants
+    const participant1Text = getParticipantSearchText(conversation.participant_1)
+    const participant2Text = getParticipantSearchText(conversation.participant_2)
+    const participantsText = `${participant1Text} ${participant2Text}`
+    
+    if (normalizeText(participantsText).includes(normalizedQuery)) {
+      return true
+    }
+    
+    // 2. Recherche dans le numéro de commande (pour les conversations de type "order")
+    if (conversation.type === 'order' && conversation.order_id) {
+      const orderIdText = conversation.order_id.toLowerCase()
+      if (orderIdText.includes(normalizedQuery)) {
+        return true
+      }
+    }
+    
+    // 3. Recherche dans le contenu du dernier message
+    if (conversation.last_message?.content) {
+      const messageContent = normalizeText(conversation.last_message.content)
+      if (messageContent.includes(normalizedQuery)) {
+        return true
+      }
+    }
+    
+    return false
+  }
+
+  // Fonction de recherche améliorée pour un groupe de conversations
+  const matchesSearchQueryGroup = (groupConversations: Conversation[], query: string): boolean => {
+    if (!query) return true
+    
+    const normalizedQuery = normalizeText(query)
+    
+    // Rechercher dans toutes les conversations du groupe
+    for (const conv of groupConversations) {
+      if (matchesSearchQuery(conv, query)) {
+        return true
+      }
+      
+      // Recherche supplémentaire dans le nom du groupe
+      const groupName = getGroupName([conv])
+      if (normalizeText(groupName).includes(normalizedQuery)) {
+        return true
+      }
+      
+      // Recherche dans le dernier message du groupe
+      const lastMessage = getGroupLastMessage(groupConversations)
+      if (lastMessage && normalizeText(lastMessage).includes(normalizedQuery)) {
+        return true
+      }
+    }
+    
+    return false
+  }
+
   // Utiliser groupedConversations si disponible, sinon utiliser conversations
   const itemsToDisplay = groupedConversations || conversations.map((conv) => ({ type: 'single' as const, conversation: conv, key: conv.id }))
 
   const filteredItems = itemsToDisplay.filter((item) => {
+    // Filtrage par type
+    const matchesFilter = 
+      filterType === 'all' || 
+      (item.type === 'group' && filterType === 'order') ||
+      (item.type === 'single' && item.conversation && item.conversation.type === filterType)
+    
+    if (!matchesFilter) return false
+    
+    // Recherche
     if (item.type === 'group' && item.conversations) {
-      const groupName = getGroupName(item.conversations)
-      const matchesSearch = searchQuery === '' || groupName.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesFilter = filterType === 'all' || filterType === 'order'
-      return matchesSearch && matchesFilter
+      return matchesSearchQueryGroup(item.conversations, searchQuery)
     } else if (item.type === 'single' && item.conversation) {
-      const matchesSearch = searchQuery === '' || 
-        getParticipantName(item.conversation).toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesFilter = filterType === 'all' || item.conversation.type === filterType
-      return matchesSearch && matchesFilter
+      return matchesSearchQuery(item.conversation, searchQuery)
     }
+    
     return false
   })
 
@@ -343,7 +435,16 @@ export default function ConversationList({
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {sortedItems.length === 0 ? (
           <div style={{ padding: '20px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>
-            Aucune conversation
+            {searchQuery ? (
+              <>
+                <div style={{ marginBottom: '8px' }}>Aucune conversation trouvée</div>
+                <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                  Essayez de modifier votre recherche
+                </div>
+              </>
+            ) : (
+              'Aucune conversation'
+            )}
           </div>
         ) : (
           sortedItems.map((item) => {

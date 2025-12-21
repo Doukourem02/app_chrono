@@ -1,47 +1,46 @@
 'use client'
 
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { getRecentActivities } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
-import { useDateFilter } from '@/contexts/DateFilterContext'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
-    label: 'Pending',
+    label: 'En attente',
     backgroundColor: '#FFEDD5',
     color: '#EA580C',
   },
   accepted: {
-    label: 'Accepted',
+    label: 'Acceptée',
     backgroundColor: '#DBEAFE',
     color: '#2563EB',
   },
   enroute: {
-    label: 'On Progress',
+    label: 'En cours',
     backgroundColor: '#DBEAFE',
     color: '#2563EB',
   },
   picked_up: {
-    label: 'Picked Up',
+    label: 'Récupérée',
     backgroundColor: '#F3E8FF',
     color: '#9333EA',
   },
   completed: {
-    label: 'Delivered',
+    label: 'Livrée',
     backgroundColor: '#D1FAE5',
     color: '#16A34A',
   },
   declined: {
-    label: 'Declined',
+    label: 'Refusée',
     backgroundColor: '#FEE2E2',
     color: '#DC2626',
   },
   cancelled: {
-    label: 'Cancelled',
+    label: 'Annulée',
     backgroundColor: '#FEE2E2',
     color: '#B91C1C',
   },
@@ -62,71 +61,88 @@ const parseDateToISO = (value?: string) => {
   return undefined
 }
 
+type LocalDateFilter = 'thisWeek' | 'thisMonth' | 'thisYear'
+
 export default function ActivityTable() {
   const router = useRouter()
-  const { dateFilter, dateRange } = useDateFilter()
-  const { startDate, endDate } = dateRange
+  const [localDateFilter, setLocalDateFilter] = useState<LocalDateFilter>('thisMonth')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 3 // Limité à 3 comme demandé
   
-  // Stabiliser la queryKey avec useRef pour éviter les recalculs inutiles
-  const latestKey = React.useMemo(
-    () =>
-      ['recent-activities', currentPage, dateFilter, startDate, endDate] as [
-        string,
-        number,
-        string,
-        string,
-        string
-      ],
-    [currentPage, dateFilter, startDate, endDate]
-  )
-
-  const [queryKey, setQueryKey] = React.useState(latestKey)
-
-  React.useEffect(() => {
-    setQueryKey((prev) => {
-      if (
-        prev &&
-        prev.length === latestKey.length &&
-        prev.every((item, index) => item === latestKey[index])
-      ) {
-        return prev
-      }
-      console.log('🔑 [ActivityTable] QueryKey calculated:', latestKey)
-      return latestKey
+  // Calculer les dates localement en fonction du filtre sélectionné
+  const { startDate, endDate } = useMemo(() => {
+    const now = new Date()
+    const endDate = new Date(now)
+    endDate.setHours(23, 59, 59, 999)
+    
+    let startDate = new Date(now)
+    
+    switch (localDateFilter) {
+      case 'thisWeek':
+        const dayOfWeek = now.getDay()
+        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+        startDate = new Date(now)
+        startDate.setDate(diff)
+        startDate.setHours(0, 0, 0, 0)
+        break
+      case 'thisMonth':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        startDate.setHours(0, 0, 0, 0)
+        break
+      case 'thisYear':
+        startDate = new Date(now.getFullYear(), 0, 1)
+        startDate.setHours(0, 0, 0, 0)
+        break
+      default:
+        startDate.setHours(0, 0, 0, 0)
+    }
+    
+    const result = {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+    }
+    
+    console.log('📅 [ActivityTable] Date range calculated:', {
+      filter: localDateFilter,
+      startDate: result.startDate,
+      endDate: result.endDate,
     })
-  }, [latestKey])
+    
+    return result
+  }, [localDateFilter])
   
+  // Gérer le changement de filtre
+  const handleFilterChange = (value: string) => {
+    setLocalDateFilter(value as LocalDateFilter)
+    // Réinitialiser la page à 1 lors du changement de filtre
+    setCurrentPage(1)
+  }
+  
+  // Créer la queryKey directement - React Query refetch automatiquement quand elle change
+  const queryKey = React.useMemo(
+    () => ['recent-activities', currentPage, localDateFilter, startDate, endDate] as const,
+    [currentPage, localDateFilter, startDate, endDate]
+  )
   
   const { data: activities, isLoading, isError, error } = useQuery({
     queryKey,
     queryFn: () => {
-      console.warn('🚀🚀🚀 [ActivityTable] queryFn CALLED - getRecentActivities', { 
-        itemsPerPage, 
+      console.log('🚀 [ActivityTable] Fetching activities with filter:', { 
+        localDateFilter,
         startDate, 
-        endDate, 
-        timestamp: new Date().toISOString(), 
-        stack: new Error().stack?.split('\n').slice(2, 15).join('\n')
+        endDate,
+        itemsPerPage,
+        timestamp: new Date().toISOString()
       })
       return getRecentActivities(itemsPerPage, startDate, endDate)
     },
-    refetchInterval: false, // Pas de refresh automatique - utilise Socket.IO pour les mises à jour en temps réel
-    staleTime: Infinity, // Les données ne deviennent jamais "stale" - pas de refetch automatique
+    refetchInterval: false,
+    staleTime: 0, // Les données sont toujours considérées comme stale pour permettre le refetch
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Refetch quand le composant monte
     refetchOnReconnect: false,
-    refetchIntervalInBackground: false, 
-    retry: false, 
-    enabled: true, 
-    placeholderData: (previousData) => {
-      if (previousData) {
-        console.log('📦 [ActivityTable] Using cached data, skipping fetch')
-        return previousData
-      }
-      return undefined
-    },
-    structuralSharing: true,
+    retry: 2,
+    enabled: true,
   })
 
   // Debug: logger les données reçues
@@ -293,16 +309,21 @@ export default function ActivityTable() {
             e.currentTarget.style.color = '#111827'
           }}
         >
-          Activity Data
+          Données d&apos;activité
         </h2>
         <div style={controlsStyle}>
-          <select style={selectStyle}>
-            <option>This week</option>
-            <option>This month</option>
-            <option>This year</option>
+          <select 
+            style={selectStyle}
+            value={localDateFilter}
+            onChange={(e) => handleFilterChange(e.target.value)}
+          >
+            <option value="thisWeek">Cette semaine</option>
+            <option value="thisMonth">Ce mois</option>
+            <option value="thisYear">Cette année</option>
           </select>
           <button
             style={filterButtonStyle}
+            onClick={() => router.push('/orders')}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#F3F4F6'
             }}
@@ -333,11 +354,11 @@ export default function ActivityTable() {
           <table style={tableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>Delivery ID</th>
+                <th style={thStyle}>ID de livraison</th>
                 <th style={thStyle}>Date</th>
-                <th style={thStyle}>Departure</th>
+                <th style={thStyle}>Départ</th>
                 <th style={thStyle}>Destination</th>
-                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Statut</th>
               </tr>
             </thead>
             <tbody>
@@ -403,7 +424,7 @@ export default function ActivityTable() {
       {!isLoading && displayData.length > 0 && (
         <div style={paginationStyle}>
           <p style={paginationTextStyle}>
-            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, displayData.length)} of {displayData.length} entries
+            Affichage de {((currentPage - 1) * itemsPerPage) + 1} à {Math.min(currentPage * itemsPerPage, displayData.length)} sur {displayData.length} entrées
           </p>
           <div style={paginationButtonsStyle}>
             <button

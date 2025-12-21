@@ -63,6 +63,11 @@ interface ApiResponse<T = unknown> {
 }
 
 class AdminMessageService {
+  private readonly REQUEST_TIMEOUT = 30000 // 30 secondes
+  private readonly MAX_RETRIES = 3
+  private readonly RETRY_DELAY = 1000 // 1 seconde
+  private pendingRequests = new Map<string, Promise<ApiResponse>>()
+
   /**
    * Récupère le token d'accès depuis Supabase
    */
@@ -77,39 +82,100 @@ class AdminMessageService {
   }
 
   /**
-   * Fait une requête HTTP au backend avec authentification
+   * Fait une requête HTTP au backend avec authentification, retry et timeout
    */
-  private async fetchWithAuth(url: string, options?: RequestInit): Promise<ApiResponse> {
-    const token = await this.getAccessToken()
-    if (!token) {
-      throw new Error('No access token available')
+  private async fetchWithAuth(
+    url: string, 
+    options?: RequestInit,
+    retryCount: number = 0
+  ): Promise<ApiResponse> {
+    const requestKey = `${options?.method || 'GET'}_${url}`
+    
+    // Si une requête identique est déjà en cours, réutiliser la promesse
+    if (this.pendingRequests.has(requestKey)) {
+      return this.pendingRequests.get(requestKey)!
     }
 
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${token}`,
-      ...(options?.headers as Record<string, string> | undefined),
-    }
-
-    if (options?.method && ['POST', 'PUT', 'PATCH'].includes(options.method)) {
-      headers['Content-Type'] = 'application/json'
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}${url}`, {
-        ...options,
-        headers,
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Network error' }))
-        throw new Error(errorData.message || `HTTP ${response.status}`)
+    const makeRequest = async (): Promise<ApiResponse> => {
+      const token = await this.getAccessToken()
+      if (!token) {
+        throw new Error('No access token available')
       }
 
-      return await response.json()
-    } catch (error: unknown) {
-      logger.error('[adminMessageService] Fetch error:', error)
-      throw error
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT)
+
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${token}`,
+        ...(options?.headers as Record<string, string> | undefined),
+      }
+
+      if (options?.method && ['POST', 'PUT', 'PATCH'].includes(options.method)) {
+        headers['Content-Type'] = 'application/json'
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}${url}`, {
+          ...options,
+          headers,
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+        // Nettoyer la requête en cours
+        this.pendingRequests.delete(requestKey)
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Network error' }))
+          throw new Error(errorData.message || `HTTP ${response.status}`)
+        }
+
+        return await response.json()
+      } catch (error: unknown) {
+        clearTimeout(timeoutId)
+        // Nettoyer la requête en cours même en cas d'erreur
+        this.pendingRequests.delete(requestKey)
+
+        // Si c'est une erreur d'abort (timeout) ou de connexion, et qu'on peut retry
+        const isRetryable = 
+          (error instanceof Error && (
+            error.name === 'AbortError' ||
+            error.message.includes('timeout') ||
+            error.message.includes('Connection terminated') ||
+            error.message.includes('Failed to fetch')
+          )) ||
+          (error instanceof TypeError && error.message.includes('fetch'))
+
+        if (isRetryable && retryCount < this.MAX_RETRIES) {
+          // Attendre avant de retry avec un délai exponentiel
+          const delay = this.RETRY_DELAY * Math.pow(2, retryCount)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          
+          logger.warn(
+            `[adminMessageService] Retry attempt ${retryCount + 1}/${this.MAX_RETRIES} for ${url}`,
+            'adminMessageService'
+          )
+          
+          return this.fetchWithAuth(url, options, retryCount + 1)
+        }
+
+        // Si ce n'est pas retryable ou qu'on a épuisé les retries, logger et throw
+        if (retryCount === 0 || !isRetryable) {
+          logger.error('[adminMessageService] Fetch error:', error)
+        }
+        throw error
+      }
     }
+
+    const requestPromise = makeRequest()
+    this.pendingRequests.set(requestKey, requestPromise)
+    
+    // Nettoyer automatiquement après un certain temps pour éviter les fuites mémoire
+    setTimeout(() => {
+      this.pendingRequests.delete(requestKey)
+    }, this.REQUEST_TIMEOUT + 5000)
+
+    return requestPromise
   }
 
   /**

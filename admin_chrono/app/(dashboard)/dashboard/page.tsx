@@ -257,7 +257,7 @@ export default function DashboardPage() {
             variant="primary"
             style={newShippingButtonStyle}
           >
-            + New Shipping
+            + Nouvelle livraison
           </AnimatedButton>
         </div>
       </div>

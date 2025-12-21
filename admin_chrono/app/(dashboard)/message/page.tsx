@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Bell } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useAdminMessageStore } from '@/stores/useAdminMessageStore'
@@ -32,6 +32,10 @@ export default function MessagePage() {
   const [filterType, setFilterType] = useState<'all' | 'order' | 'support' | 'admin'>('all')
   const [selectedParticipantPair, setSelectedParticipantPair] = useState<{ participant1Id: string; participant2Id: string } | null>(null)
   const [isNewConversationModalOpen, setIsNewConversationModalOpen] = useState(false)
+  
+  // Protection contre les requêtes multiples simultanées
+  const isLoadingConversationsRef = useRef(false)
+  const lastLoadTimeRef = useRef<number>(0)
 
   const containerStyle: React.CSSProperties = {
     display: 'flex',
@@ -65,7 +69,25 @@ export default function MessagePage() {
   const loadConversations = useCallback(async () => {
     if (!user?.id) return
 
+    // Protection contre les requêtes multiples simultanées
+    const now = Date.now()
+    const timeSinceLastLoad = now - lastLoadTimeRef.current
+    
+    // Si une requête est déjà en cours, ne pas en lancer une nouvelle
+    if (isLoadingConversationsRef.current) {
+      return
+    }
+    
+    // Si une requête a été faite il y a moins de 2 secondes, ne pas en lancer une nouvelle
+    // (sauf si c'est un changement de filtre)
+    if (timeSinceLastLoad < 2000 && timeSinceLastLoad > 0) {
+      return
+    }
+
+    isLoadingConversationsRef.current = true
+    lastLoadTimeRef.current = now
     setLoading(true)
+    
     try {
       const data = await adminMessageService.getConversations(filterType === 'all' ? undefined : filterType)
       setConversations(data)
@@ -79,6 +101,7 @@ export default function MessagePage() {
       console.error('Error loading conversations:', error)
     } finally {
       setLoading(false)
+      isLoadingConversationsRef.current = false
     }
   }, [user?.id, filterType, setConversations, setLoading])
 
@@ -594,9 +617,13 @@ export default function MessagePage() {
     loadConversations()
     
     // Recharger les conversations périodiquement pour détecter les nouvelles conversations de support
+    // Intervalle augmenté à 10 secondes pour réduire la charge et éviter les timeouts
     const interval = setInterval(() => {
-      loadConversations()
-    }, 5000) // Recharger toutes les 5 secondes pour détecter rapidement les nouvelles conversations
+      // Ne charger que si aucune requête n'est en cours
+      if (!isLoadingConversationsRef.current) {
+        loadConversations()
+      }
+    }, 10000) // Recharger toutes les 10 secondes pour détecter rapidement les nouvelles conversations
     
     return () => clearInterval(interval)
   }, [loadConversations])
