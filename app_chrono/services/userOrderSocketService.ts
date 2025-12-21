@@ -86,18 +86,10 @@ class UserOrderSocketService {
         }
         // If backend reported persistence failure, inform the user
         if (data && data.dbSaved === false) {
-          const message = data.dbError || 'La commande n\'a pas pu être enregistrée en base de données.';
           UserFriendlyError.showSaveError('la commande', () => {
-            [
-              {
-                text: 'Réessayer', onPress: () => {
-                  // Keep UI simple: clear pending so user can recreate or retry flow
-                  useOrderStore.getState().clear();
-                }
-              },
-              { text: 'OK', style: 'cancel' }
-            ]
-          );
+            // Keep UI simple: clear pending so user can recreate or retry flow
+            useOrderStore.getState().clear();
+          });
         }
       } catch (err) {
         logger.warn('Unable to store pending order', 'userOrderSocketService', err);

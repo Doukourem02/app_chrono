@@ -1,24 +1,47 @@
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useNotificationStore, NotificationType } from '@/stores/useNotificationStore'
+import { useNotificationStore } from '@/stores/useNotificationStore'
 import { useAdminMessageStore } from '@/stores/useAdminMessageStore'
 import { adminSocketService } from '@/lib/adminSocketService'
 import { adminMessageSocketService } from '@/services/adminMessageSocketService'
 import { soundService } from '@/utils/soundService'
+import type { SocketEventData } from '@/types/socket'
 
 /**
  * Hook pour gérer les notifications en temps réel
  * Écoute les événements Socket.IO et crée des notifications
  */
+// Type for order:created event (similar structure to order:status:update)
+type OrderCreatedData = {
+  order?: {
+    id?: string
+    is_phone_order?: boolean
+    shipmentNumber?: string
+    shipment_number?: string
+    deliveryId?: string
+    delivery_id?: string
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+// Extended type for order:status:update that includes additional properties
+type OrderStatusUpdateData = SocketEventData['order:status:update'] & {
+  order?: SocketEventData['order:status:update']['order'] & {
+    shipment_number?: string
+    deliveryId?: string
+    delivery_id?: string
+  }
+}
+
 export function useNotifications() {
-  const router = useRouter()
   const { addNotification } = useNotificationStore()
   const { unreadCount: messageUnreadCount } = useAdminMessageStore()
 
   useEffect(() => {
     // Écouter les nouvelles commandes
-    const unsubscribeOrderCreated = adminSocketService.on('order:created', (data: any) => {
-      const order = data?.order
+    const unsubscribeOrderCreated = adminSocketService.on('order:created', (data: unknown) => {
+      const orderData = data as OrderCreatedData
+      const order = orderData?.order
       if (!order || !order.id) return
 
       // Ne pas créer de notification pour les commandes téléphoniques créées par l'admin
@@ -47,8 +70,9 @@ export function useNotifications() {
     })
 
     // Écouter les mises à jour de statut de commande
-    const unsubscribeOrderStatus = adminSocketService.on('order:status:update', (data: any) => {
-      const order = data?.order
+    const unsubscribeOrderStatus = adminSocketService.on('order:status:update', (data: unknown) => {
+      const orderData = data as OrderStatusUpdateData
+      const order = orderData?.order
       if (!order || !order.id) return
 
       // Ne créer une notification que pour les changements importants
