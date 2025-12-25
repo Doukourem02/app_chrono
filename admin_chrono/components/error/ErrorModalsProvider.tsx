@@ -2,7 +2,7 @@
 
 import React, { useMemo, useCallback } from 'react'
 import { ErrorModal } from './ErrorModal'
-import { useErrorModalStore } from '@/store/useErrorModalStore'
+import { useErrorModalStore } from '@/stores/useErrorModalStore'
 
 /**
  * Provider pour afficher les modals d'erreur globalement

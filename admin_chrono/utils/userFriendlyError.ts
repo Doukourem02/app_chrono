@@ -1,4 +1,4 @@
-import { useErrorModalStore } from '@/store/useErrorModalStore'
+import { useErrorModalStore } from '@/stores/useErrorModalStore'
 import { ErrorTypes } from '@/components/error/errorTypes'
 
 /**
