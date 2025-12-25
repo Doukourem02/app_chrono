@@ -25,6 +25,7 @@ interface OrderRequest {
   estimatedDuration: string;
   createdAt: Date;
   isPhoneOrder?: boolean; // Indique si la commande a été créée par téléphone/admin
+  isB2BOrder?: boolean; // Indique si la commande est une commande B2B
   driverNotes?: string; // Notes spéciales pour le livreur
 }
 
@@ -328,6 +329,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
           {/* Informations spéciales pour les commandes admin/téléphoniques */}
           <AdminOrderInfo
             isPhoneOrder={order.isPhoneOrder || false}
+            isB2BOrder={order.isB2BOrder || false}
             driverNotes={order.driverNotes}
           />
 

@@ -4,28 +4,36 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface AdminOrderInfoProps {
   isPhoneOrder: boolean;
+  isB2BOrder?: boolean;
   driverNotes?: string;
 }
 
 /**
  * Composant pour afficher les informations spéciales des commandes créées par l'administrateur
- * S'affiche uniquement pour les commandes téléphoniques/hors ligne
+ * S'affiche uniquement pour les commandes téléphoniques/hors ligne ou B2B
  */
 export const AdminOrderInfo: React.FC<AdminOrderInfoProps> = ({
   isPhoneOrder,
+  isB2BOrder,
   driverNotes,
 }) => {
-  if (!isPhoneOrder) {
+  if (!isPhoneOrder && !isB2BOrder) {
     return null;
   }
 
+  const isB2B = isB2BOrder === true;
+  const badgeText = isB2B ? 'Commande B2B' : 'Commande téléphonique';
+  const badgeColor = isB2B ? '#4338CA' : '#F59E0B';
+  const containerBgColor = isB2B ? '#E0E7FF' : '#FEF3C7';
+  const borderColor = isB2B ? '#4338CA' : '#F59E0B';
+
   return (
-    <View style={styles.container}>
-      {/* Badge "Commande téléphonique" */}
+    <View style={[styles.container, { backgroundColor: containerBgColor, borderLeftColor: borderColor }]}>
+      {/* Badge "Commande B2B" ou "Commande téléphonique" */}
       <View style={styles.badgeContainer}>
-        <View style={styles.badge}>
-          <Ionicons name="phone-portrait" size={14} color="#F59E0B" />
-          <Text style={styles.badgeText}>Commande téléphonique</Text>
+        <View style={[styles.badge, { borderColor: badgeColor }]}>
+          <Ionicons name="phone-portrait" size={14} color={badgeColor} />
+          <Text style={[styles.badgeText, { color: badgeColor }]}>{badgeText}</Text>
         </View>
       </View>
 
@@ -57,10 +65,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 12,
-    backgroundColor: '#FEF3C7', // Fond jaune clair pour différencier
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#F59E0B', // Bordure orange à gauche
   },
   badgeContainer: {
     marginBottom: 8,
@@ -74,13 +80,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F59E0B',
   },
   badgeText: {
     marginLeft: 6,
     fontSize: 12,
     fontWeight: '600',
-    color: '#F59E0B',
   },
   notesContainer: {
     marginTop: 8,

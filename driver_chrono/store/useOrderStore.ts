@@ -50,6 +50,7 @@ export interface OrderRequest {
   completedAt?: Date;
   notes?: string;
   isPhoneOrder?: boolean;
+  isB2BOrder?: boolean;
   driverNotes?: string;
 }
 
@@ -99,6 +100,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     const mappedOrder: OrderRequest = {
       ...order,
       isPhoneOrder: (order as any).is_phone_order ?? (order as any).isPhoneOrder ?? false,
+      isB2BOrder: (order as any).is_b2b_order ?? (order as any).isB2BOrder ?? false,
       driverNotes: (order as any).driver_notes ?? (order as any).driverNotes ?? undefined,
     };
     
@@ -136,6 +138,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     const mappedOrder: OrderRequest = {
       ...order,
       isPhoneOrder: (order as any).is_phone_order ?? (order as any).isPhoneOrder ?? false,
+      isB2BOrder: (order as any).is_b2b_order ?? (order as any).isB2BOrder ?? false,
       driverNotes: (order as any).driver_notes ?? (order as any).driverNotes ?? undefined,
     };
     

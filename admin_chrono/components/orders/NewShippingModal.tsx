@@ -181,6 +181,7 @@ export default function NewShippingModal({
         price,
         notes: notes || undefined,
         isPhoneOrder: isPhoneOrder || undefined,
+        isB2BOrder: false, // Les commandes créées depuis NewShippingModal ne sont pas B2B
         driverNotes: driverNotes || undefined,
       })
 

@@ -1,10 +1,13 @@
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import { logger } from './logger';
+import { useErrorModalStore } from '../store/useErrorModalStore';
+import { useDeferredPaymentErrorStore } from '../store/useDeferredPaymentErrorStore';
+import { ErrorTypes } from '../components/error/errorTypes';
 
 /**
  * Service centralisé pour afficher des messages d'erreur user-friendly
- * Remplace tous les Alert.alert avec messages techniques
+ * Utilise des modals animés avec explications détaillées au lieu de simples Alert.alert
  */
 export class UserFriendlyError {
   /**
@@ -15,183 +18,167 @@ export class UserFriendlyError {
     message: string = 'Désolé, une erreur inattendue s\'est produite. Veuillez réessayer ou contacter le support si le problème persiste.',
     onRetry?: () => void
   ) {
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: 'OK', style: 'default' },
-        ...(onRetry ? [{ text: 'Réessayer', onPress: onRetry }] : []),
-      ],
-      { cancelable: true }
-    );
+    const errorData = ErrorTypes.GENERIC(title, message, onRetry);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur de connexion réseau
+   * @param onRetry - Fonction de retry
+   * @param operation - Description de l'opération qui a échoué (ex: "la création de commande", "le chargement des données")
    */
-  static showNetworkError(onRetry?: () => void) {
-    this.showGenericError(
-      'Problème de connexion',
-      'Vérifiez votre connexion internet et réessayez.',
-      onRetry
-    );
+  static showNetworkError(onRetry?: () => void, operation?: string) {
+    const errorData = ErrorTypes.NETWORK(onRetry, operation);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur de session expirée
    */
   static showSessionExpired() {
-    Alert.alert(
-      'Session expirée',
-      'Votre session a expiré. Veuillez vous reconnecter.',
-      [
-        {
-          text: 'Se reconnecter',
-          onPress: () => {
-            // Rediriger vers la page de connexion
-            router.replace('/(auth)/login');
-          },
-        },
-        { text: 'OK', style: 'cancel' },
-      ]
-    );
+    const errorData = ErrorTypes.SESSION_EXPIRED(() => {
+      router.replace('/(auth)/login');
+    });
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur de permission
    */
   static showPermissionError(permission: 'localisation' | 'photos' | 'caméra' = 'localisation') {
-    const messages = {
-      localisation: 'Activez la localisation dans les paramètres pour utiliser cette fonctionnalité.',
-      photos: 'Autorisez l\'accès à vos photos dans les paramètres pour utiliser cette fonctionnalité.',
-      caméra: 'Autorisez l\'accès à la caméra dans les paramètres pour utiliser cette fonctionnalité.',
+    const errorData = ErrorTypes.PERMISSION(permission);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
     };
-
-    Alert.alert(
-      'Permission requise',
-      messages[permission],
-      [
-        { text: 'OK', style: 'default' },
-      ]
-    );
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur de validation (champs manquants, etc.)
    */
   static showValidationError(message: string) {
-    Alert.alert(
-      'Information requise',
-      message,
-      [{ text: 'OK', style: 'default' }]
-    );
+    const errorData = ErrorTypes.VALIDATION(message);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur API avec message user-friendly
+   * @param message - Message précis expliquant exactement ce qui ne fonctionne pas
+   * @param onRetry - Fonction de retry
+   * @param serviceName - Nom du service concerné (ex: "Service de géolocalisation", "API de paiement")
    */
   static showAPIError(
-    message: string = 'Service temporairement indisponible. Réessayez plus tard.',
-    onRetry?: () => void
+    message?: string,
+    onRetry?: () => void,
+    serviceName?: string
   ) {
-    this.showGenericError('Service indisponible', message, onRetry);
+    const errorData = ErrorTypes.API_ERROR(message, onRetry, serviceName);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur lors de l'enregistrement
+   * @param item - Ce qui n'a pas pu être enregistré (ex: "la commande", "vos informations")
+   * @param onRetry - Fonction de retry
+   * @param reason - Raison précise de l'échec (ex: "L'adresse de livraison est invalide", "Le montant minimum n'est pas atteint")
    */
   static showSaveError(
     item: string = 'les données',
-    onRetry?: () => void
+    onRetry?: () => void,
+    reason?: string
   ) {
-    this.showGenericError(
-      'Erreur d\'enregistrement',
-      `Impossible d'enregistrer ${item}. Veuillez réessayer.`,
-      onRetry
-    );
+    const errorData = ErrorTypes.SAVE_ERROR(item, onRetry, reason);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur lors du chargement
+   * @param item - Ce qui n'a pas pu être chargé (ex: "vos commandes", "la liste des livreurs")
+   * @param onRetry - Fonction de retry
+   * @param reason - Raison précise de l'échec (ex: "La ressource demandée n'existe pas", "Vous n'avez pas les permissions nécessaires")
    */
   static showLoadError(
     item: string = 'les données',
-    onRetry?: () => void
+    onRetry?: () => void,
+    reason?: string
   ) {
-    this.showGenericError(
-      'Erreur de chargement',
-      `Impossible de charger ${item}. Veuillez réessayer.`,
-      onRetry
-    );
+    const errorData = ErrorTypes.LOAD_ERROR(item, onRetry, reason);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur de compte incomplet
    */
   static showIncompleteAccount(onReconnect?: () => void) {
-    Alert.alert(
-      'Compte incomplet',
-      'Votre compte n\'est pas totalement configuré. Veuillez vous reconnecter pour synchroniser votre profil.',
-      [
-        {
-          text: 'Se reconnecter',
-          onPress: () => {
-            if (onReconnect) {
-              onReconnect();
-            } else {
-              router.replace('/(auth)/login');
-            }
-          },
-        },
-        { text: 'OK', style: 'cancel' },
-      ]
-    );
+    const errorData = ErrorTypes.INCOMPLETE_ACCOUNT(() => {
+      if (onReconnect) {
+        onReconnect();
+      } else {
+        router.replace('/(auth)/login');
+      }
+    });
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur de connexion requise
    */
   static showLoginRequired() {
-    Alert.alert(
-      'Connexion requise',
-      'Vous devez vous connecter ou créer un compte pour utiliser cette fonctionnalité.',
-      [
-        {
-          text: 'Se connecter',
-          onPress: () => router.replace('/(auth)/login'),
-        },
-        { text: 'Annuler', style: 'cancel' },
-      ]
-    );
+    const errorData = ErrorTypes.LOGIN_REQUIRED();
+    errorData.onAction = () => {
+      router.replace('/(auth)/login');
+      useErrorModalStore.getState().hideError();
+    };
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur de service indisponible
    */
   static showServiceUnavailable(service: string = 'ce service', onRetry?: () => void) {
-    this.showGenericError(
-      'Service indisponible',
-      `${service} est temporairement indisponible. Réessayez plus tard.`,
-      onRetry
-    );
+    const errorData = ErrorTypes.SERVICE_UNAVAILABLE(service, onRetry);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
+    };
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
    * Erreur lors de l'ouverture d'une application externe
    */
   static showExternalAppError(app: 'email' | 'téléphone' | 'whatsapp' | 'navigation') {
-    const messages = {
-      email: 'Impossible d\'ouvrir l\'application email. Vérifiez que vous avez une application email installée.',
-      téléphone: 'Impossible d\'ouvrir l\'application téléphone. Vérifiez que vous avez une application téléphone installée.',
-      whatsapp: 'Impossible d\'ouvrir WhatsApp. Vérifiez que WhatsApp est installé sur votre appareil.',
-      navigation: 'Impossible d\'ouvrir l\'application de navigation. Vérifiez que vous avez une application de navigation installée.',
+    const errorData = ErrorTypes.EXTERNAL_APP(app);
+    errorData.onClose = () => {
+      useErrorModalStore.getState().hideError();
     };
-
-    Alert.alert(
-      'Application non disponible',
-      messages[app],
-      [{ text: 'OK', style: 'default' }]
-    );
+    useErrorModalStore.getState().showError(errorData);
   }
 
   /**
@@ -234,6 +221,46 @@ export class UserFriendlyError {
         { text: confirmText, onPress: onConfirm, style: 'default' },
       ]
     );
+  }
+
+  /**
+   * Erreur de paiement différé - quota atteint
+   * Utilise le modal dédié avec explications détaillées
+   */
+  static showDeferredPaymentError(
+    message: string,
+    details?: {
+      errorCode?: string;
+      monthlyRemaining?: number;
+      monthlyLimit?: number;
+      requestedAmount?: number;
+      monthlyUsages?: number;
+      maxUsagesPerMonth?: number;
+      annualLimit?: number;
+      cooldownDaysRemaining?: number;
+      blockEndDate?: string;
+      minAmount?: number;
+    }
+  ) {
+    const errorData: import('../components/error/DeferredPaymentErrorModal').DeferredPaymentErrorData = {
+      message,
+      errorCode: details?.errorCode,
+      details: details ? {
+        monthlyRemaining: details.monthlyRemaining,
+        monthlyLimit: details.monthlyLimit,
+        requestedAmount: details.requestedAmount,
+        monthlyUsages: details.monthlyUsages,
+        maxUsagesPerMonth: details.maxUsagesPerMonth,
+        annualLimit: details.annualLimit,
+        cooldownDaysRemaining: details.cooldownDaysRemaining,
+        blockEndDate: details.blockEndDate,
+        minAmount: details.minAmount,
+      } : undefined,
+      onClose: () => {
+        useDeferredPaymentErrorStore.getState().hideError();
+      },
+    };
+    useDeferredPaymentErrorStore.getState().showError(errorData);
   }
 
   /**

@@ -242,6 +242,57 @@ async function findNearbyDrivers(
 }
 
 /**
+ * Trouve tous les livreurs disponibles (pour les commandes B2B sans coordonnées GPS précises)
+ */
+async function findAllAvailableDrivers(
+  deliveryMethod: string
+): Promise<NearbyDriver[]> {
+  const DEBUG = process.env.DEBUG_SOCKETS === 'true';
+  // Import dynamique pour éviter les problèmes de dépendances circulaires
+  const { realDriverStatuses } = await import('../controllers/driverController.js');
+  const availableDrivers: NearbyDriver[] = [];
+
+  if (DEBUG) {
+    console.log(`[findAllAvailableDrivers] Recherche tous les livreurs disponibles: ${realDriverStatuses.size} livreurs en mémoire`);
+  }
+
+  // Vérifier aussi les livreurs connectés via socket
+  const connectedDriversCount = connectedDrivers.size;
+  if (DEBUG) {
+    console.log(`[findAllAvailableDrivers] Livreurs connectés (socket): ${connectedDriversCount}`);
+  }
+
+  for (const [driverId, driverData] of realDriverStatuses.entries()) {
+    if (!driverData.is_online || !driverData.is_available) {
+      if (DEBUG) {
+        console.log(`[findAllAvailableDrivers] Livreur ${maskUserId(driverId)} ignoré: online=${driverData.is_online}, available=${driverData.is_available}`);
+      }
+      continue;
+    }
+
+    // Vérifier si le livreur est connecté via socket
+    const isConnected = connectedDrivers.has(driverId);
+    if (!isConnected && DEBUG) {
+      console.log(`[findAllAvailableDrivers] Livreur ${maskUserId(driverId)} disponible mais non connecté via socket`);
+    }
+
+    // Pour les commandes B2B, on accepte même les livreurs sans position GPS
+    // car ils devront appeler le client pour obtenir la position exacte
+    availableDrivers.push({
+      driverId,
+      distance: 0, // Distance inconnue pour les commandes B2B
+      ...driverData
+    });
+  }
+
+  if (DEBUG) {
+    console.log(`[findAllAvailableDrivers] Total livreurs disponibles: ${availableDrivers.length} (${availableDrivers.filter(d => connectedDrivers.has(d.driverId)).length} connectés)`);
+  }
+
+  return availableDrivers;
+}
+
+/**
  * Fonction utilitaire pour rechercher et notifier les livreurs d'une nouvelle commande
  * Peut être utilisée depuis adminController pour les commandes créées par l'admin
  */
@@ -253,10 +304,15 @@ async function notifyDriversForOrder(
 ): Promise<void> {
   const DEBUG = process.env.DEBUG_SOCKETS === 'true';
   
-  // Si pas de coordonnées (commande téléphonique), ne pas chercher de livreurs pour l'instant
-  if (!pickupCoords || !pickupCoords.latitude || !pickupCoords.longitude) {
+  // Vérifier si c'est une commande téléphonique (B2B ou hors-ligne)
+  const isPhoneOrder = (order as any).is_phone_order === true;
+  const isB2BOrder = (order as any).is_b2b_order === true;
+  const isPhoneOrB2B = isPhoneOrder || isB2BOrder;
+  
+  // Si pas de coordonnées ET ce n'est pas une commande téléphonique/B2B, ne pas chercher de livreurs
+  if ((!pickupCoords || !pickupCoords.latitude || !pickupCoords.longitude) && !isPhoneOrB2B) {
     if (DEBUG) {
-      console.log(`[notifyDriversForOrder] Commande ${maskOrderId(order.id)} sans coordonnées GPS - pas de recherche de livreurs`);
+      console.log(`[notifyDriversForOrder] Commande ${maskOrderId(order.id)} sans coordonnées GPS et non-téléphonique - pas de recherche de livreurs`);
     }
     return;
   }
@@ -265,16 +321,36 @@ async function notifyDriversForOrder(
     // Ajouter la commande à activeOrders pour le suivi
     activeOrders.set(order.id, order);
 
-    // Chercher les livreurs proches
-    const nearbyDrivers = await findNearbyDrivers(pickupCoords, deliveryMethod);
+    // Pour les commandes B2B ou téléphoniques, notifier tous les livreurs disponibles
+    // Pour les autres commandes, chercher les livreurs proches
+    let nearbyDrivers: NearbyDriver[];
+    if (isB2BOrder) {
+      // Pour les commandes B2B, toujours notifier tous les livreurs disponibles (avec ou sans coordonnées GPS)
+      if (DEBUG) {
+        console.log(`[notifyDriversForOrder] Commande B2B ${maskOrderId(order.id)} - recherche de tous les livreurs disponibles (avec coordonnées: ${!!(pickupCoords && pickupCoords.latitude && pickupCoords.longitude)})`);
+      }
+      nearbyDrivers = await findAllAvailableDrivers(deliveryMethod);
+    } else if (isPhoneOrder && (!pickupCoords || !pickupCoords.latitude || !pickupCoords.longitude)) {
+      // Pour les commandes téléphoniques normales sans coordonnées GPS, notifier tous les livreurs
+      if (DEBUG) {
+        console.log(`[notifyDriversForOrder] Commande téléphonique ${maskOrderId(order.id)} sans coordonnées GPS - recherche de tous les livreurs disponibles`);
+      }
+      nearbyDrivers = await findAllAvailableDrivers(deliveryMethod);
+    } else {
+      // Chercher les livreurs proches avec coordonnées GPS
+      if (DEBUG) {
+        console.log(`[notifyDriversForOrder] Commande normale ${maskOrderId(order.id)} - recherche de livreurs proches`);
+      }
+      nearbyDrivers = await findNearbyDrivers(pickupCoords!, deliveryMethod);
+    }
     
     if (DEBUG) {
-      console.log(`[notifyDriversForOrder] ${nearbyDrivers.length} livreurs trouvés pour commande ${maskOrderId(order.id)}`);
+      console.log(`[notifyDriversForOrder] ${nearbyDrivers.length} livreurs trouvés pour commande ${maskOrderId(order.id)} (B2B: ${isB2BOrder}, Téléphonique: ${isPhoneOrder})`);
     }
 
     if (nearbyDrivers.length === 0) {
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`);
+        console.log(`[notifyDriversForOrder] Aucun chauffeur disponible pour la commande ${maskOrderId(order.id)}`);
       }
       return;
     }
@@ -403,10 +479,12 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             socket.emit('order-error', {
               success: false,
               message: errorMsg,
-              code: 'DEFERRED_PAYMENT_LIMIT_EXCEEDED'
+              code: validation.errorCode || 'DEFERRED_PAYMENT_LIMIT_EXCEEDED',
+              errorCode: validation.errorCode,
+              details: validation.details,
             });
             if (typeof ack === 'function') {
-              ack({ success: false, message: errorMsg });
+              ack({ success: false, message: errorMsg, errorCode: validation.errorCode, details: validation.details });
             }
             return;
           }
@@ -1061,6 +1139,6 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 export {
   activeOrders, calculatePrice, connectedDrivers,
   connectedUsers, estimateDuration,
-  findNearbyDrivers, setupOrderSocket, notifyDriversForOrder
+  findNearbyDrivers, findAllAvailableDrivers, setupOrderSocket, notifyDriversForOrder
 };
 

@@ -3293,6 +3293,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       price,
       notes,
       isPhoneOrder,
+      isB2BOrder,
       driverNotes,
     } = req.body;
 
@@ -3430,6 +3431,10 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     if (isPhoneOrderBool) {
       (order as any).is_phone_order = true;
     }
+    // Marquer comme B2B si spécifié (commandes créées depuis le planning)
+    if (isB2BOrder === true) {
+      (order as any).is_b2b_order = true;
+    }
     if (driverNotes) {
       (order as any).driver_notes = driverNotes;
     }
@@ -3444,16 +3449,36 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       if (io) {
         broadcastOrderUpdateToAdmins(io, 'order:created', { order });
         
-        // Rechercher et notifier les livreurs proches (comme pour les commandes client)
-        // Seulement si les coordonnées GPS sont disponibles
+        // Rechercher et notifier les livreurs
+        // Pour les commandes B2B, notifier même sans coordonnées GPS précises
         const finalPickupCoords = order.pickup.coordinates;
-        if (finalPickupCoords && finalPickupCoords.latitude && finalPickupCoords.longitude) {
+        const isB2BOrderValue = isB2BOrder === true;
+        
+        if (isB2BOrderValue) {
+          // Pour les commandes B2B, toujours notifier les livreurs (même sans coordonnées GPS)
+          logger.info(`[createAdminOrder] Commande B2B ${orderId} - notification de tous les livreurs disponibles`, {
+            orderId,
+            isB2BOrder: (order as any).is_b2b_order,
+            isPhoneOrder: (order as any).is_phone_order,
+            hasCoordinates: !!(finalPickupCoords && finalPickupCoords.latitude && finalPickupCoords.longitude),
+          });
+          notifyDriversForOrder(io, order, finalPickupCoords, deliveryMethod).catch((error) => {
+            logger.warn(`[createAdminOrder] Erreur notification livreurs pour commande B2B ${orderId}:`, error);
+          });
+        } else if (isPhoneOrderBool) {
+          // Pour les commandes téléphoniques normales (hors-ligne), notifier aussi les livreurs
+          logger.info(`[createAdminOrder] Commande téléphonique ${orderId} - notification de tous les livreurs disponibles`);
+          notifyDriversForOrder(io, order, finalPickupCoords, deliveryMethod).catch((error) => {
+            logger.warn(`[createAdminOrder] Erreur notification livreurs pour commande téléphonique ${orderId}:`, error);
+          });
+        } else if (finalPickupCoords && finalPickupCoords.latitude && finalPickupCoords.longitude) {
+          // Pour les commandes normales, notifier seulement si coordonnées GPS disponibles
           logger.info(`[createAdminOrder] Notification des livreurs pour commande ${orderId} avec coordonnées: ${finalPickupCoords.latitude}, ${finalPickupCoords.longitude}`);
           notifyDriversForOrder(io, order, finalPickupCoords, deliveryMethod).catch((error) => {
             logger.warn(`[createAdminOrder] Erreur notification livreurs pour commande ${orderId}:`, error);
           });
         } else {
-          logger.info(`[createAdminOrder] Commande ${orderId} créée sans coordonnées GPS - pas de recherche de livreurs (commande téléphonique ou géocodage échoué)`);
+          logger.info(`[createAdminOrder] Commande ${orderId} créée sans coordonnées GPS - pas de recherche de livreurs (géocodage échoué)`);
         }
       }
 

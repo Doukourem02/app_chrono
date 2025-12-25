@@ -402,13 +402,34 @@ class UserOrderSocketService {
     this.socket.on('order-error', (data) => {
       logger.warn('❌ Erreur commande', 'userOrderSocketService', data);
       if (data?.message) {
-        UserFriendlyError.handleUnknownError(
-          new Error(data.message),
-          'order-error',
-          () => {
-            // Retry logic si nécessaire
-          }
-        );
+        // Gérer spécifiquement les erreurs de paiement différé
+        const errorCode = data.code || data.errorCode;
+        if (errorCode && (
+          errorCode === 'DEFERRED_PAYMENT_LIMIT_EXCEEDED' || 
+          errorCode === 'MONTHLY_CREDIT_INSUFFICIENT' ||
+          errorCode === 'MONTHLY_USAGE_LIMIT_EXCEEDED' ||
+          errorCode === 'ANNUAL_LIMIT_EXCEEDED' ||
+          errorCode === 'COOLDOWN_PERIOD_ACTIVE' ||
+          errorCode === 'DEFERRED_PAYMENT_BLOCKED' ||
+          errorCode === 'MIN_AMOUNT_NOT_REACHED'
+        )) {
+          UserFriendlyError.showDeferredPaymentError(
+            data.message,
+            {
+              errorCode,
+              ...data.details,
+            }
+          );
+        } else {
+          // Pour les autres erreurs, utiliser la gestion générique
+          UserFriendlyError.handleUnknownError(
+            new Error(data.message),
+            'order-error',
+            () => {
+              // Retry logic si nécessaire
+            }
+          );
+        }
       }
     });
 

@@ -362,6 +362,19 @@ export async function canUseDeferredPayment(
 ): Promise<{
   canUse: boolean;
   reason?: string;
+  errorCode?: string;
+  details?: {
+    monthlyRemaining?: number;
+    monthlyLimit?: number;
+    requestedAmount?: number;
+    monthlyUsages?: number;
+    maxUsagesPerMonth?: number;
+    annualRemaining?: number;
+    annualLimit?: number;
+    cooldownDays?: number;
+    minAmount?: number;
+    blockEndDate?: Date;
+  };
   info?: DeferredPaymentInfo;
 }> {
   try {
@@ -369,7 +382,12 @@ export async function canUseDeferredPayment(
     if (amount < DEFERRED_PAYMENT_LIMITS.MIN_AMOUNT) {
       return {
         canUse: false,
-        reason: `Montant minimum requis : ${DEFERRED_PAYMENT_LIMITS.MIN_AMOUNT.toLocaleString()} FCFA`,
+        reason: `Le montant minimum pour utiliser le paiement différé est de ${DEFERRED_PAYMENT_LIMITS.MIN_AMOUNT.toLocaleString('fr-FR')} FCFA.`,
+        errorCode: 'MIN_AMOUNT_NOT_REACHED',
+        details: {
+          requestedAmount: amount,
+          minAmount: DEFERRED_PAYMENT_LIMITS.MIN_AMOUNT,
+        },
       };
     }
 
@@ -378,7 +396,11 @@ export async function canUseDeferredPayment(
     if (latePayments.isBlocked && latePayments.blockEndDate && latePayments.blockEndDate > currentDate) {
       return {
         canUse: false,
-        reason: `Paiement différé bloqué jusqu'au ${latePayments.blockEndDate.toLocaleDateString('fr-FR')} (3 retards de paiement)`,
+        reason: `Paiement différé bloqué jusqu'au ${latePayments.blockEndDate.toLocaleDateString('fr-FR')} en raison de 3 retards de paiement.`,
+        errorCode: 'DEFERRED_PAYMENT_BLOCKED',
+        details: {
+          blockEndDate: latePayments.blockEndDate,
+        },
       };
     }
 
@@ -391,7 +413,13 @@ export async function canUseDeferredPayment(
     if (amount > monthlyRemaining) {
       return {
         canUse: false,
-        reason: `Vous avez atteint votre quota de paiement différé.`,
+        reason: `Crédit mensuel insuffisant. Votre crédit disponible est de ${monthlyRemaining.toLocaleString('fr-FR')} FCFA, mais le montant demandé est de ${amount.toLocaleString('fr-FR')} FCFA.`,
+        errorCode: 'MONTHLY_CREDIT_INSUFFICIENT',
+        details: {
+          monthlyRemaining,
+          monthlyLimit: creditInfo.finalCredit,
+          requestedAmount: amount,
+        },
       };
     }
 
@@ -400,7 +428,12 @@ export async function canUseDeferredPayment(
     if (monthlyUsages >= DEFERRED_PAYMENT_LIMITS.MAX_USAGES_PER_MONTH) {
       return {
         canUse: false,
-        reason: `Vous avez atteint votre quota de paiement différé.`,
+        reason: `Vous avez atteint la limite d'utilisations mensuelles (${DEFERRED_PAYMENT_LIMITS.MAX_USAGES_PER_MONTH} utilisations par mois). Vous pourrez utiliser le paiement différé à nouveau le mois prochain.`,
+        errorCode: 'MONTHLY_USAGE_LIMIT_EXCEEDED',
+        details: {
+          monthlyUsages,
+          maxUsagesPerMonth: DEFERRED_PAYMENT_LIMITS.MAX_USAGES_PER_MONTH,
+        },
       };
     }
 
@@ -414,7 +447,11 @@ export async function canUseDeferredPayment(
         const daysRemaining = DEFERRED_PAYMENT_LIMITS.COOLDOWN_DAYS - daysSinceLastPayment;
         return {
           canUse: false,
-          reason: `Période de refroidissement active. Réessayez dans ${daysRemaining} jour(s)`,
+          reason: `Période de refroidissement active. Réessayez dans ${daysRemaining} jour(s).`,
+          errorCode: 'COOLDOWN_PERIOD_ACTIVE',
+          details: {
+            cooldownDays: daysRemaining,
+          },
         };
       }
     }
@@ -427,7 +464,13 @@ export async function canUseDeferredPayment(
     if (amount > annualRemaining) {
       return {
         canUse: false,
-        reason: `Vous avez atteint votre quota annuel de paiement différé. Vous pourrez utiliser cette option à nouveau l'année prochaine.`,
+        reason: `Vous avez atteint votre quota annuel de paiement différé (${DEFERRED_PAYMENT_LIMITS.ANNUAL_LIMIT.toLocaleString('fr-FR')} FCFA). Vous pourrez utiliser cette option à nouveau l'année prochaine.`,
+        errorCode: 'ANNUAL_LIMIT_EXCEEDED',
+        details: {
+          annualRemaining,
+          annualLimit: DEFERRED_PAYMENT_LIMITS.ANNUAL_LIMIT,
+          requestedAmount: amount,
+        },
       };
     }
 

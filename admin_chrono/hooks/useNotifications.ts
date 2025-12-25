@@ -15,6 +15,7 @@ type OrderCreatedData = {
   order?: {
     id?: string
     is_phone_order?: boolean
+    is_b2b_order?: boolean
     shipmentNumber?: string
     shipment_number?: string
     deliveryId?: string
@@ -44,8 +45,10 @@ export function useNotifications() {
       const order = orderData?.order
       if (!order || !order.id) return
 
-      // Ne pas créer de notification pour les commandes téléphoniques créées par l'admin
-      if (order.is_phone_order) return
+      // Ne pas créer de notification pour les commandes téléphoniques normales (hors-ligne)
+      // Mais permettre les notifications pour les commandes B2B
+      const isB2BOrder = order.is_b2b_order === true
+      if (order.is_phone_order && !isB2BOrder) return
 
       const shipmentNumber = order.shipmentNumber || order.shipment_number || order.deliveryId || order.delivery_id
       

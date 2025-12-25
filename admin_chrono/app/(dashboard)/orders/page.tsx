@@ -75,6 +75,8 @@ interface Order {
   departure: string;
   destination: string;
   status: string;
+  is_phone_order?: boolean;
+  is_b2b_order?: boolean; // Indicateur pour les commandes B2B créées depuis le planning
 }
 
 export default function OrdersPage() {
@@ -630,18 +632,53 @@ export default function OrdersPage() {
                         }}
                       >
                         <td style={{ padding: "12px" }}>
-                          <span
-                            style={{
-                              fontSize: "13px",
-                              color: "#111827",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {formatDeliveryId(
-                              order.deliveryId,
-                              parseDateToISO(order.date) || order.date
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#111827",
+                                fontWeight: 500,
+                              }}
+                            >
+                              {formatDeliveryId(
+                                order.deliveryId,
+                                parseDateToISO(order.date) || order.date
+                              )}
+                            </span>
+                            {/* Badge pour différencier les types de commandes */}
+                            {order.is_b2b_order === true && (
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  backgroundColor: '#E0E7FF',
+                                  color: '#4338CA',
+                                  textTransform: 'uppercase',
+                                }}
+                                title="Commande B2B créée depuis le planning"
+                              >
+                                B2B
+                              </span>
                             )}
-                          </span>
+                            {order.is_phone_order === true && !order.is_b2b_order && (
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  backgroundColor: '#FEF3C7',
+                                  color: '#92400E',
+                                  textTransform: 'uppercase',
+                                }}
+                                title="Commande téléphonique créée depuis le dashboard"
+                              >
+                                Téléphonique
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td style={{ padding: "12px" }}>
                           <span style={{ fontSize: "14px", color: "#374151" }}>

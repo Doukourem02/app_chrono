@@ -4,6 +4,7 @@ import { AppState, AppStateStatus } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
+import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
 import { soundService } from "../services/soundService";
 import { apiService } from "../services/apiService";
 import "../config/envCheck";
@@ -85,11 +86,13 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
+      <ErrorModalsProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        />
+      </ErrorModalsProvider>
     </ErrorBoundary>
   );
 }

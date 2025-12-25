@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
+import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
 import { soundService } from "../services/soundService";
 import { useAuthStore } from "../store/useAuthStore";
 import { userApiService } from "../services/userApiService";
@@ -51,12 +52,14 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="summary" />
-      </Stack>
+      <ErrorModalsProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="summary" />
+        </Stack>
+      </ErrorModalsProvider>
     </ErrorBoundary>
   );
 }

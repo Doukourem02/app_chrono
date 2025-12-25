@@ -1438,6 +1438,7 @@ class AdminApiService {
     price: number
     notes?: string
     isPhoneOrder?: boolean
+    isB2BOrder?: boolean
     driverNotes?: string
   }): Promise<{
     success: boolean
