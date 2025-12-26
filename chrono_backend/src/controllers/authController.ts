@@ -46,6 +46,55 @@ interface RefreshTokenBody {
   refreshToken: string;
 }
 
+/**
+ * Supprime toutes les traces d'un utilisateur (users + driver_profiles)
+ * Utilisé quand un utilisateur est supprimé de Supabase Auth mais existe encore dans PostgreSQL
+ */
+const cleanupOrphanedUser = async (userId: string, email: string): Promise<void> => {
+  try {
+    logger.info(`Nettoyage des données orphelines pour ${maskEmail(email)} (${maskUserId(userId)})`);
+    
+    const clientForDelete = supabaseAdmin || supabase;
+    
+    // Supprimer le profil driver s'il existe
+    try {
+      const { error: driverProfileError } = await clientForDelete
+        .from('driver_profiles')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (driverProfileError) {
+        logger.warn('Erreur suppression profil driver (peut ne pas exister):', driverProfileError);
+      } else {
+        logger.info('Profil driver supprimé avec succès');
+      }
+    } catch (error) {
+      logger.warn('Erreur lors de la suppression du profil driver:', error);
+    }
+
+    // Supprimer l'utilisateur de la table users
+    try {
+      const { error: userDeleteError } = await clientForDelete
+        .from('users')
+        .delete()
+        .eq('id', userId);
+      
+      if (userDeleteError) {
+        logger.error('Erreur suppression utilisateur:', userDeleteError);
+      } else {
+        logger.info('Utilisateur supprimé de PostgreSQL avec succès');
+      }
+    } catch (error) {
+      logger.error('Erreur lors de la suppression de l\'utilisateur:', error);
+    }
+
+    logger.info(`Nettoyage terminé pour ${maskEmail(email)}`);
+  } catch (error: any) {
+    logger.error('Erreur lors du nettoyage des données orphelines:', error);
+    // Ne pas throw, on continue même si le nettoyage échoue partiellement
+  }
+};
+
 const createDriverProfile = async (
   userId: string,
   email: string,
@@ -77,6 +126,7 @@ const createDriverProfile = async (
           first_name: firstName || null,
           last_name: lastName || null,
           vehicle_type: 'moto',
+          driver_type: 'partner', // Par défaut, tous les livreurs s'inscrivant sont des partenaires
           is_online: false,
           is_available: true,
           rating: 5.0,
@@ -529,6 +579,27 @@ const verifyOTPCode = async (
 
     logger.info('Code OTP valide !');
 
+    // ÉTAPE 1 : Vérifier d'abord si l'utilisateur existe dans Supabase Auth
+    logger.info('Vérification dans Supabase Auth...');
+    let existingAuthUser: any = null;
+
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const { data: authUsers, error: authListError } = await supabase.auth.admin.listUsers();
+      if (authListError) {
+        logger.warn(
+          'Impossible de lister les utilisateurs Auth (nécessite service role key):',
+          authListError.message
+        );
+      } else if (authUsers?.users) {
+        existingAuthUser = authUsers.users.find((user: any) => user.email === email);
+      }
+    } else {
+      logger.warn(
+        "SUPABASE_SERVICE_ROLE_KEY non défini, impossible de vérifier si l'utilisateur existe dans Supabase Auth"
+      );
+    }
+
+    // ÉTAPE 2 : Vérifier si l'utilisateur existe dans PostgreSQL
     const { data: existingUsers, error: checkError } = await supabase
       .from('users')
       .select('*')
@@ -539,230 +610,241 @@ const verifyOTPCode = async (
       logger.error('Erreur vérification utilisateur:', checkError);
     }
 
+    // ÉTAPE 3 : Si l'utilisateur existe dans PostgreSQL mais PAS dans Supabase Auth, nettoyer les données orphelines
+    if (existingUsers && existingUsers.length > 0 && !existingAuthUser) {
+      logger.warn(
+        `Utilisateur trouvé dans PostgreSQL mais absent de Supabase Auth. Nettoyage des données orphelines pour ${maskEmail(email)}`
+      );
+      const orphanedUser = existingUsers[0];
+      await cleanupOrphanedUser(orphanedUser.id, email);
+      // Réinitialiser pour traiter comme un nouvel utilisateur
+      existingUsers.length = 0;
+    }
+
     let userData: any;
     let isNewUser = false;
+    let driverProfile: any = null; // Profil driver créé (si applicable)
 
-    if (existingUsers && existingUsers.length > 0) {
-      logger.info('Utilisateur existant trouvé dans PostgreSQL !');
+    if (existingUsers && existingUsers.length > 0 && existingAuthUser) {
+      // Utilisateur existe dans les deux (PostgreSQL + Supabase Auth)
+      logger.info('Utilisateur existant trouvé dans PostgreSQL et Supabase Auth !');
       userData = existingUsers[0];
-    } else {
-      logger.info('Vérification dans Supabase Auth...');
-      let existingAuthUser: any = null;
-
-      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        const { data: authUsers, error: authListError } = await supabase.auth.admin.listUsers();
-        if (authListError) {
-          logger.warn(
-            'Impossible de lister les utilisateurs Auth (nécessite service role key):',
-            authListError.message
-          );
-        } else if (authUsers?.users) {
-          existingAuthUser = authUsers.users.find((user: any) => user.email === email);
+      
+      // Récupérer le profil driver s'il existe
+      if (role === 'driver' && userData.id) {
+        try {
+          const clientForSelect = supabaseAdmin || supabase;
+          const { data: existingProfile } = await clientForSelect
+            .from('driver_profiles')
+            .select('*')
+            .eq('user_id', userData.id)
+            .single();
+          if (existingProfile) {
+            driverProfile = existingProfile;
+          }
+        } catch (error) {
+          logger.warn('Impossible de récupérer le profil driver existant:', error);
         }
-      } else {
+      }
+    } else if (existingAuthUser && (!existingUsers || existingUsers.length === 0)) {
+      // Utilisateur existe dans Supabase Auth mais pas dans PostgreSQL → Synchronisation
+      logger.info('Utilisateur trouvé dans Supabase Auth, synchronisation vers PostgreSQL...');
+      const clientForInsert = supabaseAdmin || supabase;
+      if (!supabaseAdmin) {
         logger.warn(
-          "SUPABASE_SERVICE_ROLE_KEY non défini, impossible de vérifier si l'utilisateur existe dans Supabase Auth"
+          'supabaseAdmin non disponible (SUPABASE_SERVICE_ROLE_KEY manquant), insertion dans users peut échouer à cause de RLS'
         );
       }
 
-      if (existingAuthUser) {
-        logger.info('Utilisateur trouvé dans Supabase Auth, synchronisation vers PostgreSQL...');
-        const clientForInsert = supabaseAdmin || supabase;
-        if (!supabaseAdmin) {
-          logger.warn(
-            'supabaseAdmin non disponible (SUPABASE_SERVICE_ROLE_KEY manquant), insertion dans users peut échouer à cause de RLS'
-          );
-        }
-
-        const { data: newUser, error: insertError } = await clientForInsert
-          .from('users')
-          .insert([
-            {
-              id: existingAuthUser.id,
-              email: email,
-              phone: phone,
-              role: role,
-              created_at: existingAuthUser.created_at || new Date().toISOString(),
-            },
-          ])
-          .select()
-          .single();
-
-        if (insertError) {
-          logger.error('Erreur synchronisation PostgreSQL:', insertError);
-          if (insertError.code === '2501' && !supabaseAdmin) {
-            logger.warn(
-              'Synchronisation users échouée à cause de RLS (SUPABASE_SERVICE_ROLE_KEY manquant), utilisation des données Auth'
-            );
-            userData = {
-              id: existingAuthUser.id,
-              email: email,
-              phone: phone,
-              role: role,
-              created_at: existingAuthUser.created_at || new Date().toISOString(),
-            };
-          } else {
-            res.status(500).json({
-              success: false,
-              message: 'Erreur lors de la synchronisation du profil utilisateur',
-              error: insertError.message,
-            });
-            return;
-          }
-        } else {
-          userData = newUser;
-        }
-
-        if (role === 'driver' && userData && userData.id) {
-          logger.info('Création automatique du profil driver pour utilisateur synchronisé...');
-          const driverProfile = await createDriverProfile(userData.id, email, phone, null, null);
-          if (driverProfile) {
-            logger.info('Profil driver créé avec succès !');
-          } else {
-            logger.warn('Échec création profil driver (non bloquant)');
-          }
-        }
-
-        logger.info('Utilisateur synchronisé avec succès !');
-      } else {
-        logger.info('Création nouvel utilisateur complet...');
-        isNewUser = true;
-        const tempPassword = Math.random().toString(36).slice(-12);
-        let authUser: any, authError: any;
-
-        if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-          const result = await supabase.auth.admin.createUser({
+      const { data: newUser, error: insertError } = await clientForInsert
+        .from('users')
+        .insert([
+          {
+            id: existingAuthUser.id,
             email: email,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: {
-              role: role,
-              phone: phone,
-            },
-          });
-          authUser = result.data;
-          authError = result.error;
-        } else {
+            phone: phone,
+            role: role,
+            created_at: existingAuthUser.created_at || new Date().toISOString(),
+          },
+        ])
+        .select()
+        .single();
+
+      if (insertError) {
+        logger.error('Erreur synchronisation PostgreSQL:', insertError);
+        if (insertError.code === '2501' && !supabaseAdmin) {
           logger.warn(
-            'SUPABASE_SERVICE_ROLE_KEY non défini, utilisation de signUp() (nécessite confirmation email)'
+            'Synchronisation users échouée à cause de RLS (SUPABASE_SERVICE_ROLE_KEY manquant), utilisation des données Auth'
           );
-          const result = await supabase.auth.signUp({
+          userData = {
+            id: existingAuthUser.id,
             email: email,
-            password: tempPassword,
-            options: {
-              data: {
-                role: role,
-                phone: phone,
-              },
-            },
-          });
-          authUser = result.data;
-          authError = result.error;
-        }
-
-        if (authError) {
-          logger.error('Erreur création Supabase Auth:', authError);
-          let errorMessage = authError.message;
-          if (authError.message.includes('not allowed') || authError.code === 'not_admin') {
-            errorMessage =
-              'Création de compte non autorisée. Vérifiez la configuration Supabase (inscriptions activées et service role key configurée).';
-          } else if (authError.message.includes('already registered')) {
-            errorMessage = 'Cet email est déjà utilisé.';
-          }
-          res.status(400).json({
-            success: false,
-            message: 'Erreur lors de la création du compte',
-            error: errorMessage,
-          });
-          return;
-        }
-
-        const userId = authUser?.user?.id || authUser?.id;
-        if (!userId) {
-          logger.error('Erreur: utilisateur créé mais ID introuvable');
+            phone: phone,
+            role: role,
+            created_at: existingAuthUser.created_at || new Date().toISOString(),
+          };
+        } else {
           res.status(500).json({
             success: false,
-            message: 'Erreur lors de la création du compte',
-            error: 'ID utilisateur introuvable',
+            message: 'Erreur lors de la synchronisation du profil utilisateur',
+            error: insertError.message,
           });
           return;
         }
+      } else {
+        userData = newUser;
+      }
 
-        logger.info('Utilisateur créé dans Supabase Auth avec ID:', maskUserId(userId));
+      if (role === 'driver' && userData && userData.id) {
+        logger.info('Création automatique du profil driver pour utilisateur synchronisé...');
+        driverProfile = await createDriverProfile(userData.id, email, phone, null, null);
+        if (driverProfile) {
+          logger.info('Profil driver créé avec succès !');
+        } else {
+          logger.warn('Échec création profil driver (non bloquant)');
+        }
+      }
 
-        const clientForInsert = supabaseAdmin || supabase;
-        if (!supabaseAdmin) {
+      logger.info('Utilisateur synchronisé avec succès !');
+    } else if (!existingAuthUser && (!existingUsers || existingUsers.length === 0)) {
+      // Utilisateur n'existe ni dans Supabase Auth ni dans PostgreSQL → Nouvel utilisateur
+      logger.info('Création nouvel utilisateur complet...');
+      isNewUser = true;
+      const tempPassword = Math.random().toString(36).slice(-12);
+      let authUser: any, authError: any;
+
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const result = await supabase.auth.admin.createUser({
+          email: email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: {
+            role: role,
+            phone: phone,
+          },
+        });
+        authUser = result.data;
+        authError = result.error;
+      } else {
+        logger.warn(
+          'SUPABASE_SERVICE_ROLE_KEY non défini, utilisation de signUp() (nécessite confirmation email)'
+        );
+        const result = await supabase.auth.signUp({
+          email: email,
+          password: tempPassword,
+          options: {
+            data: {
+              role: role,
+              phone: phone,
+            },
+          },
+        });
+        authUser = result.data;
+        authError = result.error;
+      }
+
+      if (authError) {
+        logger.error('Erreur création Supabase Auth:', authError);
+        let errorMessage = authError.message;
+        if (authError.message.includes('not allowed') || authError.code === 'not_admin') {
+          errorMessage =
+            'Création de compte non autorisée. Vérifiez la configuration Supabase (inscriptions activées et service role key configurée).';
+        } else if (authError.message.includes('already registered')) {
+          errorMessage = 'Cet email est déjà utilisé.';
+        }
+        res.status(400).json({
+          success: false,
+          message: 'Erreur lors de la création du compte',
+          error: errorMessage,
+        });
+        return;
+      }
+
+      const userId = authUser?.user?.id || authUser?.id;
+      if (!userId) {
+        logger.error('Erreur: utilisateur créé mais ID introuvable');
+        res.status(500).json({
+          success: false,
+          message: 'Erreur lors de la création du compte',
+          error: 'ID utilisateur introuvable',
+        });
+        return;
+      }
+
+      logger.info('Utilisateur créé dans Supabase Auth avec ID:', maskUserId(userId));
+
+      const clientForInsert = supabaseAdmin || supabase;
+      if (!supabaseAdmin) {
+        logger.warn(
+          'supabaseAdmin non disponible (SUPABASE_SERVICE_ROLE_KEY manquant), insertion dans users peut échouer à cause de RLS'
+        );
+      }
+
+      const { data: newUser, error: insertError } = await clientForInsert
+        .from('users')
+        .insert([
+          {
+            id: userId,
+            email: email,
+            phone: phone,
+            role: role,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        .select()
+        .single();
+
+      if (insertError) {
+        logger.error('Erreur insertion PostgreSQL:', insertError);
+        if (insertError.code === '2501' && !supabaseAdmin) {
           logger.warn(
-            'supabaseAdmin non disponible (SUPABASE_SERVICE_ROLE_KEY manquant), insertion dans users peut échouer à cause de RLS'
+            'Insertion users échouée à cause de RLS (SUPABASE_SERVICE_ROLE_KEY manquant), mais utilisateur créé dans Auth'
+          );
+          logger.warn(
+            'Solution: Ajouter SUPABASE_SERVICE_ROLE_KEY dans .env ou créer une politique RLS qui permet l\'insertion'
+          );
+          userData = {
+            id: userId,
+            email: email,
+            phone: phone,
+            role: role,
+            created_at: new Date().toISOString(),
+          };
+        } else {
+          res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la création du profil utilisateur',
+            error: insertError.message,
+          });
+          return;
+        }
+      } else {
+        userData = newUser;
+      }
+
+      if (role === 'driver' && userData && userData.id) {
+        logger.info('Création automatique du profil driver...');
+        driverProfile = await createDriverProfile(userData.id, email, phone, null, null);
+        if (driverProfile) {
+          logger.info('Profil driver créé avec succès !');
+        } else {
+          logger.warn('Échec création profil driver (non bloquant)');
+        }
+      }
+
+      if (userData && userData.id) {
+        try {
+          await createDefaultPaymentMethods(userData.id);
+          logger.debug('Méthodes de paiement par défaut créées');
+        } catch (paymentMethodError: any) {
+          logger.warn(
+            'Échec création méthodes de paiement par défaut (non bloquant):',
+            paymentMethodError.message
           );
         }
-
-        const { data: newUser, error: insertError } = await clientForInsert
-          .from('users')
-          .insert([
-            {
-              id: userId,
-              email: email,
-              phone: phone,
-              role: role,
-              created_at: new Date().toISOString(),
-            },
-          ])
-          .select()
-          .single();
-
-        if (insertError) {
-          logger.error('Erreur insertion PostgreSQL:', insertError);
-          if (insertError.code === '2501' && !supabaseAdmin) {
-            logger.warn(
-              'Insertion users échouée à cause de RLS (SUPABASE_SERVICE_ROLE_KEY manquant), mais utilisateur créé dans Auth'
-            );
-            logger.warn(
-              'Solution: Ajouter SUPABASE_SERVICE_ROLE_KEY dans .env ou créer une politique RLS qui permet l\'insertion'
-            );
-            userData = {
-              id: userId,
-              email: email,
-              phone: phone,
-              role: role,
-              created_at: new Date().toISOString(),
-            };
-          } else {
-            res.status(500).json({
-              success: false,
-              message: 'Erreur lors de la création du profil utilisateur',
-              error: insertError.message,
-            });
-            return;
-          }
-        } else {
-          userData = newUser;
-        }
-
-        if (role === 'driver' && userData && userData.id) {
-          logger.info('Création automatique du profil driver...');
-          const driverProfile = await createDriverProfile(userData.id, email, phone, null, null);
-          if (driverProfile) {
-            logger.info('Profil driver créé avec succès !');
-          } else {
-            logger.warn('Échec création profil driver (non bloquant)');
-          }
-        }
-
-        if (userData && userData.id) {
-          try {
-            await createDefaultPaymentMethods(userData.id);
-            logger.debug('Méthodes de paiement par défaut créées');
-          } catch (paymentMethodError: any) {
-            logger.warn(
-              'Échec création méthodes de paiement par défaut (non bloquant):',
-              paymentMethodError.message
-            );
-          }
-        }
-
-        logger.info('Nouvel utilisateur créé avec succès !');
       }
+
+      logger.info('Nouvel utilisateur créé avec succès !');
     }
 
     if (!userData || !userData.id) {
@@ -775,6 +857,24 @@ const verifyOTPCode = async (
       return;
     }
 
+    // Si c'est un driver et qu'on n'a pas encore le profil, essayer de le récupérer
+    let finalDriverProfile = driverProfile;
+    if (role === 'driver' && !finalDriverProfile && userData.id) {
+      try {
+        const clientForSelect = supabaseAdmin || supabase;
+        const { data: existingProfile } = await clientForSelect
+          .from('driver_profiles')
+          .select('*')
+          .eq('user_id', userData.id)
+          .single();
+        if (existingProfile) {
+          finalDriverProfile = existingProfile;
+        }
+      } catch (error) {
+        logger.warn('Impossible de récupérer le profil driver:', error);
+      }
+    }
+
     const { accessToken, refreshToken } = generateTokens(userData);
 
     res.json({
@@ -782,6 +882,7 @@ const verifyOTPCode = async (
       message: isNewUser ? 'Compte créé avec succès !' : 'Connexion réussie !',
       data: {
         user: userData,
+        profile: finalDriverProfile, // Inclure le profil driver dans la réponse
         tokens: {
           accessToken,
           refreshToken,

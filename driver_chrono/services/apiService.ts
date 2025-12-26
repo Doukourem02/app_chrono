@@ -893,6 +893,98 @@ class ApiService {
       };
     }
   }
+
+  /**
+   * 🔄 Mettre à jour le type de livreur (internal/partner)
+   */
+  async updateDriverType(
+    userId: string,
+    driverType: 'internal' | 'partner'
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      driver_type: 'internal' | 'partner';
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/driver-type`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ driver_type: driverType }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la mise à jour du type de livreur');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur updateDriverType:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
+   * 🚗 Récupérer le profil driver complet
+   */
+  async getDriverProfile(userId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/details`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la récupération du profil driver');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur getDriverProfile:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
 }
 
 

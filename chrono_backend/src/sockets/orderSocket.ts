@@ -11,6 +11,8 @@ import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionF
 import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
 import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
 import { broadcastOrderUpdateToAdmins } from './adminSocket.js';
+import { orderMatchingService } from '../utils/orderMatchingService.js';
+import logger from '../utils/logger.js';
 interface OrderCoordinates {
   latitude: number; longitude: number;
 }
@@ -355,19 +357,65 @@ async function notifyDriversForOrder(
       return;
     }
 
-    // Envoyer la commande aux livreurs proches
+    // 🎯 MATCHING ÉQUITABLE : TOUS les livreurs reçoivent la commande, triés par priorité (notes)
+    let selectedDrivers: NearbyDriver[];
+    const useFairMatching = process.env.USE_INTELLIGENT_MATCHING !== 'false'; // Activé par défaut
+    
+    if (useFairMatching && nearbyDrivers.length > 0) {
+      if (DEBUG) {
+        console.log(`[notifyDriversForOrder] 🎯 Utilisation du matching ÉQUITABLE pour commande ${maskOrderId(order.id)} - TOUS les livreurs recevront la commande`);
+      }
+      
+      try {
+        // Récupérer TOUS les livreurs triés par priorité (notes + équité)
+        // PRIORISATION INTERNES : Les internes sont prioritaires sur B2B/planifiées
+        const allDrivers = await orderMatchingService.findBestDrivers(
+          nearbyDrivers,
+          (driverId: string) => getActiveOrdersCountByDriver(driverId),
+          {
+            isB2B: isB2BOrder,
+            isScheduled: (order as any).is_scheduled === true || (order as any).scheduled_at !== null,
+            isSensitive: (order as any).is_sensitive === true || (order as any).is_vip === true,
+          }
+        );
+        
+        // Convertir les ScoredDriver en NearbyDriver pour compatibilité
+        // TOUS les livreurs sont inclus (pas de limite)
+        selectedDrivers = allDrivers.map(scored => ({
+          driverId: scored.driverId,
+          distance: scored.distance,
+        }));
+        
+        if (DEBUG) {
+          console.log(`[notifyDriversForOrder] ✅ TOUS les ${selectedDrivers.length} livreurs recevront la commande (triés par priorité: notes + équité)`);
+        }
+      } catch (error: any) {
+        logger.warn(`[notifyDriversForOrder] Erreur matching équitable, fallback sur tri par distance:`, error.message);
+        // Fallback : trier par distance si le matching échoue
+        selectedDrivers = nearbyDrivers.sort((a, b) => a.distance - b.distance);
+      }
+    } else {
+      // Fallback : trier par distance (comportement original)
+      if (DEBUG) {
+        console.log(`[notifyDriversForOrder] Utilisation du tri par distance (matching équitable désactivé)`);
+      }
+      selectedDrivers = nearbyDrivers.sort((a, b) => a.distance - b.distance);
+    }
+
+    // Envoyer la commande aux livreurs sélectionnés (top 3)
     let driverIndex = 0;
     const tryNextDriver = async (): Promise<void> => {
-      if (driverIndex >= nearbyDrivers.length) {
+      if (driverIndex >= selectedDrivers.length) {
         if (DEBUG) {
-          console.log(`[notifyDriversForOrder] Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)}`);
+          console.log(`[notifyDriversForOrder] Tous les ${selectedDrivers.length} chauffeurs sélectionnés ont refusé ou timeout pour la commande ${maskOrderId(order.id)}`);
         }
         // Ne pas annuler automatiquement, laisser la commande en pending
+        // Optionnel : on pourrait réessayer avec les autres livreurs disponibles
         activeOrders.delete(order.id);
         return;
       }
 
-      const driver = nearbyDrivers[driverIndex];
+      const driver = selectedDrivers[driverIndex];
       const driverSocketId = connectedDrivers.get(driver.driverId);
 
       if (DEBUG) {
@@ -600,13 +648,60 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           return;
         }
         if (DEBUG) console.log(`${nearbyDrivers.length} chauffeurs trouvés pour la commande ${maskOrderId(order.id)}`);
+        
+        // 🎯 MATCHING ÉQUITABLE : TOUS les livreurs reçoivent la commande, triés par priorité (notes)
+        let selectedDrivers: NearbyDriver[];
+        const useFairMatching = process.env.USE_INTELLIGENT_MATCHING !== 'false'; // Activé par défaut
+        
+        if (useFairMatching && nearbyDrivers.length > 0) {
+          if (DEBUG) {
+            console.log(`[create-order] 🎯 Utilisation du matching ÉQUITABLE pour commande ${maskOrderId(order.id)} - TOUS les livreurs recevront la commande`);
+          }
+          
+          try {
+            // Récupérer TOUS les livreurs triés par priorité (notes + équité)
+            // PRIORISATION INTERNES : Les internes sont prioritaires sur B2B/planifiées
+            const orderIsB2B = (order as any).is_b2b_order === true;
+            const allDrivers = await orderMatchingService.findBestDrivers(
+              nearbyDrivers,
+              (driverId: string) => getActiveOrdersCountByDriver(driverId),
+              {
+                isB2B: orderIsB2B,
+                isScheduled: (order as any).is_scheduled === true || (order as any).scheduled_at !== null,
+                isSensitive: (order as any).is_sensitive === true || (order as any).is_vip === true,
+              }
+            );
+            
+            // Convertir les ScoredDriver en NearbyDriver pour compatibilité
+            // TOUS les livreurs sont inclus (pas de limite)
+            selectedDrivers = allDrivers.map(scored => ({
+              driverId: scored.driverId,
+              distance: scored.distance,
+            }));
+            
+            if (DEBUG) {
+              console.log(`[create-order] ✅ TOUS les ${selectedDrivers.length} livreurs recevront la commande (triés par priorité: notes + équité)`);
+            }
+          } catch (error: any) {
+            logger.warn(`[create-order] Erreur matching équitable, fallback sur tri par distance:`, error.message);
+            // Fallback : trier par distance si le matching échoue
+            selectedDrivers = nearbyDrivers.sort((a, b) => a.distance - b.distance);
+          }
+        } else {
+          // Fallback : trier par distance (comportement original)
+          if (DEBUG) {
+            console.log(`[create-order] Utilisation du tri par distance (matching équitable désactivé)`);
+          }
+          selectedDrivers = nearbyDrivers.sort((a, b) => a.distance - b.distance);
+        }
+        
         let driverIndex = 0;
         const tryNextDriver = async (): Promise<void> => {
-          if (driverIndex >= nearbyDrivers.length) {
+          if (driverIndex >= selectedDrivers.length) {
             console.log(`Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)} - Annulation automatique`); try { order.status = 'cancelled'; order.cancelledAt = new Date(); await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt }); console.log(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB`); } catch (dbError: any) { console.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message); } const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) { io.to(userSocketId).emit('order-cancelled', { orderId: order.id, reason: 'no_drivers_available', message: 'Aucun chauffeur disponible - Commande annulée' }); } socket.emit('no-drivers-available', { orderId: order.id, message: 'Tous les chauffeurs sont occupés - Commande annulée' }); activeOrders.delete(order.id); return;
           }
 
-          const driver = nearbyDrivers[driverIndex];
+          const driver = selectedDrivers[driverIndex];
           const driverSocketId = connectedDrivers.get(driver.driverId);
 
           console.log(`[DIAGNOSTIC] Tentative envoi à livreur ${maskUserId(driver.driverId)}:`); console.log(` - Socket ID: ${driverSocketId || 'NON CONNECTÉ'}`); console.log(` - Distance: ${driver.distance.toFixed(2)}km`); if (driverSocketId) {

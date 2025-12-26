@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase.js';
+import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { maskUserId, maskAmount, maskOrderId, maskFinancialStats } from '../utils/maskSensitiveData.js';
@@ -634,17 +634,28 @@ export const getDriverDetails = async (req: Request, res: Response): Promise<voi
     const { data: driver, error } = await supabase
       .from('driver_profiles')
       .select(`
-        user_id, first_name, last_name,
+        id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        last_name,
         vehicle_type,
         vehicle_plate,
         vehicle_model,
+        vehicle_brand,
+        vehicle_color,
+        license_number,
+        driver_type,
         current_latitude,
         current_longitude,
         is_online,
         is_available,
         total_deliveries,
         completed_deliveries,
-        profile_image_url
+        profile_image_url,
+        created_at,
+        updated_at
       `)
       .eq('user_id', driverId)
       .single();
@@ -659,12 +670,28 @@ export const getDriverDetails = async (req: Request, res: Response): Promise<voi
 
     const rating = await calculateDriverRating(driverId);
 
+    // Calculer les revenus totaux depuis les commandes complétées
+    let totalEarnings = 0;
+    try {
+      const earningsResult = await (pool as any).query(
+        `SELECT COALESCE(SUM(price_cfa), 0) as total
+         FROM orders
+         WHERE driver_id = $1 AND status = 'completed'`,
+        [driverId]
+      );
+      totalEarnings = parseFloat(earningsResult.rows[0]?.total || '0');
+    } catch (earningsError) {
+      logger.warn('Erreur calcul revenus:', earningsError);
+    }
+
     res.json({
       success: true,
       message: 'Détails chauffeur récupérés',
       data: {
         ...driver,
-        rating
+        rating,
+        total_earnings: totalEarnings,
+        completed_deliveries: driver.completed_deliveries || 0,
       }
     });
 
@@ -1281,6 +1308,117 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la mise à jour du véhicule',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Met à jour le type de livreur (internal/partner)
+ */
+export const updateDriverType = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { driver_type } = req.body;
+
+    if (req.user && req.user.id !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez modifier que votre propre type de livreur',
+      });
+      return;
+    }
+
+    if (!driver_type || !['internal', 'partner'].includes(driver_type)) {
+      res.status(400).json({
+        success: false,
+        message: 'Type de livreur invalide. Doit être: internal ou partner',
+      });
+      return;
+    }
+
+    // Vérifier que le profil driver existe
+    const profileResult = await (pool as any).query(
+      'SELECT id, driver_type FROM driver_profiles WHERE user_id = $1',
+      [userId]
+    );
+
+    let finalDriverType: string;
+
+    if (!profileResult.rows || profileResult.rows.length === 0) {
+      // Le profil n'existe pas → le créer avec le driver_type spécifié
+      logger.info(`Profil driver non trouvé pour ${maskUserId(userId)}, création automatique avec driver_type=${driver_type}`);
+      
+      // Récupérer les informations de l'utilisateur depuis la table users
+      const userResult = await (pool as any).query(
+        'SELECT email, phone FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (!userResult.rows || userResult.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé',
+        });
+        return;
+      }
+
+      const user = userResult.rows[0];
+
+      // Créer le profil driver via Supabase (utiliser supabaseAdmin si disponible pour contourner RLS)
+      const clientForInsert = supabaseAdmin || supabase;
+      const { data: newProfile, error: insertError } = await clientForInsert
+        .from('driver_profiles')
+        .insert([
+          {
+            user_id: userId,
+            email: user.email,
+            phone: user.phone || null,
+            driver_type: driver_type,
+            vehicle_type: 'moto', // Valeur par défaut
+          },
+        ])
+        .select()
+        .single();
+
+      if (insertError) {
+        logger.error('Erreur création profil driver:', insertError);
+        res.status(500).json({
+          success: false,
+          message: 'Erreur lors de la création du profil driver',
+          error: insertError.message,
+        });
+        return;
+      }
+
+      finalDriverType = driver_type;
+      logger.info(`Profil driver créé avec succès pour ${maskUserId(userId)} avec driver_type=${driver_type}`);
+    } else {
+      // Le profil existe → mettre à jour le driver_type
+      const updateResult = await (pool as any).query(
+        `UPDATE driver_profiles 
+         SET driver_type = $1, updated_at = NOW()
+         WHERE user_id = $2
+         RETURNING driver_type`,
+        [driver_type, userId]
+      );
+
+      finalDriverType = updateResult.rows[0].driver_type;
+      logger.info(`Type de livreur mis à jour pour ${maskUserId(userId)}: ${driver_type}`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Type de livreur mis à jour avec succès',
+      data: {
+        driver_type: finalDriverType,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Erreur mise à jour type livreur:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour du type de livreur',
       error: error.message,
     });
   }

@@ -24,6 +24,7 @@ export interface DriverProfile {
   rating: number;
   total_earnings: number;
   profile_image_url?: string;
+  driver_type?: 'internal' | 'partner';
 }
 
 export interface DriverUser {
@@ -59,6 +60,11 @@ interface DriverStore {
   setOnlineStatus: (isOnline: boolean) => void;
   setLocation: (location: { latitude: number; longitude: number }) => void;
   updateProfile: (updates: Partial<DriverProfile>) => void;
+
+  // Vérification du profil
+  isProfileComplete: () => boolean;
+  needsDriverTypeSelection: () => boolean;
+  needsOnboarding: () => boolean;
 
   // Statistiques
   todayStats: {
@@ -188,6 +194,31 @@ export const useDriverStore = create<DriverStore>()(
             }
           });
         }
+      },
+
+      // Vérifier si le profil est complet
+      isProfileComplete: () => {
+        const { profile } = get();
+        if (!profile) return false;
+        
+        // Vérifier que driver_type est défini
+        // Pour les partenaires, seule l'acceptation des conditions est requise
+        // Les informations véhicule peuvent être complétées plus tard
+        return !!profile.driver_type;
+      },
+
+      // Vérifier si la sélection du type de livreur est nécessaire
+      needsDriverTypeSelection: () => {
+        const { profile } = get();
+        return !profile || !profile.driver_type;
+      },
+
+      // Vérifier si l'onboarding est nécessaire
+      // Maintenant, l'onboarding n'est plus nécessaire car les infos véhicule sont optionnelles
+      // Cette fonction retourne toujours false, mais on la garde pour compatibilité
+      needsOnboarding: () => {
+        // Les informations véhicule sont optionnelles, donc l'onboarding n'est plus bloquant
+        return false;
       },
 
       updateTodayStats: (stats) => {

@@ -3,11 +3,25 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
+import { useDriverStore } from '../../store/useDriverStore';
 
 export default function SuccessScreen() {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const { isNewUser, clearTempData } = useTempDriverStore();
+  const { isNewUser, driverType, clearTempData } = useTempDriverStore();
+  const { profile, needsDriverTypeSelection } = useDriverStore();
+  
+  // Vérifier au montage si redirection nécessaire
+  useEffect(() => {
+    // ÉTAPE 1 : Si pas de driver_type, rediriger vers la sélection (PRIORITÉ)
+    if (needsDriverTypeSelection()) {
+      router.replace('/(auth)/driver-type-selection' as any);
+      return;
+    }
+    
+    // Les informations véhicule sont optionnelles, donc pas de redirection vers onboarding
+    // Le profil est considéré complet dès que driver_type est défini
+  }, [needsDriverTypeSelection]);
 
   useEffect(() => {
     Animated.sequence([
@@ -26,6 +40,16 @@ export default function SuccessScreen() {
 
   const handleContinue = () => {
     clearTempData();
+    
+    // ÉTAPE 1 : Vérifier si driver_type manquant (PRIORITÉ)
+    if (needsDriverTypeSelection()) {
+      router.replace('/(auth)/driver-type-selection' as any);
+      return;
+    }
+    
+    // Les informations véhicule sont optionnelles, donc pas de vérification supplémentaire
+    // Le profil est considéré complet dès que driver_type est défini
+    // Profil complet → aller au dashboard
     router.replace('/(tabs)' as any);
   };
 

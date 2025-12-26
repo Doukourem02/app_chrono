@@ -5,7 +5,7 @@ import { useDriverStore } from "../store/useDriverStore";
 import { apiService } from "../services/apiService";
 
 export default function RootIndex() {
-  const { isAuthenticated, user, accessToken, validateUserExists, logout } =
+  const { isAuthenticated, user, accessToken, profile, validateUserExists, logout } =
     useDriverStore();
 
   useEffect(() => {
@@ -41,6 +41,34 @@ export default function RootIndex() {
           validationResult === null ||
           validationResult === "not_found"
         ) {
+          // Recharger le profil depuis le backend pour s'assurer qu'on a les données à jour
+          // (le profil persisté pourrait être obsolète)
+          let freshProfile = null;
+          try {
+            const profileResult = await apiService.getDriverProfile(user.id);
+            if (profileResult.success && profileResult.data) {
+              freshProfile = profileResult.data;
+              // Mettre à jour le profil dans le store avec les données fraîches du backend
+              const { setProfile } = useDriverStore.getState();
+              setProfile(freshProfile);
+            }
+          } catch (error) {
+            console.warn('Erreur rechargement profil:', error);
+            // Continuer même si le rechargement échoue
+          }
+
+          // Utiliser le profil frais si disponible, sinon utiliser celui du store
+          const currentProfile = freshProfile || profile;
+          
+          // ÉTAPE 1 : Vérifier si driver_type manquant (PRIORITÉ - TOUJOURS EN PREMIER)
+          if (!currentProfile || !currentProfile.driver_type) {
+            router.replace("/(auth)/driver-type-selection" as any);
+            return;
+          }
+          
+          // Si driver_type existe, le profil est considéré comme complété
+          // (les informations véhicule sont optionnelles et peuvent être complétées plus tard)
+          // Profil complet → accès aux tabs
           router.replace("/(tabs)" as any);
         } else {
           // validationResult === false : suppression explicite côté backend
@@ -65,7 +93,7 @@ export default function RootIndex() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [isAuthenticated, user, accessToken, validateUserExists, logout]);
+  }, [isAuthenticated, user, accessToken, profile, validateUserExists, logout]);
 
   return (
     <View

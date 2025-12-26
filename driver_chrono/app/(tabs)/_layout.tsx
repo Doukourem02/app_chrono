@@ -1,12 +1,28 @@
 import { Ionicons } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, router } from 'expo-router';
+import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useUIStore } from '../../store/useUIStore';
+import { useDriverStore } from '../../store/useDriverStore';
 
 export default function TabLayout() {
   const hideTabBar = useUIStore((state) => state.hideTabBar);
+  const { needsDriverTypeSelection } = useDriverStore();
+  
+  // Vérifier au montage si le profil est complet
+  useEffect(() => {
+    // Ajouter un petit délai pour éviter les race conditions lors de la navigation
+    const timer = setTimeout(() => {
+      // Si pas de driver_type, rediriger vers la sélection
+      if (needsDriverTypeSelection()) {
+        router.replace('/(auth)/driver-type-selection' as any);
+        return;
+      }
+    }, 200);
+    
+    return () => clearTimeout(timer);
+  }, [needsDriverTypeSelection]);
   
   return (
     <Tabs

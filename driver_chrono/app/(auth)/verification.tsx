@@ -89,10 +89,24 @@ export default function VerificationScreen() {
         });
       }
 
+      // Mettre à jour le profil dans le store (important pour écraser l'ancien profil persisté)
       if (data.data.profile) {
         setProfile(data.data.profile);
       }
       
+      // ÉTAPE 1 : TOUS les utilisateurs (nouveaux et existants) doivent d'abord passer par driver-type-selection
+      // si leur profil n'a pas de driver_type défini
+      const currentProfile = data.data.profile;
+      const needsDriverType = !currentProfile || !currentProfile.driver_type;
+      
+      if (needsDriverType) {
+        // Pas de driver_type → TOUJOURS aller à driver-type-selection en premier
+        router.push('./driver-type-selection' as any);
+        return;
+      }
+      
+      // Si driver_type existe, le profil est considéré comme complété
+      // (les informations véhicule sont optionnelles et peuvent être complétées plus tard)
       router.push('./success' as any);
     } catch (error) {
       console.error('Erreur lors de la vérification:', error);
