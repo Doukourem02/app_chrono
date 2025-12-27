@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { cancelAdminOrder, createAdminOrder, createAdminPromoCode, deleteAdminRating, getAdminAdminDetails, getAdminClientDetails, getAdminClientStatistics, getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminDisputes, getAdminDriverDetails, getAdminFinancialStats, getAdminGlobalSearch, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminPromoCodes, getAdminRatings, getAdminRecentActivities, getAdminReportClients, getAdminReportDeliveries, getAdminReportDrivers, getAdminReportPayments, getAdminReportRevenues, getAdminTransactions, getAdminUsers, updateAdminDispute, updateAdminDriverStatus } from '../controllers/adminController.js';
+import { cancelAdminOrder, createAdminOrder, createAdminPromoCode, deleteAdminRating, getAdminAdminDetails, getAdminClientDetails, getAdminClientStatistics, getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminDisputes, getAdminDriverDetails, getAdminDriverFullDetails, getAdminDrivers, getAdminFinancialStats, getAdminGlobalSearch, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminPromoCodes, getAdminRatings, getAdminRecentActivities, getAdminReportClients, getAdminReportDeliveries, getAdminReportDrivers, getAdminReportPayments, getAdminReportRevenues, getAdminTransactions, getAdminUsers, rechargeAdminDriverCommission, suspendAdminDriverCommission, updateAdminDispute, updateAdminDriverCommissionRate, updateAdminDriverStatus, getAdminDriverCommissionTransactions } from '../controllers/adminController.js';
 import { createConversation, getConversationById, getConversations, getMessages, getUnreadCount, markMessagesAsRead, sendMessage } from '../controllers/messageController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 
@@ -22,8 +22,14 @@ router.get('/reports/revenues', verifyAdminSupabase, getAdminReportRevenues);
 router.get('/reports/clients', verifyAdminSupabase, getAdminReportClients);
 router.get('/reports/drivers', verifyAdminSupabase, getAdminReportDrivers);
 router.get('/reports/payments', verifyAdminSupabase, getAdminReportPayments);
+router.get('/drivers', verifyAdminSupabase, getAdminDrivers);
+router.get('/drivers/:driverId', verifyAdminSupabase, getAdminDriverFullDetails);
 router.get('/drivers/:driverId/details', verifyAdminSupabase, getAdminDriverDetails);
 router.put('/drivers/:driverId/status', verifyAdminSupabase, updateAdminDriverStatus);
+router.post('/drivers/:driverId/commission/recharge', verifyAdminSupabase, rechargeAdminDriverCommission);
+router.put('/drivers/:driverId/commission/suspend', verifyAdminSupabase, suspendAdminDriverCommission);
+router.put('/drivers/:driverId/commission/rate', verifyAdminSupabase, updateAdminDriverCommissionRate);
+router.get('/drivers/:driverId/commission/transactions', verifyAdminSupabase, getAdminDriverCommissionTransactions);
 router.get('/clients/:clientId/details', verifyAdminSupabase, getAdminClientDetails);
 router.get('/clients/:clientId/statistics', verifyAdminSupabase, getAdminClientStatistics);
 router.get('/admins/:adminId/details', verifyAdminSupabase, getAdminAdminDetails);

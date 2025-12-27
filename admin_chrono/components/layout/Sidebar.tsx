@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Star,} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Star,Truck,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -17,6 +17,7 @@ const navigation = [
   { href: "/reports", icon: FileText, label: "Reports" },
   { href: "/finance", icon: Wallet, label: "Finance" },
   { href: "/planning", icon: Calendar, label: "Planning" },
+  { href: "/drivers", icon: Truck, label: "Drivers" },
   { href: "/users", icon: Users, label: "Users" },
   { href: "/ratings", icon: Star, label: "Ratings" },
   { href: "/settings", icon: Settings, label: "Settings" },
@@ -31,6 +32,7 @@ export default function Sidebar() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string; first_name?: string | null; last_name?: string | null } | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -118,8 +120,9 @@ export default function Sidebar() {
   }, [user]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadProfile();
+    requestAnimationFrame(() => {
+      loadProfile();
+    });
   }, [loadProfile]);
 
   useEffect(() => {
@@ -172,16 +175,39 @@ export default function Sidebar() {
     };
   }, [loadProfile]);
 
+  const collapsedWidth = 72
+  const expandedWidth = 240
+  const iconSlotSize = 44
+  const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
         setShowProfileMenu(false);
+        setMenuPosition(null);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (showProfileMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
+
+  // Mettre à jour la position du menu quand le sidebar se redimensionne
+  useEffect(() => {
+    if (showProfileMenu && profileMenuRef.current) {
+      const rect = profileMenuRef.current.getBoundingClientRect();
+      const sidebarWidth = isExpanded ? expandedWidth : collapsedWidth;
+      setMenuPosition({
+        top: rect.top + rect.height / 2,
+        left: rect.left + sidebarWidth + 16,
+      });
+    }
+  }, [isExpanded, showProfileMenu, expandedWidth, collapsedWidth]);
 
   const getUserInitials = () => {
     if (userProfile?.first_name && userProfile?.last_name) {
@@ -222,11 +248,6 @@ export default function Sidebar() {
     router.push('/login');
   };
 
-  const collapsedWidth = 72
-  const expandedWidth = 240
-  const iconSlotSize = 44
-  const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
-
   const sidebarStyle: React.CSSProperties = {
     height: '100vh',
     width: isExpanded ? expandedWidth : collapsedWidth,
@@ -235,14 +256,15 @@ export default function Sidebar() {
     display: 'flex',
     flexDirection: 'column',
     alignItems: isExpanded ? 'flex-start' : 'center',
-    paddingTop: 28,
-    paddingBottom: 28,
+    paddingTop: 0,
+    paddingBottom: 0,
     paddingLeft: isExpanded ? 24 : 0,
     paddingRight: isExpanded ? 16 : 0,
     borderTopRightRadius: '32px',
     borderBottomRightRadius: '32px',
     boxShadow: '4px 0 20px rgba(0,0,0,0.05)',
     position: 'relative',
+    overflow: 'hidden',
     transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
   }
 
@@ -252,8 +274,15 @@ export default function Sidebar() {
     alignItems: 'center',
     gap: '12px',
     width: '100%',
-    marginBottom: isExpanded ? 8 : 0,
+    paddingTop: 28,
+    paddingBottom: 20,
+    marginBottom: 0,
     transition: 'transform 0.2s ease',
+    position: 'sticky',
+    top: 0,
+    backgroundColor: '#FFFFFF',
+    zIndex: 10,
+    flexShrink: 0,
   }
 
   const logoImageContainerStyle: React.CSSProperties = {
@@ -279,11 +308,16 @@ export default function Sidebar() {
     display: 'flex',
     flexDirection: 'column',
     alignItems: isExpanded ? 'flex-start' : 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: isExpanded ? 12 : 20,
     flex: 1,
     width: '100%',
-    marginTop: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    minHeight: 0,
+    scrollbarWidth: 'thin',
   }
 
   const getNavButtonStyle = (active: boolean): React.CSSProperties => ({
@@ -329,8 +363,16 @@ export default function Sidebar() {
     flexDirection: 'column',
     alignItems: 'center',
     width: '100%',
-    marginTop: isExpanded ? 24 : 16,
-    transition: 'align-items 0.2s ease',
+    paddingTop: isExpanded ? 24 : 16,
+    paddingBottom: 28,
+    paddingLeft: isExpanded ? 12 : 0,
+    paddingRight: isExpanded ? 12 : 0,
+    position: 'sticky',
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
+    zIndex: 10,
+    flexShrink: 0,
+    boxSizing: 'border-box',
   }
 
   const avatarWrapperStyle: React.CSSProperties = {
@@ -340,13 +382,28 @@ export default function Sidebar() {
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    maxWidth: '100%',
+    overflow: 'visible',
   }
 
   const avatarImageWrapperStyle: React.CSSProperties = {
     position: 'relative',
-    width: 48,
-    height: 48,
+    width: '48px',
+    height: '48px',
+    minWidth: '48px',
+    minHeight: '48px',
+    maxWidth: '48px',
+    maxHeight: '48px',
     marginBottom: 8,
+    flexShrink: 0,
+    overflow: 'hidden',
+    borderRadius: '50%',
+    boxSizing: 'border-box',
+    isolation: 'isolate',
+    aspectRatio: '1 / 1',
+    contain: 'layout style paint',
+    marginLeft: 'auto',
+    marginRight: 'auto',
   }
 
   const avatarButtonStyle: React.CSSProperties = {
@@ -359,6 +416,9 @@ export default function Sidebar() {
     padding: 0,
     transition: 'transform 0.2s',
     width: '100%',
+    maxWidth: '100%',
+    position: 'relative',
+    zIndex: 1,
   }
 
   // Calculer le style de l'avatar dynamiquement pour qu'il se mette à jour
@@ -367,6 +427,10 @@ export default function Sidebar() {
     const style: React.CSSProperties = {
       width: '48px',
       height: '48px',
+      minWidth: '48px',
+      minHeight: '48px',
+      maxWidth: '48px',
+      maxHeight: '48px',
       borderRadius: '50%',
       display: 'flex',
       alignItems: 'center',
@@ -380,6 +444,8 @@ export default function Sidebar() {
       transform: showProfileMenu ? 'scale(1.1)' : 'scale(1)',
       overflow: 'hidden',
       position: 'relative',
+      flexShrink: 0,
+      aspectRatio: '1 / 1',
     };
     
     if (avatarUrl) {
@@ -410,22 +476,23 @@ export default function Sidebar() {
     transition: 'opacity 0.2s ease, transform 0.2s ease',
     textAlign: isExpanded ? 'left' : 'center',
     marginTop: 4,
+    marginBottom: 0,
+    paddingBottom: 0,
   }
 
   const profileMenuStyle: React.CSSProperties = {
-    position: 'absolute',
-    left: '100%',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    marginLeft: '16px',
+    position: 'fixed',
+    top: menuPosition ? `${menuPosition.top}px` : '0',
+    left: menuPosition ? `${menuPosition.left}px` : '0',
+    transform: menuPosition ? 'translateY(-50%)' : 'none',
     backgroundColor: '#FFFFFF',
     borderRadius: '12px',
     boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
     border: '1px solid #E5E7EB',
     minWidth: '220px',
-    zIndex: 1000,
+    zIndex: 10000,
     padding: '0',
-    display: showProfileMenu ? 'block' : 'none',
+    display: showProfileMenu && menuPosition ? 'block' : 'none',
   }
 
   const profileMenuHeaderStyle: React.CSSProperties = {
@@ -517,7 +584,17 @@ export default function Sidebar() {
         <div style={avatarWrapperStyle} ref={profileMenuRef}>
           <button
             style={avatarButtonStyle}
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            onClick={() => {
+              if (profileMenuRef.current) {
+                const rect = profileMenuRef.current.getBoundingClientRect();
+                const sidebarWidth = isExpanded ? expandedWidth : collapsedWidth;
+                setMenuPosition({
+                  top: rect.top + rect.height / 2,
+                  left: rect.left + sidebarWidth + 16,
+                });
+              }
+              setShowProfileMenu(!showProfileMenu);
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.05)';
             }}
@@ -531,29 +608,41 @@ export default function Sidebar() {
               {avatarUrl ? (
                 <>
                   {console.log('[Sidebar] Rendering avatar with URL:', avatarUrl)}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    key={avatarUrl} 
-                    src={avatarUrl}
-                    alt="Avatar"
+                  <div
                     style={{
-                      width: '48px',
-                      height: '48px',
+                      position: 'relative',
+                      width: '100%',
+                      height: '100%',
                       borderRadius: '50%',
-                      objectFit: 'cover',
-                      display: 'block',
-                      backgroundColor: 'transparent',
+                      overflow: 'hidden',
                     }}
-                    onLoad={() => {
-                      console.log(' [Sidebar] Avatar image loaded successfully:', avatarUrl);
-                    }}
-                    onError={(e) => {
-                      console.error(' [Sidebar] Avatar image failed to load:', avatarUrl);
-                      console.error('Error event:', e);
-                      // Si l'image ne charge pas, réinitialiser avatarUrl pour afficher les initiales
-                      setAvatarUrl(null);
-                    }}
-                  />
+                  >
+                    <Image
+                      key={avatarUrl} 
+                      src={avatarUrl}
+                      alt="Avatar"
+                      width={48}
+                      height={48}
+                      unoptimized={true}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center',
+                        display: 'block',
+                        backgroundColor: 'transparent',
+                      }}
+                      onLoad={() => {
+                        console.log(' [Sidebar] Avatar image loaded successfully:', avatarUrl);
+                      }}
+                      onError={(e) => {
+                        console.error(' [Sidebar] Avatar image failed to load:', avatarUrl);
+                        console.error('Error event:', e);
+                        // Si l'image ne charge pas, réinitialiser avatarUrl pour afficher les initiales
+                        setAvatarUrl(null);
+                      }}
+                    />
+                  </div>
                 </>
               ) : (
                 <div style={avatarStyle}>
@@ -566,7 +655,7 @@ export default function Sidebar() {
             )}
           </button>
 
-          {showProfileMenu && (
+          {showProfileMenu && menuPosition && (
             <div style={profileMenuStyle}>
               <div style={profileMenuHeaderStyle}>
                 <div style={profileMenuUserNameStyle}>{getUserName()}</div>

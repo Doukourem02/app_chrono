@@ -311,10 +311,22 @@ export default function ProfilePage() {
           
           <View style={styles.userInfo}>
             <Text style={styles.userName}>
-              {formatUserName(user as any) || formatUserName(profile as any) || user?.email || 'Utilisateur'}
+              {(user?.first_name || user?.last_name || profile?.first_name || profile?.last_name)
+                ? formatUserName(user as any) || formatUserName(profile as any) || 'Utilisateur'
+                : 'Compléter votre profil'}
             </Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
             <Text style={styles.userPhone}>{user?.phone}</Text>
+            {!(user?.first_name || user?.last_name || profile?.first_name || profile?.last_name) && (
+              <TouchableOpacity 
+                style={styles.completeProfileButton}
+                onPress={() => router.push('/profile/personal-info')}
+              >
+                <Text style={styles.completeProfileText}>
+                  Ajouter votre nom et prénom
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -558,6 +570,19 @@ const styles = StyleSheet.create({
   userPhone: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  completeProfileButton: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#F3F0FF',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  completeProfileText: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    fontWeight: '600',
   },
   statsContainer: {
     flexDirection: 'row',

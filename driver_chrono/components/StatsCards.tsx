@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useDriverStore } from '../store/useDriverStore';
+import { CommissionBalanceCard } from './CommissionBalanceCard';
 
 const { width } = Dimensions.get('window');
 
@@ -17,6 +19,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
   isOnline = false,
   todayDeliveries = 0
 }) => {
+  const { profile } = useDriverStore();
+  const isPartner = profile?.driver_type === 'partner';
+
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat('fr-FR', {
       minimumFractionDigits: 0,
@@ -28,6 +33,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
 
   return (
     <View style={styles.statsContainer}>
+      {/* Carte "Aujourd'hui" - Toujours affichée */}
       <View style={[styles.card, !isOnline && styles.cardDisabled]}>
         <Ionicons 
           name="cube" 
@@ -44,21 +50,26 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
         </View>
       </View>
 
-      <View style={[styles.card, !isOnline && styles.cardDisabled]}>
-        <MaterialCommunityIcons 
-          name="wallet" 
-          size={24} 
-          color={isOnline ? "#8B5CF6" : "#9CA3AF"} 
-        />
-        <View style={{ marginLeft: 8 }}>
-          <Text style={[styles.cardTitle, !isOnline && styles.textDisabled]}>
-            Revenus total
-          </Text>
-          <Text style={[styles.cardSubtitle, !isOnline && styles.textDisabled]}>
-            {formatCurrency(totalRevenue)}
-          </Text>
+      {/* Carte conditionnelle : Revenus total (interne) ou Solde Commission (partenaire) */}
+      {isPartner ? (
+        <CommissionBalanceCard isOnline={isOnline} />
+      ) : (
+        <View style={[styles.card, !isOnline && styles.cardDisabled]}>
+          <MaterialCommunityIcons 
+            name="wallet" 
+            size={24} 
+            color={isOnline ? "#8B5CF6" : "#9CA3AF"} 
+          />
+          <View style={{ marginLeft: 8 }}>
+            <Text style={[styles.cardTitle, !isOnline && styles.textDisabled]}>
+              Revenus total
+            </Text>
+            <Text style={[styles.cardSubtitle, !isOnline && styles.textDisabled]}>
+              {formatCurrency(totalRevenue)}
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 };

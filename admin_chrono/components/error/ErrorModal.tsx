@@ -28,12 +28,12 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
     if (visible) {
       // Use requestAnimationFrame to defer state update and avoid cascading renders
       requestAnimationFrame(() => {
-        setIsAnimating(true)
+      setIsAnimating(true)
       })
     } else {
       // Use requestAnimationFrame to defer state update and avoid cascading renders
       requestAnimationFrame(() => {
-        setIsAnimating(false)
+      setIsAnimating(false)
       })
     }
   }, [visible])

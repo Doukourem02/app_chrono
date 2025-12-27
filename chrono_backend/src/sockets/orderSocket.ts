@@ -12,6 +12,7 @@ import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
 import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
 import { broadcastOrderUpdateToAdmins } from './adminSocket.js';
 import { orderMatchingService } from '../utils/orderMatchingService.js';
+import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
 import logger from '../utils/logger.js';
 interface OrderCoordinates {
   latitude: number; longitude: number;
@@ -381,13 +382,27 @@ async function notifyDriversForOrder(
         
         // Convertir les ScoredDriver en NearbyDriver pour compatibilité
         // TOUS les livreurs sont inclus (pas de limite)
-        selectedDrivers = allDrivers.map(scored => ({
-          driverId: scored.driverId,
-          distance: scored.distance,
-        }));
+        // MAIS filtrer les partenaires avec solde insuffisant
+        const driversWithBalance: NearbyDriver[] = [];
+        
+        for (const scored of allDrivers) {
+          const balanceCheck = await canReceiveOrders(scored.driverId);
+          if (balanceCheck.canReceive) {
+            driversWithBalance.push({
+              driverId: scored.driverId,
+              distance: scored.distance,
+            });
+          } else {
+            if (DEBUG) {
+              console.log(`[notifyDriversForOrder] ⚠️ Livreur ${maskUserId(scored.driverId)} exclu: ${balanceCheck.reason}`);
+            }
+          }
+        }
+        
+        selectedDrivers = driversWithBalance;
         
         if (DEBUG) {
-          console.log(`[notifyDriversForOrder] ✅ TOUS les ${selectedDrivers.length} livreurs recevront la commande (triés par priorité: notes + équité)`);
+          console.log(`[notifyDriversForOrder] ✅ ${selectedDrivers.length} livreurs recevront la commande (${allDrivers.length - selectedDrivers.length} exclus pour solde insuffisant)`);
         }
       } catch (error: any) {
         logger.warn(`[notifyDriversForOrder] Erreur matching équitable, fallback sur tri par distance:`, error.message);
@@ -1055,6 +1070,37 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         }
 
         if (status === 'completed') {
+          // Prélever la commission pour les livreurs partenaires
+          try {
+            const commissionResult = await deductCommissionAfterDelivery(
+              driverId,
+              orderId,
+              order.price
+            );
+
+            if (commissionResult.success) {
+              if (DEBUG) {
+                console.log(
+                  `✅ Commission prélevée pour ${maskUserId(driverId)}: ` +
+                  `${commissionResult.commissionAmount?.toFixed(2)} FCFA ` +
+                  `(nouveau solde: ${commissionResult.newBalance?.toFixed(2)} FCFA)`
+                );
+              }
+            } else {
+              logger.warn(
+                `⚠️ Échec prélèvement commission pour ${maskUserId(driverId)}: ${commissionResult.error}`
+              );
+              // Ne pas bloquer la livraison si le prélèvement échoue
+              // Le système d'alertes gérera la notification au livreur
+            }
+          } catch (commissionError: any) {
+            logger.error(
+              `Erreur prélèvement commission pour ${maskUserId(driverId)}:`,
+              commissionError
+            );
+            // Ne pas bloquer la livraison
+          }
+
           setTimeout(() => {
             activeOrders.delete(order.id);
             if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} supprimée du cache`);

@@ -4,6 +4,7 @@ import pool from '../config/db.js';
 import fs from 'fs';
 import path from 'path';
 import { activeOrders, connectedUsers } from '../sockets/orderSocket.js';
+import { deductCommissionAfterDelivery } from '../services/commissionService.js';
 import logger from '../utils/logger.js';
 
 interface RequestWithApp extends Request {
@@ -332,6 +333,32 @@ export const updateDeliveryStatus = async (
     }
 
     if (status === 'completed') {
+      // Prélever la commission pour les livreurs partenaires
+      if (driverId) {
+        try {
+          const commissionResult = await deductCommissionAfterDelivery(
+            driverId,
+            orderId,
+            order.price
+          );
+
+          if (commissionResult.success) {
+            logger.info(
+              `✅ Commission prélevée (REST) pour ${driverId}: ` +
+              `${commissionResult.commissionAmount?.toFixed(2)} FCFA ` +
+              `(nouveau solde: ${commissionResult.newBalance?.toFixed(2)} FCFA)`
+            );
+          } else {
+            logger.warn(
+              `⚠️ Échec prélèvement commission (REST) pour ${driverId}: ${commissionResult.error}`
+            );
+          }
+        } catch (commissionError: any) {
+          logger.error(`Erreur prélèvement commission (REST) pour ${driverId}:`, commissionError);
+          // Ne pas bloquer la livraison
+        }
+      }
+
       setTimeout(() => activeOrders.delete(orderId), 1000 * 60 * 5);
     }
 

@@ -19,6 +19,8 @@ export interface User {
   id: string
   email: string
   full_name: string
+  first_name?: string | null
+  last_name?: string | null
   phone?: string
   role: 'client' | 'driver' | 'admin' | 'super_admin' | 'partner'
   avatar_url?: string
@@ -32,6 +34,13 @@ export interface Driver extends User {
   average_rating?: number
   total_deliveries?: number
   is_online?: boolean
+  driver_type?: 'internal' | 'partner'
+  commission_balance?: number
+  commission_rate?: number
+  is_suspended?: boolean
+  completed_deliveries?: number
+  total_revenue?: number
+  totalRatings?: number
 }
 
 export interface DashboardStats {

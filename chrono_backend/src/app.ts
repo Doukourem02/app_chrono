@@ -13,6 +13,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import qrCodeRoutes from './routes/qrCodeRoutes.js';
+import commissionRoutes from './routes/commissionRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSwagger } from './config/swagger.js';
 import { isOriginAllowed } from './config/cors.js';
@@ -94,6 +95,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api', qrCodeRoutes);
+app.use('/api/commission', commissionRoutes);
 
 app.use(errorHandler);
 

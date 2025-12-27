@@ -3637,3 +3637,583 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
   }
 };
 
+/**
+ * Récupère tous les livreurs avec distinction partenaire/interne et commission
+ */
+export const getAdminDrivers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const type = req.query.type as string | undefined; // 'all' | 'partner' | 'internal'
+    const status = req.query.status as string | undefined; // 'all' | 'active' | 'suspended' | 'low_balance'
+    const search = req.query.search as string | undefined;
+
+    logger.info('🚀 [getAdminDrivers] DÉBUT', { type, status, search });
+
+    if (!process.env.DATABASE_URL) {
+      res.json({
+        success: true,
+        data: [],
+        counts: {
+          total: 0,
+          partners: 0,
+          internals: 0,
+          active: 0,
+          suspended: 0,
+        },
+      });
+      return;
+    }
+
+    // Construire la requête de base
+    let query = `
+      SELECT 
+        u.id,
+        u.email,
+        u.phone,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.created_at,
+        u.avatar_url,
+        dp.driver_type,
+        dp.is_online,
+        dp.is_available,
+        cb.balance as commission_balance,
+        cb.commission_rate,
+        cb.is_suspended,
+        COUNT(DISTINCT o.id) as total_deliveries,
+        COUNT(DISTINCT CASE WHEN o.status = 'completed' THEN o.id END) as completed_deliveries
+      FROM users u
+      LEFT JOIN driver_profiles dp ON dp.user_id = u.id
+      LEFT JOIN commission_balance cb ON cb.driver_id = u.id
+      LEFT JOIN orders o ON o.driver_id = u.id
+      WHERE u.role = 'driver'
+    `;
+
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    // Filtre par type
+    if (type && type !== 'all') {
+      query += ` AND dp.driver_type = $${paramIndex}`;
+      params.push(type);
+      paramIndex++;
+    }
+
+    // Filtre par recherche
+    if (search) {
+      query += ` AND (
+        u.email ILIKE $${paramIndex} OR
+        u.phone ILIKE $${paramIndex} OR
+        u.first_name ILIKE $${paramIndex} OR
+        u.last_name ILIKE $${paramIndex}
+      )`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    query += ` GROUP BY u.id, u.email, u.phone, u.first_name, u.last_name, u.role, u.created_at, u.avatar_url, 
+               dp.driver_type, dp.is_online, dp.is_available, cb.balance, cb.commission_rate, cb.is_suspended
+               ORDER BY u.created_at DESC`;
+
+    const result = await (pool as any).query(query, params);
+
+    // Calculer les statistiques
+    const counts = {
+      total: result.rows.length,
+      partners: 0,
+      internals: 0,
+      active: 0,
+      suspended: 0,
+    };
+
+    // Ajouter les ratings et filtrer par statut solde
+    const formatted = result.rows
+      .map((row: any) => {
+        const driverType = row.driver_type || 'partner';
+        const balance = parseFloat(row.commission_balance || 0);
+        const isSuspended = row.is_suspended || balance <= 0;
+
+        // Compter
+        if (driverType === 'partner') counts.partners++;
+        if (driverType === 'internal') counts.internals++;
+        if (!isSuspended && balance > 0) counts.active++;
+        if (isSuspended) counts.suspended++;
+
+        // Filtrer par statut solde si demandé
+        if (status && status !== 'all') {
+          if (status === 'active' && (isSuspended || balance <= 0)) return null;
+          if (status === 'suspended' && !isSuspended) return null;
+          if (status === 'low_balance' && (balance >= 3000 || isSuspended)) return null;
+        }
+
+        return {
+          id: row.id,
+          email: row.email,
+          phone: row.phone || null,
+          first_name: row.first_name || null,
+          last_name: row.last_name || null,
+          role: row.role,
+          created_at: row.created_at,
+          avatar_url: row.avatar_url || null,
+          driver_type: driverType,
+          is_online: row.is_online || false,
+          commission_balance: balance,
+          commission_rate: parseFloat(row.commission_rate || 10),
+          is_suspended: isSuspended,
+          total_deliveries: parseInt(row.total_deliveries || 0),
+          completed_deliveries: parseInt(row.completed_deliveries || 0),
+        };
+      })
+      .filter((driver: any) => driver !== null);
+
+    // Récupérer les ratings pour chaque driver
+    for (const driver of formatted) {
+      try {
+        const ratingResult = await (pool as any).query(
+          `SELECT AVG(rating) as avg_rating, COUNT(*) as total_ratings
+           FROM ratings
+           WHERE driver_id = $1`,
+          [driver.id]
+        );
+        if (ratingResult.rows.length > 0) {
+          driver.average_rating = parseFloat(ratingResult.rows[0].avg_rating || 0);
+          driver.totalRatings = parseInt(ratingResult.rows[0].total_ratings || 0);
+        } else {
+          driver.average_rating = null;
+          driver.totalRatings = 0;
+        }
+      } catch (ratingError) {
+        logger.warn('Erreur récupération rating:', ratingError);
+        driver.average_rating = null;
+        driver.totalRatings = 0;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: formatted,
+      counts,
+    });
+  } catch (error: any) {
+    logger.error('Erreur getAdminDrivers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Récupère les détails complets d'un livreur avec commission (pour admin)
+ */
+export const getAdminDriverFullDetails = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { driverId } = req.params;
+
+    logger.info('🚀 [getAdminDriverFullDetails] DÉBUT', { driverId });
+
+    if (!process.env.DATABASE_URL) {
+      res.status(404).json({ success: false, message: 'Driver non trouvé' });
+      return;
+    }
+
+    // Récupérer les infos utilisateur
+    const userResult = await (pool as any).query(
+      `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
+       FROM users
+       WHERE id = $1 AND role = 'driver'`,
+      [driverId]
+    );
+
+    if (userResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Driver non trouvé' });
+      return;
+    }
+
+    const user = userResult.rows[0];
+
+    // Récupérer le profil driver
+    let driverProfile: any = null;
+    try {
+      const profileResult = await (pool as any).query(
+        `SELECT * FROM driver_profiles WHERE user_id = $1`,
+        [driverId]
+      );
+      if (profileResult.rows.length > 0) {
+        driverProfile = profileResult.rows[0];
+      }
+    } catch (profileError) {
+      logger.warn('Table driver_profiles non disponible:', profileError);
+    }
+
+    // Récupérer le compte commission si partenaire
+    let commissionAccount: any = null;
+    if (driverProfile?.driver_type === 'partner') {
+      try {
+        const commissionResult = await (pool as any).query(
+          `SELECT balance, commission_rate, is_suspended, updated_at
+           FROM commission_balance
+           WHERE driver_id = $1`,
+          [driverId]
+        );
+        if (commissionResult.rows.length > 0) {
+          commissionAccount = {
+            balance: parseFloat(commissionResult.rows[0].balance || 0),
+            commission_rate: parseFloat(commissionResult.rows[0].commission_rate || 10),
+            is_suspended: commissionResult.rows[0].is_suspended || false,
+            last_updated: commissionResult.rows[0].updated_at,
+          };
+        }
+      } catch (commissionError) {
+        logger.warn('Erreur récupération commission:', commissionError);
+      }
+    }
+
+    // Statistiques
+    const priceColumnsInfo = await (pool as any).query(
+      `SELECT column_name FROM information_schema.columns 
+       WHERE table_schema = 'public' AND table_name = 'orders' 
+       AND column_name = ANY($1)`,
+      [['price_cfa', 'price']]
+    );
+    const priceColumnSet = new Set(priceColumnsInfo.rows.map((row: any) => row.column_name));
+    const priceColumn = priceColumnSet.has('price_cfa') ? 'price_cfa' : priceColumnSet.has('price') ? 'price' : null;
+
+    const statsQuery = `
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'completed') as total_completed,
+        COALESCE(SUM(${priceColumn || '0'}) FILTER (WHERE status = 'completed'), 0) as total_revenue
+      FROM orders
+      WHERE driver_id = $1
+    `;
+
+    const statsResult = await (pool as any).query(statsQuery, [driverId]);
+    const stats = statsResult.rows[0] || {};
+
+    // Rating
+    let averageRating: number | null = null;
+    let totalRatings = 0;
+    try {
+      const ratingResult = await (pool as any).query(
+        `SELECT AVG(rating) as avg_rating, COUNT(*) as total_ratings
+         FROM ratings
+         WHERE driver_id = $1`,
+        [driverId]
+      );
+      if (ratingResult.rows.length > 0 && ratingResult.rows[0].avg_rating) {
+        averageRating = parseFloat(ratingResult.rows[0].avg_rating);
+        totalRatings = parseInt(ratingResult.rows[0].total_ratings || 0);
+      }
+    } catch (ratingError) {
+      logger.warn('Erreur récupération rating:', ratingError);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        first_name: user.first_name || null,
+        last_name: user.last_name || null,
+        role: user.role,
+        created_at: user.created_at,
+        avatar_url: user.avatar_url,
+        driver_type: driverProfile?.driver_type || 'partner',
+        is_online: driverProfile?.is_online || false,
+        total_deliveries: parseInt(stats.total_completed || 0),
+        completed_deliveries: parseInt(stats.total_completed || 0),
+        total_revenue: parseFloat(stats.total_revenue || 0),
+        average_rating: averageRating,
+        totalRatings: totalRatings,
+        commission_account: commissionAccount,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Erreur getAdminDriverFullDetails:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
+  }
+};
+
+/**
+ * Recharge manuellement le compte commission d'un livreur partenaire (admin)
+ */
+export const rechargeAdminDriverCommission = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { driverId } = req.params;
+    const { amount, method = 'admin_manual', notes } = req.body;
+
+    logger.info('🚀 [rechargeAdminDriverCommission] DÉBUT', { driverId, amount, method });
+
+    if (!amount || amount < 10000) {
+      res.status(400).json({
+        success: false,
+        message: 'Le montant minimum de recharge est de 10 000 FCFA',
+      });
+      return;
+    }
+
+    // Vérifier que c'est un livreur partenaire
+    const driverCheck = await (pool as any).query(
+      `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
+      [driverId]
+    );
+
+    if (!driverCheck.rows || driverCheck.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Profil livreur non trouvé',
+      });
+      return;
+    }
+
+    if (driverCheck.rows[0].driver_type !== 'partner') {
+      res.status(400).json({
+        success: false,
+        message: 'Cette fonctionnalité est réservée aux livreurs partenaires',
+      });
+      return;
+    }
+
+    // Recharger le compte
+    const rechargeResult = await (pool as any).query(
+      `SELECT recharge_commission_balance(
+        $1, -- driver_id
+        $2, -- amount
+        $3, -- payment_method
+        NULL, -- payment_provider
+        NULL, -- payment_transaction_id
+        $4 -- description
+      ) as transaction_id`,
+      [driverId, amount, method, notes || `Recharge manuelle par admin`]
+    );
+
+    const transactionId = rechargeResult.rows[0].transaction_id;
+
+    logger.info(`✅ Recharge commission pour ${driverId}: ${amount} FCFA`);
+
+    res.json({
+      success: true,
+      message: 'Recharge effectuée avec succès',
+      data: {
+        transactionId,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Erreur rechargeAdminDriverCommission:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la recharge',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Suspend ou réactive le compte commission d'un livreur partenaire (admin)
+ */
+export const suspendAdminDriverCommission = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { driverId } = req.params;
+    const { is_suspended, reason } = req.body;
+
+    logger.info('🚀 [suspendAdminDriverCommission] DÉBUT', { driverId, is_suspended });
+
+    // Vérifier que c'est un livreur partenaire
+    const driverCheck = await (pool as any).query(
+      `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
+      [driverId]
+    );
+
+    if (!driverCheck.rows || driverCheck.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Profil livreur non trouvé',
+      });
+      return;
+    }
+
+    if (driverCheck.rows[0].driver_type !== 'partner') {
+      res.status(400).json({
+        success: false,
+        message: 'Cette fonctionnalité est réservée aux livreurs partenaires',
+      });
+      return;
+    }
+
+    // Mettre à jour le statut
+    await (pool as any).query(
+      `UPDATE commission_balance
+       SET is_suspended = $1,
+           suspended_at = CASE WHEN $1 = true THEN NOW() ELSE NULL END,
+           suspended_reason = $2,
+           updated_at = NOW()
+       WHERE driver_id = $3`,
+      [is_suspended, reason || null, driverId]
+    );
+
+    logger.info(`✅ Statut commission mis à jour pour ${driverId}: ${is_suspended ? 'suspendu' : 'réactivé'}`);
+
+    res.json({
+      success: true,
+      message: `Compte ${is_suspended ? 'suspendu' : 'réactivé'} avec succès`,
+    });
+  } catch (error: any) {
+    logger.error('Erreur suspendAdminDriverCommission:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Modifie le taux de commission d'un livreur partenaire (admin)
+ */
+export const updateAdminDriverCommissionRate = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { driverId } = req.params;
+    const { commission_rate } = req.body;
+
+    logger.info('🚀 [updateAdminDriverCommissionRate] DÉBUT', { driverId, commission_rate });
+
+    if (!commission_rate || ![10, 20].includes(commission_rate)) {
+      res.status(400).json({
+        success: false,
+        message: 'Le taux de commission doit être 10 ou 20',
+      });
+      return;
+    }
+
+    // Vérifier que c'est un livreur partenaire
+    const driverCheck = await (pool as any).query(
+      `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
+      [driverId]
+    );
+
+    if (!driverCheck.rows || driverCheck.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Profil livreur non trouvé',
+      });
+      return;
+    }
+
+    if (driverCheck.rows[0].driver_type !== 'partner') {
+      res.status(400).json({
+        success: false,
+        message: 'Cette fonctionnalité est réservée aux livreurs partenaires',
+      });
+      return;
+    }
+
+    // Mettre à jour le taux
+    await (pool as any).query(
+      `UPDATE commission_balance
+       SET commission_rate = $1,
+           updated_at = NOW()
+       WHERE driver_id = $2`,
+      [commission_rate, driverId]
+    );
+
+    logger.info(`✅ Taux commission mis à jour pour ${driverId}: ${commission_rate}%`);
+
+    res.json({
+      success: true,
+      message: 'Taux de commission mis à jour avec succès',
+    });
+  } catch (error: any) {
+    logger.error('Erreur updateAdminDriverCommissionRate:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Récupère l'historique des transactions commission d'un livreur (admin)
+ */
+export const getAdminDriverCommissionTransactions = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { driverId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const type = req.query.type as string | undefined;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+
+    logger.info('🚀 [getAdminDriverCommissionTransactions] DÉBUT', { driverId, limit, offset, type });
+
+    let query = `
+      SELECT 
+        id,
+        transaction_type,
+        amount,
+        balance_before,
+        balance_after,
+        order_id,
+        payment_method,
+        payment_provider,
+        description,
+        created_at
+      FROM commission_transactions
+      WHERE driver_id = $1
+    `;
+
+    const params: any[] = [driverId];
+    let paramIndex = 2;
+
+    if (type && type !== 'all') {
+      query += ` AND transaction_type = $${paramIndex}`;
+      params.push(type);
+      paramIndex++;
+    }
+
+    if (startDate) {
+      query += ` AND created_at >= $${paramIndex}`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      query += ` AND created_at <= $${paramIndex}`;
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    const result = await (pool as any).query(query, params);
+
+    const transactions = result.rows.map((tx: any) => ({
+      id: tx.id,
+      type: tx.transaction_type,
+      amount: parseFloat(tx.amount),
+      balance_before: parseFloat(tx.balance_before),
+      balance_after: parseFloat(tx.balance_after),
+      order_id: tx.order_id,
+      payment_method: tx.payment_method,
+      payment_provider: tx.payment_provider,
+      status: 'completed',
+      created_at: tx.created_at,
+    }));
+
+    res.json({
+      success: true,
+      data: transactions,
+    });
+  } catch (error: any) {
+    logger.error('Erreur getAdminDriverCommissionTransactions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des transactions',
+      error: error.message,
+    });
+  }
+};
+

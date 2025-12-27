@@ -985,6 +985,199 @@ class ApiService {
       };
     }
   }
+
+  /**
+   * 💳 Récupérer le solde commission
+   */
+  async getCommissionBalance(userId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      balance: number;
+      minimum_balance: number;
+      commission_rate: number;
+      is_suspended: boolean;
+      last_updated: string;
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/commission/${userId}/balance`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Vérifier le Content-Type avant de parser
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        // Si la route n'existe pas encore, retourner une erreur explicite
+        if (response.status === 404 || text.includes('<html') || text.includes('<!DOCTYPE')) {
+          return {
+            success: false,
+            message: 'La fonctionnalité commission n\'est pas encore disponible. Veuillez contacter le support.',
+          };
+        }
+        throw new Error(`Réponse invalide du serveur: ${text.substring(0, 100)}`);
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la récupération du solde');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur getCommissionBalance:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
+   * 💳 Récupérer l'historique des transactions commission
+   */
+  async getCommissionTransactions(userId: string, limit: number = 50): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      id: string;
+      type: 'recharge' | 'deduction' | 'refund';
+      amount: number;
+      balance_before: number;
+      balance_after: number;
+      order_id?: string;
+      payment_method?: string;
+      status: 'pending' | 'completed' | 'failed';
+      created_at: string;
+    }[];
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/commission/${userId}/transactions?limit=${limit}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Vérifier le Content-Type avant de parser
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        if (response.status === 404 || text.includes('<html') || text.includes('<!DOCTYPE')) {
+          return {
+            success: false,
+            message: 'La fonctionnalité commission n\'est pas encore disponible.',
+          };
+        }
+        throw new Error(`Réponse invalide du serveur: ${text.substring(0, 100)}`);
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la récupération des transactions');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur getCommissionTransactions:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
+   * 💳 Recharger le compte commission
+   */
+  async rechargeCommission(
+    userId: string,
+    amount: number,
+    method: 'orange_money' | 'wave'
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      transactionId: string;
+      paymentUrl?: string;
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/commission/${userId}/recharge`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount, method }),
+      });
+
+      // Vérifier le Content-Type avant de parser
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        if (response.status === 404 || text.includes('<html') || text.includes('<!DOCTYPE')) {
+          return {
+            success: false,
+            message: 'La fonctionnalité commission n\'est pas encore disponible.',
+          };
+        }
+        throw new Error(`Réponse invalide du serveur: ${text.substring(0, 100)}`);
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la recharge');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Erreur rechargeCommission:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
 }
 
 

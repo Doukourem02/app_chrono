@@ -8,6 +8,7 @@ import { apiService } from '../../services/apiService';
 export default function PersonalInfoPage() {
   const { user, profile } = useDriverStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -15,16 +16,18 @@ export default function PersonalInfoPage() {
     phone: user?.phone || '',
   });
 
+  // Initialiser les champs une seule fois au montage
   useEffect(() => {
-    if (profile) {
+    if (!isInitialized && (profile || user)) {
       setFormData({
-        firstName: profile.first_name || '',
-        lastName: profile.last_name || '',
+        firstName: profile?.first_name || user?.first_name || '',
+        lastName: profile?.last_name || user?.last_name || '',
         email: user?.email || '',
         phone: user?.phone || '',
       });
+      setIsInitialized(true);
     }
-  }, [profile, user]);
+  }, [profile, user, isInitialized]);
 
   const handleSave = async () => {
     if (!formData.firstName.trim() || !formData.lastName.trim()) {

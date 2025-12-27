@@ -1,6 +1,6 @@
 # 🚚 Chrono Livraison - Plan Stratégique
 
-**Version** : 3.0 - Roadmap Restante  
+**Version** : 4.0 - Roadmap Restante  
 **Date** : 2025-01-XX
 
 ---
@@ -10,7 +10,7 @@
 **Chrono Livraison** : Plateforme logistique urbaine hybride combinant :
 - **Livreurs internes** : Qualité garantie pour commandes B2B/sensibles
 - **Livreurs partenaires** : Scalabilité avec commission prépayée
-- **Matching intelligent** : ✅ **FAIT** - Affectation équitable basée sur rating
+- ✅ **Chrono reconnaît maintenant les partenaires et les livreurs internes**
 
 ---
 
@@ -28,38 +28,24 @@
 
 ---
 
+## ✅ FAIT
+
+- ✅ Matching intelligent (affectation équitable par rating)
+- ✅ Distinction interne/partenaire (driver_type dans DB)
+- ✅ Onboarding partenaire (acceptation conditions + infos véhicule optionnelles)
+- ✅ Sélection type de livreur (écran dédié)
+- ✅ Affichage conditionnel : "Solde Commission" (partenaires) vs "Revenus total" (internes)
+- ✅ Store commission créé (useCommissionStore)
+- ✅ Composant CommissionBalanceCard créé
+- ✅ API methods frontend créées (getCommissionBalance, getCommissionTransactions, rechargeCommission)
+- ✅ Dashboard Commission Backend (routes API, service commission, prélèvement automatique, vérification solde)
+- ✅ Gestion livreurs Admin Dashboard (liste, filtres, détails, recharge commission, suspension)
+
+---
+
 ## 🗺️ Roadmap Technique - À FAIRE
 
-### ✅ FAIT
-- ✅ Matching intelligent (affectation équitable par rating)
-- ✅ Distinction interne/partenaire (driver_type)
-- ✅ Onboarding partenaire
-- ✅ Sélection type de livreur
-
----
-
-### 🔥 PRIORITÉ 1 : Dashboard Commission ⭐⭐⭐
-
-**Objectif** : Transparence et gestion du crédit commission
-
-**Fonctionnalités** :
-- Affichage solde en temps réel (app livreur)
-- Historique des prélèvements
-- Alertes automatiques :
-  - À 3 000 FCFA : "Solde faible"
-  - À 1 000 FCFA : "Solde très faible"
-  - À 0 FCFA : Suspension automatique
-- Recharge Mobile Money (Orange Money/Wave)
-- Recharge manuelle par admin
-
-**Bénéfices** :
-- Transparence totale
-- Réduction suspensions surprises : -80%
-- Augmentation recharges proactives : +50%
-
----
-
-### ⚡ PRIORITÉ 2 : Suivi Livreur Temps Réel ⭐⭐
+### ⚡ PRIORITÉ 1 : Suivi Livreur Temps Réel ⭐⭐⭐
 
 **Objectif** : Expérience client premium
 
@@ -76,7 +62,7 @@
 
 ---
 
-### 📈 PRIORITÉ 3 : Intelligence Contextuelle (3-6 mois)
+### 📈 PRIORITÉ 2 : Intelligence Contextuelle (3-6 mois)
 
 #### 1. Trafic Google Maps
 - Affichage trafic en temps réel
@@ -97,7 +83,7 @@
 
 ---
 
-### 🚀 PRIORITÉ 4 : Optimisation (6-12 mois)
+### 🚀 PRIORITÉ 3 : Optimisation (6-12 mois)
 
 #### 1. Livraisons Multiples
 - Un livreur = plusieurs commandes
@@ -144,25 +130,21 @@
 
 ## 🎯 Plan d'Exécution
 
-### Mois 1 : Dashboard Commission
-- **Semaine 1-2** : Dashboard solde + historique
-- **Semaine 3-4** : Alertes automatiques + recharge Mobile Money
-
-### Mois 2 : Suivi Temps Réel
+### Mois 1 : Suivi Temps Réel
 - **Semaine 1-2** : Animation marker + GPS temps réel
 - **Semaine 3-4** : ETA dynamique + fallback REST
 
-### Mois 3 : Intelligence Contextuelle
+### Mois 2 : Intelligence Contextuelle
 - **Semaine 1-2** : Trafic Google Maps + recalcul itinéraires
 - **Semaine 3-4** : Météo + géofencing
 
-### Mois 4-6 : Optimisation
+### Mois 3-6 : Optimisation
 - Livraisons multiples
 - Prévision demande
 - Gamification
 - Analytics avancés
 
-### Mois 7-12 : Montée en Charge
+### Mois 7-12 : Montée en Charge & Mobile Money
 - Support client structuré
 - Optimisations performance
 - Scaling infrastructure
@@ -172,17 +154,16 @@
 ## 📝 Checklist Déploiement
 
 ### Pré-requis
+- [x] Base de données commission configurée
 - [ ] Google Maps API configurée
 - [ ] Mobile Money (Orange Money/Wave) intégré
-- [ ] Base de données commission configurée
 
 ### Tests
-- [ ] Dashboard commission (affichage, alertes)
-- [ ] Recharge Mobile Money
 - [ ] Suivi temps réel (animation, ETA)
 - [ ] Trafic Google Maps
 - [ ] Géofencing
+- [ ] Recharge Mobile Money
 
 ---
 
-**Statut** : ✅ Matching Intelligent fait | 🔄 Dashboard Commission en cours
+**Statut** : ✅ Système commission opérationnel | ✅ Gestion livreurs admin opérationnelle | 🔄 Suivi temps réel à implémenter
