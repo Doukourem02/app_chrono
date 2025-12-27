@@ -189,7 +189,7 @@ class OrderSocketService {
         const { order } = data || {};
         
         if (!order || !order.id) {
-          logger.warn('⚠️ order:status:update reçu sans order.id', undefined, data);
+          logger.warn('order:status:update reçu sans order.id', undefined, data);
           return;
         }
 
@@ -287,7 +287,7 @@ class OrderSocketService {
     try {
       const tokenResult = await apiService.ensureAccessToken();
       if (!tokenResult.token) {
-        logger.warn('⚠️ Token d\'authentification invalide ou expiré lors de l\'acceptation', undefined, { orderId });
+        logger.warn('Token d\'authentification invalide ou expiré lors de l\'acceptation', undefined, { orderId });
         const { user } = useDriverStore.getState();
         if (!user) {
           Alert.alert(
@@ -299,10 +299,10 @@ class OrderSocketService {
         }
         // Si l'utilisateur existe mais le token ne peut pas être rafraîchi, 
         // essayer de continuer quand même (le backend pourra rejeter si nécessaire)
-        logger.warn('⚠️ Impossible de rafraîchir le token, continuation avec les données existantes', undefined);
+        logger.warn('Impossible de rafraîchir le token, continuation avec les données existantes', undefined);
       }
     } catch (error) {
-      logger.error('❌ Erreur lors de la vérification du token', undefined, error);
+      logger.error('Erreur lors de la vérification du token', undefined, error);
       // Continuer quand même, le backend pourra rejeter si nécessaire
     }
 
@@ -326,11 +326,11 @@ class OrderSocketService {
     try {
       const tokenResult = await apiService.ensureAccessToken();
       if (!tokenResult.token) {
-        logger.warn('⚠️ Token d\'authentification invalide ou expiré lors du refus', undefined, { orderId });
+        logger.warn('Token d\'authentification invalide ou expiré lors du refus', undefined, { orderId });
         // Pour le refus, on peut continuer même sans token valide (moins critique)
       }
     } catch (error) {
-      logger.error('❌ Erreur lors de la vérification du token', undefined, error);
+      logger.error('Erreur lors de la vérification du token', undefined, error);
     }
 
     logger.info('Déclinaison commande', undefined, { orderId });
@@ -395,7 +395,7 @@ class OrderSocketService {
     });
 
     logger.info(
-      `📍 Géofencing: ${eventType} pour commande ${orderId.slice(0, 8)}...`,
+      `Géofencing: ${eventType} pour commande ${orderId.slice(0, 8)}...`,
       'orderSocketService'
     );
   }

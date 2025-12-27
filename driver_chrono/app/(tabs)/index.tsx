@@ -243,11 +243,11 @@ export default function Index() {
     enabled: isOnline && !!currentOrder && !!destination && !!location,
     onEnteredZone: () => {
       // Notification visuelle ou sonore quand on entre dans la zone
-      logger.info('📍 Vous êtes arrivé dans la zone de livraison', 'geofencing');
+      logger.info('Vous êtes arrivé dans la zone de livraison', 'geofencing');
     },
     onValidated: () => {
       // Notification quand la validation automatique est déclenchée
-      logger.info('✅ Livraison validée automatiquement', 'geofencing');
+      logger.info('Livraison validée automatiquement', 'geofencing');
     },
   });
   

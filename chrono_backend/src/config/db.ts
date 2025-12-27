@@ -37,11 +37,11 @@ if (process.env.DATABASE_URL) {
 
     // Événements du pool
     pool.on('connect', (client) => {
-      logger.debug('✅ Nouvelle connexion PostgreSQL établie');
+      logger.debug('Nouvelle connexion PostgreSQL établie');
     });
 
     pool.on('error', (err: Error, client: PoolClient) => {
-      logger.error('❌ Erreur PostgreSQL dans le pool:', err.message);
+      logger.error('Erreur PostgreSQL dans le pool:', err.message);
       // Ne pas logger la stack complète en production pour éviter le spam
       if (process.env.NODE_ENV === 'development') {
         logger.error('Stack:', err.stack);
@@ -49,19 +49,19 @@ if (process.env.DATABASE_URL) {
     });
 
     pool.on('acquire', (client) => {
-      logger.debug('🔌 Connexion acquise du pool');
+      logger.debug('Connexion acquise du pool');
     });
 
     pool.on('remove', (client) => {
-      logger.debug('🔌 Connexion retirée du pool');
+      logger.debug('Connexion retirée du pool');
     });
 
     // Test de connexion initial
     pool.query('SELECT 1', (err) => {
       if (err) {
-        logger.warn('⚠️  Test de connexion PostgreSQL échoué:', err.message);
+        logger.warn(' Test de connexion PostgreSQL échoué:', err.message);
       } else {
-        logger.info(`✅ Pool PostgreSQL initialisé (max: ${poolConfig.max}, min: ${poolConfig.min})`);
+        logger.info(`Pool PostgreSQL initialisé (max: ${poolConfig.max}, min: ${poolConfig.min})`);
       }
     });
 
@@ -80,11 +80,11 @@ if (process.env.DATABASE_URL) {
     }
 
   } catch (error: any) {
-    logger.warn('⚠️  Erreur lors de la création du pool PostgreSQL:', error.message);
+    logger.warn(' Erreur lors de la création du pool PostgreSQL:', error.message);
     pool = null;
   }
 } else {
-  logger.warn('⚠️  DATABASE_URL non configuré. Les fonctionnalités de base de données PostgreSQL seront désactivées.');
+  logger.warn(' DATABASE_URL non configuré. Les fonctionnalités de base de données PostgreSQL seront désactivées.');
 }
 
 const mockPool = {

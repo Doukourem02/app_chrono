@@ -63,20 +63,20 @@ export async function initializeRedis(): Promise<{
 
     // Connexion réussie
     pubClient.on('connect', () => {
-      logger.info('🔌 Redis Publisher connecté');
+      logger.info('Redis Publisher connecté');
     });
 
     subClient.on('connect', () => {
-      logger.info('🔌 Redis Subscriber connecté');
+      logger.info('Redis Subscriber connecté');
     });
 
     pubClient.on('ready', () => {
-      logger.info('✅ Redis Publisher prêt');
+      logger.info('Redis Publisher prêt');
       isRedisAvailable = true;
     });
 
     subClient.on('ready', () => {
-      logger.info('✅ Redis Subscriber prêt');
+      logger.info('Redis Subscriber prêt');
     });
 
     // Connexion
@@ -85,7 +85,7 @@ export async function initializeRedis(): Promise<{
 
     // Test de connexion
     await pubClient.ping();
-    logger.info('✅ Redis initialisé avec succès - Socket.IO peut maintenant scaler horizontalement');
+    logger.info('Redis initialisé avec succès - Socket.IO peut maintenant scaler horizontalement');
 
     return { pubClient, subClient, isAvailable: true };
   } catch (error: any) {
@@ -115,11 +115,11 @@ export async function closeRedis(): Promise<void> {
   try {
     if (pubClient?.isOpen) {
       await pubClient.quit();
-      logger.info('🔌 Redis Publisher fermé');
+      logger.info('Redis Publisher fermé');
     }
     if (subClient?.isOpen) {
       await subClient.quit();
-      logger.info('🔌 Redis Subscriber fermé');
+      logger.info('Redis Subscriber fermé');
     }
   } catch (error: any) {
     logger.error('Erreur lors de la fermeture Redis:', error.message);

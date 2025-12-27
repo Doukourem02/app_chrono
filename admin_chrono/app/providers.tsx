@@ -20,10 +20,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
             refetchIntervalInBackground: false,
             retry: false,
             networkMode: 'online',
-            throwOnError: false, // Ne pas lancer d'erreur, laisser ErrorBoundary gérer
+            throwOnError: false, 
           },
           mutations: {
-            throwOnError: false, // Ne pas lancer d'erreur, laisser ErrorBoundary gérer
+            throwOnError: false, 
           },
         },
       })

@@ -103,7 +103,7 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
     }
     
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stableUserLocation?.latitude, stableUserLocation?.longitude, autoRefresh, refreshInterval]); // ⚠️ Dépendances contrôlées
+  }, [stableUserLocation?.latitude, stableUserLocation?.longitude, autoRefresh, refreshInterval]);
 
   // Fonction pour rafraîchir manuellement
   const refresh = useCallback(() => {

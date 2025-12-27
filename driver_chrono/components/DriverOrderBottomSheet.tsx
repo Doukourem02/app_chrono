@@ -211,7 +211,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
         <View style={styles.dragHandle} />
       </TouchableOpacity>
 
-      {/* ✅ COLLAPSÉ */}
+      {/* État collapsé */}
       {!isExpanded && (
         <View style={styles.collapsedWrapper}>
           <View style={styles.collapsedContainer}>
@@ -245,7 +245,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
         </View>
       )}
 
-      {/* ✅ EXPANDÉ */}
+      {/* État expandé */}
       {isExpanded && (
         <View style={styles.expandedCard}>
           {/* Header avec onglets */}

@@ -81,7 +81,7 @@ export const verifyAdminSupabase = async (
       }
 
       (req as any).user = { id: user.id, role: user.role };
-      logger.debug('✅ [verifyAdminSupabase] Auth successful, calling next()');
+      logger.debug('[verifyAdminSupabase] Auth successful, calling next()');
       next();
       return;
     }

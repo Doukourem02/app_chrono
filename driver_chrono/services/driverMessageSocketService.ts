@@ -91,7 +91,7 @@ class DriverMessageSocketService {
     // Confirmation d'envoi
     this.socket.on('message-sent', (data: { success: boolean; messageId?: string }) => {
       if (!data.success) {
-        logger.warn('⚠️ Échec envoi message', 'driverMessageSocketService', data);
+        logger.warn('Échec envoi message', 'driverMessageSocketService', data);
       }
     });
   }

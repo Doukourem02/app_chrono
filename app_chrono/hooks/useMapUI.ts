@@ -71,7 +71,7 @@ export function useMapUI({
 
       if (isUserTypingRef.current) {
         logger.info(
-          '📍 Réinitialisation ignorée - utilisateur en train de saisir',
+          'Réinitialisation ignorée - utilisateur en train de saisir',
           'useMapUI'
         );
         return;
@@ -84,7 +84,7 @@ export function useMapUI({
 
       if (hasFilledFields) {
         logger.info(
-          '📍 Réinitialisation partielle - champs déjà remplis, conservation des données',
+          'Réinitialisation partielle - champs déjà remplis, conservation des données',
           'useMapUI',
           {
             pickup: currentPickup.substring(0, 30),
@@ -102,7 +102,7 @@ export function useMapUI({
       isResettingRef.current = true;
       lastFocusTimeRef.current = now;
       logger.info(
-        '📍 Arrivée sur map - réinitialisation complète pour nouvelle commande',
+        'Arrivée sur map - réinitialisation complète pour nouvelle commande',
         'useMapUI'
       );
 
@@ -185,7 +185,7 @@ export function useMapUI({
     isUserTypingRef.current = hasFilledFields;
 
     if (hasFilledFields) {
-      logger.debug('📍 Champs remplis détectés - protection activée', 'useMapUI', {
+      logger.debug('Champs remplis détectés - protection activée', 'useMapUI', {
         pickup: pickupLocation.substring(0, 20),
         delivery: deliveryLocation.substring(0, 20),
       });

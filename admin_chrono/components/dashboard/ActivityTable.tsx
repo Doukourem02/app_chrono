@@ -152,7 +152,7 @@ export default function ActivityTable() {
       console.debug('🔍 [ActivityTable] Activities count:', activities.length)
     }
     if (isError) {
-      console.error('❌ [ActivityTable] Error loading activities:', error)
+      console.error('[ActivityTable] Error loading activities:', error)
     }
   }, [activities, isError, error])
 

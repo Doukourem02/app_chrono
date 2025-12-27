@@ -291,7 +291,7 @@ export default function SettingsPage() {
         return
       }
 
-      console.log('📤 Upload attempt:', {
+      console.log('Upload attempt:', {
         filePath,
         fileSize: fileToUpload.size,
         userId: user.id,
@@ -332,7 +332,7 @@ export default function SettingsPage() {
       const publicUrl = result.url
 
       // Mettre à jour le profil dans la table users via l'API route (bypass RLS)
-      console.log('📤 Calling update-avatar-url API...')
+      console.log('Calling update-avatar-url API...')
       const updateResponse = await fetch('/api/update-avatar-url', {
         method: 'POST',
         headers: {

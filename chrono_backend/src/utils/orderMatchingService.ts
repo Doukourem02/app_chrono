@@ -79,7 +79,7 @@ class OrderMatchingService {
           ? (acceptanceResult.rows[0].accepted / acceptanceResult.rows[0].total_assigned)
           : 0.8; // Par défaut 80% si pas d'historique
 
-      // Calculer la note moyenne
+      // Calcul de la note moyenne
       const avgRating = await calculateDriverRating(driverId);
 
       // Calculer le nombre de commandes reçues récemment (pour l'équité)
@@ -126,7 +126,7 @@ class OrderMatchingService {
     recentOrdersCount: number,
     averageRecentOrders: number
   ): number {
-    // Score de note (0-5 normalisé entre 0-1) - 70%
+    // Score de note normalisé (0-5 → 0-1), poids 70%
     const ratingScore = (rating / 5) * 0.7;
     
     // Score d'équité (bonus pour livreurs moins sollicités) - 30%
@@ -172,7 +172,7 @@ class OrderMatchingService {
 
     if (this.DEBUG) {
       logger.info(
-        `[OrderMatchingService] 🎯 Calcul priorité ÉQUITABLE pour ${nearbyDrivers.length} livreurs (TOUS recevront la commande)`
+        `[OrderMatchingService] Calcul priorité équitable pour ${nearbyDrivers.length} livreurs`
       );
     }
 
@@ -195,7 +195,7 @@ class OrderMatchingService {
       ? recentOrdersCounts.reduce((a, b) => a + b, 0) / recentOrdersCounts.length
       : 0;
 
-    // Étape 2 : Calculer la priorité pour chaque livreur (basée sur notes + équité)
+    // Calcul de la priorité pour chaque livreur
     // PRIORISATION : Les internes sont TOUJOURS prioritaires sur B2B/planifiées/sensibles
     const isPriorityOrder = orderInfo?.isB2B || orderInfo?.isScheduled || orderInfo?.isSensitive;
     
@@ -204,7 +204,7 @@ class OrderMatchingService {
         const currentLoad = activeOrdersCount(driver.driverId);
         const stats = await this.getDriverStats(driver.driverId, currentLoad);
         
-        // Calculer le score de priorité (notes 70% + équité 30%)
+        // Calcul du score de priorité (notes 70% + équité 30%)
         let priorityScore = this.calculatePriorityScore(
           stats.avgRating,
           stats.recentOrdersCount,
@@ -225,7 +225,7 @@ class OrderMatchingService {
         scoredDrivers.push({
           driverId: driver.driverId,
           distance: driver.distance,
-          score: priorityScore, // Score de priorité basé sur notes + équité (+ bonus interne si B2B)
+          score: priorityScore,
           details: {
             distanceScore: 0, // Plus utilisé
             acceptanceScore: 0, // Plus utilisé
@@ -254,7 +254,7 @@ class OrderMatchingService {
           `[OrderMatchingService] Erreur calcul priorité pour ${maskUserId(driver.driverId)}:`,
           error.message
         );
-        // En cas d'erreur, utiliser une note par défaut (5.0) et équité max
+        // En cas d'erreur, utiliser une note par défaut et équité maximale
         let priorityScore = this.calculatePriorityScore(5.0, 0, averageRecentOrders);
         
         // Bonus interne si commande prioritaire (même en cas d'erreur, on essaie de récupérer le type)
@@ -292,13 +292,13 @@ class OrderMatchingService {
       }
     }
 
-    // Étape 3 : Trier par priorité (meilleure note + équité = envoyé en premier)
+    // Tri par priorité décroissante
     // MAIS TOUS les livreurs sont retournés (pas de limite)
     const sortedDrivers = scoredDrivers.sort((a, b) => b.score - a.score);
 
     if (this.DEBUG) {
       logger.info(
-        `[OrderMatchingService] ✅ TOUS les ${sortedDrivers.length} livreurs recevront la commande (triés par priorité)`
+        `[OrderMatchingService] ${sortedDrivers.length} livreurs recevront la commande (triés par priorité)`
       );
       sortedDrivers.forEach((driver, index) => {
         logger.info(

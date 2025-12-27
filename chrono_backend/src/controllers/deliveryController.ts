@@ -344,7 +344,7 @@ export const updateDeliveryStatus = async (
 
           if (commissionResult.success) {
             logger.info(
-              `✅ Commission prélevée (REST) pour ${driverId}: ` +
+              `Commission prélevée (REST) pour ${driverId}: ` +
               `${commissionResult.commissionAmount?.toFixed(2)} FCFA ` +
               `(nouveau solde: ${commissionResult.newBalance?.toFixed(2)} FCFA)`
             );

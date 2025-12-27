@@ -419,7 +419,7 @@ export default function MapPage() {
       cleanupOrderState();
     } else if (status === "completed") {
       logger.info(
-        "✅ Commande complétée - attente du RatingBottomSheet avant nettoyage",
+        "Commande complétée - attente du RatingBottomSheet avant nettoyage",
         "map.tsx"
       );
     }
@@ -451,7 +451,7 @@ export default function MapPage() {
                   driverName
                 );
                 logger.info(
-                  "⭐ Affichage automatique RatingBottomSheet pour commande complétée",
+                  "Affichage automatique RatingBottomSheet pour commande complétée",
                   "map.tsx",
                   {
                     orderId: currentOrder.id,
@@ -490,20 +490,20 @@ export default function MapPage() {
     });
     
     if (showRatingBottomSheet && ratingOrderId) {
-      logger.info("⭐ Ouverture automatique rating bottom sheet", "map.tsx", {
+      logger.info("Ouverture automatique rating bottom sheet", "map.tsx", {
         orderId: ratingOrderId,
         driverName: ratingDriverName,
       });
       
       setTimeout(() => {
         expandRatingBottomSheet();
-        logger.info("✅ RatingBottomSheet ouvert", "map.tsx", {
+        logger.info("RatingBottomSheet ouvert", "map.tsx", {
           orderId: ratingOrderId,
         });
       }, 100);
     } else if (!showRatingBottomSheet) {
       collapseRatingBottomSheet();
-      logger.debug("❌ RatingBottomSheet fermé", "map.tsx");
+      logger.debug("RatingBottomSheet fermé", "map.tsx");
     }
   }, [
     showRatingBottomSheet,
@@ -516,7 +516,7 @@ export default function MapPage() {
 
   const handleRatingSubmitted = useCallback(() => {
     logger.info(
-      "✅ Évaluation soumise, fermeture rating bottom sheet",
+      "Évaluation soumise, fermeture rating bottom sheet",
       "map.tsx"
     );
     resetRatingBottomSheet();
@@ -536,7 +536,7 @@ export default function MapPage() {
   ]);
 
   const handleRatingClose = useCallback(() => {
-    logger.info("❌ Rating bottom sheet fermé", "map.tsx");
+    logger.info("Rating bottom sheet fermé", "map.tsx");
     resetRatingBottomSheet();
     collapseRatingBottomSheet();
     setTimeout(() => {
@@ -890,12 +890,12 @@ export default function MapPage() {
                   setDeliveryLocation("");
                   setSelectedMethod("moto");
 
-                  logger.info("✅ Commande annulée avec succès", "map.tsx", {
+                  logger.info("Commande annulée avec succès", "map.tsx", {
                     orderId,
                   });
                   Alert.alert("Succès", "Commande annulée avec succès");
               } else {
-                  logger.warn("❌ Erreur annulation commande", "map.tsx", {
+                  logger.warn("Erreur annulation commande", "map.tsx", {
                     message: result.message,
                   });
                   Alert.alert(
@@ -904,7 +904,7 @@ export default function MapPage() {
                   );
               }
             } catch (error) {
-                logger.error("❌ Erreur annulation commande", "map.tsx", error);
+                logger.error("Erreur annulation commande", "map.tsx", error);
                 Alert.alert("Erreur", "Impossible d'annuler la commande");
             }
           },
@@ -1178,11 +1178,11 @@ export default function MapPage() {
                     );
                   }}
                   onPaymentSuccess={(transactionId) => {
-                        console.log("✅ Paiement réussi:", transactionId);
+                        console.log("Paiement réussi:", transactionId);
                     setShowPaymentSheet(false);
                   }}
                   onPaymentError={(error) => {
-                        console.error("❌ Erreur paiement:", error);
+                        console.error("Erreur paiement:", error);
                         Alert.alert("Erreur de paiement", error);
                   }}
                 />

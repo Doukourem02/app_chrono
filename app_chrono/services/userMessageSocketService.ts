@@ -60,7 +60,7 @@ class UserMessageSocketService {
         error.message?.includes('transport unknown');
 
       if (!isTemporaryPollError) {
-        logger.error('❌ Erreur connexion socket messagerie:', 'userMessageSocketService', {
+        logger.error('Erreur connexion socket messagerie:', 'userMessageSocketService', {
           message: error.message,
           type: (error as any).type,
         });
@@ -85,7 +85,7 @@ class UserMessageSocketService {
     // Confirmation d'envoi
     this.socket.on('message-sent', (data: { success: boolean; messageId?: string }) => {
       if (!data.success) {
-        logger.warn('⚠️ Échec envoi message', 'userMessageSocketService', data);
+        logger.warn('Échec envoi message', 'userMessageSocketService', data);
       }
     });
   }

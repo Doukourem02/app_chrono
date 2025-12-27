@@ -76,9 +76,9 @@ class UserOrderSocketService {
         if (order && order.id) {
           const store = useOrderStore.getState();
           store.addOrder(order as any);
-          // IMPORTANT : Sélectionner automatiquement la nouvelle commande créée
+          // Sélectionner automatiquement la nouvelle commande créée
           // Cela garantit que la recherche de livreur se fait pour la nouvelle commande, pas pour l'ancienne
-          logger.info('🎯 Sélection automatique de la nouvelle commande créée', 'userOrderSocketService', {
+          logger.info('Sélection automatique de la nouvelle commande créée', 'userOrderSocketService', {
             orderId: order.id,
             previousSelectedId: store.selectedOrderId,
           });
@@ -96,9 +96,9 @@ class UserOrderSocketService {
       }
     });
 
-    // ❌ Aucun chauffeur disponible
+    // Aucun chauffeur disponible
     this.socket.on('no-drivers-available', (data) => {
-      logger.info('❌ Aucun chauffeur disponible', 'userOrderSocketService', data);
+      logger.info('Aucun chauffeur disponible', 'userOrderSocketService', data);
 
       // Réinitialiser l'état pour permettre une nouvelle commande
       try {
@@ -120,16 +120,16 @@ class UserOrderSocketService {
           'Aucun chauffeur n\'est disponible dans votre zone pour le moment. Vous pouvez réessayer plus tard.'
         );
 
-        logger.info('✅ État réinitialisé après aucun chauffeur disponible', 'userOrderSocketService');
+        logger.info('État réinitialisé après aucun chauffeur disponible', 'userOrderSocketService');
       } catch (err) {
         logger.warn('Erreur lors de la réinitialisation après aucun chauffeur', 'userOrderSocketService', err);
       }
     });
 
-    // ✅ Commande acceptée par un driver
-    // IMPORTANT : Ce listener doit être réinstallé à chaque reconnexion
+    // Commande acceptée par un driver
+    // Ce listener doit être réinstallé à chaque reconnexion
     this.socket.on('order-accepted', (data) => {
-      logger.info('✅ Commande acceptée par driver - ÉVÉNEMENT REÇU', 'userOrderSocketService', {
+      logger.info('Commande acceptée par driver - ÉVÉNEMENT REÇU', 'userOrderSocketService', {
         orderId: data?.order?.id,
         hasOrder: !!data?.order,
         hasDriverInfo: !!data?.driverInfo,
@@ -183,7 +183,7 @@ class UserOrderSocketService {
           // Vérifier que la mise à jour a bien eu lieu
           const updatedStore = useOrderStore.getState();
           const updatedOrder = updatedStore.activeOrders.find(o => o.id === order.id);
-          logger.info('✅ Commande mise à jour dans le store avec statut accepted', 'userOrderSocketService', {
+          logger.info('Commande mise à jour dans le store avec statut accepted', 'userOrderSocketService', {
             orderId: order.id,
             status: orderWithStatus.status,
             hasDriver: !!driverInfo,
@@ -205,13 +205,13 @@ class UserOrderSocketService {
             console.warn('[userOrderSocketService] Erreur lecture son:', err);
           });
 
-          // IMPORTANT : Sélectionner automatiquement la commande acceptée pour qu'elle soit affichée
+          // Sélectionner automatiquement la commande acceptée pour qu'elle soit affichée
           // Cela garantit que même avec plusieurs commandes actives, la commande acceptée est visible
           if (updatedOrder && updatedOrder.status === 'accepted' && updatedOrder.driver) {
             const currentSelectedId = updatedStore.selectedOrderId;
             // Sélectionner cette commande si aucune n'est sélectionnée, ou si la commande sélectionnée n'est pas acceptée
             if (!currentSelectedId) {
-              logger.info('🎯 Sélection automatique de la commande acceptée (aucune sélection)', 'userOrderSocketService', {
+              logger.info('Sélection automatique de la commande acceptée (aucune sélection)', 'userOrderSocketService', {
                 orderId: order.id,
               });
               updatedStore.setSelectedOrder(order.id);
@@ -219,7 +219,7 @@ class UserOrderSocketService {
               const selectedOrder = updatedStore.activeOrders.find(o => o.id === currentSelectedId);
               // Si la commande sélectionnée n'est pas acceptée, sélectionner la nouvelle commande acceptée
               if (!selectedOrder || selectedOrder.status !== 'accepted' || !selectedOrder.driver) {
-                logger.info('🎯 Sélection automatique de la commande acceptée (remplacement)', 'userOrderSocketService', {
+                logger.info('Sélection automatique de la commande acceptée (remplacement)', 'userOrderSocketService', {
                   orderId: order.id,
                   previousSelectedId: currentSelectedId,
                   previousStatus: selectedOrder?.status,
@@ -229,7 +229,7 @@ class UserOrderSocketService {
             }
           }
         } else {
-          logger.warn('⚠️ order-accepted reçu mais order.id manquant', 'userOrderSocketService', { data });
+          logger.warn('order-accepted reçu mais order.id manquant', 'userOrderSocketService', { data });
         }
 
         // Si backend fournit position dans driverInfo, l'utiliser
@@ -388,7 +388,7 @@ class UserOrderSocketService {
 
     // Autres listeners...
     this.socket.on('order-cancelled', (data) => {
-      logger.info('❌ Commande annulée', 'userOrderSocketService', data);
+      logger.info('Commande annulée', 'userOrderSocketService', data);
       try {
         if (data?.orderId) {
           const store = useOrderStore.getState();
@@ -400,7 +400,7 @@ class UserOrderSocketService {
     });
 
     this.socket.on('order-error', (data) => {
-      logger.warn('❌ Erreur commande', 'userOrderSocketService', data);
+      logger.warn('Erreur commande', 'userOrderSocketService', data);
       if (data?.message) {
         // Gérer spécifiquement les erreurs de paiement différé
         const errorCode = data.code || data.errorCode;
@@ -467,7 +467,7 @@ class UserOrderSocketService {
           
           if (eventType === 'entered') {
             logger.info(
-              '📍 Votre livreur est arrivé dans la zone de livraison',
+              'Votre livreur est arrivé dans la zone de livraison',
               'userOrderSocketService',
               { orderId }
             );
@@ -475,7 +475,7 @@ class UserOrderSocketService {
             // Par exemple : Alert.alert('Livreur arrivé', 'Votre livreur est arrivé dans la zone de livraison');
           } else if (eventType === 'validated') {
             logger.info(
-              '✅ Livraison validée automatiquement',
+              'Livraison validée automatiquement',
               'userOrderSocketService',
               { orderId }
             );
@@ -490,7 +490,7 @@ class UserOrderSocketService {
   private setupSocketListeners(userId: string, skipConnectDisconnect = false) {
     if (!this.socket) return;
 
-    // IMPORTANT : Retirer les anciens listeners avant d'en ajouter de nouveaux
+    // Retirer les anciens listeners avant d'en ajouter de nouveaux
     // Cela évite les listeners dupliqués lors des reconnexions
     // Ne pas retirer 'connect' et 'disconnect' si on est déjà dans le listener connect
     if (!skipConnectDisconnect) {
@@ -530,7 +530,7 @@ class UserOrderSocketService {
       // Réinstaller les listeners (sauf connect/disconnect pour éviter la récursion)
       this.installEventListeners(userId);
 
-      // S'identifier comme user - IMPORTANT : Toujours ré-émettre même si déjà connecté
+      // S'identifier comme user - toujours ré-émettre même si déjà connecté
       // Cela garantit que le serveur a bien le userId associé au socket actuel
       logger.info('👤 Identification comme user', 'userOrderSocketService', { userId });
       this.socket?.emit('user-connect', userId);
@@ -618,14 +618,14 @@ class UserOrderSocketService {
     return new Promise<boolean>(async (resolve) => {
       // Protection contre les appels multiples simultanés
       if (this.isCreatingOrder) {
-        logger.warn('⚠️ Tentative de création de commande alors qu\'une création est déjà en cours', 'userOrderSocketService');
+        logger.warn('Tentative de création de commande alors qu\'une création est déjà en cours', 'userOrderSocketService');
         resolve(false);
         return;
       }
 
       // Vérifier que l'utilisateur est connecté avant de créer la commande
       if (!this.userId) {
-        logger.warn('⚠️ Tentative de création de commande sans userId', 'userOrderSocketService');
+        logger.warn('Tentative de création de commande sans userId', 'userOrderSocketService');
         UserFriendlyError.showLoginRequired();
         resolve(false);
         return;
@@ -636,7 +636,7 @@ class UserOrderSocketService {
       try {
         const token = await userApiService.ensureAccessToken();
         if (!token) {
-          logger.warn('⚠️ Token d\'authentification invalide ou expiré', 'userOrderSocketService');
+          logger.warn('Token d\'authentification invalide ou expiré', 'userOrderSocketService');
           const { user } = useAuthStore.getState();
           if (!user) {
             UserFriendlyError.showSessionExpired();
@@ -645,10 +645,10 @@ class UserOrderSocketService {
           }
           // Si l'utilisateur existe mais le token ne peut pas être rafraîchi, 
           // essayer de continuer quand même (le backend pourra rejeter si nécessaire)
-          logger.warn('⚠️ Impossible de rafraîchir le token, continuation avec les données existantes', 'userOrderSocketService');
+          logger.warn('Impossible de rafraîchir le token, continuation avec les données existantes', 'userOrderSocketService');
         }
       } catch (error) {
-        logger.error('❌ Erreur lors de la vérification du token', 'userOrderSocketService', error);
+        logger.error('Erreur lors de la vérification du token', 'userOrderSocketService', error);
         // Continuer quand même, le backend pourra rejeter si nécessaire
       }
 
@@ -673,7 +673,7 @@ class UserOrderSocketService {
 
       // Double vérification après la reconnexion
       if (!this.socket || !this.isConnected || !this.userId) {
-        logger.error('❌ Socket toujours non connecté après ensureConnected', 'userOrderSocketService');
+        logger.error('Socket toujours non connecté après ensureConnected', 'userOrderSocketService');
         UserFriendlyError.showLoginRequired();
         finishOrderCreation(false);
         return;
@@ -689,7 +689,7 @@ class UserOrderSocketService {
         });
       } catch (error: any) {
         // Log full error for debugging
-        logger.error('❌ Échec enregistrement commande Supabase', 'userOrderSocketService', error);
+        logger.error('Échec enregistrement commande Supabase', 'userOrderSocketService', error);
 
         // Supabase / Postgres function may return a custom error code when the
         // user/profile is not present (seen as PO001 in dev logs). Detect this
@@ -736,7 +736,7 @@ class UserOrderSocketService {
       const timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
-          logger.warn('⚠️ createOrder ack timeout');
+          logger.warn('createOrder ack timeout');
           finishOrderCreation(false);
         }
       }, 10000); // 10s timeout
@@ -760,7 +760,7 @@ class UserOrderSocketService {
               // server persisted the order
               finishOrderCreation(true);
             } else {
-              logger.warn('❌ createOrder rejected by server', ackResponse);
+              logger.warn('createOrder rejected by server', ackResponse);
               finishOrderCreation(false);
             }
           } catch (err) {
@@ -770,7 +770,7 @@ class UserOrderSocketService {
         });
       } catch (err) {
         clearTimeout(timeout);
-        logger.error('❌ Error emitting create-order', 'userOrderSocketService', err);
+        logger.error('Error emitting create-order', 'userOrderSocketService', err);
         finishOrderCreation(false);
       }
     });
@@ -782,7 +782,7 @@ class UserOrderSocketService {
 
     // Si le socket existe mais n'est pas connecté, essayer de se reconnecter
     if (this.socket && !isConnected && this.userId) {
-      logger.warn('⚠️ Socket existe mais non connecté, tentative de reconnexion...', 'userOrderSocketService');
+      logger.warn('Socket existe mais non connecté, tentative de reconnexion...', 'userOrderSocketService');
       this.connect(this.userId);
     }
 
@@ -798,7 +798,7 @@ class UserOrderSocketService {
     if (!this.userId) {
       // Ce n'est pas une erreur critique, juste un avertissement
       // car ensureConnected() peut être appelé avant que l'utilisateur soit connecté
-      logger.debug('⚠️ ensureConnected appelé sans userId (utilisateur non connecté)', 'userOrderSocketService');
+      logger.debug('ensureConnected appelé sans userId (utilisateur non connecté)', 'userOrderSocketService');
       return false;
     }
 
@@ -812,14 +812,14 @@ class UserOrderSocketService {
 
     while (elapsed < maxWaitTime) {
       if (this.isConnected && this.socket?.connected) {
-        logger.info('✅ Socket connecté avec succès', 'userOrderSocketService');
+        logger.info('Socket connecté avec succès', 'userOrderSocketService');
         return true;
       }
       await new Promise(resolve => setTimeout(resolve, checkInterval));
       elapsed += checkInterval;
     }
 
-    logger.error('❌ Impossible de connecter le socket après 3 secondes', 'userOrderSocketService');
+    logger.error('Impossible de connecter le socket après 3 secondes', 'userOrderSocketService');
     return false;
   }
 }

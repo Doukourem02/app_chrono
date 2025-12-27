@@ -90,7 +90,7 @@ export default function DashboardLayout({
   // Logger l'état de connexion socket pour déboguer
   useEffect(() => {
     if (user && !loading) {
-      console.log('[DashboardLayout] 🔌 État connexion socket:', {
+      console.log('[DashboardLayout] État connexion socket:', {
         isConnected,
         userId: user.id,
         timestamp: new Date().toISOString(),

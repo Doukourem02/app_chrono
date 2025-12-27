@@ -74,14 +74,14 @@ class DriverMessageService {
 
       // Si le token est expiré ou absent, essayer de le rafraîchir
       if (!refreshToken) {
-        logger.warn('⚠️ Pas de refreshToken disponible - session expirée');
+        logger.warn('Pas de refreshToken disponible - session expirée');
         logout();
         return null;
       }
 
       // Vérifier si le refresh token est encore valide
       if (!this.isTokenValid(refreshToken)) {
-        logger.warn('⚠️ Refresh token expiré - session expirée');
+        logger.warn('Refresh token expiré - session expirée');
         logout();
         return null;
       }
@@ -90,15 +90,15 @@ class DriverMessageService {
       const newAccessToken = await this.refreshAccessToken(refreshToken);
       if (newAccessToken) {
         setTokens({ accessToken: newAccessToken, refreshToken });
-        logger.info('✅ Token rafraîchi et sauvegardé avec succès');
+        logger.info('Token rafraîchi et sauvegardé avec succès');
         return newAccessToken;
       }
 
-      logger.warn('⚠️ Impossible de rafraîchir le token - session expirée');
+      logger.warn('Impossible de rafraîchir le token - session expirée');
       logout();
       return null;
     } catch (error: any) {
-      logger.error('❌ Erreur ensureAccessToken:', error);
+      logger.error('Erreur ensureAccessToken:', error);
       const { logout } = useDriverStore.getState();
       logout();
       return null;
@@ -123,17 +123,17 @@ class DriverMessageService {
         const isExpired = now >= expirationTime;
         
         if (isExpired) {
-          logger.warn('⚠️ Token expiré, expiration:', new Date(expirationTime).toISOString());
+          logger.warn('Token expiré, expiration:', new Date(expirationTime).toISOString());
           return false;
         }
         
         return true;
       }
 
-      logger.warn('⚠️ Token sans expiration définie');
+      logger.warn('Token sans expiration définie');
       return true;
     } catch (error: any) {
-      logger.error('❌ Erreur vérification token:', error);
+      logger.error('Erreur vérification token:', error);
       return false;
     }
   }
@@ -161,21 +161,21 @@ class DriverMessageService {
       }
 
       if (!result.success) {
-        logger.error('❌ Échec du rafraîchissement:', result.message);
+        logger.error('Échec du rafraîchissement:', result.message);
         return null;
       }
 
       if (!result.data?.accessToken) {
-        logger.error('❌ Pas de accessToken dans la réponse:', result);
+        logger.error('Pas de accessToken dans la réponse:', result);
         return null;
       }
 
-      logger.info('✅ Token rafraîchi avec succès');
+      logger.info('Token rafraîchi avec succès');
       return result.data.accessToken as string;
     } catch (error: any) {
-      logger.error('❌ Erreur réseau lors du rafraîchissement:', error);
+      logger.error('Erreur réseau lors du rafraîchissement:', error);
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        logger.error('❌ Impossible de se connecter au serveur. Vérifiez que le backend est démarré sur', API_BASE_URL);
+        logger.error('Impossible de se connecter au serveur. Vérifiez que le backend est démarré sur', API_BASE_URL);
       }
       return null;
     }

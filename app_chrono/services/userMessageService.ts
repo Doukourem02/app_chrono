@@ -73,7 +73,7 @@ class UserMessageService {
 
       // Si le token est expiré ou absent, essayer de le rafraîchir
       if (!refreshToken) {
-        logger.warn('⚠️ Pas de refreshToken disponible - session expirée');
+        logger.warn('Pas de refreshToken disponible - session expirée');
         // Déconnecter l'utilisateur car la session est expirée
         logout();
         return null;
@@ -81,7 +81,7 @@ class UserMessageService {
 
       // Vérifier si le refresh token est encore valide
       if (!this.isTokenValid(refreshToken)) {
-        logger.warn('⚠️ Refresh token expiré - session expirée');
+        logger.warn('Refresh token expiré - session expirée');
         // Déconnecter l'utilisateur car la session est expirée
         logout();
         return null;
@@ -91,16 +91,16 @@ class UserMessageService {
       const newAccessToken = await this.refreshAccessToken(refreshToken);
       if (newAccessToken) {
         setTokens({ accessToken: newAccessToken, refreshToken });
-        logger.info('✅ Token rafraîchi et sauvegardé avec succès');
+        logger.info('Token rafraîchi et sauvegardé avec succès');
         return newAccessToken;
       }
 
       // Impossible de rafraîchir => déconnecter l'utilisateur
-      logger.warn('⚠️ Impossible de rafraîchir le token - session expirée');
+      logger.warn('Impossible de rafraîchir le token - session expirée');
       logout();
       return null;
     } catch (error: any) {
-      logger.error('❌ Erreur ensureAccessToken:', error);
+      logger.error('Erreur ensureAccessToken:', error);
       // En cas d'erreur, déconnecter pour éviter un état incohérent
       const { logout } = useAuthStore.getState();
       logout();
@@ -129,7 +129,7 @@ class UserMessageService {
         const isExpired = now >= expirationTime;
         
         if (isExpired) {
-          logger.warn('⚠️ Token expiré, expiration:', new Date(expirationTime).toISOString());
+          logger.warn('Token expiré, expiration:', new Date(expirationTime).toISOString());
           return false;
         }
         
@@ -138,10 +138,10 @@ class UserMessageService {
       }
 
       // Si pas d'expiration définie, considérer comme valide (mais ça ne devrait pas arriver)
-      logger.warn('⚠️ Token sans expiration définie');
+      logger.warn('Token sans expiration définie');
       return true;
     } catch (error: any) {
-      logger.error('❌ Erreur vérification token:', error);
+      logger.error('Erreur vérification token:', error);
       // En cas d'erreur de décodage, considérer comme invalide
       return false;
     }
@@ -170,26 +170,26 @@ class UserMessageService {
       }
 
       if (!result.success) {
-        logger.error('❌ Échec du rafraîchissement:', result.message);
+        logger.error('Échec du rafraîchissement:', result.message);
         return null;
       }
 
       if (!result.data?.accessToken) {
-        logger.error('❌ Pas de accessToken dans la réponse:', result);
+        logger.error('Pas de accessToken dans la réponse:', result);
         return null;
       }
 
-      logger.info('✅ Token rafraîchi avec succès');
+      logger.info('Token rafraîchi avec succès');
       return result.data.accessToken as string;
     } catch (error: any) {
       // Ne logger les erreurs réseau que si ce n'est pas une erreur de connexion temporaire
       // (backend inaccessible en développement)
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         // Logger seulement en mode debug pour éviter le bruit dans les logs
-        logger.debug('⚠️ Backend inaccessible lors du rafraîchissement du token', API_BASE_URL);
+        logger.debug('Backend inaccessible lors du rafraîchissement du token', API_BASE_URL);
       } else {
         // Pour les autres erreurs, logger normalement
-        logger.warn('⚠️ Erreur lors du rafraîchissement du token', undefined, error);
+        logger.warn('Erreur lors du rafraîchissement du token', undefined, error);
       }
       return null;
     }

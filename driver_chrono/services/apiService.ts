@@ -71,7 +71,7 @@ class ApiService {
     // Si le token est expiré ou absent, essayer de le rafraîchir
     if (!refreshToken) {
       if (__DEV__) {
-        console.warn('⚠️ Pas de refreshToken disponible - session expirée');
+        console.warn('Pas de refreshToken disponible - session expirée');
       }
       // Déconnecter l'utilisateur car la session est expirée
       logout();
@@ -81,7 +81,7 @@ class ApiService {
     // Vérifier si le refresh token est encore valide avant d'essayer de rafraîchir
     if (!this.isTokenValid(refreshToken)) {
       if (__DEV__) {
-        console.warn('⚠️ Refresh token expiré - session expirée');
+        console.warn('Refresh token expiré - session expirée');
       }
       // Déconnecter l'utilisateur car la session est expirée
       logout();
@@ -96,7 +96,7 @@ class ApiService {
 
     // Impossible de rafraîchir => déconnecter l'utilisateur
     if (__DEV__) {
-      console.warn('⚠️ Impossible de rafraîchir le token - session expirée');
+      console.warn('Impossible de rafraîchir le token - session expirée');
     }
     logout();
     return { token: null, reason: 'refresh_failed' };
@@ -408,7 +408,7 @@ class ApiService {
         // Ces erreurs sont souvent temporaires (connexion DB, réseau, etc.)
         if (response.status === 500) {
           if (__DEV__) {
-            console.debug('⚠️ [apiService.getDriverRevenues] Erreur serveur (500):', result.message || 'Erreur serveur');
+            console.debug('[apiService.getDriverRevenues] Erreur serveur (500):', result.message || 'Erreur serveur');
           }
         } else if (__DEV__) {
           console.error(' [apiService.getDriverRevenues] Erreur HTTP:', response.status, result);
@@ -437,7 +437,7 @@ class ApiService {
                       result.data.totalEarnings > 0 || 
                       (result.data.orders && result.data.orders.length > 0);
         if (!hasData) {
-          console.debug('ℹ [apiService.getDriverRevenues] Réponse OK mais données vides (pas de livraisons)');
+          console.debug('[apiService.getDriverRevenues] Réponse OK mais données vides (pas de livraisons)');
         }
       }
       
@@ -446,7 +446,7 @@ class ApiService {
       // Gérer spécifiquement les erreurs réseau
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         if (__DEV__) {
-          console.debug('⚠️ [apiService.getDriverRevenues] Erreur réseau (backend inaccessible)');
+          console.debug('[apiService.getDriverRevenues] Erreur réseau (backend inaccessible)');
         }
         return {
           success: false,
@@ -468,7 +468,7 @@ class ApiService {
       
       // Pour les autres erreurs, logger en debug pour éviter le spam
       if (__DEV__) {
-        console.debug('⚠️ [apiService.getDriverRevenues] Erreur:', error instanceof Error ? error.message : 'Erreur inconnue');
+        console.debug('[apiService.getDriverRevenues] Erreur:', error instanceof Error ? error.message : 'Erreur inconnue');
       }
       
       return {
@@ -637,7 +637,7 @@ class ApiService {
       if (__DEV__ && result.success && result.data) {
         const hasData = result.data.completedDeliveries > 0 || result.data.totalEarnings > 0;
         if (!hasData) {
-          console.debug('ℹ [apiService.getDriverStatistics] Réponse OK mais données vides (pas de livraisons)');
+          console.debug('[apiService.getDriverStatistics] Réponse OK mais données vides (pas de livraisons)');
         }
       }
 
@@ -701,7 +701,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur getUserProfile:', error);
+      console.error('Erreur getUserProfile:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -761,7 +761,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur updateProfile:', error);
+      console.error('Erreur updateProfile:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -825,7 +825,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur uploadAvatar:', error);
+      console.error('Erreur uploadAvatar:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -886,7 +886,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur updateDriverVehicle:', error);
+      console.error('Erreur updateDriverVehicle:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -935,7 +935,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur updateDriverType:', error);
+      console.error('Erreur updateDriverType:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -978,7 +978,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur getDriverProfile:', error);
+      console.error('Erreur getDriverProfile:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -1041,7 +1041,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur getCommissionBalance:', error);
+      console.error('Erreur getCommissionBalance:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -1107,7 +1107,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur getCommissionTransactions:', error);
+      console.error('Erreur getCommissionTransactions:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -1171,7 +1171,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('❌ Erreur rechargeCommission:', error);
+      console.error('Erreur rechargeCommission:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'

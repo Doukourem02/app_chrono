@@ -95,13 +95,13 @@ const io = new Server(server, {
   if (isAvailable && redisPub && redisSub) {
     try {
       io.adapter(createAdapter(redisPub, redisSub));
-      logger.info('✅ Socket.IO Redis Adapter activé - Scaling horizontal disponible');
+      logger.info('Socket.IO Redis Adapter activé - Scaling horizontal disponible');
     } catch (error: any) {
-      logger.error('❌ Erreur lors de l\'activation du Redis Adapter:', error.message);
-      logger.warn('⚠️  Socket.IO fonctionnera en mode standalone');
+      logger.error('Erreur lors de l\'activation du Redis Adapter:', error.message);
+      logger.warn(' Socket.IO fonctionnera en mode standalone');
     }
   } else {
-    logger.info('ℹ️  Socket.IO fonctionne en mode standalone (Redis non disponible)');
+    logger.info(' Socket.IO fonctionne en mode standalone (Redis non disponible)');
     logger.info('💡 Pour activer le scaling horizontal, configurez REDIS_URL');
   }
 })();
@@ -141,7 +141,7 @@ process.on('SIGTERM', async () => {
   logger.info('🛑 SIGTERM reçu, fermeture propre du serveur...');
   await closeRedis();
   server.close(() => {
-    logger.info('✅ Serveur fermé proprement');
+    logger.info('Serveur fermé proprement');
     process.exit(0);
   });
 });
@@ -150,7 +150,7 @@ process.on('SIGINT', async () => {
   logger.info('🛑 SIGINT reçu, fermeture propre du serveur...');
   await closeRedis();
   server.close(() => {
-    logger.info('✅ Serveur fermé proprement');
+    logger.info('Serveur fermé proprement');
     process.exit(0);
   });
 });

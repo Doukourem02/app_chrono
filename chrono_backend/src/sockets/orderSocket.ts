@@ -179,7 +179,7 @@ function estimateDuration(distance: number, method: string): string {
 }
 
 // Fonction pour trouver les chauffeurs proches disponibles
-// IMPORTANT: Aucune restriction sur le nombre de commandes qu'un client peut envoyer au même driver
+// Aucune restriction sur le nombre de commandes qu'un client peut envoyer au même driver
 // Les clients peuvent envoyer un nombre illimité de commandes au même driver
 async function findNearbyDrivers(
   pickupCoords: OrderCoordinates,
@@ -238,7 +238,7 @@ async function findNearbyDrivers(
   }
 
   // Trier par distance
-  // NOTE: Aucun filtrage basé sur le nombre de commandes précédentes entre le client et le driver
+  // Aucun filtrage basé sur le nombre de commandes précédentes entre le client et le driver
   // Tous les drivers disponibles dans la zone sont retournés, même s'ils ont déjà reçu
   // plusieurs commandes du même client
   return nearbyDrivers.sort((a, b) => a.distance - b.distance);
@@ -358,17 +358,17 @@ async function notifyDriversForOrder(
       return;
     }
 
-    // 🎯 MATCHING ÉQUITABLE : TOUS les livreurs reçoivent la commande, triés par priorité (notes)
+    // Matching équitable : tous les livreurs reçoivent la commande, triés par priorité (notes)
     let selectedDrivers: NearbyDriver[];
-    const useFairMatching = process.env.USE_INTELLIGENT_MATCHING !== 'false'; // Activé par défaut
+    const useFairMatching = process.env.USE_INTELLIGENT_MATCHING !== 'false';
     
     if (useFairMatching && nearbyDrivers.length > 0) {
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] 🎯 Utilisation du matching ÉQUITABLE pour commande ${maskOrderId(order.id)} - TOUS les livreurs recevront la commande`);
+        console.log(`[notifyDriversForOrder] Utilisation du matching équitable pour commande ${maskOrderId(order.id)}`);
       }
       
       try {
-        // Récupérer TOUS les livreurs triés par priorité (notes + équité)
+        // Récupérer tous les livreurs triés par priorité
         // PRIORISATION INTERNES : Les internes sont prioritaires sur B2B/planifiées
         const allDrivers = await orderMatchingService.findBestDrivers(
           nearbyDrivers,
@@ -394,7 +394,7 @@ async function notifyDriversForOrder(
             });
           } else {
             if (DEBUG) {
-              console.log(`[notifyDriversForOrder] ⚠️ Livreur ${maskUserId(scored.driverId)} exclu: ${balanceCheck.reason}`);
+              console.log(`[notifyDriversForOrder] Livreur ${maskUserId(scored.driverId)} exclu: ${balanceCheck.reason}`);
             }
           }
         }
@@ -402,7 +402,7 @@ async function notifyDriversForOrder(
         selectedDrivers = driversWithBalance;
         
         if (DEBUG) {
-          console.log(`[notifyDriversForOrder] ✅ ${selectedDrivers.length} livreurs recevront la commande (${allDrivers.length - selectedDrivers.length} exclus pour solde insuffisant)`);
+          console.log(`[notifyDriversForOrder] ${selectedDrivers.length} livreurs recevront la commande (${allDrivers.length - selectedDrivers.length} exclus pour solde insuffisant)`);
         }
       } catch (error: any) {
         logger.warn(`[notifyDriversForOrder] Erreur matching équitable, fallback sur tri par distance:`, error.message);
@@ -537,7 +537,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           if (!validation.canUse) {
             const errorMsg = validation.reason || 'Paiement différé non autorisé';
             if (DEBUG) {
-              console.log(`❌ Paiement différé refusé pour ${maskUserId(userId)}: ${errorMsg}`);
+              console.log(`Paiement différé refusé pour ${maskUserId(userId)}: ${errorMsg}`);
             }
             socket.emit('order-error', {
               success: false,
@@ -552,7 +552,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             return;
           }
           if (DEBUG) {
-            console.log(`✅ Paiement différé autorisé pour ${maskUserId(userId)} - Montant: ${price} FCFA`);
+            console.log(`Paiement différé autorisé pour ${maskUserId(userId)} - Montant: ${price} FCFA`);
           }
         }
 
@@ -664,17 +664,17 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         }
         if (DEBUG) console.log(`${nearbyDrivers.length} chauffeurs trouvés pour la commande ${maskOrderId(order.id)}`);
         
-        // 🎯 MATCHING ÉQUITABLE : TOUS les livreurs reçoivent la commande, triés par priorité (notes)
+        // Matching équitable : tous les livreurs reçoivent la commande, triés par priorité (notes)
         let selectedDrivers: NearbyDriver[];
         const useFairMatching = process.env.USE_INTELLIGENT_MATCHING !== 'false'; // Activé par défaut
         
         if (useFairMatching && nearbyDrivers.length > 0) {
           if (DEBUG) {
-            console.log(`[create-order] 🎯 Utilisation du matching ÉQUITABLE pour commande ${maskOrderId(order.id)} - TOUS les livreurs recevront la commande`);
+            console.log(`[create-order] Utilisation du matching équitable pour commande ${maskOrderId(order.id)}`);
           }
           
           try {
-            // Récupérer TOUS les livreurs triés par priorité (notes + équité)
+            // Récupérer tous les livreurs triés par priorité
             // PRIORISATION INTERNES : Les internes sont prioritaires sur B2B/planifiées
             const orderIsB2B = (order as any).is_b2b_order === true;
             const allDrivers = await orderMatchingService.findBestDrivers(
@@ -695,7 +695,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             }));
             
             if (DEBUG) {
-              console.log(`[create-order] ✅ TOUS les ${selectedDrivers.length} livreurs recevront la commande (triés par priorité: notes + équité)`);
+              console.log(`[create-order] ${selectedDrivers.length} livreurs recevront la commande (triés par priorité)`);
             }
           } catch (error: any) {
             logger.warn(`[create-order] Erreur matching équitable, fallback sur tri par distance:`, error.message);
@@ -821,7 +821,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
             return;
           } else {
-            console.warn(`⚠️ User ${maskUserId(order.user.id)} non connecté après ${retryCount} tentatives - impossible d'émettre order-accepted pour commande ${maskOrderId(orderId)}`);
+            console.warn(`User ${maskUserId(order.user.id)} non connecté après ${retryCount} tentatives - impossible d'émettre order-accepted pour commande ${maskOrderId(orderId)}`);
             console.log(`[DIAGNOSTIC] Users connectés:`, Array.from(connectedUsers.keys()).map(id => maskUserId(id)));
             return;
           }
@@ -836,7 +836,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
             return;
           } else {
-            console.warn(`⚠️ User ${maskUserId(order.user.id)} socket ${userSocketId} non connecté après ${retryCount} tentatives - impossible d'émettre order-accepted pour commande ${maskOrderId(orderId)}`);
+            console.warn(`User ${maskUserId(order.user.id)} socket ${userSocketId} non connecté après ${retryCount} tentatives - impossible d'émettre order-accepted pour commande ${maskOrderId(orderId)}`);
             return;
           }
         }
@@ -870,7 +870,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
               return;
             } else {
-              console.error(`❌ Impossible d'envoyer order-accepted: socket déconnecté après ${retryCount} tentatives`);
+              console.error(`Impossible d'envoyer order-accepted: socket déconnecté après ${retryCount} tentatives`);
               return;
             }
           }
@@ -883,9 +883,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             dbError: dbErrorAssign
           });
 
-          console.log(`✅ order-accepted émis avec succès pour commande ${maskOrderId(orderId)}`);
+          console.log(`order-accepted émis avec succès pour commande ${maskOrderId(orderId)}`);
         } catch (err) {
-          console.error(`❌ Erreur préparation order-accepted:`, err);
+          console.error(`Erreur préparation order-accepted:`, err);
           // En cas d'erreur, essayer quand même d'envoyer avec les données minimales
           const currentSocket = io.sockets.sockets.get(userSocketId);
           if (currentSocket && currentSocket.connected) {
@@ -893,7 +893,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               order: orderToSend, // Utiliser orderToSend même en cas d'erreur
               driverInfo: { id: driverId }
             });
-            console.log(`✅ order-accepted émis (mode fallback) pour commande ${maskOrderId(orderId)}`);
+            console.log(`order-accepted émis (mode fallback) pour commande ${maskOrderId(orderId)}`);
           } else if (retryCount < 3) {
             setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
           }
@@ -1025,13 +1025,13 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                   );
 
                   if (DEBUG) {
-                    console.log(`✅ Paiement en espèces marqué comme payé pour commande ${maskOrderId(orderId)}`);
+                    console.log(`Paiement en espèces marqué comme payé pour commande ${maskOrderId(orderId)}`);
                   }
                 }
               }
             } catch (paymentError: any) {
               // Ne pas bloquer la mise à jour du statut de livraison si la mise à jour du paiement échoue
-              console.warn(`⚠️ Échec mise à jour paiement pour ${maskOrderId(orderId)}:`, paymentError.message);
+              console.warn(`Échec mise à jour paiement pour ${maskOrderId(orderId)}:`, paymentError.message);
             }
           }
         } catch (dbError: any) {
@@ -1081,14 +1081,14 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             if (commissionResult.success) {
               if (DEBUG) {
                 console.log(
-                  `✅ Commission prélevée pour ${maskUserId(driverId)}: ` +
+                  `Commission prélevée pour ${maskUserId(driverId)}: ` +
                   `${commissionResult.commissionAmount?.toFixed(2)} FCFA ` +
                   `(nouveau solde: ${commissionResult.newBalance?.toFixed(2)} FCFA)`
                 );
               }
             } else {
               logger.warn(
-                `⚠️ Échec prélèvement commission pour ${maskUserId(driverId)}: ${commissionResult.error}`
+                `Échec prélèvement commission pour ${maskUserId(driverId)}: ${commissionResult.error}`
               );
               // Ne pas bloquer la livraison si le prélèvement échoue
               // Le système d'alertes gérera la notification au livreur

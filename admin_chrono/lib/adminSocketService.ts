@@ -40,7 +40,7 @@ class AdminSocketService {
       return
     }
 
-    console.log('🔌 [adminSocketService] connect() CALLED', { 
+    console.log('[adminSocketService] connect() CALLED', { 
       timestamp: new Date().toISOString(), 
       stack: new Error().stack,
       alreadyConnected: this.socket?.connected,
@@ -173,7 +173,7 @@ class AdminSocketService {
 
       // Écouter la confirmation de connexion admin
       this.socket.on('admin:connected', (data) => {
-        console.log('[adminSocketService] ✅ Admin connecté confirmé par le serveur:', data)
+        console.log('[adminSocketService] Admin connecté confirmé par le serveur:', data)
         if (process.env.NODE_ENV === 'development') {
           logger.info('[adminSocketService] Admin connecté:', data)
         }
@@ -209,7 +209,7 @@ class AdminSocketService {
       })
 
       // Écouter les mises à jour de commandes
-      console.log('[adminSocketService] 🔌 Installation du listener order:status:update')
+      console.log('[adminSocketService] Installation du listener order:status:update')
       this.socket.on('order:status:update', (data: OrderStatusUpdateData) => {
         if (process.env.NODE_ENV === 'development') {
           logger.debug('[adminSocketService] Mise à jour de commande:', data.order?.id)
@@ -231,19 +231,19 @@ class AdminSocketService {
           })
           
           if (isClientOrder) {
-            console.log('[adminSocketService] 🔊 Commande client détectée, tentative de jouer le son pour nouvelle commande:', data.order?.id)
+            console.log('[adminSocketService] Commande client détectée, tentative de jouer le son pour nouvelle commande:', data.order?.id)
             import('@/utils/soundService').then(({ soundService }) => {
-              console.log('[adminSocketService] 🔊 soundService importé (order:status:update), appel de playNewOrder()')
+              console.log('[adminSocketService] soundService importé (order:status:update), appel de playNewOrder()')
               soundService.playNewOrder().then(() => {
-                console.log('[adminSocketService] ✅ playNewOrder() résolu avec succès (order:status:update)')
+                console.log('[adminSocketService] playNewOrder() résolu avec succès (order:status:update)')
               }).catch((err) => {
-                console.warn('[adminSocketService] ❌ Erreur lecture son nouvelle commande (order:status:update):', err)
+                console.warn('[adminSocketService] Erreur lecture son nouvelle commande (order:status:update):', err)
               })
             }).catch((err) => {
-              console.warn('[adminSocketService] ❌ Erreur chargement soundService (order:status:update):', err)
+              console.warn('[adminSocketService] Erreur chargement soundService (order:status:update):', err)
             })
           } else {
-            console.log('[adminSocketService] ⏭️ Commande téléphonique, son ignoré (order:status:update)')
+            console.log('[adminSocketService] Commande téléphonique, son ignoré (order:status:update)')
           }
         }
         
@@ -251,7 +251,7 @@ class AdminSocketService {
       })
 
       // Écouter les nouvelles commandes créées (si l'événement existe)
-      console.log('[adminSocketService] 🔌 Installation du listener order:created')
+      console.log('[adminSocketService] Installation du listener order:created')
       this.socket.on('order:created', (data: OrderCreatedData) => {
         console.log('[adminSocketService] 📨 ÉVÉNEMENT order:created REÇU!', {
           hasData: !!data,
@@ -277,19 +277,19 @@ class AdminSocketService {
         const isClientOrder = data.order && (data.order.is_phone_order === undefined || data.order.is_phone_order === false)
         
         if (isClientOrder && typeof window !== 'undefined') {
-          console.log('[adminSocketService] 🔊 Commande client détectée, tentative de jouer le son pour order:created:', data.order?.id)
+          console.log('[adminSocketService] Commande client détectée, tentative de jouer le son pour order:created:', data.order?.id)
           // Importer et jouer le son immédiatement (sans délai)
           import('@/utils/soundService').then(({ soundService }) => {
-            console.log('[adminSocketService] 🔊 soundService importé, appel de playNewOrder()')
+            console.log('[adminSocketService] soundService importé, appel de playNewOrder()')
             // Jouer le son immédiatement, sans attendre
             soundService.playNewOrder().catch((err) => {
-              console.warn('[adminSocketService] ❌ Erreur lecture son order:created:', err)
+              console.warn('[adminSocketService] Erreur lecture son order:created:', err)
             })
           }).catch((err) => {
-            console.warn('[adminSocketService] ❌ Erreur chargement soundService:', err)
+            console.warn('[adminSocketService] Erreur chargement soundService:', err)
           })
         } else {
-          console.log('[adminSocketService] ⏭️ Son ignoré:', {
+          console.log('[adminSocketService] Son ignoré:', {
             isClientOrder,
             hasWindow: typeof window !== 'undefined',
             isPhoneOrder: data.order?.is_phone_order,

@@ -78,7 +78,7 @@ export function useGeofencing({
       }
 
       logger.info(
-        `✅ Géofencing: Validation automatique ${newStatus} pour commande ${orderId.slice(0, 8)}...`,
+        `Géofencing: Validation automatique ${newStatus} pour commande ${orderId.slice(0, 8)}...`,
         'useGeofencing'
       );
 
@@ -141,7 +141,7 @@ export function useGeofencing({
     // Si vient d'entrer dans la zone
     if (newState.status === GeofenceStatus.ENTERING) {
       logger.info(
-        `📍 Géofencing: Entrée dans la zone pour commande ${orderId.slice(0, 8)}...`,
+        `Géofencing: Entrée dans la zone pour commande ${orderId.slice(0, 8)}...`,
         'useGeofencing'
       );
       

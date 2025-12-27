@@ -753,7 +753,7 @@ function TrackingMap({
           {(() => {
             if (onlineDrivers.length > 0) {
               if (process.env.NODE_ENV === 'development') {
-                console.log('🗺️ [TrackingMap] Tentative d\'affichage de', onlineDrivers.length, 'drivers sur la carte')
+                console.log('[TrackingMap] Tentative d\'affichage de', onlineDrivers.length, 'drivers sur la carte')
               }
             }
             return null
@@ -765,7 +765,7 @@ function TrackingMap({
             
             if (!isOnlineStrict || !hasCoords) {
               if (process.env.NODE_ENV === 'development') {
-                console.warn('⚠️ [TrackingMap] Driver filtré au dernier moment:', {
+                console.warn('[TrackingMap] Driver filtré au dernier moment:', {
                   userId: driver.userId?.substring(0, 8),
                   is_online: driver.is_online,
                   is_online_strict: isOnlineStrict,

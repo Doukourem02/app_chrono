@@ -381,9 +381,9 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
     let result;
     try {
       result = await (pool as any).query(query, params);
-      logger.info(`✅ [getAdminRecentActivities] Requête réussie: ${result.rows.length} lignes récupérées`);
+      logger.info(`[getAdminRecentActivities] Requête réussie: ${result.rows.length} lignes récupérées`);
     } catch (queryError: any) {
-      logger.error('❌ [getAdminRecentActivities] Erreur lors de la requête SQL:', queryError);
+      logger.error('[getAdminRecentActivities] Erreur lors de la requête SQL:', queryError);
       throw queryError;
     }
 
@@ -442,12 +442,12 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
       };
     });
 
-    logger.info(`✅ [getAdminRecentActivities] Données formatées: ${formatted.length} activités`);
+    logger.info(`[getAdminRecentActivities] Données formatées: ${formatted.length} activités`);
 
     if (formatted.length > 0) {
-      logger.debug('📋 [getAdminRecentActivities] Exemple de données formatées:', JSON.stringify(formatted[0], null, 2));
+      logger.debug('[getAdminRecentActivities] Exemple de données formatées:', JSON.stringify(formatted[0], null, 2));
     } else {
-      logger.warn('⚠️ [getAdminRecentActivities] Aucune donnée formatée - la table orders est peut-être vide ou les données ne correspondent pas au format attendu');
+      logger.warn('[getAdminRecentActivities] Aucune donnée formatée - la table orders est peut-être vide');
     }
 
     const response = {
@@ -455,7 +455,7 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
       data: formatted,
     };
 
-    logger.debug('📤 [getAdminRecentActivities] Sending response:', JSON.stringify(response, null, 2));
+    logger.debug('[getAdminRecentActivities] Sending response:', JSON.stringify(response, null, 2));
 
     res.json(response);
   } catch (error: any) {
@@ -636,16 +636,16 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       }
       logger.info('🔍 [getAdminGlobalSearch] Exécution requête commandes avec params:', ordersParams);
       ordersResult = await (pool as any).query(ordersQuery, ordersParams);
-      logger.info(`✅ [getAdminGlobalSearch] Commandes trouvées: ${ordersResult.rows.length}`);
+      logger.info(`[getAdminGlobalSearch] Commandes trouvées: ${ordersResult.rows.length}`);
 
       // Pour les utilisateurs : searchTerm, exactSearchTerm, searchTerm (pour le tri)
       const usersParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
       logger.info('🔍 [getAdminGlobalSearch] Exécution requête utilisateurs avec params:', usersParams);
       logger.info('🔍 [getAdminGlobalSearch] Requête SQL utilisateurs:', usersQuery);
       usersResult = await (pool as any).query(usersQuery, usersParams);
-      logger.info(`✅ [getAdminGlobalSearch] Utilisateurs trouvés: ${usersResult.rows.length}`);
+      logger.info(`[getAdminGlobalSearch] Utilisateurs trouvés: ${usersResult.rows.length}`);
       if (usersResult.rows.length > 0) {
-        logger.info('📋 [getAdminGlobalSearch] Exemples utilisateurs:', usersResult.rows.slice(0, 3).map((u: any) => ({
+        logger.info('[getAdminGlobalSearch] Exemples utilisateurs:', usersResult.rows.slice(0, 3).map((u: any) => ({
           id: u.id,
           email: u.email,
           first_name: u.first_name,
@@ -654,7 +654,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         })));
       }
     } catch (queryError: any) {
-      logger.error('❌ [getAdminGlobalSearch] Erreur lors de la requête SQL:', queryError);
+      logger.error('[getAdminGlobalSearch] Erreur lors de la requête SQL:', queryError);
       throw queryError;
     }
 
@@ -714,7 +714,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       };
     });
 
-    logger.info(`✅ [getAdminGlobalSearch] Résultats: ${formattedOrders.length} commandes, ${formattedUsers.length} utilisateurs`);
+    logger.info(`[getAdminGlobalSearch] Résultats: ${formattedOrders.length} commandes, ${formattedUsers.length} utilisateurs`);
 
     res.json({
       success: true,
@@ -772,9 +772,9 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     let result;
     try {
       result = await (pool as any).query(query);
-      logger.info(`✅ [getAdminOngoingDeliveries] Requête réussie: ${result.rows.length} lignes récupérées`);
+      logger.info(`[getAdminOngoingDeliveries] Requête réussie: ${result.rows.length} lignes récupérées`);
     } catch (queryError: any) {
-      logger.error('❌ [getAdminOngoingDeliveries] Erreur lors de la requête SQL:', queryError);
+      logger.error('[getAdminOngoingDeliveries] Erreur lors de la requête SQL:', queryError);
       throw queryError;
     }
 
@@ -908,7 +908,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
       };
     });
 
-    logger.info(`✅ [getAdminOngoingDeliveries] Données formatées: ${formatted.length} livraisons en cours`);
+    logger.info(`[getAdminOngoingDeliveries] Données formatées: ${formatted.length} livraisons en cours`);
 
     res.json({
       success: true,
@@ -995,9 +995,9 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
     let result;
     try {
       result = await (pool as any).query(query, queryParams);
-      logger.info(`✅ [getAdminOrdersByStatus] Requête réussie: ${result.rows.length} lignes récupérées`);
+      logger.info(`[getAdminOrdersByStatus] Requête réussie: ${result.rows.length} lignes récupérées`);
     } catch (queryError: any) {
-      logger.error('❌ [getAdminOrdersByStatus] Erreur lors de la requête SQL:', queryError);
+      logger.error('[getAdminOrdersByStatus] Erreur lors de la requête SQL:', queryError);
       throw queryError;
     }
 
@@ -1033,7 +1033,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
         endOfLastMonth.toISOString(),
       ]);
     } catch (countsError: any) {
-      logger.error('❌ [getAdminOrdersByStatus] Erreur lors de la requête de comptage:', countsError);
+      logger.error('[getAdminOrdersByStatus] Erreur lors de la requête de comptage:', countsError);
       countsResult = { rows: [{ onProgress: 0, successful: 0, onHold: 0, canceled: 0, all: 0, onProgressLastMonth: 0, successfulLastMonth: 0, onHoldLastMonth: 0, canceledLastMonth: 0, allLastMonth: 0 }] };
     }
 
@@ -1103,7 +1103,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
       };
     });
 
-    logger.info(`✅ [getAdminOrdersByStatus] Données formatées: ${formatted.length} commandes`);
+    logger.info(`[getAdminOrdersByStatus] Données formatées: ${formatted.length} commandes`);
 
     res.json({
       success: true,
@@ -1174,9 +1174,9 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
     let result;
     try {
       result = await (pool as any).query(query);
-      logger.info(`✅ [getAdminUsers] Requête réussie: ${result.rows.length} utilisateurs récupérés`);
+      logger.info(`[getAdminUsers] Requête réussie: ${result.rows.length} utilisateurs récupérés`);
     } catch (queryError: any) {
-      logger.error('❌ [getAdminUsers] Erreur lors de la requête SQL:', queryError);
+      logger.error('[getAdminUsers] Erreur lors de la requête SQL:', queryError);
       throw queryError;
     }
 
@@ -1210,7 +1210,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
       };
     });
 
-    logger.info(`✅ [getAdminUsers] Données formatées: ${formatted.length} utilisateurs`);
+    logger.info(`[getAdminUsers] Données formatées: ${formatted.length} utilisateurs`);
 
     res.json({
       success: true,
@@ -3581,7 +3581,7 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
       ['cancelled', orderId]
     );
 
-    logger.info(`✅ [cancelAdminOrder] Commande ${orderId} annulée avec succès par l'admin`);
+    logger.info(`[cancelAdminOrder] Commande ${orderId} annulée avec succès par l'admin`);
 
     // Notifier via WebSocket si disponible
     try {
@@ -3619,7 +3619,7 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
         });
       }
     } catch (socketError: any) {
-      logger.warn('⚠️ [cancelAdminOrder] Erreur lors de la notification WebSocket:', socketError.message);
+      logger.warn('[cancelAdminOrder] Erreur lors de la notification WebSocket:', socketError.message);
     }
 
     res.json({
@@ -3628,7 +3628,7 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
       order: { ...dbOrder, status: 'cancelled' },
     });
   } catch (error: any) {
-    logger.error('❌ [cancelAdminOrder] Erreur lors de l\'annulation:', error);
+    logger.error('[cancelAdminOrder] Erreur lors de l\'annulation:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',
@@ -3991,7 +3991,7 @@ export const rechargeAdminDriverCommission = async (req: Request, res: Response)
 
     const transactionId = rechargeResult.rows[0].transaction_id;
 
-    logger.info(`✅ Recharge commission pour ${driverId}: ${amount} FCFA`);
+    logger.info(`Recharge commission pour ${driverId}: ${amount} FCFA`);
 
     res.json({
       success: true,
@@ -4053,7 +4053,7 @@ export const suspendAdminDriverCommission = async (req: Request, res: Response):
       [is_suspended, reason || null, driverId]
     );
 
-    logger.info(`✅ Statut commission mis à jour pour ${driverId}: ${is_suspended ? 'suspendu' : 'réactivé'}`);
+    logger.info(`Statut commission mis à jour pour ${driverId}: ${is_suspended ? 'suspendu' : 'réactivé'}`);
 
     res.json({
       success: true,
@@ -4118,7 +4118,7 @@ export const updateAdminDriverCommissionRate = async (req: Request, res: Respons
       [commission_rate, driverId]
     );
 
-    logger.info(`✅ Taux commission mis à jour pour ${driverId}: ${commission_rate}%`);
+    logger.info(`Taux commission mis à jour pour ${driverId}: ${commission_rate}%`);
 
     res.json({
       success: true,
