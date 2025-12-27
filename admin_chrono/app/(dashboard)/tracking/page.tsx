@@ -9,6 +9,8 @@ import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
 import { useRealTimeTracking } from '@/hooks/useRealTimeTracking'
 import { useAnimatedPosition } from '@/hooks/useAnimatedPosition'
 import { calculateFullETA } from '@/utils/etaCalculator'
+import { extractTrafficData, type TrafficData } from '@/utils/trafficUtils'
+import { fetchWeatherData, type WeatherAdjustment } from '@/utils/weatherUtils'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
@@ -141,6 +143,12 @@ function TrackingMap({
   
   // Garder une trace de la position précédente pour l'animation fluide
   const [previousDriverPosition, setPreviousDriverPosition] = useState<{ lat: number; lng: number } | null>(null)
+  
+  // Données de trafic pour l'ETA
+  const [trafficData, setTrafficData] = useState<TrafficData | null>(null)
+  
+  // Données météo pour l'ETA
+  const [weatherAdjustment, setWeatherAdjustment] = useState<{ adjustment: WeatherAdjustment; weather: unknown; isDifficult: boolean } | null>(null)
 
   // Trouver le livreur assigné à la livraison sélectionnée
   const assignedDriver = useMemo(() => {
@@ -154,6 +162,7 @@ function TrackingMap({
       zoomControl: true,
       styles: minimalMapStyle,
       backgroundColor: '#F7F8FC',
+      trafficLayer: true, // Activer l'affichage du trafic
     }),
     []
   )
@@ -344,6 +353,10 @@ function TrackingMap({
         destination: dropoffCoords,
         travelMode: window.google.maps.TravelMode.DRIVING,
         provideRouteAlternatives: false,
+        drivingOptions: {
+          departureTime: new Date(), // Utiliser l'heure actuelle pour le trafic
+          trafficModel: window.google.maps.TrafficModel.BEST_GUESS, // Modèle de trafic
+        },
       },
       (result, status) => {
         // Vérifier que la livraison n'a pas changé pendant le chargement
@@ -353,6 +366,13 @@ function TrackingMap({
 
         if (status === window.google.maps.DirectionsStatus.OK && result?.routes?.[0]) {
           const route = result.routes[0]
+          const leg = route.legs?.[0]
+          
+          // Extraire les données de trafic
+          if (leg) {
+            const traffic = extractTrafficData(leg)
+            setTrafficData(traffic)
+          }
           
           // Fonction pour s'assurer que le chemin commence et se termine exactement sur pickup et dropoff (même logique que app_chrono)
           const ensureExactEndpoints = (path: Array<{ lat: number; lng: number }>) => {
@@ -471,8 +491,40 @@ function TrackingMap({
     return calculateFullETA(
       animatedDriverPosition,
       destination,
-      vehicleType
+      vehicleType,
+      trafficData,
+      weatherAdjustment?.adjustment || null
     )
+  }, [animatedDriverPosition, selectedDelivery, assignedDriver, trafficData, weatherAdjustment])
+  
+  // Charger les données météo
+  useEffect(() => {
+    if (!animatedDriverPosition || !selectedDelivery) {
+      return
+    }
+    
+    const destination = 
+      (selectedDelivery.status === 'accepted' || selectedDelivery.status === 'enroute') 
+        ? selectedDelivery.pickup?.coordinates 
+        : selectedDelivery.status === 'picked_up'
+        ? selectedDelivery.dropoff?.coordinates
+        : null
+    
+    if (!destination) return
+    
+    const loadWeather = async () => {
+      const vehicleType = assignedDriver?.vehicle_type as 'moto' | 'vehicule' | 'cargo' | null
+      const data = await fetchWeatherData(destination.lat, destination.lng, vehicleType || null)
+      if (data) {
+        setWeatherAdjustment(data)
+      }
+    }
+    
+    loadWeather()
+    
+    // Recharger toutes les 10 minutes
+    const interval = setInterval(loadWeather, 10 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [animatedDriverPosition, selectedDelivery, assignedDriver])
 
 

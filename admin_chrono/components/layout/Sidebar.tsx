@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Star,Truck,} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Star,Truck,TrendingUp,Trophy,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -20,6 +20,8 @@ const navigation = [
   { href: "/drivers", icon: Truck, label: "Drivers" },
   { href: "/users", icon: Users, label: "Users" },
   { href: "/ratings", icon: Star, label: "Ratings" },
+  { href: "/analytics", icon: TrendingUp, label: "Analytics" },
+  { href: "/gamification", icon: Trophy, label: "Gamification" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

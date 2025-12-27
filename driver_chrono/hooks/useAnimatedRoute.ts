@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { config } from '../config';
+import { extractTrafficData, type TrafficData } from '../utils/trafficUtils';
 
 type Coordinates = {
   latitude: number;
@@ -25,10 +26,15 @@ export const useAnimatedRoute = ({
 }: UseAnimatedRouteOptions) => {
   const [routeCoordinates, setRouteCoordinates] = useState<Coordinates[]>([]);
   const [animatedCoordinates, setAnimatedCoordinates] = useState<Coordinates[]>([]);
+  const [trafficData, setTrafficData] = useState<TrafficData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const animationRef = useRef<number | null>(null);
+  const lastRecalcRef = useRef<number>(0);
   const GOOGLE_API_KEY = config.googleApiKey;
+  
+  // Intervalle de recalcul pour tenir compte du trafic en temps réel (2 minutes)
+  const TRAFFIC_RECALC_INTERVAL = 2 * 60 * 1000; // 2 minutes
 
   // Décoder polyline Google
   const decodePolyline = useCallback((encoded: string): Coordinates[] => {
@@ -95,6 +101,14 @@ export const useAnimatedRoute = ({
 
       if (data.status === 'OK' && data.routes && data.routes.length > 0) {
         const route = data.routes[0];
+        const leg = route.legs?.[0];
+        
+        // Extraire les données de trafic
+        if (leg) {
+          const traffic = extractTrafficData(leg);
+          setTrafficData(traffic);
+        }
+        
         let points = decodePolyline(route.overview_polyline.points);
 
         // S'assurer que les points de départ et d'arrivée sont inclus
@@ -190,6 +204,7 @@ export const useAnimatedRoute = ({
     if (!enabled || !origin || !destination) {
       setRouteCoordinates([]);
       setAnimatedCoordinates([]);
+      setTrafficData(null);
       return;
     }
 
@@ -204,6 +219,7 @@ export const useAnimatedRoute = ({
           onRouteCalculated?.(route);
           // Démarrer l'animation
           animateRoute(route);
+          lastRecalcRef.current = Date.now();
         } else {
           // Fallback: ligne droite si pas de route disponible
           const fallbackRoute = [origin, destination];
@@ -223,6 +239,38 @@ export const useAnimatedRoute = ({
     return () => clearTimeout(timeoutId);
   }, [origin, destination, enabled, fetchRoute, animateRoute, onRouteCalculated]);
 
+  // Recalcul périodique pour tenir compte du trafic en temps réel
+  useEffect(() => {
+    if (!enabled || !origin || !destination || routeCoordinates.length === 0) {
+      return;
+    }
+
+    const recalculateRoute = async () => {
+      const now = Date.now();
+      const timeSinceLastRecalc = now - lastRecalcRef.current;
+
+      // Recalculer toutes les 2 minutes pour tenir compte du trafic
+      if (timeSinceLastRecalc >= TRAFFIC_RECALC_INTERVAL) {
+        try {
+          const route = await fetchRoute(origin, destination);
+          if (route && route.length > 0) {
+            // Mettre à jour les coordonnées si la route a changé significativement
+            setRouteCoordinates(route);
+            lastRecalcRef.current = Date.now();
+          }
+        } catch (err) {
+          // Ignorer les erreurs silencieusement pour ne pas perturber l'utilisateur
+          console.debug('Erreur recalcul route trafic:', err);
+        }
+      }
+    };
+
+    // Vérifier toutes les 30 secondes si un recalcul est nécessaire
+    const intervalId = setInterval(recalculateRoute, 30 * 1000);
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, origin, destination, routeCoordinates.length, fetchRoute]);
+
   // Nettoyer l'animation au démontage
   useEffect(() => {
     return () => {
@@ -235,6 +283,7 @@ export const useAnimatedRoute = ({
   return {
     routeCoordinates,
     animatedCoordinates,
+    trafficData,
     isLoading,
     error,
     refetch: () => {
@@ -243,6 +292,7 @@ export const useAnimatedRoute = ({
           if (route) {
             setRouteCoordinates(route);
             animateRoute(route);
+            lastRecalcRef.current = Date.now();
           }
         });
       }

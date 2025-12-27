@@ -380,6 +380,26 @@ class OrderSocketService {
     }
   }
 
+  // Émettre un événement de géofencing (livreur entré dans la zone)
+  emitGeofenceEvent(orderId: string, eventType: 'entered' | 'validated', location?: any) {
+    if (!this.socket) {
+      logger.error('Socket non connecté pour géofencing');
+      return;
+    }
+
+    this.socket.emit('driver-geofence-event', {
+      orderId,
+      eventType,
+      location,
+      timestamp: new Date().toISOString(),
+    });
+
+    logger.info(
+      `📍 Géofencing: ${eventType} pour commande ${orderId.slice(0, 8)}...`,
+      'orderSocketService'
+    );
+  }
+
   // Vérifier la connexion
   isSocketConnected() {
     return this.isConnected && this.socket?.connected;

@@ -2,6 +2,11 @@
  * Utilitaires pour calculer l'ETA (Estimated Time of Arrival) en temps réel
  */
 
+import type { TrafficData } from './trafficUtils'
+import { calculateETAWithTraffic, formatETAWithTraffic } from './trafficUtils'
+import type { WeatherAdjustment } from './weatherUtils'
+import { applyWeatherAdjustment as applyWeather } from './weatherUtils'
+
 interface Position {
   lat: number
   lng: number
@@ -83,22 +88,58 @@ export function formatETA(etaMinutes: number): string {
 
 /**
  * Calcule l'ETA complet entre la position actuelle du driver et la destination
+ * Utilise les données de trafic Google Maps si disponibles, sinon calcule basé sur la distance
  * @param driverPosition Position actuelle du driver
  * @param destination Position de destination
  * @param vehicleType Type de véhicule (optionnel)
+ * @param trafficData Données de trafic Google Maps (optionnel)
+ * @param weatherAdjustment Ajustement météo (optionnel)
  * @returns Objet avec distance (mètres) et ETA (minutes)
  */
 export function calculateFullETA(
   driverPosition: Position | null,
   destination: Position | null,
-  vehicleType: 'moto' | 'vehicule' | 'cargo' | null = null
+  vehicleType: 'moto' | 'vehicule' | 'cargo' | null = null,
+  trafficData: TrafficData | null = null,
+  weatherAdjustment: WeatherAdjustment | null = null
 ): { distance: number; etaMinutes: number; formattedETA: string } | null {
   if (!driverPosition || !destination) {
     return null
   }
 
   const distance = calculateDistance(driverPosition, destination)
-  const etaMinutes = calculateETAForVehicle(distance, vehicleType)
+  
+  // Utiliser les données de trafic si disponibles
+  if (trafficData?.hasTrafficData) {
+    const vehicleMultiplier = vehicleType === 'moto' ? 0.85 : vehicleType === 'cargo' ? 1.25 : 1.0
+    const etaSeconds = calculateETAWithTraffic(trafficData, vehicleMultiplier)
+    
+    if (etaSeconds !== null) {
+      let etaMinutes = Math.ceil(etaSeconds / 60)
+      
+      // Appliquer l'ajustement météo si disponible
+      if (weatherAdjustment) {
+        etaMinutes = applyWeather(etaMinutes, weatherAdjustment)
+      }
+      
+      const formattedETA = formatETAWithTraffic(etaSeconds)
+      
+      return {
+        distance,
+        etaMinutes,
+        formattedETA,
+      }
+    }
+  }
+  
+  // Fallback: calcul basé sur la distance
+  let etaMinutes = calculateETAForVehicle(distance, vehicleType)
+  
+  // Appliquer l'ajustement météo si disponible
+  if (weatherAdjustment) {
+    etaMinutes = applyWeather(etaMinutes, weatherAdjustment)
+  }
+  
   const formattedETA = formatETA(etaMinutes)
 
   return {

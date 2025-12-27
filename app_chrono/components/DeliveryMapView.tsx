@@ -6,6 +6,7 @@ import { useRadarPulse } from '../hooks/useRadarPulse';
 import { useAnimatedRoute } from '../hooks/useAnimatedRoute';
 import { useAnimatedPosition } from '../hooks/useAnimatedPosition';
 import { calculateFullETA } from '../utils/etaCalculator';
+import { useWeather } from '../hooks/useWeather';
 
 type Coordinates = {
   latitude: number;
@@ -104,6 +105,14 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   // Garder une trace de la position précédente pour l'animation fluide
   const previousDriverCoordsRef = useRef<Coordinates | null>(null);
   
+  // Données météo pour ajuster l'ETA
+  const weatherData = useWeather({
+    latitude: animatedDriverPosition?.latitude || destination?.latitude || null,
+    longitude: animatedDriverPosition?.longitude || destination?.longitude || null,
+    vehicleType: selectedMethod === 'moto' ? 'moto' : selectedMethod === 'vehicule' ? 'vehicule' : selectedMethod === 'cargo' ? 'cargo' : null,
+    enabled: !!animatedDriverPosition && !!destination,
+  });
+  
   // Animation fluide de la position du driver
   const animatedDriverPosition = useAnimatedPosition({
     currentPosition: orderDriverCoords || null,
@@ -130,12 +139,20 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
     
     if (!destination) return null;
     
+    // Utiliser les données de trafic de la route active
+    const activeRoute = (orderStatus === 'accepted' || orderStatus === 'pending') 
+      ? driverToPickupRoute 
+      : driverToDropoffRoute;
+    const trafficData = activeRoute?.trafficData || null;
+    
     return calculateFullETA(
       animatedDriverPosition,
       destination,
-      selectedMethod === 'moto' ? 'moto' : selectedMethod === 'vehicule' ? 'vehicule' : selectedMethod === 'cargo' ? 'cargo' : null
+      selectedMethod === 'moto' ? 'moto' : selectedMethod === 'vehicule' ? 'vehicule' : selectedMethod === 'cargo' ? 'cargo' : null,
+      trafficData,
+      weatherData.adjustment || null
     );
-  }, [animatedDriverPosition, orderStatus, pickupCoords, dropoffCoords, selectedMethod]);
+  }, [animatedDriverPosition, orderStatus, pickupCoords, dropoffCoords, selectedMethod, driverToPickupRoute, driverToDropoffRoute, weatherData.adjustment]);
 
   useEffect(() => {
     const outerListenerId = outerPulse.addListener(({ value }) => {
@@ -189,7 +206,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       showsCompass={false}
       showsScale={false}
       showsBuildings={false}
-      showsTraffic={false}
+      showsTraffic={true}
       showsIndoors={false}
       showsPointsOfInterest={false}
       mapType="standard"

@@ -22,6 +22,8 @@ import { useMapCamera } from '../../hooks/useMapCamera';
 import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
 import { useAnimatedPosition } from '../../hooks/useAnimatedPosition';
 import { calculateFullETA } from '../../utils/etaCalculator';
+import { useGeofencing } from '../../hooks/useGeofencing';
+import { useWeather } from '../../hooks/useWeather';
 import MessageBottomSheet from "../../components/MessageBottomSheet";
 import { formatUserName } from '../../utils/formatName';
 
@@ -224,6 +226,31 @@ export default function Index() {
   const currentPickupCoord = currentOrder ? resolveCoords(currentOrder.pickup) : null;
   const currentDropoffCoord = currentOrder ? resolveCoords(currentOrder.dropoff) : null;
   
+  // Données météo pour ajuster l'ETA
+  const weatherData = useWeather({
+    latitude: location?.latitude || destination?.latitude || null,
+    longitude: location?.longitude || destination?.longitude || null,
+    vehicleType: profile?.vehicle_type as 'moto' | 'vehicule' | 'cargo' | null || null,
+    enabled: isOnline && !!location && !!destination,
+  });
+  
+  // Géofencing : détection automatique d'arrivée
+  const geofencing = useGeofencing({
+    driverPosition: location,
+    targetPosition: destination,
+    orderId: currentOrder?.id || null,
+    orderStatus: currentOrder?.status || null,
+    enabled: isOnline && !!currentOrder && !!destination && !!location,
+    onEnteredZone: () => {
+      // Notification visuelle ou sonore quand on entre dans la zone
+      logger.info('📍 Vous êtes arrivé dans la zone de livraison', 'geofencing');
+    },
+    onValidated: () => {
+      // Notification quand la validation automatique est déclenchée
+      logger.info('✅ Livraison validée automatiquement', 'geofencing');
+    },
+  });
+  
   // Route animée vers la destination
   const animatedRoute = useAnimatedRoute({
     origin: location,
@@ -308,12 +335,20 @@ export default function Index() {
     
     const vehicleType = profile?.vehicle_type as 'moto' | 'vehicule' | 'cargo' | null;
     
+    // Utiliser les données de trafic de la route active
+    const activeRoute = (status === 'accepted' || status === 'enroute' || status === 'in_progress')
+      ? animatedRoute
+      : orderFullRoute;
+    const trafficData = activeRoute?.trafficData || null;
+    
     return calculateFullETA(
       animatedDriverPosition,
       destination,
-      vehicleType
+      vehicleType,
+      trafficData,
+      weatherData.adjustment || null
     );
-  }, [animatedDriverPosition, currentOrder, location, profile?.vehicle_type]);
+  }, [animatedDriverPosition, currentOrder, location, profile?.vehicle_type, animatedRoute, orderFullRoute, weatherData.adjustment]);
   
   const polyPulseIntervalRef = useRef<number | null>(null);
   const animationTimeoutsRef = useRef<number[]>([]);
@@ -683,7 +718,7 @@ export default function Index() {
         showsCompass={false}
         showsScale={false}
         showsBuildings={false}
-        showsTraffic={false}
+        showsTraffic={true}
         showsIndoors={false}
         showsPointsOfInterest={false}
         mapType="standard"

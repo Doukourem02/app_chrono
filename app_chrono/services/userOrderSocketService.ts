@@ -457,6 +457,34 @@ class UserOrderSocketService {
         logger.warn('Error handling driver:location:update', 'userOrderSocketService', err);
       }
     });
+
+    // Événement de géofencing (livreur entré dans la zone)
+    this.socket.on('driver:geofence:event', (data) => {
+      try {
+        const { orderId, eventType, location } = data || {};
+        if (orderId) {
+          const store = useOrderStore.getState();
+          
+          if (eventType === 'entered') {
+            logger.info(
+              '📍 Votre livreur est arrivé dans la zone de livraison',
+              'userOrderSocketService',
+              { orderId }
+            );
+            // Vous pouvez ajouter une notification visuelle ici
+            // Par exemple : Alert.alert('Livreur arrivé', 'Votre livreur est arrivé dans la zone de livraison');
+          } else if (eventType === 'validated') {
+            logger.info(
+              '✅ Livraison validée automatiquement',
+              'userOrderSocketService',
+              { orderId }
+            );
+          }
+        }
+      } catch (err) {
+        logger.warn('Error handling driver:geofence:event', 'userOrderSocketService', err);
+      }
+    });
   }
 
   private setupSocketListeners(userId: string, skipConnectDisconnect = false) {

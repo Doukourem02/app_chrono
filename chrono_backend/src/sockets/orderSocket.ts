@@ -1114,6 +1114,56 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       }
     });
 
+    // Événement de géofencing (livreur entré dans la zone)
+    socket.on('driver-geofence-event', (data: { orderId: string; eventType: 'entered' | 'validated'; location?: any; timestamp?: string }) => {
+      try {
+        const { orderId, eventType, location } = data || {};
+
+        if (!orderId) {
+          return;
+        }
+
+        const order = activeOrders.get(orderId);
+        if (!order) {
+          return;
+        }
+
+        const driverId = socket.driverId;
+        if (!driverId || order.driverId !== driverId) {
+          return;
+        }
+
+        // Notifier le client
+        const userSocketId = connectedUsers.get(order.user.id);
+        if (userSocketId) {
+          io.to(userSocketId).emit('driver:geofence:event', {
+            orderId,
+            eventType,
+            location,
+            timestamp: data.timestamp || new Date().toISOString(),
+          });
+
+          if (DEBUG) {
+            console.log(
+              `[driver-geofence-event] ${eventType} pour commande ${maskOrderId(orderId)} - notifié client`
+            );
+          }
+        }
+
+        // Diffuser aux admins
+        broadcastOrderUpdateToAdmins(io, 'driver:geofence:event', {
+          orderId,
+          eventType,
+          location,
+          timestamp: data.timestamp || new Date().toISOString(),
+        });
+      } catch (err: any) {
+        if (DEBUG) {
+          console.error('Error in driver-geofence-event socket handler', err);
+        }
+      }
+    });
+
     socket.on('send-proof', async (data: { orderId: string; proofBase64: string; proofType?: string }, ack?: (response: any) => void) => {
       try {
         const { orderId, proofBase64, proofType = 'image' } = data || {};

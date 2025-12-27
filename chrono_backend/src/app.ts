@@ -14,6 +14,12 @@ import adminRoutes from './routes/adminRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
 import qrCodeRoutes from './routes/qrCodeRoutes.js';
 import commissionRoutes from './routes/commissionRoutes.js';
+import weatherRoutes from './routes/weatherRoutes.js';
+import gamificationRoutes from './routes/gamificationRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
+import multiDeliveryRoutes from './routes/multiDeliveryRoutes.js';
+import demandForecastRoutes from './routes/demandForecastRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSwagger } from './config/swagger.js';
 import { isOriginAllowed } from './config/cors.js';
@@ -96,6 +102,12 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api', qrCodeRoutes);
 app.use('/api/commission', commissionRoutes);
+app.use('/api/weather', weatherRoutes);
+app.use('/api/gamification', gamificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/multi-delivery', multiDeliveryRoutes);
+app.use('/api/forecast', demandForecastRoutes);
 
 app.use(errorHandler);
 
