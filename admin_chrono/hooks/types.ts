@@ -5,6 +5,7 @@ export interface OnlineDriver {
   current_latitude?: number
   current_longitude?: number
   updated_at?: string
+  vehicle_type?: 'moto' | 'vehicule' | 'cargo'
 }
 
 export interface Delivery {

@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation'
 import DeliveryCard from '@/components/tracking/DeliveryCard'
 import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
 import { useRealTimeTracking } from '@/hooks/useRealTimeTracking'
+import { useAnimatedPosition } from '@/hooks/useAnimatedPosition'
+import { calculateFullETA } from '@/utils/etaCalculator'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
@@ -130,11 +132,15 @@ function TrackingMap({
     current_latitude?: number
     current_longitude?: number
     updated_at?: string
+    vehicle_type?: 'moto' | 'vehicule' | 'cargo'
   }>
   adminLocation: { lat: number; lng: number }
 }) {
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
   const [closedDriverInfoIds, setClosedDriverInfoIds] = useState<Set<string>>(new Set())
+  
+  // Garder une trace de la position précédente pour l'animation fluide
+  const [previousDriverPosition, setPreviousDriverPosition] = useState<{ lat: number; lng: number } | null>(null)
 
   // Trouver le livreur assigné à la livraison sélectionnée
   const assignedDriver = useMemo(() => {
@@ -315,8 +321,9 @@ function TrackingMap({
     if (isNewDelivery) {
       previousDeliveryIdRef.current = currentDeliveryId
       // Réinitialiser le chemin pour éviter d'afficher l'ancienne route pendant le chargement
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFullRoutePath([])
+      requestAnimationFrame(() => {
+        setFullRoutePath([])
+      })
     }
 
     const pickupCoords = selectedDelivery.pickup.coordinates
@@ -427,6 +434,46 @@ function TrackingMap({
     // Ne pas afficher de position si le livreur n'est pas en ligne
     return null
   }, [assignedDriver])
+  
+  // Animation fluide de la position du driver
+  const animatedDriverPosition = useAnimatedPosition({
+    currentPosition: currentVehiclePosition,
+    previousPosition: previousDriverPosition,
+    animationDuration: 5000, // 5 secondes (fréquence GPS)
+  })
+  
+  // Mettre à jour la position précédente quand la position actuelle change
+  useEffect(() => {
+    if (currentVehiclePosition) {
+      requestAnimationFrame(() => {
+        setPreviousDriverPosition(currentVehiclePosition)
+      })
+    }
+  }, [currentVehiclePosition])
+  
+  // Calculer l'ETA en temps réel
+  const realTimeETA = useMemo(() => {
+    if (!animatedDriverPosition || !selectedDelivery) return null
+    
+    // Déterminer la destination selon le statut
+    const destination = 
+      (selectedDelivery.status === 'accepted' || selectedDelivery.status === 'enroute') 
+        ? selectedDelivery.pickup?.coordinates 
+        : selectedDelivery.status === 'picked_up'
+        ? selectedDelivery.dropoff?.coordinates
+        : null
+    
+    if (!destination) return null
+    
+    // Récupérer le type de véhicule depuis le driver (si disponible)
+    const vehicleType = assignedDriver?.vehicle_type as 'moto' | 'vehicule' | 'cargo' | null
+    
+    return calculateFullETA(
+      animatedDriverPosition,
+      destination,
+      vehicleType
+    )
+  }, [animatedDriverPosition, selectedDelivery, assignedDriver])
 
 
 
@@ -571,13 +618,13 @@ function TrackingMap({
             </div>
           </InfoWindow>
           
-          {/* Position actuelle du livreur (si assigné, en ligne et avec coordonnées GPS) */}
-          {currentVehiclePosition && assignedDriver && assignedDriver.is_online === true && (
+          {/* Position actuelle du livreur (si assigné, en ligne et avec coordonnées GPS) - Animation fluide */}
+          {animatedDriverPosition && assignedDriver && assignedDriver.is_online === true && (
             <>
               {/* Cercle pulsant pour la position actuelle du livreur */}
               <Marker
                 key={`driver-inner-${selectedDelivery.id}`}
-                position={currentVehiclePosition}
+                position={animatedDriverPosition}
                 icon={{
                   path: window.google?.maps?.SymbolPath?.CIRCLE || 0,
                   scale: 14,
@@ -599,7 +646,7 @@ function TrackingMap({
               {/* Cercle extérieur pulsant */}
               <Marker
                 key={`driver-outer-${selectedDelivery.id}`}
-                position={currentVehiclePosition}
+                position={animatedDriverPosition}
                 icon={{
                   path: window.google?.maps?.SymbolPath?.CIRCLE || 0,
                   scale: 24,
@@ -609,10 +656,20 @@ function TrackingMap({
                   strokeWeight: 2,
                 }}
               />
+              {/* Affichage ETA en temps réel */}
+              {realTimeETA && (
+                <InfoWindow position={animatedDriverPosition}>
+                  <div style={{ padding: '6px 8px', minWidth: '80px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#10B981' }}>
+                      {realTimeETA.formattedETA}
+                    </div>
+                  </div>
+                </InfoWindow>
+              )}
               {/* InfoWindow pour le livreur en mouvement - toujours visible comme les autres marqueurs */}
-              {!closedDriverInfoIds.has(selectedDelivery.id) && (
+              {!closedDriverInfoIds.has(selectedDelivery.id) && !realTimeETA && (
                 <InfoWindow 
-                  position={currentVehiclePosition}
+                  position={animatedDriverPosition}
                   onCloseClick={() => {
                     if (selectedDelivery?.id) {
                       setClosedDriverInfoIds(prev => new Set(prev).add(selectedDelivery.id))

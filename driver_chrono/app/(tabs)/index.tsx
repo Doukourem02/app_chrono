@@ -20,6 +20,8 @@ import { driverMessageSocketService } from "../../services/driverMessageSocketSe
 import { logger } from '../../utils/logger';
 import { useMapCamera } from '../../hooks/useMapCamera';
 import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
+import { useAnimatedPosition } from '../../hooks/useAnimatedPosition';
+import { calculateFullETA } from '../../utils/etaCalculator';
 import MessageBottomSheet from "../../components/MessageBottomSheet";
 import { formatUserName } from '../../utils/formatName';
 
@@ -269,7 +271,50 @@ export default function Index() {
     isOnline
   );
 
-  const [animatedDriverPos, setAnimatedDriverPos] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Garder une trace de la position précédente pour l'animation fluide
+  const previousLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  
+  // Animation fluide de la position du driver
+  const animatedDriverPosition = useAnimatedPosition({
+    currentPosition: location,
+    previousPosition: previousLocationRef.current,
+    animationDuration: 5000, // 5 secondes (fréquence GPS)
+  });
+  
+  // Mettre à jour la position précédente quand la position actuelle change
+  useEffect(() => {
+    if (location) {
+      previousLocationRef.current = location;
+    }
+  }, [location]);
+  
+  // Calculer l'ETA en temps réel vers la destination
+  const realTimeETA = React.useMemo(() => {
+    if (!animatedDriverPosition || !currentOrder || !location) return null;
+    
+    // Calculer la destination directement selon le statut de la commande
+    const status = String(currentOrder.status || '');
+    const pickupCoord = resolveCoords(currentOrder.pickup);
+    const dropoffCoord = resolveCoords(currentOrder.dropoff);
+    
+    let destination = null;
+    if ((status === 'accepted' || status === 'enroute' || status === 'in_progress') && pickupCoord) {
+      destination = pickupCoord;
+    } else if ((status === 'picked_up' || status === 'delivering') && dropoffCoord) {
+      destination = dropoffCoord;
+    }
+    
+    if (!destination) return null;
+    
+    const vehicleType = profile?.vehicle_type as 'moto' | 'vehicule' | 'cargo' | null;
+    
+    return calculateFullETA(
+      animatedDriverPosition,
+      destination,
+      vehicleType
+    );
+  }, [animatedDriverPosition, currentOrder, location, profile?.vehicle_type]);
+  
   const polyPulseIntervalRef = useRef<number | null>(null);
   const animationTimeoutsRef = useRef<number[]>([]);
 
@@ -463,7 +508,7 @@ export default function Index() {
     const status = String(currentOrder?.status || '');
 
     if (!currentOrder || status === 'completed') {
-      setAnimatedDriverPos(null);
+      // Animation gérée par useAnimatedPosition
 
       if (polyPulseIntervalRef.current) {
         clearInterval(polyPulseIntervalRef.current);
@@ -649,20 +694,33 @@ export default function Index() {
         zoomEnabled={true}
         followsUserLocation={false}
       >
-        {isOnline && (animatedDriverPos || location) && (
+        {isOnline && (animatedDriverPosition || location) && (
           <Marker
             coordinate={{
-              latitude: (animatedDriverPos || location)!.latitude,
-              longitude: (animatedDriverPos || location)!.longitude,
+              latitude: (animatedDriverPosition || location)!.latitude,
+              longitude: (animatedDriverPosition || location)!.longitude,
             }}
             title="Ma position"
-            description="Chauffeur en ligne"
+            description={realTimeETA ? `Arrivée dans ${realTimeETA.formattedETA}` : 'Chauffeur en ligne'}
             anchor={{ x: 0.5, y: 0.5 }}
             tracksViewChanges={false}
           >
             <View style={styles.driverMarkerContainer}>
               <View style={styles.driverPulseOuter} />
               <View style={styles.driverMarkerInner} />
+            </View>
+          </Marker>
+        )}
+        
+        {/* Affichage ETA en temps réel */}
+        {realTimeETA && animatedDriverPosition && isOnline && (
+          <Marker
+            coordinate={animatedDriverPosition}
+            anchor={{ x: 0.5, y: 1.2 }}
+            tracksViewChanges={false}
+          >
+            <View style={styles.realTimeETABadge}>
+              <Text style={styles.realTimeETAText}>{realTimeETA.formattedETA}</Text>
             </View>
           </Marker>
         )}
@@ -686,13 +744,18 @@ export default function Index() {
             )}
 
             {/* Route animée active (violet comme admin_chrono) */}
-            <Polyline
-              coordinates={animatedRoute.animatedCoordinates}
-              strokeColor="#8B5CF6"
-              strokeWidth={6}
-              lineCap="round"
-              lineJoin="round"
-            />
+            {animatedDriverPosition && (
+              <Polyline
+                coordinates={[
+                  animatedDriverPosition,
+                  ...animatedRoute.animatedCoordinates.slice(1),
+                ]}
+                strokeColor="#8B5CF6"
+                strokeWidth={6}
+                lineCap="round"
+                lineJoin="round"
+              />
+            )}
           </>
         )}
 
@@ -826,7 +889,7 @@ export default function Index() {
               const dropoffCoord = resolveCoords(currentOrder.dropoff);
               await orderSocketService.updateDeliveryStatus(currentOrder.id, status, location);
               if (location && dropoffCoord) {
-                setAnimatedDriverPos(null);
+                // Animation gérée par useAnimatedPosition
                 setTimeout(() => {
                   animatedRoute.refetch();
                   fitToRoute();
@@ -1050,6 +1113,24 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
     position: 'absolute',
+  },
+  realTimeETABadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  realTimeETAText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 

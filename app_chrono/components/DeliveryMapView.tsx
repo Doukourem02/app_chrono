@@ -1,9 +1,11 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Text, Animated } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Circle } from 'react-native-maps';
 import { OnlineDriver } from '../hooks/useOnlineDrivers';
 import { useRadarPulse } from '../hooks/useRadarPulse';
 import { useAnimatedRoute } from '../hooks/useAnimatedRoute';
+import { useAnimatedPosition } from '../hooks/useAnimatedPosition';
+import { calculateFullETA } from '../utils/etaCalculator';
 
 type Coordinates = {
   latitude: number;
@@ -98,6 +100,42 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   const radarCenter = radarCoords || pickupCoords || null;
   const [outerRadius, setOuterRadius] = useState(0);
   const [innerRadius, setInnerRadius] = useState(0);
+  
+  // Garder une trace de la position précédente pour l'animation fluide
+  const previousDriverCoordsRef = useRef<Coordinates | null>(null);
+  
+  // Animation fluide de la position du driver
+  const animatedDriverPosition = useAnimatedPosition({
+    currentPosition: orderDriverCoords || null,
+    previousPosition: previousDriverCoordsRef.current || null,
+    animationDuration: 5000, // 5 secondes (fréquence GPS)
+  });
+  
+  // Mettre à jour la position précédente quand la position actuelle change
+  useEffect(() => {
+    if (orderDriverCoords) {
+      previousDriverCoordsRef.current = orderDriverCoords;
+    }
+  }, [orderDriverCoords]);
+  
+  // Calculer l'ETA en temps réel
+  const realTimeETA = useMemo(() => {
+    if (!animatedDriverPosition) return null;
+    
+    // Déterminer la destination selon le statut
+    const destination = 
+      (orderStatus === 'accepted' || orderStatus === 'pending') ? pickupCoords :
+      (orderStatus === 'enroute' || orderStatus === 'picked_up') ? dropoffCoords :
+      null;
+    
+    if (!destination) return null;
+    
+    return calculateFullETA(
+      animatedDriverPosition,
+      destination,
+      selectedMethod === 'moto' ? 'moto' : selectedMethod === 'vehicule' ? 'vehicule' : selectedMethod === 'cargo' ? 'cargo' : null
+    );
+  }, [animatedDriverPosition, orderStatus, pickupCoords, dropoffCoords, selectedMethod]);
 
   useEffect(() => {
     const outerListenerId = outerPulse.addListener(({ value }) => {
@@ -255,15 +293,15 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         />
       )}
 
-      {orderDriverCoords && 
+      {animatedDriverPosition && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
         <>
           <Marker
-            coordinate={orderDriverCoords}
+            coordinate={animatedDriverPosition}
             title="Livreur"
-            description="Livreur en route"
+            description={realTimeETA ? `Arrivée dans ${realTimeETA.formattedETA}` : 'Livreur en route'}
             anchor={{ x: 0.5, y: 0.5 }}
             tracksViewChanges={false}
           >
@@ -274,9 +312,14 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
           </Marker>
 
           {(orderStatus === 'accepted' || orderStatus === 'pending') && 
+           animatedDriverPosition &&
+           pickupCoords &&
            driverToPickupRoute.animatedCoordinates.length > 0 && (
             <Polyline
-              coordinates={driverToPickupRoute.animatedCoordinates}
+              coordinates={[
+                animatedDriverPosition,
+                ...driverToPickupRoute.animatedCoordinates.slice(1),
+              ]}
               strokeColor="#8B5CF6"
               strokeWidth={6}
               lineJoin="round"
@@ -285,14 +328,32 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
           )}
 
           {(orderStatus === 'enroute' || orderStatus === 'picked_up') && 
+           animatedDriverPosition &&
+           dropoffCoords &&
            driverToDropoffRoute.animatedCoordinates.length > 0 && (
             <Polyline
-              coordinates={driverToDropoffRoute.animatedCoordinates}
+              coordinates={[
+                animatedDriverPosition,
+                ...driverToDropoffRoute.animatedCoordinates.slice(1),
+              ]}
               strokeColor="#8B5CF6"
               strokeWidth={6}
               lineJoin="round"
               lineCap="round"
             />
+          )}
+          
+          {/* Affichage ETA en temps réel */}
+          {realTimeETA && animatedDriverPosition && (
+            <Marker
+              coordinate={animatedDriverPosition}
+              anchor={{ x: 0.5, y: 1.2 }}
+              tracksViewChanges={false}
+            >
+              <View style={styles.realTimeETABadge}>
+                <Text style={styles.realTimeETAText}>{realTimeETA.formattedETA}</Text>
+              </View>
+            </Marker>
           )}
 
           {pickupCoords && (
@@ -538,5 +599,23 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
     position: 'absolute',
+  },
+  realTimeETABadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  realTimeETAText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
