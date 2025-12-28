@@ -8,7 +8,7 @@ interface Coordinates {
 }
 
 /**
- * Calcule la distance en mètres entre deux points GPS (formule de Haversine)
+ * Calcule de la distance en mètres entre deux points GPS :formule de Haversine
  */
 export function calculateDistance(
   point1: Coordinates,
@@ -34,12 +34,12 @@ function toRad(degrees: number): number {
 }
 
 /**
- * Rayon de la zone de géofencing en mètres (50m par défaut)
+ * Rayon de la zone de géofencing en mètres 
  */
-export const GEOFENCE_RADIUS = 50; // 50 mètres
+export const GEOFENCE_RADIUS = 50; // 50 mètres par défaut
 
 /**
- * Durée minimale dans la zone avant validation automatique (10 secondes)
+ * Durée minimale dans la zone avant validation automatique
  */
 export const AUTO_VALIDATE_DELAY = 10000; // 10 secondes
 
@@ -125,7 +125,7 @@ export function calculateGeofenceState(
 
   // Dans la zone
   const wasInside = previousState?.status === GeofenceStatus.INSIDE || 
-                   previousState?.status === GeofenceStatus.ENTERING;
+                  previousState?.status === GeofenceStatus.ENTERING;
   const enteredAt = wasInside && previousState?.enteredAt 
     ? previousState.enteredAt 
     : now;
