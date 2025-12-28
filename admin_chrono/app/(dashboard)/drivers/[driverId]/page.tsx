@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, User, Briefcase, Wallet, CreditCard, Package, Star } from 'lucide-react'
+import { ArrowLeft, User, Briefcase, Wallet, CreditCard, Package, Star, ExternalLink, TrendingDown, TrendingUp } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
@@ -62,6 +62,30 @@ export default function DriverDetailPage() {
   }) | undefined
 
   const transactions = transactionsData?.data || []
+
+  // Calculer les statistiques de commission
+  const commissionStats = React.useMemo(() => {
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    
+    const monthlyDeductions = transactions.filter((tx: any) => {
+      if (tx.type !== 'deduction') return false
+      const txDate = new Date(tx.created_at)
+      return txDate >= startOfMonth
+    })
+
+    const totalDeductions = monthlyDeductions.reduce((sum: number, tx: any) => sum + tx.amount, 0)
+    const totalRecharges = transactions
+      .filter((tx: any) => tx.type === 'recharge')
+      .reduce((sum: number, tx: any) => sum + tx.amount, 0)
+
+    return {
+      monthlyDeductions: totalDeductions,
+      totalRecharges,
+      deductionCount: monthlyDeductions.length,
+      averageDeduction: monthlyDeductions.length > 0 ? totalDeductions / monthlyDeductions.length : 0,
+    }
+  }, [transactions])
 
   const formatCurrency = (amount: number | undefined) => {
     if (amount === undefined || amount === null) return 'N/A'
@@ -354,6 +378,40 @@ export default function DriverDetailPage() {
                 </button>
               </div>
 
+              {/* Statistiques Commission */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                gap: '16px', 
+                marginBottom: '24px' 
+              }}>
+                <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Commissions ce mois</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#EF4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <TrendingDown size={16} />
+                    {formatCurrency(commissionStats.monthlyDeductions)}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+                    {commissionStats.deductionCount} prélèvements
+                  </div>
+                </div>
+                
+                <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Moyenne par commande</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827' }}>
+                    {formatCurrency(commissionStats.averageDeduction)}
+                  </div>
+                </div>
+                
+                <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Total recharges</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <TrendingUp size={16} />
+                    {formatCurrency(commissionStats.totalRecharges)}
+                  </div>
+                </div>
+              </div>
+
               {/* Historique des transactions */}
               <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Historique des transactions</h3>
               {transactions.length === 0 ? (
@@ -361,32 +419,69 @@ export default function DriverDetailPage() {
                   Aucune transaction
                 </div>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
-                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Date</th>
-                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Type</th>
-                      <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Montant</th>
-                      <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Solde après</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((tx) => (
-                      <tr key={tx.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                        <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>{formatDate(tx.created_at)}</td>
-                        <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
-                          {tx.type === 'recharge' ? 'Recharge' : tx.type === 'deduction' ? 'Prélèvement' : 'Remboursement'}
-                        </td>
-                        <td style={{ padding: '12px', fontSize: '14px', color: tx.type === 'recharge' ? '#10B981' : '#EF4444', textAlign: 'right', fontWeight: 600 }}>
-                          {tx.type === 'recharge' ? '+' : '-'}{formatCurrency(tx.amount)}
-                        </td>
-                        <td style={{ padding: '12px', fontSize: '14px', color: '#111827', textAlign: 'right' }}>
-                          {formatCurrency(tx.balance_after)}
-                        </td>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
+                        <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Date</th>
+                        <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Type</th>
+                        <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Commande</th>
+                        <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Montant</th>
+                        <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Solde après</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {transactions.map((tx: any) => (
+                        <tr key={tx.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                          <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>{formatDate(tx.created_at)}</td>
+                          <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
+                            <span style={{
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              backgroundColor: tx.type === 'recharge' ? '#D1FAE5' : tx.type === 'deduction' ? '#FEE2E2' : '#FEF3C7',
+                              color: tx.type === 'recharge' ? '#065F46' : tx.type === 'deduction' ? '#DC2626' : '#92400E',
+                            }}>
+                              {tx.type === 'recharge' ? 'Recharge' : tx.type === 'deduction' ? 'Prélèvement' : 'Remboursement'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
+                            {tx.order_id ? (
+                              <button
+                                onClick={() => router.push(`/orders?search=${tx.order_id}`)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#F3F4F6',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  color: '#8B5CF6',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {tx.order_id.slice(0, 8)}...
+                                <ExternalLink size={12} />
+                              </button>
+                            ) : (
+                              <span style={{ color: '#9CA3AF', fontSize: '12px' }}>-</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px', fontSize: '14px', color: tx.type === 'recharge' ? '#10B981' : '#EF4444', textAlign: 'right', fontWeight: 600 }}>
+                            {tx.type === 'recharge' ? '+' : '-'}{formatCurrency(tx.amount)}
+                          </td>
+                          <td style={{ padding: '12px', fontSize: '14px', color: '#111827', textAlign: 'right' }}>
+                            {formatCurrency(tx.balance_after)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}

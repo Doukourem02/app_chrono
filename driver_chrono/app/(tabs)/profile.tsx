@@ -231,6 +231,12 @@ export default function ProfilePage() {
       subtitle: 'Gérer les informations du véhicule',
       onPress: () => router.push('/profile/vehicle'),
     },
+    ...(profile?.driver_type === 'partner' ? [{
+      icon: 'wallet-outline',
+      title: 'Commission',
+      subtitle: 'Gérer votre solde commission',
+      onPress: () => router.push('/commission' as any),
+    }] : []),
     {
       icon: 'card-outline',
       title: 'Paiements',

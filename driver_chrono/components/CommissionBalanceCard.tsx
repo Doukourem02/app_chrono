@@ -1,8 +1,11 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useCommissionStore } from '../store/useCommissionStore';
 import { useDriverStore } from '../store/useDriverStore';
+import { RechargeModal } from './RechargeModal';
+
+const { width } = Dimensions.get('window');
 
 interface CommissionBalanceCardProps {
   isOnline?: boolean;
@@ -15,6 +18,7 @@ export const CommissionBalanceCard: React.FC<CommissionBalanceCardProps> = ({
 }) => {
   const { account, isLoading, alerts, error, fetchBalance } = useCommissionStore();
   const { profile } = useDriverStore();
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
 
   // Charger le solde au montage et quand le profil change
   useEffect(() => {
@@ -53,6 +57,14 @@ export const CommissionBalanceCard: React.FC<CommissionBalanceCardProps> = ({
   const balance = account?.balance ?? 0;
   const balanceColor = getBalanceColor();
   const alertIcon = getAlertIcon();
+
+  const handleCardPress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      setShowRechargeModal(true);
+    }
+  };
 
   const CardContent = (
     <View style={[styles.card, !isOnline && styles.cardDisabled]}>
@@ -113,24 +125,28 @@ export const CommissionBalanceCard: React.FC<CommissionBalanceCardProps> = ({
     </View>
   );
 
-  if (onPress) {
-    return (
+  return (
+    <>
       <TouchableOpacity 
-        onPress={onPress}
+        onPress={handleCardPress}
         activeOpacity={0.7}
+        disabled={!isOnline}
       >
         {CardContent}
       </TouchableOpacity>
-    );
-  }
-
-  return CardContent;
+      
+      <RechargeModal
+        visible={showRechargeModal}
+        onClose={() => setShowRechargeModal(false)}
+      />
+    </>
+  );
 };
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    width: '48%',
+    width: width * 0.4,
     paddingVertical: 16,
     paddingHorizontal: 10,
     borderRadius: 15,

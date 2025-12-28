@@ -18,6 +18,7 @@ const navigation = [
   { href: "/finance", icon: Wallet, label: "Finance" },
   { href: "/planning", icon: Calendar, label: "Planning" },
   { href: "/drivers", icon: Truck, label: "Drivers" },
+  { href: "/commissions", icon: Wallet, label: "Commissions" },
   { href: "/users", icon: Users, label: "Users" },
   { href: "/ratings", icon: Star, label: "Ratings" },
   { href: "/analytics", icon: TrendingUp, label: "Analytics" },
