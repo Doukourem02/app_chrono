@@ -41,6 +41,14 @@ module.exports = {
       "expo-router",
       "expo-barcode-scanner",
       [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission: "Cette application a besoin de votre localisation pour fonctionner correctement.",
+          locationAlwaysPermission: "Cette application a besoin de votre localisation en arrière-plan pour le suivi des livraisons.",
+          locationWhenInUsePermission: "Cette application a besoin de votre localisation pour afficher votre position sur la carte.",
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           image: "./assets/images/splash-icon.png",
