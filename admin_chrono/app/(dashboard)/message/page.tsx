@@ -29,7 +29,7 @@ export default function MessagePage() {
   } = useAdminMessageStore()
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'order' | 'support' | 'admin'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'order' | 'support' | 'admin'>('order')
   const [selectedParticipantPair, setSelectedParticipantPair] = useState<{ participant1Id: string; participant2Id: string } | null>(null)
   const [isNewConversationModalOpen, setIsNewConversationModalOpen] = useState(false)
   

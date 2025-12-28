@@ -57,7 +57,15 @@ export default function NewShippingModal({
       const result = await adminApiService.getUsers()
       if (result.success && result.data) {
         const allUsers = result.data as UserData[]
-        const clients = allUsers.filter((user) => user.role === 'client')
+        
+        // Filtrer strictement pour ne garder QUE les clients
+        // Exclure explicitement: drivers, admins, super_admins, et utilisateurs sans rôle
+        const clients = allUsers.filter((user) => {
+          const role = user.role?.toLowerCase().trim()
+          // Ne garder que les utilisateurs avec role === 'client' exactement
+          return role === 'client'
+        })
+        
         setUsers(clients)
         setFilteredUsers(clients)
       }
@@ -76,11 +84,12 @@ export default function NewShippingModal({
 
   useEffect(() => {
     if (searchQuery) {
-      const query = searchQuery.toLowerCase()
+      const query = searchQuery.toLowerCase().trim()
       setFilteredUsers(
         users.filter(
           (user) =>
             user.email.toLowerCase().includes(query) ||
+            (user.phone && user.phone.toLowerCase().includes(query)) ||
             (user.first_name && user.first_name.toLowerCase().includes(query)) ||
             (user.last_name && user.last_name.toLowerCase().includes(query)) ||
             ((user.first_name && user.last_name) &&

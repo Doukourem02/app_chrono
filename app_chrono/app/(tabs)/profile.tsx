@@ -246,6 +246,13 @@ export default function ProfilePage() {
     },
     {
       icon: "receipt-outline",
+      title: "Mes transactions",
+      subtitle: "Historique et réclamations",
+      onPress: () => router.push("/profile/transactions"),
+      color: "#3B82F6",
+    },
+    {
+      icon: "receipt-outline",
       title: "Mes dettes",
       subtitle: "Gérer mes paiements différés",
       onPress: () => router.push("/profile/debts"),

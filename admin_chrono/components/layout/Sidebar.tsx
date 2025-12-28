@@ -2,28 +2,73 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Star,Truck,TrendingUp,Trophy,} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
 
-const navigation = [
+interface NavItem {
+  href: string;
+  icon: React.ComponentType<{ size?: number; color?: string }>;
+  label: string;
+}
+
+interface NavSection {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; color?: string }>;
+  items: NavItem[];
+}
+
+const mainNavigation: NavItem[] = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/tracking", icon: MapPin, label: "Tracking Orders" },
   { href: "/orders", icon: Package, label: "Orders" },
   { href: "/message", icon: MessageSquare, label: "Message" },
-  { href: "/reports", icon: FileText, label: "Reports" },
-  { href: "/finance", icon: Wallet, label: "Finance" },
-  { href: "/planning", icon: Calendar, label: "Planning" },
-  { href: "/drivers", icon: Truck, label: "Drivers" },
-  { href: "/commissions", icon: Wallet, label: "Commissions" },
-  { href: "/users", icon: Users, label: "Users" },
-  { href: "/ratings", icon: Star, label: "Ratings" },
-  { href: "/analytics", icon: TrendingUp, label: "Analytics" },
-  { href: "/gamification", icon: Trophy, label: "Performance" },
-  { href: "/settings", icon: Settings, label: "Settings" },
+];
+
+const navigationSections: NavSection[] = [
+  {
+    id: "analyses",
+    label: "Analyses & Rapports",
+    icon: TrendingUp,
+    items: [
+      { href: "/analytics", icon: TrendingUp, label: "Analytics" },
+      { href: "/reports", icon: FileText, label: "Reports" },
+    ],
+  },
+  {
+    id: "finances",
+    label: "Finances",
+    icon: Wallet,
+    items: [
+      { href: "/finances", icon: CreditCard, label: "Transactions Clients" },
+      { href: "/finances", icon: Coins, label: "Commissions Livreurs" },
+    ],
+  },
+  {
+    id: "gestion",
+    label: "Gestion",
+    icon: Users,
+    items: [
+      { href: "/users", icon: Users, label: "Users" },
+      { href: "/drivers", icon: Truck, label: "Drivers" },
+      { href: "/gamification", icon: Trophy, label: "Performance" },
+    ],
+  },
+  {
+    id: "administration",
+    label: "Administration",
+    icon: Settings,
+    items: [
+      { href: "/planning", icon: Calendar, label: "Planning" },
+      { href: "/promo-codes", icon: Tag, label: "Promo-codes" },
+      { href: "/disputes", icon: AlertTriangle, label: "Réclamations" },
+      { href: "/settings", icon: Settings, label: "Settings" },
+    ],
+  },
 ];
 
 export default function Sidebar() {
@@ -36,6 +81,7 @@ export default function Sidebar() {
   const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string; first_name?: string | null; last_name?: string | null } | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['analyses', 'gestion', 'administration']));
 
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -179,7 +225,7 @@ export default function Sidebar() {
   }, [loadProfile]);
 
   const collapsedWidth = 72
-  const expandedWidth = 240
+  const expandedWidth = 290
   const iconSlotSize = 44
   const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
 
@@ -359,6 +405,8 @@ export default function Sidebar() {
     transition: 'opacity 0.2s ease, transform 0.2s ease',
     color: active ? '#FFFFFF' : '#111827',
     whiteSpace: 'nowrap',
+    overflow: 'visible',
+    textOverflow: 'clip',
   })
 
   const avatarContainerStyle: React.CSSProperties = {
@@ -561,7 +609,8 @@ export default function Sidebar() {
       </div>
 
       <nav style={navStyle}>
-        {navigation.map((item) => {
+        {/* Navigation principale */}
+        {mainNavigation.map((item) => {
           const Icon = item.icon;
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
@@ -573,12 +622,166 @@ export default function Sidebar() {
               style={getNavButtonStyle(active)}
             >
               <span style={iconWrapperStyle}>
-                <Icon size={20} strokeWidth={1.7} />
+                <Icon size={20} />
               </span>
               {isExpanded && (
                 <span style={getNavLabelStyle(active)}>{item.label}</span>
               )}
             </Link>
+          );
+        })}
+
+        {/* Sections repliables */}
+        {isExpanded && navigationSections.map((section) => {
+          const SectionIcon = section.icon;
+          const isExpanded = expandedSections.has(section.id);
+          const hasActiveItem = section.items.some(
+            (item) => pathname === item.href || pathname.startsWith(item.href + "/")
+          );
+
+          return (
+            <div key={section.id} style={{ width: '100%', marginTop: '8px' }}>
+              <button
+                onClick={() => {
+                  const newExpanded = new Set(expandedSections);
+                  if (newExpanded.has(section.id)) {
+                    newExpanded.delete(section.id);
+                  } else {
+                    newExpanded.add(section.id);
+                  }
+                  setExpandedSections(newExpanded);
+                }}
+                style={{
+                  width: '100%',
+                  height: 48,
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingLeft: 16,
+                  paddingRight: 12,
+                  backgroundColor: hasActiveItem ? '#F3F4F6' : 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = hasActiveItem ? '#F3F4F6' : 'transparent';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                  <SectionIcon size={18} color={hasActiveItem ? '#8B5CF6' : '#6B7280'} />
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: hasActiveItem ? '#8B5CF6' : '#6B7280',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {section.label}
+                  </span>
+                </div>
+                {isExpanded ? (
+                  <ChevronDown size={16} color="#6B7280" />
+                ) : (
+                  <ChevronRight size={16} color="#6B7280" />
+                )}
+              </button>
+
+              {isExpanded && (
+                <div style={{
+                  marginTop: '4px',
+                  marginLeft: '16px',
+                  paddingLeft: '16px',
+                  borderLeft: '2px solid #E5E7EB',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                }}>
+                  {section.items.map((item, index) => {
+                    const ItemIcon = item.icon;
+                    let active = pathname === item.href || pathname.startsWith(item.href + "/");
+                    
+                    // Détection spéciale pour les pages Finance/Commissions
+                    if (item.href === "/finances") {
+                      if (item.label === "Transactions Clients") {
+                        active = pathname === "/finance" || pathname.startsWith("/finance/");
+                      } else if (item.label === "Commissions Livreurs") {
+                        active = pathname === "/commissions" || pathname.startsWith("/commissions/");
+                      }
+                    }
+
+                    // Clé unique basée sur l'index et le label pour éviter les doublons
+                    const uniqueKey = `${section.id}-${item.label}-${index}`;
+                    const actualHref = item.label === "Transactions Clients" ? "/finance" : item.label === "Commissions Livreurs" ? "/commissions" : item.href;
+
+                    return (
+                      <Link
+                        key={uniqueKey}
+                        href={actualHref}
+                        style={{
+                          ...getNavButtonStyle(active),
+                          height: 44,
+                          paddingLeft: 12,
+                          marginLeft: 0,
+                        }}
+                      >
+                        <span style={iconWrapperStyle}>
+                          <ItemIcon size={18} />
+                        </span>
+                        <span style={getNavLabelStyle(active)}>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Afficher les sections en mode collapsed comme des icônes simples */}
+        {!isExpanded && navigationSections.map((section) => {
+          const SectionIcon = section.icon;
+          const hasActiveItem = section.items.some(
+            (item) => pathname === item.href || pathname.startsWith(item.href + "/")
+          );
+
+          return (
+            <div key={section.id} style={{ position: 'relative' }}>
+              <button
+                onClick={() => {
+                  const newExpanded = new Set(expandedSections);
+                  if (newExpanded.has(section.id)) {
+                    newExpanded.delete(section.id);
+                  } else {
+                    newExpanded.add(section.id);
+                  }
+                  setExpandedSections(newExpanded);
+                }}
+                style={{
+                  width: collapsedWidth,
+                  height: 48,
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: hasActiveItem ? '#F3F4F6' : 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = hasActiveItem ? '#F3F4F6' : 'transparent';
+                }}
+              >
+                <SectionIcon size={20} color={hasActiveItem ? '#8B5CF6' : '#6B7280'} />
+              </button>
+            </div>
           );
         })}
       </nav>

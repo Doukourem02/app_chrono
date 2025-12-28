@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Download, TrendingUp, Package, DollarSign, Clock, CheckCircle, Star, ExternalLink } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Download, TrendingUp, Package, DollarSign, Clock, CheckCircle, Star, ExternalLink, Search, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { adminApiService } from '@/lib/adminApiService'
 
 interface ZoneData {
   zone: string
@@ -11,9 +12,21 @@ interface ZoneData {
   revenue: string | number
 }
 
+type TabType = 'overview' | 'ratings'
+
 export default function AnalyticsPage() {
+  const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [days, setDays] = useState(7)
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json')
+  
+  // État pour l'onglet Ratings
+  const [ratingsPage, setRatingsPage] = useState(1)
+  const driverFilter = ''
+  const clientFilter = ''
+  const [minRatingFilter, setMinRatingFilter] = useState<string>('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const ratingsItemsPerPage = 20
+  const queryClient = useQueryClient()
 
   // KPIs en temps réel
   const { data: kpis, isLoading: kpisLoading } = useQuery({
@@ -63,11 +76,118 @@ export default function AnalyticsPage() {
     }
   }
 
+  // Requête pour les évaluations (onglet Ratings)
+  const { data: ratingsData, isLoading: ratingsLoading } = useQuery({
+    queryKey: ['ratings', ratingsPage, driverFilter, clientFilter, minRatingFilter],
+    queryFn: () =>
+      adminApiService.getRatings({
+        page: ratingsPage,
+        limit: ratingsItemsPerPage,
+        driverId: driverFilter || undefined,
+        clientId: clientFilter || undefined,
+        minRating: minRatingFilter ? parseInt(minRatingFilter) : undefined,
+      }),
+    enabled: activeTab === 'ratings',
+  })
+
+  const deleteRatingMutation = useMutation({
+    mutationFn: async (ratingId: string) => {
+      return await adminApiService.deleteRating(ratingId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ratings'] })
+    },
+  })
+
+  const ratings = (ratingsData?.data || []) as Array<{
+    id: string
+    rating: string | number
+    user_email?: string
+    user_phone?: string
+    user_first_name?: string
+    user_last_name?: string
+    driver_email?: string
+    driver_phone?: string
+    driver_first_name?: string
+    driver_last_name?: string
+    order_id?: string
+    order_id_full?: string
+    comment?: string
+    created_at?: string
+  }>
+
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A'
+    const date = new Date(dateString)
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        size={16}
+        style={{
+          color: i < rating ? '#FBBF24' : '#E5E7EB',
+          fill: i < rating ? '#FBBF24' : 'transparent',
+        }}
+      />
+    ))
+  }
+
   return (
     <div style={{ padding: '24px' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
-        Analytics Avancés
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>
+          Analytics Avancés
+        </h1>
+      </div>
+
+      {/* Onglets */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid #E5E7EB' }}>
+        <button
+          onClick={() => setActiveTab('overview')}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            backgroundColor: 'transparent',
+            borderBottom: activeTab === 'overview' ? '2px solid #8B5CF6' : '2px solid transparent',
+            color: activeTab === 'overview' ? '#8B5CF6' : '#6B7280',
+            fontWeight: activeTab === 'overview' ? 600 : 500,
+            cursor: 'pointer',
+            fontSize: '14px',
+            transition: 'all 0.2s',
+          }}
+        >
+          Vue d&apos;ensemble
+        </button>
+        <button
+          onClick={() => setActiveTab('ratings')}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            backgroundColor: 'transparent',
+            borderBottom: activeTab === 'ratings' ? '2px solid #8B5CF6' : '2px solid transparent',
+            color: activeTab === 'ratings' ? '#8B5CF6' : '#6B7280',
+            fontWeight: activeTab === 'ratings' ? 600 : 500,
+            cursor: 'pointer',
+            fontSize: '14px',
+            transition: 'all 0.2s',
+          }}
+        >
+          Évaluations
+        </button>
+      </div>
+
+      {/* Contenu onglet Overview */}
+      {activeTab === 'overview' && (
+        <>
 
       {/* KPIs en temps réel */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
@@ -313,6 +433,206 @@ export default function AnalyticsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      </>)}
+
+      {/* Contenu onglet Évaluations */}
+      {activeTab === 'ratings' && (
+        <div>
+          {/* Filtres */}
+          <div style={{ marginBottom: '24px', padding: '20px', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+                <input
+                  type="text"
+                  placeholder="Rechercher..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px 10px 36px',
+                    borderRadius: '8px',
+                    border: '1px solid #E5E7EB',
+                    fontSize: '14px',
+                  }}
+                />
+              </div>
+              <select
+                value={minRatingFilter}
+                onChange={(e) => setMinRatingFilter(e.target.value)}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #E5E7EB',
+                  fontSize: '14px',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">Toutes les notes</option>
+                <option value="5">5 étoiles</option>
+                <option value="4">4+ étoiles</option>
+                <option value="3">3+ étoiles</option>
+                <option value="2">2+ étoiles</option>
+                <option value="1">1+ étoiles</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Liste des évaluations */}
+          <div style={{ backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+            {ratingsLoading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>
+                Chargement...
+              </div>
+            ) : ratings.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>
+                Aucune évaluation trouvée
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Note</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Client</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Livreur</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Commande</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Commentaire</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Date</th>
+                    <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ratings
+                    .filter((rating) => {
+                      if (!searchQuery) return true
+                      const query = searchQuery.toLowerCase()
+                      return (
+                        rating.user_email?.toLowerCase().includes(query) ||
+                        rating.driver_email?.toLowerCase().includes(query) ||
+                        rating.order_id?.toLowerCase().includes(query) ||
+                        rating.comment?.toLowerCase().includes(query)
+                      )
+                    })
+                    .map((rating) => {
+                      const ratingNum = typeof rating.rating === 'string' ? parseFloat(rating.rating) : rating.rating
+                      return (
+                        <tr key={rating.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {renderStars(ratingNum)}
+                              <span style={{ marginLeft: '4px', fontWeight: 600 }}>{ratingNum}/5</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>
+                                {rating.user_first_name || ''} {rating.user_last_name || ''}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#6B7280' }}>{rating.user_email}</div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>
+                                {rating.driver_first_name || ''} {rating.driver_last_name || ''}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#6B7280' }}>{rating.driver_email}</div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            {rating.order_id_full ? (
+                              <Link
+                                href={`/orders?search=${rating.order_id_full}`}
+                                style={{
+                                  color: '#8B5CF6',
+                                  textDecoration: 'none',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {rating.order_id_full}
+                                <ExternalLink size={12} style={{ marginLeft: '4px', display: 'inline' }} />
+                              </Link>
+                            ) : (
+                              <span style={{ color: '#9CA3AF', fontSize: '12px' }}>-</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px', maxWidth: '300px' }}>
+                            <div style={{ fontSize: '13px', color: '#111827' }}>
+                              {rating.comment || <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Aucun commentaire</span>}
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px', fontSize: '12px', color: '#6B7280' }}>
+                            {formatDate(rating.created_at)}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <button
+                              onClick={() => {
+                                if (confirm('Êtes-vous sûr de vouloir supprimer cette évaluation ?')) {
+                                  deleteRatingMutation.mutate(rating.id)
+                                }
+                              }}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '6px',
+                                backgroundColor: '#FEE2E2',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#DC2626',
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            )}
+
+            {/* Pagination */}
+            {ratingsData?.pagination && (
+              <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #E5E7EB' }}>
+                <div style={{ fontSize: '14px', color: '#6B7280' }}>
+                  Page {ratingsPage} sur {ratingsData.pagination.totalPages || 1}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setRatingsPage((p) => Math.max(1, p - 1))}
+                    disabled={ratingsPage === 1}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #E5E7EB',
+                      backgroundColor: ratingsPage === 1 ? '#F9FAFB' : '#FFFFFF',
+                      cursor: ratingsPage === 1 ? 'not-allowed' : 'pointer',
+                      color: ratingsPage === 1 ? '#9CA3AF' : '#111827',
+                    }}
+                  >
+                    Précédent
+                  </button>
+                  <button
+                    onClick={() => setRatingsPage((p) => p + 1)}
+                    disabled={ratingsPage >= (ratingsData.pagination.totalPages || 1)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #E5E7EB',
+                      backgroundColor: ratingsPage >= (ratingsData.pagination.totalPages || 1) ? '#F9FAFB' : '#FFFFFF',
+                      cursor: ratingsPage >= (ratingsData.pagination.totalPages || 1) ? 'not-allowed' : 'pointer',
+                      color: ratingsPage >= (ratingsData.pagination.totalPages || 1) ? '#9CA3AF' : '#111827',
+                    }}
+                  >
+                    Suivant
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
