@@ -359,7 +359,8 @@ export const updateDeliveryStatus = async (
         }
       }
 
-      setTimeout(() => activeOrders.delete(orderId), 1000 * 60 * 5);
+      // Retirer immédiatement de activeOrders pour éviter qu'elle réapparaisse après refresh
+      activeOrders.delete(orderId);
     }
 
     res.json({ success: true, order });

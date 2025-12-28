@@ -267,14 +267,26 @@ export default function OrderTrackingPage() {
           const existingOrder = store.activeOrders.find(o => o.id === orderId);
           
           if (existingOrder) {
+            // Si le statut a changé, utiliser updateFromSocket qui gère correctement les statuts finaux
             if (existingOrder.status !== orderStatus) {
               store.updateFromSocket({ order: formattedOrder as any });
             } else {
-              store.updateOrder(orderId, formattedOrder as any);
+              // Si le statut n'a pas changé mais que c'est un statut final, s'assurer qu'il est retiré
+              if (isFinalStatus) {
+                store.removeOrder(orderId);
+              } else {
+                store.updateOrder(orderId, formattedOrder as any);
+              }
             }
           } else {
+            // Si la commande n'existe pas dans le store
             if (!isFinalStatus) {
+              // Ajouter seulement si ce n'est pas un statut final
               store.addOrder(formattedOrder as any);
+            } else {
+              // Si c'est un statut final et qu'elle n'existe pas, ne rien faire
+              // (elle ne devrait pas être dans activeOrders)
+              logger.info('Commande complétée chargée depuis l\'API mais non ajoutée au store (statut final)', 'order-tracking', { orderId, status: orderStatus });
             }
           }
           
@@ -299,17 +311,18 @@ export default function OrderTrackingPage() {
       loadOrderFromAPI();
     }
     
-    // Recharger toutes les 5 secondes pour garantir que le statut est à jour
+    // Recharger toutes les 3 secondes pour garantir que le statut est à jour
+    // Réduire l'intervalle pour une meilleure réactivité
     const interval = setInterval(() => {
       if (orderId && user?.id) {
-        if (currentOrder && currentOrder.status !== 'completed' && currentOrder.status !== 'cancelled' && currentOrder.status !== 'declined') {
-          loadOrderFromAPI();
-        }
+        // Toujours recharger depuis l'API pour garantir la synchronisation
+        // même si le statut semble final (peut avoir changé côté serveur)
+        loadOrderFromAPI();
       }
-    }, 5000);
+    }, 3000);
     
     return () => clearInterval(interval);
-  }, [orderId, user?.id, currentOrder, storeOrder, loadOrderFromAPI]);
+  }, [orderId, user?.id, loadOrderFromAPI]);
 
   // Calculer la région de la map pour afficher pickup et dropoff
   useEffect(() => {

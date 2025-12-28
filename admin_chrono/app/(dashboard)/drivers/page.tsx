@@ -73,6 +73,13 @@ export default function DriversPage() {
     setCurrentPage(1)
   }, [typeFilter, balanceStatusFilter, searchQuery])
 
+  // Réinitialiser balanceStatusFilter quand on passe à 'internal' (pas de commission pour internes)
+  React.useEffect(() => {
+    if (typeFilter === 'internal') {
+      setBalanceStatusFilter('all')
+    }
+  }, [typeFilter])
+
   const formatCurrency = (amount: number | undefined) => {
     if (amount === undefined || amount === null) return 'N/A'
     return new Intl.NumberFormat('fr-FR', {

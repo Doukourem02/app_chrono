@@ -616,7 +616,9 @@ export async function getOrderById(orderId: string): Promise<any | null> {
     const result = await (pool as any).query(
      `SELECT * FROM orders 
       WHERE user_id = $1 
-    AND status IN ('pending', 'accepted', 'enroute', 'picked_up') ORDER BY created_at DESC`, [userId] ); return (result.rows || []).map((order: any) => { const etaMinutes = order.eta_minutes != null ? Number(order.eta_minutes) : null; return {
+    AND status IN ('pending', 'accepted', 'enroute', 'picked_up', 'delivering', 'in_progress') 
+    AND status NOT IN ('completed', 'cancelled', 'declined')
+    ORDER BY created_at DESC`, [userId] ); return (result.rows || []).map((order: any) => { const etaMinutes = order.eta_minutes != null ? Number(order.eta_minutes) : null; return {
         ...order,
         pickup: parseJsonField(order.pickup_address),
         dropoff: parseJsonField(order.dropoff_address),
@@ -630,7 +632,9 @@ export async function getOrderById(orderId: string): Promise<any | null> {
     const result = await (pool as any).query(
      `SELECT * FROM orders 
       WHERE driver_id = $1 
-    AND status IN ('accepted', 'enroute', 'picked_up') ORDER BY accepted_at DESC`, [driverId] ); return (result.rows || []).map((order: any) => { const etaMinutes = order.eta_minutes != null ? Number(order.eta_minutes) : null; return {
+    AND status IN ('accepted', 'enroute', 'picked_up', 'delivering', 'in_progress') 
+    AND status NOT IN ('completed', 'cancelled', 'declined')
+    ORDER BY accepted_at DESC`, [driverId] ); return (result.rows || []).map((order: any) => { const etaMinutes = order.eta_minutes != null ? Number(order.eta_minutes) : null; return {
         ...order,
         pickup: parseJsonField(order.pickup_address),
         dropoff: parseJsonField(order.dropoff_address),

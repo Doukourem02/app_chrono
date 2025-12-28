@@ -105,14 +105,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   // Garder une trace de la position précédente pour l'animation fluide
   const previousDriverCoordsRef = useRef<Coordinates | null>(null);
   
-  // Données météo pour ajuster l'ETA
-  const weatherData = useWeather({
-    latitude: animatedDriverPosition?.latitude || destination?.latitude || null,
-    longitude: animatedDriverPosition?.longitude || destination?.longitude || null,
-    vehicleType: selectedMethod === 'moto' ? 'moto' : selectedMethod === 'vehicule' ? 'vehicule' : selectedMethod === 'cargo' ? 'cargo' : null,
-    enabled: !!animatedDriverPosition && !!destination,
-  });
-  
   // Animation fluide de la position du driver
   const animatedDriverPosition = useAnimatedPosition({
     currentPosition: orderDriverCoords || null,
@@ -127,15 +119,37 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
     }
   }, [orderDriverCoords]);
   
+  // Déterminer la destination selon le statut (calculé avant useWeather)
+  const destination = useMemo(() => {
+    return (orderStatus === 'accepted' || orderStatus === 'pending') ? pickupCoords :
+           (orderStatus === 'enroute' || orderStatus === 'picked_up') ? dropoffCoords :
+           null;
+  }, [orderStatus, pickupCoords, dropoffCoords]);
+  
+  // Routes animées vers pickup et dropoff (définies avant leur utilisation)
+  const driverToPickupRoute = useAnimatedRoute({
+    origin: (orderStatus === 'accepted' || orderStatus === 'pending') && orderDriverCoords ? orderDriverCoords : null,
+    destination: (orderStatus === 'accepted' || orderStatus === 'pending') && pickupCoords ? pickupCoords : null,
+    enabled: !!(orderStatus === 'accepted' || orderStatus === 'pending') && !!orderDriverCoords && !!pickupCoords,
+  });
+
+  const driverToDropoffRoute = useAnimatedRoute({
+    origin: (orderStatus === 'enroute' || orderStatus === 'picked_up') && orderDriverCoords ? orderDriverCoords : null,
+    destination: (orderStatus === 'enroute' || orderStatus === 'picked_up') && dropoffCoords ? dropoffCoords : null,
+    enabled: !!(orderStatus === 'enroute' || orderStatus === 'picked_up') && !!orderDriverCoords && !!dropoffCoords,
+  });
+
+  // Données météo pour ajuster l'ETA
+  const weatherData = useWeather({
+    latitude: animatedDriverPosition?.latitude || destination?.latitude || null,
+    longitude: animatedDriverPosition?.longitude || destination?.longitude || null,
+    vehicleType: selectedMethod === 'moto' ? 'moto' : selectedMethod === 'vehicule' ? 'vehicule' : selectedMethod === 'cargo' ? 'cargo' : null,
+    enabled: !!animatedDriverPosition && !!destination,
+  });
+  
   // Calculer l'ETA en temps réel
   const realTimeETA = useMemo(() => {
     if (!animatedDriverPosition) return null;
-    
-    // Déterminer la destination selon le statut
-    const destination = 
-      (orderStatus === 'accepted' || orderStatus === 'pending') ? pickupCoords :
-      (orderStatus === 'enroute' || orderStatus === 'picked_up') ? dropoffCoords :
-      null;
     
     if (!destination) return null;
     
@@ -152,7 +166,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       trafficData,
       weatherData.adjustment || null
     );
-  }, [animatedDriverPosition, orderStatus, pickupCoords, dropoffCoords, selectedMethod, driverToPickupRoute, driverToDropoffRoute, weatherData.adjustment]);
+  }, [animatedDriverPosition, destination, orderStatus, selectedMethod, driverToPickupRoute, driverToDropoffRoute, weatherData.adjustment]);
 
   useEffect(() => {
     const outerListenerId = outerPulse.addListener(({ value }) => {
@@ -182,18 +196,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       });
   }, [onlineDrivers, orderDriverCoords]);
 
-  const driverToPickupRoute = useAnimatedRoute({
-    origin: (orderStatus === 'accepted' || orderStatus === 'pending') && orderDriverCoords ? orderDriverCoords : null,
-    destination: (orderStatus === 'accepted' || orderStatus === 'pending') && pickupCoords ? pickupCoords : null,
-    enabled: !!(orderStatus === 'accepted' || orderStatus === 'pending') && !!orderDriverCoords && !!pickupCoords,
-  });
-
-  const driverToDropoffRoute = useAnimatedRoute({
-    origin: (orderStatus === 'enroute' || orderStatus === 'picked_up') && orderDriverCoords ? orderDriverCoords : null,
-    destination: (orderStatus === 'enroute' || orderStatus === 'picked_up') && dropoffCoords ? dropoffCoords : null,
-    enabled: !!(orderStatus === 'enroute' || orderStatus === 'picked_up') && !!orderDriverCoords && !!dropoffCoords,
-  });
-
   return (
     <MapView 
       provider={PROVIDER_GOOGLE}
@@ -206,7 +208,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       showsCompass={false}
       showsScale={false}
       showsBuildings={false}
-      showsTraffic={true}
+      showsTraffic={false}
       showsIndoors={false}
       showsPointsOfInterest={false}
       mapType="standard"

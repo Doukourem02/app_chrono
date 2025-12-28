@@ -69,30 +69,47 @@ export const getCommissionBalance = async (
     let balanceData;
     if (!balanceResult.rows || balanceResult.rows.length === 0) {
       // Initialiser le solde si n'existe pas
-      const initResult = await (pool as any).query(
-        `SELECT initialize_commission_balance($1, 10.00) as balance_id`,
-        [userId]
-      );
+      try {
+        const initResult = await (pool as any).query(
+          `SELECT initialize_commission_balance($1, 10.00) as balance_id`,
+          [userId]
+        );
 
-      // Récupérer le solde initialisé
-      const newBalanceResult = await (pool as any).query(
-        `SELECT 
-          id,
-          balance,
-          is_suspended,
-          suspended_at,
-          suspended_reason,
-          commission_rate,
-          created_at,
-          updated_at
-        FROM commission_balance
-        WHERE driver_id = $1`,
-        [userId]
-      );
+        if (!initResult.rows || initResult.rows.length === 0) {
+          throw new Error('Échec de l\'initialisation du solde commission');
+        }
 
-      balanceData = newBalanceResult.rows[0];
+        // Récupérer le solde initialisé
+        const newBalanceResult = await (pool as any).query(
+          `SELECT 
+            id,
+            balance,
+            is_suspended,
+            suspended_at,
+            suspended_reason,
+            commission_rate,
+            created_at,
+            updated_at
+          FROM commission_balance
+          WHERE driver_id = $1`,
+          [userId]
+        );
+
+        if (!newBalanceResult.rows || newBalanceResult.rows.length === 0) {
+          throw new Error('Solde commission initialisé mais non trouvé après création');
+        }
+
+        balanceData = newBalanceResult.rows[0];
+      } catch (initError: any) {
+        logger.error('Erreur lors de l\'initialisation du solde commission:', initError);
+        throw new Error(`Impossible d'initialiser le solde commission: ${initError.message}`);
+      }
     } else {
       balanceData = balanceResult.rows[0];
+    }
+
+    if (!balanceData) {
+      throw new Error('Données de solde commission introuvables');
     }
 
     logger.info(`Solde commission récupéré pour ${maskUserId(userId)}: ${maskAmount(balanceData.balance)} FCFA`);
@@ -109,10 +126,11 @@ export const getCommissionBalance = async (
     });
   } catch (error: any) {
     logger.error('Erreur getCommissionBalance:', error);
+    const errorMessage = error.message || 'Erreur lors de la récupération du solde';
     res.status(500).json({
       success: false,
-      message: 'Erreur lors de la récupération du solde',
-      error: error.message,
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };

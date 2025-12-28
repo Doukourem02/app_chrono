@@ -47,6 +47,52 @@ export const getRealTimeKPIs = async (req: Request, res: Response): Promise<void
       [weekStart]
     );
 
+    // Statistiques de ratings
+    let averageRating = 0;
+    let totalRatings = 0;
+    let ratingDistribution = { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 };
+    
+    try {
+      const ratingsTableCheck = await pool.query(
+        `SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_schema = 'public' AND table_name = 'ratings'
+        )`
+      );
+      
+      if (ratingsTableCheck.rows[0]?.exists) {
+        const ratingsResult = await pool.query(
+          `SELECT 
+            COALESCE(AVG(rating::numeric), 0) as avg_rating,
+            COUNT(*) as total_count
+           FROM ratings`
+        );
+        
+        if (ratingsResult.rows[0]) {
+          averageRating = parseFloat(ratingsResult.rows[0].avg_rating || '0');
+          totalRatings = parseInt(ratingsResult.rows[0].total_count || '0');
+        }
+        
+        const distributionResult = await pool.query(
+          `SELECT 
+            rating::text,
+            COUNT(*) as count
+           FROM ratings
+           GROUP BY rating
+           ORDER BY rating DESC`
+        );
+        
+        distributionResult.rows.forEach((row: any) => {
+          const ratingKey = String(row.rating);
+          if (ratingKey in ratingDistribution) {
+            ratingDistribution[ratingKey as keyof typeof ratingDistribution] = parseInt(row.count || '0');
+          }
+        });
+      }
+    } catch (ratingError: any) {
+      logger.warn('Erreur calcul statistiques ratings:', ratingError);
+    }
+
     const kpis = {
       activeOrders: parseInt(activeOrdersResult.rows[0]?.count || '0'),
       completedToday: parseInt(completedTodayResult.rows[0]?.count || '0'),
@@ -55,6 +101,9 @@ export const getRealTimeKPIs = async (req: Request, res: Response): Promise<void
       acceptanceRate: acceptanceRateResult.rows[0]?.total > 0
         ? (parseInt(acceptanceRateResult.rows[0]?.accepted || '0') / parseInt(acceptanceRateResult.rows[0]?.total || '1')) * 100
         : 0,
+      averageRating,
+      totalRatings,
+      ratingDistribution,
       timestamp: new Date().toISOString(),
     };
 
@@ -110,9 +159,43 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
       [startDate]
     );
 
+    // Évolution des ratings dans le temps
+    let ratingTrend: Array<{ date: string; average: number; count: number }> = [];
+    try {
+      const ratingsTableCheck = await pool.query(
+        `SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_schema = 'public' AND table_name = 'ratings'
+        )`
+      );
+      
+      if (ratingsTableCheck.rows[0]?.exists) {
+        const ratingTrendResult = await pool.query(
+          `SELECT 
+            DATE(created_at) as date,
+            COALESCE(AVG(rating::numeric), 0) as average,
+            COUNT(*) as count
+           FROM ratings
+           WHERE created_at >= $1
+           GROUP BY DATE(created_at)
+           ORDER BY date ASC`,
+          [startDate]
+        );
+        
+        ratingTrend = ratingTrendResult.rows.map((row: any) => ({
+          date: row.date,
+          average: parseFloat(row.average || '0'),
+          count: parseInt(row.count || '0'),
+        }));
+      }
+    } catch (ratingError: any) {
+      logger.warn('Erreur calcul évolution ratings:', ratingError);
+    }
+
     res.json({
       daily: dailyDataResult.rows,
       byZone: zoneDataResult.rows,
+      ratingTrend,
     });
   } catch (error: any) {
     logger.error('Error getting performance data:', error);

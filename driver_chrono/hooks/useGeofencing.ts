@@ -50,8 +50,24 @@ export function useGeofencing({
   const previousStateRef = useRef<GeofenceState | null>(null);
   const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasValidatedRef = useRef<boolean>(false);
+  const lastDriverPositionRef = useRef<Coordinates | null>(null);
+  const onEnteredZoneRef = useRef(onEnteredZone);
+  const onValidatedRef = useRef(onValidated);
 
-  // Fonction pour valider automatiquement
+  // Mettre à jour les refs des callbacks à chaque render
+  useEffect(() => {
+    onEnteredZoneRef.current = onEnteredZone;
+    onValidatedRef.current = onValidated;
+  }, [onEnteredZone, onValidated]);
+
+  const driverPositionRef = useRef(driverPosition);
+  
+  // Mettre à jour la ref de la position du driver
+  useEffect(() => {
+    driverPositionRef.current = driverPosition;
+  }, [driverPosition]);
+
+  // Fonction pour valider automatiquement (stabilisée avec useRef)
   const handleAutoValidate = useCallback(
     (orderId: string, currentStatus: string | null) => {
       if (hasValidatedRef.current) {
@@ -82,11 +98,15 @@ export function useGeofencing({
         'useGeofencing'
       );
 
-      // Notifier le client que la validation a été déclenchée
-      orderSocketService.emitGeofenceEvent(orderId, 'validated', driverPosition);
+      const currentDriverPosition = driverPositionRef.current;
 
-      // Mettre à jour le statut via Socket.IO
-      orderSocketService.updateDeliveryStatus(orderId, newStatus, driverPosition);
+      // Notifier le client que la validation a été déclenchée
+      if (currentDriverPosition) {
+        orderSocketService.emitGeofenceEvent(orderId, 'validated', currentDriverPosition);
+
+        // Mettre à jour le statut via Socket.IO
+        orderSocketService.updateDeliveryStatus(orderId, newStatus, currentDriverPosition);
+      }
 
       // Mettre à jour l'état local
       setGeofenceState((prev) => ({
@@ -94,9 +114,9 @@ export function useGeofencing({
         status: GeofenceStatus.VALIDATED,
       }));
 
-      onValidated?.();
+      onValidatedRef.current?.();
     },
-    [driverPosition, onValidated]
+    []
   );
 
   // Réinitialiser quand l'ordre change
@@ -129,14 +149,40 @@ export function useGeofencing({
       return;
     }
 
+    // Vérifier si la position du driver a vraiment changé (tolérance de 10m pour éviter les recalculs inutiles)
+    const lastPos = lastDriverPositionRef.current;
+    if (lastPos) {
+      const latDiff = Math.abs(lastPos.latitude - driverPosition.latitude);
+      const lonDiff = Math.abs(lastPos.longitude - driverPosition.longitude);
+      // Si la position n'a pas changé significativement (< 10m), ne pas recalculer
+      if (latDiff < 0.0001 && lonDiff < 0.0001) {
+        return;
+      }
+    }
+    lastDriverPositionRef.current = driverPosition;
+
     const newState = calculateGeofenceState(
       driverPosition,
       targetPosition,
       previousStateRef.current
     );
 
-    setGeofenceState(newState);
-    previousStateRef.current = newState;
+    // Ne mettre à jour l'état que s'il a vraiment changé pour éviter les boucles infinies
+    const previousState = previousStateRef.current;
+    const hasChanged = 
+      !previousState ||
+      previousState.status !== newState.status ||
+      (previousState.distance !== null && newState.distance !== null && 
+       Math.abs(previousState.distance - newState.distance) > 5) || // Tolérance de 5m pour distance
+      previousState.enteredAt !== newState.enteredAt;
+
+    if (hasChanged) {
+      setGeofenceState(newState);
+      previousStateRef.current = newState;
+    } else {
+      // Mettre à jour la ref même si l'état n'a pas changé
+      previousStateRef.current = newState;
+    }
 
     // Si vient d'entrer dans la zone
     if (newState.status === GeofenceStatus.ENTERING) {
@@ -150,7 +196,7 @@ export function useGeofencing({
         orderSocketService.emitGeofenceEvent(orderId, 'entered', driverPosition);
       }
       
-      onEnteredZone?.();
+      onEnteredZoneRef.current?.();
 
       // Programmer la validation automatique après 10 secondes
       if (validationTimeoutRef.current) {
@@ -178,25 +224,31 @@ export function useGeofencing({
     targetPosition,
     orderId,
     orderStatus,
-    onEnteredZone,
     handleAutoValidate,
   ]);
 
-  // Mettre à jour le temps passé dans la zone
+  // Mettre à jour le temps passé dans la zone (seulement si INSIDE)
   useEffect(() => {
-    if (geofenceState.status !== GeofenceStatus.INSIDE) {
+    if (geofenceState.status !== GeofenceStatus.INSIDE || !geofenceState.enteredAt) {
       return;
     }
 
     const interval = setInterval(() => {
-      if (geofenceState.enteredAt) {
-        const timeInZone = Date.now() - geofenceState.enteredAt;
-        setGeofenceState((prev) => ({
+      setGeofenceState((prev) => {
+        if (prev.status !== GeofenceStatus.INSIDE || !prev.enteredAt) {
+          return prev;
+        }
+        const timeInZone = Date.now() - prev.enteredAt;
+        // Ne mettre à jour que si le temps a vraiment changé (tolérance de 500ms)
+        if (Math.abs(prev.timeInZone - timeInZone) < 500) {
+          return prev;
+        }
+        return {
           ...prev,
           timeInZone,
-        }));
-      }
-    }, 100); // Mise à jour toutes les 100ms pour l'affichage
+        };
+      });
+    }, 1000); // Mise à jour toutes les 1 seconde (au lieu de 100ms)
 
     return () => clearInterval(interval);
   }, [geofenceState.status, geofenceState.enteredAt]);

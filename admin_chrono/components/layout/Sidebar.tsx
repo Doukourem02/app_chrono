@@ -21,7 +21,7 @@ const navigation = [
   { href: "/users", icon: Users, label: "Users" },
   { href: "/ratings", icon: Star, label: "Ratings" },
   { href: "/analytics", icon: TrendingUp, label: "Analytics" },
-  { href: "/gamification", icon: Trophy, label: "Gamification" },
+  { href: "/gamification", icon: Trophy, label: "Performance" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

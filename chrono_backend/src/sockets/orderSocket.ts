@@ -1,12 +1,8 @@
 import { Socket, Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/db.js';
-import {
-  recordOrderAssignment,
-  saveDeliveryProofRecord,
-  saveOrder, updateOrderStatus as updateOrderStatusDB,
-} from '../config/orderStorage.js';
-import qrCodeService from '../services/qrCodeService.js'; // Interfaces for order data
+import {recordOrderAssignment,saveDeliveryProofRecord,saveOrder, updateOrderStatus as updateOrderStatusDB,getActiveOrdersByDriver,} from '../config/orderStorage.js';
+import qrCodeService from '../services/qrCodeService.js';
 import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionForOrder.js';
 import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
 import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
@@ -883,7 +879,13 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             dbError: dbErrorAssign
           });
 
-          console.log(`order-accepted émis avec succès pour commande ${maskOrderId(orderId)}`);
+          // Émettre aussi order:status:update pour garantir la synchronisation du statut
+          currentSocket.emit('order:status:update', {
+            order: orderToSend,
+            location: null
+          });
+
+          console.log(`order-accepted et order:status:update émis avec succès pour commande ${maskOrderId(orderId)}`);
         } catch (err) {
           console.error(`Erreur préparation order-accepted:`, err);
           // En cas d'erreur, essayer quand même d'envoyer avec les données minimales
@@ -893,7 +895,12 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               order: orderToSend, // Utiliser orderToSend même en cas d'erreur
               driverInfo: { id: driverId }
             });
-            console.log(`order-accepted émis (mode fallback) pour commande ${maskOrderId(orderId)}`);
+            // Émettre aussi order:status:update même en cas d'erreur
+            currentSocket.emit('order:status:update', {
+              order: orderToSend,
+              location: null
+            });
+            console.log(`order-accepted et order:status:update émis (mode fallback) pour commande ${maskOrderId(orderId)}`);
           } else if (retryCount < 3) {
             setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
           }
@@ -1042,14 +1049,46 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 
         if (DEBUG) console.log(`Statut livraison ${maskOrderId(orderId)}: ${status} par driver ${maskUserId(driverId)}`);
 
+        // Émettre l'événement au client AVANT de supprimer de activeOrders
+        // Cela garantit que le client reçoit la mise à jour même si la commande est complétée
         const userSocketId = connectedUsers.get(order.user.id);
         if (userSocketId) {
-          io.to(userSocketId).emit('order:status:update', {
-            order,
-            location,
-            dbSaved: dbSavedStatus,
-            dbError: dbErrorStatus
-          });
+          // S'assurer que le statut est bien défini dans l'objet order avant l'émission
+          const orderToEmit = {
+            ...order,
+            status: status, // Forcer le statut à jour
+            completedAt: status === 'completed' ? order.completedAt : order.completedAt,
+          };
+          
+          // Vérifier que le socket est toujours connecté
+          const userSocket = io.sockets.sockets.get(userSocketId);
+          if (userSocket && userSocket.connected) {
+            userSocket.emit('order:status:update', {
+              order: orderToEmit,
+              location,
+              dbSaved: dbSavedStatus,
+              dbError: dbErrorStatus
+            });
+            
+            logger.info(
+              `[DIAGNOSTIC] order:status:update émis au client ${maskUserId(order.user.id)} pour commande ${maskOrderId(orderId)} avec statut ${status}`,
+              undefined,
+              { orderId, status, userSocketId, hasLocation: !!location }
+            );
+          } else {
+            logger.warn(
+              `[DIAGNOSTIC] Socket ${userSocketId} non connecté pour user ${maskUserId(order.user.id)} - impossible d'émettre order:status:update`,
+              undefined,
+              { orderId, status }
+            );
+          }
+        } else {
+          // Si le client n'est pas connecté, logger un avertissement
+          logger.warn(
+            `[DIAGNOSTIC] Client ${maskUserId(order.user.id)} non connecté - impossible d'émettre order:status:update pour commande ${maskOrderId(orderId)} avec statut ${status}`,
+            undefined,
+            { orderId, status, connectedUsersCount: connectedUsers.size }
+          );
         }
 
         // Diffuser aux admins
@@ -1101,10 +1140,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             // Ne pas bloquer la livraison
           }
 
-          setTimeout(() => {
-            activeOrders.delete(order.id);
-            if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} supprimée du cache`);
-          }, 1000 * 60 * 5);
+          // Retirer immédiatement de activeOrders pour éviter qu'elle réapparaisse après refresh
+          activeOrders.delete(order.id);
+          if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} supprimée du cache (complétée)`);
         }
       } catch (err: any) {
         if (DEBUG) console.error('Error in update-delivery-status socket handler', err);
@@ -1255,20 +1293,80 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       }
     });
 
-    socket.on('user-reconnect', ({ userId }: { userId?: string } = {}) => {
+    socket.on('user-reconnect', async ({ userId }: { userId?: string } = {}) => {
       try {
         if (!userId) return;
 
         const pending: Order[] = [];
         const current: Order[] = [];
+        const ordersFromDB = new Map<string, any>();
 
-        for (const [, o] of activeOrders.entries()) {
-          if (o.user && o.user.id === userId) {
-            if (o.status === 'pending') {
-              pending.push(o);
-            } else if (o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined') {
-              current.push(o);
+        // Charger depuis la base de données pour avoir les statuts à jour
+        try {
+          const { getActiveOrdersByUser } = await import('../config/orderStorage.js');
+          const dbOrders = await getActiveOrdersByUser(userId);
+          for (const dbOrder of dbOrders) {
+            // Enrichir avec les informations driver si nécessaire
+            if (dbOrder.driver_id) {
+              const driverResult = await (pool as any).query(
+                'SELECT id, email, phone, first_name, last_name, avatar_url FROM users WHERE id = $1',
+                [dbOrder.driver_id]
+              );
+              if (driverResult.rows.length > 0) {
+                const driver = driverResult.rows[0];
+                ordersFromDB.set(dbOrder.id, {
+                  ...dbOrder,
+                  driver: {
+                    id: driver.id,
+                    email: driver.email,
+                    phone: driver.phone,
+                    name: driver.first_name && driver.last_name 
+                      ? `${driver.first_name} ${driver.last_name}` 
+                      : driver.email,
+                    avatar: driver.avatar_url,
+                  },
+                  driverId: dbOrder.driver_id,
+                  status: dbOrder.status,
+                });
+              }
+            } else {
+              ordersFromDB.set(dbOrder.id, {
+                ...dbOrder,
+                status: dbOrder.status,
+              });
             }
+          }
+        } catch (dbError: any) {
+          logger.warn('Erreur lors du chargement depuis la DB pour user-reconnect:', dbError);
+        }
+
+        // Fusionner avec activeOrders en mémoire (priorité à la DB)
+        const allOrders = new Map<string, Order>();
+
+        // D'abord ajouter les commandes de la DB (source de vérité)
+        for (const [orderId, dbOrder] of ordersFromDB.entries()) {
+          if (dbOrder.status !== 'completed' && dbOrder.status !== 'cancelled' && dbOrder.status !== 'declined') {
+            allOrders.set(orderId, dbOrder as Order);
+          }
+        }
+
+        // Ensuite ajouter les commandes de la mémoire qui ne sont pas dans la DB
+        for (const [orderId, memOrder] of activeOrders.entries()) {
+          if (memOrder.user && memOrder.user.id === userId && 
+              memOrder.status !== 'completed' && 
+              memOrder.status !== 'cancelled' && 
+              memOrder.status !== 'declined' &&
+              !allOrders.has(orderId)) {
+            allOrders.set(orderId, memOrder);
+          }
+        }
+
+        // Séparer pending et current
+        for (const [, order] of allOrders.entries()) {
+          if (order.status === 'pending') {
+            pending.push(order);
+          } else {
+            current.push(order);
           }
         }
 
@@ -1279,24 +1377,79 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           currentOrder: current.length ? current[0] : null,
         });
       } catch (err: any) {
+        logger.error('Error handling user-reconnect', err);
         if (DEBUG) console.warn('Error handling user-reconnect', err);
       }
     });
 
-    socket.on('driver-reconnect', ({ driverId }: { driverId?: string } = {}) => {
+    socket.on('driver-reconnect', async ({ driverId }: { driverId?: string } = {}) => {
       try {
         if (!driverId) return;
 
         const pending: Order[] = [];
         const active: Order[] = [];
+        const ordersFromDB = new Map<string, any>();
 
-        for (const [, o] of activeOrders.entries()) {
-          if (o.driverId === driverId && o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined') {
-            if (o.status === 'pending') {
-              pending.push(o);
-            } else {
-              active.push(o);
+        // Charger depuis la base de données pour avoir les statuts à jour
+        try {
+          const dbOrders = await getActiveOrdersByDriver(driverId);
+          for (const dbOrder of dbOrders) {
+            // Enrichir avec les informations user si nécessaire
+            if (dbOrder.user_id) {
+              const userResult = await (pool as any).query(
+                'SELECT id, email, phone, first_name, last_name, avatar_url FROM users WHERE id = $1',
+                [dbOrder.user_id]
+              );
+              if (userResult.rows.length > 0) {
+                const user = userResult.rows[0];
+                ordersFromDB.set(dbOrder.id, {
+                  ...dbOrder,
+                  user: {
+                    id: user.id,
+                    email: user.email,
+                    phone: user.phone,
+                    name: user.first_name && user.last_name 
+                      ? `${user.first_name} ${user.last_name}` 
+                      : user.email,
+                    avatar: user.avatar_url,
+                  },
+                  driverId: dbOrder.driver_id,
+                  status: dbOrder.status,
+                });
+              }
             }
+          }
+        } catch (dbError: any) {
+          logger.warn('Erreur lors du chargement depuis la DB pour driver-reconnect:', dbError);
+        }
+
+        // Fusionner avec activeOrders en mémoire (priorité à la DB)
+        const allOrders = new Map<string, Order>();
+
+        // D'abord ajouter les commandes de la DB (source de vérité)
+        for (const [orderId, dbOrder] of ordersFromDB.entries()) {
+          if (dbOrder.status !== 'completed' && dbOrder.status !== 'cancelled' && dbOrder.status !== 'declined') {
+            allOrders.set(orderId, dbOrder as Order);
+          }
+        }
+
+        // Ensuite ajouter les commandes de la mémoire qui ne sont pas dans la DB
+        for (const [orderId, memOrder] of activeOrders.entries()) {
+          if (memOrder.driverId === driverId && 
+              memOrder.status !== 'completed' && 
+              memOrder.status !== 'cancelled' && 
+              memOrder.status !== 'declined' &&
+              !allOrders.has(orderId)) {
+            allOrders.set(orderId, memOrder);
+          }
+        }
+
+        // Séparer pending et active
+        for (const [, order] of allOrders.entries()) {
+          if (order.status === 'pending') {
+            pending.push(order);
+          } else {
+            active.push(order);
           }
         }
 
@@ -1307,6 +1460,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           currentOrder: active.length ? active[0] : null,
         });
       } catch (err: any) {
+        logger.error('Error handling driver-reconnect', err);
         if (DEBUG) console.warn('Error handling driver-reconnect', err);
       }
     });

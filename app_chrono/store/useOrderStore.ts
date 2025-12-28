@@ -81,6 +81,19 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   driverCoords: new Map(),
 
   addOrder: (order) => set((state) => {
+    // Ne pas ajouter les commandes complétées, annulées ou déclinées
+    if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'declined') {
+      // Si la commande existe déjà et est complétée, la retirer
+      const exists = state.activeOrders.some(o => o.id === order.id);
+      if (exists) {
+        return {
+          activeOrders: state.activeOrders.filter(o => o.id !== order.id),
+          selectedOrderId: state.selectedOrderId === order.id ? null : state.selectedOrderId,
+        };
+      }
+      return state;
+    }
+
     const exists = state.activeOrders.some(o => o.id === order.id);
     if (exists) {
       return state;
@@ -149,14 +162,17 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       order.id === orderId ? { ...order, status } : order
     );
     
-    const completedOrders = updatedOrders.filter(o => 
-      o.id === orderId && (status === 'completed' || status === 'cancelled' || status === 'declined')
-    );
-    
-    if (completedOrders.length > 0) {
-      setTimeout(() => {
-        get().removeOrder(orderId);
-      }, 2000);
+    // Si la commande est dans un état final, la retirer immédiatement
+    if (status === 'completed' || status === 'cancelled' || status === 'declined') {
+      const filteredOrders = updatedOrders.filter(o => o.id !== orderId);
+      let newSelectedId = state.selectedOrderId;
+      if (state.selectedOrderId === orderId) {
+        newSelectedId = filteredOrders.length > 0 ? filteredOrders[0].id : null;
+      }
+      return { 
+        activeOrders: filteredOrders,
+        selectedOrderId: newSelectedId,
+      };
     }
     
     return { activeOrders: updatedOrders };
@@ -170,9 +186,15 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         const existingOrder = state.activeOrders.find(o => o.id === order.id);
         const status: OrderStatus = (order.status as OrderStatus) || 'pending';
         
-        // Log pour debug
+        // Log détaillé pour debug
         if (__DEV__) {
-          console.log(`🔄 updateFromSocket - Mise à jour commande ${order.id.slice(0, 8)}...: ${existingOrder?.status || 'nouvelle'} → ${status}`);
+          console.log('🔄 updateFromSocket appelé', {
+            orderId: order.id,
+            newStatus: status,
+            existingStatus: existingOrder?.status,
+            hasExistingOrder: !!existingOrder,
+            orderKeys: Object.keys(order),
+          });
         }
         
         if (existingOrder) {
@@ -214,7 +236,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
                   ? { 
                       ...o, 
                       ...order,
-                      status, // Nouveau statut
+                      status, // Nouveau statut - FORCER le statut
                       // Ajouter completed_at si la commande est complétée
                       ...(status === 'completed' && !o.completed_at 
                         ? { completed_at: new Date().toISOString() }
@@ -226,6 +248,31 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
                     }
                   : o
               );
+              
+              if (__DEV__) {
+                const updatedOrder = updatedOrders.find(o => o.id === order.id);
+                console.log('✅ updateFromSocket - Commande mise à jour dans le store', {
+                  orderId: order.id,
+                  oldStatus: existingOrder?.status,
+                  newStatus: status,
+                  actualStatusInStore: updatedOrder?.status,
+                  willBeRemoved: status === 'completed' || status === 'cancelled' || status === 'declined',
+                });
+              }
+              
+              // Si la commande est dans un état final, la retirer immédiatement AVANT de retourner
+              if (status === 'completed' || status === 'cancelled' || status === 'declined') {
+                const filteredOrders = updatedOrders.filter(o => o.id !== order.id);
+                let newSelectedId = currentState.selectedOrderId;
+                if (currentState.selectedOrderId === order.id) {
+                  newSelectedId = filteredOrders.length > 0 ? filteredOrders[0].id : null;
+                }
+                return { 
+                  activeOrders: filteredOrders,
+                  selectedOrderId: newSelectedId,
+                };
+              }
+              
               // Créer un nouveau tableau pour forcer le re-render
               return { activeOrders: [...updatedOrders] };
             });
@@ -255,15 +302,8 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
           });
         }
         
-        // Si la commande est dans un état final, la retirer après 2 secondes
-        if (status === 'completed' || status === 'cancelled' || status === 'declined') {
-          const orderId = order.id;
-          if (orderId) {
-            setTimeout(() => {
-              get().removeOrder(orderId);
-            }, 2000);
-          }
-        }
+        // Si la commande est dans un état final, elle a déjà été retirée dans le set() ci-dessus
+        // Pas besoin de la retirer à nouveau ici
       }
 
       if (location && location.latitude && location.longitude && order?.id) {

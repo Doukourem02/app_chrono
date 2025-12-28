@@ -152,27 +152,38 @@ class OrderSocketService {
         const { pendingOrders, activeOrders, pendingOrder, currentOrder } = data || {};
         const store = useOrderStore.getState();
 
+        // Nettoyer d'abord les commandes complétées/annulées existantes
+        const completedOrCancelled = store.activeOrders.filter(o => 
+          o.status === 'completed' || o.status === 'cancelled' || o.status === 'declined'
+        );
+        if (completedOrCancelled.length > 0) {
+          completedOrCancelled.forEach(order => {
+            store.completeOrder(order.id);
+          });
+        }
+
         // Ajouter toutes les commandes en attente (nouveau format avec tableaux)
         if (Array.isArray(pendingOrders)) {
           pendingOrders.forEach((order: any) => {
-            if (order && order.id) {
+            if (order && order.id && order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined') {
               store.addPendingOrder(order);
             }
           });
-        } else if (pendingOrder && pendingOrder.id) {
+        } else if (pendingOrder && pendingOrder.id && pendingOrder.status !== 'completed' && pendingOrder.status !== 'cancelled' && pendingOrder.status !== 'declined') {
           // Compatibilité avec l'ancien format
           store.addPendingOrder(pendingOrder as any);
         }
 
-        // Ajouter toutes les commandes actives
+        // Ajouter toutes les commandes actives (filtrer les complétées/annulées)
         if (Array.isArray(activeOrders)) {
-          activeOrders.forEach((order: any) => {
-            if (order && order.id) {
-              store.addOrder(order);
-            }
+          const validActiveOrders = activeOrders.filter((order: any) => 
+            order && order.id && order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined'
+          );
+          validActiveOrders.forEach((order: any) => {
+            store.addOrder(order);
           });
-          logger.info(`${activeOrders.length} commande(s) active(s) restaurée(s) après reconnexion`, undefined);
-        } else if (currentOrder && currentOrder.id) {
+          logger.info(`${validActiveOrders.length} commande(s) active(s) restaurée(s) après reconnexion`, undefined);
+        } else if (currentOrder && currentOrder.id && currentOrder.status !== 'completed' && currentOrder.status !== 'cancelled' && currentOrder.status !== 'declined') {
           // Compatibilité avec l'ancien format
           store.addOrder(currentOrder as any);
           logger.info('Commande active restaurée après reconnexion', undefined, { orderId: currentOrder.id });

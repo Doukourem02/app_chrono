@@ -2,6 +2,8 @@
  * Utilitaires météo pour app_chrono
  */
 
+import { config } from '../config';
+
 export interface WeatherData {
   temperature: number;
   condition: string;
@@ -27,8 +29,7 @@ export async function fetchWeatherData(
   vehicleType?: 'moto' | 'vehicule' | 'cargo' | null
 ): Promise<{ weather: WeatherData; adjustment: WeatherAdjustment; isDifficult: boolean } | null> {
   try {
-    const { apiUrl } = await import('../config');
-    const url = `${apiUrl}/api/weather/${latitude}/${longitude}${vehicleType ? `?vehicleType=${vehicleType}` : ''}`;
+    const url = `${config.apiUrl}/api/weather/${latitude}/${longitude}${vehicleType ? `?vehicleType=${vehicleType}` : ''}`;
     
     const response = await fetch(url);
     
@@ -39,7 +40,10 @@ export async function fetchWeatherData(
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching weather:', error);
+    // Ne pas logger les erreurs réseau en production (normal si le backend n'est pas disponible)
+    if (__DEV__) {
+      console.warn('Weather API unavailable:', error instanceof Error ? error.message : 'Network error');
+    }
     return null;
   }
 }

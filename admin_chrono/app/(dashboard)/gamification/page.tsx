@@ -32,7 +32,7 @@ export default function GamificationPage() {
   return (
     <div style={{ padding: '24px' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
-        Gamification & Classements
+        Performance
       </h1>
 
       {/* Filtres */}

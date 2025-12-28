@@ -347,26 +347,38 @@ class UserOrderSocketService {
         const { pendingOrders, activeOrders, pendingOrder, currentOrder, driverCoords } = data || {};
         const store = useOrderStore.getState();
 
-        // Ajouter toutes les commandes actives (nouveau format avec tableaux)
-        if (Array.isArray(activeOrders)) {
-          activeOrders.forEach((order: any) => {
-            if (order && order.id) {
-              store.addOrder(order);
-            }
+        // Nettoyer d'abord les commandes complétées/annulées existantes
+        const completedOrCancelled = store.activeOrders.filter(o => 
+          o.status === 'completed' || o.status === 'cancelled' || o.status === 'declined'
+        );
+        if (completedOrCancelled.length > 0) {
+          completedOrCancelled.forEach(order => {
+            store.removeOrder(order.id);
           });
-        } else if (currentOrder && currentOrder.id) {
+        }
+
+        // Ajouter toutes les commandes actives (filtrer les complétées/annulées)
+        if (Array.isArray(activeOrders)) {
+          const validActiveOrders = activeOrders.filter((order: any) => 
+            order && order.id && order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined'
+          );
+          validActiveOrders.forEach((order: any) => {
+            store.addOrder(order);
+          });
+        } else if (currentOrder && currentOrder.id && currentOrder.status !== 'completed' && currentOrder.status !== 'cancelled' && currentOrder.status !== 'declined') {
           // Compatibilité avec l'ancien format
           store.addOrder(currentOrder as any);
         }
 
-        // Ajouter toutes les commandes en attente
+        // Ajouter toutes les commandes en attente (filtrer les complétées/annulées)
         if (Array.isArray(pendingOrders)) {
-          pendingOrders.forEach((order: any) => {
-            if (order && order.id) {
-              store.addOrder(order);
-            }
+          const validPendingOrders = pendingOrders.filter((order: any) => 
+            order && order.id && order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined'
+          );
+          validPendingOrders.forEach((order: any) => {
+            store.addOrder(order);
           });
-        } else if (pendingOrder && pendingOrder.id) {
+        } else if (pendingOrder && pendingOrder.id && pendingOrder.status !== 'completed' && pendingOrder.status !== 'cancelled' && pendingOrder.status !== 'declined') {
           // Compatibilité avec l'ancien format
           store.addOrder(pendingOrder as any);
         }
@@ -434,15 +446,44 @@ class UserOrderSocketService {
     });
 
     this.socket.on('order:status:update', (data) => {
-      logger.info('🔄 Mise à jour statut commande', 'userOrderSocketService', data);
+      logger.info('🔄 Mise à jour statut commande reçue', 'userOrderSocketService', {
+        orderId: data?.order?.id,
+        status: data?.order?.status,
+        hasOrder: !!data?.order,
+        dbSaved: data?.dbSaved,
+        dbError: data?.dbError,
+      });
       try {
         const { order } = data || {};
         if (order && order.id) {
           const store = useOrderStore.getState();
+          const existingOrder = store.activeOrders.find(o => o.id === order.id);
+          
+          logger.info('📦 État avant updateFromSocket', 'userOrderSocketService', {
+            orderId: order.id,
+            newStatus: order.status,
+            existingStatus: existingOrder?.status,
+            existsInStore: !!existingOrder,
+          });
+          
           store.updateFromSocket({ order: order as any });
+          
+          // Vérifier que la mise à jour a bien eu lieu
+          const updatedStore = useOrderStore.getState();
+          const updatedOrder = updatedStore.activeOrders.find(o => o.id === order.id);
+          
+          logger.info('✅ État après updateFromSocket', 'userOrderSocketService', {
+            orderId: order.id,
+            expectedStatus: order.status,
+            actualStatus: updatedOrder?.status,
+            stillInStore: !!updatedOrder,
+            shouldBeRemoved: order.status === 'completed' || order.status === 'cancelled' || order.status === 'declined',
+          });
+        } else {
+          logger.warn('⚠️ order:status:update reçu mais order.id manquant', 'userOrderSocketService', { data });
         }
       } catch (err) {
-        logger.warn('Error handling order:status:update', 'userOrderSocketService', err);
+        logger.error('❌ Error handling order:status:update', 'userOrderSocketService', err);
       }
     });
 
@@ -461,10 +502,8 @@ class UserOrderSocketService {
     // Événement de géofencing (livreur entré dans la zone)
     this.socket.on('driver:geofence:event', (data) => {
       try {
-        const { orderId, eventType, location } = data || {};
+        const { orderId, eventType } = data || {};
         if (orderId) {
-          const store = useOrderStore.getState();
-          
           if (eventType === 'entered') {
             logger.info(
               'Votre livreur est arrivé dans la zone de livraison',

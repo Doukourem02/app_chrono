@@ -1036,15 +1036,23 @@ class ApiService {
       const result = await response.json();
 
       if (!response.ok) {
+        const errorMessage = result.message || result.error || 'Erreur lors de la récupération du solde';
+        throw new Error(errorMessage);
+      }
+
+      if (!result.success) {
         throw new Error(result.message || 'Erreur lors de la récupération du solde');
       }
 
       return result;
     } catch (error) {
       console.error('Erreur getCommissionBalance:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Erreur de connexion au serveur. Veuillez réessayer.';
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: errorMessage
       };
     }
   }

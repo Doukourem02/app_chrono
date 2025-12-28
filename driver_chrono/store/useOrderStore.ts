@@ -94,6 +94,19 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   isReceivingOrders: true,
 
   addOrder: (order) => set((state) => {
+    // Ne pas ajouter les commandes complétées, annulées ou déclinées
+    if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'declined') {
+      // Si la commande existe déjà et est complétée, la retirer
+      const exists = state.activeOrders.some(o => o.id === order.id);
+      if (exists) {
+        return {
+          activeOrders: state.activeOrders.filter(o => o.id !== order.id),
+          selectedOrderId: state.selectedOrderId === order.id ? null : state.selectedOrderId,
+        };
+      }
+      return state;
+    }
+
     const exists = state.activeOrders.some(o => o.id === order.id);
     
     // Mapper les champs du backend (snake_case) vers le format frontend (camelCase)

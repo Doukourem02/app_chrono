@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, TrendingUp, Package, DollarSign, Clock, CheckCircle } from 'lucide-react'
+import { Download, TrendingUp, Package, DollarSign, Clock, CheckCircle, Star, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 
 interface ZoneData {
   zone: string
@@ -119,6 +120,21 @@ export default function AnalyticsPage() {
             {kpisLoading ? '...' : `${Math.round(kpis?.acceptanceRate || 0)}%`}
           </div>
         </div>
+
+        <div style={{ padding: '20px', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <Star style={{ width: '20px', height: '20px', color: '#FBBF24' }} />
+            <span style={{ fontSize: '14px', color: '#6B7280' }}>Note moyenne</span>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {kpisLoading ? '...' : kpis?.averageRating ? `${kpis.averageRating.toFixed(1)}/5` : 'N/A'}
+          </div>
+          {kpis?.totalRatings && (
+            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+              {kpis.totalRatings} évaluations
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Export */}
@@ -161,6 +177,116 @@ export default function AnalyticsPage() {
           </button>
         </div>
       </div>
+
+      {/* Statistiques de ratings */}
+      {kpis && (kpis.averageRating || kpis.totalRatings) && (
+        <div style={{ marginBottom: '32px', padding: '20px', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Statistiques des évaluations</h2>
+            <Link 
+              href="/ratings" 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                color: '#8B5CF6', 
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: 600
+              }}
+            >
+              Voir le détail
+              <ExternalLink style={{ width: '14px', height: '14px' }} />
+            </Link>
+          </div>
+
+          {/* Distribution des notes */}
+          {kpis.ratingDistribution && (
+            <div style={{ marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#6B7280', marginBottom: '12px' }}>
+                Distribution des notes
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {[5, 4, 3, 2, 1].map((rating) => {
+                  const count = kpis.ratingDistribution?.[String(rating) as keyof typeof kpis.ratingDistribution] || 0;
+                  const total = kpis.totalRatings || 1;
+                  const percentage = (count / total) * 100;
+                  
+                  return (
+                    <div key={rating} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: '60px' }}>
+                        <Star 
+                          style={{ 
+                            width: '14px', 
+                            height: '14px', 
+                            color: '#FBBF24',
+                            fill: '#FBBF24'
+                          }} 
+                        />
+                        <span style={{ fontSize: '14px', fontWeight: 600 }}>{rating}</span>
+                      </div>
+                      <div style={{ flex: 1, height: '8px', backgroundColor: '#E5E7EB', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${percentage}%`,
+                            height: '100%',
+                            backgroundColor: rating >= 4 ? '#10B981' : rating >= 3 ? '#F59E0B' : '#EF4444',
+                            transition: 'width 0.3s ease',
+                          }}
+                        />
+                      </div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#111827', minWidth: '50px', textAlign: 'right' }}>
+                        {count} ({percentage.toFixed(1)}%)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Évolution des notes */}
+          {performance?.ratingTrend && performance.ratingTrend.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#6B7280', marginBottom: '12px' }}>
+                Évolution de la note moyenne ({days} derniers jours)
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '120px', marginBottom: '8px' }}>
+                {performance.ratingTrend.map((point: { date: string; average: number; count: number }, index: number) => {
+                  const maxRating = 5;
+                  const height = (point.average / maxRating) * 100;
+                  const date = new Date(point.date);
+                  const dayLabel = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+                  
+                  return (
+                    <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                      <div 
+                        style={{ 
+                          width: '100%',
+                          height: `${height}%`,
+                          backgroundColor: point.average >= 4 ? '#10B981' : point.average >= 3 ? '#F59E0B' : '#EF4444',
+                          borderRadius: '4px 4px 0 0',
+                          minHeight: '4px',
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          justifyContent: 'center',
+                          paddingBottom: '4px',
+                        }}
+                        title={`${point.average.toFixed(1)}/5 (${point.count} éval.)`}
+                      >
+                        <span style={{ fontSize: '10px', color: 'white', fontWeight: 600 }}>
+                          {point.average.toFixed(1)}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '10px', color: '#6B7280' }}>{dayLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Données par zone */}
       {performance && (
