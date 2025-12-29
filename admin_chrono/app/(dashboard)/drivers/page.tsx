@@ -88,15 +88,21 @@ export default function DriversPage() {
     }).format(amount) + ' FCFA'
   }
 
-  const getBalanceColor = (balance: number | undefined, isSuspended: boolean | undefined) => {
-    if (isSuspended || balance === 0) return '#EF4444' // Rouge
-    if (balance !== undefined && balance < 1000) return '#F59E0B' // Orange
-    if (balance !== undefined && balance < 3000) return '#FBBF24' // Jaune
+  const getBalanceColor = (balance: number | undefined, isSuspended: boolean | undefined, isInactive: boolean | undefined) => {
+    // Suspendu manuellement (sanction) = Rouge foncé
+    if (isSuspended) return '#DC2626' // Rouge foncé pour sanction
+    // Non actif (solde à 0) = Orange
+    if (isInactive || balance === 0) return '#F59E0B' // Orange pour solde insuffisant
+    if (balance !== undefined && balance < 1000) return '#FBBF24' // Jaune
+    if (balance !== undefined && balance < 3000) return '#FCD34D' // Jaune clair
     return '#10B981' // Vert
   }
 
-  const getBalanceStatus = (balance: number | undefined, isSuspended: boolean | undefined) => {
-    if (isSuspended || balance === 0) return 'Suspendu'
+  const getBalanceStatus = (balance: number | undefined, isSuspended: boolean | undefined, isInactive: boolean | undefined) => {
+    // Suspendu manuellement (sanction)
+    if (isSuspended) return 'Suspendu'
+    // Non actif (solde insuffisant, pas une sanction)
+    if (isInactive || balance === 0) return 'Non actif'
     if (balance !== undefined && balance < 1000) return 'Très faible'
     if (balance !== undefined && balance < 3000) return 'Faible'
     return 'Actif'
@@ -480,9 +486,10 @@ export default function DriversPage() {
                       : driver.full_name || driver.email || 'N/A'
                   const isPartner = driver.driver_type === 'partner'
                   const balance = driver.commission_balance ?? 0
-                  const isSuspended = driver.is_suspended ?? false
-                  const balanceColor = getBalanceColor(balance, isSuspended)
-                  const balanceStatus = getBalanceStatus(balance, isSuspended)
+                  const isSuspended = driver.is_suspended ?? false // Suspension manuelle (sanction)
+                  const isInactive = (driver as any).is_inactive ?? false // Solde insuffisant (pas une sanction)
+                  const balanceColor = getBalanceColor(balance, isSuspended, isInactive)
+                  const balanceStatus = getBalanceStatus(balance, isSuspended, isInactive)
 
                   return (
                     <tr key={driver.id}>

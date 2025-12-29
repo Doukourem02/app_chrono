@@ -3863,19 +3863,37 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
       .map((row: any) => {
         const driverType = row.driver_type || 'partner';
         const balance = parseFloat(row.commission_balance || 0);
-        const isSuspended = row.is_suspended || balance <= 0;
+        const isManuallySuspended = row.is_suspended || false; // Suspension manuelle (sanction)
+        const hasNoBalance = balance <= 0; // Solde insuffisant (pas une sanction)
+        
+        // Un livreur est suspendu SEULEMENT s'il est partenaire ET suspendu manuellement
+        // Les internes ne peuvent pas être suspendus car ils n'ont pas de commission
+        const isSuspended = driverType === 'partner' && isManuallySuspended;
+        
+        // Un livreur est non actif s'il est partenaire ET n'a pas de solde (mais pas suspendu manuellement)
+        const isInactive = driverType === 'partner' && hasNoBalance && !isManuallySuspended;
 
         // Compter
         if (driverType === 'partner') counts.partners++;
         if (driverType === 'internal') counts.internals++;
-        if (!isSuspended && balance > 0) counts.active++;
+        // Actifs : seulement les partenaires avec solde > 0 et non suspendus
+        if (driverType === 'partner' && !isSuspended && !isInactive && balance > 0) counts.active++;
+        // Suspendus : seulement les partenaires suspendus MANUELLEMENT (sanction)
         if (isSuspended) counts.suspended++;
 
-        // Filtrer par statut solde si demandé
+        // Filtrer par statut solde si demandé (seulement pour les partenaires)
         if (status && status !== 'all') {
-          if (status === 'active' && (isSuspended || balance <= 0)) return null;
-          if (status === 'suspended' && !isSuspended) return null;
-          if (status === 'low_balance' && (balance >= 3000 || isSuspended)) return null;
+          // Les internes ne sont pas affectés par les filtres de solde
+          if (driverType === 'internal') {
+            // Les internes passent tous les filtres sauf si on filtre spécifiquement les suspendus
+            if (status === 'suspended') return null; // Les internes ne sont jamais suspendus
+            // Sinon, on garde les internes
+          } else {
+            // Pour les partenaires, appliquer les filtres normaux
+            if (status === 'active' && (isSuspended || isInactive || balance <= 0)) return null;
+            if (status === 'suspended' && !isSuspended) return null; // Seulement les suspendus manuellement
+            if (status === 'low_balance' && (balance >= 3000 || isSuspended || isInactive)) return null;
+          }
         }
 
         return {
@@ -3891,7 +3909,9 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
           is_online: row.is_online || false,
           commission_balance: balance,
           commission_rate: parseFloat(row.commission_rate || 10),
-          is_suspended: isSuspended,
+          is_suspended: isSuspended, // Seulement si suspendu manuellement
+          is_inactive: isInactive, // Si solde à 0 mais pas suspendu manuellement
+          has_balance: balance > 0, // Indique si le livreur a un solde
           total_deliveries: parseInt(row.total_deliveries || 0),
           completed_deliveries: parseInt(row.completed_deliveries || 0),
         };

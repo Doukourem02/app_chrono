@@ -44,8 +44,11 @@ export default function DriverDetailPage() {
       return await adminApiService.rechargeDriverCommission(driverId, amount, 'admin_manual', rechargeNotes)
     },
     onSuccess: () => {
+      // Invalider les queries pour rafraîchir les données immédiatement
       queryClient.invalidateQueries({ queryKey: ['driver', driverId] })
       queryClient.invalidateQueries({ queryKey: ['driver-transactions', driverId] })
+      // Invalider aussi la liste des livreurs pour mettre à jour les compteurs
+      queryClient.invalidateQueries({ queryKey: ['drivers'] })
       setShowRechargeModal(false)
       setRechargeAmount('')
       setRechargeNotes('')
@@ -106,11 +109,24 @@ export default function DriverDetailPage() {
     })
   }
 
-  const getBalanceColor = (balance: number | undefined, isSuspended: boolean | undefined) => {
-    if (isSuspended || balance === 0) return '#EF4444'
-    if (balance !== undefined && balance < 1000) return '#F59E0B'
-    if (balance !== undefined && balance < 3000) return '#FBBF24'
-    return '#10B981'
+  const getBalanceColor = (balance: number | undefined, isSuspended: boolean | undefined, isInactive: boolean | undefined) => {
+    // Suspendu manuellement (sanction) = Rouge foncé
+    if (isSuspended) return '#DC2626' // Rouge foncé pour sanction
+    // Non actif (solde à 0) = Orange
+    if (isInactive || balance === 0) return '#F59E0B' // Orange pour solde insuffisant
+    if (balance !== undefined && balance < 1000) return '#FBBF24' // Jaune
+    if (balance !== undefined && balance < 3000) return '#FCD34D' // Jaune clair
+    return '#10B981' // Vert
+  }
+
+  const getBalanceStatus = (balance: number | undefined, isSuspended: boolean | undefined, isInactive: boolean | undefined) => {
+    // Suspendu manuellement (sanction)
+    if (isSuspended) return 'Suspendu'
+    // Non actif (solde insuffisant, pas une sanction)
+    if (isInactive || balance === 0) return 'Non actif'
+    if (balance !== undefined && balance < 1000) return 'Très faible'
+    if (balance !== undefined && balance < 3000) return 'Faible'
+    return 'Actif'
   }
 
   if (isLoading) {
@@ -141,8 +157,10 @@ export default function DriverDetailPage() {
   const isPartner = driver.driver_type === 'partner'
   const commissionAccount = driver.commission_account
   const balance = commissionAccount?.balance ?? 0
-  const isSuspended = commissionAccount?.is_suspended ?? false
-  const balanceColor = getBalanceColor(balance, isSuspended)
+  const isSuspended = commissionAccount?.is_suspended ?? false // Suspension manuelle (sanction)
+  const isInactive = balance <= 0 && !isSuspended // Solde insuffisant (pas une sanction)
+  const balanceColor = getBalanceColor(balance, isSuspended, isInactive)
+  const balanceStatus = getBalanceStatus(balance, isSuspended, isInactive)
 
   const containerStyle: React.CSSProperties = {
     display: 'flex',
@@ -353,9 +371,13 @@ export default function DriverDetailPage() {
                       <span style={{ padding: '6px 12px', borderRadius: '6px', backgroundColor: '#FEE2E2', color: '#DC2626', fontSize: '12px', fontWeight: 600 }}>
                         Suspendu
                       </span>
+                    ) : isInactive ? (
+                      <span style={{ padding: '6px 12px', borderRadius: '6px', backgroundColor: '#FEF3C7', color: '#D97706', fontSize: '12px', fontWeight: 600 }}>
+                        Non actif
+                      </span>
                     ) : (
                       <span style={{ padding: '6px 12px', borderRadius: '6px', backgroundColor: '#D1FAE5', color: '#065F46', fontSize: '12px', fontWeight: 600 }}>
-                        Actif
+                        {balanceStatus}
                       </span>
                     )}
                   </div>

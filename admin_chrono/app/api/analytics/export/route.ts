@@ -1,0 +1,104 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+
+// Créer un client Supabase pour vérifier l'authentification
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null
+
+/**
+ * API route pour exporter les données analytics
+ * Fait le proxy vers le backend avec authentification
+ */
+export async function GET(request: NextRequest) {
+  try {
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Supabase not configured' },
+        { status: 500 }
+      )
+    }
+
+    // Récupérer le token depuis le header Authorization
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Unauthorized - No authorization header' },
+        { status: 401 }
+      )
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Invalid token format' },
+        { status: 401 }
+      )
+    }
+
+    // Vérifier le token avec Supabase (juste pour valider qu'il est valide)
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
+    if (authError || !user) {
+      console.error('[API Route] Erreur authentification Supabase:', authError)
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      )
+    }
+
+    // Le backend vérifiera lui-même le rôle admin, on fait juste confiance au token Supabase
+    // Cela évite les problèmes de synchronisation entre Supabase et PostgreSQL
+
+    // Récupérer les paramètres de requête
+    const { searchParams } = new URL(request.url)
+    const format = searchParams.get('format') || 'json'
+    const days = searchParams.get('days') || '7'
+
+    // Faire le proxy vers le backend
+    const backendUrl = `${API_BASE_URL}/api/analytics/export?format=${format}&days=${days}`
+    const response = await fetch(backendUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Backend error:', errorText)
+      return NextResponse.json(
+        { error: 'Backend error', details: errorText },
+        { status: response.status }
+      )
+    }
+
+    // Si c'est un CSV, retourner le blob directement
+    if (format === 'csv') {
+      const blob = await response.blob()
+      return new NextResponse(blob, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="analytics-${Date.now()}.csv"`,
+        },
+      })
+    }
+
+    // Sinon, retourner le JSON
+    const data = await response.json()
+    return NextResponse.json(data)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error'
+    console.error('Error in analytics/export API:', errorMessage)
+    return NextResponse.json(
+      { error: 'Internal server error', details: errorMessage },
+      { status: 500 }
+    )
+  }
+}
+

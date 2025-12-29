@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Download, TrendingUp, Package, DollarSign, Clock, CheckCircle, Star, ExternalLink, Search, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { adminApiService } from '@/lib/adminApiService'
+import { supabase } from '@/lib/supabase'
 
 interface ZoneData {
   zone: string
@@ -32,9 +33,32 @@ export default function AnalyticsPage() {
   const { data: kpis, isLoading: kpisLoading } = useQuery({
     queryKey: ['analytics', 'kpis'],
     queryFn: async () => {
-      const response = await fetch('/api/analytics/kpis')
-      if (!response.ok) throw new Error('Erreur chargement KPIs')
-      return response.json()
+      // Récupérer le token depuis Supabase
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        throw new Error('Non authentifié')
+      }
+
+      const response = await fetch('/api/analytics/kpis', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[Analytics] Erreur KPIs:', response.status, errorText)
+        throw new Error(`Erreur chargement KPIs: ${response.status}`)
+      }
+      const data = await response.json()
+      console.log('[Analytics] KPIs reçus:', {
+        averageRating: data.averageRating,
+        totalRatings: data.totalRatings,
+        hasAverageRating: data.averageRating != null,
+        typeAverageRating: typeof data.averageRating
+      })
+      return data
     },
     refetchInterval: 30000, // Mise à jour toutes les 30 secondes
   })
@@ -43,7 +67,19 @@ export default function AnalyticsPage() {
   const { data: performance } = useQuery({
     queryKey: ['analytics', 'performance', days],
     queryFn: async () => {
-      const response = await fetch(`/api/analytics/performance?days=${days}`)
+      // Récupérer le token depuis Supabase
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        throw new Error('Non authentifié')
+      }
+
+      const response = await fetch(`/api/analytics/performance?days=${days}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
       if (!response.ok) throw new Error('Erreur chargement performance')
       return response.json()
     },
@@ -51,7 +87,20 @@ export default function AnalyticsPage() {
 
   const handleExport = async () => {
     try {
-      const response = await fetch(`/api/analytics/export?format=${exportFormat}&days=${days}`)
+      // Récupérer le token depuis Supabase
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        alert('Vous devez être connecté pour exporter les données')
+        return
+      }
+
+      const response = await fetch(`/api/analytics/export?format=${exportFormat}&days=${days}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
       if (!response.ok) throw new Error('Erreur export')
       
       if (exportFormat === 'csv') {
@@ -247,11 +296,48 @@ export default function AnalyticsPage() {
             <span style={{ fontSize: '14px', color: '#6B7280' }}>Note moyenne</span>
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {kpisLoading ? '...' : kpis?.averageRating ? `${kpis.averageRating.toFixed(1)}/5` : 'N/A'}
+            {kpisLoading ? '...' : (() => {
+              // Debug: log pour voir les valeurs reçues
+              if (kpis && !kpisLoading) {
+                console.log('[Analytics] KPIs reçus:', {
+                  averageRating: kpis.averageRating,
+                  totalRatings: kpis.totalRatings,
+                  typeAverageRating: typeof kpis.averageRating,
+                  isNull: kpis.averageRating === null,
+                  isUndefined: kpis.averageRating === undefined,
+                  fullKpis: kpis
+                });
+              }
+              
+              // Afficher la note si on a des ratings
+              const hasRatings = kpis?.totalRatings && kpis.totalRatings > 0;
+              const avgRating = kpis?.averageRating;
+              
+              // Si on a des ratings, essayer d'afficher la note même si elle est 0
+              if (hasRatings) {
+                // Si averageRating est null/undefined, essayer de le calculer depuis ratingDistribution
+                if (avgRating == null && kpis?.ratingDistribution) {
+                  const dist = kpis.ratingDistribution;
+                  const total = (dist['5'] || 0) + (dist['4'] || 0) + (dist['3'] || 0) + (dist['2'] || 0) + (dist['1'] || 0);
+                  if (total > 0) {
+                    const calculatedAvg = ((dist['5'] || 0) * 5 + (dist['4'] || 0) * 4 + (dist['3'] || 0) * 3 + (dist['2'] || 0) * 2 + (dist['1'] || 0) * 1) / total;
+                    console.log('[Analytics] Note calculée depuis distribution:', calculatedAvg);
+                    return `${calculatedAvg.toFixed(1)}/5`;
+                  }
+                }
+                
+                // Si averageRating est disponible, l'utiliser
+                if (avgRating != null && !isNaN(Number(avgRating))) {
+                  return `${Number(avgRating).toFixed(1)}/5`;
+                }
+              }
+              
+              return 'N/A';
+            })()}
           </div>
-          {kpis?.totalRatings && (
+          {kpis?.totalRatings && kpis.totalRatings > 0 && (
             <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
-              {kpis.totalRatings} évaluations
+              {kpis.totalRatings} évaluation{kpis.totalRatings > 1 ? 's' : ''}
             </div>
           )}
         </div>
@@ -299,7 +385,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Statistiques de ratings */}
-      {kpis && (kpis.averageRating || kpis.totalRatings) && (
+      {kpis && kpis.totalRatings && kpis.totalRatings > 0 && (
         <div style={{ marginBottom: '32px', padding: '20px', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>Statistiques des évaluations</h2>
