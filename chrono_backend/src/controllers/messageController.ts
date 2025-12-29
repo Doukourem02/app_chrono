@@ -28,6 +28,26 @@ export const getConversations = async (req: AuthenticatedRequest, res: Response)
     return res.json({ success: true, data: conversations });
   } catch (error: any) {
     logger.error('Erreur lors de la récupération des conversations:', error);
+    
+    // Gérer les erreurs de connexion à la base de données
+    const isConnectionError = 
+      error.message && (
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('getaddrinfo') ||
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('SASL') ||
+        error.message.includes('password') ||
+        error.code === 'ENOTFOUND' ||
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ETIMEDOUT'
+      );
+
+    if (isConnectionError) {
+      logger.warn('Erreur de connexion DB, retour de tableau vide');
+      return res.json({ success: true, data: [] });
+    }
+
     return res.status(500).json({ success: false, message: error.message });
   }
 };

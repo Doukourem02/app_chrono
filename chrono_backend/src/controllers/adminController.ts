@@ -917,7 +917,21 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
   } catch (error: any) {
     logger.error('Erreur getAdminOngoingDeliveries:', error);
 
-    if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
+    // Gérer les erreurs de connexion à la base de données
+    const isConnectionError = 
+      error.message && (
+        error.message.includes('SASL') || 
+        error.message.includes('password') ||
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('getaddrinfo') ||
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.code === 'ENOTFOUND' ||
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ETIMEDOUT'
+      );
+
+    if (isConnectionError) {
       logger.warn('Erreur de connexion DB, retour de données vides');
       res.json({
         success: true,

@@ -163,6 +163,26 @@ export class MessageService {
       return result.rows.map((row) => this.mapConversationFromRow(row));
     } catch (error: any) {
       logger.error('Erreur lors de la récupération des conversations:', error);
+      
+      // Gérer les erreurs de connexion à la base de données
+      const isConnectionError = 
+        error.message && (
+          error.message.includes('ENOTFOUND') ||
+          error.message.includes('getaddrinfo') ||
+          error.message.includes('ECONNREFUSED') ||
+          error.message.includes('ETIMEDOUT') ||
+          error.message.includes('SASL') ||
+          error.message.includes('password') ||
+          error.code === 'ENOTFOUND' ||
+          error.code === 'ECONNREFUSED' ||
+          error.code === 'ETIMEDOUT'
+        );
+
+      if (isConnectionError) {
+        logger.warn('Erreur de connexion DB, retour de tableau vide');
+        return [];
+      }
+
       throw new Error(`Impossible de récupérer les conversations: ${error.message}`);
     }
   }
@@ -203,6 +223,26 @@ export class MessageService {
       return result.rows.map((row) => this.mapConversationFromRow(row));
     } catch (error: any) {
       logger.error('Erreur lors de la récupération de toutes les conversations:', error);
+      
+      // Gérer les erreurs de connexion à la base de données
+      const isConnectionError = 
+        error.message && (
+          error.message.includes('ENOTFOUND') ||
+          error.message.includes('getaddrinfo') ||
+          error.message.includes('ECONNREFUSED') ||
+          error.message.includes('ETIMEDOUT') ||
+          error.message.includes('SASL') ||
+          error.message.includes('password') ||
+          error.code === 'ENOTFOUND' ||
+          error.code === 'ECONNREFUSED' ||
+          error.code === 'ETIMEDOUT'
+        );
+
+      if (isConnectionError) {
+        logger.warn('Erreur de connexion DB, retour de tableau vide');
+        return [];
+      }
+
       throw new Error(`Impossible de récupérer les conversations: ${error.message}`);
     }
   }
@@ -317,6 +357,26 @@ export class MessageService {
       return result.rows.map((row) => this.mapMessageFromRow(row));
     } catch (error: any) {
       logger.error('Erreur lors de la récupération des messages:', error);
+      
+      // Gérer les erreurs de connexion à la base de données
+      const isConnectionError = 
+        error.message && (
+          error.message.includes('ENOTFOUND') ||
+          error.message.includes('getaddrinfo') ||
+          error.message.includes('ECONNREFUSED') ||
+          error.message.includes('ETIMEDOUT') ||
+          error.message.includes('SASL') ||
+          error.message.includes('password') ||
+          error.code === 'ENOTFOUND' ||
+          error.code === 'ECONNREFUSED' ||
+          error.code === 'ETIMEDOUT'
+        );
+
+      if (isConnectionError) {
+        logger.warn('Erreur de connexion DB, retour de tableau vide');
+        return [];
+      }
+
       throw new Error(`Impossible de récupérer les messages: ${error.message}`);
     }
   }
