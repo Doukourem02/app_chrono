@@ -714,7 +714,8 @@ class AdminApiService {
     success: boolean
     data?: {
       orders: unknown[]
-      users: unknown[]
+      drivers: unknown[]
+      clients: unknown[]
     }
   }> {
     try {
@@ -730,7 +731,8 @@ class AdminApiService {
           success: false,
           data: {
             orders: [],
-            users: [],
+            drivers: [],
+            clients: [],
           },
         }
       }
@@ -740,7 +742,8 @@ class AdminApiService {
           success: false,
           data: {
             orders: [],
-            users: [],
+            drivers: [],
+            clients: [],
           },
         }
       }
@@ -752,7 +755,8 @@ class AdminApiService {
           success: true,
           data: result.data as {
             orders: unknown[]
-            users: unknown[]
+            drivers: unknown[]
+            clients: unknown[]
           },
         }
       }
@@ -761,7 +765,8 @@ class AdminApiService {
         success: false,
         data: {
           orders: [],
-          users: [],
+          drivers: [],
+          clients: [],
         },
       }
     } catch (error: unknown) {
@@ -770,7 +775,8 @@ class AdminApiService {
         success: false,
         data: {
           orders: [],
-          users: [],
+          drivers: [],
+          clients: [],
         },
       }
     }

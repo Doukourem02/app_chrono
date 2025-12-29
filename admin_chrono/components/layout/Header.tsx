@@ -17,17 +17,41 @@ interface SearchOrder {
   status: string
   clientName?: string
   driverName?: string
+  price?: string | null
   createdAt: string
 }
 
-interface SearchUser {
+interface SearchDriver {
   id: string
   email: string
-  role: string
   phone: string
   first_name?: string | null
   last_name?: string | null
   fullName?: string | null
+  avatar_url?: string | null
+  driver_type: string
+  driver_type_label: string
+  vehicle_type: string
+  vehicle_type_label: string
+  license_number?: string | null
+  rating: string
+  total_deliveries: number
+  is_online: boolean
+  is_available: boolean
+  commission_balance?: string | null
+  commission_rate?: string | null
+  is_suspended: boolean
+  createdAt: string
+}
+
+interface SearchClient {
+  id: string
+  email: string
+  phone: string
+  first_name?: string | null
+  last_name?: string | null
+  fullName?: string | null
+  avatar_url?: string | null
   createdAt: string
 }
 
@@ -74,9 +98,11 @@ export default function Header() {
       console.log('🔍 [Header] Résultats de recherche:', {
         query: debouncedQuery,
         ordersCount: searchResults.data.orders?.length || 0,
-        usersCount: searchResults.data.users?.length || 0,
+        driversCount: searchResults.data.drivers?.length || 0,
+        clientsCount: searchResults.data.clients?.length || 0,
         orders: searchResults.data.orders?.slice(0, 3),
-        users: searchResults.data.users?.slice(0, 3),
+        drivers: searchResults.data.drivers?.slice(0, 3),
+        clients: searchResults.data.clients?.slice(0, 3),
       })
     }
   }, [searchResults, debouncedQuery])
@@ -102,7 +128,7 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSearchResultClick = (type: 'order' | 'user', id?: string, orderStatus?: string) => {
+  const handleSearchResultClick = (type: 'order' | 'driver' | 'client', id?: string, orderStatus?: string) => {
     if (type === 'order' && id) {
       // Mapper le statut de la commande vers le paramètre d'URL
       const statusToUrlMap: Record<string, string> = {
@@ -117,12 +143,16 @@ export default function Header() {
       }
       const urlStatus = orderStatus ? (statusToUrlMap[orderStatus.toLowerCase()] || 'all') : 'all'
       router.push(`/orders?status=${urlStatus}&orderId=${id}`)
-    } else if (type === 'user' && id) {
+    } else if (type === 'driver' && id) {
+      router.push(`/drivers/${id}`)
+    } else if (type === 'client' && id) {
       router.push(`/users/${id}`)
     } else {
       if (type === 'order') {
         router.push(`/orders`)
-      } else if (type === 'user') {
+      } else if (type === 'driver') {
+        router.push(`/drivers`)
+      } else if (type === 'client') {
         router.push(`/users`)
       }
     }
@@ -158,15 +188,6 @@ export default function Header() {
       picked_up: 'Récupéré',
     }
     return statusMap[status?.toLowerCase()] || status
-  }
-
-  const getRoleLabel = (role: string) => {
-    const roleMap: Record<string, string> = {
-      client: 'Client',
-      driver: 'Livreur',
-      admin: 'Admin',
-    }
-    return roleMap[role?.toLowerCase()] || role
   }
 
   const dateOptions: { value: DateFilterType; label: string }[] = [
@@ -448,28 +469,92 @@ export default function Header() {
               <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>
                 Recherche en cours...
               </div>
-            ) : searchResults?.data && (searchResults.data.orders.length > 0 || searchResults.data.users.length > 0) ? (
+            ) : searchResults?.data && (searchResults.data.orders.length > 0 || searchResults.data.drivers.length > 0 || searchResults.data.clients.length > 0) ? (
               <>
                 {(() => {
-                  // Déterminer si c'est une recherche de commande (commence par CHL)
-                  const isOrderSearch = debouncedQuery.trim().toUpperCase().startsWith('CHL')
+                  const hasOrders = searchResults.data.orders.length > 0
+                  const hasDrivers = searchResults.data.drivers.length > 0
+                  const hasClients = searchResults.data.clients.length > 0
                   
                   // Si c'est une recherche de commande, afficher les commandes en premier
-                  // Sinon, afficher les utilisateurs en premier
-                  if (isOrderSearch) {
-                    // Ordre : Commandes puis Utilisateurs
-                    return (
-                      <>
-                        {searchResults.data.orders.length > 0 && (
-                          <>
-                            <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
-                              Commandes ({searchResults.data.orders.length})
+                  // Sinon, afficher dans l'ordre : Livreurs, Clients, Commandes
+                  return (
+                    <>
+                      {/* Commandes */}
+                      {hasOrders && (
+                        <>
+                          <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
+                            Commandes ({searchResults.data.orders.length})
+                          </div>
+                          {((searchResults.data.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
+                            <div
+                              key={order.id}
+                              style={searchResultItemStyle}
+                              onClick={() => handleSearchResultClick('order', order.id, order.status)}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#F9FAFB'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent'
+                              }}
+                            >
+                              <Package size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                                    {order.deliveryId || order.id.slice(0, 8) + '...'}
+                                  </div>
+                                  <span
+                                    style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      backgroundColor: getStatusColor(order.status) + '20',
+                                      color: getStatusColor(order.status),
+                                    }}
+                                  >
+                                    {getStatusLabel(order.status)}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                  {order.pickup} → {order.dropoff}
+                                </div>
+                                {order.price && (
+                                  <div style={{ fontSize: '12px', color: '#8B5CF6', fontWeight: 600, marginBottom: '2px' }}>
+                                    {order.price}
+                                  </div>
+                                )}
+                                {(order.clientName || order.driverName) && (
+                                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
+                                    {order.clientName && `Client: ${order.clientName}`}
+                                    {order.clientName && order.driverName && ' • '}
+                                    {order.driverName && `Livreur: ${order.driverName}`}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                                  {order.createdAt}
+                                </div>
+                              </div>
                             </div>
-                            {((searchResults.data.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
+                          ))}
+                        </>
+                      )}
+
+                      {/* Livreurs */}
+                      {hasDrivers && (
+                        <>
+                          <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', borderTop: hasOrders ? '1px solid #E5E7EB' : 'none', marginTop: hasOrders ? '8px' : '0' }}>
+                            Livreurs ({searchResults.data.drivers.length})
+                          </div>
+                          {((searchResults.data.drivers as SearchDriver[]) || []).map((driver: SearchDriver) => {
+                            const displayName = driver.fullName || driver.email
+                            
+                            return (
                               <div
-                                key={order.id}
+                                key={driver.id}
                                 style={searchResultItemStyle}
-                                onClick={() => handleSearchResultClick('order', order.id, order.status)}
+                                onClick={() => handleSearchResultClick('driver', driver.id)}
                                 onMouseEnter={(e) => {
                                   e.currentTarget.style.backgroundColor = '#F9FAFB'
                                 }}
@@ -477,11 +562,11 @@ export default function Header() {
                                   e.currentTarget.style.backgroundColor = 'transparent'
                                 }}
                               >
-                                <Package size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
+                                <User size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                                      {order.deliveryId || order.id.slice(0, 8) + '...'}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {displayName}
                                     </div>
                                     <span
                                       style={{
@@ -489,163 +574,72 @@ export default function Header() {
                                         borderRadius: '4px',
                                         fontSize: '11px',
                                         fontWeight: 600,
-                                        backgroundColor: getStatusColor(order.status) + '20',
-                                        color: getStatusColor(order.status),
+                                        backgroundColor: driver.driver_type === 'internal' ? '#EF444420' : '#8B5CF620',
+                                        color: driver.driver_type === 'internal' ? '#EF4444' : '#8B5CF6',
+                                        flexShrink: 0,
                                       }}
                                     >
-                                      {getStatusLabel(order.status)}
+                                      {driver.driver_type_label}
+                                    </span>
+                                    <span
+                                      style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        backgroundColor: driver.is_online ? '#10B98120' : '#6B728020',
+                                        color: driver.is_online ? '#10B981' : '#6B7280',
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {driver.is_online ? 'En ligne' : 'Hors ligne'}
                                     </span>
                                   </div>
-                                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                    {order.pickup} → {order.dropoff}
-                                  </div>
-                                  {(order.clientName || order.driverName) && (
-                                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
-                                      {order.clientName && `Client: ${order.clientName}`}
-                                      {order.clientName && order.driverName && ' • '}
-                                      {order.driverName && `Livreur: ${order.driverName}`}
+                                  {driver.fullName && (
+                                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                      {driver.email}
                                     </div>
                                   )}
+                                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                    {driver.phone}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                    <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                                      {driver.vehicle_type_label} {driver.license_number ? `• ${driver.license_number}` : ''}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                                      ⭐ {driver.rating} ({driver.total_deliveries} livraisons)
+                                    </div>
+                                    {driver.commission_balance && (
+                                      <div style={{ fontSize: '11px', color: '#8B5CF6', fontWeight: 600 }}>
+                                        💰 {driver.commission_balance} ({driver.commission_rate})
+                                      </div>
+                                    )}
+                                  </div>
                                   <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                                    {order.createdAt}
+                                    Inscrit le {driver.createdAt}
                                   </div>
                                 </div>
                               </div>
-                            ))}
-                          </>
-                        )}
-                        {searchResults.data.users.length > 0 && (
-                          <>
-                            <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', borderTop: searchResults.data.orders.length > 0 ? '1px solid #E5E7EB' : 'none', marginTop: searchResults.data.orders.length > 0 ? '8px' : '0' }}>
-                              Utilisateurs ({searchResults.data.users.length})
-                            </div>
-                            {((searchResults.data.users as SearchUser[]) || []).map((user: SearchUser) => {
-                              const displayName = user.fullName || user.email
-                              const roleColor = user.role === 'driver' ? '#8B5CF6' : user.role === 'admin' ? '#EF4444' : '#10B981'
-                              
-                              return (
-                                <div
-                                  key={user.id}
-                                  style={searchResultItemStyle}
-                                  onClick={() => handleSearchResultClick('user', user.id)}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#F9FAFB'
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent'
-                                  }}
-                                >
-                                  <User size={20} style={{ color: roleColor, flexShrink: 0 }} />
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {displayName}
-                                      </div>
-                                      <span
-                                        style={{
-                                          padding: '2px 8px',
-                                          borderRadius: '4px',
-                                          fontSize: '11px',
-                                          fontWeight: 600,
-                                          backgroundColor: roleColor + '20',
-                                          color: roleColor,
-                                          flexShrink: 0,
-                                        }}
-                                      >
-                                        {getRoleLabel(user.role)}
-                                      </span>
-                                    </div>
-                                    {user.fullName && (
-                                      <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                        {user.email}
-                                      </div>
-                                    )}
-                                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                      {user.phone}
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                                      Inscrit le {user.createdAt}
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </>
-                        )}
-                      </>
-                    )
-                  } else {
-                    // Ordre : Utilisateurs puis Commandes (pour les recherches de noms)
-                    return (
-                      <>
-                        {searchResults.data.users.length > 0 && (
-                          <>
-                            <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
-                              Utilisateurs ({searchResults.data.users.length})
-                            </div>
-                            {((searchResults.data.users as SearchUser[]) || []).map((user: SearchUser) => {
-                              const displayName = user.fullName || user.email
-                              const roleColor = user.role === 'driver' ? '#8B5CF6' : user.role === 'admin' ? '#EF4444' : '#10B981'
-                              
-                              return (
-                                <div
-                                  key={user.id}
-                                  style={searchResultItemStyle}
-                                  onClick={() => handleSearchResultClick('user', user.id)}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = '#F9FAFB'
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'transparent'
-                                  }}
-                                >
-                                  <User size={20} style={{ color: roleColor, flexShrink: 0 }} />
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {displayName}
-                                      </div>
-                                      <span
-                                        style={{
-                                          padding: '2px 8px',
-                                          borderRadius: '4px',
-                                          fontSize: '11px',
-                                          fontWeight: 600,
-                                          backgroundColor: roleColor + '20',
-                                          color: roleColor,
-                                          flexShrink: 0,
-                                        }}
-                                      >
-                                        {getRoleLabel(user.role)}
-                                      </span>
-                                    </div>
-                                    {user.fullName && (
-                                      <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                        {user.email}
-                                      </div>
-                                    )}
-                                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                      {user.phone}
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                                      Inscrit le {user.createdAt}
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </>
-                        )}
-                        {searchResults.data.orders.length > 0 && (
-                          <>
-                            <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', borderTop: searchResults.data.users.length > 0 ? '1px solid #E5E7EB' : 'none', marginTop: searchResults.data.users.length > 0 ? '8px' : '0' }}>
-                              Commandes ({searchResults.data.orders.length})
-                            </div>
-                            {((searchResults.data.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
+                            )
+                          })}
+                        </>
+                      )}
+
+                      {/* Clients */}
+                      {hasClients && (
+                        <>
+                          <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', borderTop: (hasOrders || hasDrivers) ? '1px solid #E5E7EB' : 'none', marginTop: (hasOrders || hasDrivers) ? '8px' : '0' }}>
+                            Clients ({searchResults.data.clients.length})
+                          </div>
+                          {((searchResults.data.clients as SearchClient[]) || []).map((client: SearchClient) => {
+                            const displayName = client.fullName || client.email
+                            
+                            return (
                               <div
-                                key={order.id}
+                                key={client.id}
                                 style={searchResultItemStyle}
-                                onClick={() => handleSearchResultClick('order', order.id, order.status)}
+                                onClick={() => handleSearchResultClick('client', client.id)}
                                 onMouseEnter={(e) => {
                                   e.currentTarget.style.backgroundColor = '#F9FAFB'
                                 }}
@@ -653,11 +647,11 @@ export default function Header() {
                                   e.currentTarget.style.backgroundColor = 'transparent'
                                 }}
                               >
-                                <Package size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
+                                <User size={20} style={{ color: '#10B981', flexShrink: 0 }} />
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                                      {order.deliveryId || order.id.slice(0, 8) + '...'}
+                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {displayName}
                                     </div>
                                     <span
                                       style={{
@@ -665,34 +659,33 @@ export default function Header() {
                                         borderRadius: '4px',
                                         fontSize: '11px',
                                         fontWeight: 600,
-                                        backgroundColor: getStatusColor(order.status) + '20',
-                                        color: getStatusColor(order.status),
+                                        backgroundColor: '#10B98120',
+                                        color: '#10B981',
+                                        flexShrink: 0,
                                       }}
                                     >
-                                      {getStatusLabel(order.status)}
+                                      Client
                                     </span>
                                   </div>
-                                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                    {order.pickup} → {order.dropoff}
-                                  </div>
-                                  {(order.clientName || order.driverName) && (
-                                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
-                                      {order.clientName && `Client: ${order.clientName}`}
-                                      {order.clientName && order.driverName && ' • '}
-                                      {order.driverName && `Livreur: ${order.driverName}`}
+                                  {client.fullName && (
+                                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                      {client.email}
                                     </div>
                                   )}
+                                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
+                                    {client.phone}
+                                  </div>
                                   <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                                    {order.createdAt}
+                                    Inscrit le {client.createdAt}
                                   </div>
                                 </div>
                               </div>
-                            ))}
-                          </>
-                        )}
-                      </>
-                    )
-                  }
+                            )
+                          })}
+                        </>
+                      )}
+                    </>
+                  )
                 })()}
               </>
             ) : (

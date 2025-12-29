@@ -492,7 +492,8 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         success: true,
         data: {
           orders: [],
-          users: [],
+          drivers: [],
+          clients: [],
         },
       });
       return;
@@ -504,7 +505,8 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         success: true,
         data: {
           orders: [],
-          users: [],
+          drivers: [],
+          clients: [],
         },
       });
       return;
@@ -513,11 +515,14 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     const searchTerm = `%${query.trim()}%`;
     const exactSearchTerm = query.trim();
     const upperQuery = query.trim().toUpperCase();
-    const trimmedQuery = query.trim();
+    const trimmedQuery = query.trim().toLowerCase();
 
-    // Détecter si c'est une recherche d'ID de commande (commence par CHL)
-    // Si oui, on priorisera les commandes dans les résultats
+    // Détection intelligente du type de recherche
     const isOrderSearch = upperQuery.startsWith('CHL');
+    const isPhoneSearch = /^[\d\s\+\-\(\)]+$/.test(query.trim());
+    const isEmailSearch = trimmedQuery.includes('@');
+    const isVehicleTypeSearch = ['moto', 'vehicule', 'cargo', 'véhicule'].includes(trimmedQuery);
+    const isDriverTypeSearch = ['interne', 'internal', 'partenaire', 'partner'].includes(trimmedQuery);
 
     // Construire la condition de recherche pour l'ID formaté (si recherche de commande)
     let deliveryIdCondition = '';
@@ -537,8 +542,18 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       `;
     }
 
-    // Rechercher dans TOUTES les commandes (par ID, statut, adresses, emails/téléphones/noms des clients/livreurs)
-    // Améliorer la recherche pour mieux gérer tous les champs
+    // Vérifier si price_cfa ou price existe dans orders
+    const priceColumnsInfo = await (pool as any).query(
+      `SELECT column_name FROM information_schema.columns 
+       WHERE table_schema = 'public' AND table_name = 'orders' 
+       AND column_name = ANY($1)`,
+      [['price_cfa', 'price']]
+    );
+    const priceColumnSet = new Set(priceColumnsInfo.rows.map((row: any) => row.column_name));
+    const priceColumn = priceColumnSet.has('price_cfa') ? 'price_cfa' : priceColumnSet.has('price') ? 'price' : null;
+    const priceSearchCondition = priceColumn ? `OR CAST(COALESCE(o.${priceColumn}, 0) AS TEXT) ILIKE LOWER($1)` : '';
+
+    // Rechercher dans TOUTES les commandes (par ID, statut, adresses, emails/téléphones/noms, montant)
     const ordersWhereClause = `
       (LOWER(o.id::text) ILIKE LOWER($1) OR
       LOWER(REPLACE(o.id::text, '-', '')) ILIKE LOWER($1) OR
@@ -557,7 +572,8 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       LOWER(COALESCE(d.last_name, '')) ILIKE LOWER($1) OR
       LOWER(CONCAT(COALESCE(d.first_name, ''), ' ', COALESCE(d.last_name, ''))) ILIKE LOWER($1) OR
       LOWER(CONCAT(COALESCE(d.last_name, ''), ' ', COALESCE(d.first_name, ''))) ILIKE LOWER($1)
-      ${deliveryIdCondition})
+      ${deliveryIdCondition}
+      ${priceSearchCondition})
     `;
 
     // Rechercher dans les commandes avec plus de précision
@@ -570,6 +586,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         o.dropoff_address,
         o.user_id,
         o.driver_id,
+        ${priceColumn ? `o.${priceColumn} as price,` : 'NULL as price,'}
         u.first_name as user_first_name,
         u.last_name as user_last_name,
         u.email as user_email,
@@ -599,35 +616,90 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       LIMIT 10
     `;
 
-    // Rechercher dans les utilisateurs avec recherche par nom et prénom
-    // Simplifier la recherche pour qu'elle soit plus robuste
-    const usersQuery = `
-      SELECT id, email, phone, role, first_name, last_name, created_at
+    // Rechercher dans les LIVREURS (avec driver_profiles et commission_balance)
+    const driversQuery = `
+      SELECT 
+        u.id,
+        u.email,
+        u.phone,
+        u.first_name,
+        u.last_name,
+        u.created_at,
+        u.avatar_url,
+        dp.driver_type,
+        dp.vehicle_type,
+        dp.license_number,
+        dp.rating,
+        dp.total_deliveries,
+        dp.is_online,
+        dp.is_available,
+        COALESCE(cb.balance, 0) as commission_balance,
+        COALESCE(cb.commission_rate, 10) as commission_rate,
+        COALESCE(cb.is_suspended, false) as is_suspended
+      FROM users u
+      INNER JOIN driver_profiles dp ON dp.user_id = u.id
+      LEFT JOIN commission_balance cb ON cb.driver_id = u.id
+      WHERE u.role = 'driver' AND (
+        u.email ILIKE $1 OR
+        u.phone ILIKE $1 OR
+        u.first_name ILIKE $1 OR
+        u.last_name ILIKE $1 OR
+        (u.first_name IS NOT NULL AND u.last_name IS NOT NULL AND CONCAT(u.first_name, ' ', u.last_name) ILIKE $1) OR
+        (u.first_name IS NOT NULL AND u.last_name IS NOT NULL AND CONCAT(u.last_name, ' ', u.first_name) ILIKE $1) OR
+        LOWER(COALESCE(dp.vehicle_type, '')) ILIKE LOWER($1) OR
+        LOWER(COALESCE(dp.license_number, '')) ILIKE LOWER($1) OR
+        LOWER(COALESCE(dp.driver_type, '')) ILIKE LOWER($1) OR
+        CAST(COALESCE(dp.rating, 0) AS TEXT) ILIKE LOWER($1) OR
+        CAST(COALESCE(dp.total_deliveries, 0) AS TEXT) ILIKE LOWER($1) OR
+        CAST(COALESCE(cb.balance, 0) AS TEXT) ILIKE LOWER($1) OR
+        CAST(COALESCE(cb.commission_rate, 10) AS TEXT) ILIKE LOWER($1)
+      )
+      ORDER BY 
+        CASE 
+          WHEN u.email = $2 THEN 1
+          WHEN u.email ILIKE $3 THEN 2
+          ${isPhoneSearch ? 'WHEN u.phone ILIKE $1 THEN 3' : ''}
+          ${isVehicleTypeSearch ? 'WHEN LOWER(dp.vehicle_type) = LOWER($2) THEN 4' : ''}
+          ${isDriverTypeSearch ? 'WHEN LOWER(dp.driver_type) = LOWER($2) THEN 5' : ''}
+          WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL AND CONCAT(u.first_name, ' ', u.last_name) ILIKE $1 THEN 6
+          WHEN u.first_name ILIKE $1 THEN 7
+          WHEN u.last_name ILIKE $1 THEN 8
+          WHEN LOWER(dp.license_number) ILIKE LOWER($1) THEN 9
+          ELSE 10
+        END,
+        u.created_at DESC
+      LIMIT 10
+    `;
+
+    // Rechercher dans les CLIENTS uniquement (role='client')
+    const clientsQuery = `
+      SELECT id, email, phone, role, first_name, last_name, created_at, avatar_url
       FROM users
-      WHERE 
+      WHERE role = 'client' AND (
         email ILIKE $1 OR
         phone ILIKE $1 OR
-        role ILIKE $1 OR
         first_name ILIKE $1 OR
         last_name ILIKE $1 OR
         (first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(first_name, ' ', last_name) ILIKE $1) OR
         (first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(last_name, ' ', first_name) ILIKE $1)
+      )
       ORDER BY 
         CASE 
           WHEN email = $2 THEN 1
           WHEN email ILIKE $3 THEN 2
-          WHEN role = $2 THEN 3
-          WHEN first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(first_name, ' ', last_name) ILIKE $1 THEN 4
-          WHEN first_name ILIKE $1 THEN 5
-          WHEN last_name ILIKE $1 THEN 6
-          WHEN phone ILIKE $1 THEN 7
-          ELSE 8
+          ${isPhoneSearch ? 'WHEN phone ILIKE $1 THEN 3' : ''}
+          ${isEmailSearch ? 'WHEN email ILIKE $1 THEN 4' : ''}
+          WHEN first_name IS NOT NULL AND last_name IS NOT NULL AND CONCAT(first_name, ' ', last_name) ILIKE $1 THEN 5
+          WHEN first_name ILIKE $1 THEN 6
+          WHEN last_name ILIKE $1 THEN 7
+          WHEN phone ILIKE $1 THEN 8
+          ELSE 9
         END,
         created_at DESC
       LIMIT 10
     `;
 
-    let ordersResult, usersResult;
+    let ordersResult, driversResult, clientsResult;
     try {
       // Pour les commandes : searchTerm ($1), exactSearchTerm ($2), `${exactSearchTerm}%` ($3), et si orderSearch: `${upperQuery}%` ($4) et upperQuery ($5)
       const ordersParams: any[] = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
@@ -638,21 +710,17 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       ordersResult = await (pool as any).query(ordersQuery, ordersParams);
       logger.info(`[getAdminGlobalSearch] Commandes trouvées: ${ordersResult.rows.length}`);
 
-      // Pour les utilisateurs : searchTerm, exactSearchTerm, searchTerm (pour le tri)
-      const usersParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
-      logger.info('🔍 [getAdminGlobalSearch] Exécution requête utilisateurs avec params:', usersParams);
-      logger.info('🔍 [getAdminGlobalSearch] Requête SQL utilisateurs:', usersQuery);
-      usersResult = await (pool as any).query(usersQuery, usersParams);
-      logger.info(`[getAdminGlobalSearch] Utilisateurs trouvés: ${usersResult.rows.length}`);
-      if (usersResult.rows.length > 0) {
-        logger.info('[getAdminGlobalSearch] Exemples utilisateurs:', usersResult.rows.slice(0, 3).map((u: any) => ({
-          id: u.id,
-          email: u.email,
-          first_name: u.first_name,
-          last_name: u.last_name,
-          role: u.role
-        })));
-      }
+      // Pour les livreurs : searchTerm, exactSearchTerm, searchTerm (pour le tri)
+      const driversParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
+      logger.info('🔍 [getAdminGlobalSearch] Exécution requête livreurs avec params:', driversParams);
+      driversResult = await (pool as any).query(driversQuery, driversParams);
+      logger.info(`[getAdminGlobalSearch] Livreurs trouvés: ${driversResult.rows.length}`);
+
+      // Pour les clients : searchTerm, exactSearchTerm, searchTerm (pour le tri)
+      const clientsParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
+      logger.info('🔍 [getAdminGlobalSearch] Exécution requête clients avec params:', clientsParams);
+      clientsResult = await (pool as any).query(clientsQuery, clientsParams);
+      logger.info(`[getAdminGlobalSearch] Clients trouvés: ${clientsResult.rows.length}`);
     } catch (queryError: any) {
       logger.error('[getAdminGlobalSearch] Erreur lors de la requête SQL:', queryError);
       throw queryError;
@@ -671,10 +739,17 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
       return field;
     };
 
+    const formatCurrency = (amount: number | null | undefined): string => {
+      if (!amount) return 'N/A';
+      return new Intl.NumberFormat('fr-FR', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount) + ' FCFA';
+    };
+
     const formattedOrders = ordersResult.rows.map((order: any) => {
       const pickup = parseJsonField(order.pickup_address);
       const dropoff = parseJsonField(order.dropoff_address);
-      // Utiliser la fonction formatDeliveryId pour générer le format CHLV–YYMMDD-XXXX
       const deliveryId = formatDeliveryId(order.id, order.created_at);
 
       const clientName = (order.user_first_name && order.user_last_name)
@@ -693,46 +768,89 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         dropoff: dropoff?.address || dropoff?.formatted_address || dropoff?.name || 'Adresse inconnue',
         clientName,
         driverName,
+        price: order.price ? formatCurrency(order.price) : null,
         createdAt: new Date(order.created_at).toLocaleDateString('fr-FR'),
       };
     });
 
-    const formattedUsers = usersResult.rows.map((user: any) => {
-      const fullName = (user.first_name && user.last_name)
-        ? `${user.first_name} ${user.last_name}`
+    const formattedDrivers = driversResult.rows.map((driver: any) => {
+      const fullName = (driver.first_name && driver.last_name)
+        ? `${driver.first_name} ${driver.last_name}`
         : null;
 
+      const vehicleTypeLabels: { [key: string]: string } = {
+        moto: 'Moto',
+        vehicule: 'Véhicule',
+        cargo: 'Cargo',
+      };
+
+      const driverTypeLabels: { [key: string]: string } = {
+        internal: 'Interne',
+        partner: 'Partenaire',
+      };
+
       return {
-        id: user.id,
-        email: user.email,
-        phone: user.phone || 'N/A',
-        role: user.role,
-        first_name: user.first_name || null,
-        last_name: user.last_name || null,
+        id: driver.id,
+        email: driver.email,
+        phone: driver.phone || 'N/A',
+        first_name: driver.first_name || null,
+        last_name: driver.last_name || null,
         fullName,
-        createdAt: new Date(user.created_at).toLocaleDateString('fr-FR'),
+        avatar_url: driver.avatar_url || null,
+        driver_type: driver.driver_type || 'partner',
+        driver_type_label: driverTypeLabels[driver.driver_type] || 'Partenaire',
+        vehicle_type: driver.vehicle_type || 'moto',
+        vehicle_type_label: vehicleTypeLabels[driver.vehicle_type] || 'Moto',
+        license_number: driver.license_number || null,
+        rating: driver.rating ? parseFloat(driver.rating).toFixed(1) : '5.0',
+        total_deliveries: driver.total_deliveries || 0,
+        is_online: driver.is_online || false,
+        is_available: driver.is_available || false,
+        commission_balance: driver.driver_type === 'partner' ? formatCurrency(parseFloat(driver.commission_balance || 0)) : null,
+        commission_rate: driver.driver_type === 'partner' ? `${driver.commission_rate}%` : null,
+        is_suspended: driver.is_suspended || false,
+        createdAt: new Date(driver.created_at).toLocaleDateString('fr-FR'),
       };
     });
 
-    logger.info(`[getAdminGlobalSearch] Résultats: ${formattedOrders.length} commandes, ${formattedUsers.length} utilisateurs`);
+    const formattedClients = clientsResult.rows.map((client: any) => {
+      const fullName = (client.first_name && client.last_name)
+        ? `${client.first_name} ${client.last_name}`
+        : null;
+
+      return {
+        id: client.id,
+        email: client.email,
+        phone: client.phone || 'N/A',
+        first_name: client.first_name || null,
+        last_name: client.last_name || null,
+        fullName,
+        avatar_url: client.avatar_url || null,
+        createdAt: new Date(client.created_at).toLocaleDateString('fr-FR'),
+      };
+    });
+
+    logger.info(`[getAdminGlobalSearch] Résultats: ${formattedOrders.length} commandes, ${formattedDrivers.length} livreurs, ${formattedClients.length} clients`);
 
     res.json({
       success: true,
       data: {
         orders: formattedOrders,
-        users: formattedUsers,
+        drivers: formattedDrivers,
+        clients: formattedClients,
       },
     });
   } catch (error: any) {
     logger.error('Erreur getAdminGlobalSearch:', error);
 
-    if (error.message && (error.message.includes('SASL') || error.message.includes('password'))) {
+    if (error.message && (error.message.includes('SASL') || error.message.includes('password') || error.message.includes('ENOTFOUND'))) {
       logger.warn('Erreur de connexion DB, retour de données vides');
       res.json({
         success: true,
         data: {
           orders: [],
-          users: [],
+          drivers: [],
+          clients: [],
         },
       });
       return;
