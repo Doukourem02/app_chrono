@@ -2,7 +2,7 @@
  * Tests d'intégration pour WebSocket (Socket.IO)
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import { io, Socket } from 'socket.io-client';
 import http from 'http';
 import { Server } from 'socket.io';

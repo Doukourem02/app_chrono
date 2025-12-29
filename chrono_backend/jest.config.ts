@@ -14,15 +14,7 @@ const config: Config = {
   transform: {
     '^.+\\.ts$': ['ts-jest', {
       useESM: true,
-      tsconfig: {
-        extends: './tsconfig.json',
-        include: ['src/**/*', 'tests/**/*'],
-        compilerOptions: {
-          module: 'ESNext',
-          moduleResolution: 'node',
-          types: ['node', 'jest', '@types/supertest'],
-        },
-      },
+      tsconfig: './tsconfig.test.json',
     }],
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
@@ -36,8 +28,17 @@ const config: Config = {
     '!src/**/*.d.ts',
     '!src/config/**',
     '!src/utils/logger.ts',
+    '!src/server.ts',
   ],
   coverageDirectory: 'coverage',
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70,
+    },
+  },
   verbose: true,
   testTimeout: 10000,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],

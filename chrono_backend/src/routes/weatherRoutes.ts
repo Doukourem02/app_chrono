@@ -27,7 +27,7 @@ router.get('/:latitude/:longitude', verifyJWT, async (req, res) => {
     const adjustment = calculateWeatherAdjustment(weather, vehicleType);
     const isDifficult = isDifficultWeather(weather);
 
-    res.json({
+    return res.json({
       weather,
       adjustment,
       isDifficult,
