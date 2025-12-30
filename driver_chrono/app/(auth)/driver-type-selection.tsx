@@ -6,11 +6,6 @@ import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 
-/**
- * Écran de sélection du type de livreur
- * - Livreur Partenaire Indépendant (commission prépayée)
- * - Livreur Interne Chrono (créé par admin, pas accessible ici normalement)
- */
 export default function DriverTypeSelectionScreen() {
   const [selectedType, setSelectedType] = useState<'partner' | 'internal' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,35 +25,35 @@ export default function DriverTypeSelectionScreen() {
     setIsLoading(true);
 
     try {
-      // Mettre à jour le type de livreur dans la base de données
+  
       const response = await apiService.updateDriverType(user.id, selectedType);
 
       if (response.success) {
-        // Stocker le type choisi dans le store temporaire
+      
         setDriverType(selectedType);
         
-        // Recharger le profil complet depuis le backend pour s'assurer qu'on a les données à jour
+
         try {
           const profileResult = await apiService.getDriverProfile(user.id);
           if (profileResult.success && profileResult.data) {
-            // Mettre à jour le profil dans le store avec les données fraîches du backend
+        
             setProfile(profileResult.data);
             
-            // Attendre un court instant pour s'assurer que le store est bien mis à jour
+        
             await new Promise(resolve => setTimeout(resolve, 100));
           } else {
             console.warn('Profil non trouvé après mise à jour du type');
           }
         } catch (profileError) {
           console.warn('Erreur rechargement profil après mise à jour type:', profileError);
-          // Continuer même si le rechargement échoue
+        
         }
 
         if (selectedType === 'partner') {
-          // Livreur partenaire → Redirection vers onboarding
+      
           router.replace('/(auth)/partner-onboarding' as any);
         } else {
-          // Livreur interne → Accès direct au dashboard
+        
           router.replace('/(tabs)' as any);
         }
       } else {

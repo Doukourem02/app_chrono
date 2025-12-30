@@ -5,11 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 
-/**
- * Écran d'onboarding pour les nouveaux livreurs partenaires
- * - Acceptation des conditions de commission prépayée
- * - Complétion du profil (véhicule, permis, etc.)
- */
+
 export default function PartnerOnboardingScreen() {
   const { user, profile, setProfile } = useDriverStore();
   const [acceptedTerms, setAcceptedTerms] = useState(false);

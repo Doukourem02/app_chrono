@@ -8,21 +8,18 @@ import { useDriverStore } from '../../store/useDriverStore';
 export default function SuccessScreen() {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const { isNewUser, driverType, clearTempData } = useTempDriverStore();
-  const { profile, needsDriverTypeSelection } = useDriverStore();
-  
-  // Vérifier au montage si redirection nécessaire
+
+  const { isNewUser, clearTempData } = useTempDriverStore();
+  const { needsDriverTypeSelection } = useDriverStore();
+
+  // ✅ Vérifier au montage si redirection nécessaire
   useEffect(() => {
-    // ÉTAPE 1 : Si pas de driver_type, rediriger vers la sélection (PRIORITÉ)
     if (needsDriverTypeSelection()) {
       router.replace('/(auth)/driver-type-selection' as any);
-      return;
     }
-    
-    // Les informations véhicule sont optionnelles, donc pas de redirection vers onboarding
-    // Le profil est considéré complet dès que driver_type est défini
   }, [needsDriverTypeSelection]);
 
+  // ✅ Animation lancée UNE SEULE FOIS
   useEffect(() => {
     Animated.sequence([
       Animated.timing(scaleAnim, {
@@ -36,60 +33,55 @@ export default function SuccessScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-  });
+  }, [scaleAnim, fadeAnim]);
 
   const handleContinue = () => {
     clearTempData();
-    
-    // ÉTAPE 1 : Vérifier si driver_type manquant (PRIORITÉ)
+
     if (needsDriverTypeSelection()) {
       router.replace('/(auth)/driver-type-selection' as any);
       return;
     }
-    
-    // Les informations véhicule sont optionnelles, donc pas de vérification supplémentaire
-    // Le profil est considéré complet dès que driver_type est défini
-    // Profil complet → aller au dashboard
+
     router.replace('/(tabs)' as any);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.contentContainer}>
-        <Animated.View 
+        <Animated.View
           style={[
             styles.successIconContainer,
-            { transform: [{ scale: scaleAnim }] }
+            { transform: [{ scale: scaleAnim }] },
           ]}
         >
           <View style={styles.successIcon}>
-            <Ionicons 
-              name={isNewUser ? "car-sport" : "checkmark-circle"} 
-              size={60} 
-              color="#FFFFFF" 
+            <Ionicons
+              name={isNewUser ? 'car-sport' : 'checkmark-circle'}
+              size={60}
+              color="#FFFFFF"
             />
           </View>
         </Animated.View>
 
         <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
           <Text style={styles.title}>
-            {isNewUser ? "Bienvenue Chauffeur!" : "Connexion réussie!"}
+            {isNewUser ? 'Bienvenue Chauffeur !' : 'Connexion réussie !'}
           </Text>
           <Text style={styles.subtitle}>
-            {isNewUser 
-              ? "Félicitations! Votre compte chauffeur a été créé avec succès. Vous pouvez maintenant commencer à livrer."
-              : "Heureux de vous revoir! Vous êtes maintenant connecté à votre tableau de bord chauffeur."
-            }
+            {isNewUser
+              ? 'Félicitations ! Votre compte chauffeur a été créé avec succès. Vous pouvez maintenant commencer à livrer.'
+              : 'Heureux de vous revoir ! Vous êtes maintenant connecté à votre tableau de bord chauffeur.'}
           </Text>
         </Animated.View>
 
         <Animated.View style={[styles.buttonContainer, { opacity: fadeAnim }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.continueButton}
             onPress={handleContinue}
           >
             <Text style={styles.continueButtonText}>
-              {isNewUser ? "Commencer à livrer" : "Accéder au tableau de bord"}
+              {isNewUser ? 'Commencer à livrer' : 'Accéder au tableau de bord'}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -120,10 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#8B5CF6',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 15,
@@ -154,10 +143,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     shadowColor: '#8B5CF6',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,

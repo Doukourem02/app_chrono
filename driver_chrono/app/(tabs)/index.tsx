@@ -235,21 +235,20 @@ export default function Index() {
   });
   
   // Géofencing : détection automatique d'arrivée
-  const geofencing = useGeofencing({
-    driverPosition: location,
-    targetPosition: destination,
-    orderId: currentOrder?.id || null,
-    orderStatus: currentOrder?.status || null,
-    enabled: isOnline && !!currentOrder && !!destination && !!location,
-    onEnteredZone: () => {
-      // Notification visuelle ou sonore quand on entre dans la zone
-      logger.info('Vous êtes arrivé dans la zone de livraison', 'geofencing');
-    },
-    onValidated: () => {
-      // Notification quand la validation automatique est déclenchée
-      logger.info('Livraison validée automatiquement', 'geofencing');
-    },
-  });
+  useGeofencing({
+  driverPosition: location,
+  targetPosition: destination,
+  orderId: currentOrder?.id || null,
+  orderStatus: currentOrder?.status || null,
+  enabled: isOnline && !!currentOrder && !!destination && !!location,
+  onEnteredZone: () => {
+    logger.info('Vous êtes arrivé dans la zone de livraison', 'geofencing');
+  },
+  onValidated: () => {
+    logger.info('Livraison validée automatiquement', 'geofencing');
+  },
+});
+
   
   // Route animée vers la destination
   const animatedRoute = useAnimatedRoute({

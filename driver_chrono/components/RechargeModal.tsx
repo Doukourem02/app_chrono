@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCommissionStore } from '../store/useCommissionStore';
-import { useDriverStore } from '../store/useDriverStore';
 
 interface RechargeModalProps {
   visible: boolean;
@@ -21,7 +20,6 @@ interface RechargeModalProps {
 
 export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }) => {
   const { account, recharge, isLoading } = useCommissionStore();
-  const { user } = useDriverStore();
   const [amount, setAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<'orange_money' | 'wave' | null>(null);
 
@@ -289,7 +287,6 @@ const styles = StyleSheet.create({
   minimumText: {
     fontSize: 12,
     color: '#6B7280',
-    fontSize: 12,
   },
   section: {
     marginBottom: 24,
