@@ -28,7 +28,7 @@ export const useAnimatedRoute = ({
   const animationRef = useRef<number | null>(null);
   const lastRecalcRef = useRef<number>(0);
   const GOOGLE_API_KEY = config.googleApiKey;
-  
+
   // Intervalle de recalcul pour tenir compte du trafic en temps réel (2 minutes)
   const TRAFFIC_RECALC_INTERVAL = 2 * 60 * 1000; // 2 minutes
 
@@ -351,10 +351,10 @@ export const useAnimatedRoute = ({
       }
     };
 
-    // Vérifier toutes les 30 secondes si un recalcul est nécessaire
-    const intervalId = setInterval(recalculateRoute, 30 * 1000);
+    // Vérifier toutes les 2 minutes si un recalcul est nécessaire
+    const intervalId = setInterval(recalculateRoute, TRAFFIC_RECALC_INTERVAL);
     return () => clearInterval(intervalId);
-  }, [enabled, origin, destination, routeCoordinates.length, fetchRoute]);
+  }, [enabled, origin, destination, routeCoordinates.length, fetchRoute, TRAFFIC_RECALC_INTERVAL]);
 
   // Nettoyer l'animation au démontage
   useEffect(() => {

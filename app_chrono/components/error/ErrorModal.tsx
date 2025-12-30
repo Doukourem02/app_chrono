@@ -187,7 +187,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
                   {/* Code d'erreur (pour debug) */}
                   {error?.errorCode && __DEV__ && (
                     <View style={styles.errorCodeContainer}>
-                      <Text style={styles.errorCodeLabel}>Code d'erreur:</Text>
+                      <Text style={styles.errorCodeLabel}>Code d&apos;erreur:</Text>
                       <Text style={styles.errorCodeText}>{error?.errorCode}</Text>
                     </View>
                   )}

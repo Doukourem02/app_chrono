@@ -2,8 +2,9 @@
  * Composant de support client avec FAQ et tickets
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 // Icons will be displayed as emojis or using react-native-vector-icons
 import { config } from '../config';
 import { logger } from '../utils/logger';
@@ -34,7 +35,7 @@ export function SupportChat({ userId }: { userId: string }) {
         setFaqResults(data.results || []);
       }
     } catch (error) {
-      logger.error('Error searching FAQ:', error);
+      logger.error('Error searching FAQ:', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -71,7 +72,7 @@ export function SupportChat({ userId }: { userId: string }) {
         Alert.alert('Erreur', 'Impossible de créer le ticket');
       }
     } catch (error) {
-      logger.error('Error creating ticket:', error);
+      logger.error('Error creating ticket:', error instanceof Error ? error.message : String(error));
       Alert.alert('Erreur', 'Une erreur est survenue');
     }
   };
@@ -79,7 +80,7 @@ export function SupportChat({ userId }: { userId: string }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <HelpCircle style={styles.headerIcon} />
+        <Ionicons name="help-circle" style={styles.headerIcon} />
         <Text style={styles.headerTitle}>Support Client</Text>
       </View>
 
@@ -131,10 +132,10 @@ export function SupportChat({ userId }: { userId: string }) {
               <Text style={styles.cancelButtonText}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, styles.submitButton]}
+              style={styles.submitButton}
               onPress={handleCreateTicket}
             >
-              <Send style={styles.submitIcon} />
+              <Ionicons name="send" style={styles.submitIcon} />
               <Text style={styles.submitButtonText}>Envoyer</Text>
             </TouchableOpacity>
           </View>
@@ -144,7 +145,7 @@ export function SupportChat({ userId }: { userId: string }) {
           style={styles.createTicketButton}
           onPress={() => setShowTicketForm(true)}
         >
-          <MessageSquare style={styles.createTicketIcon} />
+          <Ionicons name="chatbox" style={styles.createTicketIcon} />
           <Text style={styles.createTicketText}>Créer un ticket de support</Text>
         </TouchableOpacity>
       )}

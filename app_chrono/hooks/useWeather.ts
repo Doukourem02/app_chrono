@@ -38,7 +38,7 @@ export function useWeather({ latitude, longitude, vehicleType, enabled = true }:
           setError('Données météo non disponibles');
         }
       } catch (err) {
-        logger.error('Error loading weather:', err);
+        logger.error('Error loading weather:', err instanceof Error ? err.message : String(err));
         setError('Erreur lors du chargement des données météo');
       } finally {
         setIsLoading(false);

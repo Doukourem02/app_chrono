@@ -48,7 +48,7 @@ export const DeferredPaymentErrorModal: React.FC<DeferredPaymentErrorModalProps>
   const contentOpacity = useSharedValue(0);
 
   const handleClose = () => {
-    if (error.onClose) {
+    if (error?.onClose) {
       error.onClose();
     }
     hideError();

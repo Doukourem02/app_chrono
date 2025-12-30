@@ -322,7 +322,7 @@ export default function OrderTrackingPage() {
     }, 3000);
     
     return () => clearInterval(interval);
-  }, [orderId, user?.id, loadOrderFromAPI]);
+  }, [orderId, user?.id, loadOrderFromAPI, currentOrder]);
 
   // Calculer la région de la map pour afficher pickup et dropoff
   useEffect(() => {
