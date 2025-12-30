@@ -487,7 +487,7 @@ export default function DriversPage() {
                   const isPartner = driver.driver_type === 'partner'
                   const balance = driver.commission_balance ?? 0
                   const isSuspended = driver.is_suspended ?? false // Suspension manuelle (sanction)
-                  const isInactive = (driver as any).is_inactive ?? false // Solde insuffisant (pas une sanction)
+                  const isInactive = driver.is_inactive ?? false // Solde insuffisant (pas une sanction)
                   const balanceColor = getBalanceColor(balance, isSuspended, isInactive)
                   const balanceStatus = getBalanceStatus(balance, isSuspended, isInactive)
 

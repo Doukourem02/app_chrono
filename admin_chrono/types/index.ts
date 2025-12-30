@@ -38,6 +38,7 @@ export interface Driver extends User {
   commission_balance?: number
   commission_rate?: number
   is_suspended?: boolean
+  is_inactive?: boolean
   completed_deliveries?: number
   total_revenue?: number
   totalRatings?: number

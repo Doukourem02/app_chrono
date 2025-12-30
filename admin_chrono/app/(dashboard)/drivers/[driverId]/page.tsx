@@ -11,6 +11,16 @@ import type { Driver } from '@/types'
 
 type TabType = 'overview' | 'commission' | 'deliveries' | 'ratings'
 
+interface Transaction {
+  id: string
+  type: 'recharge' | 'deduction' | 'refund'
+  amount: number
+  created_at: string
+  balance_after?: number
+  order_id?: string
+  notes?: string
+}
+
 export default function DriverDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -64,23 +74,23 @@ export default function DriverDetailPage() {
     }
   }) | undefined
 
-  const transactions = transactionsData?.data || []
+  const transactions = React.useMemo(() => transactionsData?.data || [], [transactionsData?.data])
 
   // Calculer les statistiques de commission
   const commissionStats = React.useMemo(() => {
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     
-    const monthlyDeductions = transactions.filter((tx: any) => {
+    const monthlyDeductions = transactions.filter((tx: Transaction) => {
       if (tx.type !== 'deduction') return false
       const txDate = new Date(tx.created_at)
       return txDate >= startOfMonth
     })
 
-    const totalDeductions = monthlyDeductions.reduce((sum: number, tx: any) => sum + tx.amount, 0)
+    const totalDeductions = monthlyDeductions.reduce((sum: number, tx: Transaction) => sum + tx.amount, 0)
     const totalRecharges = transactions
-      .filter((tx: any) => tx.type === 'recharge')
-      .reduce((sum: number, tx: any) => sum + tx.amount, 0)
+      .filter((tx: Transaction) => tx.type === 'recharge')
+      .reduce((sum: number, tx: Transaction) => sum + tx.amount, 0)
 
     return {
       monthlyDeductions: totalDeductions,
@@ -453,7 +463,7 @@ export default function DriverDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.map((tx: any) => (
+                      {transactions.map((tx: Transaction) => (
                         <tr key={tx.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
                           <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>{formatDate(tx.created_at)}</td>
                           <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>

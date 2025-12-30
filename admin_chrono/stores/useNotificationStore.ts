@@ -36,11 +36,6 @@ interface NotificationStore {
 export const useNotificationStore = create<NotificationStore>()(
   persist(
     (set, get) => {
-      // Calculer le unreadCount initial depuis les notifications
-      const calculateUnreadCount = (notifs: Notification[]) => {
-        return notifs.filter((n) => !n.read).length
-      }
-
       return {
         notifications: [],
         unreadCount: 0,
