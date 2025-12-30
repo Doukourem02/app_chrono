@@ -7,6 +7,8 @@ import { useAnimatedRoute } from '../hooks/useAnimatedRoute';
 import { useAnimatedPosition } from '../hooks/useAnimatedPosition';
 import { calculateFullETA } from '../utils/etaCalculator';
 import { useWeather } from '../hooks/useWeather';
+import { calculateBearing } from '../utils/bearingCalculator';
+import { AnimatedVehicleMarker } from './AnimatedVehicleMarker';
 
 type Coordinates = {
   latitude: number;
@@ -104,6 +106,14 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   
   // Garder une trace de la position précédente pour l'animation fluide
   const previousDriverCoordsRef = useRef<Coordinates | null>(null);
+  const previousAnimatedPositionRef = useRef<Coordinates | null>(null);
+  
+  // Déterminer la destination selon le statut (calculé avant useWeather et driverBearing)
+  const destination = useMemo(() => {
+    return (orderStatus === 'accepted' || orderStatus === 'pending') ? pickupCoords :
+           (orderStatus === 'enroute' || orderStatus === 'picked_up') ? dropoffCoords :
+           null;
+  }, [orderStatus, pickupCoords, dropoffCoords]);
   
   // Animation fluide de la position du driver
   const animatedDriverPosition = useAnimatedPosition({
@@ -112,19 +122,58 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
     animationDuration: 5000, // 5 secondes (fréquence GPS)
   });
   
+  // Debug: Log pour vérifier les positions et conditions d'affichage
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('[DeliveryMapView] Debug marqueur:', {
+        orderDriverCoords,
+        animatedDriverPosition,
+        orderStatus,
+        isSearchingDriver,
+        shouldShow: !isSearchingDriver && (animatedDriverPosition || orderDriverCoords) && 
+                    orderStatus !== 'completed' && 
+                    orderStatus !== 'cancelled' && 
+                    orderStatus !== 'declined'
+      });
+    }
+  }, [orderDriverCoords, animatedDriverPosition, orderStatus, isSearchingDriver]);
+  
   // Mettre à jour la position précédente quand la position actuelle change
   useEffect(() => {
     if (orderDriverCoords) {
       previousDriverCoordsRef.current = orderDriverCoords;
     }
   }, [orderDriverCoords]);
-  
-  // Déterminer la destination selon le statut (calculé avant useWeather)
-  const destination = useMemo(() => {
-    return (orderStatus === 'accepted' || orderStatus === 'pending') ? pickupCoords :
-           (orderStatus === 'enroute' || orderStatus === 'picked_up') ? dropoffCoords :
-           null;
-  }, [orderStatus, pickupCoords, dropoffCoords]);
+
+  // Calculer le bearing (direction) du véhicule
+  const driverBearing = useMemo(() => {
+    if (!animatedDriverPosition) {
+      return 0; // Par défaut, orienté vers le nord
+    }
+
+    // Si pas de position précédente animée, utiliser la destination pour calculer le bearing initial
+    if (!previousAnimatedPositionRef.current) {
+      if (destination) {
+        return calculateBearing(animatedDriverPosition, destination);
+      }
+      return 0; // Par défaut, orienté vers le nord
+    }
+
+    // Calculer le bearing entre la position précédente et actuelle
+    const bearing = calculateBearing(
+      previousAnimatedPositionRef.current,
+      animatedDriverPosition
+    );
+    
+    return bearing;
+  }, [animatedDriverPosition, destination]);
+
+  // Mettre à jour la position animée précédente pour le calcul du bearing
+  useEffect(() => {
+    if (animatedDriverPosition) {
+      previousAnimatedPositionRef.current = animatedDriverPosition;
+    }
+  }, [animatedDriverPosition]);
   
   // Routes animées vers pickup et dropoff (définies avant leur utilisation)
   const driverToPickupRoute = useAnimatedRoute({
@@ -312,23 +361,48 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         />
       )}
 
-      {animatedDriverPosition && 
+      {/* Marqueur du livreur animé - s'affiche si on a une position animée */}
+      {!isSearchingDriver &&
+       (animatedDriverPosition || orderDriverCoords) && 
        orderStatus !== 'completed' && 
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
         <>
           <Marker
-            coordinate={animatedDriverPosition}
+            coordinate={animatedDriverPosition || orderDriverCoords!}
             title="Livreur"
             description={realTimeETA ? `Arrivée dans ${realTimeETA.formattedETA}` : 'Livreur en route'}
             anchor={{ x: 0.5, y: 0.5 }}
             tracksViewChanges={false}
           >
-            <View style={styles.orderDriverMarkerContainer}>
-              <View style={styles.driverPulseOuter} />
-              <View style={styles.orderDriverMarker} />
-            </View>
+            <AnimatedVehicleMarker
+              vehicleType={
+                selectedMethod === 'moto' ? 'moto' :
+                selectedMethod === 'cargo' ? 'cargo' :
+                'vehicule'
+              }
+              bearing={driverBearing}
+              size={64}
+            />
           </Marker>
+          
+          {/* Marqueur de fallback simple pour debug - à retirer une fois que le marqueur animé fonctionne */}
+          {__DEV__ && (
+            <Marker
+              coordinate={animatedDriverPosition || orderDriverCoords!}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+            >
+              <View style={{
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                backgroundColor: '#3B82F6',
+                borderWidth: 3,
+                borderColor: '#FFFFFF',
+              }} />
+            </Marker>
+          )}
 
           {(orderStatus === 'accepted' || orderStatus === 'pending') && 
            animatedDriverPosition &&

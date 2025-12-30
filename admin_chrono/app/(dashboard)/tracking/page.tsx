@@ -11,6 +11,7 @@ import { useAnimatedPosition } from '@/hooks/useAnimatedPosition'
 import { calculateFullETA } from '@/utils/etaCalculator'
 import { extractTrafficData, type TrafficData } from '@/utils/trafficUtils'
 import { fetchWeatherData, type WeatherAdjustment } from '@/utils/weatherUtils'
+import { calculateDriverOffsets } from '@/utils/markerOffset'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
@@ -141,8 +142,51 @@ function TrackingMap({
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
   const [closedDriverInfoIds, setClosedDriverInfoIds] = useState<Set<string>>(new Set())
   
-  // Garder une trace de la position précédente pour l'animation fluide
+  // Garder une trace de la position précédente pour l'animation fluide (pour le driver assigné)
   const [previousDriverPosition, setPreviousDriverPosition] = useState<{ lat: number; lng: number } | null>(null)
+  
+  // Garder une trace des positions précédentes de tous les drivers pour calculer le bearing
+  const previousDriverPositionsRef = useRef<Map<string, { lat: number; lng: number }>>(new Map())
+  
+  const routePathFallback = useMemo(() => {
+    if (selectedDelivery?.pickup?.coordinates && selectedDelivery?.dropoff?.coordinates) {
+      return [
+        selectedDelivery.pickup.coordinates,
+        selectedDelivery.dropoff.coordinates,
+      ]
+    }
+    return []
+  }, [selectedDelivery])
+
+  // Mettre à jour les positions précédentes des drivers pour calculer le bearing
+  useEffect(() => {
+    // Utiliser les drivers filtrés pour mettre à jour les positions précédentes
+    const allDrivers = Array.from(onlineDrivers.values())
+    allDrivers.forEach((driver) => {
+      if (driver.current_latitude && driver.current_longitude) {
+        const currentPosition = {
+          lat: driver.current_latitude,
+          lng: driver.current_longitude,
+        }
+        previousDriverPositionsRef.current.set(driver.userId, currentPosition)
+      }
+    })
+  }, [onlineDrivers])
+
+  // Suivre le niveau de zoom actuel de la carte
+  const initialZoom = selectedDelivery && routePathFallback.length > 0 ? DELIVERY_ZOOM : OVERVIEW_ZOOM
+  const [currentZoom, setCurrentZoom] = useState<number>(initialZoom)
+  
+  // Calculer les offsets pour séparer les marqueurs qui ont la même position
+  // Le rayon s'ajuste automatiquement selon le niveau de zoom
+  const driverOffsets = useMemo(() => {
+    const validDrivers = onlineDrivers.filter(
+      driver => driver.is_online === true && 
+      driver.current_latitude && 
+      driver.current_longitude
+    )
+    return calculateDriverOffsets(validDrivers, currentZoom)
+  }, [onlineDrivers, currentZoom])
   
   // Données de trafic pour l'ETA
   const [trafficData, setTrafficData] = useState<TrafficData | null>(null)
@@ -179,16 +223,6 @@ function TrackingMap({
 
   const [fullRoutePath, setFullRoutePath] = useState<Array<{ lat: number; lng: number }>>([])
   const previousDeliveryIdRef = useRef<string | null>(null)
-
-  const routePathFallback = useMemo(() => {
-    if (selectedDelivery?.pickup?.coordinates && selectedDelivery?.dropoff?.coordinates) {
-      return [
-        selectedDelivery.pickup.coordinates,
-        selectedDelivery.dropoff.coordinates,
-      ]
-    }
-    return []
-  }, [selectedDelivery])
 
   // Fonction pour décoder le polyline encodé de Google
   const decodePolyline = useCallback((encoded: string): Array<{ lat: number; lng: number }> => {
@@ -588,6 +622,24 @@ function TrackingMap({
       center={center}
       zoom={selectedDelivery && routePathFallback.length > 0 ? DELIVERY_ZOOM : OVERVIEW_ZOOM}
       options={mapOptions}
+      onLoad={(map) => {
+        // Écouter les changements de zoom
+        if (map && window.google?.maps?.event) {
+          // Initialiser le zoom
+          const mapZoom = map.getZoom()
+          if (mapZoom !== undefined) {
+            setCurrentZoom(mapZoom)
+          }
+          
+          // Écouter les changements de zoom
+          window.google.maps.event.addListener(map, 'zoom_changed', () => {
+            const zoom = map.getZoom()
+            if (zoom !== undefined) {
+              setCurrentZoom(zoom)
+            }
+          })
+        }
+      }}
     >
       {/* Afficher uniquement le polyline et les marqueurs de la livraison sélectionnée */}
       {selectedDelivery && routePathFallback.length >= 2 && (
@@ -784,16 +836,30 @@ function TrackingMap({
             }
             
             // Type assertion car on a déjà vérifié que les coordonnées existent
-            const driverPosition = {
+            const originalPosition = {
               lat: driver.current_latitude!,
               lng: driver.current_longitude!,
             }
+            
+            // Obtenir la position avec offset (pour séparer les marqueurs superposés)
+            const offsetData = driverOffsets.get(driver.userId)
+            const driverPosition = offsetData 
+              ? { lat: offsetData.lat, lng: offsetData.lng }
+              : originalPosition
+            
+            // Créer l'icône personnalisée avec l'image deliveryman.png et rotation
+            // Vérifier que Google Maps est chargé
+            const deliverymanIcon: google.maps.Icon | null = window.google?.maps ? {
+              url: '/assets/deliveryman.png', // Chemin relatif depuis public
+              scaledSize: new window.google.maps.Size(64, 64),
+              anchor: new window.google.maps.Point(32, 32), // Centrer l'icône
+            } : null
             
             return (
               <React.Fragment key={`driver-${driver.userId}`}>
                 <Marker
                   position={driverPosition}
-                  icon={{
+                  icon={deliverymanIcon || {
                     path: window.google?.maps?.SymbolPath?.CIRCLE || 0,
                     scale: 8,
                     fillColor: '#3B82F6',
@@ -804,7 +870,10 @@ function TrackingMap({
                   onClick={() => setSelectedDriverId(selectedDriverId === driver.userId ? null : driver.userId)}
                 />
                 {selectedDriverId === driver.userId && (
-                  <InfoWindow position={driverPosition} onCloseClick={() => setSelectedDriverId(null)}>
+                  <InfoWindow 
+                    position={offsetData?.originalPosition || originalPosition} 
+                    onCloseClick={() => setSelectedDriverId(null)}
+                  >
                     <div style={{ padding: '4px' }}>
                       <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
                         Driver {driver.userId.substring(0, 8)}
@@ -812,6 +881,11 @@ function TrackingMap({
                       <div style={{ fontSize: '12px', color: '#6B7280' }}>
                         {driver.is_available ? 'Disponible' : 'Occupé'}
                       </div>
+                      {offsetData && (
+                        <div style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '4px', fontStyle: 'italic' }}>
+                          Position partagée avec {driverOffsets.size > 1 ? 'd\'autres livreurs' : 'un autre livreur'}
+                        </div>
+                      )}
                     </div>
                   </InfoWindow>
                 )}
