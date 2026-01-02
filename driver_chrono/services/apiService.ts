@@ -1,6 +1,7 @@
 // Service API pour communiquer avec le backend Chrono
 import { useDriverStore } from '../store/useDriverStore';
 import { config } from '../config/index';
+import { logger } from '../utils/logger';
 
 // Configuration de l'API
 const API_BASE_URL = config.apiUrl;
@@ -33,7 +34,7 @@ class ApiService {
         
         if (isExpired) {
           if (__DEV__) {
-            console.debug(' Token expiré, expiration:', new Date(expirationTime).toISOString());
+            logger.debug('Token expiré, expiration:', 'apiService', new Date(expirationTime).toISOString());
           }
           return false;
         }
@@ -44,12 +45,12 @@ class ApiService {
 
       // Si pas d'expiration définie, considérer comme valide (mais ça ne devrait pas arriver)
       if (__DEV__) {
-        console.warn('Token sans expiration définie');
+        logger.warn('Token sans expiration définie', 'apiService');
       }
       return true;
     } catch (error) {
       if (__DEV__) {
-        console.error(' Erreur vérification token:', error);
+        logger.error('Erreur vérification token:', 'apiService', error);
       }
       // En cas d'erreur de décodage, considérer comme invalide
       return false;
@@ -71,7 +72,7 @@ class ApiService {
     // Si le token est expiré ou absent, essayer de le rafraîchir
     if (!refreshToken) {
       if (__DEV__) {
-        console.warn('Pas de refreshToken disponible - session expirée');
+        logger.warn('Pas de refreshToken disponible - session expirée', 'apiService');
       }
       // Déconnecter l'utilisateur car la session est expirée
       logout();
@@ -81,7 +82,7 @@ class ApiService {
     // Vérifier si le refresh token est encore valide avant d'essayer de rafraîchir
     if (!this.isTokenValid(refreshToken)) {
       if (__DEV__) {
-        console.warn('Refresh token expiré - session expirée');
+        logger.warn('Refresh token expiré - session expirée', 'apiService');
       }
       // Déconnecter l'utilisateur car la session est expirée
       logout();
@@ -96,7 +97,7 @@ class ApiService {
 
     // Impossible de rafraîchir => déconnecter l'utilisateur
     if (__DEV__) {
-      console.warn('Impossible de rafraîchir le token - session expirée');
+      logger.warn('Impossible de rafraîchir le token - session expirée', 'apiService');
     }
     logout();
     return { token: null, reason: 'refresh_failed' };
@@ -115,13 +116,13 @@ class ApiService {
       const result = await response.json();
 
       if (!response.ok || !result.success || !result.data?.accessToken) {
-        console.warn(' Refresh token échoué (driver):', result);
+        logger.warn('Refresh token échoué (driver):', 'apiService', result);
         return null;
       }
 
       return result.data.accessToken as string;
     } catch (error) {
-      console.error('Erreur refreshAccessToken (driver):', error);
+      logger.error('Erreur refreshAccessToken (driver):', 'apiService', error);
       return null;
     }
   }
@@ -164,7 +165,7 @@ class ApiService {
         // Erreur réseau (backend inaccessible, timeout, etc.)
         if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
           if (__DEV__) {
-            console.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+            logger.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
@@ -180,7 +181,7 @@ class ApiService {
       } catch {
         // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
         if (__DEV__) {
-          console.error(' Réponse non-JSON reçue:', response.status, response.statusText);
+          logger.error(' Réponse non-JSON reçue:', undefined, { status: response.status, statusText: response.statusText });
         }
         return {
           success: false,
@@ -205,7 +206,7 @@ class ApiService {
       return result;
     } catch (error) {
       if (__DEV__) {
-        console.error(' Erreur updateDriverStatus:', error);
+        logger.error('Erreur updateDriverStatus:', 'apiService', error);
       }
       
       // Gérer spécifiquement les erreurs réseau
@@ -234,7 +235,7 @@ class ApiService {
         current_longitude: longitude
       });
     } catch (error) {
-      console.error(' Erreur updateDriverLocation:', error);
+      logger.error('Erreur updateDriverLocation:', 'apiService', error);
       return {
         success: false,
         message: 'Erreur mise à jour position'
@@ -318,7 +319,7 @@ class ApiService {
       let response: Response;
       try {
       if (__DEV__) {
-        console.debug('🔍 [apiService.getDriverRevenues] Appel API:', url);
+        logger.debug('🔍 [apiService.getDriverRevenues] Appel API:', 'apiService', url);
       }
       response = await fetch(url, {
         method: 'GET',
@@ -326,13 +327,13 @@ class ApiService {
       });
       
       if (__DEV__) {
-        console.debug(' [apiService.getDriverRevenues] Status:', response.status, response.statusText);
+        logger.debug('[apiService.getDriverRevenues] Status:', 'apiService', { status: response.status, statusText: response.statusText });
       }
       } catch (fetchError: any) {
         // Erreur réseau (backend inaccessible, timeout, etc.)
         if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
           if (__DEV__) {
-            console.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+            logger.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
@@ -360,7 +361,7 @@ class ApiService {
       } catch {
         // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
         if (__DEV__) {
-          console.error(' Réponse non-JSON reçue:', response.status, response.statusText);
+          logger.error(' Réponse non-JSON reçue:', undefined, { status: response.status, statusText: response.statusText });
         }
         return {
           success: false,
@@ -384,7 +385,7 @@ class ApiService {
         // Si l'erreur est 401 (non autorisé), c'est probablement un token expiré
         if (response.status === 401) {
           if (__DEV__) {
-            console.warn(' [apiService.getDriverRevenues] Session expirée (401)');
+            logger.warn('[apiService.getDriverRevenues] Session expirée (401)', 'apiService');
           }
           return {
             success: false,
@@ -408,10 +409,10 @@ class ApiService {
         // Ces erreurs sont souvent temporaires (connexion DB, réseau, etc.)
         if (response.status === 500) {
           if (__DEV__) {
-            console.debug('[apiService.getDriverRevenues] Erreur serveur (500):', result.message || 'Erreur serveur');
+            logger.debug('[apiService.getDriverRevenues] Erreur serveur (500):', 'apiService', result.message || 'Erreur serveur');
           }
         } else if (__DEV__) {
-          console.error(' [apiService.getDriverRevenues] Erreur HTTP:', response.status, result);
+          logger.error('[apiService.getDriverRevenues] Erreur HTTP:', 'apiService', { status: response.status, result });
         }
         return {
           success: false,
@@ -437,7 +438,7 @@ class ApiService {
                       result.data.totalEarnings > 0 || 
                       (result.data.orders && result.data.orders.length > 0);
         if (!hasData) {
-          console.debug('[apiService.getDriverRevenues] Réponse OK mais données vides (pas de livraisons)');
+          logger.debug('[apiService.getDriverRevenues] Réponse OK mais données vides (pas de livraisons)', 'apiService');
         }
       }
       
@@ -446,7 +447,7 @@ class ApiService {
       // Gérer spécifiquement les erreurs réseau
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         if (__DEV__) {
-          console.debug('[apiService.getDriverRevenues] Erreur réseau (backend inaccessible)');
+          logger.debug('[apiService.getDriverRevenues] Erreur réseau (backend inaccessible)', 'apiService');
         }
         return {
           success: false,
@@ -468,7 +469,7 @@ class ApiService {
       
       // Pour les autres erreurs, logger en debug pour éviter le spam
       if (__DEV__) {
-        console.debug('[apiService.getDriverRevenues] Erreur:', error instanceof Error ? error.message : 'Erreur inconnue');
+        logger.debug('[apiService.getDriverRevenues] Erreur:', 'apiService', error instanceof Error ? error.message : 'Erreur inconnue');
       }
       
       return {
@@ -516,7 +517,7 @@ class ApiService {
         data: { deliveries: 0, earnings: 0, hours: 0 }
       };
     } catch (error) {
-      console.error('Erreur getTodayStats:', error);
+      logger.error('Erreur getTodayStats:', 'apiService', error);
       return {
         success: false,
         data: { deliveries: 0, earnings: 0, hours: 0 }
@@ -560,19 +561,19 @@ class ApiService {
       let response: Response;
       try {
         if (__DEV__) {
-          console.debug(' [apiService.getDriverStatistics] Appel API:', `${API_BASE_URL}/api/drivers/${userId}/statistics`);
+          logger.debug('[apiService.getDriverStatistics] Appel API:', 'apiService', `${API_BASE_URL}/api/drivers/${userId}/statistics`);
         }
         response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/statistics`, {
           method: 'GET',
           headers,
         });
         if (__DEV__) {
-          console.debug(' [apiService.getDriverStatistics] Status:', response.status, response.statusText);
+          logger.debug('[apiService.getDriverStatistics] Status:', 'apiService', { status: response.status, statusText: response.statusText });
         }
       } catch (fetchError: any) {
         if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
           if (__DEV__) {
-            console.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+            logger.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
@@ -592,7 +593,7 @@ class ApiService {
         result = await response.json();
       } catch {
         if (__DEV__) {
-          console.error(' Réponse non-JSON reçue:', response.status, response.statusText);
+          logger.error(' Réponse non-JSON reçue:', undefined, { status: response.status, statusText: response.statusText });
         }
         return {
           success: false,
@@ -608,7 +609,7 @@ class ApiService {
       if (!response.ok) {
         if (response.status === 401) {
           if (__DEV__) {
-            console.warn(' [apiService.getDriverStatistics] Session expirée (401)');
+            logger.warn('[apiService.getDriverStatistics] Session expirée (401)', 'apiService');
           }
           return {
             success: false,
@@ -621,7 +622,7 @@ class ApiService {
           };
         }
         if (__DEV__) {
-          console.error(' [apiService.getDriverStatistics] Erreur HTTP:', response.status, result);
+          logger.error('[apiService.getDriverStatistics] Erreur HTTP:', 'apiService', { status: response.status, result });
         }
         return {
           success: false,
@@ -637,13 +638,13 @@ class ApiService {
       if (__DEV__ && result.success && result.data) {
         const hasData = result.data.completedDeliveries > 0 || result.data.totalEarnings > 0;
         if (!hasData) {
-          console.debug('[apiService.getDriverStatistics] Réponse OK mais données vides (pas de livraisons)');
+          logger.debug('[apiService.getDriverStatistics] Réponse OK mais données vides (pas de livraisons)', 'apiService');
         }
       }
 
       return result;
     } catch (error) {
-      console.error(' Erreur getDriverStatistics:', error);
+      logger.error('Erreur getDriverStatistics:', 'apiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -701,7 +702,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur getUserProfile:', error);
+      logger.error('Erreur getUserProfile:', 'apiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -761,7 +762,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur updateProfile:', error);
+      logger.error('Erreur updateProfile:', 'apiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -825,7 +826,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur uploadAvatar:', error);
+      logger.error('Erreur uploadAvatar:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -886,7 +887,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur updateDriverVehicle:', error);
+      logger.error('Erreur updateDriverVehicle:', 'apiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -935,7 +936,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur updateDriverType:', error);
+      logger.error('Erreur updateDriverType:', 'apiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -978,7 +979,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur getDriverProfile:', error);
+      logger.error('Erreur getDriverProfile:', 'apiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -1046,7 +1047,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur getCommissionBalance:', error);
+      logger.error('Erreur getCommissionBalance:', 'apiService', error);
       const errorMessage = error instanceof Error 
         ? error.message 
         : 'Erreur de connexion au serveur. Veuillez réessayer.';
@@ -1115,7 +1116,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur getCommissionTransactions:', error);
+      logger.error('Erreur getCommissionTransactions:', 'apiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -1179,7 +1180,7 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur rechargeCommission:', error);
+      logger.error('Erreur rechargeCommission:', 'apiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'

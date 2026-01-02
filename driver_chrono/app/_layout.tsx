@@ -8,6 +8,7 @@ import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
 import { soundService } from "../services/soundService";
 import { apiService } from "../services/apiService";
 import "../config/envCheck";
+import { logger } from "../utils/logger";
 
 //  SENTRY: Initialiser le monitoring d'erreurs
 initSentry();
@@ -29,7 +30,7 @@ export default function RootLayout() {
           }
         } catch (error) {
           // En cas d'erreur, continuer avec la validation normale
-          console.warn('Erreur lors de la vérification du token:', error);
+          logger.warn('Erreur lors de la vérification du token:', undefined, error);
         }
 
         const result = await validateUserExists();
@@ -53,13 +54,13 @@ export default function RootLayout() {
           if (!tokenResult.token) {
             // Token invalide ou impossible à rafraîchir, déconnecter silencieusement
             // L'utilisateur sera redirigé à la prochaine action nécessitant une authentification
-            console.warn('[RootLayout] Session expirée lors du retour en arrière-plan');
+            logger.warn('[RootLayout] Session expirée lors du retour en arrière-plan');
             logout();
             return;
           }
         } catch (error) {
           // En cas d'erreur, ne pas déconnecter (peut être une erreur réseau temporaire)
-          console.warn('[RootLayout] Erreur lors de la vérification du token au retour:', error);
+          logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', undefined, error);
         }
 
         // Valider aussi l'existence de l'utilisateur
@@ -80,7 +81,7 @@ export default function RootLayout() {
   useEffect(() => {
     // Initialiser le service de son au démarrage
     soundService.initialize().catch((err) => {
-      console.warn('[RootLayout] Erreur initialisation service son:', err);
+      logger.warn('[RootLayout] Erreur initialisation service son:', undefined, err);
     });
   }, []);
 

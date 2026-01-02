@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { config } from '../config';
 import { extractTrafficData, type TrafficData } from '../utils/trafficUtils';
+import { logger } from '../utils/logger';
 
 type Coordinates = {
   latitude: number;
@@ -128,7 +129,7 @@ export const useAnimatedRoute = ({
         return null;
       }
     } catch (err) {
-      console.error('Error fetching route:', err);
+      logger.error('Error fetching route:', undefined, err);
       return null;
     }
   }, [GOOGLE_API_KEY, decodePolyline]);
@@ -260,7 +261,7 @@ export const useAnimatedRoute = ({
           }
         } catch (err) {
           // Ignorer les erreurs silencieusement pour ne pas perturber l'utilisateur
-          console.debug('Erreur recalcul route trafic:', err);
+          logger.debug('Erreur recalcul route trafic:', undefined, err);
         }
       }
     };

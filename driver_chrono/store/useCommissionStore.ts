@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { apiService } from '../services/apiService';
 import { useDriverStore } from './useDriverStore';
+import { logger } from '../utils/logger';
 
 export interface CommissionTransaction {
   id: string;
@@ -86,7 +87,7 @@ export const useCommissionStore = create<CommissionStore>((set, get) => ({
         });
       }
     } catch (error: any) {
-      console.error('Erreur fetchBalance:', error);
+      logger.error('Erreur fetchBalance:', undefined, error);
       set({ 
         error: error.message || 'Erreur de connexion',
         isLoading: false 
@@ -125,7 +126,7 @@ export const useCommissionStore = create<CommissionStore>((set, get) => ({
         });
       }
     } catch (error: any) {
-      console.error('Erreur fetchTransactions:', error);
+      logger.error('Erreur fetchTransactions:', undefined, error);
       set({ 
         error: error.message || 'Erreur de connexion',
         isLoading: false 
@@ -168,7 +169,7 @@ export const useCommissionStore = create<CommissionStore>((set, get) => ({
         return { success: false, message: result.message || 'Erreur lors de la recharge' };
       }
     } catch (error: any) {
-      console.error('Erreur recharge:', error);
+      logger.error('Erreur recharge:', undefined, error);
       set({ 
         error: error.message || 'Erreur de connexion',
         isLoading: false 

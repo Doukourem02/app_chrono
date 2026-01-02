@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDriverStore } from '../../store/useDriverStore';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { config } from '../../config/index';
+import { logger } from '../../utils/logger';
 
 export default function VerificationScreen() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -66,7 +67,7 @@ export default function VerificationScreen() {
         throw new Error(data.error || data.message || 'Code de vérification incorrect');
       }
 
-      console.log(`${otpMethod} OTP vérifié avec succès pour driver:`, data);
+      logger.debug(`${otpMethod} OTP vérifié avec succès pour driver:`, undefined, data);
 
       setIsNewUser(data.data.isNewUser || false);
 
@@ -109,7 +110,7 @@ export default function VerificationScreen() {
       // (les informations véhicule sont optionnelles et peuvent être complétées plus tard)
       router.push('./success' as any);
     } catch (error) {
-      console.error('Erreur lors de la vérification:', error);
+      logger.error('Erreur lors de la vérification:', undefined, error);
       
       // Gérer spécifiquement les erreurs réseau
       let errorMessage = 'Code de vérification incorrect. Veuillez réessayer.';

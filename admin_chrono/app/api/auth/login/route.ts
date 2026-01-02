@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { rateLimit, getRateLimitIdentifier } from '@/lib/rateLimit'
+import { logger } from '@/utils/logger'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('Error in login API:', error)
+      logger.error('Error in login API:', error)
     }
     return NextResponse.json(
       { error: 'Internal server error' },

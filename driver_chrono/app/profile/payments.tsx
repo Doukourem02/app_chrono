@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {View,Text,StyleSheet,TouchableOpacity,ScrollView,ActivityIndicator} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { logger } from '../../utils/logger';
 
 interface PaymentMethod {
   id: string;
@@ -24,7 +25,7 @@ export default function PaymentsPage() {
       // TODO: Charger les méthodes de paiement depuis l'API
       setPaymentMethods([]);
     } catch (error) {
-      console.error('Erreur chargement méthodes:', error);
+      logger.error('Erreur chargement méthodes:', undefined, error);
     } finally {
       setIsLoading(false);
     }

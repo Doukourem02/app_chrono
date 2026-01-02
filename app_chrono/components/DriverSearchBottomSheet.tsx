@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Animated, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { logger } from '../utils/logger';
 
 interface DriverInfo {
   id?: string;
@@ -115,7 +116,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     
     // Debug en développement
     if (__DEV__) {
-      console.log('📦 Driver info:', {
+      logger.debug('📦 Driver info:', {
         id: driver.id,
         first_name: driver.first_name,
         last_name: driver.last_name,

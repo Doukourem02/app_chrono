@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { logger } from '@/utils/logger'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -64,12 +65,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(' User check result:', { hasUser: !!existingUser, error: checkError?.code })
+      logger.debug(' User check result:', { hasUser: !!existingUser, error: checkError?.code })
     }
 
     if (checkError && checkError.code === 'PGRST116') {
       if (process.env.NODE_ENV === 'development') {
-        console.log(' User does not exist, creating...')
+        logger.debug(' User does not exist, creating...')
       }
       // L'utilisateur n'existe pas, le créer
       // D'abord, vérifier si la colonne avatar_url existe en essayant de l'insérer
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
             
             if (insertError2) {
               if (process.env.NODE_ENV === 'development') {
-                console.error('Error creating user profile:', insertError2)
+                logger.error('Error creating user profile:', insertError2)
               }
               return NextResponse.json(
                 { 
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
             }
           } else {
             if (process.env.NODE_ENV === 'development') {
-              console.error('Error creating user profile:', insertError)
+              logger.error('Error creating user profile:', insertError)
             }
             return NextResponse.json(
               { 
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
         }
       } catch (err) {
         if (process.env.NODE_ENV === 'development') {
-          console.error('Error in insert:', err)
+          logger.error('Error in insert:', err)
         }
         const errorMessage = process.env.NODE_ENV === 'production'
           ? 'Error creating user profile'
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
       }
     } else if (checkError) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Error checking user profile:', checkError)
+        logger.error('Error checking user profile:', checkError)
       }
       return NextResponse.json(
         { 
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
     } else {
       // L'utilisateur existe, mettre à jour
       if (process.env.NODE_ENV === 'development') {
-        console.log('User exists, updating avatar_url...')
+        logger.debug('User exists, updating avatar_url...')
       }
       // Essayer de mettre à jour avatar_url, mais gérer le cas où la colonne n'existe pas
       try {
@@ -170,12 +171,12 @@ export async function POST(request: NextRequest) {
           .select()
 
         if (process.env.NODE_ENV === 'development') {
-          console.log(' Update result:', { hasData: !!updateData, error: updateError?.code })
+          logger.debug(' Update result:', { hasData: !!updateData, error: updateError?.code })
         }
 
         if (updateError) {
           if (process.env.NODE_ENV === 'development') {
-            console.error(' Update error details:', {
+            logger.error(' Update error details:', {
               message: updateError.message,
               code: updateError.code,
               details: updateError.details,
@@ -210,11 +211,11 @@ export async function POST(request: NextRequest) {
         }
 
         if (process.env.NODE_ENV === 'development') {
-          console.log(' Avatar URL updated successfully')
+          logger.debug(' Avatar URL updated successfully')
         }
       } catch (err) {
         if (process.env.NODE_ENV === 'development') {
-          console.error(' Error in update catch:', err)
+          logger.error(' Error in update catch:', err)
         }
         const errorMessage = err instanceof Error ? err.message : 'Error updating profile'
         return NextResponse.json(
@@ -233,7 +234,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('Error in update-avatar-url API:', error)
+      logger.error('Error in update-avatar-url API:', error)
     }
     const errorMessage = process.env.NODE_ENV === 'production'
       ? 'Internal server error'

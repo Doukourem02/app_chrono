@@ -6,6 +6,7 @@ import { Download, TrendingUp, Package, DollarSign, Clock, CheckCircle, Star, Ex
 import Link from 'next/link'
 import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/utils/logger'
 
 interface ZoneData {
   zone: string
@@ -48,11 +49,11 @@ export default function AnalyticsPage() {
       })
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('[Analytics] Erreur KPIs:', response.status, errorText)
+        logger.error('[Analytics] Erreur KPIs:', response.status, errorText)
         throw new Error(`Erreur chargement KPIs: ${response.status}`)
       }
       const data = await response.json()
-      console.log('[Analytics] KPIs reçus:', {
+      logger.debug('[Analytics] KPIs reçus:', {
         averageRating: data.averageRating,
         totalRatings: data.totalRatings,
         hasAverageRating: data.averageRating != null,
@@ -120,7 +121,7 @@ export default function AnalyticsPage() {
         a.click()
       }
     } catch (error) {
-      console.error('Error exporting:', error)
+      logger.error('Error exporting:', error)
       alert('Erreur lors de l\'export')
     }
   }
@@ -299,7 +300,7 @@ export default function AnalyticsPage() {
             {kpisLoading ? '...' : (() => {
               // Debug: log pour voir les valeurs reçues
               if (kpis && !kpisLoading) {
-                console.log('[Analytics] KPIs reçus:', {
+                logger.debug('[Analytics] KPIs reçus:', {
                   averageRating: kpis.averageRating,
                   totalRatings: kpis.totalRatings,
                   typeAverageRating: typeof kpis.averageRating,
@@ -321,7 +322,7 @@ export default function AnalyticsPage() {
                   const total = (dist['5'] || 0) + (dist['4'] || 0) + (dist['3'] || 0) + (dist['2'] || 0) + (dist['1'] || 0);
                   if (total > 0) {
                     const calculatedAvg = ((dist['5'] || 0) * 5 + (dist['4'] || 0) * 4 + (dist['3'] || 0) * 3 + (dist['2'] || 0) * 2 + (dist['1'] || 0) * 1) / total;
-                    console.log('[Analytics] Note calculée depuis distribution:', calculatedAvg);
+                    logger.debug('[Analytics] Note calculée depuis distribution:', calculatedAvg);
                     return `${calculatedAvg.toFixed(1)}/5`;
                   }
                 }

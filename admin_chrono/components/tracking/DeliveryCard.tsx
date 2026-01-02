@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Phone, MessageSquare, Truck } from 'lucide-react'
 import { AnimatedCard } from '@/components/animations'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
+import { logger } from '@/utils/logger'
 
 interface DeliveryCardProps {
   delivery: {
@@ -257,7 +258,7 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
             
             // Debug: logger les données pour comprendre le problème
             if (process.env.NODE_ENV === 'development') {
-              console.log('[DeliveryCard] Delivery data:', {
+              logger.debug('[DeliveryCard] Delivery data:', {
                 deliveryId: delivery.id,
                 hasClient: !!delivery.client,
                 hasDriver: !!delivery.driver,

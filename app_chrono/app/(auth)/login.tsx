@@ -3,6 +3,7 @@ import {View,Text,TextInput,StyleSheet,Alert} from 'react-native';
 import { router } from 'expo-router';
 import { useTempAuthStore } from '../../store/useTempAuthStore';
 import { AnimatedButton, ScreenTransition } from '../../components/animations';
+import { logger } from '../../utils/logger';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -52,7 +53,7 @@ export default function LoginScreen() {
       router.push('/(auth)/verification' as any);
       
     } catch (error) {
-      console.error('Erreur lors de l\'envoi OTP:', error);
+      logger.error('Erreur lors de l\'envoi OTP:', error);
       Alert.alert('Erreur', (error as Error).message || 'Erreur lors de l\'envoi de l\'OTP');
     } finally {
       setIsLoading(false);

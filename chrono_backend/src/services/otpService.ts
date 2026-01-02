@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import logger from '../utils/logger.js';
 
 export async function storeOTP(
   email: string,
@@ -24,7 +25,7 @@ export async function storeOTP(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Erreur lors du stockage OTP:', error);
+    logger.error('Erreur lors du stockage OTP:', error);
     throw error;
   }
 }
@@ -65,7 +66,7 @@ export async function verifyOTP(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Erreur lors de la vérification OTP:', error);
+    logger.error('Erreur lors de la vérification OTP:', error);
     throw error;
   }
 }
@@ -84,7 +85,7 @@ export async function markOTPAsVerified(
       [email, phone, role, code]
     );
   } catch (error: any) {
-    console.error('Erreur lors du marquage OTP:', error);
+    logger.error('Erreur lors du marquage OTP:', error);
     throw error;
   }
 }
@@ -98,10 +99,10 @@ export async function cleanupExpiredOTP(): Promise<{
       `DELETE FROM otp_codes WHERE expires_at < NOW() RETURNING *`
     );
 
-    console.log(`${result.rowCount || 0} codes OTP expirés supprimés`);
+    logger.info(`${result.rowCount || 0} codes OTP expirés supprimés`);
     return { success: true, deleted: result.rowCount || 0 };
   } catch (error: any) {
-    console.error('Erreur lors du nettoyage OTP:', error);
+    logger.error('Erreur lors du nettoyage OTP:', error);
     throw error;
   }
 }
@@ -134,7 +135,7 @@ export async function getOTPStats(): Promise<{
       active: total - expired,
     };
   } catch (error: any) {
-    console.error('Erreur lors de la récupération des stats OTP:', error);
+    logger.error('Erreur lors de la récupération des stats OTP:', error);
     throw error;
   }
 }

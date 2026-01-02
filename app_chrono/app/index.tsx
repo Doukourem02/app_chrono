@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { userApiService } from '../services/userApiService';
+import { logger } from '../utils/logger';
 
 export default function RootIndex() {
   const { isAuthenticated, user, validateUser, logout } = useAuthStore();
@@ -26,7 +27,7 @@ export default function RootIndex() {
           }
         } catch (error) {
           // En cas d'erreur, continuer avec la validation normale
-          console.warn('Erreur lors de la vérification du token:', error);
+          logger.warn('Erreur lors de la vérification du token:', error);
         }
 
         // Si l'utilisateur est authentifié, valider sa session

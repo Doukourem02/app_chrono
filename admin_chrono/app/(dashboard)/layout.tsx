@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { useNotifications } from "@/hooks/useNotifications";
 import { soundService } from "@/utils/soundService";
+import { logger } from "@/utils/logger";
 
 export default function DashboardLayout({
   children,
@@ -58,7 +59,7 @@ export default function DashboardLayout({
       // Initialiser le service de sons (essaie de précharger automatiquement)
       soundService.initialize().catch((error) => {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[DashboardLayout] Erreur initialisation soundService:', error);
+          logger.warn('[DashboardLayout] Erreur initialisation soundService:', error);
         }
       });
       
@@ -90,7 +91,7 @@ export default function DashboardLayout({
   // Logger l'état de connexion socket pour déboguer
   useEffect(() => {
     if (user && !loading) {
-      console.log('[DashboardLayout] État connexion socket:', {
+      logger.debug('[DashboardLayout] État connexion socket:', {
         isConnected,
         userId: user.id,
         timestamp: new Date().toISOString(),

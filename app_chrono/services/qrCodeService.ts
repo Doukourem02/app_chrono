@@ -1,5 +1,6 @@
 import { config } from '../config';
 import { useAuthStore } from '../store/useAuthStore';
+import { logger } from '../utils/logger';
 
 const API_BASE_URL = config.apiUrl;
 
@@ -53,7 +54,7 @@ class QRCodeService {
       }
       return null;
     } catch (error) {
-      console.error('Erreur lors de la récupération du QR code:', error);
+      logger.error('Erreur lors de la récupération du QR code:', undefined, error);
       return null;
     }
   }
@@ -88,7 +89,7 @@ class QRCodeService {
       }
       return null;
     } catch (error) {
-      console.error('Erreur lors de la génération du QR code:', error);
+      logger.error('Erreur lors de la génération du QR code:', undefined, error);
       return null;
     }
   }

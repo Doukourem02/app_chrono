@@ -73,7 +73,7 @@ export default function VehiclePage() {
         Alert.alert('Erreur', result.message || 'Impossible de mettre à jour les informations');
       }
     } catch (error) {
-      console.error('Erreur mise à jour véhicule:', error);
+      logger.error('Erreur mise à jour véhicule:', error);
       Alert.alert('Erreur', 'Impossible de mettre à jour les informations');
     } finally {
       setIsLoading(false);

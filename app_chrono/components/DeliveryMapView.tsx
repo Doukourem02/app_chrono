@@ -9,6 +9,7 @@ import { calculateFullETA } from '../utils/etaCalculator';
 import { useWeather } from '../hooks/useWeather';
 import { calculateBearing } from '../utils/bearingCalculator';
 import { AnimatedVehicleMarker } from './AnimatedVehicleMarker';
+import { logger } from '../utils/logger';
 
 type Coordinates = {
   latitude: number;
@@ -125,7 +126,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   // Debug: Log pour vérifier les positions et conditions d'affichage
   useEffect(() => {
     if (__DEV__) {
-      console.log('[DeliveryMapView] Debug marqueur:', {
+      logger.debug('[DeliveryMapView] Debug marqueur:', {
         orderDriverCoords,
         animatedDriverPosition,
         orderStatus,

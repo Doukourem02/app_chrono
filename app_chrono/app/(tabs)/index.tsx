@@ -5,6 +5,7 @@ import Header from "../../components/Header";
 import SearchBar from "../../components/SearchBar";
 import SectionHeader from "../../components/SectionHeader";
 import ShipmentList from "../../components/ShipmentList";
+import { logger } from "../../utils/logger";
 
 export default function Index() {
 
@@ -17,7 +18,7 @@ export default function Index() {
         <ActionCards />
         <SectionHeader 
           title="Expédition actuelle" 
-          onSeeMorePress={() => console.log('Voir plus pressed')}
+          onSeeMorePress={() => logger.debug('Voir plus pressed')}
         />
         <ShipmentList />
       </ScrollView>

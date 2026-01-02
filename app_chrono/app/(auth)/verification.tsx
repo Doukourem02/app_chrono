@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useTempAuthStore } from '../../store/useTempAuthStore';
+import { logger } from '../../utils/logger';
 
 export default function VerificationScreen() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -66,7 +67,7 @@ export default function VerificationScreen() {
         throw new Error(data.error || 'Code de vérification incorrect');
       }
 
-      console.log(`${otpMethod} OTP vérifié avec succès:`, data);
+      logger.debug(`${otpMethod} OTP vérifié avec succès:`, data);
 
       const userData = {
         id: data.data.user.id,
@@ -88,7 +89,7 @@ export default function VerificationScreen() {
       
       router.push('./success' as any);
     } catch (error) {
-      console.error('Erreur lors de la vérification:', error);
+      logger.error('Erreur lors de la vérification:', error);
       Alert.alert('Erreur', (error as Error).message || 'Code de vérification incorrect. Veuillez réessayer.');
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { logger } from '@/utils/logger'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Upload error:', uploadError)
+        logger.error('Upload error:', uploadError)
       }
       return NextResponse.json(
         { 
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('Error in upload-avatar API:', error)
+      logger.error('Error in upload-avatar API:', error)
     }
     const errorMessage = process.env.NODE_ENV === 'production'
       ? 'Internal server error'

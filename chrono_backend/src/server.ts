@@ -77,9 +77,11 @@ const io = new Server(server, {
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        console.warn(`Socket.io CORS bloqué pour origin: ${origin}`);
-        console.warn(`Origins autorisées:`, allowedOrigins);
-        console.warn(`NODE_ENV: ${process.env.NODE_ENV}, isDevelopment: ${isDevelopment}`);
+        logger.warn(`Socket.io CORS bloqué pour origin: ${origin}`, {
+          allowedOrigins,
+          nodeEnv: process.env.NODE_ENV,
+          isDevelopment,
+        });
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -107,11 +109,11 @@ const io = new Server(server, {
 })();
 
 io.on('connection', (socket) => {
-  console.log('🟢 Client connecté :', socket.id);
+  logger.info('🟢 Client connecté', { socketId: socket.id });
   deliverySocket(io, socket);
 
   socket.on('disconnect', () => {
-    console.log('🔴 Client déconnecté :', socket.id);
+    logger.info('🔴 Client déconnecté', { socketId: socket.id });
   });
 });
 

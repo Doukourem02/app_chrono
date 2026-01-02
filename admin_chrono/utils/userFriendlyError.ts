@@ -1,5 +1,6 @@
 import { useErrorModalStore } from '@/stores/useErrorModalStore'
 import { ErrorTypes } from '@/components/error/errorTypes'
+import { logger } from './logger'
 
 /**
  * Service centralisé pour afficher des messages d'erreur user-friendly
@@ -164,7 +165,7 @@ export class UserFriendlyError {
   static handleUnknownError(error: unknown, context?: string, onRetry?: () => void) {
     // Logger l'erreur technique (pas visible à l'utilisateur)
     if (process.env.NODE_ENV === 'development') {
-      console.error(`Erreur inconnue${context ? ` dans ${context}` : ''}:`, error)
+      logger.error(`Erreur inconnue${context ? ` dans ${context}` : ''}:`, error)
     }
 
     // Afficher un message user-friendly

@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { config } from '../../config/index';
+import { logger } from '../../utils/logger';
 
 export default function OTPMethodScreen() {
   const [selectedMethod, setSelectedMethod] = useState<'email' | 'sms'>('email');
@@ -45,12 +46,12 @@ export default function OTPMethodScreen() {
         throw new Error(data.error || data.message || 'Erreur lors de l\'envoi de l\'OTP');
       }
 
-      console.log('OTP envoyé avec succès:', data);
+      logger.debug('OTP envoyé avec succès:', undefined, data);
       
       setTempData(email, phoneNumber, selectedMethod);
       router.push('./verification' as any);
     } catch (error) {
-      console.error('Erreur lors de l\'envoi OTP:', error);
+      logger.error('Erreur lors de l\'envoi OTP:', undefined, error);
       
       // Gérer spécifiquement les erreurs réseau
       let errorMessage = 'Une erreur est survenue. Veuillez réessayer.';

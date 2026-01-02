@@ -11,6 +11,7 @@ import type { Delivery } from '@/hooks/types'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
 import { GoogleMapsDeletedProjectError } from '@/components/error/GoogleMapsDeletedProjectError'
+import { logger } from '@/utils/logger'
 
 interface GoogleMapsWindow extends Window {
   google?: {
@@ -187,12 +188,12 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   const { data: deliveriesResponse, isLoading: queryLoading } = useQuery({
     queryKey: ['ongoing-delivery-card'],
     queryFn: async () => {
-      console.warn('🚀🚀🚀 [TrackerCard] queryFn CALLED - getOngoingDeliveries', {
+      logger.warn('🚀🚀🚀 [TrackerCard] queryFn CALLED - getOngoingDeliveries', {
         timestamp: new Date().toISOString(),
         stack: new Error().stack?.split('\n').slice(2, 15).join('\n'),
       })
       const result = await adminApiService.getOngoingDeliveries()
-      console.log('✅ [TrackerCard] getOngoingDeliveries SUCCESS', {
+      logger.debug('✅ [TrackerCard] getOngoingDeliveries SUCCESS', {
         hasData: !!result.data && (result.data as Delivery[]).length > 0,
         timestamp: new Date().toISOString(),
       })

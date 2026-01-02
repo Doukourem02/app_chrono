@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useOrderStore } from '../store/useOrderStore';
+import { logger } from '../utils/logger';
 
 interface UseMapPaymentProps {
   currentOrder: ReturnType<typeof useOrderStore.getState>['activeOrders'][0] | null;
@@ -28,7 +29,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     const order = currentOrder || pendingOrder;
 
     if (__DEV__) {
-      console.log('🔍 PaymentBottomSheet useEffect:', {
+      logger.debug('🔍 PaymentBottomSheet useEffect:', undefined, {
         orderStatus,
         hasCurrentOrder: !!currentOrder,
         hasPendingOrder: !!pendingOrder,
@@ -43,7 +44,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     // Ne pas afficher le PaymentBottomSheet si c'est le destinataire qui paie
     if (paymentPayerType === 'recipient') {
       if (__DEV__) {
-        console.log('⏭️ PaymentBottomSheet: destinataire paie, on ne l\'affiche pas');
+        logger.debug('⏭️ PaymentBottomSheet: destinataire paie, on ne l\'affiche pas');
       }
       return;
     }
@@ -51,7 +52,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     // Ne pas afficher si on n'a pas de commande ou si le statut n'est pas 'accepted'
     if (orderStatus !== 'accepted' || !order) {
       if (__DEV__) {
-        console.log('⏭️ PaymentBottomSheet: statut pas accepted ou pas de commande', {
+        logger.debug('⏭️ PaymentBottomSheet: statut pas accepted ou pas de commande', undefined, {
           orderStatus,
           hasOrder: !!order,
         });
@@ -62,7 +63,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     // S'assurer qu'on a bien une commande avec le bon statut
     if (order.status !== 'accepted') {
       if (__DEV__) {
-        console.log('⏭️ PaymentBottomSheet: commande pas accepted', {
+        logger.debug('⏭️ PaymentBottomSheet: commande pas accepted', undefined, {
           orderStatus: order.status,
         });
       }
@@ -72,7 +73,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     // Ne pas afficher si déjà affiché ou si déjà payé
     if (showPaymentSheet) {
       if (__DEV__) {
-        console.log('⏭️ PaymentBottomSheet: déjà affiché');
+        logger.debug('⏭️ PaymentBottomSheet: déjà affiché');
       }
       return;
     }
@@ -80,7 +81,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     const paymentStatus = (order as any)?.payment_status;
     if (paymentStatus === 'paid') {
       if (__DEV__) {
-        console.log('⏭️ PaymentBottomSheet: déjà payé');
+        logger.debug('⏭️ PaymentBottomSheet: déjà payé');
       }
       return;
     }
@@ -88,7 +89,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     // Pour les paiements en espèces ou différé, pas besoin d'afficher le PaymentBottomSheet
     if (selectedPaymentMethodType === 'cash' || selectedPaymentMethodType === 'deferred') {
       if (__DEV__) {
-        console.log('✅ Paiement en espèces ou différé - pas de paiement électronique requis');
+        logger.debug('✅ Paiement en espèces ou différé - pas de paiement électronique requis');
       }
       return;
     }
@@ -100,12 +101,12 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
       !selectedPaymentMethodType
     ) {
       if (__DEV__) {
-        console.log('✅ Affichage du PaymentBottomSheet dans 500ms');
+        logger.debug('✅ Affichage du PaymentBottomSheet dans 500ms');
       }
       const timer = setTimeout(() => {
         setShowPaymentSheet(true);
         if (__DEV__) {
-          console.log('✅ PaymentBottomSheet affiché');
+          logger.debug('✅ PaymentBottomSheet affiché');
         }
       }, 500);
 
@@ -113,7 +114,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     }
 
     if (__DEV__) {
-      console.log('⏭️ PaymentBottomSheet: aucune condition remplie pour afficher');
+      logger.debug('⏭️ PaymentBottomSheet: aucune condition remplie pour afficher');
     }
   }, [
     currentOrder?.status,

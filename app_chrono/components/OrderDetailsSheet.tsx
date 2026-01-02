@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import { PaymentMethodType } from '../services/paymentApi';
 import { usePaymentStore } from '../store/usePaymentStore';
+import { logger } from '../utils/logger';
 
 
 interface AddressDetails {
@@ -120,7 +121,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     } catch (error) {
-      console.error('Error picking image:', error);
+      logger.error('Error picking image:', error);
       Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
     }
   };

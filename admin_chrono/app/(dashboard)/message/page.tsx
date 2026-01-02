@@ -9,6 +9,7 @@ import { adminMessageSocketService } from '@/services/adminMessageSocketService'
 import ConversationList from '@/components/message/ConversationList'
 import ChatArea from '@/components/message/ChatArea'
 import NewConversationModal from '@/components/message/NewConversationModal'
+import { logger } from '@/utils/logger'
 
 export default function MessagePage() {
   const { user } = useAuthStore()
@@ -98,7 +99,7 @@ export default function MessagePage() {
         adminMessageSocketService.joinConversation(conv.id)
       }
     } catch (error) {
-      console.error('Error loading conversations:', error)
+      logger.error('Error loading conversations:', error)
     } finally {
       setLoading(false)
       isLoadingConversationsRef.current = false
@@ -123,7 +124,7 @@ export default function MessagePage() {
       // Sinon, utiliser le compteur du backend pour la synchronisation
       setUnreadCount(count)
     } catch (error) {
-      console.error('Error loading unread count:', error)
+      logger.error('Error loading unread count:', error)
     }
   }, [user?.id, setUnreadCount])
 
@@ -150,11 +151,11 @@ export default function MessagePage() {
             setConversations(updatedConversations)
           })
           .catch((error) => {
-            console.error('Error reloading conversations:', error)
+            logger.error('Error reloading conversations:', error)
           })
       ])
     } catch (error) {
-      console.error('Error loading messages:', error)
+      logger.error('Error loading messages:', error)
     } finally {
       setLoading(false)
     }
@@ -210,11 +211,11 @@ export default function MessagePage() {
             setConversations(updatedConversations)
           })
           .catch((error) => {
-            console.error('Error reloading conversations:', error)
+            logger.error('Error reloading conversations:', error)
           })
       ])
     } catch (error) {
-      console.error('Error loading messages for pair:', error)
+      logger.error('Error loading messages for pair:', error)
     } finally {
       setLoading(false)
     }
@@ -295,7 +296,7 @@ export default function MessagePage() {
       
       // Charger les messages en arrière-plan (ne pas bloquer l'UI)
       loadAllMessagesForPair(p1Id, p2Id).catch((error) => {
-        console.error('Error loading messages for pair:', error)
+        logger.error('Error loading messages for pair:', error)
       })
     } else {
       // Conversation normale
@@ -309,7 +310,7 @@ export default function MessagePage() {
         adminMessageSocketService.joinConversation(conversation.id)
         // Charger les messages (cela va aussi marquer comme lus et recharger les conversations)
         loadMessages(conversation.id).catch((error) => {
-          console.error('Error loading messages:', error)
+          logger.error('Error loading messages:', error)
         })
       }
     }
@@ -584,10 +585,10 @@ export default function MessagePage() {
               setConversations(updatedConversations)
             })
             .catch((error) => {
-              console.error('Error reloading conversations:', error)
+              logger.error('Error reloading conversations:', error)
             })
         }).catch((error) => {
-          console.error('Error marking as read:', error)
+          logger.error('Error marking as read:', error)
         })
       } else {
         // Si ce n'est pas la conversation actuelle, mettre à jour le unread_count de la conversation

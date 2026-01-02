@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { logger } from '../utils/logger';
 
 export const config = {
   // API Configuration
@@ -38,7 +39,7 @@ export const config = {
 
 // Validation des variables critiques
 if (!config.googleApiKey) {
-  console.warn('⚠️ Google API Key not configured. Map features may not work properly.');
+  logger.warn('⚠️ Google API Key not configured. Map features may not work properly.');
 }
 
 export default config;

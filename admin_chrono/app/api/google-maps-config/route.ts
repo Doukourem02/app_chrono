@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { logger } from '@/utils/logger'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error'
     if (process.env.NODE_ENV === 'development') {
-      console.error('Error in google-maps-config API:', errorMessage)
+      logger.error('Error in google-maps-config API:', errorMessage)
     }
     return NextResponse.json(
       { error: 'Internal server error' },

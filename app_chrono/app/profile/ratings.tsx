@@ -3,6 +3,7 @@ import {View,Text,StyleSheet,ScrollView,ActivityIndicator,TouchableOpacity} from
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
+import { logger } from '../../utils/logger';
 
 interface Rating {
   id: string;
@@ -27,7 +28,7 @@ export default function RatingsPage() {
   
       setRatings([]);
     } catch (error) {
-      console.error('Erreur chargement évaluations:', error);
+      logger.error('Erreur chargement évaluations:', error);
     } finally {
       setIsLoading(false);
     }

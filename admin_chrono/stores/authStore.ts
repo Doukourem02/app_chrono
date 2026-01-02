@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
+import { logger } from '@/utils/logger'
 
 interface AuthState {
   user: User | null
@@ -49,15 +50,15 @@ export const useAuthStore = create<AuthState>()(
               .single()
 
             if (emailError || !emailData) {
-              console.error('Admin role check failed:', error || emailError)
-              console.warn('⚠️ User not found in users table. Make sure the user exists with the correct ID or email.')
+              logger.error('Admin role check failed:', error || emailError)
+              logger.warn('⚠️ User not found in users table. Make sure the user exists with the correct ID or email.')
               set({ isAdmin: false })
               return false
             }
 
             // Avertir si les IDs ne correspondent pas
             if (emailData.id !== user.id) {
-              console.warn(
+              logger.warn(
                 `⚠️ ID mismatch: auth.users.id (${user.id}) != users.id (${emailData.id}). ` +
                 `Update users.id to match auth.users.id for proper authentication.`
               )
@@ -76,7 +77,7 @@ export const useAuthStore = create<AuthState>()(
           set({ isAdmin })
           return isAdmin
         } catch (error) {
-          console.error('Error checking admin role:', error)
+          logger.error('Error checking admin role:', error)
           set({ isAdmin: false })
           return false
         }

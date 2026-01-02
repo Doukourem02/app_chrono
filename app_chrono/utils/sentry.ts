@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import { config } from '../config/index';
+import { logger } from './logger';
 
 /**
  * Initialise Sentry pour le monitoring d'erreurs
@@ -12,7 +13,7 @@ export function initSentry() {
 
   if (!sentryDsn) {
     if (__DEV__) {
-      console.log('⚠️ Sentry DSN non configuré - monitoring d\'erreurs désactivé');
+      logger.debug('⚠️ Sentry DSN non configuré - monitoring d\'erreurs désactivé');
     }
     return;
   }
@@ -31,7 +32,7 @@ export function initSentry() {
   });
 
   if (__DEV__) {
-    console.log('✅ Sentry initialisé pour le monitoring d\'erreurs');
+    logger.debug('✅ Sentry initialisé pour le monitoring d\'erreurs');
   }
 }
 

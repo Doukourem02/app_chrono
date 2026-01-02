@@ -5,6 +5,7 @@ import { adminSocketService } from '@/lib/adminSocketService'
 import { adminMessageSocketService } from '@/services/adminMessageSocketService'
 import { soundService } from '@/utils/soundService'
 import type { SocketEventData } from '@/types/socket'
+import { logger } from '@/utils/logger'
 
 /**
  * Hook pour gérer les notifications en temps réel
@@ -67,7 +68,7 @@ export function useNotifications() {
       // Jouer le son pour nouvelle commande
       soundService.playNewOrder().catch((err) => {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[useNotifications] Erreur lecture son nouvelle commande:', err)
+          logger.warn('[useNotifications] Erreur lecture son nouvelle commande:', err)
         }
       })
     })
@@ -107,7 +108,7 @@ export function useNotifications() {
       // Jouer le son pour mise à jour de commande (même son que nouvelle commande)
       soundService.playNewOrder().catch((err) => {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[useNotifications] Erreur lecture son mise à jour commande:', err)
+          logger.warn('[useNotifications] Erreur lecture son mise à jour commande:', err)
         }
       })
     })
@@ -138,7 +139,7 @@ export function useNotifications() {
       // Jouer le son pour nouveau message
       soundService.playNewMessage().catch((err) => {
         if (process.env.NODE_ENV === 'development') {
-          console.warn('[useNotifications] Erreur lecture son nouveau message:', err)
+          logger.warn('[useNotifications] Erreur lecture son nouveau message:', err)
         }
       })
     })

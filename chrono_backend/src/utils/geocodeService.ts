@@ -1,6 +1,7 @@
 /**
  * Service de géocodage utilisant Google Geocoding API
  */
+import logger from './logger.js';
 
 interface GeocodeResult {
   latitude: number;
@@ -28,7 +29,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
   const googleApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY;
   
   if (!googleApiKey || googleApiKey.startsWith('<')) {
-    console.warn('[geocodeService] Google API key not configured');
+    logger.warn('[geocodeService] Google API key not configured');
     return null;
   }
 
@@ -46,11 +47,11 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
         longitude: location.lng,
       };
     } else {
-      console.warn(`[geocodeService] Geocoding failed for address "${address}": ${data.status}`);
+      logger.warn(`[geocodeService] Geocoding failed for address "${address}": ${data.status}`);
       return null;
     }
   } catch (error) {
-    console.error('[geocodeService] Error geocoding address:', error);
+    logger.error('[geocodeService] Error geocoding address:', error);
     return null;
   }
 }

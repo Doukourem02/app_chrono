@@ -16,6 +16,7 @@ import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
 import { GoogleMapsDeletedProjectError } from '@/components/error/GoogleMapsDeletedProjectError'
+import { logger } from '@/utils/logger'
 
 const DEFAULT_CENTER = { lat: 5.3600, lng: -4.0083 } 
 const DELIVERY_ZOOM = 12.8
@@ -374,7 +375,7 @@ function TrackingMap({
     
     // Vérifier que les coordonnées sont valides
     if (!pickupCoords || !dropoffCoords) {
-      console.warn('Coordonnées pickup ou dropoff manquantes')
+      logger.warn('Coordonnées pickup ou dropoff manquantes')
       return
     }
 
@@ -446,7 +447,7 @@ function TrackingMap({
                 return
               }
             } catch (err) {
-              console.warn('Erreur décodage polyline:', err)
+              logger.warn('Erreur décodage polyline:', err)
             }
           }
           
@@ -468,7 +469,7 @@ function TrackingMap({
         // Ne pas utiliser le fallback (ligne droite) - laisser vide si Google Directions échoue
         // Seulement si la livraison n'a pas changé
         if (previousDeliveryIdRef.current === currentDeliveryId) {
-          console.warn('Google Directions API a échoué ou n\'a pas retourné de route valide')
+          logger.warn('Google Directions API a échoué ou n\'a pas retourné de route valide')
           setFullRoutePath([])
         }
       }
@@ -805,7 +806,7 @@ function TrackingMap({
           {(() => {
             if (onlineDrivers.length > 0) {
               if (process.env.NODE_ENV === 'development') {
-                console.log('[TrackingMap] Tentative d\'affichage de', onlineDrivers.length, 'drivers sur la carte')
+                logger.debug('[TrackingMap] Tentative d\'affichage de', onlineDrivers.length, 'drivers sur la carte')
               }
             }
             return null
@@ -817,7 +818,7 @@ function TrackingMap({
             
             if (!isOnlineStrict || !hasCoords) {
               if (process.env.NODE_ENV === 'development') {
-                console.warn('[TrackingMap] Driver filtré au dernier moment:', {
+                logger.warn('[TrackingMap] Driver filtré au dernier moment:', {
                   userId: driver.userId?.substring(0, 8),
                   is_online: driver.is_online,
                   is_online_strict: isOnlineStrict,
@@ -828,7 +829,7 @@ function TrackingMap({
             }
             
             if (process.env.NODE_ENV === 'development') {
-              console.log(' [TrackingMap] Affichage du driver:', {
+              logger.debug('[TrackingMap] Affichage du driver:', {
                 userId: driver.userId?.substring(0, 8),
                 is_online: driver.is_online,
                 coords: `${driver.current_latitude}, ${driver.current_longitude}`,
@@ -922,7 +923,7 @@ export default function TrackingPage() {
         })
       },
       (error) => {
-        console.warn('[TrackingPage] Impossible de récupérer la position admin:', error)
+        logger.warn('[TrackingPage] Impossible de récupérer la position admin:', error)
       },
       {
         enableHighAccuracy: true,
@@ -943,7 +944,7 @@ export default function TrackingPage() {
     // Si on revient sur la page Tracking (pathname change vers /tracking)
     if (pathname === '/tracking') {
       if (process.env.NODE_ENV === 'development') {
-        console.log(' [TrackingPage] Retour sur la page Tracking, rechargement des données...')
+        logger.debug('[TrackingPage] Retour sur la page Tracking, rechargement des données...')
       }
       // Recharger les données après un court délai pour s'assurer que le composant est monté
       const timer = setTimeout(() => {
@@ -960,7 +961,7 @@ export default function TrackingPage() {
       if (document.visibilityState === 'visible' && pathname === '/tracking') {
         // Recharger les données quand on revient sur l'onglet
         if (process.env.NODE_ENV === 'development') {
-          console.log(' [TrackingPage] Onglet redevient visible, rechargement des données...')
+          logger.debug('[TrackingPage] Onglet redevient visible, rechargement des données...')
         }
         reloadData()
       }
@@ -981,7 +982,7 @@ export default function TrackingPage() {
   const filteredDeliveries = useMemo(() => {
     // Log pour déboguer les changements
     if (process.env.NODE_ENV === 'development') {
-      console.log(' [TrackingPage] filteredDeliveries recalculé:', {
+      logger.debug('[TrackingPage] filteredDeliveries recalculé:', {
         ongoingDeliveriesLength: ongoingDeliveries.length,
         timestamp: new Date().toISOString(),
         stack: new Error().stack?.split('\n').slice(2, 5).join('\n')
@@ -991,7 +992,7 @@ export default function TrackingPage() {
     const deliveries = ongoingDeliveries.length > 0 ? ongoingDeliveries : []
     if (!deliveries || deliveries.length === 0) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn(' [TrackingPage] Aucune livraison disponible')
+        logger.warn('[TrackingPage] Aucune livraison disponible')
       }
       return []
     }
@@ -1063,7 +1064,7 @@ export default function TrackingPage() {
       return diffInMinutes <= 5
     }
     
-    console.log(' [TrackingPage] DEBUG - Analyse des drivers:', {
+    logger.debug(' [TrackingPage] DEBUG - Analyse des drivers:', {
       totalInMap: allDrivers.length,
       drivers: allDrivers.map((d) => {
         const updatedAt = d.updated_at ? new Date(d.updated_at) : null
@@ -1100,7 +1101,7 @@ export default function TrackingPage() {
           if (!hasCoordinates) reasons.push('pas de coordonnées')
           if (!isActive) reasons.push('inactif (>5 min)')
           
-          console.log(` [TrackingPage] Driver ${driver.userId?.substring(0, 8) || 'unknown'} FILTRÉ:`, {
+          logger.debug(`[TrackingPage] Driver ${driver.userId?.substring(0, 8) || 'unknown'} FILTRÉ:`, {
             is_online: driver.is_online,
             is_online_strict: isOnline,
             hasCoordinates,
@@ -1114,7 +1115,7 @@ export default function TrackingPage() {
       return shouldDisplay
     })
     
-    console.log(' [TrackingPage] Drivers après filtrage:', {
+    logger.debug('[TrackingPage] Drivers après filtrage:', {
       total: allDrivers.length,
       filtered: filteredDrivers.length,
       willBeDisplayed: filteredDrivers.map((d) => d.userId?.substring(0, 8) || 'unknown'),

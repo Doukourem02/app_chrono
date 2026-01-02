@@ -7,6 +7,7 @@ import { ArrowLeft, Download, Search, TrendingDown, TrendingUp, ExternalLink } f
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import type { Driver } from '@/types'
+import { logger } from '@/utils/logger'
 
 interface CommissionTransaction {
   id: string
@@ -56,7 +57,7 @@ export default function CommissionsPage() {
             })) as CommissionTransaction[]
           }
         } catch (error) {
-          console.error(`Error loading transactions for driver ${driverId}:`, error)
+          logger.error(`Error loading transactions for driver ${driverId}:`, error)
         }
         return []
       })

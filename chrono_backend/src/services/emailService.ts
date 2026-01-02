@@ -1,4 +1,5 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import logger from '../utils/logger.js';
 
 let transporter: Transporter | null = null;
 
@@ -23,7 +24,7 @@ export const sendOTPEmail = async (
   role: string = 'driver'
 ): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
-    console.log(`Envoi email OTP Gmail à ${email} pour rôle ${role}`);
+    logger.info(`Envoi email OTP Gmail à ${email} pour rôle ${role}`);
 
     const htmlTemplate = `
       <!DOCTYPE html>
@@ -137,10 +138,10 @@ Ce code expire dans 5 minutes. Si vous n'avez pas demandé ce code, ignorez cet 
 
     const result = await createTransporter().sendMail(mailOptions);
 
-    console.log('Email OTP envoyé avec succès:', result.messageId);
+    logger.info('Email OTP envoyé avec succès:', result.messageId);
     return { success: true, messageId: result.messageId };
   } catch (error: any) {
-    console.error('Erreur envoi email Gmail:', error);
+    logger.error('Erreur envoi email Gmail:', error);
     return { success: false, error: error.message };
   }
 };
@@ -151,9 +152,9 @@ export const sendOTPSMS = async (
   role: string = 'driver'
 ): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
-    console.log(`Envoi SMS OTP au ${phone} pour rôle ${role}`);
+    logger.info(`Envoi SMS OTP au ${phone} pour rôle ${role}`);
 
-    console.log(`
+    logger.debug(`
 ========================================
 SMS OTP pour ${role.toUpperCase()}
 ========================================
@@ -167,7 +168,7 @@ Expire dans 5 min.
 
     return { success: true, messageId: 'sim-' + Date.now() };
   } catch (error: any) {
-    console.error('Erreur envoi SMS:', error);
+    logger.error('Erreur envoi SMS:', error);
     return { success: false, error: error.message };
   }
 };

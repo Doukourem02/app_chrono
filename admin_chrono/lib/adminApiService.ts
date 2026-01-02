@@ -85,7 +85,7 @@ class AdminApiService {
     const timestamp = new Date().toISOString()
     const stackTrace = new Error().stack
     const stackLines = stackTrace ? stackTrace.split('\n').slice(2, 8) : [] // Lignes 2-7 de la stack (ignorer Error et fetchWithAuth)
-    console.log('[adminApiService] FETCH REQUEST', {
+    logger.debug('[adminApiService] FETCH REQUEST', {
       url,
       timestamp,
       method: options?.method || 'GET',
@@ -99,7 +99,7 @@ class AdminApiService {
       logger.debug('[adminApiService] Attempting fetch to:', url)
       const response = await fetch(url, { ...options, headers })
       const responseTimestamp = new Date().toISOString()
-      console.log('[adminApiService] FETCH RESPONSE', {
+      logger.debug('[adminApiService] FETCH RESPONSE', {
         url,
         status: response.status,
         statusText: response.statusText,
@@ -1358,7 +1358,7 @@ class AdminApiService {
       }
 
       const timestamp = new Date().toISOString()
-      console.log('[adminApiService] FETCH REQUEST (getOnlineDrivers)', {
+      logger.debug('[adminApiService] FETCH REQUEST (getOnlineDrivers)', {
         url: `${API_BASE_URL}/api/drivers/online`,
         timestamp,
         method: 'GET',
@@ -1369,7 +1369,7 @@ class AdminApiService {
           'Authorization': `Bearer ${token}`,
         },
       })
-      console.log('[adminApiService] FETCH RESPONSE (getOnlineDrivers)', {
+      logger.debug('[adminApiService] FETCH RESPONSE (getOnlineDrivers)', {
         url: `${API_BASE_URL}/api/drivers/online`,
         status: response.status,
         timestamp: new Date().toISOString()

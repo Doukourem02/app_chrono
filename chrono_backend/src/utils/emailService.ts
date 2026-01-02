@@ -1,4 +1,5 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import logger from './logger.js';
 
 let transporter: Transporter | null = null;
 
@@ -151,8 +152,8 @@ export async function sendOTPEmail(
 
     const result = await transporter.sendMail(mailOptions);
 
-    console.log(`Email OTP envoyé à ${to}: ${otpCode}`);
-    console.log('Message ID:', result.messageId);
+    logger.info(`Email OTP envoyé à ${to}: ${otpCode}`);
+    logger.debug('Message ID:', result.messageId);
 
     return {
       success: true,
@@ -160,7 +161,7 @@ export async function sendOTPEmail(
       message: 'Code OTP envoyé par email avec succès',
     };
   } catch (error: any) {
-    console.error('Erreur envoi email OTP:', error);
+    logger.error('Erreur envoi email OTP:', error);
     throw new Error(`Erreur email: ${error.message}`);
   }
 }
@@ -169,10 +170,10 @@ export async function testEmailConfig(): Promise<boolean> {
   try {
     const transporter = createTransporter();
     await transporter.verify();
-    console.log('Configuration email OK');
+    logger.info('Configuration email OK');
     return true;
   } catch (error: any) {
-    console.error('Erreur configuration email:', error.message);
+    logger.error('Erreur configuration email:', error.message);
     return false;
   }
 }

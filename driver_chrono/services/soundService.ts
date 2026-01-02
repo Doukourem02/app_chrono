@@ -1,5 +1,6 @@
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../utils/logger';
 
 const SOUND_ENABLED_KEY = '@chrono_sound_enabled';
 
@@ -32,7 +33,7 @@ class SoundService {
 
       this.isInitialized = true;
     } catch (error) {
-      console.warn('[SoundService] Erreur initialisation:', error);
+      logger.warn('[SoundService] Erreur initialisation:', undefined, error);
     }
   }
 
@@ -56,7 +57,7 @@ class SoundService {
       await this.orderCompletedSound.setPositionAsync(0);
       await this.orderCompletedSound.playAsync();
     } catch (error) {
-      console.warn('[SoundService] Erreur lecture son commande complétée:', error);
+      logger.warn('[SoundService] Erreur lecture son commande complétée:', undefined, error);
     }
   }
 
@@ -68,7 +69,7 @@ class SoundService {
       }
       this.isInitialized = false;
     } catch (error) {
-      console.warn('[SoundService] Erreur cleanup:', error);
+      logger.warn('[SoundService] Erreur cleanup:', undefined, error);
     }
   }
 }

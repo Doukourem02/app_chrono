@@ -3,6 +3,8 @@
  * Implémente une stratégie de retry avec backoff exponentiel
  */
 
+import { logger } from './logger';
+
 export interface RetryOptions {
   /** Nombre maximum de tentatives (défaut: 3) */
   maxAttempts?: number;
@@ -145,7 +147,7 @@ export async function retry<T>(
       
       // Logger le retry en développement
       if (__DEV__) {
-        console.warn(`⚠️ Tentative ${attempt}/${opts.maxAttempts} échouée, retry dans ${delay}ms...`, error.message);
+        logger.warn(`⚠️ Tentative ${attempt}/${opts.maxAttempts} échouée, retry dans ${delay}ms...`, undefined, { error: error.message, attempt, maxAttempts: opts.maxAttempts, delay });
       }
       
       // Attendre avant le prochain retry
@@ -155,7 +157,7 @@ export async function retry<T>(
   
   // Toutes les tentatives ont échoué
   if (__DEV__) {
-    console.error(`❌ Toutes les tentatives (${opts.maxAttempts}) ont échoué`);
+    logger.error(`❌ Toutes les tentatives (${opts.maxAttempts}) ont échoué`);
   }
   
   throw lastError;

@@ -1,5 +1,6 @@
 import { Vonage } from '@vonage/server-sdk';
 import { sendOTPEmail } from './emailService.js';
+import logger from './logger.js';
 
 const vonage =
   process.env.VONAGE_API_KEY && process.env.VONAGE_API_SECRET
@@ -30,10 +31,10 @@ export async function sendEmailOTP(
 
     const result = await sendOTPEmail(email, otpCode, 'CHRONO');
 
-    console.log(`Email OTP personnalisé envoyé à: ${email}`);
+    logger.info(`Email OTP personnalisé envoyé à: ${email}`);
 
     if (phone) {
-      console.log(`Téléphone associé: ${phone}`);
+      logger.debug(`Téléphone associé: ${phone}`);
     }
 
     return {
@@ -44,7 +45,7 @@ export async function sendEmailOTP(
       message: 'Code OTP envoyé par email avec succès',
     };
   } catch (error: any) {
-    console.error('Erreur sendEmailOTP:', error);
+    logger.error('Erreur sendEmailOTP:', error);
     throw error;
   }
 }
@@ -75,7 +76,7 @@ export async function sendSMSOTP(
     });
 
     if (response.messages[0].status === '0') {
-      console.log(`SMS OTP envoyé à ${phone}: ${otpCode}`);
+      logger.info(`SMS OTP envoyé à ${phone}: ${otpCode}`);
 
       return {
         success: true,
@@ -88,7 +89,7 @@ export async function sendSMSOTP(
       throw new Error(`Erreur SMS: ${response.messages[0]['error-text']}`);
     }
   } catch (error: any) {
-    console.error('Erreur sendSMSOTP:', error);
+    logger.error('Erreur sendSMSOTP:', error);
     throw error;
   }
 }
@@ -117,7 +118,7 @@ export async function verifyEmailOTP(
       throw new Error('Code OTP invalide');
     }
 
-    console.log(`Email OTP vérifié pour: ${email}`);
+    logger.info(`Email OTP vérifié pour: ${email}`);
 
     const user = {
       id: `email_user_${Date.now()}`,
@@ -137,7 +138,7 @@ export async function verifyEmailOTP(
       },
     };
   } catch (error: any) {
-    console.error('Erreur verifyEmailOTP:', error);
+    logger.error('Erreur verifyEmailOTP:', error);
     throw error;
   }
 }

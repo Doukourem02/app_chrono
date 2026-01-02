@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
 import { adminMessageService } from '@/services/adminMessageService'
 import { Conversation } from '@/services/adminMessageService'
+import { logger } from '@/utils/logger'
 
 interface UserData {
   id: string
@@ -47,7 +48,7 @@ export default function NewConversationModal({
         setFilteredUsers(filtered)
       }
     } catch (error) {
-      console.error('Error loading users:', error)
+      logger.error('Error loading users:', error)
     } finally {
       setIsLoading(false)
     }
@@ -89,7 +90,7 @@ export default function NewConversationModal({
         alert('Impossible de créer la conversation')
       }
     } catch (error) {
-      console.error('Error creating conversation:', error)
+      logger.error('Error creating conversation:', error)
       alert('Une erreur est survenue lors de la création de la conversation')
     } finally {
       setIsCreating(false)

@@ -23,6 +23,7 @@ import demandForecastRoutes from './routes/demandForecastRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSwagger } from './config/swagger.js';
 import { isOriginAllowed } from './config/cors.js';
+import logger from './utils/logger.js';
 
 const app: Express = express();
 
@@ -68,7 +69,7 @@ app.use(
       if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
-        console.warn(`CORS bloqué pour origin: ${origin}`);
+        logger.warn(`CORS bloqué pour origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },

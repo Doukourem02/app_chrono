@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
+import { logger } from '../../utils/logger';
 
 
 export default function PartnerOnboardingScreen() {
@@ -78,7 +79,7 @@ export default function PartnerOnboardingScreen() {
         ]
       );
     } catch (error: any) {
-      console.error('Erreur complétion profil:', error);
+      logger.error('Erreur complétion profil:', undefined, error);
       Alert.alert('Erreur', error.message || 'Une erreur est survenue lors de la complétion de votre profil');
     } finally {
       setIsLoading(false);

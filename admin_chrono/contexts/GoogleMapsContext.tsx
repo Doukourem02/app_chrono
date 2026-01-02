@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import type { Library } from "@googlemaps/js-api-loader";
 import { useLoadScript } from "@react-google-maps/api";
 import { useQuery } from "@tanstack/react-query";
+import { logger } from "@/utils/logger";
 import {
   createContext,
   ReactNode,
@@ -223,7 +224,7 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (combinedError && process.env.NODE_ENV === "development") {
       if (billingError) {
-        console.warn("[GoogleMaps] Billing error detected:", {
+        logger.warn("[GoogleMaps] Billing error detected:", {
           message: combinedError.message,
           name: combinedError.name,
           error: combinedError,
@@ -231,7 +232,7 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
         });
       }
       if (deletedProjectError) {
-        console.warn("[GoogleMaps] Deleted project error detected:", {
+        logger.warn("[GoogleMaps] Deleted project error detected:", {
           message: combinedError.message,
           name: combinedError.name,
           error: combinedError,

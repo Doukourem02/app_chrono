@@ -8,6 +8,7 @@ import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
+import { logger } from "@/utils/logger";
 
 interface NavItem {
   href: string;
@@ -87,7 +88,7 @@ export default function Sidebar() {
     if (!user?.id) return;
 
     try {
-      console.log('🔄 [Sidebar] Loading profile for user:', user.id);
+      logger.debug('🔄 [Sidebar] Loading profile for user:', user.id);
       const { data: userData, error } = await supabase
         .from('users')
         .select('avatar_url, phone, first_name, last_name')
@@ -96,7 +97,7 @@ export default function Sidebar() {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          console.log(' [Sidebar] User not found in users table, using user_metadata');
+          logger.debug('[Sidebar] User not found in users table, using user_metadata');
           setAvatarUrl(null);
         setUserProfile({
           full_name: user?.user_metadata?.full_name || undefined,
@@ -105,7 +106,7 @@ export default function Sidebar() {
           last_name: undefined,
         });
         } else {
-          console.warn(' [Sidebar] Error loading profile from users table:', {
+          logger.warn('[Sidebar] Error loading profile from users table:', {
             code: error.code,
             message: error.message,
             details: error.details,
@@ -120,7 +121,7 @@ export default function Sidebar() {
         });
         }
       } else if (userData) {
-        console.log(' [Sidebar] Profile loaded from database:', {
+        logger.debug('[Sidebar] Profile loaded from database:', {
           avatar_url: userData.avatar_url,
           avatar_url_type: typeof userData.avatar_url,
           avatar_url_length: userData.avatar_url?.length,
@@ -128,20 +129,20 @@ export default function Sidebar() {
           user_id: user.id,
         });
         let newAvatarUrl = userData.avatar_url || null;
-        console.log(' [Sidebar] Raw avatar URL from DB:', newAvatarUrl);
+        logger.debug('[Sidebar] Raw avatar URL from DB:', newAvatarUrl);
         
         // Corriger l'URL si elle contient un double "avatars/avatars"
         if (newAvatarUrl && newAvatarUrl.includes('/avatars/avatars/')) {
           newAvatarUrl = newAvatarUrl.replace('/avatars/avatars/', '/avatars/');
-          console.log('🔧 [Sidebar] Corrected URL from double avatars:', newAvatarUrl);
+          logger.debug('🔧 [Sidebar] Corrected URL from double avatars:', newAvatarUrl);
         }
         
         // Vérifier que l'URL est valide
         if (newAvatarUrl && !newAvatarUrl.startsWith('http')) {
-          console.warn(' [Sidebar] Avatar URL does not start with http:', newAvatarUrl);
+          logger.warn('[Sidebar] Avatar URL does not start with http:', newAvatarUrl);
         }
         
-        console.log(' [Sidebar] Final avatar URL to set:', newAvatarUrl);
+        logger.debug('[Sidebar] Final avatar URL to set:', newAvatarUrl);
         // Mettre à jour directement l'URL (la vérification se fera via onLoad/onError de l'img)
         setAvatarUrl(newAvatarUrl);
         
@@ -154,7 +155,7 @@ export default function Sidebar() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.warn(' [Sidebar] Unexpected error loading profile:', {
+      logger.warn('[Sidebar] Unexpected error loading profile:', {
         message: errorMessage,
         error,
       });
@@ -177,24 +178,24 @@ export default function Sidebar() {
   useEffect(() => {
     const handleAvatarUpdate = (event: CustomEvent) => {
       const { avatarUrl: newAvatarUrl } = event.detail;
-      console.log('📢 [Sidebar] Received avatar-updated event:', { newAvatarUrl });
+      logger.debug('📢 [Sidebar] Received avatar-updated event:', { newAvatarUrl });
       if (newAvatarUrl) {
         let correctedUrl = newAvatarUrl;
         if (newAvatarUrl.includes('/avatars/avatars/')) {
           correctedUrl = newAvatarUrl.replace('/avatars/avatars/', '/avatars/');
-          console.log(' [Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
+          logger.debug('[Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
         }
-        console.log(' [Sidebar] Setting avatar URL immediately:', correctedUrl);
+        logger.debug('[Sidebar] Setting avatar URL immediately:', correctedUrl);
         setAvatarUrl(correctedUrl);
         loadProfile();
       } else {
-        console.warn(' [Sidebar] No avatar URL in event detail');
+        logger.warn('[Sidebar] No avatar URL in event detail');
       }
     };
 
     const handleProfileUpdate = (event: CustomEvent) => {
       const { fullName, phone, avatarUrl: newAvatarUrl } = event.detail;
-      console.log(' [Sidebar] Received profile-updated event:', { fullName, phone, newAvatarUrl });
+      logger.debug('[Sidebar] Received profile-updated event:', { fullName, phone, newAvatarUrl });
       if (fullName) {
         setUserProfile(prev => ({ ...prev, full_name: fullName }));
       }
@@ -205,9 +206,9 @@ export default function Sidebar() {
         let correctedUrl = newAvatarUrl;
         if (newAvatarUrl.includes('/avatars/avatars/')) {
           correctedUrl = newAvatarUrl.replace('/avatars/avatars/', '/avatars/');
-          console.log(' [Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
+          logger.debug('[Sidebar] Corrected URL from:', newAvatarUrl, 'to:', correctedUrl);
         }
-        console.log(' [Sidebar] Setting avatar URL from profile-updated:', correctedUrl);
+        logger.debug('[Sidebar] Setting avatar URL from profile-updated:', correctedUrl);
         setAvatarUrl(correctedUrl);
       } else {
         setAvatarUrl(null);
@@ -474,7 +475,7 @@ export default function Sidebar() {
 
   // Calculer le style de l'avatar dynamiquement pour qu'il se mette à jour
   const avatarStyle: React.CSSProperties = useMemo(() => {
-    console.log('🎨 [Sidebar] Computing avatarStyle with avatarUrl:', avatarUrl);
+    logger.debug('🎨 [Sidebar] Computing avatarStyle with avatarUrl:', avatarUrl);
     const style: React.CSSProperties = {
       width: '48px',
       height: '48px',
@@ -515,7 +516,7 @@ export default function Sidebar() {
   
   // Log pour déboguer les changements d'avatarUrl
   useEffect(() => {
-    console.log('🔄 [Sidebar] avatarUrl changed:', avatarUrl);
+    logger.debug('🔄 [Sidebar] avatarUrl changed:', avatarUrl);
   }, [avatarUrl]);
 
   const avatarNameStyle: React.CSSProperties = {
@@ -813,7 +814,7 @@ export default function Sidebar() {
             <div style={avatarImageWrapperStyle}>
               {avatarUrl ? (
                 <>
-                  {console.log('[Sidebar] Rendering avatar with URL:', avatarUrl)}
+                  {logger.debug('[Sidebar] Rendering avatar with URL:', avatarUrl)}
                   <div
                     style={{
                       position: 'relative',
@@ -839,11 +840,11 @@ export default function Sidebar() {
                         backgroundColor: 'transparent',
                       }}
                       onLoad={() => {
-                        console.log(' [Sidebar] Avatar image loaded successfully:', avatarUrl);
+                        logger.debug('[Sidebar] Avatar image loaded successfully:', avatarUrl);
                       }}
                       onError={(e) => {
-                        console.error(' [Sidebar] Avatar image failed to load:', avatarUrl);
-                        console.error('Error event:', e);
+                        logger.error('[Sidebar] Avatar image failed to load:', avatarUrl);
+                        logger.error('Error event:', e);
                         // Si l'image ne charge pas, réinitialiser avatarUrl pour afficher les initiales
                         setAvatarUrl(null);
                       }}

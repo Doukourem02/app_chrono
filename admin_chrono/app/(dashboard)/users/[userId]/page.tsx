@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
 import {ArrowLeft,Mail,Phone,Calendar,Truck,MapPin,Power,User,Shield,CreditCard,Download,} from 'lucide-react'
 import { exportData } from '@/utils/exportUtils'
+import { logger } from '@/utils/logger'
 
 interface User {
   id: string
@@ -233,7 +234,7 @@ export default function UserDetailsPage() {
         const users: User[] = (usersResult.data as User[]) || []
         user = users.find((u: User) => u.id === userId)
       } catch (error) {
-        console.error('[UserDetails] Error fetching users list:', error)
+        logger.error('[UserDetails] Error fetching users list:', error)
       }
 
       // Si on a trouvé l'utilisateur, essayer de récupérer les détails selon son rôle
@@ -243,14 +244,14 @@ export default function UserDetailsPage() {
             const driverResult = await adminApiService.getDriverDetails(userId)
             if (driverResult.success && driverResult.data) {
               const driverData = driverResult.data as UserDetails
-              console.log('[UserDetails] Driver details récupérés:', {
+              logger.debug('[UserDetails] Driver details récupérés:', {
                 pendingPaymentOrdersCount: driverData.pendingPaymentOrders?.length || 0,
                 recentOrdersCount: driverData.recentOrders?.length || 0,
               })
               return driverResult as { data: UserDetails }
             }
           } catch (error) {
-            console.warn('[UserDetails] Error fetching driver details, using basic info:', error)
+            logger.warn('[UserDetails] Error fetching driver details, using basic info:', error)
           }
           // Si les détails du driver échouent, utiliser les infos de base
         } else if (user.role === 'client') {
@@ -260,7 +261,7 @@ export default function UserDetailsPage() {
               return clientResult as { data: UserDetails }
             }
           } catch (error) {
-            console.warn('[UserDetails] Error fetching client details, using basic info:', error)
+            logger.warn('[UserDetails] Error fetching client details, using basic info:', error)
           }
           // Si les détails du client échouent, utiliser les infos de base
         } else if (user.role === 'admin' || user.role === 'super_admin') {
@@ -270,7 +271,7 @@ export default function UserDetailsPage() {
               return adminResult as { data: UserDetails }
             }
           } catch (error) {
-            console.warn('[UserDetails] Error fetching admin details, using basic info:', error)
+            logger.warn('[UserDetails] Error fetching admin details, using basic info:', error)
           }
           // Si les détails de l'admin échouent, utiliser les infos de base
         }

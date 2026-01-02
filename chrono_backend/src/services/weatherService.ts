@@ -2,6 +2,7 @@
  * Service d'intégration météo (OpenWeatherMap)
  * Ajuste les temps de livraison selon les conditions météorologiques
  */
+import logger from '../utils/logger.js';
 
 interface WeatherData {
   temperature: number; // °C
@@ -29,7 +30,7 @@ export async function getWeatherData(
   const apiKey = process.env.OPENWEATHER_API_KEY;
 
   if (!apiKey || apiKey.startsWith('<')) {
-    console.warn('[weatherService] OpenWeather API key not configured');
+    logger.warn('[weatherService] OpenWeather API key not configured');
     return null;
   }
 
@@ -39,7 +40,7 @@ export async function getWeatherData(
     const response = await fetch(url);
     
     if (!response.ok) {
-      console.warn(`[weatherService] API error: ${response.status}`);
+      logger.warn(`[weatherService] API error: ${response.status}`);
       return null;
     }
 
@@ -58,7 +59,7 @@ export async function getWeatherData(
       icon: data.weather?.[0]?.icon || '',
     };
   } catch (error) {
-    console.error('[weatherService] Error fetching weather:', error);
+    logger.error('[weatherService] Error fetching weather:', error);
     return null;
   }
 }

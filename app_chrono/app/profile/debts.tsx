@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {ActivityIndicator,Alert,ScrollView,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
 import { DeferredPaymentInfo, paymentApi } from "../../services/paymentApi";
+import { logger } from "../../utils/logger";
 
 interface Debt {
   id: string;
@@ -46,7 +47,7 @@ export default function DebtsPage() {
         setDebts(debtsResult.data);
       }
     } catch (error) {
-      console.error("Erreur chargement données:", error);
+      logger.error("Erreur chargement données:", error);
       Alert.alert(
         "Erreur",
         "Impossible de charger les données. Veuillez réessayer."

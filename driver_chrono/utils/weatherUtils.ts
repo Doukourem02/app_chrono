@@ -41,7 +41,7 @@ export async function fetchWeatherData(
   } catch (error) {
     // Ne pas logger les erreurs réseau en production (normal si le backend n'est pas disponible)
     if (__DEV__) {
-      console.warn('Weather API unavailable:', error instanceof Error ? error.message : 'Network error');
+      logger.warn('Weather API unavailable:', error instanceof Error ? error.message : 'Network error');
     }
     return null;
   }

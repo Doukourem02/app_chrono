@@ -1,5 +1,6 @@
 // Service API pour l'application utilisateur
 import { useAuthStore } from '../store/useAuthStore';
+import { logger } from '../utils/logger';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? 'http://localhost:4000' : 'https://votre-api.com');
 
@@ -32,7 +33,7 @@ class UserApiService {
     }[];
   }> {
     try {
-      console.log('🔍 Récupération chauffeurs online...');
+      logger.debug('🔍 Récupération chauffeurs online...');
 
       let url = `${API_BASE_URL}/api/drivers/online`;
 
@@ -48,10 +49,10 @@ class UserApiService {
         throw new Error(result.message || 'Erreur récupération chauffeurs');
       }
 
-      console.log(`${result.data?.length || 0} chauffeurs online trouvés`);
+      logger.debug(`${result.data?.length || 0} chauffeurs online trouvés`);
       return result;
     } catch (error) {
-      console.error('Erreur getOnlineDrivers:', error);
+      logger.error('Erreur getOnlineDrivers:', 'userApiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -73,7 +74,7 @@ class UserApiService {
       if (response.status === 404) {
         // Si c'est une erreur 404 (driver non trouvé), c'est normal et ne doit pas être loggé comme une erreur critique
         if (__DEV__) {
-          console.warn(`Driver non trouvé: ${driverId}`);
+          logger.warn(`Driver non trouvé: ${driverId}`, 'userApiService');
         }
         return {
           success: false,
@@ -93,7 +94,7 @@ class UserApiService {
       // Ne logger que les vraies erreurs (réseau, serveur, etc.), pas les 404
       const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
       if (!errorMessage.includes('Chauffeur non trouvé') && !errorMessage.includes('404')) {
-        console.error('Erreur getDriverDetails:', error);
+        logger.error('Erreur getDriverDetails:', 'userApiService', error);
       }
       return {
         success: false,
@@ -156,7 +157,7 @@ class UserApiService {
       } catch (fetchError: any) {
         // Erreur réseau (backend inaccessible, timeout, etc.)
         if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
-          console.warn('Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
+          logger.warn('Backend inaccessible - vérifiez que le serveur est démarré sur', 'userApiService', API_BASE_URL);
           return {
             success: false,
             message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
@@ -171,7 +172,7 @@ class UserApiService {
         result = await response.json();
       } catch {
         // Si la réponse n'est pas du JSON valide, c'est probablement une erreur serveur
-        console.error('Réponse non-JSON reçue:', response.status, response.statusText);
+        logger.error('Réponse non-JSON reçue:', 'userApiService', { status: response.status, statusText: response.statusText });
         return {
           success: false,
           message: `Erreur serveur (${response.status}). Veuillez réessayer plus tard.`,
@@ -197,7 +198,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur getUserDeliveries:', error);
+      logger.error('Erreur getUserDeliveries:', 'userApiService', error);
 
       // Gérer spécifiquement les erreurs réseau
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
@@ -285,7 +286,7 @@ class UserApiService {
         errorMessage.includes('Session expirée');
 
       if (!isExpectedError) {
-        console.error('Erreur cancelOrder:', error);
+        logger.error('Erreur cancelOrder:', 'userApiService', error);
       }
 
       return {
@@ -315,7 +316,7 @@ class UserApiService {
 
       // Si le token est expiré ou absent, essayer de le rafraîchir
       if (!refreshToken) {
-        console.warn('Pas de refreshToken disponible - session expirée');
+        logger.warn('Pas de refreshToken disponible - session expirée', 'userApiService');
         // Déconnecter l'utilisateur car la session est expirée
         logout();
         return null;
@@ -323,26 +324,26 @@ class UserApiService {
 
       // Vérifier si le refresh token est encore valide
       if (!this.isTokenValid(refreshToken)) {
-        console.warn('Refresh token expiré - session expirée');
+        logger.warn('Refresh token expiré - session expirée', 'userApiService');
         // Déconnecter l'utilisateur car la session est expirée
         logout();
         return null;
       }
 
-      console.log('🔄 Token expiré ou absent, rafraîchissement en cours...');
+      logger.debug('🔄 Token expiré ou absent, rafraîchissement en cours...', 'userApiService');
       const newAccessToken = await this.refreshAccessToken(refreshToken);
       if (newAccessToken) {
         setTokens({ accessToken: newAccessToken, refreshToken });
-        console.log('Token rafraîchi et sauvegardé avec succès');
+        logger.debug('Token rafraîchi et sauvegardé avec succès', 'userApiService');
         return newAccessToken;
       }
 
       // Impossible de rafraîchir => déconnecter l'utilisateur
-      console.warn('Impossible de rafraîchir le token - session expirée');
+      logger.warn('Impossible de rafraîchir le token - session expirée', 'userApiService');
       logout();
       return null;
     } catch (error) {
-      console.error('Erreur ensureAccessToken:', error);
+      logger.error('Erreur ensureAccessToken:', 'userApiService', error);
       // En cas d'erreur, déconnecter pour éviter un état incohérent
       const { logout } = useAuthStore.getState();
       logout();
@@ -373,7 +374,7 @@ class UserApiService {
         const isExpired = now >= expirationTime;
 
         if (isExpired) {
-          console.log('Token expiré, expiration:', new Date(expirationTime).toISOString());
+          logger.debug('Token expiré, expiration:', 'userApiService', new Date(expirationTime).toISOString());
           return false;
         }
 
@@ -382,10 +383,10 @@ class UserApiService {
       }
 
       // Si pas d'expiration définie, considérer comme valide (mais ça ne devrait pas arriver)
-      console.warn('Token sans expiration définie');
+      logger.warn('Token sans expiration définie', 'userApiService');
       return true;
     } catch (error) {
-      console.error('Erreur vérification token:', error);
+      logger.error('Erreur vérification token:', 'userApiService', error);
       // En cas d'erreur de décodage, considérer comme invalide
       return false;
     }
@@ -393,7 +394,7 @@ class UserApiService {
 
   private async refreshAccessToken(refreshToken: string): Promise<string | null> {
     try {
-      console.log('🔄 Tentative de rafraîchissement du token...');
+      logger.debug('🔄 Tentative de rafraîchissement du token...', 'userApiService');
 
       const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
         method: 'POST',
@@ -406,21 +407,21 @@ class UserApiService {
       const result = await response.json();
 
       if (!response.ok) {
-        console.error('Erreur HTTP lors du rafraîchissement:', response.status, result.message);
+        logger.error('Erreur HTTP lors du rafraîchissement:', 'userApiService', { status: response.status, message: result.message });
         return null;
       }
 
       if (!result.success) {
-        console.error('Échec du rafraîchissement:', result.message);
+        logger.error('Échec du rafraîchissement:', 'userApiService', result.message);
         return null;
       }
 
       if (!result.data?.accessToken) {
-        console.error('Pas de accessToken dans la réponse:', result);
+        logger.error('Pas de accessToken dans la réponse:', 'userApiService', result);
         return null;
       }
 
-      console.log('Token rafraîchi avec succès');
+      logger.debug('Token rafraîchi avec succès', 'userApiService');
       return result.data.accessToken as string;
     } catch (error) {
       // Ne logger les erreurs réseau que si ce n'est pas une erreur de connexion temporaire
@@ -428,11 +429,11 @@ class UserApiService {
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         // Logger seulement en mode debug pour éviter le bruit dans les logs
         if (__DEV__) {
-          console.debug('Backend inaccessible lors du rafraîchissement du token:', API_BASE_URL);
+          logger.debug('Backend inaccessible lors du rafraîchissement du token:', 'userApiService', API_BASE_URL);
         }
       } else {
         // Pour les autres erreurs, logger normalement
-        console.warn('Erreur lors du rafraîchissement du token:', error);
+        logger.warn('Erreur lors du rafraîchissement du token:', 'userApiService', error);
       }
       return null;
     }
@@ -472,7 +473,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur getUserStatistics:', error);
+      logger.error('Erreur getUserStatistics:', 'userApiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -526,7 +527,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur submitRating:', error);
+      logger.error('Erreur submitRating:', 'userApiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -568,7 +569,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur getOrderRating:', error);
+      logger.error('Erreur getOrderRating:', 'userApiService', error);
       return {
         success: false,
         data: null
@@ -623,7 +624,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur updateProfile:', error);
+      logger.error('Erreur updateProfile:', 'userApiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'
@@ -665,7 +666,7 @@ class UserApiService {
 
       if (response.status === 404) {
         if (__DEV__) {
-          console.warn(`Utilisateur non trouvé: ${userId}`);
+          logger.warn(`Utilisateur non trouvé: ${userId}`, 'userApiService');
         }
         return {
           success: false,
@@ -683,7 +684,7 @@ class UserApiService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
       if (!errorMessage.includes('Utilisateur non trouvé') && !errorMessage.includes('404')) {
-        console.error('Erreur getUserProfile:', error);
+        logger.error('Erreur getUserProfile:', 'userApiService', error);
       }
       return {
         success: false,
@@ -743,7 +744,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      console.error('Erreur uploadAvatar:', error);
+      logger.error('Erreur uploadAvatar:', 'userApiService', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion'

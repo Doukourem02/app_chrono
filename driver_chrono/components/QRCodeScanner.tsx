@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { logger } from '../utils/logger';
 
 // Import conditionnel du scanner QR code
 let BarCodeScanner: any = null;
@@ -11,7 +12,7 @@ try {
   const barcodeModule = require('expo-barcode-scanner');
   BarCodeScanner = barcodeModule.BarCodeScanner;
 } catch {
-  console.warn('expo-barcode-scanner non disponible. Un développement build est requis.');
+  logger.warn('expo-barcode-scanner non disponible. Un développement build est requis.', undefined);
 }
 
 interface QRCodeScannerProps {
@@ -51,7 +52,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       const { status } = await BarCodeScanner.requestPermissionsAsync();
       setHasPermission(status === 'granted');
     } catch (error) {
-      console.error('Erreur demande permission caméra:', error);
+      logger.error('Erreur demande permission caméra:', undefined, error);
       setHasPermission(false);
     }
   };
@@ -70,7 +71,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       // Appeler le callback avec les données scannées
       onScan(data);
     } catch (error) {
-      console.error('Erreur lors du scan:', error);
+      logger.error('Erreur lors du scan:', undefined, error);
       Alert.alert('Erreur', 'Impossible de traiter le QR code scanné');
     } finally {
       setIsLoading(false);

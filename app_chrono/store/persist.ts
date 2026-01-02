@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StateCreator } from 'zustand';
+import { logger } from '../utils/logger';
 
 export interface PersistOptions {
   name: string;
@@ -36,7 +37,7 @@ export const persist = <T>(
           }));
         }
       } catch (error) {
-        console.warn('Error loading persisted state:', error);
+        logger.warn('Error loading persisted state:', undefined, error);
       }
     };
 
@@ -49,7 +50,7 @@ export const persist = <T>(
         };
         await AsyncStorage.setItem(name, JSON.stringify(persistData));
       } catch (error) {
-        console.warn('Error saving state:', error);
+        logger.warn('Error saving state:', undefined, error);
       }
     };
 

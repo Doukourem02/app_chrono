@@ -4,6 +4,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useCommissionStore } from '../store/useCommissionStore';
 import { useDriverStore } from '../store/useDriverStore';
 import { RechargeModal } from './RechargeModal';
+import { logger } from '../utils/logger';
 
 const { width } = Dimensions.get('window');
 
@@ -26,7 +27,7 @@ export const CommissionBalanceCard: React.FC<CommissionBalanceCardProps> = ({
       fetchBalance().catch((error) => {
         // Erreur silencieuse si l'API n'est pas encore disponible
         if (__DEV__) {
-          console.warn('Commission API non disponible:', error);
+          logger.warn('Commission API non disponible:', undefined, error);
         }
       });
     }

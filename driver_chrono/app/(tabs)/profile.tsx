@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useDriverStore } from '../../store/useDriverStore';
 import { formatUserName } from '../../utils/formatName';
 import { apiService } from '../../services/apiService';
+import { logger } from '../../utils/logger';
 
 interface DriverStatistics {
   completedDeliveries: number;
@@ -47,7 +48,7 @@ export default function ProfilePage() {
         // Elle est mise à jour automatiquement à chaque nouvelle évaluation
         setStatistics(result.data);
         if (__DEV__) {
-          console.debug('[Profile] Statistiques chargées:', {
+          logger.debug('[Profile] Statistiques chargées:', undefined, {
             completedDeliveries: result.data.completedDeliveries,
             averageRating: result.data.averageRating,
             totalEarnings: result.data.totalEarnings
@@ -55,7 +56,7 @@ export default function ProfilePage() {
         }
       }
     } catch (error) {
-      console.error('[Profile] Erreur chargement statistiques:', error);
+      logger.error('[Profile] Erreur chargement statistiques:', undefined, error);
     } finally {
       setIsLoadingStats(false);
     }
@@ -84,7 +85,7 @@ export default function ProfilePage() {
           });
         }
       } catch (error) {
-        console.error('Erreur chargement profil utilisateur:', error);
+        logger.error('Erreur chargement profil utilisateur:', error);
       }
     };
 
@@ -149,7 +150,7 @@ export default function ProfilePage() {
         ]
       );
     } catch (error) {
-      console.error('Erreur sélection image:', error);
+      logger.error('Erreur sélection image:', undefined, error);
       Alert.alert('Erreur', 'Impossible d\'accéder à vos photos');
     }
   };
@@ -193,7 +194,7 @@ export default function ProfilePage() {
         Alert.alert('Erreur', result.message || 'Impossible de mettre à jour l\'avatar');
       }
     } catch (error) {
-      console.error('Erreur upload avatar:', error);
+      logger.error('Erreur upload avatar:', undefined, error);
       Alert.alert('Erreur', 'Impossible de mettre à jour l\'avatar');
     } finally {
       setUploadingAvatar(false);
@@ -412,7 +413,7 @@ export default function ProfilePage() {
                   );
                 }
               } catch (error) {
-                console.error('Erreur synchronisation statut depuis profile:', error);
+                logger.error('Erreur synchronisation statut depuis profile:', undefined, error);
                 // Rollback en cas d'erreur
                 setOnlineStatus(!value);
                 

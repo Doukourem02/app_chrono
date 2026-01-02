@@ -10,6 +10,7 @@ import { adminMessageSocketService } from '@/services/adminMessageSocketService'
 import { Conversation } from '@/services/adminMessageService'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
+import { logger } from '@/utils/logger'
 
 export default function QuickMessage() {
   const router = useRouter()
@@ -31,7 +32,7 @@ export default function QuickMessage() {
         adminMessageSocketService.joinConversation(conv.id)
       }
     } catch (error) {
-      console.error('Error loading conversations in QuickMessage:', error)
+      logger.error('Error loading conversations in QuickMessage:', error)
     }
   }, [user?.id, setConversations])
 

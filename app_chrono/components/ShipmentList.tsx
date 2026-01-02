@@ -7,6 +7,7 @@ import {OrderRequest,OrderStatus,useOrderStore,} from "../store/useOrderStore";
 import { formatUserName } from "../utils/formatName";
 import { AnimatedCard, SkeletonLoader } from "./animations";
 import ShipmentCard from "./ShipmentCard";
+import { logger } from "../utils/logger";
 
 interface OrderWithDB extends OrderRequest {
   created_at?: string;
@@ -104,7 +105,7 @@ export default function ShipmentList() {
         const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
 
         if (!createdTime) {
-          console.warn("Commande sans date de création:", order.id);
+          logger.warn("Commande sans date de création:", order.id);
           continue;
         }
 
@@ -150,7 +151,7 @@ export default function ShipmentList() {
             autoCancelledPendingRef.current.delete(order.id);
           }
         } catch (err: any) {
-          console.error("Erreur auto-cancel pending:", order.id, err);
+          logger.error("Erreur auto-cancel pending:", order.id, err);
           autoCancelledPendingRef.current.delete(order.id);
         }
       }
@@ -175,7 +176,7 @@ export default function ShipmentList() {
 
       if (result.success && result.data) {
         if (__DEV__ && result.data.length > 0) {
-          console.debug("Commandes reçues:", result.data.length);
+          logger.debug("Commandes reçues:", undefined, { count: result.data.length });
         }
 
         const formattedOrders = result.data.map((order: any) => {
@@ -197,7 +198,7 @@ export default function ShipmentList() {
               };
             }
           } catch (e) {
-            console.warn("Erreur parsing pickup:", e);
+            logger.warn("Erreur parsing pickup:", undefined, e);
             pickup = {
               address: "",
               coordinates: { latitude: 0, longitude: 0 },
@@ -216,7 +217,7 @@ export default function ShipmentList() {
               };
             }
           } catch (e) {
-            console.warn("Erreur parsing dropoff:", e);
+            logger.warn("Erreur parsing dropoff:", undefined, e);
             dropoff = {
               address: "",
               coordinates: { latitude: 0, longitude: 0 },
@@ -495,7 +496,7 @@ export default function ShipmentList() {
         setOrders([]);
       }
     } catch (error) {
-      console.error("Erreur chargement commandes:", error);
+      logger.error("Erreur chargement commandes:", undefined, error);
       setOrders([]);
     } finally {
       setLoading(false);
@@ -656,7 +657,7 @@ export default function ShipmentList() {
         const createdTime = createdAt ? new Date(createdAt).getTime() : 0;
 
         if (!createdTime) {
-          console.warn(
+          logger.warn(
             "Commande sans date de création dans checkAndCancel:",
             order.id
           );
@@ -709,7 +710,7 @@ export default function ShipmentList() {
               autoCancelledPendingRef.current.delete(order.id);
             }
           } catch (err: any) {
-            console.error(
+            logger.error(
               "Erreur auto-cancel pending:",
               order.id,
               err?.message || err

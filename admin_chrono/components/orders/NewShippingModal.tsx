@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
 import { useRouter } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
+import { logger } from '@/utils/logger'
 
 interface UserData {
   id: string
@@ -70,7 +71,7 @@ export default function NewShippingModal({
         setFilteredUsers(clients)
       }
     } catch (error) {
-      console.error('Error loading users:', error)
+      logger.error('Error loading users:', error)
     } finally {
       setIsLoading(false)
     }
@@ -199,10 +200,10 @@ export default function NewShippingModal({
           // Jouer le son de succès
           const { soundService } = await import('@/utils/soundService')
           if (process.env.NODE_ENV === 'development') {
-            console.log('[NewShippingModal] 🔊 Tentative de jouer le son de succès')
+            logger.debug('[NewShippingModal] 🔊 Tentative de jouer le son de succès')
           }
           soundService.playSuccess().catch((err) => {
-            console.warn('[NewShippingModal] Erreur lecture son succès:', err)
+            logger.warn('[NewShippingModal] Erreur lecture son succès:', err)
           })
           resetForm()
           onClose()
@@ -212,7 +213,7 @@ export default function NewShippingModal({
         alert(result.message || 'Impossible de créer la commande')
       }
     } catch (error) {
-      console.error('Error creating order:', error)
+      logger.error('Error creating order:', error)
       alert('Une erreur est survenue lors de la création de la commande')
     } finally {
       setIsCreating(false)

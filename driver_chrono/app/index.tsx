@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 import { apiService } from "../services/apiService";
+import { logger } from "../utils/logger";
 
 export default function RootIndex() {
   const { isAuthenticated, user, accessToken, profile, validateUserExists, logout } =
@@ -27,7 +28,7 @@ export default function RootIndex() {
           }
         } catch (error) {
           // En cas d'erreur, continuer avec la validation normale
-          console.warn('Erreur lors de la vérification du token:', error);
+          logger.warn('Erreur lors de la vérification du token:', undefined, error);
         }
 
         const validationResult = await validateUserExists();
@@ -53,7 +54,7 @@ export default function RootIndex() {
               setProfile(freshProfile);
             }
           } catch (error) {
-            console.warn('Erreur rechargement profil:', error);
+            logger.warn('Erreur rechargement profil:', undefined, error);
             // Continuer même si le rechargement échoue
           }
 

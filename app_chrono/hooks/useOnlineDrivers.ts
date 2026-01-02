@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { userApiService } from '../services/userApiService';
+import { logger } from '../utils/logger';
 
 export interface OnlineDriver {
   user_id: string;
@@ -57,7 +58,7 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
           setDrivers(onlineOnly);
           setLastUpdate(new Date());
           if (onlineOnly.length > 0) {
-            console.log(`🚗 ${onlineOnly.length} chauffeur(s) en ligne`);
+            logger.debug(`🚗 ${onlineOnly.length} chauffeur(s) en ligne`);
           }
         } else {
           setError(result.message || 'Erreur de récupération');

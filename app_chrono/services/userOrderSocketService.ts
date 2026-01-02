@@ -202,7 +202,7 @@ class UserOrderSocketService {
           soundService.initialize().then(() => {
             soundService.playOrderAccepted();
           }).catch((err) => {
-            console.warn('[userOrderSocketService] Erreur lecture son:', err);
+            logger.warn('[userOrderSocketService] Erreur lecture son:', err);
           });
 
           // Sélectionner automatiquement la commande acceptée pour qu'elle soit affichée

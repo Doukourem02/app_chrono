@@ -1,6 +1,7 @@
 /**
  * Utilitaires météo pour admin_chrono
  */
+import { logger } from './logger'
 
 export interface WeatherData {
   temperature: number;
@@ -39,7 +40,7 @@ export async function fetchWeatherData(
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching weather:', error);
+    logger.error('Error fetching weather:', error);
     return null;
   }
 }

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { soundService } from '../services/soundService';
+import { logger } from '../utils/logger';
 
 export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'delivering' | 'completed' | 'declined' | 'cancelled';
 
@@ -124,7 +125,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
                           orderToRemove.status === 'declined';
       
       if (!isFinalStatus) {
-        console.warn('⚠️ Tentative de retirer une commande active - ignorée', { orderId, status: orderToRemove.status });
+        logger.warn('⚠️ Tentative de retirer une commande active - ignorée', undefined, { orderId, status: orderToRemove.status });
         return state;
       }
     }
@@ -188,7 +189,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         
         // Log détaillé pour debug
         if (__DEV__) {
-          console.log('🔄 updateFromSocket appelé', {
+          logger.debug('🔄 updateFromSocket appelé', undefined, {
             orderId: order.id,
             newStatus: status,
             existingStatus: existingOrder?.status,
@@ -218,7 +219,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
           } else {
             // Le statut a changé, mettre à jour avec le nouveau statut
             if (__DEV__) {
-              console.log(`✅ updateFromSocket - Changement de statut détecté: ${existingOrder.status} → ${status}`);
+              logger.debug(`✅ updateFromSocket - Changement de statut détecté: ${existingOrder.status} → ${status}`);
             }
             
             // Jouer le son si la commande est complétée
@@ -226,7 +227,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
               soundService.initialize().then(() => {
                 soundService.playOrderCompleted();
               }).catch((err) => {
-                console.warn('[useOrderStore] Erreur lecture son:', err);
+                logger.warn('[useOrderStore] Erreur lecture son:', err);
               });
             }
             
@@ -251,7 +252,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
               
               if (__DEV__) {
                 const updatedOrder = updatedOrders.find(o => o.id === order.id);
-                console.log('✅ updateFromSocket - Commande mise à jour dans le store', {
+                logger.debug('✅ updateFromSocket - Commande mise à jour dans le store', undefined, {
                   orderId: order.id,
                   oldStatus: existingOrder?.status,
                   newStatus: status,
@@ -284,7 +285,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
             soundService.initialize().then(() => {
               soundService.playOrderCompleted();
             }).catch((err) => {
-              console.warn('[useOrderStore] Erreur lecture son:', err);
+              logger.warn('[useOrderStore] Erreur lecture son:', err);
             });
           }
           
@@ -323,7 +324,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         }
       }
     } catch (err) {
-      console.warn('useOrderStore.updateFromSocket error', err);
+      logger.warn('useOrderStore.updateFromSocket error', undefined, err);
     }
   },
 

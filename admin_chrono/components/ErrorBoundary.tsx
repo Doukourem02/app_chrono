@@ -45,13 +45,27 @@ export class ErrorBoundary extends Component<Props, State> {
       errorInfo,
     })
 
-    // En production, envoyer à Sentry ou autre service de monitoring
+    // En production, envoyer à Sentry si disponible
     if (process.env.NODE_ENV === 'production') {
-      // TODO: Intégrer Sentry ici si nécessaire
-      // Sentry.captureException(error, { 
-      //   contexts: { react: { componentStack: errorInfo.componentStack } },
-      //   tags: { type: 'error_boundary' }
-      // })
+      // Import dynamique pour éviter les erreurs si Sentry n'est pas installé
+      import('@sentry/nextjs')
+        .then((Sentry) => {
+          if (Sentry && typeof Sentry.captureException === 'function') {
+            Sentry.captureException(error, {
+              contexts: {
+                react: {
+                  componentStack: errorInfo.componentStack,
+                },
+              },
+              tags: { type: 'error_boundary' },
+            })
+            logger.debug('Error sent to Sentry')
+          }
+        })
+        .catch(() => {
+          // Sentry n'est pas installé ou non configuré - ce n'est pas critique
+          logger.debug('Sentry not available, error logged locally only')
+        })
     }
   }
 

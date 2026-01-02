@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
+import { logger } from '../../utils/logger';
 
 export default function DriverTypeSelectionScreen() {
   const [selectedType, setSelectedType] = useState<'partner' | 'internal' | null>(null);
@@ -42,10 +43,10 @@ export default function DriverTypeSelectionScreen() {
         
             await new Promise(resolve => setTimeout(resolve, 100));
           } else {
-            console.warn('Profil non trouvé après mise à jour du type');
+            logger.warn('Profil non trouvé après mise à jour du type');
           }
         } catch (profileError) {
-          console.warn('Erreur rechargement profil après mise à jour type:', profileError);
+          logger.warn('Erreur rechargement profil après mise à jour type:', undefined, profileError);
         
         }
 
@@ -60,7 +61,7 @@ export default function DriverTypeSelectionScreen() {
         throw new Error(response.message || 'Erreur lors de la mise à jour du type de livreur');
       }
     } catch (error: any) {
-      console.error('Erreur mise à jour type livreur:', error);
+      logger.error('Erreur mise à jour type livreur:', undefined, error);
       Alert.alert('Erreur', error.message || 'Une erreur est survenue lors de la sélection du type de livreur');
     } finally {
       setIsLoading(false);

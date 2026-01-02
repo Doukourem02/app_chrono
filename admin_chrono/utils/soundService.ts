@@ -2,6 +2,7 @@
  * Service de gestion des sons pour le dashboard admin
  * Les fichiers audio doivent être placés dans /public/sounds/
  */
+import { logger } from './logger'
 
 class SoundService {
   private sounds: Map<string, HTMLAudioElement> = new Map()
@@ -163,7 +164,7 @@ class SoundService {
       if (preloadSuccess) {
         this.userInteracted = true
         if (process.env.NODE_ENV === 'development') {
-          console.log('[SoundService] Préchargement silencieux réussi, userInteracted = true')
+          logger.debug('[SoundService] Préchargement silencieux réussi, userInteracted = true')
         }
       }
     } catch {
@@ -226,7 +227,7 @@ class SoundService {
   private async playSound(name: string, path: string): Promise<void> {
     if (!this.soundEnabled || typeof window === 'undefined') {
       if (process.env.NODE_ENV === 'development') {
-        console.debug(`[SoundService] Son ${name} ignoré:`, { soundEnabled: this.soundEnabled, hasWindow: typeof window !== 'undefined' })
+        logger.debug(`[SoundService] Son ${name} ignoré:`, { soundEnabled: this.soundEnabled, hasWindow: typeof window !== 'undefined' })
       }
       return
     }
@@ -242,7 +243,7 @@ class SoundService {
       if (playPromise !== undefined) {
         await playPromise
         if (process.env.NODE_ENV === 'development') {
-          console.log(`[SoundService] Son ${name} joué avec succès`)
+          logger.debug(`[SoundService] Son ${name} joué avec succès`)
         }
         // Marquer que l'utilisateur a interagi (via le son qui joue)
         this.userInteracted = true
@@ -253,14 +254,14 @@ class SoundService {
       const err = error as { name?: string; code?: number; message?: string };
       if (err?.name === 'NotAllowedError' || err?.code === 0) {
         if (process.env.NODE_ENV === 'development') {
-          console.warn(`[SoundService] Lecture automatique bloquée pour ${name}. userInteracted: ${this.userInteracted}`)
+          logger.warn(`[SoundService] Lecture automatique bloquée pour ${name}. userInteracted: ${this.userInteracted}`)
         }
         
         // Si l'utilisateur n'a pas encore interagi, on ne peut rien faire
         // Le son sera joué après la prochaine interaction (déjà géré dans initialize)
         if (!this.userInteracted) {
           if (process.env.NODE_ENV === 'development') {
-            console.warn(`[SoundService] En attente d'interaction utilisateur pour débloquer l'autoplay`)
+            logger.warn(`[SoundService] En attente d'interaction utilisateur pour débloquer l'autoplay`)
           }
           return
         }
@@ -275,20 +276,20 @@ class SoundService {
           
           await newAudio.play()
           if (process.env.NODE_ENV === 'development') {
-            console.log(`[SoundService] Son ${name} joué avec nouvel élément audio`)
+            logger.debug(`[SoundService] Son ${name} joué avec nouvel élément audio`)
           }
           
           // Mettre à jour le cache
           this.sounds.set(name, newAudio)
         } catch (retryError) {
           if (process.env.NODE_ENV === 'development') {
-            console.warn(`[SoundService] Échec relecture avec nouvel audio:`, retryError)
+            logger.warn(`[SoundService] Échec relecture avec nouvel audio:`, retryError)
           }
         }
       } else {
         // Autre type d'erreur
         if (process.env.NODE_ENV === 'development') {
-          console.warn(`[SoundService] Erreur lecture ${name}:`, err?.message || error)
+          logger.warn(`[SoundService] Erreur lecture ${name}:`, err?.message || error)
         }
       }
     }
@@ -349,12 +350,12 @@ class SoundService {
       if (preloadSuccess) {
         this.userInteracted = true
         if (process.env.NODE_ENV === 'development') {
-          console.log('[SoundService] Préchargement forcé réussi, userInteracted = true')
+          logger.debug('[SoundService] Préchargement forcé réussi, userInteracted = true')
         }
       }
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[SoundService] Erreur préchargement forcé:', error)
+        logger.warn('[SoundService] Erreur préchargement forcé:', error)
       }
     }
   }

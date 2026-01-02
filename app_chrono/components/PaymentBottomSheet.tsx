@@ -5,6 +5,7 @@ import { paymentApi, PaymentMethodType, DeferredPaymentInfo } from '../services/
 import { usePaymentStore } from '../store/usePaymentStore';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import PriceCalculationCard from './PriceCalculationCard';
+import { logger } from '../utils/logger';
 
 interface PaymentBottomSheetProps {
   orderId: string;
@@ -80,7 +81,7 @@ export default function PaymentBottomSheet({
         setDeferredInfo(result.data);
       }
     } catch (error) {
-      console.error('Erreur chargement limites paiement différé:', error);
+      logger.error('Erreur chargement limites paiement différé:', error);
     }
   };
 

@@ -1178,11 +1178,11 @@ export default function MapPage() {
                     );
                   }}
                   onPaymentSuccess={(transactionId) => {
-                        console.log("Paiement réussi:", transactionId);
+                        logger.debug("Paiement réussi:", transactionId);
                     setShowPaymentSheet(false);
                   }}
                   onPaymentError={(error) => {
-                        console.error("Erreur paiement:", error);
+                        logger.error("Erreur paiement:", error);
                         Alert.alert("Erreur de paiement", error);
                   }}
                 />

@@ -3,6 +3,7 @@
  */
 
 import { useDriverStore } from '../store/useDriverStore';
+import { logger } from './logger';
 
 export type AnalyticsEvent = 
   // Authentification
@@ -69,7 +70,7 @@ class AnalyticsService {
     }
 
     if (__DEV__) {
-      console.log('📊 Analytics service initialisé (driver)', { enabled: this.enabled });
+      logger.debug('📊 Analytics service initialisé (driver)', undefined, { enabled: this.enabled });
     }
   }
 
@@ -103,12 +104,12 @@ class AnalyticsService {
     };
 
     if (__DEV__) {
-      console.log('📊 Analytics Event (driver):', event, eventData.properties);
+      logger.debug('📊 Analytics Event (driver):', undefined, { event, properties: eventData.properties });
     }
 
     this.sendToBackend(eventData).catch(error => {
       if (__DEV__) {
-        console.warn('⚠️ Erreur envoi analytics au backend:', error);
+        logger.warn('⚠️ Erreur envoi analytics au backend:', undefined, error);
       }
     });
   }

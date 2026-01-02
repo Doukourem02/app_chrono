@@ -394,14 +394,14 @@ export default function Index() {
   const handleToggleOnline = async (value: boolean) => {
     if (isTogglingRef.current) {
       if (__DEV__) {
-        console.debug('Toggle déjà en cours, ignoré');
+        logger.debug('Toggle déjà en cours, ignoré');
       }
       return;
     }
     
     if (value === isOnline) {
       if (__DEV__) {
-        console.debug('Statut déjà à', value, ', ignoré');
+        logger.debug('Statut déjà à', undefined, { value, isOnline });
       }
       return;
     }
@@ -436,7 +436,7 @@ export default function Index() {
         
         if (!result.success) {
           if (__DEV__) {
-            console.warn('Échec synchronisation:', result.message);
+            logger.warn('Échec synchronisation:', result.message);
           }
           
           // Si la session est expirée, le logout() a déjà été appelé
@@ -463,7 +463,7 @@ export default function Index() {
         isTogglingRef.current = false;
         
         if (__DEV__) {
-          console.error('Erreur updateDriverStatus:', error);
+          logger.error('Erreur updateDriverStatus:', error);
         }
         
         // Rollback en cas d'erreur
@@ -508,7 +508,7 @@ export default function Index() {
           if (!result.success && result.message?.includes('Session expirée')) {
             sessionExpiredRef.current = true;
             if (__DEV__) {
-              console.debug('Session expirée - arrêt de la synchronisation automatique de la position');
+              logger.debug('Session expirée - arrêt de la synchronisation automatique de la position');
             }
             return;
           }
@@ -518,7 +518,7 @@ export default function Index() {
           }
         } catch (error) {
           if (__DEV__) {
-            console.debug('Erreur sync position:', error);
+            logger.debug('Erreur sync position:', undefined, error);
           }
         }
       }
@@ -634,7 +634,7 @@ export default function Index() {
       // Vérifier que l'utilisateur est toujours authentifié
       if (!isAuthenticated || !user?.id) {
         if (__DEV__) {
-          console.debug('[Index] Pas de user.id ou utilisateur non authentifié pour charger les stats');
+          logger.debug('[Index] Pas de user.id ou utilisateur non authentifié pour charger les stats');
         }
         return;
       }
@@ -644,7 +644,7 @@ export default function Index() {
         
         if (todayResult.success && todayResult.data) {
           if (__DEV__) {
-            console.debug('[Index] getTodayStats réussi:', {
+            logger.debug('[Index] getTodayStats réussi:', undefined, {
               deliveries: todayResult.data.deliveries,
               earnings: todayResult.data.earnings
             });
@@ -656,14 +656,14 @@ export default function Index() {
           }));
         } else {
           if (__DEV__) {
-            console.warn('[Index] getTodayStats échoué ou pas de données');
+            logger.warn('[Index] getTodayStats échoué ou pas de données');
           }
         }
         const statsResult = await apiService.getDriverStatistics(user.id);
         
         if (statsResult.success && statsResult.data) {
           if (__DEV__) {
-            console.debug('[Index] getDriverStatistics réussi:', {
+            logger.debug('[Index] getDriverStatistics réussi:', undefined, {
               completedDeliveries: statsResult.data.completedDeliveries,
               totalEarnings: statsResult.data.totalEarnings
             });
@@ -674,12 +674,12 @@ export default function Index() {
           }));
         } else {
           if (__DEV__) {
-            console.warn('[Index] getDriverStatistics échoué ou pas de données');
+            logger.warn('[Index] getDriverStatistics échoué ou pas de données');
           }
         }
       } catch (err) {
         if (__DEV__) {
-          console.error('[Index] Erreur chargement stats:', err);
+          logger.error('[Index] Erreur chargement stats:', undefined, err);
         }
       }
     };

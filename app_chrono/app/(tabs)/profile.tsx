@@ -7,6 +7,7 @@ import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Switch,Tex
 import { userApiService } from "../../services/userApiService";
 import { useAuthStore } from "../../store/useAuthStore";
 import { formatUserName } from "../../utils/formatName";
+import { logger } from "../../utils/logger";
 
 interface UserStatistics {
   completedOrders: number;
@@ -60,7 +61,7 @@ export default function ProfilePage() {
           } as any);
         }
       } catch (error) {
-        console.error("Erreur chargement profil utilisateur:", error);
+        logger.error("Erreur chargement profil utilisateur:", error);
       }
     };
 
@@ -80,7 +81,7 @@ export default function ProfilePage() {
           setStatistics(result.data);
         }
       } catch (error) {
-        console.error("Erreur chargement statistiques:", error);
+        logger.error("Erreur chargement statistiques:", error);
       } finally {
         setIsLoadingStats(false);
       }
@@ -158,7 +159,7 @@ export default function ProfilePage() {
         },
       ]);
     } catch (error) {
-      console.error("Erreur sélection image:", error);
+      logger.error("Erreur sélection image:", error);
       Alert.alert("Erreur", "Impossible d'accéder à vos photos");
     }
   };
@@ -198,7 +199,7 @@ export default function ProfilePage() {
         );
       }
     } catch (error) {
-      console.error("Erreur upload avatar:", error);
+      logger.error("Erreur upload avatar:", error);
       Alert.alert("Erreur", "Impossible de mettre à jour l'avatar");
     } finally {
       setUploadingAvatar(false);

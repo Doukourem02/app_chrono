@@ -7,6 +7,7 @@ import { Camera, Save, User, Mail, Phone } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { AnimatedButton } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+import { logger } from '@/utils/logger'
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
@@ -36,7 +37,7 @@ export default function SettingsPage() {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          console.debug('User not found in users table, using user_metadata')
+          logger.debug('User not found in users table, using user_metadata')
           const fullNameFromMetadata = user?.user_metadata?.full_name || ''
           const names = fullNameFromMetadata.split(' ')
           setFirstName(names[0] || '')
@@ -45,7 +46,7 @@ export default function SettingsPage() {
           setPhone('')
         } else {
           // Autre erreur (permissions, réseau, etc.)
-          console.warn('Error loading profile from users table:', {
+          logger.warn('Error loading profile from users table:', {
             code: error.code,
             message: error.message,
             details: error.details,
@@ -61,7 +62,7 @@ export default function SettingsPage() {
         }
       } else if (userData) {
         // Données trouvées dans la table users
-        console.log(' [Settings] Profile loaded from database:', {
+        logger.debug('[Settings] Profile loaded from database:', {
           avatar_url: userData.avatar_url,
           avatar_url_type: typeof userData.avatar_url,
           avatar_url_length: userData.avatar_url?.length,
@@ -69,21 +70,21 @@ export default function SettingsPage() {
           user_id: user.id,
         });
         const dbAvatarUrl = userData.avatar_url || null;
-        console.log(' [Settings] Raw avatar URL from DB:', dbAvatarUrl);
+        logger.debug('[Settings] Raw avatar URL from DB:', dbAvatarUrl);
         
         // Corriger l'URL si elle contient un double "avatars/avatars"
         let correctedAvatarUrl = dbAvatarUrl;
         if (dbAvatarUrl && dbAvatarUrl.includes('/avatars/avatars/')) {
           correctedAvatarUrl = dbAvatarUrl.replace('/avatars/avatars/', '/avatars/');
-          console.log('🔧 [Settings] Corrected URL from double avatars:', correctedAvatarUrl);
+          logger.debug('🔧 [Settings] Corrected URL from double avatars:', correctedAvatarUrl);
         }
         
         // Vérifier que l'URL est valide
         if (correctedAvatarUrl && !correctedAvatarUrl.startsWith('http')) {
-          console.warn(' [Settings] Avatar URL does not start with http:', correctedAvatarUrl);
+          logger.warn('[Settings] Avatar URL does not start with http:', correctedAvatarUrl);
         }
         
-        console.log(' [Settings] Final avatar URL to set:', correctedAvatarUrl);
+        logger.debug('[Settings] Final avatar URL to set:', correctedAvatarUrl);
         setAvatarUrl(correctedAvatarUrl);
         // Charger first_name et last_name depuis la base de données
         setFirstName(userData.first_name || '')
@@ -102,7 +103,7 @@ export default function SettingsPage() {
       // Erreur inattendue
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       const errorStack = error instanceof Error ? error.stack : undefined
-      console.error('Unexpected error loading profile:', {
+      logger.error('Unexpected error loading profile:', {
         message: errorMessage,
         stack: errorStack,
         error,
@@ -181,11 +182,11 @@ export default function SettingsPage() {
     // Vérifier la session Supabase
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     if (sessionError || !session) {
-      console.error('Session error:', sessionError)
+      logger.error('Session error:', sessionError)
       alert('Erreur de session. Veuillez vous reconnecter.')
       return
     }
-    console.log(' [Settings] Session valide:', { userId: session.user.id, email: session.user.email })
+    logger.debug('[Settings] Session valide:', { userId: session.user.id, email: session.user.email })
 
     // Vérifier le type de fichier
     if (!file.type.startsWith('image/')) {
@@ -272,9 +273,9 @@ export default function SettingsPage() {
           fileToUpload = await compressImage(file, 1920, 1920, 0.85)
           const originalSize = (file.size / 1024 / 1024).toFixed(2)
           const compressedSize = (fileToUpload.size / 1024 / 1024).toFixed(2)
-          console.log(`Image compressée: ${originalSize}MB → ${compressedSize}MB`)
+          logger.debug(`Image compressée: ${originalSize}MB → ${compressedSize}MB`)
         } catch (error) {
-          console.warn('Erreur lors de la compression, utilisation du fichier original:', error)
+          logger.warn('Erreur lors de la compression, utilisation du fichier original:', error)
           // Continuer avec le fichier original si la compression échoue
         }
       }
@@ -291,7 +292,7 @@ export default function SettingsPage() {
         return
       }
 
-      console.log('Upload attempt:', {
+      logger.debug('Upload attempt:', {
         filePath,
         fileSize: fileToUpload.size,
         userId: user.id,
@@ -314,7 +315,7 @@ export default function SettingsPage() {
       const result = await response.json()
 
       if (!response.ok) {
-        console.error('Upload error:', result)
+        logger.error('Upload error:', result)
         if (result.error.includes('Bucket not found') || result.error.includes('not found')) {
           alert(
             'Le bucket "avatars" n\'existe pas.\n\n' +
@@ -332,7 +333,7 @@ export default function SettingsPage() {
       const publicUrl = result.url
 
       // Mettre à jour le profil dans la table users via l'API route (bypass RLS)
-      console.log('Calling update-avatar-url API...')
+      logger.debug('Calling update-avatar-url API...')
       const updateResponse = await fetch('/api/update-avatar-url', {
         method: 'POST',
         headers: {
@@ -344,21 +345,21 @@ export default function SettingsPage() {
         }),
       })
 
-      console.log(' [Settings] Update API response status:', updateResponse.status, updateResponse.statusText)
+      logger.debug('[Settings] Update API response status:', updateResponse.status, updateResponse.statusText)
 
       let updateResult: { error?: string; message?: string; hint?: string } = {}
       let responseText = ''
       
       try {
         responseText = await updateResponse.text()
-        console.log(' [Settings] Update API response text:', responseText)
+        logger.debug('[Settings] Update API response text:', responseText)
         
         if (responseText) {
           updateResult = JSON.parse(responseText)
         }
       } catch (jsonError) {
-        console.error(' [Settings] Error parsing JSON response:', jsonError)
-        console.error(' [Settings] Response text that failed to parse:', responseText)
+        logger.error('[Settings] Error parsing JSON response:', jsonError)
+        logger.error('[Settings] Response text that failed to parse:', responseText)
         setAvatarUrl(publicUrl)
         alert(
           'L\'image a été uploadée avec succès, mais la mise à jour du profil a échoué.\n\n' +
@@ -368,10 +369,10 @@ export default function SettingsPage() {
         return
       }
 
-      console.log(' [Settings] Update result parsed:', updateResult)
+      logger.debug('[Settings] Update result parsed:', updateResult)
 
       if (!updateResponse.ok) {
-        console.error(' [Settings] Error updating profile:', {
+        logger.error('[Settings] Error updating profile:', {
           status: updateResponse.status,
           statusText: updateResponse.statusText,
           result: updateResult,
@@ -407,14 +408,14 @@ export default function SettingsPage() {
 
       // Notifier le Sidebar et autres composants que l'avatar a été mis à jour
       const finalAvatarUrl = userData?.avatar_url || publicUrl
-      console.log(' [Settings] Dispatching avatar-updated event with URL:', finalAvatarUrl)
+      logger.debug('[Settings] Dispatching avatar-updated event with URL:', finalAvatarUrl)
       window.dispatchEvent(new CustomEvent('avatar-updated', {
         detail: { avatarUrl: finalAvatarUrl }
       }))
 
       alert('Photo de profil mise à jour avec succès!')
     } catch (error) {
-      console.error('Error uploading avatar:', error)
+      logger.error('Error uploading avatar:', error)
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue'
       alert('Erreur lors de l\'upload de l\'image: ' + errorMessage)
     } finally {
@@ -456,12 +457,12 @@ export default function SettingsPage() {
           ])
 
         if (insertError) {
-          console.error('Error creating user profile:', insertError)
+          logger.error('Error creating user profile:', insertError)
           alert('Erreur lors de la création du profil. Veuillez réessayer.')
           return
         }
       } else if (checkError) {
-        console.error('Error checking user profile:', checkError)
+        logger.error('Error checking user profile:', checkError)
         alert('Erreur lors de la vérification du profil')
         return
       } else {
@@ -477,7 +478,7 @@ export default function SettingsPage() {
           .eq('id', user.id)
 
         if (updateError) {
-          console.error('Error saving profile:', updateError)
+          logger.error('Error saving profile:', updateError)
           alert('Erreur lors de la sauvegarde')
           return
         }
@@ -492,7 +493,7 @@ export default function SettingsPage() {
       })
 
       if (metadataError) {
-        console.warn('Error updating metadata (non-critical):', metadataError)
+        logger.warn('Error updating metadata (non-critical):', metadataError)
       }
 
       // Recharger le profil pour mettre à jour l'affichage
@@ -523,7 +524,7 @@ export default function SettingsPage() {
 
       alert('Profil mis à jour avec succès')
     } catch (error) {
-      console.error('Error saving profile:', error)
+      logger.error('Error saving profile:', error)
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue'
       alert('Erreur lors de la sauvegarde: ' + errorMessage)
     } finally {

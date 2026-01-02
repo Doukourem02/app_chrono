@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { Conversation, Message } from '@/services/adminMessageService'
+import { logger } from '@/utils/logger'
 
 interface AdminMessageStore {
   conversations: Conversation[]
@@ -142,7 +143,7 @@ export const useAdminMessageStore = create<AdminMessageStore>((set) => ({
       if (process.env.NODE_ENV === 'development') {
         const updated = updatedConversations.find(c => c.id === conversationId)
         if (updated) {
-          console.log('[useAdminMessageStore] Updated unread_count:', {
+          logger.debug('[useAdminMessageStore] Updated unread_count:', {
             conversationId,
             oldCount: state.conversations.find(c => c.id === conversationId)?.unread_count,
             newCount: count,

@@ -8,6 +8,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { useDateFilter, type DateFilterType } from '@/contexts/DateFilterContext'
 import { useNotificationStore } from '@/stores/useNotificationStore'
 import { useNotifications } from '@/hooks/useNotifications'
+import { logger } from '@/utils/logger'
 
 interface SearchOrder {
   id: string
@@ -95,7 +96,7 @@ export default function Header() {
   // Log pour déboguer les résultats de recherche
   useEffect(() => {
     if (searchResults?.data) {
-      console.log('🔍 [Header] Résultats de recherche:', {
+      logger.debug('🔍 [Header] Résultats de recherche:', {
         query: debouncedQuery,
         ordersCount: searchResults.data.orders?.length || 0,
         driversCount: searchResults.data.drivers?.length || 0,

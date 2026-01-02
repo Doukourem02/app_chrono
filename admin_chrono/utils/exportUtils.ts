@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
+import { logger } from './logger'
 
 export interface ExportData {
   title: string
@@ -250,7 +251,7 @@ export const showExportMenu = (data: ExportData, onSelect: (format: 'pdf' | 'exc
 export const exportData = (data: ExportData, format?: 'pdf' | 'excel') => {
   if (format === 'pdf') {
     exportToPDF(data).catch((error) => {
-      console.error('Erreur lors de l\'export PDF:', error)
+      logger.error('Erreur lors de l\'export PDF:', error)
       alert('Erreur lors de l\'export PDF. Veuillez réessayer.')
     })
   } else if (format === 'excel') {
@@ -260,7 +261,7 @@ export const exportData = (data: ExportData, format?: 'pdf' | 'excel') => {
     showExportMenu(data, (selectedFormat) => {
       if (selectedFormat === 'pdf') {
         exportToPDF(data).catch((error) => {
-          console.error('Erreur lors de l\'export PDF:', error)
+          logger.error('Erreur lors de l\'export PDF:', error)
           alert('Erreur lors de l\'export PDF. Veuillez réessayer.')
         })
       } else {

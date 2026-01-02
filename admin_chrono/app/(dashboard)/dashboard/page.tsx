@@ -15,6 +15,7 @@ import { ScreenTransition } from '@/components/animations'
 import { useDateFilter } from '@/contexts/DateFilterContext'
 import type { Delivery } from '@/hooks/types'
 import NewShippingModal from '@/components/orders/NewShippingModal'
+import { logger } from '@/utils/logger'
 
 export default function DashboardPage() {
   const { dateFilter, dateRange } = useDateFilter()
@@ -63,7 +64,7 @@ export default function DashboardPage() {
         return prev
       }
 
-      console.log(' [DashboardPage] QueryKey calculated:', latestKey)
+      logger.debug(' [DashboardPage] QueryKey calculated:', latestKey)
       return latestKey
     })
   }, [latestKey])
@@ -71,7 +72,7 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey,
     queryFn: () => {
-      console.warn(' [DashboardPage] queryFn CALLED - getDashboardStats', { 
+      logger.warn(' [DashboardPage] queryFn CALLED - getDashboardStats', { 
         startDate, 
         endDate, 
         timestamp: new Date().toISOString(), 
@@ -87,7 +88,7 @@ export default function DashboardPage() {
     refetchIntervalInBackground: false,
     placeholderData: (previousData) => {
       if (previousData) {
-        console.log(' [DashboardPage] Using cached data, skipping fetch')
+        logger.debug(' [DashboardPage] Using cached data, skipping fetch')
         return previousData
       }
       return undefined
@@ -105,12 +106,12 @@ export default function DashboardPage() {
   const { data: ongoingDeliveriesResponse, isLoading: ongoingDeliveriesLoading } = useQuery({
     queryKey: ['ongoing-delivery-card'],
     queryFn: async () => {
-      console.warn(' [DashboardPage] queryFn CALLED - getOngoingDeliveries', {
+      logger.warn(' [DashboardPage] queryFn CALLED - getOngoingDeliveries', {
         timestamp: new Date().toISOString(),
         stack: new Error().stack?.split('\n').slice(2, 15).join('\n'),
       })
       const result = await adminApiService.getOngoingDeliveries()
-      console.log(' [DashboardPage] getOngoingDeliveries SUCCESS', {
+      logger.debug(' [DashboardPage] getOngoingDeliveries SUCCESS', {
         hasData: !!result.data && (result.data as Delivery[]).length > 0,
         timestamp: new Date().toISOString(),
       })

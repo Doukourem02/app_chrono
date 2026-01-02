@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userApiService } from "../services/userApiService";
 import { QRCodeDisplay } from "./QRCodeDisplay";
 import { formatUserName } from "../utils/formatName";
+import { logger } from "../utils/logger";
 
 interface TrackingBottomSheetProps {
   currentOrder: any;
@@ -71,7 +72,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         setOrderRating(null);
       }
     } catch (error) {
-      console.error('Erreur chargement rating:', error);
+      logger.error('Erreur chargement rating:', undefined, error);
       setOrderRating(null);
     } finally {
       setIsLoadingRating(false);
@@ -82,7 +83,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
     // Ne pas utiliser de valeur par défaut, utiliser le statut réel de la commande
     const currentStatus = currentOrder?.status ? String(currentOrder.status) : "pending";
     if (__DEV__) {
-      console.log('🔍 TrackingBottomSheet status:', {
+      logger.debug('🔍 TrackingBottomSheet status:', undefined, {
         orderId: currentOrder?.id,
         status: currentStatus,
         rawStatus: currentOrder?.status,
@@ -111,7 +112,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const canCancel = React.useMemo(() => {
     const canCancelOrder = (status === 'pending' || status === 'accepted') && onCancel;
     if (__DEV__) {
-      console.log('🔍 TrackingBottomSheet canCancel:', {
+      logger.debug('🔍 TrackingBottomSheet canCancel:', undefined, {
         status,
         hasOnCancel: !!onCancel,
         canCancel: canCancelOrder,

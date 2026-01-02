@@ -2,6 +2,7 @@ import { config } from '../config/index';
 import { useDriverStore } from '../store/useDriverStore';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 
 const API_BASE_URL = config.apiUrl;
 
@@ -55,7 +56,7 @@ class QRCodeService {
             longitude: currentLocation.coords.longitude,
           };
         } catch (error) {
-          console.warn('Impossible de récupérer la localisation pour le scan:', error);
+          logger.warn('Impossible de récupérer la localisation pour le scan:', undefined, error);
           // Continuer sans localisation
         }
       }
@@ -95,7 +96,7 @@ class QRCodeService {
 
       return result;
     } catch (error: any) {
-      console.error('Erreur lors du scan du QR code:', error);
+      logger.error('Erreur lors du scan du QR code:', undefined, error);
       return {
         success: false,
         isValid: false,
@@ -127,7 +128,7 @@ class QRCodeService {
       const result = await response.json();
       return result.data || null;
     } catch (error) {
-      console.error('Erreur lors de la récupération du QR code:', error);
+      logger.error('Erreur lors de la récupération du QR code:', undefined, error);
       return null;
     }
   }

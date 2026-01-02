@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useMemo, ReactNode } from 'react'
+import { logger } from '@/utils/logger'
 
 export type DateFilterType = 'today' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'all'
 
@@ -81,7 +82,7 @@ export function DateFilterProvider({ children }: { children: ReactNode }) {
         dateRangeRef.current.startDate === result.startDate && 
         dateRangeRef.current.endDate === result.endDate) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('🔄🔄🔄 [DateFilterContext] dateRange unchanged, reusing previous value:', {
+        logger.warn('🔄🔄🔄 [DateFilterContext] dateRange unchanged, reusing previous value:', {
           dateFilter,
           dateKey,
           result,
@@ -92,7 +93,7 @@ export function DateFilterProvider({ children }: { children: ReactNode }) {
     }
     
     if (process.env.NODE_ENV === 'development') {
-      console.warn('🔄🔄🔄 [DateFilterContext] dateRange changed:', {
+      logger.warn('🔄🔄🔄 [DateFilterContext] dateRange changed:', {
         dateFilter,
         dateKey,
         previous: dateRangeRef.current,

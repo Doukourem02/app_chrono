@@ -4,6 +4,26 @@ import logger from '../utils/logger.js';
 import { AppError } from '../types/index.js';
 import { sendErrorAlert, sendCriticalAlert } from '../utils/slackNotifier.js';
 
+/**
+ * Interface pour les erreurs Joi
+ */
+interface JoiError extends Error {
+  isJoi?: boolean;
+  details?: Array<{
+    message: string;
+    path: (string | number)[];
+    type: string;
+  }>;
+}
+
+/**
+ * Interface pour les erreurs avec status code
+ */
+interface ErrorWithStatus extends Error {
+  status?: number;
+  statusCode?: number;
+}
+
 export const errorHandler = (
   err: AppError | Error,
   req: Request,
@@ -18,7 +38,7 @@ export const errorHandler = (
     timestamp: new Date().toISOString()
   });
 
-  let statusCode = (err as AppError).statusCode || (err as any).status || 500;
+  let statusCode = (err as AppError).statusCode || (err as ErrorWithStatus).status || 500;
 
   if (process.env.SENTRY_DSN && statusCode >= 500) {
     Sentry.captureException(err, {
@@ -73,12 +93,12 @@ export const errorHandler = (
     return;
   }
   
-  if (err.name === 'ValidationError' || (err as any).isJoi) {
-    const joiError = err as any;
+  if (err.name === 'ValidationError' || (err as JoiError).isJoi) {
+    const joiError = err as JoiError;
     res.status(400).json({
       success: false,
       message: 'Erreur de validation',
-      errors: joiError.details ? joiError.details.map((d: any) => d.message) : [err.message]
+      errors: joiError.details ? joiError.details.map((d) => d.message) : [err.message]
     });
     return;
   }
@@ -99,7 +119,7 @@ export const errorHandler = (
     return;
   }
   
-  statusCode = (err as AppError).statusCode || (err as any).status || 500;
+  statusCode = (err as AppError).statusCode || (err as ErrorWithStatus).status || 500;
   res.status(statusCode).json({
     success: false,
     message: process.env.NODE_ENV === 'production' ? 'Erreur serveur' : err.message,

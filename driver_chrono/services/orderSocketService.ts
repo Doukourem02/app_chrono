@@ -383,7 +383,7 @@ class OrderSocketService {
         soundService.initialize().then(() => {
           soundService.playOrderCompleted();
         }).catch((err) => {
-          console.warn('[orderSocketService] Erreur lecture son:', err);
+          logger.warn('[orderSocketService] Erreur lecture son:', err);
         });
       } catch (err) {
         logger.warn('Failed to complete order locally', undefined, err);

@@ -10,6 +10,7 @@ import { broadcastOrderUpdateToAdmins } from './adminSocket.js';
 import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
 import logger from '../utils/logger.js';
+import type { SocketAckCallback, UpdateDeliveryStatusData, SendProofData } from '../types/socketEvents.js';
 interface OrderCoordinates {
   latitude: number; longitude: number;
 }
@@ -188,20 +189,20 @@ async function findNearbyDrivers(
   const nearbyDrivers: NearbyDriver[] = [];
 
   if (DEBUG) {
-    console.log(`Recherche livreurs proches: ${realDriverStatuses.size} livreurs en mémoire`);
+    logger.debug(`Recherche livreurs proches: ${realDriverStatuses.size} livreurs en mémoire`);
   }
 
   for (const [driverId, driverData] of realDriverStatuses.entries()) {
     if (!driverData.is_online || !driverData.is_available) {
       if (DEBUG) {
-        console.log(`Livreur ${driverId.slice(0, 8)} ignoré: online=${driverData.is_online}, available=${driverData.is_available}`);
+        logger.debug(`Livreur ${driverId.slice(0, 8)} ignoré: online=${driverData.is_online}, available=${driverData.is_available}`);
       }
       continue;
     }
 
     if (!driverData.current_latitude || !driverData.current_longitude) {
       if (DEBUG) {
-        console.log(`Livreur ${driverId.slice(0, 8)} ignoré: pas de position GPS`);
+        logger.debug(`Livreur ${driverId.slice(0, 8)} ignoré: pas de position GPS`);
       }
       continue;
     }
@@ -215,7 +216,7 @@ async function findNearbyDrivers(
 
     if (distance <= maxDistance) {
       if (DEBUG) {
-        console.log(`Livreur ${driverId.slice(0, 8)} trouvé à ${distance.toFixed(2)}km`);
+        logger.debug(`Livreur ${driverId.slice(0, 8)} trouvé à ${distance.toFixed(2)}km`);
       }
       nearbyDrivers.push({
         driverId,
@@ -224,13 +225,13 @@ async function findNearbyDrivers(
       });
     } else {
       if (DEBUG) {
-        console.log(`Livreur ${driverId.slice(0, 8)} trop loin: ${distance.toFixed(2)}km (max: ${maxDistance}km)`);
+        logger.debug(`Livreur ${driverId.slice(0, 8)} trop loin: ${distance.toFixed(2)}km (max: ${maxDistance}km)`);
       }
     }
   }
 
   if (DEBUG) {
-    console.log(`Total livreurs trouvés: ${nearbyDrivers.length}`);
+    logger.debug(`Total livreurs trouvés: ${nearbyDrivers.length}`);
   }
 
   // Trier par distance
@@ -252,19 +253,19 @@ async function findAllAvailableDrivers(
   const availableDrivers: NearbyDriver[] = [];
 
   if (DEBUG) {
-    console.log(`[findAllAvailableDrivers] Recherche tous les livreurs disponibles: ${realDriverStatuses.size} livreurs en mémoire`);
+    logger.debug(`[findAllAvailableDrivers] Recherche tous les livreurs disponibles: ${realDriverStatuses.size} livreurs en mémoire`);
   }
 
   // Vérifier aussi les livreurs connectés via socket
   const connectedDriversCount = connectedDrivers.size;
   if (DEBUG) {
-    console.log(`[findAllAvailableDrivers] Livreurs connectés (socket): ${connectedDriversCount}`);
+    logger.debug(`[findAllAvailableDrivers] Livreurs connectés (socket): ${connectedDriversCount}`);
   }
 
   for (const [driverId, driverData] of realDriverStatuses.entries()) {
     if (!driverData.is_online || !driverData.is_available) {
       if (DEBUG) {
-        console.log(`[findAllAvailableDrivers] Livreur ${maskUserId(driverId)} ignoré: online=${driverData.is_online}, available=${driverData.is_available}`);
+        logger.debug(`[findAllAvailableDrivers] Livreur ${maskUserId(driverId)} ignoré: online=${driverData.is_online}, available=${driverData.is_available}`);
       }
       continue;
     }
@@ -272,7 +273,7 @@ async function findAllAvailableDrivers(
     // Vérifier si le livreur est connecté via socket
     const isConnected = connectedDrivers.has(driverId);
     if (!isConnected && DEBUG) {
-      console.log(`[findAllAvailableDrivers] Livreur ${maskUserId(driverId)} disponible mais non connecté via socket`);
+      logger.debug(`[findAllAvailableDrivers] Livreur ${maskUserId(driverId)} disponible mais non connecté via socket`);
     }
 
     // Pour les commandes B2B, on accepte même les livreurs sans position GPS
@@ -285,7 +286,7 @@ async function findAllAvailableDrivers(
   }
 
   if (DEBUG) {
-    console.log(`[findAllAvailableDrivers] Total livreurs disponibles: ${availableDrivers.length} (${availableDrivers.filter(d => connectedDrivers.has(d.driverId)).length} connectés)`);
+    logger.debug(`[findAllAvailableDrivers] Total livreurs disponibles: ${availableDrivers.length} (${availableDrivers.filter(d => connectedDrivers.has(d.driverId)).length} connectés)`);
   }
 
   return availableDrivers;
@@ -311,7 +312,7 @@ async function notifyDriversForOrder(
   // Si pas de coordonnées ET ce n'est pas une commande téléphonique/B2B, ne pas chercher de livreurs
   if ((!pickupCoords || !pickupCoords.latitude || !pickupCoords.longitude) && !isPhoneOrB2B) {
     if (DEBUG) {
-      console.log(`[notifyDriversForOrder] Commande ${maskOrderId(order.id)} sans coordonnées GPS et non-téléphonique - pas de recherche de livreurs`);
+      logger.debug(`[notifyDriversForOrder] Commande ${maskOrderId(order.id)} sans coordonnées GPS et non-téléphonique - pas de recherche de livreurs`);
     }
     return;
   }
@@ -326,30 +327,30 @@ async function notifyDriversForOrder(
     if (isB2BOrder) {
       // Pour les commandes B2B, toujours notifier tous les livreurs disponibles (avec ou sans coordonnées GPS)
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] Commande B2B ${maskOrderId(order.id)} - recherche de tous les livreurs disponibles (avec coordonnées: ${!!(pickupCoords && pickupCoords.latitude && pickupCoords.longitude)})`);
+        logger.debug(`[notifyDriversForOrder] Commande B2B ${maskOrderId(order.id)} - recherche de tous les livreurs disponibles (avec coordonnées: ${!!(pickupCoords && pickupCoords.latitude && pickupCoords.longitude)})`);
       }
       nearbyDrivers = await findAllAvailableDrivers(deliveryMethod);
     } else if (isPhoneOrder && (!pickupCoords || !pickupCoords.latitude || !pickupCoords.longitude)) {
       // Pour les commandes téléphoniques normales sans coordonnées GPS, notifier tous les livreurs
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] Commande téléphonique ${maskOrderId(order.id)} sans coordonnées GPS - recherche de tous les livreurs disponibles`);
+        logger.debug(`[notifyDriversForOrder] Commande téléphonique ${maskOrderId(order.id)} sans coordonnées GPS - recherche de tous les livreurs disponibles`);
       }
       nearbyDrivers = await findAllAvailableDrivers(deliveryMethod);
     } else {
       // Chercher les livreurs proches avec coordonnées GPS
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] Commande normale ${maskOrderId(order.id)} - recherche de livreurs proches`);
+        logger.debug(`[notifyDriversForOrder] Commande normale ${maskOrderId(order.id)} - recherche de livreurs proches`);
       }
       nearbyDrivers = await findNearbyDrivers(pickupCoords!, deliveryMethod);
     }
     
     if (DEBUG) {
-      console.log(`[notifyDriversForOrder] ${nearbyDrivers.length} livreurs trouvés pour commande ${maskOrderId(order.id)} (B2B: ${isB2BOrder}, Téléphonique: ${isPhoneOrder})`);
+      logger.debug(`[notifyDriversForOrder] ${nearbyDrivers.length} livreurs trouvés pour commande ${maskOrderId(order.id)} (B2B: ${isB2BOrder}, Téléphonique: ${isPhoneOrder})`);
     }
 
     if (nearbyDrivers.length === 0) {
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] Aucun chauffeur disponible pour la commande ${maskOrderId(order.id)}`);
+        logger.debug(`[notifyDriversForOrder] Aucun chauffeur disponible pour la commande ${maskOrderId(order.id)}`);
       }
       return;
     }
@@ -360,7 +361,7 @@ async function notifyDriversForOrder(
     
     if (useFairMatching && nearbyDrivers.length > 0) {
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] Utilisation du matching équitable pour commande ${maskOrderId(order.id)}`);
+        logger.debug(`[notifyDriversForOrder] Utilisation du matching équitable pour commande ${maskOrderId(order.id)}`);
       }
       
       try {
@@ -389,16 +390,16 @@ async function notifyDriversForOrder(
               distance: scored.distance,
             });
           } else {
-            if (DEBUG) {
-              console.log(`[notifyDriversForOrder] Livreur ${maskUserId(scored.driverId)} exclu: ${balanceCheck.reason}`);
+  if (DEBUG) {
+    logger.debug(`[notifyDriversForOrder] Livreur ${maskUserId(scored.driverId)} exclu: ${balanceCheck.reason}`);
             }
           }
         }
         
         selectedDrivers = driversWithBalance;
         
-        if (DEBUG) {
-          console.log(`[notifyDriversForOrder] ${selectedDrivers.length} livreurs recevront la commande (${allDrivers.length - selectedDrivers.length} exclus pour solde insuffisant)`);
+  if (DEBUG) {
+    logger.debug(`[notifyDriversForOrder] ${selectedDrivers.length} livreurs recevront la commande (${allDrivers.length - selectedDrivers.length} exclus pour solde insuffisant)`);
         }
       } catch (error: any) {
         logger.warn(`[notifyDriversForOrder] Erreur matching équitable, fallback sur tri par distance:`, error.message);
@@ -408,7 +409,7 @@ async function notifyDriversForOrder(
     } else {
       // Fallback : trier par distance (comportement original)
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] Utilisation du tri par distance (matching équitable désactivé)`);
+        logger.debug(`[notifyDriversForOrder] Utilisation du tri par distance (matching équitable désactivé)`);
       }
       selectedDrivers = nearbyDrivers.sort((a, b) => a.distance - b.distance);
     }
@@ -417,8 +418,8 @@ async function notifyDriversForOrder(
     let driverIndex = 0;
     const tryNextDriver = async (): Promise<void> => {
       if (driverIndex >= selectedDrivers.length) {
-        if (DEBUG) {
-          console.log(`[notifyDriversForOrder] Tous les ${selectedDrivers.length} chauffeurs sélectionnés ont refusé ou timeout pour la commande ${maskOrderId(order.id)}`);
+  if (DEBUG) {
+    logger.debug(`[notifyDriversForOrder] Tous les ${selectedDrivers.length} chauffeurs sélectionnés ont refusé ou timeout pour la commande ${maskOrderId(order.id)}`);
         }
         // Ne pas annuler automatiquement, laisser la commande en pending
         // Optionnel : on pourrait réessayer avec les autres livreurs disponibles
@@ -430,7 +431,7 @@ async function notifyDriversForOrder(
       const driverSocketId = connectedDrivers.get(driver.driverId);
 
       if (DEBUG) {
-        console.log(`[notifyDriversForOrder] Tentative envoi à livreur ${maskUserId(driver.driverId)}: socket=${driverSocketId || 'NON CONNECTÉ'}, distance=${driver.distance.toFixed(2)}km`);
+        logger.debug(`[notifyDriversForOrder] Tentative envoi à livreur ${maskUserId(driver.driverId)}: socket=${driverSocketId || 'NON CONNECTÉ'}, distance=${driver.distance.toFixed(2)}km`);
       }
 
       if (driverSocketId) {
@@ -443,16 +444,16 @@ async function notifyDriversForOrder(
         // Envoyer la commande au livreur
         io.to(driverSocketId).emit('new-order-request', order);
         
-        if (DEBUG) {
-          console.log(`[notifyDriversForOrder] Événement 'new-order-request' émis vers socket ${driverSocketId}`);
+  if (DEBUG) {
+    logger.debug(`[notifyDriversForOrder] Événement 'new-order-request' émis vers socket ${driverSocketId}`);
         }
 
         // Timeout de 20 secondes pour la réponse du livreur
         setTimeout(async () => {
           const currentOrder = activeOrders.get(order.id);
           if (currentOrder && currentOrder.status === 'pending') {
-            if (DEBUG) {
-              console.log(`[notifyDriversForOrder] Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`);
+  if (DEBUG) {
+    logger.debug(`[notifyDriversForOrder] Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`);
             }
             await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => {});
             driverIndex++;
@@ -460,8 +461,8 @@ async function notifyDriversForOrder(
           }
         }, 20000);
       } else {
-        if (DEBUG) {
-          console.log(`[notifyDriversForOrder] Chauffeur ${maskUserId(driver.driverId)} trouvé mais socket non connecté`);
+  if (DEBUG) {
+    logger.debug(`[notifyDriversForOrder] Chauffeur ${maskUserId(driver.driverId)} trouvé mais socket non connecté`);
         }
         driverIndex++;
         tryNextDriver().catch(() => {});
@@ -470,13 +471,13 @@ async function notifyDriversForOrder(
 
     tryNextDriver().catch(() => {});
   } catch (error: any) {
-    console.error(`[notifyDriversForOrder] Erreur notification livreurs pour commande ${maskOrderId(order.id)}:`, error);
+    logger.error(`[notifyDriversForOrder] Erreur notification livreurs pour commande ${maskOrderId(order.id)}:`, error);
   }
 }
 
 const setupOrderSocket = (io: SocketIOServer): void => {
   const DEBUG = process.env.DEBUG_SOCKETS === 'true'; io.on('connection', (socket: ExtendedSocket) => {
-    if (DEBUG) console.log(`Nouvelle connexion Socket: ${socket.id}`); socket.on('driver-connect', (driverId: string) => { connectedDrivers.set(driverId, socket.id); socket.driverId = driverId; console.log(`[DIAGNOSTIC] Driver connecté: ${maskUserId(driverId)} (socket: ${socket.id})`); console.log(` - Total drivers connectés: ${connectedDrivers.size}`); }); socket.on('user-connect', (userId: string) => {
+    if (DEBUG) logger.debug(`Nouvelle connexion Socket: ${socket.id}`); socket.on('driver-connect', (driverId: string) => { connectedDrivers.set(driverId, socket.id); socket.driverId = driverId; logger.debug(`[DIAGNOSTIC] Driver connecté: ${maskUserId(driverId)} (socket: ${socket.id})`); logger.debug(` - Total drivers connectés: ${connectedDrivers.size}`); }); socket.on('user-connect', (userId: string) => {
       // Toujours mettre à jour l'association userId -> socketId
       // Cela garantit que même si le socket se reconnecte, l'association est correcte
       const previousSocketId = connectedUsers.get(userId);
@@ -484,15 +485,15 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       socket.userId = userId;
 
       if (DEBUG || previousSocketId !== socket.id) {
-        console.log(`[DIAGNOSTIC] User connecté: ${maskUserId(userId)} (socket: ${socket.id})`);
+        logger.info(`[DIAGNOSTIC] User connecté: ${maskUserId(userId)} (socket: ${socket.id})`);
         if (previousSocketId && previousSocketId !== socket.id) {
-          console.log(`[DIAGNOSTIC] Socket précédent remplacé: ${previousSocketId} → ${socket.id}`);
+          logger.debug(`[DIAGNOSTIC] Socket précédent remplacé: ${previousSocketId} → ${socket.id}`);
         }
-        console.log(`[DIAGNOSTIC] Total users connectés: ${connectedUsers.size}`);
+        logger.debug(`[DIAGNOSTIC] Total users connectés: ${connectedUsers.size}`);
       }
-    }); socket.on('create-order', async (orderData: CreateOrderData, ack?: (response: any) => void) => {
+    }); socket.on('create-order', async (orderData: CreateOrderData, ack?: SocketAckCallback) => {
       try {
-        if (DEBUG) console.log(`Nouvelle commande de ${maskUserId(socket.userId || 'unknown')}`); const { pickup, dropoff, deliveryMethod, userId, userInfo,
+        if (DEBUG) logger.debug(`Nouvelle commande de ${maskUserId(socket.userId || 'unknown')}`); const { pickup, dropoff, deliveryMethod, userId, userInfo,
           orderId: providedOrderId,
           price: providedPrice,
           distance: providedDistance,
@@ -532,8 +533,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           const validation = await canUseDeferredPayment(userId, price);
           if (!validation.canUse) {
             const errorMsg = validation.reason || 'Paiement différé non autorisé';
-            if (DEBUG) {
-              console.log(`Paiement différé refusé pour ${maskUserId(userId)}: ${errorMsg}`);
+  if (DEBUG) {
+    logger.debug(`Paiement différé refusé pour ${maskUserId(userId)}: ${errorMsg}`);
             }
             socket.emit('order-error', {
               success: false,
@@ -547,8 +548,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             }
             return;
           }
-          if (DEBUG) {
-            console.log(`Paiement différé autorisé pour ${maskUserId(userId)} - Montant: ${price} FCFA`);
+  if (DEBUG) {
+    logger.debug(`Paiement différé autorisé pour ${maskUserId(userId)} - Montant: ${price} FCFA`);
           }
         }
 
@@ -583,7 +584,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         try {
           await saveOrder(order);
           dbSaved = true;
-          if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} sauvegardée en DB`);
+          if (DEBUG) logger.debug(`Commande ${maskOrderId(order.id)} sauvegardée en DB`);
 
           // Générer automatiquement le QR code de livraison
           try {
@@ -604,9 +605,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               creatorName
             );
 
-            if (DEBUG) console.log(`QR code généré pour commande ${maskOrderId(order.id)}`);
-          } catch (qrError: any) {
-            console.warn(`Échec génération QR code pour ${maskOrderId(order.id)}:`, qrError.message);
+            if (DEBUG) logger.debug(`QR code généré pour commande ${maskOrderId(order.id)}`);
+            } catch (qrError: any) {
+            logger.warn(`Échec génération QR code pour ${maskOrderId(order.id)}:`, qrError.message);
             // Ne pas bloquer la création de commande si le QR code échoue
           }
 
@@ -627,24 +628,24 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                 paymentPayerType || 'client', recipientUserId, paymentMethodId || null);
 
               if (transactionId && invoiceId) {
-                if (DEBUG) {
-                  console.log(`Transaction ${transactionId} et facture ${invoiceId} créées pour commande ${maskOrderId(order.id)}`);
-                } else { console.log(`Transaction créée: ${transactionId} pour commande ${maskOrderId(order.id)}`); }
-              } else { console.warn(`Transaction ou facture non créée pour commande ${maskOrderId(order.id)}: transactionId=${transactionId}, invoiceId=${invoiceId}`); }
-            } catch (transactionError: any) { console.error(`Échec création transaction/facture pour ${maskOrderId(order.id)}:`, transactionError.message, transactionError.stack); }
+  if (DEBUG) {
+    logger.debug(`Transaction ${transactionId} et facture ${invoiceId} créées pour commande ${maskOrderId(order.id)}`);
+                } else { logger.info(`Transaction créée: ${transactionId} pour commande ${maskOrderId(order.id)}`); }
+              } else { logger.warn(`Transaction ou facture non créée pour commande ${maskOrderId(order.id)}: transactionId=${transactionId}, invoiceId=${invoiceId}`); }
+            } catch (transactionError: any) { logger.error(`Échec création transaction/facture pour ${maskOrderId(order.id)}:`, transactionError.message, transactionError.stack); }
           } else {
-            if (DEBUG) {
-              console.log(`Transaction non créée pour commande ${maskOrderId(order.id)}: paymentMethodType=${paymentMethodType}, price=${price}`);
+  if (DEBUG) {
+    logger.debug(`Transaction non créée pour commande ${maskOrderId(order.id)}: paymentMethodType=${paymentMethodType}, price=${price}`);
             }
           }
         } catch (dbError: any) {
           dbSaved = false;
           dbErrorMsg = dbError && dbError.message ? dbError.message : String(dbError);
-          console.warn(`Échec sauvegarde DB pour ${maskOrderId(order.id)}:`, dbErrorMsg);
+          logger.warn(`Échec sauvegarde DB pour ${maskOrderId(order.id)}:`, dbErrorMsg);
         } io.to(socket.id).emit('order-created', {
           success: true, order, dbSaved, dbError: dbErrorMsg,
           message: 'Commande créée, recherche de chauffeur...'
-        }); try { if (typeof ack === 'function') ack({ success: true, orderId: order.id, dbSaved, dbError: dbErrorMsg }); } catch (e) { if (DEBUG) console.warn('Ack callback failed for create-order', e); } const nearbyDrivers = await findNearbyDrivers(pickup.coordinates, deliveryMethod); const { realDriverStatuses } = await import('../controllers/driverController.js'); console.log(`[DIAGNOSTIC] Recherche livreurs pour commande ${maskOrderId(order.id)}:`); console.log(` - Livreurs en mémoire: ${realDriverStatuses.size}`); console.log(` - Livreurs connectés (socket): ${connectedDrivers.size}`); console.log(` - Livreurs proches trouvés: ${nearbyDrivers.length}`); for (const [driverId, driverData] of realDriverStatuses.entries()) {
+        }); try { if (typeof ack === 'function') ack({ success: true, orderId: order.id, dbSaved, dbError: dbErrorMsg }); } catch (e) { if (DEBUG) logger.warn('Ack callback failed for create-order', e); } const nearbyDrivers = await findNearbyDrivers(pickup.coordinates, deliveryMethod); const { realDriverStatuses } = await import('../controllers/driverController.js'); logger.debug(`[DIAGNOSTIC] Recherche livreurs pour commande ${maskOrderId(order.id)}:`); logger.debug(` - Livreurs en mémoire: ${realDriverStatuses.size}`); logger.debug(` - Livreurs connectés (socket): ${connectedDrivers.size}`); logger.debug(` - Livreurs proches trouvés: ${nearbyDrivers.length}`); for (const [driverId, driverData] of realDriverStatuses.entries()) {
           const isConnected = connectedDrivers.has(driverId); const hasPosition = !!(driverData.current_latitude && driverData.current_longitude); const distance = hasPosition ? getDistanceInKm(
             pickup.coordinates.latitude,
             pickup.coordinates.longitude,
@@ -652,21 +653,21 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             driverData.current_longitude!
           ) : null;
 
-          console.log(` - ${maskUserId(driverId)}: online=${driverData.is_online}, available=${driverData.is_available}, connected=${isConnected}, has_position=${hasPosition}${distance !== null ? `, distance=${distance.toFixed(2)}km` : ''}`);
+          logger.debug(` - ${maskUserId(driverId)}: online=${driverData.is_online}, available=${driverData.is_available}, connected=${isConnected}, has_position=${hasPosition}${distance !== null ? `, distance=${distance.toFixed(2)}km` : ''}`);
         } if (nearbyDrivers.length === 0) {
-          console.log(`Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`);
+          logger.warn(`Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`);
           io.to(socket.id).emit('no-drivers-available', { orderId: order.id, message: 'Aucun chauffeur disponible dans votre zone' });
           return;
         }
-        if (DEBUG) console.log(`${nearbyDrivers.length} chauffeurs trouvés pour la commande ${maskOrderId(order.id)}`);
+        if (DEBUG) logger.debug(`${nearbyDrivers.length} chauffeurs trouvés pour la commande ${maskOrderId(order.id)}`);
         
         // Matching équitable : tous les livreurs reçoivent la commande, triés par priorité (notes)
         let selectedDrivers: NearbyDriver[];
         const useFairMatching = process.env.USE_INTELLIGENT_MATCHING !== 'false'; // Activé par défaut
         
         if (useFairMatching && nearbyDrivers.length > 0) {
-          if (DEBUG) {
-            console.log(`[create-order] Utilisation du matching équitable pour commande ${maskOrderId(order.id)}`);
+  if (DEBUG) {
+    logger.debug(`[create-order] Utilisation du matching équitable pour commande ${maskOrderId(order.id)}`);
           }
           
           try {
@@ -690,8 +691,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               distance: scored.distance,
             }));
             
-            if (DEBUG) {
-              console.log(`[create-order] ${selectedDrivers.length} livreurs recevront la commande (triés par priorité)`);
+  if (DEBUG) {
+    logger.debug(`[create-order] ${selectedDrivers.length} livreurs recevront la commande (triés par priorité)`);
             }
           } catch (error: any) {
             logger.warn(`[create-order] Erreur matching équitable, fallback sur tri par distance:`, error.message);
@@ -700,8 +701,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           }
         } else {
           // Fallback : trier par distance (comportement original)
-          if (DEBUG) {
-            console.log(`[create-order] Utilisation du tri par distance (matching équitable désactivé)`);
+  if (DEBUG) {
+    logger.debug(`[create-order] Utilisation du tri par distance (matching équitable désactivé)`);
           }
           selectedDrivers = nearbyDrivers.sort((a, b) => a.distance - b.distance);
         }
@@ -709,23 +710,23 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         let driverIndex = 0;
         const tryNextDriver = async (): Promise<void> => {
           if (driverIndex >= selectedDrivers.length) {
-            console.log(`Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)} - Annulation automatique`); try { order.status = 'cancelled'; order.cancelledAt = new Date(); await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt }); console.log(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB`); } catch (dbError: any) { console.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message); } const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) { io.to(userSocketId).emit('order-cancelled', { orderId: order.id, reason: 'no_drivers_available', message: 'Aucun chauffeur disponible - Commande annulée' }); } socket.emit('no-drivers-available', { orderId: order.id, message: 'Tous les chauffeurs sont occupés - Commande annulée' }); activeOrders.delete(order.id); return;
+            logger.warn(`Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)} - Annulation automatique`); try { order.status = 'cancelled'; order.cancelledAt = new Date(); await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt }); logger.debug(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB`); } catch (dbError: any) { logger.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message); } const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) { io.to(userSocketId).emit('order-cancelled', { orderId: order.id, reason: 'no_drivers_available', message: 'Aucun chauffeur disponible - Commande annulée' }); } socket.emit('no-drivers-available', { orderId: order.id, message: 'Tous les chauffeurs sont occupés - Commande annulée' }); activeOrders.delete(order.id); return;
           }
 
           const driver = selectedDrivers[driverIndex];
           const driverSocketId = connectedDrivers.get(driver.driverId);
 
-          console.log(`[DIAGNOSTIC] Tentative envoi à livreur ${maskUserId(driver.driverId)}:`); console.log(` - Socket ID: ${driverSocketId || 'NON CONNECTÉ'}`); console.log(` - Distance: ${driver.distance.toFixed(2)}km`); if (driverSocketId) {
-            const assignedAt = new Date(); order.assignedAt = assignedAt; console.log(`Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`); await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => { }); io.to(driverSocketId).emit('new-order-request', order); console.log(`Événement 'new-order-request' émis vers socket ${driverSocketId}`); setTimeout(async () => { const currentOrder = activeOrders.get(order.id); if (currentOrder && currentOrder.status === 'pending') { if (DEBUG) console.log(`Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`); await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => { }); driverIndex++; tryNextDriver().catch(() => { }); } }, 20000);
+          logger.debug(`[DIAGNOSTIC] Tentative envoi à livreur ${maskUserId(driver.driverId)}:`); logger.debug(` - Socket ID: ${driverSocketId || 'NON CONNECTÉ'}`); logger.debug(` - Distance: ${driver.distance.toFixed(2)}km`); if (driverSocketId) {
+            const assignedAt = new Date(); order.assignedAt = assignedAt; logger.debug(`Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`); await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => { }); io.to(driverSocketId).emit('new-order-request', order); logger.debug(`Événement 'new-order-request' émis vers socket ${driverSocketId}`); setTimeout(async () => { const currentOrder = activeOrders.get(order.id); if (currentOrder && currentOrder.status === 'pending') { if (DEBUG) logger.debug(`Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`); await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => { }); driverIndex++; tryNextDriver().catch(() => { }); } }, 20000);
           } else {
-            if (DEBUG) console.log(`Chauffeur ${driver.driverId} trouvé mais socket non connecté.`); driverIndex++; tryNextDriver().catch(() => { });
+            if (DEBUG) logger.debug(`Chauffeur ${driver.driverId} trouvé mais socket non connecté.`); driverIndex++; tryNextDriver().catch(() => { });
           }
         };
 
         tryNextDriver().catch(() => { });
 
       } catch (error: any) {
-        console.error('Erreur création commande:', error); socket.emit('order-error', { success: false, message: 'Erreur lors de la création de la commande' });
+        logger.error('Erreur création commande:', error); socket.emit('order-error', { success: false, message: 'Erreur lors de la création de la commande' });
       }
     });
 
@@ -765,33 +766,33 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         });
         dbSavedAssign = true;
 
-        if (DEBUG) console.log(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
+        if (DEBUG) logger.debug(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
 
         try {
           await (pool as any).query(
             `UPDATE invoices SET driver_id = $1 WHERE order_id = $2 AND driver_id IS NULL`,
             [driverId, orderId]
           );
-          if (DEBUG) console.log(`Facture mise à jour avec driverId pour commande ${maskOrderId(orderId)}`);
+          if (DEBUG) logger.debug(`Facture mise à jour avec driverId pour commande ${maskOrderId(orderId)}`);
         } catch (invoiceError: any) {
-          if (DEBUG) console.warn(`Échec mise à jour facture pour ${maskOrderId(orderId)}:`, invoiceError.message);
+          if (DEBUG) logger.warn(`Échec mise à jour facture pour ${maskOrderId(orderId)}:`, invoiceError.message);
         }
       } catch (dbError: any) {
         dbSavedAssign = false;
         dbErrorAssign = dbError && dbError.message ? dbError.message : String(dbError);
-        console.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorAssign);
+        logger.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorAssign);
       }
 
-      if (DEBUG) console.log(`Commande ${maskOrderId(orderId)} acceptée par driver ${maskUserId(driverId)}`);
+      if (DEBUG) logger.debug(`Commande ${maskOrderId(orderId)} acceptée par driver ${maskUserId(driverId)}`);
 
       // Créer automatiquement une conversation pour cette commande
       try {
         const { default: messageService } = await import('../services/messageService.js');
         await messageService.createOrderConversation(orderId, order.user.id, driverId);
-        if (DEBUG) console.log(`Conversation créée pour la commande ${maskOrderId(orderId)}`);
+        if (DEBUG) logger.debug(`Conversation créée pour la commande ${maskOrderId(orderId)}`);
       } catch (convError: any) {
         // Ne pas bloquer l'acceptation de la commande si la création de conversation échoue
-        console.warn(`Échec création conversation pour ${maskOrderId(orderId)}:`, convError.message);
+        logger.warn(`Échec création conversation pour ${maskOrderId(orderId)}:`, convError.message);
       }
 
       socket.emit('order-accepted-confirmation', {
@@ -813,12 +814,12 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         if (!userSocketId) {
           if (retryCount < 3) {
             // Attendre un peu et réessayer (le client peut être en train de se reconnecter)
-            console.log(`[RETRY ${retryCount + 1}/3] User ${maskUserId(order.user.id)} non connecté, attente de reconnexion...`);
+            logger.debug(`[RETRY ${retryCount + 1}/3] User ${maskUserId(order.user.id)} non connecté, attente de reconnexion...`);
             setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
             return;
           } else {
-            console.warn(`User ${maskUserId(order.user.id)} non connecté après ${retryCount} tentatives - impossible d'émettre order-accepted pour commande ${maskOrderId(orderId)}`);
-            console.log(`[DIAGNOSTIC] Users connectés:`, Array.from(connectedUsers.keys()).map(id => maskUserId(id)));
+            logger.warn(`User ${maskUserId(order.user.id)} non connecté après ${retryCount} tentatives - impossible d'émettre order-accepted pour commande ${maskOrderId(orderId)}`);
+            logger.debug(`[DIAGNOSTIC] Users connectés:`, Array.from(connectedUsers.keys()).map(id => maskUserId(id)));
             return;
           }
         }
@@ -828,11 +829,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         if (!userSocket || !userSocket.connected) {
           if (retryCount < 3) {
             // Le socket n'est plus connecté, attendre et réessayer
-            console.log(`[RETRY ${retryCount + 1}/3] Socket ${userSocketId} déconnecté pour user ${maskUserId(order.user.id)}, attente de reconnexion...`);
+            logger.debug(`[RETRY ${retryCount + 1}/3] Socket ${userSocketId} déconnecté pour user ${maskUserId(order.user.id)}, attente de reconnexion...`);
             setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
             return;
           } else {
-            console.warn(`User ${maskUserId(order.user.id)} socket ${userSocketId} non connecté après ${retryCount} tentatives - impossible d'émettre order-accepted pour commande ${maskOrderId(orderId)}`);
+            logger.warn(`User ${maskUserId(order.user.id)} socket ${userSocketId} non connecté après ${retryCount} tentatives - impossible d'émettre order-accepted pour commande ${maskOrderId(orderId)}`);
             return;
           }
         }
@@ -843,7 +844,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           status: 'accepted', // Forcer le statut à 'accepted'
         };
 
-        console.log(`[DIAGNOSTIC] Envoi order-accepted à user ${maskUserId(order.user.id)} (socket: ${userSocketId}) pour commande ${maskOrderId(orderId)}`);
+        logger.debug(`[DIAGNOSTIC] Envoi order-accepted à user ${maskUserId(order.user.id)} (socket: ${userSocketId}) pour commande ${maskOrderId(orderId)}`);
 
         try {
           const { realDriverStatuses } = await import('../controllers/driverController.js');
@@ -862,11 +863,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           const currentSocket = io.sockets.sockets.get(userSocketId);
           if (!currentSocket || !currentSocket.connected) {
             if (retryCount < 3) {
-              console.log(`[RETRY ${retryCount + 1}/3] Socket déconnecté juste avant l'envoi, nouvelle tentative...`);
+              logger.debug(`[RETRY ${retryCount + 1}/3] Socket déconnecté juste avant l'envoi, nouvelle tentative...`);
               setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
               return;
             } else {
-              console.error(`Impossible d'envoyer order-accepted: socket déconnecté après ${retryCount} tentatives`);
+              logger.error(`Impossible d'envoyer order-accepted: socket déconnecté après ${retryCount} tentatives`);
               return;
             }
           }
@@ -885,9 +886,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             location: null
           });
 
-          console.log(`order-accepted et order:status:update émis avec succès pour commande ${maskOrderId(orderId)}`);
+          logger.debug(`order-accepted et order:status:update émis avec succès pour commande ${maskOrderId(orderId)}`);
         } catch (err) {
-          console.error(`Erreur préparation order-accepted:`, err);
+          logger.error(`Erreur préparation order-accepted:`, err);
           // En cas d'erreur, essayer quand même d'envoyer avec les données minimales
           const currentSocket = io.sockets.sockets.get(userSocketId);
           if (currentSocket && currentSocket.connected) {
@@ -900,7 +901,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               order: orderToSend,
               location: null
             });
-            console.log(`order-accepted et order:status:update émis (mode fallback) pour commande ${maskOrderId(orderId)}`);
+            logger.debug(`order-accepted et order:status:update émis (mode fallback) pour commande ${maskOrderId(orderId)}`);
           } else if (retryCount < 3) {
             setTimeout(() => sendOrderAccepted(retryCount + 1), 500 * (retryCount + 1));
           }
@@ -920,7 +921,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         return;
       }
 
-      if (DEBUG) console.log(`Commande ${maskOrderId(orderId)} déclinée par driver ${maskUserId(driverId)}`);
+      if (DEBUG) logger.debug(`Commande ${maskOrderId(orderId)} déclinée par driver ${maskUserId(driverId)}`);
 
       recordOrderAssignment(orderId, driverId, { declinedAt: new Date() }).catch(() => { });
 
@@ -931,7 +932,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       });
     });
 
-    socket.on('update-delivery-status', async (data: { orderId: string; status: string; location?: any }, ack?: (response: any) => void) => {
+    socket.on('update-delivery-status', async (data: UpdateDeliveryStatusData, ack?: SocketAckCallback) => {
       try {
         const { orderId, status, location } = data || {};
         const order = activeOrders.get(orderId);
@@ -989,7 +990,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             completed_at: status === 'completed' ? order.completedAt : undefined
           });
           dbSavedStatus = true;
-          if (DEBUG) console.log(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
+          if (DEBUG) logger.debug(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
 
           // Si le livreur marque "picked_up" et que c'est un paiement en espèces par le client,
           // marquer automatiquement le paiement comme payé
@@ -1031,23 +1032,23 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                     [orderId]
                   );
 
-                  if (DEBUG) {
-                    console.log(`Paiement en espèces marqué comme payé pour commande ${maskOrderId(orderId)}`);
+  if (DEBUG) {
+    logger.debug(`Paiement en espèces marqué comme payé pour commande ${maskOrderId(orderId)}`);
                   }
                 }
               }
             } catch (paymentError: any) {
               // Ne pas bloquer la mise à jour du statut de livraison si la mise à jour du paiement échoue
-              console.warn(`Échec mise à jour paiement pour ${maskOrderId(orderId)}:`, paymentError.message);
+              logger.warn(`Échec mise à jour paiement pour ${maskOrderId(orderId)}:`, paymentError.message);
             }
           }
         } catch (dbError: any) {
           dbSavedStatus = false;
           dbErrorStatus = dbError && dbError.message ? dbError.message : String(dbError);
-          console.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorStatus);
+          logger.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorStatus);
         }
 
-        if (DEBUG) console.log(`Statut livraison ${maskOrderId(orderId)}: ${status} par driver ${maskUserId(driverId)}`);
+        if (DEBUG) logger.debug(`Statut livraison ${maskOrderId(orderId)}: ${status} par driver ${maskUserId(driverId)}`);
 
         // Émettre l'événement au client AVANT de supprimer de activeOrders
         // Cela garantit que le client reçoit la mise à jour même si la commande est complétée
@@ -1118,8 +1119,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             );
 
             if (commissionResult.success) {
-              if (DEBUG) {
-                console.log(
+  if (DEBUG) {
+    logger.debug(
                   `Commission prélevée pour ${maskUserId(driverId)}: ` +
                   `${commissionResult.commissionAmount?.toFixed(2)} FCFA ` +
                   `(nouveau solde: ${commissionResult.newBalance?.toFixed(2)} FCFA)`
@@ -1142,10 +1143,10 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 
           // Retirer immédiatement de activeOrders pour éviter qu'elle réapparaisse après refresh
           activeOrders.delete(order.id);
-          if (DEBUG) console.log(`Commande ${maskOrderId(order.id)} supprimée du cache (complétée)`);
+          if (DEBUG) logger.debug(`Commande ${maskOrderId(order.id)} supprimée du cache (complétée)`);
         }
       } catch (err: any) {
-        if (DEBUG) console.error('Error in update-delivery-status socket handler', err);
+        if (DEBUG) logger.error('Error in update-delivery-status socket handler', err);
         if (typeof ack === 'function') {
           ack({ success: false, message: 'Server error' });
         }
@@ -1181,8 +1182,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             timestamp: data.timestamp || new Date().toISOString(),
           });
 
-          if (DEBUG) {
-            console.log(
+  if (DEBUG) {
+    logger.debug(
               `[driver-geofence-event] ${eventType} pour commande ${maskOrderId(orderId)} - notifié client`
             );
           }
@@ -1197,12 +1198,12 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         });
       } catch (err: any) {
         if (DEBUG) {
-          console.error('Error in driver-geofence-event socket handler', err);
+          logger.error('Error in driver-geofence-event socket handler', err);
         }
       }
     });
 
-    socket.on('send-proof', async (data: { orderId: string; proofBase64: string; proofType?: string }, ack?: (response: any) => void) => {
+    socket.on('send-proof', async (data: SendProofData, ack?: SocketAckCallback) => {
       try {
         const { orderId, proofBase64, proofType = 'image' } = data || {};
 
@@ -1260,11 +1261,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           };
 
           dbSavedProof = true;
-          if (DEBUG) console.log(`Preuve de livraison sauvegardée pour ${maskOrderId(orderId)}`);
+          if (DEBUG) logger.debug(`Preuve de livraison sauvegardée pour ${maskOrderId(orderId)}`);
         } catch (err: any) {
           dbSavedProof = false;
           dbErrorProof = err && err.message ? err.message : String(err);
-          if (DEBUG) console.warn('Failed to save proof to DB', dbErrorProof);
+          if (DEBUG) logger.warn('Failed to save proof to DB', dbErrorProof);
         }
 
         const userSocketId = connectedUsers.get(order.user.id);
@@ -1286,7 +1287,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           });
         }
       } catch (err: any) {
-        if (DEBUG) console.error('Error in send-proof socket handler', err);
+        if (DEBUG) logger.error('Error in send-proof socket handler', err);
         if (typeof ack === 'function') {
           ack({ success: false, message: 'Server error' });
         }
@@ -1378,7 +1379,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         });
       } catch (err: any) {
         logger.error('Error handling user-reconnect', err);
-        if (DEBUG) console.warn('Error handling user-reconnect', err);
+        if (DEBUG) logger.warn('Error handling user-reconnect', err);
       }
     });
 
@@ -1461,21 +1462,21 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         });
       } catch (err: any) {
         logger.error('Error handling driver-reconnect', err);
-        if (DEBUG) console.warn('Error handling driver-reconnect', err);
+        if (DEBUG) logger.warn('Error handling driver-reconnect', err);
       }
     });
 
     socket.on('disconnect', () => {
-      if (DEBUG) console.log(`Déconnexion Socket: ${socket.id}`);
+      if (DEBUG) logger.debug(`Déconnexion Socket: ${socket.id}`);
 
       if (socket.driverId) {
         connectedDrivers.delete(socket.driverId);
-        if (DEBUG) console.log(`Driver déconnecté: ${socket.driverId}`);
+        if (DEBUG) logger.debug(`Driver déconnecté: ${socket.driverId}`);
       }
 
       if (socket.userId) {
         connectedUsers.delete(socket.userId);
-        if (DEBUG) console.log(`User déconnecté: ${socket.userId}`);
+        if (DEBUG) logger.debug(`User déconnecté: ${socket.userId}`);
       }
     });
   });

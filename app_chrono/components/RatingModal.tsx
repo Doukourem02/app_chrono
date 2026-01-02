@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {View,Text,StyleSheet,Modal,TouchableOpacity,TextInput,Alert,ActivityIndicator,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { userApiService } from '../services/userApiService';
+import { logger } from '../utils/logger';
 
 interface RatingModalProps {
   visible: boolean;
@@ -38,7 +39,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
         setComment('');
       }
     } catch (error) {
-      console.error('Erreur chargement évaluation:', error);
+      logger.error('Erreur chargement évaluation:', undefined, error);
       setExistingRating(null);
       setRating(0);
       setComment('');
@@ -92,7 +93,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
         Alert.alert('Erreur', result.message || 'Impossible d\'enregistrer l\'évaluation. Veuillez réessayer.');
       }
     } catch (error) {
-      console.error('Erreur soumission évaluation:', error);
+      logger.error('Erreur soumission évaluation:', undefined, error);
       Alert.alert('Erreur', 'Impossible d\'enregistrer l\'évaluation. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);

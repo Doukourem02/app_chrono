@@ -2,21 +2,23 @@
  * Utilitaire de debug conditionnel
  * Remplace les console.log pour éviter la latence et les re-renders inutiles
  */
+import { logger } from './logger'
+
 export const debug = (...args: unknown[]): void => {
   if (process.env.NODE_ENV === 'development') {
-    console.log(...args)
+    logger.debug(...args)
   }
 }
 
 export const debugWarn = (...args: unknown[]): void => {
   if (process.env.NODE_ENV === 'development') {
-    console.warn(...args)
+    logger.warn(...args)
   }
 }
 
 export const debugError = (...args: unknown[]): void => {
   if (process.env.NODE_ENV === 'development') {
-    console.error(...args)
+    logger.error(...args)
   }
 }
 

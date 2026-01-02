@@ -3,6 +3,7 @@ import {View,Text,TouchableOpacity,StyleSheet,Alert} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempAuthStore } from '../../store/useTempAuthStore';
+import { logger } from '../../utils/logger';
 
 export default function OTPMethodScreen() {
   const [selectedMethod, setSelectedMethod] = useState<'email' | 'sms'>('email');
@@ -39,7 +40,7 @@ export default function OTPMethodScreen() {
         throw new Error(data.error || 'Erreur lors de l\'envoi de l\'OTP');
       }
 
-      console.log('OTP envoyé avec succès:', data);
+      logger.debug('OTP envoyé avec succès:', data);
       
       // Sauvegarder la méthode choisie pour la vérification
       setTempData(email, phoneNumber, selectedMethod, 'client');
@@ -47,7 +48,7 @@ export default function OTPMethodScreen() {
       // Naviguer vers l'écran de vérification
       router.push('./verification' as any);
     } catch (error) {
-      console.error('Erreur lors de l\'envoi OTP:', error);
+      logger.error('Erreur lors de l\'envoi OTP:', error);
       Alert.alert('Erreur', (error as Error).message || 'Une erreur est survenue. Veuillez réessayer.');
     } finally {
       setIsLoading(false);

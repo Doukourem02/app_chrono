@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
+import { logger } from '../utils/logger';
 
 export interface DriverLocation {
   latitude: number;
@@ -68,7 +69,7 @@ export const useDriverLocation = (isOnline: boolean) => {
       } catch (err) {
         setError('Erreur lors de la récupération de la localisation');
         setLoading(false);
-        console.error('Location error:', err);
+        logger.error('Location error:', undefined, err);
       }
     };
 

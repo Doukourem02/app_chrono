@@ -7,6 +7,7 @@ import { getDeliveryAnalytics } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { useDateFilter } from '@/contexts/DateFilterContext'
+import { logger } from '@/utils/logger'
 
 export default function DeliveryAnalytics() {
   const { dateFilter, dateRange } = useDateFilter()
@@ -35,7 +36,7 @@ export default function DeliveryAnalytics() {
       ) {
         return prev
       }
-      console.log('🔑 [DeliveryAnalytics] QueryKey calculated:', latestKey)
+      logger.debug('🔑 [DeliveryAnalytics] QueryKey calculated:', latestKey)
       return latestKey
     })
   }, [latestKey])
@@ -43,7 +44,7 @@ export default function DeliveryAnalytics() {
   const { data: analyticsData, isLoading } = useQuery({
     queryKey,
     queryFn: () => {
-      console.log('🚀 [DeliveryAnalytics] queryFn CALLED - getDeliveryAnalytics', { startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
+      logger.debug('🚀 [DeliveryAnalytics] queryFn CALLED - getDeliveryAnalytics', { startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
       return getDeliveryAnalytics(startDate, endDate)
     },
     refetchInterval: false, // Pas de refresh automatique - les analytics changent rarement
@@ -53,7 +54,7 @@ export default function DeliveryAnalytics() {
     refetchOnReconnect: false,
     placeholderData: (previousData) => {
       if (previousData) {
-        console.log('📦 [DeliveryAnalytics] Using cached data, skipping fetch')
+        logger.debug('📦 [DeliveryAnalytics] Using cached data, skipping fetch')
       }
       return previousData
     },

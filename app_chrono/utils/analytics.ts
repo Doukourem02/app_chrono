@@ -4,6 +4,7 @@
  */
 
 import { useAuthStore } from '../store/useAuthStore';
+import { logger } from './logger';
 
 export type AnalyticsEvent = 
   // Authentification
@@ -68,7 +69,7 @@ class AnalyticsService {
     }
 
     if (__DEV__) {
-      console.log('📊 Analytics service initialisé', { enabled: this.enabled });
+      logger.debug('📊 Analytics service initialisé', undefined, { enabled: this.enabled });
     }
   }
 
@@ -119,7 +120,7 @@ class AnalyticsService {
 
     // Logger en développement
     if (__DEV__) {
-      console.log('📊 Analytics Event:', event, eventData.properties);
+      logger.debug('📊 Analytics Event:', undefined, { event, properties: eventData.properties });
     }
 
     // Ici, vous pouvez envoyer l'événement à votre provider d'analytics
@@ -129,7 +130,7 @@ class AnalyticsService {
     // Pour l'instant, on peut aussi envoyer au backend si nécessaire
     this.sendToBackend(eventData).catch(error => {
       if (__DEV__) {
-        console.warn('⚠️ Erreur envoi analytics au backend:', error);
+        logger.warn('⚠️ Erreur envoi analytics au backend:', undefined, error);
       }
     });
   }

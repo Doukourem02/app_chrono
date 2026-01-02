@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getWeatherData, calculateWeatherAdjustment, isDifficultWeather } from '../services/weatherService.js';
 import { verifyJWT } from '../middleware/verifyToken.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/:latitude/:longitude', verifyJWT, async (req, res) => {
       isDifficult,
     });
   } catch (error: any) {
-    console.error('Error fetching weather:', error);
+    logger.error('Error fetching weather:', error);
     return res.status(500).json({ error: 'Erreur serveur' });
   }
 });

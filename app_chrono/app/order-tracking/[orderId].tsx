@@ -160,7 +160,7 @@ export default function OrderTrackingPage() {
               }
             }
           } catch (error) {
-            console.error('Erreur vérification rating:', error);
+            logger.error('Erreur vérification rating:', undefined, error);
             const driverId = currentOrder.driverId || currentOrder.driver?.id;
             const driverName = currentOrder.driver?.name || 'Votre livreur';
             
@@ -225,7 +225,7 @@ export default function OrderTrackingPage() {
                   parsedPickup = null;
                 }
               } catch (e) {
-                console.warn('Erreur parsing pickup_address:', e);
+                logger.warn('Erreur parsing pickup_address:', undefined, e);
                 parsedPickup = null;
               }
               
@@ -245,7 +245,7 @@ export default function OrderTrackingPage() {
                   parsedDropoff = null;
                 }
               } catch (e) {
-                console.warn('Erreur parsing dropoff_address:', e);
+                logger.warn('Erreur parsing dropoff_address:', undefined, e);
                 parsedDropoff = null;
               }
               

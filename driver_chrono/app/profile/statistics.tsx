@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
+import { logger } from '../../utils/logger';
 
 export default function StatisticsPage() {
   const { user } = useDriverStore();
@@ -33,7 +34,7 @@ export default function StatisticsPage() {
         });
       }
     } catch (error) {
-      console.error('Erreur chargement statistiques:', error);
+      logger.error('Erreur chargement statistiques:', undefined, error);
     } finally {
       setIsLoading(false);
     }

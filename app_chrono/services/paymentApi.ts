@@ -4,6 +4,7 @@
  */
 
 import { useAuthStore } from '../store/useAuthStore';
+import { logger } from '../utils/logger';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? 'http://localhost:4000' : 'https://votre-api.com');
 
@@ -153,7 +154,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      console.error('❌ Erreur calculatePrice:', error);
+      logger.error('❌ Erreur calculatePrice:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -189,7 +190,7 @@ class PaymentApiService {
         data: data.data || [],
       };
     } catch (error) {
-      console.error('❌ Erreur getPaymentMethods:', error);
+      logger.error('❌ Erreur getPaymentMethods:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -232,7 +233,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      console.error('❌ Erreur createPaymentMethod:', error);
+      logger.error('❌ Erreur createPaymentMethod:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -284,7 +285,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      console.error('❌ Erreur initiatePayment:', error);
+      logger.error('❌ Erreur initiatePayment:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -320,7 +321,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      console.error('❌ Erreur checkPaymentStatus:', error);
+      logger.error('❌ Erreur checkPaymentStatus:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -374,7 +375,7 @@ class PaymentApiService {
         pagination: data.pagination,
       };
     } catch (error) {
-      console.error('❌ Erreur getTransactions:', error);
+      logger.error('❌ Erreur getTransactions:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -417,7 +418,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      console.error('❌ Erreur createDispute:', error);
+      logger.error('❌ Erreur createDispute:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -453,7 +454,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      console.error('❌ Erreur getDeferredPaymentLimits:', error);
+      logger.error('❌ Erreur getDeferredPaymentLimits:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -502,7 +503,7 @@ class PaymentApiService {
         data: data.data || [],
       };
     } catch (error) {
-      console.error('❌ Erreur getDeferredDebts:', error);
+      logger.error('❌ Erreur getDeferredDebts:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',

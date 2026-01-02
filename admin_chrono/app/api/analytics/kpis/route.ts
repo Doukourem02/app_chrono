@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { logger } from '@/utils/logger'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
     if (authError || !user) {
-      console.error('[API Route] Erreur authentification Supabase:', authError)
+      logger.error('[API Route] Erreur authentification Supabase:', authError)
       return NextResponse.json(
         { error: 'Invalid token' },
         { status: 401 }
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     // Faire le proxy vers le backend avec le token
     const backendUrl = `${API_BASE_URL}/api/analytics/kpis`
-    console.log('[API Route] Appel backend:', backendUrl)
+    logger.debug('[API Route] Appel backend:', backendUrl)
     
     const response = await fetch(backendUrl, {
       method: 'GET',
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[API Route] Backend error:', response.status, errorText)
+      logger.error('[API Route] Backend error:', response.status, errorText)
       return NextResponse.json(
         { error: 'Backend error', details: errorText },
         { status: response.status }
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json()
-    console.log('[API Route] Données reçues du backend:', {
+    logger.debug('[API Route] Données reçues du backend:', {
       averageRating: data.averageRating,
       totalRatings: data.totalRatings,
       hasAverageRating: data.averageRating != null
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error'
-    console.error('Error in analytics/kpis API:', errorMessage)
+    logger.error('Error in analytics/kpis API:', errorMessage)
     return NextResponse.json(
       { error: 'Internal server error', details: errorMessage },
       { status: 500 }

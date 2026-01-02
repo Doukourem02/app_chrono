@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
+import { logger } from '../../utils/logger';
 
 interface Order {
   id: string;
@@ -37,7 +38,7 @@ export default function OrderHistoryPage() {
         setOrders(result.data);
       }
     } catch (error) {
-      console.error('Erreur chargement historique:', error);
+      logger.error('Erreur chargement historique:', error);
     } finally {
       setIsLoading(false);
     }

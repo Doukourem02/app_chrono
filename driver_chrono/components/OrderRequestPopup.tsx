@@ -3,6 +3,7 @@ import {View,Text,TouchableOpacity,StyleSheet,Animated,Dimensions,Image,StatusBa
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
 import { AdminOrderInfo } from './AdminOrderInfo';
+import { logger } from '../utils/logger';
 
 interface OrderRequest {
   id: string;
@@ -71,7 +72,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
         await sound.setVolumeAsync(1);
         await sound.setPositionAsync(0);
       } catch (err) {
-        console.warn('[OrderRequestPopup] Impossible de charger le son', err);
+        logger.warn('[OrderRequestPopup] Impossible de charger le son', undefined, err);
       }
     })();
 
@@ -104,7 +105,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
           await sound.setPositionAsync(0);
           await sound.playAsync();
         } catch (err) {
-          console.warn('[OrderRequestPopup] Lecture son échouée', err);
+          logger.warn('[OrderRequestPopup] Lecture son échouée', undefined, err);
         }
       })();
 

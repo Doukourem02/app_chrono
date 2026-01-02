@@ -3,6 +3,7 @@ import {View,Text,StyleSheet,TouchableOpacity,ScrollView,ActivityIndicator,Alert
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { paymentApi, Transaction, DisputeType } from '../../services/paymentApi';
+import { logger } from '../../utils/logger';
 
 export default function TransactionsPage() {
   const { user } = useAuthStore();
@@ -30,7 +31,7 @@ export default function TransactionsPage() {
         setTransactions(result.data);
       }
     } catch (error) {
-      console.error('Erreur chargement transactions:', error);
+      logger.error('Erreur chargement transactions:', error);
       Alert.alert('Erreur', 'Impossible de charger vos transactions');
     } finally {
       setIsLoading(false);
@@ -152,7 +153,7 @@ export default function TransactionsPage() {
         Alert.alert('Erreur', result.message || 'Impossible de créer la réclamation');
       }
     } catch (error) {
-      console.error('Erreur création dispute:', error);
+      logger.error('Erreur création dispute:', error);
       Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);

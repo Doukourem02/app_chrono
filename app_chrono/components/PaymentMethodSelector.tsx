@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image } fr
 import { Ionicons } from '@expo/vector-icons';
 import { usePaymentStore } from '../store/usePaymentStore';
 import { PaymentMethodType, paymentApi, DeferredPaymentInfo } from '../services/paymentApi';
+import { logger } from '../utils/logger';
 
 interface PaymentMethodSelectorProps {
   onSelect?: (methodType: PaymentMethodType) => void;
@@ -60,7 +61,7 @@ export default function PaymentMethodSelector({
           setDeferredInfo(result.data);
         }
       } catch (error) {
-        console.error('Erreur chargement limites paiement différé:', error);
+        logger.error('Erreur chargement limites paiement différé:', error);
       } finally {
         setLoadingDeferredInfo(false);
       }

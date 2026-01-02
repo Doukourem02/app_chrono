@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
+import { logger } from '../../utils/logger';
 
 export default function PersonalInfoPage() {
   const { user, profile } = useDriverStore();
@@ -76,7 +77,7 @@ export default function PersonalInfoPage() {
         Alert.alert('Erreur', result.message || 'Impossible de mettre à jour vos informations');
       }
     } catch (error) {
-      console.error('Erreur mise à jour profil:', error);
+      logger.error('Erreur mise à jour profil:', undefined, error);
       Alert.alert('Erreur', 'Impossible de mettre à jour vos informations');
     } finally {
       setIsLoading(false);

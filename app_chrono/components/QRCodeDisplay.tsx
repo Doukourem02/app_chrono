@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, Share, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { logger } from '../utils/logger';
 
 interface QRCodeDisplayProps {
   visible: boolean;
@@ -62,7 +63,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
         title: 'QR Code de livraison',
       });
     } catch (error) {
-      console.error('Erreur lors du partage:', error);
+      logger.error('Erreur lors du partage:', undefined, error);
     }
   };
 

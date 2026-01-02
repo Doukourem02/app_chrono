@@ -10,6 +10,7 @@ import { adminMessageService, Message } from '@/services/adminMessageService'
 import { adminMessageSocketService } from '@/services/adminMessageSocketService'
 import ConversationList from '@/components/message/ConversationList'
 import ChatArea from '@/components/message/ChatArea'
+import { logger } from '@/utils/logger'
 
 interface Dispute {
   id: string
@@ -265,7 +266,7 @@ export default function DisputesPage() {
         adminMessageSocketService.joinConversation(conv.id)
       }
     } catch (error) {
-      console.error('Error loading support conversations:', error)
+      logger.error('Error loading support conversations:', error)
     } finally {
       setLoading(false)
       isLoadingConversationsRef.current = false
@@ -288,7 +289,7 @@ export default function DisputesPage() {
         adminMessageService.getConversations('support').then(setConversations)
       ])
     } catch (error) {
-      console.error('Error loading support messages:', error)
+      logger.error('Error loading support messages:', error)
     } finally {
       setLoading(false)
     }
@@ -301,7 +302,7 @@ export default function DisputesPage() {
       updateConversationUnreadCount(conversation.id, 0)
       adminMessageSocketService.joinConversation(conversation.id)
       loadSupportMessages(conversation.id).catch((error) => {
-        console.error('Error loading messages:', error)
+        logger.error('Error loading messages:', error)
       })
     }
   }, [supportConversations, setCurrentConversation, loadSupportMessages, updateConversationUnreadCount])

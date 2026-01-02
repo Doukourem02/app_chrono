@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, FlatList, Image } from 'react-native';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
+import { logger } from '../../utils/logger';
 
 type Period = 'today' | 'week' | 'month' | 'all';
 
@@ -46,7 +47,7 @@ export default function RevenusPage() {
   const loadRevenues = useCallback(async () => {
     if (!user?.id) {
       if (__DEV__) {
-        console.debug('[Revenus] Pas de user.id, impossible de charger les revenus');
+        logger.debug('[Revenus] Pas de user.id, impossible de charger les revenus');
       }
       setLoading(false);
       setRefreshing(false);
@@ -67,13 +68,13 @@ export default function RevenusPage() {
         
         if (__DEV__) {
           if (hasData) {
-            console.debug('[Revenus] Données reçues:', {
+            logger.debug('[Revenus] Données reçues:', undefined, {
               livraisons: result.data.totalDeliveries || 0,
               distance: result.data.totalDistance || 0,
               commandes: result.data.orders?.length || 0
             });
           } else {
-            console.debug('[Revenus] Données reçues mais vides (pas de livraisons pour cette période)');
+            logger.debug('[Revenus] Données reçues mais vides (pas de livraisons pour cette période)');
           }
         }
         setRevenuesData(result.data);
@@ -81,19 +82,19 @@ export default function RevenusPage() {
         // Si l'API retourne des données même en cas d'erreur (structure par défaut), les utiliser
         if (result.data) {
           if (__DEV__) {
-            console.warn('[Revenus] API retourné des données par défaut. Message:', result.message || 'Aucun message');
+            logger.warn('[Revenus] API retourné des données par défaut. Message:', result.message || 'Aucun message');
           }
           setRevenuesData(result.data);
         } else {
           if (__DEV__) {
-            console.warn('[Revenus] Pas de données reçues. Message:', result.message || 'Aucun message');
+            logger.warn('[Revenus] Pas de données reçues. Message:', result.message || 'Aucun message');
           }
           setRevenuesData(null);
         }
       }
     } catch (error) {
       if (__DEV__) {
-        console.error('[Revenus] Erreur chargement revenus:', error);
+        logger.error('[Revenus] Erreur chargement revenus:', undefined, error);
       }
       // En cas d'erreur, initialiser avec des données vides pour éviter les crashes
       setRevenuesData({
@@ -188,7 +189,8 @@ export default function RevenusPage() {
         selectedPeriod === item.key && styles.periodButtonActive,
       ]}
       onPress={() => {
-        console.log('[Revenus] Changement période:', item.key);
+        // logger.debug('[Revenus] Changement période:', item.key); // Debug conservé
+        logger.debug('[Revenus] Changement période:', item.key);
         setSelectedPeriod(item.key);
       }}
     >

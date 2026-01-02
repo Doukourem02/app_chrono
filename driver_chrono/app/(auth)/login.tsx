@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { config } from '../../config/index';
+import { logger } from '../../utils/logger';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -55,7 +56,7 @@ export default function Login() {
       router.push('/(auth)/verification' as any);
       
     } catch (error) {
-      console.error('Erreur lors de l\'envoi OTP:', error);
+      logger.error('Erreur lors de l\'envoi OTP:', undefined, error);
       
       // Gérer spécifiquement les erreurs réseau
       let errorMessage = 'Erreur lors de l\'envoi de l\'OTP';

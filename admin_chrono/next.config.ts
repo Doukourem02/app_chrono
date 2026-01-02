@@ -110,7 +110,7 @@ const nextConfig: NextConfig = {
         }
       } catch (e) {
         // Si l'URL n'est pas valide, on continue sans l'ajouter
-        console.warn('Invalid API URL in CSP configuration:', apiUrl)
+        logger.warn('Invalid API URL in CSP configuration:', apiUrl)
       }
     }
     
