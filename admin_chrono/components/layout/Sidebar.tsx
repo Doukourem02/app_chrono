@@ -249,12 +249,17 @@ export default function Sidebar() {
     };
 
     if (showProfileMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+      // Utiliser 'click' au lieu de 'mousedown' pour éviter les conflits
+      // et ajouter un petit délai pour laisser le clic sur le bouton se propager
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside, true);
+      }, 0);
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('click', handleClickOutside, true);
+      };
+    }
   }, [showProfileMenu]);
 
   // Mettre à jour la position du menu quand le sidebar se redimensionne
@@ -488,6 +493,7 @@ export default function Sidebar() {
     width: '100%',
     maxWidth: '100%',
     overflow: 'visible',
+    zIndex: 1000, // Augmenté pour être au-dessus du Header
   }
 
   const avatarImageWrapperStyle: React.CSSProperties = {
@@ -522,7 +528,7 @@ export default function Sidebar() {
     width: '100%',
     maxWidth: '100%',
     position: 'relative',
-    zIndex: 1,
+    zIndex: 1000, // Augmenté pour être au-dessus du Header
   }
 
   // Calculer le style de l'avatar dynamiquement pour qu'il se mette à jour
@@ -596,9 +602,10 @@ export default function Sidebar() {
     minWidth: '220px',
     maxHeight: typeof window !== 'undefined' ? `${window.innerHeight - 40}px` : 'auto',
     overflowY: 'auto',
-    zIndex: 10000,
+    zIndex: 99999, // Augmenté pour être au-dessus de tout
     padding: '0',
     display: showProfileMenu && menuPosition ? 'block' : 'none',
+    pointerEvents: 'auto', // S'assurer que le menu peut recevoir les clics
   }
 
   const profileMenuHeaderStyle: React.CSSProperties = {
@@ -859,7 +866,8 @@ export default function Sidebar() {
         <div style={avatarWrapperStyle} ref={profileMenuRef}>
           <button
             style={avatarButtonStyle}
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation(); // Empêcher la propagation du clic
               if (profileMenuRef.current) {
                 const rect = profileMenuRef.current.getBoundingClientRect();
                 const sidebarWidth = isExpanded ? expandedWidth : collapsedWidth;
@@ -890,6 +898,9 @@ export default function Sidebar() {
                 });
               }
               setShowProfileMenu(!showProfileMenu);
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation(); // Empêcher la propagation du mousedown
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.05)';

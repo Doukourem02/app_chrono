@@ -1045,7 +1045,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         } catch (dbError: any) {
           dbSavedStatus = false;
           dbErrorStatus = dbError && dbError.message ? dbError.message : String(dbError);
-          logger.warn(`Échec mise à jour DB pour ${maskOrderId(orderId)}:`, dbErrorStatus);
+          logger.error(`[CRITIQUE] Échec mise à jour DB pour ${maskOrderId(orderId)} avec statut ${status}:`, dbErrorStatus);
         }
 
         if (DEBUG) logger.debug(`Statut livraison ${maskOrderId(orderId)}: ${status} par driver ${maskUserId(driverId)}`);
@@ -1110,6 +1110,22 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         }
 
         if (status === 'completed') {
+          // CRITIQUE : Mettre à jour le statut dans activeOrders AVANT de supprimer
+          // Cela garantit que si la commande est encore dans activeOrders pour une raison quelconque,
+          // elle aura le bon statut "completed" et sera filtrée lors du resync
+          if (activeOrders.has(order.id)) {
+            const orderInCache = activeOrders.get(order.id);
+            if (orderInCache) {
+              orderInCache.status = 'completed';
+              orderInCache.completedAt = order.completedAt;
+              logger.debug(
+                `[update-delivery-status] Statut mis à jour dans activeOrders pour commande ${maskOrderId(order.id)}: completed`,
+                undefined,
+                { orderId: order.id }
+              );
+            }
+          }
+
           // Prélever la commission pour les livreurs partenaires
           try {
             const commissionResult = await deductCommissionAfterDelivery(
@@ -1141,9 +1157,25 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             // Ne pas bloquer la livraison
           }
 
-          // Retirer immédiatement de activeOrders pour éviter qu'elle réapparaisse après refresh
+          // CRITIQUE : Toujours retirer les commandes complétées de activeOrders
+          // Même si la DB échoue, on ne veut pas que la commande complétée réapparaisse lors du resync
           activeOrders.delete(order.id);
-          if (DEBUG) logger.debug(`Commande ${maskOrderId(order.id)} supprimée du cache (complétée)`);
+          if (dbSavedStatus) {
+            logger.info(
+              `[driver-reconnect] Commande ${maskOrderId(order.id)} supprimée du cache (complétée, DB mise à jour)`,
+              undefined,
+              { orderId: order.id, status }
+            );
+          } else {
+            logger.warn(
+              `[CRITIQUE] Commande ${maskOrderId(order.id)} complétée mais DB non mise à jour - retirée de activeOrders quand même pour éviter resync incorrect`,
+              undefined,
+              { orderId: order.id, status, dbError: dbErrorStatus }
+            );
+            // La commande est retirée de activeOrders même si la DB a échoué
+            // Lors du prochain resync, si la DB est toujours obsolète, la commande ne sera pas renvoyée
+            // car elle n'est plus dans activeOrders et la DB ne la retournera pas (statut = completed)
+          }
         }
       } catch (err: any) {
         if (DEBUG) logger.error('Error in update-delivery-status socket handler', err);
@@ -1394,7 +1426,58 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         // Charger depuis la base de données pour avoir les statuts à jour
         try {
           const dbOrders = await getActiveOrdersByDriver(driverId);
+          logger.info(
+            `[driver-reconnect] Commandes récupérées depuis DB pour driver ${maskUserId(driverId)}:`,
+            undefined,
+            { count: dbOrders.length, orderIds: dbOrders.map(o => maskOrderId(o.id)), statuses: dbOrders.map(o => o.status) }
+          );
+          
           for (const dbOrder of dbOrders) {
+            // CRITIQUE : Vérifier directement le statut réel dans la DB pour éviter les données obsolètes
+            try {
+              const statusCheck = await (pool as any).query(
+                'SELECT status FROM orders WHERE id = $1',
+                [dbOrder.id]
+              );
+              
+              if (statusCheck.rows.length === 0) {
+                logger.warn(
+                  `[driver-reconnect] Commande ${maskOrderId(dbOrder.id)} non trouvée dans la DB`,
+                  undefined,
+                  { orderId: dbOrder.id }
+                );
+                continue;
+              }
+              
+              const realStatus = statusCheck.rows[0].status;
+              
+              // Si le statut réel est final, ignorer cette commande
+              if (realStatus === 'completed' || realStatus === 'cancelled' || realStatus === 'declined') {
+                logger.warn(
+                  `[driver-reconnect] Commande ${maskOrderId(dbOrder.id)} ignorée : statut réel en DB est final (${realStatus}) mais getActiveOrdersByDriver a retourné (${dbOrder.status})`,
+                  undefined,
+                  { orderId: dbOrder.id, realStatus, returnedStatus: dbOrder.status }
+                );
+                continue;
+              }
+              
+              // Utiliser le statut réel de la DB au lieu de celui retourné par getActiveOrdersByDriver
+              if (realStatus !== dbOrder.status) {
+                logger.warn(
+                  `[driver-reconnect] Incohérence de statut pour commande ${maskOrderId(dbOrder.id)}: DB=${realStatus}, getActiveOrdersByDriver=${dbOrder.status}`,
+                  undefined,
+                  { orderId: dbOrder.id, realStatus, returnedStatus: dbOrder.status }
+                );
+                dbOrder.status = realStatus; // Utiliser le statut réel
+              }
+            } catch (statusCheckError: any) {
+              logger.error(
+                `[driver-reconnect] Erreur vérification statut pour commande ${maskOrderId(dbOrder.id)}:`,
+                statusCheckError
+              );
+              // Continuer avec le statut retourné par getActiveOrdersByDriver
+            }
+            
             // Enrichir avec les informations user si nécessaire
             if (dbOrder.user_id) {
               const userResult = await (pool as any).query(
@@ -1415,44 +1498,115 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                     avatar: user.avatar_url,
                   },
                   driverId: dbOrder.driver_id,
-                  status: dbOrder.status,
+                  status: dbOrder.status, // Utiliser le statut vérifié
                 });
               }
             }
           }
         } catch (dbError: any) {
-          logger.warn('Erreur lors du chargement depuis la DB pour driver-reconnect:', dbError);
+          logger.error(
+            `[driver-reconnect] Erreur lors du chargement depuis la DB pour driver ${maskUserId(driverId)}:`,
+            dbError
+          );
+          // Si la requête DB échoue, on ne peut pas faire confiance à activeOrders en mémoire
+          // car il peut contenir des statuts obsolètes. On va quand même essayer de filtrer strictement.
+          logger.warn(
+            `[driver-reconnect] Utilisation de activeOrders en mémoire uniquement (DB échouée) - filtrage strict appliqué`,
+            undefined,
+            { driverId, activeOrdersCount: activeOrders.size }
+          );
         }
 
         // Fusionner avec activeOrders en mémoire (priorité à la DB)
         const allOrders = new Map<string, Order>();
 
         // D'abord ajouter les commandes de la DB (source de vérité)
+        // MAIS vérifier aussi qu'elles ne sont pas dans activeOrders avec un statut final
         for (const [orderId, dbOrder] of ordersFromDB.entries()) {
+          // Vérifier que le statut dans la DB n'est pas final
           if (dbOrder.status !== 'completed' && dbOrder.status !== 'cancelled' && dbOrder.status !== 'declined') {
+            // Vérifier aussi qu'elle n'est pas dans activeOrders avec un statut final
+            // (au cas où la DB n'est pas encore mise à jour mais la mémoire l'est)
+            const memOrder = activeOrders.get(orderId);
+            if (memOrder && (memOrder.status === 'completed' || memOrder.status === 'cancelled' || memOrder.status === 'declined')) {
+              logger.warn(
+                `[driver-reconnect] Commande ${maskOrderId(orderId)} ignorée : statut final en mémoire (${memOrder.status}) mais statut actif en DB (${dbOrder.status})`,
+                undefined,
+                { orderId, memStatus: memOrder.status, dbStatus: dbOrder.status }
+              );
+              continue; // Ignorer cette commande
+            }
             allOrders.set(orderId, dbOrder as Order);
+          } else {
+            // La commande est complétée/annulée dans la DB, ne pas l'ajouter
+            logger.debug(
+              `[driver-reconnect] Commande ${maskOrderId(orderId)} ignorée : statut final en DB (${dbOrder.status})`,
+              undefined,
+              { orderId, status: dbOrder.status }
+            );
           }
         }
 
         // Ensuite ajouter les commandes de la mémoire qui ne sont pas dans la DB
+        // CRITIQUE : Filtrer strictement les commandes complétées/annulées même si la DB a échoué
         for (const [orderId, memOrder] of activeOrders.entries()) {
-          if (memOrder.driverId === driverId && 
-              memOrder.status !== 'completed' && 
-              memOrder.status !== 'cancelled' && 
-              memOrder.status !== 'declined' &&
-              !allOrders.has(orderId)) {
-            allOrders.set(orderId, memOrder);
+          // Vérifier strictement le statut (insensible à la casse)
+          const status = String(memOrder.status || '').toLowerCase();
+          const isFinalStatus = status === 'completed' || status === 'cancelled' || status === 'declined';
+          
+          // Ne jamais ajouter de commandes complétées/annulées, même si elles sont dans activeOrders
+          if (isFinalStatus) {
+            logger.warn(
+              `[driver-reconnect] Commande ${maskOrderId(orderId)} ignorée depuis activeOrders : statut final (${memOrder.status})`,
+              undefined,
+              { orderId, status: memOrder.status, driverId: memOrder.driverId }
+            );
+            continue; // Ignorer complètement les commandes complétées/annulées
+          }
+          
+          if (memOrder.driverId === driverId && !allOrders.has(orderId)) {
+            // Triple vérification avant d'ajouter (par sécurité)
+            const finalCheck = String(memOrder.status || '').toLowerCase();
+            if (finalCheck !== 'completed' && finalCheck !== 'cancelled' && finalCheck !== 'declined') {
+              allOrders.set(orderId, memOrder);
+            } else {
+              logger.warn(
+                `[driver-reconnect] Commande ${maskOrderId(orderId)} ignorée après vérification finale : statut final (${memOrder.status})`,
+                undefined,
+                { orderId, status: memOrder.status }
+              );
+            }
           }
         }
 
         // Séparer pending et active
+        // CRITIQUE : Filtrer une dernière fois les commandes complétées/annulées avant l'émission
         for (const [, order] of allOrders.entries()) {
+          // Vérifier strictement le statut (insensible à la casse)
+          const status = String(order.status || '').toLowerCase();
+          const isFinalStatus = status === 'completed' || status === 'cancelled' || status === 'declined';
+          
+          if (isFinalStatus) {
+            logger.warn(
+              `[driver-reconnect] Commande ${maskOrderId(order.id)} filtrée avant émission : statut final (${order.status})`,
+              undefined,
+              { orderId: order.id, status: order.status }
+            );
+            continue; // Ignorer les commandes complétées/annulées
+          }
+          
           if (order.status === 'pending') {
             pending.push(order);
           } else {
             active.push(order);
           }
         }
+
+        logger.info(
+          `[driver-reconnect] Resync envoyé au driver ${maskUserId(driverId)}: ${pending.length} pending, ${active.length} active`,
+          undefined,
+          { driverId, pendingCount: pending.length, activeCount: active.length }
+        );
 
         io.to(socket.id).emit('resync-order-state', {
           pendingOrders: pending,

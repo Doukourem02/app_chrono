@@ -52,15 +52,11 @@ class UserOrderSocketService {
       autoConnect: true,
     });
 
-    // Toujours installer les listeners (ils seront réinstallés à chaque reconnexion dans setupSocketListeners)
-    // Mais marquer comme setup pour éviter les appels multiples lors de la première connexion
-    if (!this.listenersSetup) {
-      this.setupSocketListeners(userId);
-      this.listenersSetup = true;
-    } else {
-      // Si les listeners sont déjà setup mais qu'on recrée le socket, réinstaller les listeners
-      this.setupSocketListeners(userId);
-    }
+    // CRITIQUE : Installer TOUS les listeners AVANT la connexion
+    // Cela garantit que les événements sont capturés dès la connexion
+    // setupSocketListeners installe les listeners connect/disconnect ET les event listeners
+    this.setupSocketListeners(userId);
+    this.listenersSetup = true;
   }
 
   // Méthode séparée pour installer uniquement les listeners d'événements (pas connect/disconnect)
@@ -446,12 +442,13 @@ class UserOrderSocketService {
     });
 
     this.socket.on('order:status:update', (data) => {
-      logger.info('🔄 Mise à jour statut commande reçue', 'userOrderSocketService', {
+      logger.info('🔄 [order:status:update] Événement reçu', 'userOrderSocketService', {
         orderId: data?.order?.id,
         status: data?.order?.status,
         hasOrder: !!data?.order,
         dbSaved: data?.dbSaved,
         dbError: data?.dbError,
+        socketConnected: this.socket?.connected,
       });
       try {
         const { order } = data || {};
@@ -459,31 +456,34 @@ class UserOrderSocketService {
           const store = useOrderStore.getState();
           const existingOrder = store.activeOrders.find(o => o.id === order.id);
           
-          logger.info('📦 État avant updateFromSocket', 'userOrderSocketService', {
+          logger.info('📦 [order:status:update] État AVANT updateFromSocket', 'userOrderSocketService', {
             orderId: order.id,
             newStatus: order.status,
             existingStatus: existingOrder?.status,
             existsInStore: !!existingOrder,
+            activeOrdersCount: store.activeOrders.length,
           });
           
+          // CRITIQUE : Toujours utiliser updateFromSocket pour garantir la synchronisation
           store.updateFromSocket({ order: order as any });
           
           // Vérifier que la mise à jour a bien eu lieu
           const updatedStore = useOrderStore.getState();
           const updatedOrder = updatedStore.activeOrders.find(o => o.id === order.id);
           
-          logger.info('✅ État après updateFromSocket', 'userOrderSocketService', {
+          logger.info('✅ [order:status:update] État APRÈS updateFromSocket', 'userOrderSocketService', {
             orderId: order.id,
             expectedStatus: order.status,
             actualStatus: updatedOrder?.status,
             stillInStore: !!updatedOrder,
             shouldBeRemoved: order.status === 'completed' || order.status === 'cancelled' || order.status === 'declined',
+            activeOrdersCount: updatedStore.activeOrders.length,
           });
         } else {
-          logger.warn('⚠️ order:status:update reçu mais order.id manquant', 'userOrderSocketService', { data });
+          logger.warn('⚠️ [order:status:update] order.id manquant', 'userOrderSocketService', { data });
         }
       } catch (err) {
-        logger.error('❌ Error handling order:status:update', 'userOrderSocketService', err);
+        logger.error('❌ [order:status:update] Erreur', 'userOrderSocketService', err);
       }
     });
 

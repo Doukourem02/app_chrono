@@ -78,7 +78,18 @@ export function useGeofencing({
 
       // Déterminer le nouveau statut selon le statut actuel
       let newStatus: string;
-      if (currentStatus === 'enroute' || currentStatus === 'accepted') {
+      
+      // CRITIQUE : Ne jamais valider automatiquement si le statut est 'accepted'
+      // Le livreur doit d'abord cliquer sur "Je pars" pour passer à 'enroute'
+      if (currentStatus === 'accepted') {
+        logger.warn(
+          `Géofencing: Validation automatique ignorée pour statut 'accepted' - le livreur doit d'abord cliquer sur "Je pars"`,
+          'useGeofencing'
+        );
+        return;
+      }
+      
+      if (currentStatus === 'enroute' || currentStatus === 'in_progress') {
         // Si en route vers le pickup, marquer comme picked_up
         newStatus = 'picked_up';
       } else if (currentStatus === 'picked_up' || currentStatus === 'delivering') {
@@ -146,6 +157,20 @@ export function useGeofencing({
 
     // Ne pas valider si la commande est déjà complétée ou annulée
     if (orderStatus === 'completed' || orderStatus === 'cancelled') {
+      return;
+    }
+
+    // CRITIQUE : Ne pas activer la validation automatique si le statut est 'accepted'
+    // Le livreur doit d'abord cliquer sur "Je pars" pour passer à 'enroute'
+    // Sinon, le menu "Je pars" disparaît et le livreur ne peut plus mettre à jour le statut
+    if (orderStatus === 'accepted') {
+      // Annuler toute validation programmée
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+        validationTimeoutRef.current = null;
+      }
+      hasValidatedRef.current = false;
+      // Ne pas calculer le géofencing pour éviter les notifications prématurées
       return;
     }
 

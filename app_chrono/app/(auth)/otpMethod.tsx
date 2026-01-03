@@ -18,38 +18,74 @@ export default function OTPMethodScreen() {
     }
 
     setIsLoading(true);
+    const TIMEOUT_MS = 15000; // 15 secondes pour l'envoi OTP
 
     try {
-      // Appeler l'API backend pour envoyer l'OTP
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/send-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          phone: phoneNumber,
-          email: email,
-          otpMethod: selectedMethod,
-          role: 'client', // Toujours client pour cette app
-        }),
-      });
+      // Créer un AbortController pour gérer le timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-      const data = await response.json();
+      try {
+        // Appeler l'API backend pour envoyer l'OTP
+        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/send-otp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone: phoneNumber,
+            email: email,
+            otpMethod: selectedMethod,
+            role: 'client', // Toujours client pour cette app
+          }),
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'envoi de l\'OTP');
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Erreur lors de l\'envoi de l\'OTP');
+        }
+
+        logger.debug('OTP envoyé avec succès:', data);
+        
+        // Sauvegarder la méthode choisie pour la vérification
+        setTempData(email, phoneNumber, selectedMethod, 'client');
+        
+        // Naviguer vers l'écran de vérification
+        router.push('./verification' as any);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        // Si c'est une erreur d'abort (timeout), lancer une erreur spécifique
+        if (fetchError.name === 'AbortError' || controller.signal.aborted) {
+          throw new Error('La requête a pris trop de temps. Vérifiez votre connexion internet et réessayez.');
+        }
+        
+        throw fetchError;
       }
-
-      logger.debug('OTP envoyé avec succès:', data);
+    } catch (error: any) {
+      const errorMessage = error?.message || '';
       
-      // Sauvegarder la méthode choisie pour la vérification
-      setTempData(email, phoneNumber, selectedMethod, 'client');
-      
-      // Naviguer vers l'écran de vérification
-      router.push('./verification' as any);
-    } catch (error) {
-      logger.error('Erreur lors de l\'envoi OTP:', error);
-      Alert.alert('Erreur', (error as Error).message || 'Une erreur est survenue. Veuillez réessayer.');
+      // Gérer spécifiquement les erreurs de timeout et réseau
+      if (errorMessage.includes('timeout') || errorMessage.includes('trop de temps')) {
+        logger.error('Timeout lors de l\'envoi OTP:', error);
+        Alert.alert(
+          'Timeout',
+          'La requête a pris trop de temps. Vérifiez votre connexion internet et que le serveur est accessible, puis réessayez.'
+        );
+      } else if (errorMessage.includes('Network request failed') || errorMessage.includes('Network request timed out')) {
+        logger.error('Erreur réseau lors de l\'envoi OTP:', error);
+        Alert.alert(
+          'Erreur réseau',
+          'Impossible de contacter le serveur. Vérifiez votre connexion internet et que le serveur est démarré, puis réessayez.'
+        );
+      } else {
+        logger.error('Erreur lors de l\'envoi OTP:', error);
+        Alert.alert('Erreur', errorMessage || 'Une erreur est survenue. Veuillez réessayer.');
+      }
     } finally {
       setIsLoading(false);
     }

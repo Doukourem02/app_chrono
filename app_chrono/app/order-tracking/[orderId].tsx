@@ -40,20 +40,27 @@ export default function OrderTrackingPage() {
   const [region, setRegion] = React.useState<any>(null);
   const isLoadingOrderRef = useRef(false);
 
-  // Fusionner storeOrder (temps réel) et loadedOrder (API) - le store a priorité pour le statut
+  // Fusionner storeOrder (temps réel) et loadedOrder (API) - TOUJOURS privilégier le store (temps réel)
   const currentOrder = useMemo(() => {
     if (!orderId) return null;
+    
+    // CRITIQUE : Toujours privilégier le store (temps réel) car il reçoit les mises à jour socket en direct
+    // Le loadedOrder (API) sert uniquement de fallback si le store n'a pas encore la commande
     if (storeOrder) {
+      // Si on a le store, l'utiliser en priorité (il contient les mises à jour socket les plus récentes)
+      // Fusionner avec loadedOrder uniquement pour les propriétés manquantes
       if (loadedOrder) {
-        const merged = {
-          ...loadedOrder,
-          ...storeOrder,
-          status: storeOrder.status,
+        return {
+          ...loadedOrder, // Base depuis l'API
+          ...storeOrder,  // Écraser avec les données temps réel du store
+          status: storeOrder.status, // FORCER le statut du store (le plus récent)
         };
-        return merged;
       }
       return storeOrder;
     }
+    
+    // Si on n'a pas le store mais qu'on a loadedOrder, l'utiliser
+    // Cela peut arriver lors du chargement initial avant que le socket ne synchronise
     return loadedOrder || null;
   }, [orderId, storeOrder, loadedOrder]);
   const orderDriverCoords = orderId ? orderDriverCoordsMap.get(orderId) || null : null;
@@ -267,16 +274,17 @@ export default function OrderTrackingPage() {
           const existingOrder = store.activeOrders.find(o => o.id === orderId);
           
           if (existingOrder) {
-            // Si le statut a changé, utiliser updateFromSocket qui gère correctement les statuts finaux
-            if (existingOrder.status !== orderStatus) {
-              store.updateFromSocket({ order: formattedOrder as any });
-            } else {
-              // Si le statut n'a pas changé mais que c'est un statut final, s'assurer qu'il est retiré
-              if (isFinalStatus) {
+            // TOUJOURS utiliser updateFromSocket pour garantir la synchronisation
+            // Cela force le re-render même si le statut semble identique
+            // et garantit que toutes les propriétés sont à jour
+            store.updateFromSocket({ order: formattedOrder as any });
+            
+            // Si c'est un statut final, s'assurer qu'il est retiré du store
+            if (isFinalStatus) {
+              // Attendre un peu avant de retirer pour que l'UI puisse afficher le statut final
+              setTimeout(() => {
                 store.removeOrder(orderId);
-              } else {
-                store.updateOrder(orderId, formattedOrder as any);
-              }
+              }, 2000);
             }
           } else {
             // Si la commande n'existe pas dans le store
@@ -307,19 +315,35 @@ export default function OrderTrackingPage() {
 
   // Charger la commande au montage et recharger périodiquement si elle est active
   useEffect(() => {
-    if (!currentOrder && orderId && user?.id) {
-      loadOrderFromAPI();
-    }
+    if (!orderId || !user?.id) return;
     
-    // Recharger toutes les 3 secondes pour garantir que le statut est à jour
-    // Réduire l'intervalle pour une meilleure réactivité
+    // CRITIQUE : Attendre que le socket soit connecté avant de charger depuis l'API
+    // Cela garantit que les listeners sont installés et prêts à recevoir les événements
+    const checkAndLoad = () => {
+      if (userOrderSocketService.isSocketConnected()) {
+        // Le socket est connecté, charger la commande
+        if (!currentOrder) {
+          loadOrderFromAPI();
+        }
+      } else {
+        // Le socket n'est pas encore connecté, attendre un peu
+        logger.debug('⚠️ [order-tracking] Socket non connecté, report du chargement API', 'order-tracking', { orderId });
+        setTimeout(checkAndLoad, 500);
+      }
+    };
+    
+    // Vérifier immédiatement
+    checkAndLoad();
+    
+    // Recharger toutes les 5 secondes pour garantir que le statut est à jour
+    // MAIS seulement si le socket est connecté
     const interval = setInterval(() => {
-      if (orderId && user?.id) {
+      if (orderId && user?.id && userOrderSocketService.isSocketConnected()) {
         // Toujours recharger depuis l'API pour garantir la synchronisation
         // même si le statut semble final (peut avoir changé côté serveur)
         loadOrderFromAPI();
       }
-    }, 3000);
+    }, 5000); // Augmenter à 5 secondes pour réduire la charge serveur
     
     return () => clearInterval(interval);
   }, [orderId, user?.id, loadOrderFromAPI, currentOrder]);

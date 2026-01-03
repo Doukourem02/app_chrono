@@ -104,24 +104,70 @@ class ApiService {
   }
 
   private async refreshAccessToken(refreshToken: string): Promise<string | null> {
+    const TIMEOUT_MS = 10000; // 10 secondes
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
+      // Créer un AbortController pour gérer le timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-      const result = await response.json();
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken }),
+          signal: controller.signal,
+        });
 
-      if (!response.ok || !result.success || !result.data?.accessToken) {
-        logger.warn('Refresh token échoué (driver):', 'apiService', result);
+        clearTimeout(timeoutId);
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success || !result.data?.accessToken) {
+          logger.warn('Refresh token échoué (driver):', 'apiService', result);
+          return null;
+        }
+
+        return result.data.accessToken as string;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        // Si c'est une erreur d'abort (timeout), lancer une erreur spécifique
+        if (fetchError.name === 'AbortError' || controller.signal.aborted) {
+          throw new Error('Network request timed out');
+        }
+        
+        throw fetchError;
+      }
+    } catch (error: any) {
+      // Distinguer les erreurs réseau des autres erreurs
+      const errorMessage = error?.message || '';
+      
+      if (error instanceof TypeError && (errorMessage.includes('Network request failed') || errorMessage.includes('Network request timed out'))) {
+        if (__DEV__) {
+          logger.error(
+            'Erreur réseau lors du rafraîchissement du token. Backend inaccessible sur',
+            API_BASE_URL,
+            'apiService'
+          );
+        }
+        // Ne pas déconnecter l'utilisateur en cas d'erreur réseau temporaire
+        // Le token pourra être rafraîchi lors de la prochaine tentative
         return null;
       }
-
-      return result.data.accessToken as string;
-    } catch (error) {
+      
+      if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        if (__DEV__) {
+          logger.warn(
+            `Timeout lors du rafraîchissement du token (${TIMEOUT_MS}ms). Backend peut être lent ou inaccessible.`,
+            'apiService'
+          );
+        }
+        return null;
+      }
+      
       logger.error('Erreur refreshAccessToken (driver):', 'apiService', error);
       return null;
     }

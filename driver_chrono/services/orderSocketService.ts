@@ -40,10 +40,18 @@ class OrderSocketService {
       autoConnect: true,
     });
 
+    // CRITIQUE : Installer TOUS les listeners AVANT le connect
+    // Cela garantit que les événements sont capturés dès la connexion
+    this.setupAllListeners(driverId);
+    this.setupConnectionErrorHandler();
+
     this.socket.on('connect', () => {
       logger.info('Socket connecté pour commandes');
       this.isConnected = true;
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
+
+      // Réinstaller les listeners après reconnexion pour garantir qu'ils sont actifs
+      this.setupAllListeners(driverId);
 
       // S'identifier comme driver
       logger.info('Identification comme driver', undefined, { driverId });
@@ -66,6 +74,22 @@ class OrderSocketService {
         logger.info('Le serveur a forcé la déconnexion, reconnexion automatique...', undefined);
       }
     });
+  }
+
+  // Méthode pour installer tous les listeners (sauf connect/disconnect)
+  private setupAllListeners(driverId: string) {
+    if (!this.socket) return;
+
+    // Retirer les anciens listeners pour éviter les doublons
+    this.socket.removeAllListeners('new-order-request');
+    this.socket.removeAllListeners('order-accepted-confirmation');
+    this.socket.removeAllListeners('order-declined-confirmation');
+    this.socket.removeAllListeners('order-not-found');
+    this.socket.removeAllListeners('order-already-taken');
+    this.socket.removeAllListeners('order-accept-error');
+    this.socket.removeAllListeners('resync-order-state');
+    this.socket.removeAllListeners('order:status:update');
+    this.socket.removeAllListeners('order:cancelled');
 
     // Nouvelle commande reçue
     this.socket.on('new-order-request', (order: OrderRequest) => {
@@ -176,17 +200,39 @@ class OrderSocketService {
 
         // Ajouter toutes les commandes actives (filtrer les complétées/annulées)
         if (Array.isArray(activeOrders)) {
-          const validActiveOrders = activeOrders.filter((order: any) => 
-            order && order.id && order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined'
+          const validActiveOrders = activeOrders.filter((order: any) => {
+            // Filtrer strictement les commandes complétées, annulées ou déclinées
+            if (!order || !order.id) return false;
+            const status = String(order.status || '').toLowerCase();
+            return status !== 'completed' && status !== 'cancelled' && status !== 'declined';
+          });
+          
+          // Nettoyer d'abord toutes les commandes existantes qui sont complétées
+          const existingCompleted = store.activeOrders.filter(o => 
+            o.status === 'completed' || o.status === 'cancelled' || o.status === 'declined'
           );
+          existingCompleted.forEach(order => {
+            store.completeOrder(order.id);
+          });
+          
+          // Ensuite ajouter seulement les commandes valides
           validActiveOrders.forEach((order: any) => {
-            store.addOrder(order);
+            // Vérifier une dernière fois avant d'ajouter
+            const status = String(order.status || '').toLowerCase();
+            if (status !== 'completed' && status !== 'cancelled' && status !== 'declined') {
+              store.addOrder(order);
+            }
           });
           logger.info(`${validActiveOrders.length} commande(s) active(s) restaurée(s) après reconnexion`, undefined);
-        } else if (currentOrder && currentOrder.id && currentOrder.status !== 'completed' && currentOrder.status !== 'cancelled' && currentOrder.status !== 'declined') {
-          // Compatibilité avec l'ancien format
-          store.addOrder(currentOrder as any);
-          logger.info('Commande active restaurée après reconnexion', undefined, { orderId: currentOrder.id });
+        } else if (currentOrder && currentOrder.id) {
+          // Compatibilité avec l'ancien format - vérifier strictement le statut
+          const status = String(currentOrder.status || '').toLowerCase();
+          if (status !== 'completed' && status !== 'cancelled' && status !== 'declined') {
+            store.addOrder(currentOrder as any);
+            logger.info('Commande active restaurée après reconnexion', undefined, { orderId: currentOrder.id });
+          } else {
+            logger.info('Commande complétée/annulée ignorée lors du resync', undefined, { orderId: currentOrder.id, status: currentOrder.status });
+          }
         }
       } catch (err) {
         logger.warn('Error handling resync-order-state (driver)', undefined, err);
@@ -250,6 +296,11 @@ class OrderSocketService {
         logger.warn('Error handling order:cancelled', undefined, err);
       }
     });
+  }
+
+  // Gestion des erreurs de connexion (doit être dans connect, pas dans setupAllListeners)
+  private setupConnectionErrorHandler() {
+    if (!this.socket) return;
 
     this.socket.on('connect_error', (error) => {
       this.isConnected = false;

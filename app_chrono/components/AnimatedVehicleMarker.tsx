@@ -5,17 +5,23 @@ interface AnimatedVehicleMarkerProps {
   vehicleType: 'moto' | 'vehicule' | 'cargo';
   bearing: number; // Angle en degrés (0-360)
   size?: number;
+  coordinate?: { latitude: number; longitude: number }; // Coordonnées pour le cercle de la map
 }
 
 /**
  * Composant pour afficher un marqueur de livreur animé avec rotation
  * Utilise l'image deliveryman.png qui représente un livreur sur scooter
  * La rotation suit la direction du mouvement (comme Yango)
+ * 
+ * NOTE: Le cercle violet doit être rendu via un Circle de react-native-maps
+ * dans le composant parent pour éviter la déformation. Ce composant affiche
+ * uniquement l'icône du livreur.
  */
 export const AnimatedVehicleMarker: React.FC<AnimatedVehicleMarkerProps> = ({
   vehicleType,
   bearing,
   size = 64, // Taille augmentée pour mieux voir le livreur
+  coordinate, // Non utilisé ici, mais peut être passé au parent pour le Circle
 }) => {
   const rotationAnim = useRef(new Animated.Value(bearing)).current;
   const previousBearingRef = useRef<number | null>(null);
@@ -66,9 +72,6 @@ export const AnimatedVehicleMarker: React.FC<AnimatedVehicleMarkerProps> = ({
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
-      {/* Cercle de pulse (effet radar) */}
-      <View style={[styles.pulseOuter, { width: size + 12, height: size + 12 }]} />
-      
       {/* Conteneur du livreur avec rotation */}
       <Animated.View
         style={[
@@ -91,14 +94,8 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pulseOuter: {
-    position: 'absolute',
-    borderRadius: 1000,
-    borderWidth: 2,
-    borderColor: '#8B5CF6',
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    // Animation de pulse (sera géré par le parent si nécessaire)
+    // Le cercle violet sera rendu via Circle de react-native-maps dans le parent
+    // pour éviter la déformation selon le zoom de la map
   },
   driverContainer: {
     alignItems: 'center',

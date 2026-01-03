@@ -369,6 +369,15 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
        orderStatus !== 'cancelled' && 
        orderStatus !== 'declined' && (
         <>
+          {/* Cercle violet parfait autour du livreur - utilise Circle de react-native-maps pour éviter la déformation */}
+          <Circle
+            center={animatedDriverPosition || orderDriverCoords!}
+            radius={38} // Rayon en mètres pour un cercle visible mais pas trop grand
+            strokeColor="#8B5CF6"
+            fillColor="rgba(139, 92, 246, 0.15)"
+            strokeWidth={2}
+          />
+          
           <Marker
             coordinate={animatedDriverPosition || orderDriverCoords!}
             title="Livreur"
@@ -384,6 +393,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
               }
               bearing={driverBearing}
               size={64}
+              coordinate={animatedDriverPosition || orderDriverCoords!}
             />
           </Marker>
           

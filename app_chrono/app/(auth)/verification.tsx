@@ -46,51 +46,88 @@ export default function VerificationScreen() {
     }
 
     setIsLoading(true);
+    const TIMEOUT_MS = 15000; // 15 secondes pour la vérification OTP
 
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/verify-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email,
-          phone: phoneNumber,
-          otp: fullCode,
-          method: otpMethod,
-        }),
-      });
+      // Créer un AbortController pour gérer le timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-      const data = await response.json();
+      try {
+        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/verify-otp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email,
+            phone: phoneNumber,
+            otp: fullCode,
+            method: otpMethod,
+          }),
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Code de vérification incorrect');
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Code de vérification incorrect');
+        }
+
+        logger.debug(`${otpMethod} OTP vérifié avec succès:`, data);
+
+        const userData = {
+          id: data.data.user.id,
+          email: data.data.user.email,
+          phone: data.data.user.phone,
+          isVerified: data.data.user.isVerified || true,
+          first_name: data.data.user.first_name || null,
+          last_name: data.data.user.last_name || null,
+        };
+        
+        setUser(userData);
+        const tokens = data.data.tokens || {};
+        setTokens({
+          accessToken: tokens.accessToken ?? null,
+          refreshToken: tokens.refreshToken ?? null,
+        });
+        
+        clearTempData();
+        
+        router.push('./success' as any);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        // Si c'est une erreur d'abort (timeout), lancer une erreur spécifique
+        if (fetchError.name === 'AbortError' || controller.signal.aborted) {
+          throw new Error('La requête a pris trop de temps. Vérifiez votre connexion internet et réessayez.');
+        }
+        
+        throw fetchError;
       }
-
-      logger.debug(`${otpMethod} OTP vérifié avec succès:`, data);
-
-      const userData = {
-        id: data.data.user.id,
-        email: data.data.user.email,
-        phone: data.data.user.phone,
-        isVerified: data.data.user.isVerified || true,
-        first_name: data.data.user.first_name || null,
-        last_name: data.data.user.last_name || null,
-      };
+    } catch (error: any) {
+      const errorMessage = error?.message || '';
       
-      setUser(userData);
-      const tokens = data.data.tokens || {};
-      setTokens({
-        accessToken: tokens.accessToken ?? null,
-        refreshToken: tokens.refreshToken ?? null,
-      });
+      // Gérer spécifiquement les erreurs de timeout et réseau
+      if (errorMessage.includes('timeout') || errorMessage.includes('trop de temps')) {
+        logger.error('Timeout lors de la vérification OTP:', error);
+        Alert.alert(
+          'Timeout',
+          'La requête a pris trop de temps. Vérifiez votre connexion internet et que le serveur est accessible, puis réessayez.'
+        );
+      } else if (errorMessage.includes('Network request failed') || errorMessage.includes('Network request timed out')) {
+        logger.error('Erreur réseau lors de la vérification OTP:', error);
+        Alert.alert(
+          'Erreur réseau',
+          'Impossible de contacter le serveur. Vérifiez votre connexion internet et que le serveur est démarré, puis réessayez.'
+        );
+      } else {
+        logger.error('Erreur lors de la vérification:', error);
+        Alert.alert('Erreur', errorMessage || 'Code de vérification incorrect. Veuillez réessayer.');
+      }
       
-      clearTempData();
-      
-      router.push('./success' as any);
-    } catch (error) {
-      logger.error('Erreur lors de la vérification:', error);
-      Alert.alert('Erreur', (error as Error).message || 'Code de vérification incorrect. Veuillez réessayer.');
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {

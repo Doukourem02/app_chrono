@@ -94,15 +94,27 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   isReceivingOrders: true,
 
   addOrder: (order) => set((state) => {
+    // Normaliser le statut pour la comparaison (insensible à la casse)
+    const normalizedStatus = String(order.status || '').toLowerCase();
+    
     // Ne pas ajouter les commandes complétées, annulées ou déclinées
-    if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'declined') {
-      // Si la commande existe déjà et est complétée, la retirer
+    if (normalizedStatus === 'completed' || normalizedStatus === 'cancelled' || normalizedStatus === 'declined') {
+      // Si la commande existe déjà et est complétée, la retirer immédiatement
       const exists = state.activeOrders.some(o => o.id === order.id);
       if (exists) {
+        // Logger seulement en mode dev pour éviter les logs en production
+        if (__DEV__) {
+          console.log(`[useOrderStore] Commande ${order.id.slice(0, 8)}... complétée/annulée retirée de activeOrders`, { status: order.status });
+        }
         return {
           activeOrders: state.activeOrders.filter(o => o.id !== order.id),
           selectedOrderId: state.selectedOrderId === order.id ? null : state.selectedOrderId,
         };
+      }
+      // Si elle n'existe pas, ne rien faire (ne pas l'ajouter)
+      // Logger seulement en mode dev pour éviter les logs en production
+      if (__DEV__) {
+        console.log(`[useOrderStore] Tentative d'ajout d'une commande complétée/annulée ignorée`, { orderId: order.id, status: order.status });
       }
       return state;
     }

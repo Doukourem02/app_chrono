@@ -143,13 +143,22 @@ export default function Index() {
   }, [activeOrders, sortedActiveOrdersByDistance, location]);
 
   const currentOrder = useOrderStore((s) => {
+    // Filtrer les commandes complétées/annulées avant de sélectionner
+    const validActiveOrders = s.activeOrders.filter(o => 
+      o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined'
+    );
+    
     if (s.selectedOrderId) {
-      return s.activeOrders.find(o => o.id === s.selectedOrderId) || null;
+      const selected = validActiveOrders.find(o => o.id === s.selectedOrderId);
+      // Si la commande sélectionnée est complétée/annulée, la désélectionner
+      if (!selected && s.selectedOrderId) {
+        useOrderStore.getState().setSelectedOrder(null);
+      }
+      return selected || null;
     }
     
-    // Fallback : retourner la première commande active si aucune n'est sélectionnée
-    // (la sélection automatique sera gérée par le useEffect ci-dessus)
-    return s.activeOrders[0] || null;
+    // Fallback : retourner la première commande active valide si aucune n'est sélectionnée
+    return validActiveOrders[0] || null;
   });
   
   // Bottom sheet pour les détails de la commande (remplace RecipientDetailsSheet)
@@ -235,19 +244,28 @@ export default function Index() {
   });
   
   // Géofencing : détection automatique d'arrivée
+  // CRITIQUE : Désactiver le géofencing si le statut est 'accepted'
+  // Le livreur doit d'abord cliquer sur "Je pars" pour passer à 'enroute'
+  // Sinon, le géofencing valide automatiquement et fait disparaître le menu "Je pars"
+  const shouldEnableGeofencing = isOnline && 
+    !!currentOrder && 
+    !!destination && 
+    !!location &&
+    currentOrder.status !== 'accepted'; // Désactiver si statut est 'accepted'
+  
   useGeofencing({
-  driverPosition: location,
-  targetPosition: destination,
-  orderId: currentOrder?.id || null,
-  orderStatus: currentOrder?.status || null,
-  enabled: isOnline && !!currentOrder && !!destination && !!location,
-  onEnteredZone: () => {
-    logger.info('Vous êtes arrivé dans la zone de livraison', 'geofencing');
-  },
-  onValidated: () => {
-    logger.info('Livraison validée automatiquement', 'geofencing');
-  },
-});
+    driverPosition: location,
+    targetPosition: destination,
+    orderId: currentOrder?.id || null,
+    orderStatus: currentOrder?.status || null,
+    enabled: shouldEnableGeofencing,
+    onEnteredZone: () => {
+      logger.info('Vous êtes arrivé dans la zone de livraison', 'geofencing');
+    },
+    onValidated: () => {
+      logger.info('Livraison validée automatiquement', 'geofencing');
+    },
+  });
 
   
   // Route animée vers la destination
