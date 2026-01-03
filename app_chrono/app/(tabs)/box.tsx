@@ -178,7 +178,7 @@ export default function BoxPage() {
                   return { address: '', coordinates: { latitude: 0, longitude: 0 } };
                 }
               } catch (e) {
-                logger.warn('Erreur parsing pickup:', e);
+                logger.warn('Erreur parsing pickup:', undefined, e);
                 return { address: '', coordinates: { latitude: 0, longitude: 0 } };
               }
             })(),
@@ -192,7 +192,7 @@ export default function BoxPage() {
                   return { address: '', coordinates: { latitude: 0, longitude: 0 } };
                 }
               } catch (e) {
-                logger.warn('Erreur parsing dropoff:', e);
+                logger.warn('Erreur parsing dropoff:', undefined, e);
                 return { address: '', coordinates: { latitude: 0, longitude: 0 } };
               }
             })(),
@@ -214,7 +214,7 @@ export default function BoxPage() {
                       return undefined;
                     }
                   } catch (e) {
-                    logger.warn('Erreur parsing proof:', e);
+                    logger.warn('Erreur parsing proof:', undefined, e);
                     return undefined;
                   }
                 })()
@@ -266,7 +266,7 @@ export default function BoxPage() {
           }
         }
       } catch (err) {
-        logger.error('Erreur chargement commandes:', err);
+        logger.error('Erreur chargement commandes:', undefined, err);
         if (isFirstPage) {
           // Vérifier si c'est une erreur de session expirée
           const errorMessage = err instanceof Error ? err.message : 'Impossible de charger vos commandes';

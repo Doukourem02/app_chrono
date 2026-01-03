@@ -61,7 +61,7 @@ export default function ProfilePage() {
           } as any);
         }
       } catch (error) {
-        logger.error("Erreur chargement profil utilisateur:", error);
+        logger.error("Erreur chargement profil utilisateur:", undefined, error);
       }
     };
 
@@ -81,7 +81,7 @@ export default function ProfilePage() {
           setStatistics(result.data);
         }
       } catch (error) {
-        logger.error("Erreur chargement statistiques:", error);
+        logger.error("Erreur chargement statistiques:", undefined, error);
       } finally {
         setIsLoadingStats(false);
       }
@@ -159,7 +159,7 @@ export default function ProfilePage() {
         },
       ]);
     } catch (error) {
-      logger.error("Erreur sélection image:", error);
+      logger.error("Erreur sélection image:", undefined, error);
       Alert.alert("Erreur", "Impossible d'accéder à vos photos");
     }
   };
@@ -199,7 +199,7 @@ export default function ProfilePage() {
         );
       }
     } catch (error) {
-      logger.error("Erreur upload avatar:", error);
+      logger.error("Erreur upload avatar:", undefined, error);
       Alert.alert("Erreur", "Impossible de mettre à jour l'avatar");
     } finally {
       setUploadingAvatar(false);

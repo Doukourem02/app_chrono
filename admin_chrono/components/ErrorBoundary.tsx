@@ -48,8 +48,9 @@ export class ErrorBoundary extends Component<Props, State> {
     // En production, envoyer à Sentry si disponible
     if (process.env.NODE_ENV === 'production') {
       // Import dynamique pour éviter les erreurs si Sentry n'est pas installé
+      // @ts-expect-error - Sentry est optionnel, peut ne pas être installé
       import('@sentry/nextjs')
-        .then((Sentry) => {
+        .then((Sentry: { captureException?: (error: Error, options?: unknown) => void }) => {
           if (Sentry && typeof Sentry.captureException === 'function') {
             Sentry.captureException(error, {
               contexts: {

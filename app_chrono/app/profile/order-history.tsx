@@ -38,7 +38,7 @@ export default function OrderHistoryPage() {
         setOrders(result.data);
       }
     } catch (error) {
-      logger.error('Erreur chargement historique:', error);
+      logger.error('Erreur chargement historique:', undefined, error);
     } finally {
       setIsLoading(false);
     }

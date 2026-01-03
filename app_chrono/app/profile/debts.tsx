@@ -47,7 +47,7 @@ export default function DebtsPage() {
         setDebts(debtsResult.data);
       }
     } catch (error) {
-      logger.error("Erreur chargement données:", error);
+      logger.error("Erreur chargement données:", undefined, error);
       Alert.alert(
         "Erreur",
         "Impossible de charger les données. Veuillez réessayer."

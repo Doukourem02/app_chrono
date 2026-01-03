@@ -2,6 +2,8 @@
  * Utilitaires météo pour driver_chrono
  */
 
+import { logger } from './logger';
+
 export interface WeatherData {
   temperature: number;
   condition: string;
@@ -41,7 +43,7 @@ export async function fetchWeatherData(
   } catch (error) {
     // Ne pas logger les erreurs réseau en production (normal si le backend n'est pas disponible)
     if (__DEV__) {
-      logger.warn('Weather API unavailable:', error instanceof Error ? error.message : 'Network error');
+      logger.warn('Weather API unavailable:', undefined, { error: error instanceof Error ? error.message : 'Network error' });
     }
     return null;
   }

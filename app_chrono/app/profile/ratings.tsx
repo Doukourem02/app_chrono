@@ -28,7 +28,7 @@ export default function RatingsPage() {
   
       setRatings([]);
     } catch (error) {
-      logger.error('Erreur chargement évaluations:', error);
+      logger.error('Erreur chargement évaluations:', undefined, error);
     } finally {
       setIsLoading(false);
     }

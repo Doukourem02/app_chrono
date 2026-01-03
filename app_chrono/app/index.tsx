@@ -27,7 +27,7 @@ export default function RootIndex() {
           }
         } catch (error) {
           // En cas d'erreur, continuer avec la validation normale
-          logger.warn('Erreur lors de la vérification du token:', error);
+          logger.warn('Erreur lors de la vérification du token:', undefined, error);
         }
 
         // Si l'utilisateur est authentifié, valider sa session

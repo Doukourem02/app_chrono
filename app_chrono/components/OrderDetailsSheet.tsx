@@ -121,7 +121,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
     } catch (error) {
-      logger.error('Error picking image:', error);
+      logger.error('Error picking image:', undefined, error);
       Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
     }
   };

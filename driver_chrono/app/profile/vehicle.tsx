@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
+import { logger } from '../../utils/logger';
 
 export default function VehiclePage() {
   const { profile, user } = useDriverStore();
@@ -73,7 +74,7 @@ export default function VehiclePage() {
         Alert.alert('Erreur', result.message || 'Impossible de mettre à jour les informations');
       }
     } catch (error) {
-      logger.error('Erreur mise à jour véhicule:', error);
+      logger.error('Erreur mise à jour véhicule:', undefined, error);
       Alert.alert('Erreur', 'Impossible de mettre à jour les informations');
     } finally {
       setIsLoading(false);

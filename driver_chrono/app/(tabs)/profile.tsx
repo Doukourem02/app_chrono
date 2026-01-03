@@ -85,7 +85,7 @@ export default function ProfilePage() {
           });
         }
       } catch (error) {
-        logger.error('Erreur chargement profil utilisateur:', error);
+        logger.error('Erreur chargement profil utilisateur:', undefined, error);
       }
     };
 

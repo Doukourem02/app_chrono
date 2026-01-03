@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-// Validation des variables d'environnement au démarrage (côté serveur)
-import "../lib/envCheck";
+import "../lib/envCheck"; //validation des variables d'environnement au démarrage
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

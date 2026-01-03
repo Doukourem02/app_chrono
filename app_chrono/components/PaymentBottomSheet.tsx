@@ -81,7 +81,7 @@ export default function PaymentBottomSheet({
         setDeferredInfo(result.data);
       }
     } catch (error) {
-      logger.error('Erreur chargement limites paiement différé:', error);
+      logger.error('Erreur chargement limites paiement différé:', undefined, error);
     }
   };
 

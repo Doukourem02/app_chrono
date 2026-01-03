@@ -126,7 +126,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   // Debug: Log pour vérifier les positions et conditions d'affichage
   useEffect(() => {
     if (__DEV__) {
-      logger.debug('[DeliveryMapView] Debug marqueur:', {
+      logger.debug('[DeliveryMapView] Debug marqueur:', undefined, {
         orderDriverCoords,
         animatedDriverPosition,
         orderStatus,

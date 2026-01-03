@@ -31,7 +31,7 @@ export default function TransactionsPage() {
         setTransactions(result.data);
       }
     } catch (error) {
-      logger.error('Erreur chargement transactions:', error);
+      logger.error('Erreur chargement transactions:', undefined, error);
       Alert.alert('Erreur', 'Impossible de charger vos transactions');
     } finally {
       setIsLoading(false);
@@ -153,7 +153,7 @@ export default function TransactionsPage() {
         Alert.alert('Erreur', result.message || 'Impossible de créer la réclamation');
       }
     } catch (error) {
-      logger.error('Erreur création dispute:', error);
+      logger.error('Erreur création dispute:', undefined, error);
       Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);

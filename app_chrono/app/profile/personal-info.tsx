@@ -67,7 +67,7 @@ export default function PersonalInfoPage() {
         Alert.alert('Erreur', result.message || 'Impossible de mettre à jour vos informations');
       }
     } catch (error) {
-      logger.error('Erreur mise à jour profil:', error);
+      logger.error('Erreur mise à jour profil:', undefined, error);
       Alert.alert('Erreur', 'Impossible de mettre à jour vos informations');
     } finally {
       setIsLoading(false);
