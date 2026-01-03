@@ -6,6 +6,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { Wallet, TrendingUp, CreditCard, Clock, Download, RefreshCw } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { exportData } from '@/utils/exportUtils'
+import { themeColors } from '@/utils/theme'
 import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,} from 'recharts'
 
 type Period = 'today' | 'week' | 'month' | 'year'
@@ -170,7 +171,7 @@ export default function FinancePage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '28px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const periodTabsStyle: React.CSSProperties = {
@@ -186,9 +187,9 @@ export default function FinancePage() {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    border: '1px solid #E5E7EB',
-    backgroundColor: '#FFFFFF',
-    color: '#6B7280',
+    border: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textSecondary,
   }
 
   const periodTabActiveStyle: React.CSSProperties = {
@@ -197,8 +198,8 @@ export default function FinancePage() {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    border: '1px solid #8B5CF6',
-    backgroundColor: '#8B5CF6',
+    border: `1px solid ${themeColors.purplePrimary}`,
+    backgroundColor: themeColors.purplePrimary,
     color: '#FFFFFF',
   }
 
@@ -210,11 +211,11 @@ export default function FinancePage() {
   }
 
   const kpiCardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
   }
 
   const kpiCardHeaderStyle: React.CSSProperties = {
@@ -237,29 +238,29 @@ export default function FinancePage() {
   const kpiValueStyle: React.CSSProperties = {
     fontSize: '24px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '4px',
   }
 
   const kpiLabelStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     fontWeight: 500,
   }
 
   const chartCardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     marginBottom: '16px',
   }
 
   const chartTitleStyle: React.CSSProperties = {
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '20px',
   }
 
@@ -274,27 +275,30 @@ export default function FinancePage() {
   const filterInputStyle: React.CSSProperties = {
     padding: '10px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     flex: 1,
     minWidth: '200px',
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textPrimary,
   }
 
   const filterSelectStyle: React.CSSProperties = {
     padding: '10px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     cursor: 'pointer',
+    color: themeColors.textPrimary,
   }
 
   const tableCardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4EB',
+    border: `1px solid ${themeColors.cardBorder}`,
   }
 
   const tableStyle: React.CSSProperties = {
@@ -307,16 +311,17 @@ export default function FinancePage() {
     textAlign: 'left',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     textTransform: 'uppercase',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: themeColors.grayLight,
   }
 
   const tdStyle: React.CSSProperties = {
     padding: '12px',
     fontSize: '14px',
-    color: '#111827',
-    borderBottom: '1px solid #F3F4F6',
+    color: themeColors.textPrimary,
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const paginationStyle: React.CSSProperties = {
@@ -326,7 +331,7 @@ export default function FinancePage() {
     justifyContent: 'space-between',
     marginTop: '16px',
     paddingTop: '16px',
-    borderTop: '1px solid #E5E7EB',
+    borderTop: `1px solid ${themeColors.cardBorder}`,
   }
 
   const paginationButtonStyle: React.CSSProperties = {
@@ -334,19 +339,19 @@ export default function FinancePage() {
     borderRadius: '8px',
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: themeColors.cardBorder,
+    backgroundColor: themeColors.cardBg,
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    color: '#374151',
+    color: themeColors.textPrimary,
   }
 
   const paginationButtonActiveStyle: React.CSSProperties = {
     ...paginationButtonStyle,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: themeColors.purplePrimary,
     color: '#FFFFFF',
-    borderColor: '#8B5CF6',
+    borderColor: themeColors.purplePrimary,
   }
 
   const paginationButtonDisabledStyle: React.CSSProperties = {
@@ -384,9 +389,9 @@ export default function FinancePage() {
             style={{
               padding: '10px 20px',
               borderRadius: '8px',
-              backgroundColor: '#F3F4F6',
-              color: '#374151',
-              border: '1px solid #E5E7EB',
+              backgroundColor: themeColors.grayLight,
+              color: themeColors.textPrimary,
+              border: `1px solid ${themeColors.cardBorder}`,
               fontSize: '14px',
               fontWeight: 600,
               cursor: isRefreshing ? 'not-allowed' : 'pointer',
@@ -449,7 +454,7 @@ export default function FinancePage() {
             style={{
               padding: '10px 20px',
               borderRadius: '8px',
-              backgroundColor: '#8B5CF6',
+              backgroundColor: themeColors.purplePrimary,
               color: '#FFFFFF',
               border: 'none',
               fontSize: '14px',
@@ -650,7 +655,7 @@ export default function FinancePage() {
         {transactionsLoading ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
         ) : transactions.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
             Aucune transaction trouvée
           </div>
         ) : (
@@ -680,7 +685,7 @@ export default function FinancePage() {
                             ? `${tx.user_first_name} ${tx.user_last_name}`
                             : tx.user_email || 'N/A'}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                        <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>
                           {tx.user_phone || ''}
                         </div>
                       </td>
@@ -707,7 +712,7 @@ export default function FinancePage() {
             {/* Pagination */}
             {pagination && pagination.totalPages > 1 && (
               <div style={paginationStyle}>
-                <div style={{ fontSize: '14px', color: '#6B7280' }}>
+                <div style={{ fontSize: '14px', color: themeColors.textSecondary }}>
                   Affichage {((currentPage - 1) * itemsPerPage + 1)} à{' '}
                   {Math.min(currentPage * itemsPerPage, pagination.total)} sur {pagination.total}
                 </div>

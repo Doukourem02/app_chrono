@@ -7,6 +7,7 @@ import { Search, Filter, User, Briefcase, Wallet, AlertCircle, Eye, ChevronLeft,
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+import { themeColors } from '@/utils/theme'
 import type { Driver } from '@/types'
 
 type DriverType = 'all' | 'partner' | 'internal'
@@ -123,7 +124,7 @@ export default function DriversPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '24px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const statsContainerStyle: React.CSSProperties = {
@@ -133,11 +134,11 @@ export default function DriversPage() {
   }
 
   const statCardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
@@ -156,12 +157,12 @@ export default function DriversPage() {
   const statValueStyle: React.CSSProperties = {
     fontSize: '24px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const statLabelStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const filtersContainerStyle: React.CSSProperties = {
@@ -181,18 +182,18 @@ export default function DriversPage() {
     width: '100%',
     padding: '12px 16px 12px 44px',
     borderRadius: '12px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
-    backgroundColor: '#FFFFFF',
-    color: '#111827',
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textPrimary,
   }
 
   const filterButtonStyle = (active: boolean): React.CSSProperties => ({
     padding: '10px 16px',
     borderRadius: '8px',
-    border: `1px solid ${active ? '#8B5CF6' : '#E5E7EB'}`,
-    backgroundColor: active ? '#F3F0FF' : '#FFFFFF',
-    color: active ? '#8B5CF6' : '#6B7280',
+    border: `1px solid ${active ? themeColors.purplePrimary : themeColors.cardBorder}`,
+    backgroundColor: active ? `${themeColors.purplePrimary}20` : themeColors.cardBg,
+    color: active ? themeColors.purplePrimary : themeColors.textSecondary,
     fontSize: '14px',
     fontWeight: active ? 600 : 500,
     cursor: 'pointer',
@@ -202,10 +203,10 @@ export default function DriversPage() {
   })
 
   const tableContainerStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     overflow: 'hidden',
   }
 
@@ -219,18 +220,18 @@ export default function DriversPage() {
     textAlign: 'left',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
-    borderBottom: '1px solid #E5E7EB',
-    backgroundColor: '#F9FAFB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: themeColors.grayLight,
   }
 
   const tdStyle: React.CSSProperties = {
     padding: '16px',
     fontSize: '14px',
-    color: '#111827',
-    borderBottom: '1px solid #F3F4F6',
+    color: themeColors.textPrimary,
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const badgeStyle = (type: 'partner' | 'internal'): React.CSSProperties => ({
@@ -248,8 +249,8 @@ export default function DriversPage() {
   const actionButtonStyle: React.CSSProperties = {
     padding: '8px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
-    backgroundColor: '#FFFFFF',
+    border: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: themeColors.cardBg,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -267,9 +268,9 @@ export default function DriversPage() {
   const paginationButtonStyle = (disabled: boolean): React.CSSProperties => ({
     padding: '8px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
-    backgroundColor: disabled ? '#F9FAFB' : '#FFFFFF',
-    color: disabled ? '#9CA3AF' : '#111827',
+    border: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: disabled ? themeColors.grayLight : themeColors.cardBg,
+    color: disabled ? themeColors.textTertiary : themeColors.textPrimary,
     fontSize: '14px',
     fontWeight: 500,
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -355,7 +356,7 @@ export default function DriversPage() {
                   left: '12px',
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  color: '#9CA3AF',
+                  color: themeColors.textTertiary,
                 }}
               />
               <input
@@ -451,7 +452,7 @@ export default function DriversPage() {
                 left: 0,
                 right: 0,
                 height: '2px',
-                backgroundColor: '#8B5CF6',
+                backgroundColor: themeColors.purplePrimary,
                 zIndex: 10,
                 opacity: 0.6,
               }}
@@ -475,7 +476,7 @@ export default function DriversPage() {
               {paginatedDrivers.length === 0 ? (
                 <tr>
                   <td colSpan={9} style={{ ...tdStyle, textAlign: 'center', padding: '40px' }}>
-                    <div style={{ color: '#6B7280' }}>Aucun livreur trouvé</div>
+                    <div style={{ color: themeColors.textSecondary }}>Aucun livreur trouvé</div>
                   </td>
                 </tr>
               ) : (
@@ -521,19 +522,19 @@ export default function DriversPage() {
                             <div style={{ color: balanceColor, fontWeight: 600 }}>
                               {formatCurrency(balance)}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>
+                            <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginTop: '2px' }}>
                               {balanceStatus}
                             </div>
                           </div>
                         ) : (
-                          <span style={{ color: '#9CA3AF' }}>—</span>
+                          <span style={{ color: themeColors.textTertiary }}>—</span>
                         )}
                       </td>
                       <td style={tdStyle}>
                         {driver.is_online ? (
                           <span style={{ color: '#10B981', fontWeight: 600 }}>En ligne</span>
                         ) : (
-                          <span style={{ color: '#9CA3AF' }}>Hors ligne</span>
+                          <span style={{ color: themeColors.textTertiary }}>Hors ligne</span>
                         )}
                       </td>
                       <td style={tdStyle}>
@@ -550,7 +551,7 @@ export default function DriversPage() {
                           onClick={() => router.push(`/drivers/${driver.id}`)}
                           title="Voir détails"
                         >
-                          <Eye size={16} color="#6B7280" />
+                          <Eye size={16} color={themeColors.textSecondary} />
                         </button>
                       </td>
                     </tr>
@@ -572,7 +573,7 @@ export default function DriversPage() {
               <ChevronLeft size={16} />
               Précédent
             </button>
-            <span style={{ padding: '8px 16px', color: '#6B7280' }}>
+            <span style={{ padding: '8px 16px', color: themeColors.textSecondary }}>
               Page {currentPage} sur {totalPages}
             </span>
             <button

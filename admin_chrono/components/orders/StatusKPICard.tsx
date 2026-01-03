@@ -3,6 +3,7 @@
 import React from 'react'
 import { Truck, Package, CheckSquare, User } from 'lucide-react'
 import { AnimatedCard } from '@/components/animations'
+import { themeColors } from '@/utils/theme'
 
 interface StatusKPICardProps {
   type: 'onProgress' | 'successful' | 'onHold' | 'canceled'
@@ -38,11 +39,11 @@ export default function StatusKPICard({ type, count, change = 0, index = 0 }: St
   const { icon: Icon, color, label } = config[type]
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '24px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     display: 'flex',
     flexDirection: 'column',
     minHeight: '200px',
@@ -59,7 +60,7 @@ export default function StatusKPICard({ type, count, change = 0, index = 0 }: St
   const titleStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 500,
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const iconContainerStyle: React.CSSProperties = {
@@ -80,7 +81,7 @@ export default function StatusKPICard({ type, count, change = 0, index = 0 }: St
   const valueStyle: React.CSSProperties = {
     fontSize: '32px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '8px',
   }
 

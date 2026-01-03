@@ -17,6 +17,8 @@ import { SkeletonLoader } from '@/components/animations'
 import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
 import { GoogleMapsDeletedProjectError } from '@/components/error/GoogleMapsDeletedProjectError'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
+import { useThemeStore } from '@/stores/themeStore'
 
 const DEFAULT_CENTER = { lat: 5.3600, lng: -4.0083 } 
 const DELIVERY_ZOOM = 12.8
@@ -81,6 +83,63 @@ const minimalMapStyle: google.maps.MapTypeStyle[] = [
   },
 ]
 
+const darkMapStyle: google.maps.MapTypeStyle[] = [
+  {
+    elementType: 'geometry',
+    stylers: [{ color: '#1e293b' }], // Fond sombre (slate-800)
+  },
+  {
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#cbd5e1' }], // Texte clair (slate-300)
+  },
+  {
+    elementType: 'labels.text.stroke',
+    stylers: [{ color: '#1e293b' }], // Contour sombre
+  },
+  {
+    featureType: 'administrative',
+    elementType: 'geometry',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'poi',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#334155' }], // Routes sombres (slate-700)
+  },
+  {
+    featureType: 'road',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#94a3b8' }], // Texte routes (slate-400)
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#475569' }], // Autoroutes (slate-600)
+  },
+  {
+    featureType: 'road.highway.controlled_access',
+    elementType: 'geometry',
+    stylers: [{ color: '#475569' }],
+  },
+  {
+    featureType: 'transit',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#0f172a' }], // Eau très sombre (slate-900)
+  },
+]
+
 interface Delivery {
   id: string
   shipmentNumber: string
@@ -140,6 +199,10 @@ function TrackingMap({
   }>
   adminLocation: { lat: number; lng: number }
 }) {
+  // Détecter le thème actuel
+  const theme = useThemeStore((state) => state.theme)
+  const isDarkMode = theme === 'dark'
+  
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
   const [closedDriverInfoIds, setClosedDriverInfoIds] = useState<Set<string>>(new Set())
   
@@ -205,11 +268,11 @@ function TrackingMap({
     () => ({
       disableDefaultUI: true,
       zoomControl: true,
-      styles: minimalMapStyle,
-      backgroundColor: '#F7F8FC',
+      styles: isDarkMode ? darkMapStyle : minimalMapStyle,
+      backgroundColor: isDarkMode ? '#1e293b' : '#F7F8FC',
       trafficLayer: true, // Activer l'affichage du trafic
     }),
-    []
+    [isDarkMode]
   )
 
   const center = useMemo(() => {
@@ -567,7 +630,7 @@ function TrackingMap({
   const mapPlaceholderStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: themeColors.grayLight,
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
@@ -576,7 +639,7 @@ function TrackingMap({
 
   const mapPlaceholderTextStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
       // Créer une clé unique pour forcer le re-render complet quand on change de livraison
@@ -598,7 +661,7 @@ function TrackingMap({
           <div style={{ textAlign: 'center', padding: '20px' }}>
         <p style={mapPlaceholderTextStyle}>Erreur de chargement de la carte</p>
             {loadError.message && (
-              <p style={{ ...mapPlaceholderTextStyle, fontSize: '12px', marginTop: '8px', color: '#6B7280' }}>
+              <p style={{ ...mapPlaceholderTextStyle, fontSize: '12px', marginTop: '8px', color: themeColors.textSecondary }}>
                 {loadError.message}
               </p>
           )}
@@ -674,23 +737,23 @@ function TrackingMap({
             }}
           />
           <InfoWindow position={routePathFallback[0]}>
-            <div style={{ padding: '8px 10px', maxWidth: '250px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', lineHeight: '1.4' }}>
+            <div style={{ padding: '8px 10px', maxWidth: '250px', backgroundColor: themeColors.cardBg, color: themeColors.textPrimary }}>
+              <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', lineHeight: '1.4', color: themeColors.textPrimary }}>
                 {selectedDelivery.pickup?.name || 'Point de départ'}
               </div>
-              <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: selectedDelivery.driver ? '6px' : '0', lineHeight: '1.3' }}>
+              <div style={{ fontSize: '11px', color: themeColors.textSecondary, marginBottom: selectedDelivery.driver ? '6px' : '0', lineHeight: '1.3' }}>
                 {selectedDelivery.pickup?.address || ''}
               </div>
               {selectedDelivery.driver && (
                 <div style={{ 
                   marginTop: '6px', 
                   paddingTop: '6px', 
-                  borderTop: '1px solid #E5E7EB' 
+                  borderTop: `1px solid ${themeColors.cardBorder}` 
                 }}>
-                  <div style={{ fontSize: '10px', color: '#9CA3AF', marginBottom: '2px', lineHeight: '1.2' }}>
+                  <div style={{ fontSize: '10px', color: themeColors.textTertiary, marginBottom: '2px', lineHeight: '1.2' }}>
                     Livreur assigné
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: '12px', color: '#111827', lineHeight: '1.3' }}>
+                  <div style={{ fontWeight: 600, fontSize: '12px', color: themeColors.textPrimary, lineHeight: '1.3' }}>
                     {selectedDelivery.driver.full_name || 
                      (selectedDelivery.driverId ? `Livreur ${selectedDelivery.driverId.substring(0, 8)}` : 'Livreur')}
                   </div>
@@ -713,11 +776,11 @@ function TrackingMap({
             }}
           />
           <InfoWindow position={routePathFallback[1]}>
-            <div style={{ padding: '8px 10px', maxWidth: '250px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', lineHeight: '1.4' }}>
+            <div style={{ padding: '8px 10px', maxWidth: '250px', backgroundColor: themeColors.cardBg, color: themeColors.textPrimary }}>
+              <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', lineHeight: '1.4', color: themeColors.textPrimary }}>
                 {selectedDelivery.dropoff?.name || 'Point d\'arrivée'}
               </div>
-              <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: '1.3' }}>
+              <div style={{ fontSize: '11px', color: themeColors.textSecondary, lineHeight: '1.3' }}>
                 {selectedDelivery.dropoff?.address || ''}
               </div>
             </div>
@@ -781,12 +844,12 @@ function TrackingMap({
                     }
                   }}
                 >
-                  <div style={{ padding: '8px 10px', maxWidth: '200px' }}>
-                    <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', color: '#111827', lineHeight: '1.4' }}>
+                  <div style={{ padding: '8px 10px', maxWidth: '200px', backgroundColor: themeColors.cardBg, color: themeColors.textPrimary }}>
+                    <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px', color: themeColors.textPrimary, lineHeight: '1.4' }}>
                       {selectedDelivery.driver?.full_name || 
                        (assignedDriver?.userId ? `Livreur ${assignedDriver.userId.substring(0, 8)}` : 'Livreur')}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: '1.3' }}>
+                    <div style={{ fontSize: '11px', color: themeColors.textSecondary, lineHeight: '1.3' }}>
                       {selectedDelivery.status === 'accepted' || selectedDelivery.status === 'enroute' 
                         ? 'En route vers le point de collecte'
                         : selectedDelivery.status === 'picked_up'
@@ -875,15 +938,15 @@ function TrackingMap({
                     position={offsetData?.originalPosition || originalPosition} 
                     onCloseClick={() => setSelectedDriverId(null)}
                   >
-                    <div style={{ padding: '4px' }}>
-                      <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
+                    <div style={{ padding: '4px', backgroundColor: themeColors.cardBg, color: themeColors.textPrimary }}>
+                      <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px', color: themeColors.textPrimary }}>
                         Driver {driver.userId.substring(0, 8)}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                      <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>
                         {driver.is_available ? 'Disponible' : 'Occupé'}
                       </div>
                       {offsetData && (
-                        <div style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '4px', fontStyle: 'italic' }}>
+                        <div style={{ fontSize: '10px', color: themeColors.textTertiary, marginTop: '4px', fontStyle: 'italic' }}>
                           Position partagée avec {driverOffsets.size > 1 ? 'd\'autres livreurs' : 'un autre livreur'}
                         </div>
                       )}
@@ -1134,7 +1197,7 @@ export default function TrackingPage() {
     height: '100vh',
     gap: '24px',
     padding: '24px',
-    backgroundColor: '#F5F6FA',
+    backgroundColor: themeColors.background,
   }
 
   const leftPanelStyle: React.CSSProperties = {
@@ -1154,7 +1217,7 @@ export default function TrackingPage() {
   const searchIconStyle: React.CSSProperties = {
     position: 'absolute',
     left: '16px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     pointerEvents: 'none',
   }
 
@@ -1164,11 +1227,12 @@ export default function TrackingPage() {
     paddingRight: '48px',
     paddingTop: '12px',
     paddingBottom: '12px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
+    color: themeColors.textPrimary,
   }
 
   const filterButtonStyle: React.CSSProperties = {
@@ -1184,7 +1248,7 @@ export default function TrackingPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '16px',
   }
 
@@ -1196,11 +1260,11 @@ export default function TrackingPage() {
 
   const rightPanelStyle: React.CSSProperties = {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     overflow: 'hidden',
   }
 
@@ -1210,7 +1274,7 @@ export default function TrackingPage() {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   return (
@@ -1230,13 +1294,13 @@ export default function TrackingPage() {
           <button
             style={filterButtonStyle}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6'
+              e.currentTarget.style.backgroundColor = themeColors.grayLight
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
-            <Filter size={20} style={{ color: '#6B7280' }} />
+            <Filter size={20} style={{ color: themeColors.textSecondary }} />
           </button>
         </div>
 

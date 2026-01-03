@@ -11,6 +11,7 @@ import { Conversation } from '@/services/adminMessageService'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 export default function QuickMessage() {
   const router = useRouter()
@@ -249,11 +250,12 @@ export default function QuickMessage() {
   }
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
+    transition: 'background-color 0.3s ease, border-color 0.3s ease',
     flex: 0.8,
     display: 'flex',
     flexDirection: 'column',
@@ -271,7 +273,7 @@ export default function QuickMessage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const onlineBadgeStyle: React.CSSProperties = {
@@ -350,7 +352,7 @@ export default function QuickMessage() {
   const contactNameStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -371,7 +373,7 @@ export default function QuickMessage() {
 
   const contactStatusStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   return (

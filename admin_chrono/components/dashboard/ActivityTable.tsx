@@ -8,6 +8,7 @@ import { getRecentActivities } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
@@ -166,11 +167,12 @@ export default function ActivityTable() {
   )
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
+    transition: 'background-color 0.3s ease, border-color 0.3s ease',
   }
 
   const headerStyle: React.CSSProperties = {
@@ -183,7 +185,7 @@ export default function ActivityTable() {
   const titleStyle: React.CSSProperties = {
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const controlsStyle: React.CSSProperties = {
@@ -197,11 +199,11 @@ export default function ActivityTable() {
     paddingRight: '16px',
     paddingTop: '8px',
     paddingBottom: '8px',
-    backgroundColor: '#F9FAFB',
-    border: '1px solid #E5E7EB',
+    backgroundColor: themeColors.grayLight,
+    border: `1px solid ${themeColors.cardBorder}`,
     borderRadius: '12px',
     fontSize: '14px',
-    color: '#374151',
+    color: themeColors.textPrimary,
     outline: 'none',
   }
 
@@ -227,9 +229,9 @@ export default function ActivityTable() {
     paddingRight: '12px',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#4B5563',
+    color: themeColors.textSecondary,
     textTransform: 'uppercase',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const tdStyle: React.CSSProperties = {
@@ -237,7 +239,8 @@ export default function ActivityTable() {
     paddingBottom: '10px',
     paddingLeft: '12px',
     paddingRight: '12px',
-    borderBottom: '1px solid #F3F4F6',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
+    color: themeColors.textPrimary,
   }
 
   const statusBadgeStyle = (status: typeof statusConfig[string]): React.CSSProperties => ({
@@ -259,12 +262,12 @@ export default function ActivityTable() {
     justifyContent: 'space-between',
     marginTop: '12px',
     paddingTop: '12px',
-    borderTop: '1px solid #E5E7EB',
+    borderTop: `1px solid ${themeColors.cardBorder}`,
   }
 
   const paginationTextStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#4B5563',
+    color: themeColors.textSecondary,
   }
 
   const paginationButtonsStyle: React.CSSProperties = {
@@ -276,10 +279,11 @@ export default function ActivityTable() {
   const paginationButtonStyle: React.CSSProperties = {
     padding: '8px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     backgroundColor: 'transparent',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
+    color: themeColors.textPrimary,
   }
 
   const pageButtonStyle = (active: boolean): React.CSSProperties => ({
@@ -290,8 +294,8 @@ export default function ActivityTable() {
     borderRadius: '8px',
     fontSize: '14px',
     fontWeight: 500,
-    backgroundColor: active ? '#8B5CF6' : 'transparent',
-    color: active ? '#FFFFFF' : '#374151',
+    backgroundColor: active ? themeColors.purplePrimary : 'transparent',
+    color: active ? '#FFFFFF' : themeColors.textPrimary,
     border: 'none',
     cursor: 'pointer',
     transition: 'background-color 0.2s',

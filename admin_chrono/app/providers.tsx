@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ErrorModalsProvider } from '@/components/error/ErrorModalsProvider'
+import { ThemeProvider } from '@/components/ThemeProvider'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -32,9 +33,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ErrorModalsProvider>
-          {children}
-        </ErrorModalsProvider>
+        <ThemeProvider>
+          <ErrorModalsProvider>
+            {children}
+          </ErrorModalsProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   )

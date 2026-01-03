@@ -16,6 +16,7 @@ import { useDateFilter } from '@/contexts/DateFilterContext'
 import type { Delivery } from '@/hooks/types'
 import NewShippingModal from '@/components/orders/NewShippingModal'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 export default function DashboardPage() {
   const { dateFilter, dateRange } = useDateFilter()
@@ -147,7 +148,7 @@ export default function DashboardPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '30px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const actionsContainerStyle: React.CSSProperties = {
@@ -245,7 +246,7 @@ export default function DashboardPage() {
             style={dateButtonStyle}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar size={16} style={{ color: '#6B7280' }} />
+              <Calendar size={16} style={{ color: themeColors.textSecondary }} />
               {new Date().toLocaleDateString('fr-FR', {
                 day: 'numeric',
                 month: 'long',

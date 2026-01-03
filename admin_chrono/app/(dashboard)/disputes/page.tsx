@@ -11,6 +11,7 @@ import { adminMessageSocketService } from '@/services/adminMessageSocketService'
 import ConversationList from '@/components/message/ConversationList'
 import ChatArea from '@/components/message/ChatArea'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 interface Dispute {
   id: string
@@ -134,7 +135,7 @@ export default function DisputesPage() {
       case 'rejected':
         return { ...baseStyle, backgroundColor: '#FEE2E2', color: '#991B1B' }
       default:
-        return { ...baseStyle, backgroundColor: '#F3F4F6', color: '#374151' }
+        return { ...baseStyle, backgroundColor: themeColors.grayLight, color: themeColors.textPrimary }
     }
   }
 
@@ -163,7 +164,7 @@ export default function DisputesPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '28px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const filtersStyle: React.CSSProperties = {
@@ -176,27 +177,30 @@ export default function DisputesPage() {
   const inputStyle: React.CSSProperties = {
     padding: '10px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     flex: 1,
     minWidth: '200px',
+    backgroundColor: themeColors.background,
+    color: themeColors.textPrimary,
   }
 
   const selectStyle: React.CSSProperties = {
     padding: '10px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textPrimary,
     cursor: 'pointer',
   }
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '24px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
   }
 
   const tableStyle: React.CSSProperties = {
@@ -209,16 +213,16 @@ export default function DisputesPage() {
     textAlign: 'left',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     textTransform: 'uppercase',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const tdStyle: React.CSSProperties = {
     padding: '12px',
     fontSize: '14px',
-    color: '#111827',
-    borderBottom: '1px solid #F3F4F6',
+    color: themeColors.textPrimary,
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const modalOverlayStyle: React.CSSProperties = {
@@ -235,7 +239,7 @@ export default function DisputesPage() {
   }
 
   const modalStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '24px',
     width: '90%',
@@ -407,15 +411,15 @@ export default function DisputesPage() {
       </div>
 
       {/* Onglets */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid #E5E7EB' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: `1px solid ${themeColors.cardBorder}` }}>
         <button
           onClick={() => setActiveTab('disputes')}
           style={{
             padding: '12px 20px',
             border: 'none',
             backgroundColor: 'transparent',
-            borderBottom: activeTab === 'disputes' ? '2px solid #8B5CF6' : '2px solid transparent',
-            color: activeTab === 'disputes' ? '#8B5CF6' : '#6B7280',
+            borderBottom: activeTab === 'disputes' ? `2px solid ${themeColors.purplePrimary}` : '2px solid transparent',
+            color: activeTab === 'disputes' ? themeColors.purplePrimary : themeColors.textSecondary,
             fontWeight: activeTab === 'disputes' ? 600 : 500,
             cursor: 'pointer',
             fontSize: '14px',
@@ -430,8 +434,8 @@ export default function DisputesPage() {
             padding: '12px 20px',
             border: 'none',
             backgroundColor: 'transparent',
-            borderBottom: activeTab === 'support-messages' ? '2px solid #8B5CF6' : '2px solid transparent',
-            color: activeTab === 'support-messages' ? '#8B5CF6' : '#6B7280',
+            borderBottom: activeTab === 'support-messages' ? `2px solid ${themeColors.purplePrimary}` : '2px solid transparent',
+            color: activeTab === 'support-messages' ? themeColors.purplePrimary : themeColors.textSecondary,
             fontWeight: activeTab === 'support-messages' ? 600 : 500,
             cursor: 'pointer',
             fontSize: '14px',
@@ -469,7 +473,7 @@ export default function DisputesPage() {
       {/* Filtres */}
       <div style={filtersStyle}>
         <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textSecondary }} />
           <input
             type="text"
             placeholder="Rechercher par ID transaction, commande..."
@@ -495,13 +499,13 @@ export default function DisputesPage() {
 
       {/* Table */}
       <div style={cardStyle}>
-        <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: '#111827' }}>
+        <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
           Liste des disputes
         </h3>
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>Chargement...</div>
         ) : disputes.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
             Aucune dispute trouvée
           </div>
         ) : (
@@ -541,7 +545,7 @@ export default function DisputesPage() {
                       <td style={tdStyle}>
                         <div>
                           <div style={{ fontWeight: 600 }}>{dispute.user_email || 'N/A'}</div>
-                          <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                          <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>
                             {dispute.user_phone || ''}
                           </div>
                         </div>
@@ -566,7 +570,7 @@ export default function DisputesPage() {
                           style={{
                             padding: '6px 12px',
                             borderRadius: '8px',
-                            backgroundColor: '#8B5CF6',
+                            backgroundColor: themeColors.purplePrimary,
                             color: '#FFFFFF',
                             border: 'none',
                             fontSize: '12px',
@@ -596,10 +600,10 @@ export default function DisputesPage() {
                   justifyContent: 'space-between',
                   marginTop: '16px',
                   paddingTop: '16px',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${themeColors.cardBorder}`,
                 }}
               >
-                <div style={{ fontSize: '14px', color: '#6B7280' }}>
+                <div style={{ fontSize: '14px', color: themeColors.textSecondary }}>
                   Affichage {((currentPage - 1) * itemsPerPage + 1)} à{' '}
                   {Math.min(currentPage * itemsPerPage, pagination.total)} sur {pagination.total}
                 </div>
@@ -610,23 +614,23 @@ export default function DisputesPage() {
                         ? {
                             padding: '8px 16px',
                             borderRadius: '8px',
-                            border: '1px solid #E5E7EB',
-                            backgroundColor: '#FFFFFF',
+                            border: `1px solid ${themeColors.cardBorder}`,
+                            backgroundColor: themeColors.cardBg,
                             fontSize: '14px',
                             fontWeight: 600,
                             cursor: 'not-allowed',
-                            color: '#374151',
+                            color: themeColors.textPrimary,
                             opacity: 0.5,
                           }
                         : {
                             padding: '8px 16px',
                             borderRadius: '8px',
-                            border: '1px solid #E5E7EB',
-                            backgroundColor: '#FFFFFF',
+                            border: `1px solid ${themeColors.cardBorder}`,
+                            backgroundColor: themeColors.cardBg,
                             fontSize: '14px',
                             fontWeight: 600,
                             cursor: 'pointer',
-                            color: '#374151',
+                            color: themeColors.textPrimary,
                           }
                     }
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -652,8 +656,8 @@ export default function DisputesPage() {
                               ? {
                                   padding: '8px 16px',
                                   borderRadius: '8px',
-                                  border: '1px solid #8B5CF6',
-                                  backgroundColor: '#8B5CF6',
+                                  border: `1px solid ${themeColors.purplePrimary}`,
+                                  backgroundColor: themeColors.purplePrimary,
                                   fontSize: '14px',
                                   fontWeight: 600,
                                   cursor: 'pointer',
@@ -662,12 +666,12 @@ export default function DisputesPage() {
                               : {
                                   padding: '8px 16px',
                                   borderRadius: '8px',
-                                  border: '1px solid #E5E7EB',
-                                  backgroundColor: '#FFFFFF',
+                                  border: `1px solid ${themeColors.cardBorder}`,
+                                  backgroundColor: themeColors.cardBg,
                                   fontSize: '14px',
                                   fontWeight: 600,
                                   cursor: 'pointer',
-                                  color: '#374151',
+                                  color: themeColors.textPrimary,
                                 }
                           }
                           onClick={() => setCurrentPage(page)}
@@ -682,23 +686,23 @@ export default function DisputesPage() {
                         ? {
                             padding: '8px 16px',
                             borderRadius: '8px',
-                            border: '1px solid #E5E7EB',
-                            backgroundColor: '#FFFFFF',
+                            border: `1px solid ${themeColors.cardBorder}`,
+                            backgroundColor: themeColors.cardBg,
                             fontSize: '14px',
                             fontWeight: 600,
                             cursor: 'not-allowed',
-                            color: '#374151',
+                            color: themeColors.textPrimary,
                             opacity: 0.5,
                           }
                         : {
                             padding: '8px 16px',
                             borderRadius: '8px',
-                            border: '1px solid #E5E7EB',
-                            backgroundColor: '#FFFFFF',
+                            border: `1px solid ${themeColors.cardBorder}`,
+                            backgroundColor: themeColors.cardBg,
                             fontSize: '14px',
                             fontWeight: 600,
                             cursor: 'pointer',
-                            color: '#374151',
+                            color: themeColors.textPrimary,
                           }
                     }
                     onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
@@ -717,57 +721,57 @@ export default function DisputesPage() {
       {selectedDispute && (
         <div style={modalOverlayStyle} onClick={() => setSelectedDispute(null)}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '24px', color: '#111827' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '24px', color: themeColors.textPrimary }}>
               Détails de la dispute
             </h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Type</div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Type</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                   {getDisputeTypeLabel(selectedDispute.dispute_type || '')}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Raison</div>
-                <div style={{ fontSize: '14px', color: '#111827' }}>{selectedDispute.reason || 'N/A'}</div>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Raison</div>
+                <div style={{ fontSize: '14px', color: themeColors.textPrimary }}>{selectedDispute.reason || 'N/A'}</div>
               </div>
 
               {selectedDispute.description && (
                 <div>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>
                     Description
                   </div>
-                  <div style={{ fontSize: '14px', color: '#111827', padding: '12px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '14px', color: themeColors.textPrimary, padding: '12px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
                     {selectedDispute.description}
                   </div>
                 </div>
               )}
 
               <div>
-                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Client</div>
-                <div style={{ fontSize: '14px', color: '#111827' }}>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Client</div>
+                <div style={{ fontSize: '14px', color: themeColors.textPrimary }}>
                   {selectedDispute.user_email || 'N/A'}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Montant</div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Montant</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                   {selectedDispute.amount ? formatCurrency(parseFloat(String(selectedDispute.amount))) : 'N/A'}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Statut actuel</div>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Statut actuel</div>
                 <span style={getStatusBadgeStyle(selectedDispute.status || 'pending')}>
                   {getStatusLabel(selectedDispute.status || 'pending')}
                 </span>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#111827' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: themeColors.textPrimary }}>
                   Notes admin
                 </label>
                 <textarea
@@ -779,10 +783,12 @@ export default function DisputesPage() {
                     width: '100%',
                     padding: '10px 16px',
                     borderRadius: '8px',
-                    border: '1px solid #E5E7EB',
+                    border: `1px solid ${themeColors.cardBorder}`,
                     fontSize: '14px',
                     outline: 'none',
                     resize: 'none',
+                    backgroundColor: themeColors.background,
+                    color: themeColors.textPrimary,
                   }}
                 />
               </div>

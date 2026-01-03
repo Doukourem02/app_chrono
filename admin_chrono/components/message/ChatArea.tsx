@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Send } from 'lucide-react'
 import { Conversation, Message } from '@/services/adminMessageService'
+import { themeColors } from '@/utils/theme'
 
 interface ChatAreaProps {
   conversation: Conversation | null
@@ -113,11 +114,11 @@ export default function ChatArea({
 
   const chatAreaStyle: React.CSSProperties = {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '24px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
@@ -125,7 +126,7 @@ export default function ChatArea({
 
   const headerStyle: React.CSSProperties = {
     paddingBottom: '12px',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
     marginBottom: '16px',
     display: 'flex',
     flexDirection: 'row',
@@ -136,12 +137,12 @@ export default function ChatArea({
   const headerTitleStyle: React.CSSProperties = {
     fontSize: '18px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const headerSubtitleStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#9CA3AF',
+    color: themeColors.textTertiary,
     marginTop: '2px',
   }
 
@@ -159,19 +160,19 @@ export default function ChatArea({
     borderRadius: '12px',
     maxWidth: '75%',
     alignSelf: isFromCurrentUser ? 'flex-end' : 'flex-start',
-    backgroundColor: isFromCurrentUser ? '#8B5CF6' : '#F3F4F6',
+    backgroundColor: isFromCurrentUser ? themeColors.purplePrimary : themeColors.grayLight,
     marginBottom: '4px',
   })
 
   const messageTextStyle: (isFromCurrentUser: boolean) => React.CSSProperties = (isFromCurrentUser) => ({
     fontSize: '14px',
-    color: isFromCurrentUser ? '#FFFFFF' : '#111827',
+    color: isFromCurrentUser ? '#FFFFFF' : themeColors.textPrimary,
     wordBreak: 'break-word',
   })
 
   const messageTimeStyle: (isFromCurrentUser: boolean) => React.CSSProperties = (isFromCurrentUser) => ({
     fontSize: '12px',
-    color: isFromCurrentUser ? 'rgba(255,255,255,0.8)' : '#6B7280',
+    color: isFromCurrentUser ? 'rgba(255,255,255,0.8)' : themeColors.textSecondary,
     marginTop: '4px',
   })
 
@@ -180,24 +181,26 @@ export default function ChatArea({
     flexDirection: 'row',
     gap: '12px',
     paddingTop: '16px',
-    borderTop: '1px solid #E5E7EB',
+    borderTop: `1px solid ${themeColors.cardBorder}`,
   }
 
   const messageInputStyle: React.CSSProperties = {
     flex: 1,
     padding: '12px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
     resize: 'none',
     fontFamily: 'inherit',
+    backgroundColor: themeColors.background,
+    color: themeColors.textPrimary,
   }
 
   const sendButtonStyle: React.CSSProperties = {
     padding: '12px 24px',
     borderRadius: '8px',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: themeColors.purplePrimary,
     color: '#FFFFFF',
     border: 'none',
     fontSize: '14px',
@@ -215,7 +218,7 @@ export default function ChatArea({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   if (!conversation && !participantPair) {
@@ -276,11 +279,11 @@ export default function ChatArea({
 
       <div style={messagesContainerStyle}>
         {isLoading && messages.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#6B7280', padding: '20px' }}>
+          <div style={{ textAlign: 'center', color: themeColors.textSecondary, padding: '20px' }}>
             Chargement des messages...
           </div>
         ) : messages.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#6B7280', padding: '20px' }}>
+          <div style={{ textAlign: 'center', color: themeColors.textSecondary, padding: '20px' }}>
             Aucun message. Commencez la conversation !
           </div>
         ) : (
@@ -301,7 +304,7 @@ export default function ChatArea({
             return (
               <div key={message.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isFromCurrentUser ? 'flex-end' : 'flex-start' }}>
                 {showSenderName && (
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px', marginLeft: '4px', fontWeight: 500 }}>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px', marginLeft: '4px', fontWeight: 500 }}>
                     {senderName}
                   </div>
                 )}
@@ -339,12 +342,12 @@ export default function ChatArea({
           style={sendButtonStyle}
           onMouseEnter={(e) => {
             if (!isSending && messageText.trim()) {
-              e.currentTarget.style.backgroundColor = '#7C3AED'
+              e.currentTarget.style.backgroundColor = themeColors.purpleDark
             }
           }}
           onMouseLeave={(e) => {
             if (!isSending) {
-              e.currentTarget.style.backgroundColor = '#8B5CF6'
+              e.currentTarget.style.backgroundColor = themeColors.purplePrimary
             }
           }}
         >

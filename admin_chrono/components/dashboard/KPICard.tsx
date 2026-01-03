@@ -3,6 +3,7 @@
 import { LucideIcon } from 'lucide-react'
 import { AnimatedCard } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+import { themeColors } from '@/utils/theme'
 
 interface KPICardProps {
   title: string
@@ -31,11 +32,12 @@ export default function KPICard({
     : value
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
+    transition: 'background-color 0.3s ease, border-color 0.3s ease',
   }
 
   const headerStyle: React.CSSProperties = {
@@ -89,19 +91,19 @@ export default function KPICard({
 
   const titleStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#4B5563',
+    color: themeColors.textSecondary,
     fontWeight: 500,
   }
 
   const valueStyle: React.CSSProperties = {
     fontSize: '30px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const subtitleStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   return (

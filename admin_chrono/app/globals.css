@@ -9,6 +9,51 @@
   --gray-light: #F3F4F6;
   --gray-medium: #9CA3AF;
   --gray-dark: #4B5563;
+  --card-bg: #ffffff;
+  --card-border: #E5E7EB;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --green-primary: #10B981;
+  --green-light: #D1FAE5;
+  --green-dark: #059669;
+  --yellow-primary: #F59E0B;
+  --yellow-light: #FEF3C7;
+  --yellow-dark: #92400E;
+  --blue-primary: #2563EB;
+  --blue-light: #DBEAFE;
+  --blue-dark: #1E40AF;
+  --red-primary: #EF4444;
+  --red-light: #FEE2E2;
+  --red-dark: #DC2626;
+}
+
+.dark {
+  --background: #0F172A;
+  --foreground: #F1F5F9;
+  --purple-primary: #A78BFA;
+  --purple-light: #C4B5FD;
+  --purple-dark: #8B5CF6;
+  --gray-light: #1E293B;
+  --gray-medium: #475569;
+  --gray-dark: #94A3B8;
+  --card-bg: #1E293B;
+  --card-border: #334155;
+  --text-primary: #F1F5F9;
+  --text-secondary: #CBD5E1;
+  --text-tertiary: #94A3B8;
+  --green-primary: #10B981;
+  --green-light: #065F46;
+  --green-dark: #059669;
+  --yellow-primary: #F59E0B;
+  --yellow-light: #92400E;
+  --yellow-dark: #78350F;
+  --blue-primary: #3B82F6;
+  --blue-light: #1E40AF;
+  --blue-dark: #1E3A8A;
+  --red-primary: #EF4444;
+  --red-light: #991B1B;
+  --red-dark: #DC2626;
 }
 
 body {
@@ -17,6 +62,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 * {

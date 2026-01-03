@@ -6,6 +6,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { Download, TrendingUp, Users, Truck, CreditCard, LucideIcon } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { exportData } from '@/utils/exportUtils'
+import { themeColors } from '@/utils/theme'
 import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer,LineChart,Line,} from 'recharts'
 
 type ReportType = 'deliveries' | 'revenues' | 'clients' | 'drivers' | 'payments'
@@ -398,7 +399,7 @@ export default function ReportsPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '28px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const tabsStyle: React.CSSProperties = {
@@ -415,9 +416,9 @@ export default function ReportsPage() {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    border: '1px solid #E5E7EB',
-    backgroundColor: '#FFFFFF',
-    color: '#6B7280',
+    border: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textSecondary,
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
@@ -430,8 +431,8 @@ export default function ReportsPage() {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    border: '1px solid #8B5CF6',
-    backgroundColor: '#8B5CF6',
+    border: `1px solid ${themeColors.purplePrimary}`,
+    backgroundColor: themeColors.purplePrimary,
     color: '#FFFFFF',
     display: 'flex',
     flexDirection: 'row',
@@ -440,11 +441,11 @@ export default function ReportsPage() {
   }
 
   const filtersCardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     marginBottom: '16px',
   }
 
@@ -457,27 +458,30 @@ export default function ReportsPage() {
   const inputStyle: React.CSSProperties = {
     padding: '10px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     width: '100%',
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textPrimary,
   }
 
   const selectStyle: React.CSSProperties = {
     padding: '10px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     cursor: 'pointer',
     width: '100%',
+    color: themeColors.textPrimary,
   }
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
   }
 
   const tableStyle: React.CSSProperties = {
@@ -490,22 +494,23 @@ export default function ReportsPage() {
     textAlign: 'left',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     textTransform: 'uppercase',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: themeColors.grayLight,
   }
 
   const tdStyle: React.CSSProperties = {
     padding: '12px',
     fontSize: '14px',
-    color: '#111827',
-    borderBottom: '1px solid #F3F4F6',
+    color: themeColors.textPrimary,
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const renderReportContent = () => {
     if (isLoading) {
       return (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
+        <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
           <div>Chargement du rapport...</div>
         </div>
       )
@@ -516,11 +521,11 @@ export default function ReportsPage() {
         const deliveries: Delivery[] = (deliveriesData?.data as Delivery[]) || []
         return (
           <div style={cardStyle}>
-            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
               Rapport des Livraisons ({deliveries.length} résultats)
             </h3>
             {deliveries.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+              <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
                 Aucune livraison trouvée pour cette période
               </div>
             ) : (
@@ -579,7 +584,7 @@ export default function ReportsPage() {
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={cardStyle}>
-              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
                 Rapport des Revenus
               </h3>
               {revenueChartData.length > 0 && (
@@ -590,17 +595,17 @@ export default function ReportsPage() {
                     <YAxis />
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
-                    <Line type="monotone" dataKey="revenue" stroke="#8B5CF6" name="Revenus" />
+                    <Line type="monotone" dataKey="revenue" stroke={themeColors.purplePrimary} name="Revenus" />
                   </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
             <div style={cardStyle}>
-              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
                 Détails ({revenues.length} jours)
               </h3>
               {revenues.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
                   Aucun revenu trouvé pour cette période
                 </div>
               ) : (
@@ -637,11 +642,11 @@ export default function ReportsPage() {
         const clients: Client[] = (clientsData?.data as Client[]) || []
         return (
           <div style={cardStyle}>
-            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
               Rapport des Clients ({clients.length} clients)
             </h3>
             {clients.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+              <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
                 Aucun client trouvé pour cette période
               </div>
             ) : (
@@ -680,11 +685,11 @@ export default function ReportsPage() {
         const drivers: Driver[] = (driversData?.data as Driver[]) || []
         return (
           <div style={cardStyle}>
-            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
               Rapport des Drivers ({drivers.length} drivers)
             </h3>
             {drivers.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+              <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
                 Aucun driver trouvé pour cette période
               </div>
             ) : (
@@ -759,7 +764,7 @@ export default function ReportsPage() {
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={cardStyle}>
-              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
                 Rapport des Paiements
               </h3>
               {paymentChartData.length > 0 && (
@@ -779,11 +784,11 @@ export default function ReportsPage() {
               )}
             </div>
             <div style={cardStyle}>
-              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
                 Détails ({payments.length} entrées)
               </h3>
               {payments.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
                   Aucun paiement trouvé pour cette période
                 </div>
               ) : (
@@ -835,7 +840,7 @@ export default function ReportsPage() {
           style={{
             padding: '10px 20px',
             borderRadius: '8px',
-            backgroundColor: '#8B5CF6',
+            backgroundColor: themeColors.purplePrimary,
             color: '#FFFFFF',
             border: 'none',
             fontSize: '14px',
@@ -871,12 +876,12 @@ export default function ReportsPage() {
 
       {/* Filtres */}
       <div style={filtersCardStyle}>
-        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: themeColors.textPrimary }}>
           Filtres de période
         </h3>
         <div style={filtersGridStyle}>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500 }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: themeColors.textPrimary }}>
               Période
             </label>
             <select
@@ -892,7 +897,7 @@ export default function ReportsPage() {
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500 }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: themeColors.textPrimary }}>
               Date début
             </label>
             <input
@@ -906,7 +911,7 @@ export default function ReportsPage() {
             />
           </div>
           <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500 }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: themeColors.textPrimary }}>
               Date fin
             </label>
             <input
@@ -921,7 +926,7 @@ export default function ReportsPage() {
           </div>
           {(reportType === 'deliveries' || reportType === 'revenues') && (
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500 }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: themeColors.textPrimary }}>
                 {reportType === 'deliveries' ? 'Statut' : 'Type de livraison'}
               </label>
               <select

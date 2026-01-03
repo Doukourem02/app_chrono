@@ -3,6 +3,7 @@
 import React from 'react'
 import { Search, User, Truck, Package, MessageSquare, Plus } from 'lucide-react'
 import { Conversation } from '@/services/adminMessageService'
+import { themeColors } from '@/utils/theme'
 
 interface ConversationListProps {
   conversations: Conversation[]
@@ -128,12 +129,12 @@ export default function ConversationList({
             width: '32px',
             height: '32px',
             borderRadius: '8px',
-            backgroundColor: '#F3F4F6',
+            backgroundColor: themeColors.grayLight,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-            <User size={18} style={{ color: '#6B7280' }} />
+            <User size={18} style={{ color: themeColors.textSecondary }} />
           </div>
         )
     }
@@ -313,11 +314,11 @@ export default function ConversationList({
 
   const sidebarStyle: React.CSSProperties = {
     width: '320px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
@@ -328,9 +329,11 @@ export default function ConversationList({
     padding: '10px 16px',
     paddingLeft: '40px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
+    backgroundColor: themeColors.background,
+    color: themeColors.textPrimary,
   }
 
   const filterContainerStyle: React.CSSProperties = {
@@ -345,9 +348,9 @@ export default function ConversationList({
     borderRadius: '6px',
     fontSize: '12px',
     fontWeight: active ? 600 : 400,
-    border: '1px solid #E5E7EB',
-    backgroundColor: active ? '#8B5CF6' : 'transparent',
-    color: active ? '#FFFFFF' : '#6B7280',
+    border: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: active ? themeColors.purplePrimary : 'transparent',
+    color: active ? '#FFFFFF' : themeColors.textSecondary,
     cursor: 'pointer',
   })
 
@@ -355,15 +358,15 @@ export default function ConversationList({
     padding: '12px',
     borderRadius: '8px',
     cursor: 'pointer',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     marginBottom: '8px',
-    backgroundColor: selected ? '#F3F4F6' : 'transparent',
+    backgroundColor: selected ? themeColors.grayLight : 'transparent',
   })
 
   return (
     <div style={sidebarStyle}>
       <div style={{ position: 'relative' }}>
-        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
+        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textSecondary }} />
         <input
           type="text"
           placeholder="Rechercher une conversation..."
@@ -409,7 +412,7 @@ export default function ConversationList({
             width: '100%',
             padding: '12px',
             borderRadius: '8px',
-            backgroundColor: '#8B5CF6',
+            backgroundColor: themeColors.purplePrimary,
             color: '#FFFFFF',
             border: 'none',
             fontSize: '14px',
@@ -421,10 +424,10 @@ export default function ConversationList({
             gap: '8px',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#7C3AED'
+            e.currentTarget.style.backgroundColor = themeColors.purpleDark
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#8B5CF6'
+            e.currentTarget.style.backgroundColor = themeColors.purplePrimary
           }}
         >
           <Plus size={18} />
@@ -434,11 +437,11 @@ export default function ConversationList({
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {sortedItems.length === 0 ? (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>
+          <div style={{ padding: '20px', textAlign: 'center', color: themeColors.textSecondary, fontSize: '14px' }}>
             {searchQuery ? (
               <>
                 <div style={{ marginBottom: '8px' }}>Aucune conversation trouvée</div>
-                <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                <div style={{ fontSize: '12px', color: themeColors.textTertiary }}>
                   Essayez de modifier votre recherche
                 </div>
               </>
@@ -463,7 +466,7 @@ export default function ConversationList({
                   onClick={() => onSelectConversation(item.key)}
                   onMouseEnter={(e) => {
                     if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = '#F9FAFB'
+                      e.currentTarget.style.backgroundColor = themeColors.grayLight
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -475,20 +478,20 @@ export default function ConversationList({
                   <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '12px' }}>
                     {getConversationIcon('order')}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, marginBottom: '4px' }}>
                         {participantName}
                       </div>
                       {conversationCount > 1 && (
-                        <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginBottom: '4px' }}>
                           {conversationCount} conversation{conversationCount > 1 ? 's' : ''}
                         </div>
                       )}
                       {lastMessage && (
-                        <div style={{ fontSize: '13px', color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '13px', color: themeColors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
                           {lastMessage}
                         </div>
                       )}
-                      <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                      <div style={{ fontSize: '12px', color: themeColors.textTertiary }}>
                         {formatTime(lastMessageAt)}
                       </div>
                     </div>
@@ -526,7 +529,7 @@ export default function ConversationList({
                   onClick={() => onSelectConversation(conv.id)}
                   onMouseEnter={(e) => {
                     if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = '#F9FAFB'
+                      e.currentTarget.style.backgroundColor = themeColors.grayLight
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -538,20 +541,20 @@ export default function ConversationList({
                   <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: '12px' }}>
                     {getConversationIcon(conv.type)}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, marginBottom: '4px' }}>
                         {participantName}
                       </div>
                       {conv.type === 'order' && conv.order_id && (
-                        <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginBottom: '4px' }}>
                           Commande #{conv.order_id.slice(0, 8)}
                         </div>
                       )}
                       {lastMessage && (
-                        <div style={{ fontSize: '13px', color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '13px', color: themeColors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '4px' }}>
                           {lastMessage}
                         </div>
                       )}
-                      <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                      <div style={{ fontSize: '12px', color: themeColors.textTertiary }}>
                         {formatTime(conv.last_message_at)}
                       </div>
                     </div>

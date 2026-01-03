@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Search, User, Truck, Shield, Eye } from 'luc
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+import { themeColors } from '@/utils/theme'
 import { asApiArray } from '@/types/api'
 
 interface UserData {
@@ -99,7 +100,7 @@ export default function UsersPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '24px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const statsContainerStyle: React.CSSProperties = {
@@ -109,11 +110,11 @@ export default function UsersPage() {
   }
 
   const statCardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
@@ -132,12 +133,12 @@ export default function UsersPage() {
   const statValueStyle: React.CSSProperties = {
     fontSize: '24px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const statLabelStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const filtersContainerStyle: React.CSSProperties = {
@@ -157,7 +158,7 @@ export default function UsersPage() {
     left: '12px',
     top: '50%',
     transform: 'translateY(-50%)',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     pointerEvents: 'none',
   }
 
@@ -167,11 +168,12 @@ export default function UsersPage() {
     paddingRight: '12px',
     paddingTop: '10px',
     paddingBottom: '10px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
+    color: themeColors.textPrimary,
   }
 
   const selectStyle: React.CSSProperties = {
@@ -179,20 +181,21 @@ export default function UsersPage() {
     paddingRight: '12px',
     paddingTop: '10px',
     paddingBottom: '10px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
     cursor: 'pointer',
+    color: themeColors.textPrimary,
   }
 
   const tableContainerStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '24px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
   }
 
   const tableStyle: React.CSSProperties = {
@@ -205,14 +208,15 @@ export default function UsersPage() {
     padding: '12px',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#4B5563',
+    color: themeColors.textSecondary,
     textTransform: 'uppercase',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: themeColors.grayLight,
   }
 
   const tdStyle: React.CSSProperties = {
     padding: '12px',
-    borderBottom: '1px solid #F3F4F6',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const roleBadgeStyle = (role: string): React.CSSProperties => {
@@ -245,11 +249,11 @@ export default function UsersPage() {
     justifyContent: 'space-between',
     marginTop: '16px',
     paddingTop: '16px',
-    borderTop: '1px solid #E5E7EB',
+    borderTop: `1px solid ${themeColors.cardBorder}`,
   }
 
   const paginationTextStyle: React.CSSProperties = {
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     fontSize: '14px',
   }
 
@@ -278,8 +282,8 @@ export default function UsersPage() {
     borderRadius: '8px',
     fontSize: '14px',
     fontWeight: 500,
-    backgroundColor: active ? '#8B5CF6' : 'transparent',
-    color: active ? '#FFFFFF' : '#374151',
+    backgroundColor: active ? themeColors.purplePrimary : 'transparent',
+    color: active ? '#FFFFFF' : themeColors.textPrimary,
     border: 'none',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
@@ -363,7 +367,7 @@ export default function UsersPage() {
             <SkeletonLoader width="100%" height={60} borderRadius={8} />
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: '#6B7280' }}>
+          <div style={{ padding: '48px', textAlign: 'center', color: themeColors.textSecondary }}>
             Aucun utilisateur trouvé
           </div>
         ) : (
@@ -390,35 +394,35 @@ export default function UsersPage() {
                         transition: 'background-color 0.2s',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB'
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent'
                       }}
                     >
                       <td style={tdStyle}>
-                        <span style={{ fontSize: '14px', color: '#374151' }}>
+                        <span style={{ fontSize: '14px', color: themeColors.textPrimary }}>
                           {user.last_name || 'N/A'}
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ fontSize: '14px', color: '#374151' }}>
+                        <span style={{ fontSize: '14px', color: themeColors.textPrimary }}>
                           {user.first_name || 'N/A'}
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                           {user.email}
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ fontSize: '14px', color: '#374151' }}>{user.phone}</span>
+                        <span style={{ fontSize: '14px', color: themeColors.textPrimary }}>{user.phone}</span>
                       </td>
                       <td style={tdStyle}>
                         <span style={roleBadgeStyle(user.role)}>{user.role}</span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ fontSize: '14px', color: '#374151' }}>{user.createdAt}</span>
+                        <span style={{ fontSize: '14px', color: themeColors.textPrimary }}>{user.createdAt}</span>
                       </td>
                       <td style={tdStyle}>
                         <button
@@ -426,7 +430,7 @@ export default function UsersPage() {
                           style={{
                             padding: '6px 12px',
                             borderRadius: '8px',
-                            backgroundColor: '#8B5CF6',
+                            backgroundColor: themeColors.purplePrimary,
                             color: '#FFFFFF',
                             border: 'none',
                             fontSize: '12px',
@@ -437,10 +441,10 @@ export default function UsersPage() {
                             gap: '6px',
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#7C3AED'
+                            e.currentTarget.style.backgroundColor = themeColors.purpleDark
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#8B5CF6'
+                            e.currentTarget.style.backgroundColor = themeColors.purplePrimary
                           }}
                         >
                           <Eye size={14} />
@@ -470,14 +474,14 @@ export default function UsersPage() {
                     }}
                     onMouseEnter={(e) => {
                       if (currentPage !== 1) {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB'
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight
                       }
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent'
                     }}
                   >
-                    <ChevronLeft size={20} style={{ color: '#4B5563' }} />
+                    <ChevronLeft size={20} style={{ color: themeColors.textSecondary }} />
                   </button>
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum: number
@@ -497,7 +501,7 @@ export default function UsersPage() {
                         style={pageButtonStyle(currentPage === pageNum)}
                         onMouseEnter={(e) => {
                           if (currentPage !== pageNum) {
-                            e.currentTarget.style.backgroundColor = '#F3F4F6'
+                            e.currentTarget.style.backgroundColor = themeColors.grayLight
                           }
                         }}
                         onMouseLeave={(e) => {
@@ -520,14 +524,14 @@ export default function UsersPage() {
                     }}
                     onMouseEnter={(e) => {
                       if (currentPage < totalPages) {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB'
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight
                       }
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent'
                     }}
                   >
-                    <ChevronRight size={20} style={{ color: '#4B5563' }} />
+                    <ChevronRight size={20} style={{ color: themeColors.textSecondary }} />
                   </button>
                 </div>
               </div>

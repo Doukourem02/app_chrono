@@ -8,6 +8,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import type { Driver } from '@/types'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 interface CommissionTransaction {
   id: string
@@ -185,9 +186,9 @@ export default function CommissionsPage() {
 
   return (
     <ScreenTransition>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#F9FAFB' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: themeColors.background }}>
         {/* Header */}
-        <div style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '16px 24px' }}>
+        <div style={{ backgroundColor: themeColors.cardBg, borderBottom: `1px solid ${themeColors.cardBorder}`, padding: '16px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
             <button
               onClick={() => router.back()}
@@ -202,43 +203,43 @@ export default function CommissionsPage() {
                 justifyContent: 'center',
               }}
             >
-              <ArrowLeft size={20} color="#111827" />
+              <ArrowLeft size={20} color={themeColors.textPrimary} />
             </button>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827', margin: 0 }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 700, color: themeColors.textPrimary, margin: 0 }}>
               Commissions
             </h1>
           </div>
 
           {/* Statistiques */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-            <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>
+            <div style={{ padding: '16px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>
                 Commissions prélevées (mois)
               </div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: '#EF4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <TrendingDown size={16} />
                 {formatCurrency(stats.totalDeductions)}
               </div>
-              <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: themeColors.textSecondary, marginTop: '4px' }}>
                 {stats.deductionCount} prélèvements
               </div>
             </div>
 
-            <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>
+            <div style={{ padding: '16px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>
                 Recharges totales (mois)
               </div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <TrendingUp size={16} />
                 {formatCurrency(stats.totalRecharges)}
               </div>
-              <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: themeColors.textSecondary, marginTop: '4px' }}>
                 {stats.rechargeCount} recharges
               </div>
             </div>
 
-            <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>
+            <div style={{ padding: '16px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>
                 Solde net (mois)
               </div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: stats.netCommission >= 0 ? '#10B981' : '#EF4444' }}>
@@ -249,10 +250,10 @@ export default function CommissionsPage() {
         </div>
 
         {/* Filtres */}
-        <div style={{ backgroundColor: '#FFFFFF', padding: '16px 24px', borderBottom: '1px solid #E5E7EB' }}>
+        <div style={{ backgroundColor: themeColors.cardBg, padding: '16px 24px', borderBottom: `1px solid ${themeColors.cardBorder}` }}>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textTertiary }} />
               <input
                 type="text"
                 placeholder="Rechercher (livreur, email, commande...)"
@@ -262,8 +263,10 @@ export default function CommissionsPage() {
                   width: '100%',
                   padding: '10px 12px 10px 36px',
                   borderRadius: '8px',
-                  border: '1px solid #E5E7EB',
+                  border: `1px solid ${themeColors.cardBorder}`,
                   fontSize: '14px',
+                  backgroundColor: themeColors.background,
+                  color: themeColors.textPrimary,
                 }}
               />
             </div>
@@ -274,9 +277,10 @@ export default function CommissionsPage() {
               style={{
                 padding: '10px 12px',
                 borderRadius: '8px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${themeColors.cardBorder}`,
                 fontSize: '14px',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: themeColors.cardBg,
+                color: themeColors.textPrimary,
                 cursor: 'pointer',
               }}
             >
@@ -292,9 +296,10 @@ export default function CommissionsPage() {
               style={{
                 padding: '10px 12px',
                 borderRadius: '8px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${themeColors.cardBorder}`,
                 fontSize: '14px',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: themeColors.cardBg,
+                color: themeColors.textPrimary,
                 cursor: 'pointer',
               }}
             >
@@ -309,7 +314,7 @@ export default function CommissionsPage() {
               style={{
                 padding: '10px 16px',
                 borderRadius: '8px',
-                backgroundColor: '#8B5CF6',
+                backgroundColor: themeColors.purplePrimary,
                 color: '#FFFFFF',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -329,50 +334,50 @@ export default function CommissionsPage() {
         {/* Table */}
         <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
           {filteredTransactions.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
               Aucune transaction trouvée
             </div>
           ) : (
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', overflow: 'hidden' }}>
+            <div style={{ backgroundColor: themeColors.cardBg, borderRadius: '12px', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>
+                  <tr style={{ backgroundColor: themeColors.grayLight, borderBottom: `1px solid ${themeColors.cardBorder}` }}>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
                       Date
                     </th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
                       Livreur
                     </th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
                       Type
                     </th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
                       Commande
                     </th>
-                    <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>
+                    <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
                       Montant
                     </th>
-                    <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>
+                    <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
                       Solde après
                     </th>
-                    <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>
+                    <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTransactions.map((tx) => (
-                    <tr key={tx.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
+                    <tr key={tx.id} style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
+                      <td style={{ padding: '12px', fontSize: '14px', color: themeColors.textPrimary }}>
                         {formatDate(tx.created_at)}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
+                      <td style={{ padding: '12px', fontSize: '14px', color: themeColors.textPrimary }}>
                         <div>
                           <div style={{ fontWeight: 600 }}>{tx.driverName}</div>
-                          <div style={{ fontSize: '12px', color: '#6B7280' }}>{tx.driverEmail}</div>
+                          <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{tx.driverEmail}</div>
                         </div>
                       </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
+                      <td style={{ padding: '12px', fontSize: '14px', color: themeColors.textPrimary }}>
                         <span
                           style={{
                             padding: '4px 8px',
@@ -396,7 +401,7 @@ export default function CommissionsPage() {
                           {tx.type === 'recharge' ? 'Recharge' : tx.type === 'deduction' ? 'Prélèvement' : 'Remboursement'}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
+                      <td style={{ padding: '12px', fontSize: '14px', color: themeColors.textPrimary }}>
                         {tx.order_id ? (
                           <button
                             onClick={() => router.push(`/orders?search=${tx.order_id}`)}
@@ -406,11 +411,11 @@ export default function CommissionsPage() {
                               gap: '4px',
                               padding: '4px 8px',
                               borderRadius: '4px',
-                              backgroundColor: '#F3F4F6',
+                              backgroundColor: themeColors.grayLight,
                               border: 'none',
                               cursor: 'pointer',
                               fontSize: '12px',
-                              color: '#8B5CF6',
+                              color: themeColors.purplePrimary,
                               fontWeight: 600,
                             }}
                           >
@@ -418,7 +423,7 @@ export default function CommissionsPage() {
                             <ExternalLink size={12} />
                           </button>
                         ) : (
-                          <span style={{ color: '#9CA3AF', fontSize: '12px' }}>-</span>
+                          <span style={{ color: themeColors.textTertiary, fontSize: '12px' }}>-</span>
                         )}
                       </td>
                       <td
@@ -433,7 +438,7 @@ export default function CommissionsPage() {
                         {tx.type === 'recharge' ? '+' : '-'}
                         {formatCurrency(tx.amount)}
                       </td>
-                      <td style={{ padding: '12px', fontSize: '14px', color: '#111827', textAlign: 'right' }}>
+                      <td style={{ padding: '12px', fontSize: '14px', color: themeColors.textPrimary, textAlign: 'right' }}>
                         {formatCurrency(tx.balance_after)}
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
@@ -442,11 +447,11 @@ export default function CommissionsPage() {
                           style={{
                             padding: '6px 12px',
                             borderRadius: '6px',
-                            backgroundColor: '#F3F4F6',
+                            backgroundColor: themeColors.grayLight,
                             border: 'none',
                             cursor: 'pointer',
                             fontSize: '12px',
-                            color: '#8B5CF6',
+                            color: themeColors.purplePrimary,
                             fontWeight: 600,
                           }}
                         >

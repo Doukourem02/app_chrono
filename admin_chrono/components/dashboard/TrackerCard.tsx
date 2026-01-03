@@ -12,6 +12,7 @@ import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
 import { GoogleMapsDeletedProjectError } from '@/components/error/GoogleMapsDeletedProjectError'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 interface GoogleMapsWindow extends Window {
   google?: {
@@ -93,7 +94,7 @@ function MapComponent({ routePath }: { routePath?: LatLng[] }) {
   const mapPlaceholderStyle: React.CSSProperties = {
     width: '100%',
     height: '200px',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: themeColors.grayLight,
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
@@ -102,7 +103,7 @@ function MapComponent({ routePath }: { routePath?: LatLng[] }) {
 
   const mapPlaceholderTextStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const mapPlaceholderErrorStyle: React.CSSProperties = {
@@ -317,11 +318,12 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   }
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
+    transition: 'background-color 0.3s ease, border-color 0.3s ease',
     flex: 1.5,
     display: 'flex',
     flexDirection: 'column',
@@ -335,7 +337,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
 
   const trackerHeaderStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#4B5563',
+    color: themeColors.textSecondary,
     fontWeight: 500,
     marginBottom: '8px',
   }
@@ -349,7 +351,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   const trackerIdStyle: React.CSSProperties = {
     fontSize: '20px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const statusBadgeStyle: React.CSSProperties = {
@@ -402,12 +404,12 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   const timelineTitleStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 500,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const timelineDateStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const driverInfoStyle: React.CSSProperties = {
@@ -441,12 +443,12 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   const driverNameStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const driverRoleStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const driverActionsStyle: React.CSSProperties = {
@@ -491,14 +493,14 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   const infoTitleStyle: React.CSSProperties = {
     fontSize: '12px',
     textTransform: 'uppercase',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     marginBottom: '4px',
   }
 
   const infoTextStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const renderEmpty = () => (
@@ -509,7 +511,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
         borderRadius: '12px',
         backgroundColor: '#F3F4F6',
         textAlign: 'center',
-        color: '#6B7280',
+        color: themeColors.textSecondary,
       }}
     >
       {isLoading ? 'Chargement des livraisons en cours...' : 'Aucune livraison en cours'}

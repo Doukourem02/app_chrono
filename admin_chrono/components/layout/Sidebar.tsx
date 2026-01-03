@@ -9,6 +9,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
+import { themeColors } from "@/utils/theme";
+import { useThemeStore } from "@/stores/themeStore";
 
 interface NavItem {
   href: string;
@@ -76,12 +78,15 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuthStore();
+  const theme = useThemeStore((state) => state.theme);
+  const isDarkMode = theme === 'dark';
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string; first_name?: string | null; last_name?: string | null } | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; transform?: string } | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['analyses', 'gestion', 'administration']));
 
   const loadProfile = useCallback(async () => {
@@ -232,7 +237,12 @@ export default function Sidebar() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const isClickInsideButton = profileMenuRef.current?.contains(target);
+      const isClickInsideMenu = profileDropdownRef.current?.contains(target);
+      
+      // Ne fermer le menu que si le clic est en dehors du bouton ET du menu
+      if (!isClickInsideButton && !isClickInsideMenu) {
         setShowProfileMenu(false);
         setMenuPosition(null);
       }
@@ -248,15 +258,57 @@ export default function Sidebar() {
   }, [showProfileMenu]);
 
   // Mettre à jour la position du menu quand le sidebar se redimensionne
+  // Utiliser un debounce pour éviter les recalculs trop fréquents
   useEffect(() => {
-    if (showProfileMenu && profileMenuRef.current) {
+    if (!showProfileMenu || !profileMenuRef.current) return;
+    
+    const updateMenuPosition = () => {
+      if (!profileMenuRef.current) return;
+      
       const rect = profileMenuRef.current.getBoundingClientRect();
       const sidebarWidth = isExpanded ? expandedWidth : collapsedWidth;
-      setMenuPosition({
-        top: rect.top + rect.height / 2,
-        left: rect.left + sidebarWidth + 16,
+      
+      // Hauteur estimée du menu (header + 3 items + padding)
+      const menuHeight = 200; // Approximatif : header (~60px) + 3 items (~120px) + padding
+      const windowHeight = window.innerHeight;
+      const buttonCenterY = rect.top + rect.height / 2;
+      
+      // Vérifier si le menu dépasse en bas de l'écran
+      const menuBottomIfCentered = buttonCenterY + menuHeight / 2;
+      const shouldPositionAbove = menuBottomIfCentered > windowHeight - 20; // 20px de marge
+      
+      let top: number;
+      let transform: string;
+      
+      if (shouldPositionAbove) {
+        // Positionner le menu au-dessus du bouton
+        top = rect.top - menuHeight - 8; // 8px d'espace entre le bouton et le menu
+        transform = 'none';
+      } else {
+        // Centrer le menu verticalement
+        top = buttonCenterY;
+        transform = 'translateY(-50%)';
+      }
+      
+      setMenuPosition(prev => {
+        // Ne mettre à jour que si la position a vraiment changé (évite les re-renders inutiles)
+        if (prev && Math.abs(prev.top - top) < 1 && prev.left === rect.left + sidebarWidth + 16 && prev.transform === transform) {
+          return prev;
+        }
+        return {
+          top,
+          left: rect.left + sidebarWidth + 16,
+          transform,
+        };
       });
-    }
+    };
+    
+    // Debounce pour éviter les recalculs trop fréquents
+    const timeoutId = setTimeout(updateMenuPosition, 50);
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [isExpanded, showProfileMenu, expandedWidth, collapsedWidth]);
 
   const getUserInitials = () => {
@@ -301,8 +353,8 @@ export default function Sidebar() {
   const sidebarStyle: React.CSSProperties = {
     height: '100vh',
     width: isExpanded ? expandedWidth : collapsedWidth,
-    backgroundColor: '#FFFFFF',
-    borderRight: '1px solid #E5E7EB',
+    backgroundColor: themeColors.cardBg,
+    borderRight: `1px solid ${themeColors.cardBorder}`,
     display: 'flex',
     flexDirection: 'column',
     alignItems: isExpanded ? 'flex-start' : 'center',
@@ -330,7 +382,7 @@ export default function Sidebar() {
     transition: 'transform 0.2s ease',
     position: 'sticky',
     top: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     zIndex: 10,
     flexShrink: 0,
   }
@@ -346,7 +398,7 @@ export default function Sidebar() {
   const logoTextStyle: React.CSSProperties = {
     fontSize: '13px',
     fontWeight: 600,
-    color: '#374151',
+    color: themeColors.textPrimary,
     letterSpacing: '-0.025em',
     opacity: isExpanded ? 1 : 0,
     transform: `translateX(${isExpanded ? 0 : -10}px)`,
@@ -381,8 +433,8 @@ export default function Sidebar() {
     paddingLeft: isExpanded ? 16 : collapsedIconOffset,
     paddingRight: isExpanded ? 16 : collapsedIconOffset,
     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-    backgroundColor: active ? '#8B5CF6' : 'transparent',
-    color: active ? '#FFFFFF' : '#6B7280',
+    backgroundColor: active ? themeColors.purplePrimary : 'transparent',
+    color: active ? '#FFFFFF' : themeColors.textSecondary,
     boxShadow: active
       ? (isExpanded ? '0 4px 12px rgba(139,92,246,0.4)' : '0 6px 20px rgba(139,92,246,0.35)')
       : 'none',
@@ -404,7 +456,7 @@ export default function Sidebar() {
     opacity: isExpanded ? 1 : 0,
     transform: `translateX(${isExpanded ? 0 : -8}px)`,
     transition: 'opacity 0.2s ease, transform 0.2s ease',
-    color: active ? '#FFFFFF' : '#111827',
+    color: active ? '#FFFFFF' : themeColors.textPrimary,
     whiteSpace: 'nowrap',
     overflow: 'visible',
     textOverflow: 'clip',
@@ -421,7 +473,7 @@ export default function Sidebar() {
     paddingRight: isExpanded ? 12 : 0,
     position: 'sticky',
     bottom: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     zIndex: 10,
     flexShrink: 0,
     boxSizing: 'border-box',
@@ -522,7 +574,7 @@ export default function Sidebar() {
   const avatarNameStyle: React.CSSProperties = {
     fontSize: '13px',
     fontWeight: 500,
-    color: '#374151',
+    color: themeColors.textPrimary,
     opacity: isExpanded ? 1 : 0,
     transform: `translateX(${isExpanded ? 0 : -10}px)`,
     transition: 'opacity 0.2s ease, transform 0.2s ease',
@@ -536,12 +588,14 @@ export default function Sidebar() {
     position: 'fixed',
     top: menuPosition ? `${menuPosition.top}px` : '0',
     left: menuPosition ? `${menuPosition.left}px` : '0',
-    transform: menuPosition ? 'translateY(-50%)' : 'none',
-    backgroundColor: '#FFFFFF',
+    transform: menuPosition?.transform || 'none',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     minWidth: '220px',
+    maxHeight: typeof window !== 'undefined' ? `${window.innerHeight - 40}px` : 'auto',
+    overflowY: 'auto',
     zIndex: 10000,
     padding: '0',
     display: showProfileMenu && menuPosition ? 'block' : 'none',
@@ -549,19 +603,19 @@ export default function Sidebar() {
 
   const profileMenuHeaderStyle: React.CSSProperties = {
     padding: '16px',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const profileMenuUserNameStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '4px',
   }
 
   const profileMenuUserEmailStyle: React.CSSProperties = {
     fontSize: '13px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const profileMenuItemStyle: React.CSSProperties = {
@@ -569,7 +623,7 @@ export default function Sidebar() {
     borderRadius: '0',
     cursor: 'pointer',
     fontSize: '14px',
-    color: '#111827',
+    color: themeColors.textPrimary,
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
@@ -583,15 +637,25 @@ export default function Sidebar() {
 
   const profileMenuDividerStyle: React.CSSProperties = {
     height: '1px',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: themeColors.cardBorder,
     margin: '0',
   }
 
   return (
     <div
       style={sidebarStyle}
-      onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
+      onMouseEnter={() => {
+        // Ne pas développer le sidebar si le menu de profil est ouvert
+        if (!showProfileMenu) {
+          setIsExpanded(true);
+        }
+      }}
+      onMouseLeave={() => {
+        // Ne pas rétrécir le sidebar si le menu de profil est ouvert
+        if (!showProfileMenu) {
+          setIsExpanded(false);
+        }
+      }}
     >
       <div style={logoContainerStyle}>
         <div style={logoImageContainerStyle}>
@@ -600,7 +664,11 @@ export default function Sidebar() {
             alt="Chrono Logo"
             width={60}
             height={60}
-            style={{ objectFit: 'contain' }}
+            style={{ 
+              objectFit: 'contain',
+              mixBlendMode: isDarkMode ? 'lighten' : 'normal',
+              filter: isDarkMode ? 'brightness(1.1)' : 'none',
+            }}
             priority
           />
         </div>
@@ -795,9 +863,30 @@ export default function Sidebar() {
               if (profileMenuRef.current) {
                 const rect = profileMenuRef.current.getBoundingClientRect();
                 const sidebarWidth = isExpanded ? expandedWidth : collapsedWidth;
+                
+                // Hauteur estimée du menu (header + 3 items + padding)
+                const menuHeight = 200; // Approximatif : header (~60px) + 3 items (~120px) + padding
+                const windowHeight = window.innerHeight;
+                const buttonCenterY = rect.top + rect.height / 2;
+                
+                // Vérifier si le menu dépasse en bas de l'écran
+                const menuBottomIfCentered = buttonCenterY + menuHeight / 2;
+                const shouldPositionAbove = menuBottomIfCentered > windowHeight - 20; // 20px de marge
+                
+                let top: number;
+                
+                if (shouldPositionAbove) {
+                  // Positionner le menu au-dessus du bouton
+                  top = rect.top - menuHeight - 8; // 8px d'espace entre le bouton et le menu
+                } else {
+                  // Centrer le menu verticalement
+                  top = buttonCenterY;
+                }
+                
                 setMenuPosition({
-                  top: rect.top + rect.height / 2,
+                  top,
                   left: rect.left + sidebarWidth + 16,
+                  transform: shouldPositionAbove ? 'none' : 'translateY(-50%)',
                 });
               }
               setShowProfileMenu(!showProfileMenu);
@@ -863,13 +952,13 @@ export default function Sidebar() {
           </button>
 
           {showProfileMenu && menuPosition && (
-            <div style={profileMenuStyle}>
+            <div ref={profileDropdownRef} style={profileMenuStyle}>
               <div style={profileMenuHeaderStyle}>
                 <div style={profileMenuUserNameStyle}>{getUserName()}</div>
                 <div style={profileMenuUserEmailStyle}>{user?.email || ''}</div>
               </div>
               <Link
-                href="/settings"
+                href="/profile"
                 style={profileMenuItemStyle}
                 onClick={() => setShowProfileMenu(false)}
                 onMouseEnter={(e) => {

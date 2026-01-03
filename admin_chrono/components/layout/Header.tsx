@@ -1,7 +1,7 @@
 'use client'
 
 import { Search, Bell, SlidersHorizontal, X, Package, User, ChevronDown, CheckCheck } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
@@ -9,6 +9,7 @@ import { useDateFilter, type DateFilterType } from '@/contexts/DateFilterContext
 import { useNotificationStore } from '@/stores/useNotificationStore'
 import { useNotifications } from '@/hooks/useNotifications'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 interface SearchOrder {
   id: string
@@ -200,10 +201,10 @@ export default function Header() {
   ]
 
   const headerStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '28px',
     boxShadow: '0 15px 35px rgba(15,23,42,0.08)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     paddingLeft: '16px',
     paddingRight: '24px',
     paddingTop: '12px',
@@ -227,7 +228,7 @@ export default function Header() {
     transform: 'translateY(-50%)',
     width: '20px',
     height: '20px',
-    color: '#9CA3AF',
+    color: themeColors.textTertiary,
     pointerEvents: 'none',
   }
 
@@ -237,12 +238,13 @@ export default function Header() {
     paddingRight: '16px',
     paddingTop: '10px',
     paddingBottom: '10px',
-    backgroundColor: '#F5F6FA',
+    backgroundColor: themeColors.grayLight,
     borderRadius: '16px',
     border: 'none',
     outline: 'none',
     fontSize: '14px',
     transition: 'all 0.2s',
+    color: themeColors.textPrimary,
   }
 
   const searchResultsStyle: React.CSSProperties = {
@@ -251,10 +253,10 @@ export default function Header() {
     left: 0,
     right: 0,
     marginTop: '8px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     maxHeight: '400px',
     overflowY: 'auto',
     zIndex: 1000,
@@ -262,7 +264,7 @@ export default function Header() {
 
   const searchResultItemStyle: React.CSSProperties = {
     padding: '12px 16px',
-    borderBottom: '1px solid #F3F4F6',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'flex-start',
@@ -284,9 +286,9 @@ export default function Header() {
     borderRadius: '12px',
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: '#E5E7EB',
+    borderColor: themeColors.cardBorder,
     backgroundColor: 'transparent',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -304,13 +306,13 @@ export default function Header() {
     paddingBottom: '10px',
     fontSize: '14px',
     fontWeight: 500,
-    color: '#374151',
+    color: themeColors.textPrimary,
   }
 
   const notificationButtonStyle: React.CSSProperties = {
     ...buttonStyle,
     position: 'relative',
-    color: '#4B5563',
+    color: themeColors.textPrimary,
   }
 
   const notificationBadgeStyle: React.CSSProperties = {
@@ -382,10 +384,10 @@ export default function Header() {
     top: '100%',
     right: 0,
     marginTop: '8px',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     minWidth: '200px',
     zIndex: 1000,
     padding: '8px',
@@ -396,16 +398,16 @@ export default function Header() {
     borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '14px',
-    color: '#374151',
+    color: themeColors.textPrimary,
     transition: 'background-color 0.2s',
   }
 
   const activeFilterStyle: React.CSSProperties = {
     ...buttonStyle,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: themeColors.purplePrimary,
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: '#8B5CF6',
+    borderColor: themeColors.purplePrimary,
     color: '#FFFFFF',
   }
 
@@ -424,14 +426,14 @@ export default function Header() {
           style={inputStyle}
           onFocus={(e) => {
             e.target.style.boxShadow = '0 0 0 2px rgba(139, 92, 246, 0.2)'
-            e.target.style.backgroundColor = '#FFFFFF'
+            e.target.style.backgroundColor = themeColors.cardBg
             if (debouncedQuery.length > 2 || query.length > 2) {
               setShowSearchResults(true)
             }
           }}
           onBlur={(e) => {
             e.target.style.boxShadow = 'none'
-            e.target.style.backgroundColor = '#F5F6FA'
+            e.target.style.backgroundColor = themeColors.grayLight
           }}
         />
         {query && (
@@ -454,20 +456,20 @@ export default function Header() {
               justifyContent: 'center',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6'
+              e.currentTarget.style.backgroundColor = themeColors.grayLight
               e.currentTarget.style.borderRadius = '8px'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
-            <X size={16} style={{ color: '#6B7280' }} />
+            <X size={16} style={{ color: themeColors.textSecondary }} />
           </button>
         )}
         {showSearchResults && (query.length > 2 || debouncedQuery.length > 2) && (
           <div style={searchResultsStyle}>
             {isSearching ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>
+              <div style={{ padding: '24px', textAlign: 'center', color: themeColors.textSecondary }}>
                 Recherche en cours...
               </div>
             ) : searchResults?.data && (searchResults.data.orders.length > 0 || searchResults.data.drivers.length > 0 || searchResults.data.clients.length > 0) ? (
@@ -477,220 +479,394 @@ export default function Header() {
                   const hasDrivers = searchResults.data.drivers.length > 0
                   const hasClients = searchResults.data.clients.length > 0
                   
-                  // Si c'est une recherche de commande, afficher les commandes en premier
-                  // Sinon, afficher dans l'ordre : Livreurs, Clients, Commandes
+                  // Calculer un score de pertinence pour chaque catégorie
+                  const normalizedQuery = debouncedQuery.toLowerCase().trim()
+                  
+                  // Fonction pour extraire les initiales d'un nom complet (première lettre de chaque mot)
+                  const getInitials = (fullName: string): string => {
+                    if (!fullName) return ''
+                    return fullName
+                      .split(/\s+/)
+                      .map(word => word.charAt(0))
+                      .join('')
+                      .toLowerCase()
+                  }
+                  
+                  // Fonction pour extraire les mots d'un nom (pour détecter les correspondances partielles)
+                  const getNameWords = (fullName: string): string[] => {
+                    if (!fullName) return []
+                    return fullName
+                      .toLowerCase()
+                      .split(/\s+/)
+                      .filter(word => word.length > 0)
+                  }
+                  
+                  // Détecter si la recherche ressemble à un ID de commande
+                  const isOrderId = normalizedQuery.startsWith('chlv') || 
+                                   normalizedQuery.match(/^[a-z]{4}-\d{6}-[a-z0-9]{4}$/i)
+                  
+                  // Détecter si c'est un nom (pas un ID de commande, lettres uniquement, peut contenir des espaces)
+                  const looksLikeName = !isOrderId && 
+                                       /^[a-z\s]+$/.test(normalizedQuery) &&
+                                       normalizedQuery.length >= 2
+                  
+                  // Score pour les commandes
+                  let ordersScore = 0
+                  if (hasOrders) {
+                    // Si la recherche est un ID de commande, priorité maximale
+                    if (isOrderId) {
+                      ordersScore = 100
+                    } else if (looksLikeName) {
+                      // Si c'est un nom, score très bas pour les commandes (car c'est indirect)
+                      // Seulement si le nom correspond au client ou livreur de la commande
+                      const nameMatches = (searchResults.data.orders as SearchOrder[]).filter(order => {
+                        const clientName = order.clientName?.toLowerCase() || ''
+                        const driverName = order.driverName?.toLowerCase() || ''
+                        return clientName.includes(normalizedQuery) || driverName.includes(normalizedQuery)
+                      }).length
+                      // Score très faible car recherche indirecte (via nom dans commande)
+                      ordersScore = nameMatches * 1
+                    } else {
+                      // Score basé sur le nombre de résultats et les correspondances exactes
+                      const exactMatches = (searchResults.data.orders as SearchOrder[]).filter(order => 
+                        order.deliveryId?.toLowerCase().includes(normalizedQuery) ||
+                        order.clientName?.toLowerCase().includes(normalizedQuery) ||
+                        order.driverName?.toLowerCase().includes(normalizedQuery)
+                      ).length
+                      ordersScore = exactMatches * 10 + searchResults.data.orders.length
+                    }
+                  }
+                  
+                  // Score pour les livreurs
+                  let driversScore = 0
+                  if (hasDrivers && looksLikeName) {
+                    // Analyser les correspondances dans les noms des livreurs
+                    const drivers = searchResults.data.drivers as SearchDriver[]
+                    const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 0)
+                    
+                    let directNameMatches = 0
+                    let partialMatches = 0
+                    let initialsMatches = 0
+                    
+                    drivers.forEach(driver => {
+                      const fullName = driver.fullName?.toLowerCase() || ''
+                      if (!fullName) return
+                      
+                      const nameWords = getNameWords(fullName)
+                      const initials = getInitials(fullName)
+                      
+                      // Correspondance exacte dans le nom complet
+                      if (fullName.includes(normalizedQuery)) {
+                        directNameMatches++
+                      }
+                      // Correspondance avec les initiales
+                      else if (initials.startsWith(normalizedQuery) || normalizedQuery.startsWith(initials)) {
+                        initialsMatches++
+                      }
+                      // Correspondance partielle avec un mot du nom
+                      else if (queryWords.some(qw => nameWords.some(nw => nw.includes(qw) || qw.includes(nw)))) {
+                        partialMatches++
+                      }
+                    })
+                    
+                    // Score prioritaire : correspondances directes dans le nom
+                    driversScore = directNameMatches * 100 + initialsMatches * 50 + partialMatches * 25
+                  } else if (hasDrivers) {
+                    // Pour les recherches non-nom (emails, téléphones, etc.)
+                    const exactMatches = (searchResults.data.drivers as SearchDriver[]).filter(driver => {
+                      const fullName = driver.fullName?.toLowerCase() || ''
+                      const email = driver.email?.toLowerCase() || ''
+                      const phone = driver.phone?.toLowerCase() || ''
+                      return fullName.includes(normalizedQuery) || email.includes(normalizedQuery) || phone.includes(normalizedQuery)
+                    }).length
+                    driversScore = exactMatches * 10 + searchResults.data.drivers.length
+                  }
+                  
+                  // Score pour les clients
+                  let clientsScore = 0
+                  if (hasClients && looksLikeName) {
+                    // Analyser les correspondances dans les noms des clients
+                    const clients = searchResults.data.clients as SearchClient[]
+                    const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 0)
+                    
+                    let directNameMatches = 0
+                    let partialMatches = 0
+                    let initialsMatches = 0
+                    
+                    clients.forEach(client => {
+                      const fullName = client.fullName?.toLowerCase() || ''
+                      if (!fullName) return
+                      
+                      const nameWords = getNameWords(fullName)
+                      const initials = getInitials(fullName)
+                      
+                      // Correspondance exacte dans le nom complet
+                      if (fullName.includes(normalizedQuery)) {
+                        directNameMatches++
+                      }
+                      // Correspondance avec les initiales
+                      else if (initials.startsWith(normalizedQuery) || normalizedQuery.startsWith(initials)) {
+                        initialsMatches++
+                      }
+                      // Correspondance partielle avec un mot du nom
+                      else if (queryWords.some(qw => nameWords.some(nw => nw.includes(qw) || qw.includes(nw)))) {
+                        partialMatches++
+                      }
+                    })
+                    
+                    // Score prioritaire : correspondances directes dans le nom
+                    clientsScore = directNameMatches * 100 + initialsMatches * 50 + partialMatches * 25
+                  } else if (hasClients) {
+                    // Pour les recherches non-nom (emails, téléphones, etc.)
+                    const exactMatches = (searchResults.data.clients as SearchClient[]).filter(client => {
+                      const fullName = client.fullName?.toLowerCase() || ''
+                      const email = client.email?.toLowerCase() || ''
+                      const phone = client.phone?.toLowerCase() || ''
+                      return fullName.includes(normalizedQuery) || email.includes(normalizedQuery) || phone.includes(normalizedQuery)
+                    }).length
+                    clientsScore = exactMatches * 10 + searchResults.data.clients.length
+                  }
+                  
+                  // Créer un tableau des catégories avec leurs scores
+                  const categories = [
+                    { type: 'orders' as const, score: ordersScore, hasResults: hasOrders },
+                    { type: 'drivers' as const, score: driversScore, hasResults: hasDrivers },
+                    { type: 'clients' as const, score: clientsScore, hasResults: hasClients },
+                  ]
+                  
+                  // Trier par score décroissant, puis par ordre alphabétique si scores égaux
+                  categories.sort((a, b) => {
+                    if (a.score !== b.score) {
+                      return b.score - a.score
+                    }
+                    return a.type.localeCompare(b.type)
+                  })
+                  
+                  // Afficher les catégories dans l'ordre de pertinence
                   return (
                     <>
-                      {/* Commandes */}
-                      {hasOrders && (
-                        <>
-                          <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB' }}>
-                            Commandes ({searchResults.data.orders.length})
-                          </div>
-                          {((searchResults.data.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
-                            <div
-                              key={order.id}
-                              style={searchResultItemStyle}
-                              onClick={() => handleSearchResultClick('order', order.id, order.status)}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#F9FAFB'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent'
-                              }}
-                            >
-                              <Package size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                                    {order.deliveryId || order.id.slice(0, 8) + '...'}
-                                  </div>
-                                  <span
-                                    style={{
-                                      padding: '2px 8px',
-                                      borderRadius: '4px',
-                                      fontSize: '11px',
-                                      fontWeight: 600,
-                                      backgroundColor: getStatusColor(order.status) + '20',
-                                      color: getStatusColor(order.status),
-                                    }}
-                                  >
-                                    {getStatusLabel(order.status)}
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                  {order.pickup} → {order.dropoff}
-                                </div>
-                                {order.price && (
-                                  <div style={{ fontSize: '12px', color: '#8B5CF6', fontWeight: 600, marginBottom: '2px' }}>
-                                    {order.price}
-                                  </div>
-                                )}
-                                {(order.clientName || order.driverName) && (
-                                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
-                                    {order.clientName && `Client: ${order.clientName}`}
-                                    {order.clientName && order.driverName && ' • '}
-                                    {order.driverName && `Livreur: ${order.driverName}`}
-                                  </div>
-                                )}
-                                <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                                  {order.createdAt}
-                                </div>
+                      {categories.map((category, categoryIndex) => {
+                        if (!category.hasResults) return null
+                        
+                        if (category.type === 'orders') {
+                          return (
+                            <Fragment key="orders">
+                              {/* Commandes */}
+                              <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
+                                COMMANDES ({searchResults.data?.orders?.length || 0})
                               </div>
-                            </div>
-                          ))}
-                        </>
-                      )}
-
-                      {/* Livreurs */}
-                      {hasDrivers && (
-                        <>
-                          <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', borderTop: hasOrders ? '1px solid #E5E7EB' : 'none', marginTop: hasOrders ? '8px' : '0' }}>
-                            Livreurs ({searchResults.data.drivers.length})
-                          </div>
-                          {((searchResults.data.drivers as SearchDriver[]) || []).map((driver: SearchDriver) => {
-                            const displayName = driver.fullName || driver.email
-                            
-                            return (
-                              <div
-                                key={driver.id}
-                                style={searchResultItemStyle}
-                                onClick={() => handleSearchResultClick('driver', driver.id)}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#F9FAFB'
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent'
-                                }}
-                              >
-                                <User size={20} style={{ color: '#8B5CF6', flexShrink: 0 }} />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {displayName}
+                              {((searchResults.data?.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
+                                <div
+                                  key={order.id}
+                                  style={searchResultItemStyle}
+                                  onClick={() => handleSearchResultClick('order', order.id, order.status)}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = themeColors.grayLight
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent'
+                                  }}
+                                >
+                                  <Package size={20} style={{ color: themeColors.purplePrimary, flexShrink: 0 }} />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                      <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
+                                        {order.deliveryId || order.id.slice(0, 8) + '...'}
+                                      </div>
+                                      <span
+                                        style={{
+                                          padding: '2px 8px',
+                                          borderRadius: '4px',
+                                          fontSize: '11px',
+                                          fontWeight: 600,
+                                          backgroundColor: getStatusColor(order.status) + '20',
+                                          color: getStatusColor(order.status),
+                                        }}
+                                      >
+                                        {getStatusLabel(order.status)}
+                                      </span>
                                     </div>
-                                    <span
-                                      style={{
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        backgroundColor: driver.driver_type === 'internal' ? '#EF444420' : '#8B5CF620',
-                                        color: driver.driver_type === 'internal' ? '#EF4444' : '#8B5CF6',
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      {driver.driver_type_label}
-                                    </span>
-                                    <span
-                                      style={{
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        backgroundColor: driver.is_online ? '#10B98120' : '#6B728020',
-                                        color: driver.is_online ? '#10B981' : '#6B7280',
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      {driver.is_online ? 'En ligne' : 'Hors ligne'}
-                                    </span>
-                                  </div>
-                                  {driver.fullName && (
-                                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                      {driver.email}
+                                    <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
+                                      {order.pickup} → {order.dropoff}
                                     </div>
-                                  )}
-                                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                    {driver.phone}
-                                  </div>
-                                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                    <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                                      {driver.vehicle_type_label} {driver.license_number ? `• ${driver.license_number}` : ''}
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                                      ⭐ {driver.rating} ({driver.total_deliveries} livraisons)
-                                    </div>
-                                    {driver.commission_balance && (
-                                      <div style={{ fontSize: '11px', color: '#8B5CF6', fontWeight: 600 }}>
-                                        💰 {driver.commission_balance} ({driver.commission_rate})
+                                    {order.price && (
+                                      <div style={{ fontSize: '12px', color: themeColors.purplePrimary, fontWeight: 600, marginBottom: '2px' }}>
+                                        {order.price}
                                       </div>
                                     )}
-                                  </div>
-                                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                                    Inscrit le {driver.createdAt}
+                                    {(order.clientName || order.driverName) && (
+                                      <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '4px' }}>
+                                        {order.clientName && `Client: ${order.clientName}`}
+                                        {order.clientName && order.driverName && ' • '}
+                                        {order.driverName && `Livreur: ${order.driverName}`}
+                                      </div>
+                                    )}
+                                    <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
+                                      {order.createdAt}
+                                    </div>
                                   </div>
                                 </div>
+                              ))}
+                            </Fragment>
+                          )
+                        }
+                        
+                        if (category.type === 'drivers') {
+                          return (
+                            <Fragment key="drivers">
+                              {/* Livreurs */}
+                              <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
+                                LIVREURS ({searchResults.data?.drivers?.length || 0})
                               </div>
-                            )
-                          })}
-                        </>
-                      )}
-
-                      {/* Clients */}
-                      {hasClients && (
-                        <>
-                          <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', borderTop: (hasOrders || hasDrivers) ? '1px solid #E5E7EB' : 'none', marginTop: (hasOrders || hasDrivers) ? '8px' : '0' }}>
-                            Clients ({searchResults.data.clients.length})
-                          </div>
-                          {((searchResults.data.clients as SearchClient[]) || []).map((client: SearchClient) => {
-                            const displayName = client.fullName || client.email
-                            
-                            return (
-                              <div
-                                key={client.id}
-                                style={searchResultItemStyle}
-                                onClick={() => handleSearchResultClick('client', client.id)}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#F9FAFB'
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent'
-                                }}
-                              >
-                                <User size={20} style={{ color: '#10B981', flexShrink: 0 }} />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {displayName}
+                              {((searchResults.data?.drivers as SearchDriver[]) || []).map((driver: SearchDriver) => {
+                                const displayName = driver.fullName || driver.email
+                                
+                                return (
+                                  <div
+                                    key={driver.id}
+                                    style={searchResultItemStyle}
+                                    onClick={() => handleSearchResultClick('driver', driver.id)}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = themeColors.grayLight
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'transparent'
+                                    }}
+                                  >
+                                    <User size={20} style={{ color: themeColors.purplePrimary, flexShrink: 0 }} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                        <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {displayName}
+                                        </div>
+                                        <span
+                                          style={{
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            backgroundColor: driver.driver_type === 'internal' ? '#EF444420' : '#8B5CF620',
+                                            color: driver.driver_type === 'internal' ? '#EF4444' : '#8B5CF6',
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          {driver.driver_type_label}
+                                        </span>
+                                        <span
+                                          style={{
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            backgroundColor: driver.is_online ? '#10B98120' : '#6B728020',
+                                            color: driver.is_online ? '#10B981' : '#6B7280',
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          {driver.is_online ? 'En ligne' : 'Hors ligne'}
+                                        </span>
+                                      </div>
+                                      {driver.fullName && (
+                                        <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
+                                          {driver.email}
+                                        </div>
+                                      )}
+                                      <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
+                                        {driver.phone}
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '12px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                        <div style={{ fontSize: '11px', color: themeColors.textTertiary }}>
+                                          {driver.vehicle_type_label} {driver.license_number ? `• ${driver.license_number}` : ''}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: themeColors.textTertiary }}>
+                                          ⭐ {driver.rating} ({driver.total_deliveries} livraisons)
+                                        </div>
+                                        {driver.commission_balance && (
+                                          <div style={{ fontSize: '11px', color: themeColors.purplePrimary, fontWeight: 600 }}>
+                                            💰 {driver.commission_balance} ({driver.commission_rate})
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
+                                        Inscrit le {driver.createdAt}
+                                      </div>
                                     </div>
-                                    <span
-                                      style={{
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        backgroundColor: '#10B98120',
-                                        color: '#10B981',
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      Client
-                                    </span>
                                   </div>
-                                  {client.fullName && (
-                                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                      {client.email}
-                                    </div>
-                                  )}
-                                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '2px' }}>
-                                    {client.phone}
-                                  </div>
-                                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                                    Inscrit le {client.createdAt}
-                                  </div>
-                                </div>
+                                )
+                              })}
+                            </Fragment>
+                          )
+                        }
+                        
+                        if (category.type === 'clients') {
+                          return (
+                            <Fragment key="clients">
+                              {/* Clients */}
+                              <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
+                                CLIENTS ({searchResults.data?.clients?.length || 0})
                               </div>
-                            )
-                          })}
-                        </>
-                      )}
+                              {((searchResults.data?.clients as SearchClient[]) || []).map((client: SearchClient) => {
+                                const displayName = client.fullName || client.email
+                                
+                                return (
+                                  <div
+                                    key={client.id}
+                                    style={searchResultItemStyle}
+                                    onClick={() => handleSearchResultClick('client', client.id)}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = themeColors.grayLight
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'transparent'
+                                    }}
+                                  >
+                                    <User size={20} style={{ color: '#10B981', flexShrink: 0 }} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                        <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {displayName}
+                                        </div>
+                                        <span
+                                          style={{
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            backgroundColor: '#10B98120',
+                                            color: '#10B981',
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          Client
+                                        </span>
+                                      </div>
+                                      {client.fullName && (
+                                        <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
+                                          {client.email}
+                                        </div>
+                                      )}
+                                      <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
+                                        {client.phone}
+                                      </div>
+                                      <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
+                                        Inscrit le {client.createdAt}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </Fragment>
+                          )
+                        }
+                        
+                        return null
+                      })}
                     </>
                   )
                 })()}
               </>
             ) : (
-              <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>
+              <div style={{ padding: '24px', textAlign: 'center', color: themeColors.textSecondary }}>
                 Aucun résultat trouvé
               </div>
             )}
@@ -709,7 +885,7 @@ export default function Header() {
             }}
             onMouseEnter={(e) => {
               if (!showFilters) {
-                e.currentTarget.style.backgroundColor = '#F9FAFB'
+                e.currentTarget.style.backgroundColor = themeColors.grayLight
               }
             }}
             onMouseLeave={(e) => {
@@ -722,13 +898,13 @@ export default function Header() {
           </button>
           {showFilters && (
             <div style={dropdownStyle}>
-              <div style={{ padding: '12px', fontSize: '14px', fontWeight: 600, color: '#111827', borderBottom: '1px solid #E5E7EB', marginBottom: '8px' }}>
+              <div style={{ padding: '12px', fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, borderBottom: `1px solid ${themeColors.cardBorder}`, marginBottom: '8px' }}>
                 Filtres
               </div>
               <div
                 style={dropdownItemStyle}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB'
+                  e.currentTarget.style.backgroundColor = themeColors.grayLight
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent'
@@ -743,7 +919,7 @@ export default function Header() {
               <div
                 style={dropdownItemStyle}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB'
+                  e.currentTarget.style.backgroundColor = themeColors.grayLight
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent'
@@ -758,7 +934,7 @@ export default function Header() {
               <div
                 style={dropdownItemStyle}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB'
+                  e.currentTarget.style.backgroundColor = themeColors.grayLight
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent'
@@ -784,7 +960,7 @@ export default function Header() {
             }}
             onMouseEnter={(e) => {
               if (!showDatePicker) {
-                e.currentTarget.style.backgroundColor = '#F9FAFB'
+                e.currentTarget.style.backgroundColor = themeColors.grayLight
               }
             }}
             onMouseLeave={(e) => {
@@ -793,10 +969,10 @@ export default function Header() {
               }
             }}
           >
-            <span style={{ color: showDatePicker ? '#FFFFFF' : '#6B7280' }}>
+            <span style={{ color: showDatePicker ? '#FFFFFF' : themeColors.textSecondary }}>
               {dateOptions.find((opt) => opt.value === dateFilter)?.label || 'Ce mois'}
             </span>
-            <ChevronDown size={16} style={{ color: showDatePicker ? '#FFFFFF' : '#6B7280' }} />
+            <ChevronDown size={16} style={{ color: showDatePicker ? '#FFFFFF' : themeColors.textSecondary }} />
           </button>
           {showDatePicker && (
             <div style={dropdownStyle}>
@@ -805,13 +981,13 @@ export default function Header() {
                   key={option.value}
                   style={{
                     ...dropdownItemStyle,
-                    backgroundColor: dateFilter === option.value ? '#F3E8FF' : 'transparent',
-                    color: dateFilter === option.value ? '#8B5CF6' : '#374151',
+                    backgroundColor: dateFilter === option.value ? `${themeColors.purplePrimary}20` : 'transparent',
+                    color: dateFilter === option.value ? themeColors.purplePrimary : themeColors.textPrimary,
                     fontWeight: dateFilter === option.value ? 600 : 400,
                   }}
                   onMouseEnter={(e) => {
                     if (dateFilter !== option.value) {
-                      e.currentTarget.style.backgroundColor = '#F9FAFB'
+                      e.currentTarget.style.backgroundColor = themeColors.grayLight
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -840,7 +1016,7 @@ export default function Header() {
               setShowDatePicker(false)
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F9FAFB'
+              e.currentTarget.style.backgroundColor = themeColors.grayLight
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent'
@@ -855,7 +1031,7 @@ export default function Header() {
           </button>
           {showNotifications && (
             <div style={{ ...dropdownStyle, minWidth: '360px', maxHeight: '500px', overflowY: 'auto', padding: 0 }}>
-              <div style={{ padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: '#111827', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: '#FFFFFF', zIndex: 10 }}>
+              <div style={{ padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, borderBottom: `1px solid ${themeColors.cardBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: themeColors.cardBg, zIndex: 10 }}>
                 <span>Notifications {unreadCount > 0 && `(${unreadCount})`}</span>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   {unreadCount > 0 && (
@@ -872,11 +1048,11 @@ export default function Header() {
                         alignItems: 'center',
                         gap: '4px',
                         fontSize: '12px',
-                        color: '#6B7280',
+                        color: themeColors.textSecondary,
                         borderRadius: '4px',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#F3F4F6'
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent'
@@ -898,22 +1074,22 @@ export default function Header() {
                       justifyContent: 'center',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#F3F4F6'
+                      e.currentTarget.style.backgroundColor = themeColors.grayLight
                       e.currentTarget.style.borderRadius = '4px'
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent'
                     }}
                   >
-                    <X size={16} style={{ color: '#6B7280' }} />
+                    <X size={16} style={{ color: themeColors.textSecondary }} />
                   </button>
                 </div>
               </div>
               {notifications.length === 0 ? (
-                <div style={{ padding: '48px 24px', textAlign: 'center', color: '#6B7280' }}>
-                  <Bell size={48} style={{ color: '#D1D5DB', margin: '0 auto 16px', opacity: 0.5 }} />
+                <div style={{ padding: '48px 24px', textAlign: 'center', color: themeColors.textSecondary }}>
+                  <Bell size={48} style={{ color: themeColors.textTertiary, margin: '0 auto 16px', opacity: 0.5 }} />
                   <div style={{ fontSize: '14px', fontWeight: 500 }}>Aucune notification</div>
-                  <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '4px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.textTertiary, marginTop: '4px' }}>
                     Vous serez notifié des nouvelles activités
                   </div>
                 </div>
@@ -925,26 +1101,26 @@ export default function Header() {
                       onClick={() => handleNotificationClick(notification)}
                       style={{
                         padding: '12px 16px',
-                        borderBottom: '1px solid #F3F4F6',
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
                         cursor: 'pointer',
-                        backgroundColor: notification.read ? '#FFFFFF' : '#F9FAFB',
+                        backgroundColor: notification.read ? themeColors.cardBg : themeColors.grayLight,
                         transition: 'background-color 0.2s',
                         display: 'flex',
                         gap: '12px',
                         alignItems: 'flex-start',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#F3F4F6'
+                        e.currentTarget.style.backgroundColor = themeColors.cardBorder
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = notification.read ? '#FFFFFF' : '#F9FAFB'
+                        e.currentTarget.style.backgroundColor = notification.read ? themeColors.cardBg : themeColors.grayLight
                       }}
                     >
                       <div style={{
                         width: '32px',
                         height: '32px',
                         borderRadius: '8px',
-                        backgroundColor: notification.read ? '#F3F4F6' : '#EEF2FF',
+                        backgroundColor: notification.read ? themeColors.grayLight : `${themeColors.purplePrimary}20`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -954,7 +1130,7 @@ export default function Header() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
-                          <div style={{ fontSize: '13px', fontWeight: notification.read ? 500 : 600, color: '#111827' }}>
+                          <div style={{ fontSize: '13px', fontWeight: notification.read ? 500 : 600, color: themeColors.textPrimary }}>
                             {notification.title}
                           </div>
                           {!notification.read && (
@@ -968,10 +1144,10 @@ export default function Header() {
                             }} />
                           )}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#6B7280', lineHeight: '1.4', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '12px', color: themeColors.textSecondary, lineHeight: '1.4', marginBottom: '4px' }}>
                           {notification.message}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                        <div style={{ fontSize: '11px', color: themeColors.textTertiary }}>
                           {formatNotificationTime(notification.createdAt)}
                         </div>
                       </div>

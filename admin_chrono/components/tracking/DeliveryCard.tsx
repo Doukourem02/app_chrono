@@ -6,6 +6,7 @@ import { Phone, MessageSquare, Truck } from 'lucide-react'
 import { AnimatedCard } from '@/components/animations'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 interface DeliveryCardProps {
   delivery: {
@@ -49,10 +50,10 @@ interface DeliveryCardProps {
 
 export default function DeliveryCard({ delivery, isSelected = false, onSelect, index = 0 }: DeliveryCardProps) {
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '16px',
-    border: isSelected ? '2px solid #8B5CF6' : '1px solid #E5E7EB',
+    border: isSelected ? `2px solid ${themeColors.purplePrimary}` : `1px solid ${themeColors.cardBorder}`,
     marginBottom: '16px',
     cursor: 'pointer',
     transition: 'all 0.2s',
@@ -74,7 +75,7 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
   const vehicleIconStyle: React.CSSProperties = {
     width: '40px',
     height: '40px',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: themeColors.grayLight,
     borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
@@ -84,13 +85,13 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
   const shipmentNumberStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '4px',
   }
 
   const typeStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const routeStyle: React.CSSProperties = {
@@ -122,19 +123,19 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
   const pointNameStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '2px',
   }
 
   const pointAddressStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const routeLineStyle: React.CSSProperties = {
     width: '2px',
     height: '20px',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: themeColors.cardBorder,
     marginLeft: '5px',
   }
 
@@ -143,7 +144,7 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: '16px',
-    borderTop: '1px solid #E5E7EB',
+    borderTop: `1px solid ${themeColors.cardBorder}`,
   }
 
   const partnerInfoStyle: React.CSSProperties = {
@@ -156,11 +157,11 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
     width: '40px',
     height: '40px',
     borderRadius: '50%',
-    backgroundColor: '#9333EA',
+    backgroundColor: themeColors.purplePrimary,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#FFFFFF',
+    color: themeColors.textPrimary,
     fontWeight: 600,
     fontSize: '14px',
   }
@@ -173,13 +174,13 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
   const partnerNameStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '2px',
   }
 
   const partnerAddressStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const contactButtonsStyle: React.CSSProperties = {
@@ -220,7 +221,7 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
       <div style={headerStyle}>
         <div style={shipmentInfoStyle}>
           <div style={vehicleIconStyle}>
-            <Truck size={20} style={{ color: '#6B7280' }} />
+            <Truck size={20} style={{ color: themeColors.textSecondary }} />
           </div>
           <div>
             <div style={shipmentNumberStyle}>
@@ -323,10 +324,10 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
                   <div style={avatarStyle}>{initial}</div>
                 )}
                 <div style={partnerTextStyle}>
-                  <div style={{ ...partnerNameStyle, fontSize: '12px', fontWeight: 600, marginBottom: '4px', color: '#6B7280' }}>
+                  <div style={{ ...partnerNameStyle, fontSize: '12px', fontWeight: 600, marginBottom: '4px', color: themeColors.textSecondary }}>
                     {displayLabel}
                   </div>
-                  <div style={{ ...partnerNameStyle, fontSize: '14px', fontWeight: 600, marginBottom: '2px' }}>
+                  <div style={{ ...partnerNameStyle, fontSize: '14px', fontWeight: 600, marginBottom: '2px', color: themeColors.textPrimary }}>
                     {displayName}
                   </div>
                   <div style={partnerAddressStyle}>{displayAddress}</div>
@@ -346,13 +347,13 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
               }
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6'
+              e.currentTarget.style.backgroundColor = themeColors.grayLight
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
-            <Phone size={20} style={{ color: '#4B5563' }} />
+            <Phone size={20} style={{ color: themeColors.textSecondary }} />
           </button>
           <button
             style={contactButtonStyle}
@@ -361,13 +362,13 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
               // TODO: Ouvrir le chat
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6'
+              e.currentTarget.style.backgroundColor = themeColors.grayLight
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
-            <MessageSquare size={20} style={{ color: '#4B5563' }} />
+            <MessageSquare size={20} style={{ color: themeColors.textSecondary }} />
             <span style={notificationDotStyle}></span>
           </button>
         </div>

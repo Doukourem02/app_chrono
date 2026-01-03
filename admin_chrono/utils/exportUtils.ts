@@ -108,6 +108,27 @@ export const exportToExcel = (data: ExportData) => {
  * Affiche un menu de sélection du format d'export
  */
 export const showExportMenu = (data: ExportData, onSelect: (format: 'pdf' | 'excel') => void) => {
+  // Détecter le thème actuel
+  const isDarkMode = document.documentElement.classList.contains('dark')
+  
+  // Obtenir les couleurs depuis les CSS variables
+  const getComputedColor = (variable: string) => {
+    return getComputedStyle(document.documentElement).getPropertyValue(variable).trim()
+  }
+  
+  const cardBg = isDarkMode 
+    ? getComputedColor('--card-bg') || '#1e293b'
+    : getComputedColor('--card-bg') || '#ffffff'
+  const textPrimary = isDarkMode
+    ? getComputedColor('--text-primary') || '#f1f5f9'
+    : getComputedColor('--text-primary') || '#111827'
+  const cardBorder = isDarkMode
+    ? getComputedColor('--card-border') || '#334155'
+    : getComputedColor('--card-border') || '#e5e7eb'
+  const grayLight = isDarkMode
+    ? getComputedColor('--gray-light') || '#334155'
+    : getComputedColor('--gray-light') || '#f3f4f6'
+  
   // Créer un élément de menu déroulant
   const menu = document.createElement('div')
   menu.style.cssText = `
@@ -115,13 +136,14 @@ export const showExportMenu = (data: ExportData, onSelect: (format: 'pdf' | 'exc
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: white;
+    background: ${cardBg};
     border-radius: 12px;
     padding: 24px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
     z-index: 10000;
     min-width: 300px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    border: 1px solid ${cardBorder};
   `
   
   const title = document.createElement('h3')
@@ -130,7 +152,7 @@ export const showExportMenu = (data: ExportData, onSelect: (format: 'pdf' | 'exc
     margin: 0 0 20px 0;
     fontSize: 18px;
     fontWeight: 600;
-    color: #111827;
+    color: ${textPrimary};
   `
   
   const buttonContainer = document.createElement('div')
@@ -195,9 +217,9 @@ export const showExportMenu = (data: ExportData, onSelect: (format: 'pdf' | 'exc
   cancelButton.style.cssText = `
     padding: 12px 20px;
     borderRadius: 8px;
-    backgroundColor: #F3F4F6;
-    color: #374151;
-    border: none;
+    backgroundColor: ${grayLight};
+    color: ${textPrimary};
+    border: 1px solid ${cardBorder};
     fontSize: 14px;
     fontWeight: 600;
     cursor: pointer;
@@ -205,10 +227,10 @@ export const showExportMenu = (data: ExportData, onSelect: (format: 'pdf' | 'exc
     transition: background-color 0.2s;
   `
   cancelButton.onmouseover = () => {
-    cancelButton.style.backgroundColor = '#E5E7EB'
+    cancelButton.style.backgroundColor = isDarkMode ? '#475569' : '#E5E7EB'
   }
   cancelButton.onmouseout = () => {
-    cancelButton.style.backgroundColor = '#F3F4F6'
+    cancelButton.style.backgroundColor = grayLight
   }
   cancelButton.onclick = (e) => {
     e.stopPropagation()

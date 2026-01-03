@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import NewB2BShippingModal from '@/components/orders/NewB2BShippingModal'
 import { adminApiService } from '@/lib/adminApiService'
+import { themeColors } from '@/utils/theme'
 
 interface B2BOrder {
   id: string
@@ -57,7 +58,7 @@ export default function PlanningPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '28px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const controlsStyle: React.CSSProperties = {
@@ -72,27 +73,27 @@ export default function PlanningPage() {
     borderRadius: '8px',
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: themeColors.cardBorder,
+    backgroundColor: themeColors.cardBg,
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    color: '#374151',
+    color: themeColors.textPrimary,
   }
 
   const viewModeButtonActiveStyle: React.CSSProperties = {
     ...viewModeButtonStyle,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: themeColors.purplePrimary,
     color: '#FFFFFF',
-    borderColor: '#8B5CF6',
+    borderColor: themeColors.purplePrimary,
   }
 
   const calendarCardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '24px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
   }
 
   const weekViewStyle: React.CSSProperties = {
@@ -106,23 +107,23 @@ export default function PlanningPage() {
     textAlign: 'center',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     textTransform: 'uppercase',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const dayCellStyle: React.CSSProperties = {
     minHeight: '120px',
     padding: '8px',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     borderRadius: '8px',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: themeColors.grayLight,
   }
 
   const deliveryItemStyle: React.CSSProperties = {
     padding: '8px',
     borderRadius: '6px',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: themeColors.purplePrimary,
     color: '#FFFFFF',
     fontSize: '12px',
     marginBottom: '4px',
@@ -326,7 +327,7 @@ export default function PlanningPage() {
             style={{
               padding: '10px 20px',
               borderRadius: '8px',
-              backgroundColor: '#8B5CF6',
+              backgroundColor: themeColors.purplePrimary,
               color: '#FFFFFF',
               border: 'none',
               fontSize: '14px',
@@ -338,10 +339,10 @@ export default function PlanningPage() {
               transition: 'background-color 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#7C3AED'
+              e.currentTarget.style.backgroundColor = themeColors.purpleDark
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#8B5CF6'
+              e.currentTarget.style.backgroundColor = themeColors.purplePrimary
             }}
           >
             <Plus size={16} />
@@ -358,14 +359,14 @@ export default function PlanningPage() {
             style={{
               padding: '8px',
               borderRadius: '8px',
-              border: '1px solid #E5E7EB',
-              backgroundColor: '#FFFFFF',
+              border: `1px solid ${themeColors.cardBorder}`,
+              backgroundColor: themeColors.cardBg,
               cursor: 'pointer',
             }}
           >
-            <ChevronLeft size={20} style={{ color: '#374151' }} />
+            <ChevronLeft size={20} style={{ color: themeColors.textPrimary }} />
           </button>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#111827' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: themeColors.textPrimary }}>
             {viewMode === 'week' && weekDays.length > 0 && (
               <>
                 {weekDays[0].toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} -{' '}
@@ -380,12 +381,12 @@ export default function PlanningPage() {
             style={{
               padding: '8px',
               borderRadius: '8px',
-              border: '1px solid #E5E7EB',
-              backgroundColor: '#FFFFFF',
+              border: `1px solid ${themeColors.cardBorder}`,
+              backgroundColor: themeColors.cardBg,
               cursor: 'pointer',
             }}
           >
-            <ChevronRight size={20} style={{ color: '#374151' }} />
+            <ChevronRight size={20} style={{ color: themeColors.textPrimary }} />
           </button>
         </div>
 
@@ -400,7 +401,7 @@ export default function PlanningPage() {
                 <div key={index}>
                   <div style={dayHeaderStyle}>
                     <div>{dayNames[index]}</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: isToday ? '#8B5CF6' : '#111827', marginTop: '4px' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: isToday ? themeColors.purplePrimary : themeColors.textPrimary, marginTop: '4px' }}>
                       {day.getDate()}
                     </div>
                   </div>
@@ -408,28 +409,28 @@ export default function PlanningPage() {
                     onClick={() => handleCellClick(day)}
                     style={{
                       ...dayCellStyle,
-                      backgroundColor: isToday ? '#F3E8FF' : '#F9FAFB',
-                      borderColor: isToday ? '#8B5CF6' : '#F3F4F6',
+                      backgroundColor: isToday ? `${themeColors.purplePrimary}20` : themeColors.grayLight,
+                      borderColor: isToday ? themeColors.purplePrimary : themeColors.cardBorder,
                       cursor: 'pointer',
                       position: 'relative',
                     }}
                     onMouseEnter={(e) => {
                       if (!isToday) {
-                        e.currentTarget.style.backgroundColor = '#F3F4F6'
+                        e.currentTarget.style.backgroundColor = themeColors.cardBorder
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isToday) {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB'
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight
                       }
                     }}
                   >
                     {isLoadingB2B ? (
-                      <div style={{ fontSize: '12px', color: '#6B7280', textAlign: 'center', padding: '8px' }}>
+                      <div style={{ fontSize: '12px', color: themeColors.textSecondary, textAlign: 'center', padding: '8px' }}>
                         Chargement...
                       </div>
                     ) : deliveries.length === 0 ? (
-                      <div style={{ fontSize: '11px', color: '#9CA3AF', textAlign: 'center', padding: '4px', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '11px', color: themeColors.textTertiary, textAlign: 'center', padding: '4px', fontStyle: 'italic' }}>
                         Cliquez pour ajouter
                       </div>
                     ) : (
@@ -496,25 +497,25 @@ export default function PlanningPage() {
                       flexDirection: 'row',
                       gap: '16px',
                       padding: '12px',
-                      borderBottom: '1px solid #F3F4F6',
+                      borderBottom: `1px solid ${themeColors.cardBorder}`,
                       cursor: 'pointer',
                       borderRadius: '8px',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#F9FAFB'
+                      e.currentTarget.style.backgroundColor = themeColors.grayLight
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent'
                     }}
                   >
-                    <div style={{ minWidth: '80px', fontSize: '14px', fontWeight: 600, color: '#6B7280' }}>
+                    <div style={{ minWidth: '80px', fontSize: '14px', fontWeight: 600, color: themeColors.textSecondary }}>
                       {hourKey}
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {isLoadingB2B ? (
-                        <div style={{ fontSize: '12px', color: '#6B7280' }}>Chargement...</div>
+                        <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>Chargement...</div>
                       ) : hourDeliveries.length === 0 ? (
-                        <div style={{ fontSize: '11px', color: '#9CA3AF', fontStyle: 'italic' }}>
+                        <div style={{ fontSize: '11px', color: themeColors.textTertiary, fontStyle: 'italic' }}>
                           Cliquez pour ajouter une livraison
                         </div>
                       ) : (
@@ -566,7 +567,7 @@ export default function PlanningPage() {
         )}
 
         {viewMode === 'month' && (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
             Vue mensuelle à venir
           </div>
         )}

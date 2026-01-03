@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { Plus, Search, Percent, DollarSign } from 'lucide-react'
+import { themeColors } from '@/utils/theme'
 
 interface PromoCode {
   id: string
@@ -103,15 +104,15 @@ export default function PromoCodesPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '28px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '24px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
   }
 
   const tableStyle: React.CSSProperties = {
@@ -124,16 +125,16 @@ export default function PromoCodesPage() {
     textAlign: 'left',
     fontSize: '12px',
     fontWeight: 600,
-    color: '#6B7280',
+    color: themeColors.textSecondary,
     textTransform: 'uppercase',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const tdStyle: React.CSSProperties = {
     padding: '12px',
     fontSize: '14px',
-    color: '#111827',
-    borderBottom: '1px solid #F3F4F6',
+    color: themeColors.textPrimary,
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const modalOverlayStyle: React.CSSProperties = {
@@ -150,7 +151,7 @@ export default function PromoCodesPage() {
   }
 
   const modalStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     padding: '24px',
     width: '90%',
@@ -163,16 +164,18 @@ export default function PromoCodesPage() {
     width: '100%',
     padding: '10px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
+    backgroundColor: themeColors.background,
+    color: themeColors.textPrimary,
   }
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '8px',
   }
 
@@ -185,7 +188,7 @@ export default function PromoCodesPage() {
           style={{
             padding: '10px 20px',
             borderRadius: '8px',
-            backgroundColor: '#8B5CF6',
+            backgroundColor: themeColors.purplePrimary,
             color: '#FFFFFF',
             border: 'none',
             fontSize: '14px',
@@ -202,7 +205,7 @@ export default function PromoCodesPage() {
       </div>
 
       <div style={{ position: 'relative' }}>
-        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
+        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textSecondary }} />
         <input
           type="text"
           placeholder="Rechercher un code promo..."
@@ -213,9 +216,11 @@ export default function PromoCodesPage() {
             padding: '10px 16px',
             paddingLeft: '40px',
             borderRadius: '8px',
-            border: '1px solid #E5E7EB',
+            border: `1px solid ${themeColors.cardBorder}`,
             fontSize: '14px',
             outline: 'none',
+            backgroundColor: themeColors.background,
+            color: themeColors.textPrimary,
           }}
         />
       </div>
@@ -224,7 +229,7 @@ export default function PromoCodesPage() {
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
         ) : filteredCodes.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
             Aucun code promo trouvé
           </div>
         ) : (
@@ -256,7 +261,7 @@ export default function PromoCodesPage() {
                       </span>
                     ) : (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <DollarSign size={14} style={{ color: '#6B7280' }} />
+                        <DollarSign size={14} style={{ color: themeColors.textSecondary }} />
                         Fixe
                       </span>
                     )}
@@ -295,7 +300,7 @@ export default function PromoCodesPage() {
       {showCreateModal && (
         <div style={modalOverlayStyle} onClick={() => setShowCreateModal(false)}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '24px', color: '#111827' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '24px', color: themeColors.textPrimary }}>
               Créer un code promo
             </h2>
 
@@ -377,7 +382,7 @@ export default function PromoCodesPage() {
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                   style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
-                <label style={{ fontSize: '14px', color: '#374151', cursor: 'pointer' }}>
+                <label style={{ fontSize: '14px', color: themeColors.textPrimary, cursor: 'pointer' }}>
                   Actif immédiatement
                 </label>
               </div>
@@ -389,12 +394,12 @@ export default function PromoCodesPage() {
                     flex: 1,
                     padding: '10px 20px',
                     borderRadius: '8px',
-                    border: '1px solid #E5E7EB',
-                    backgroundColor: '#FFFFFF',
+                    border: `1px solid ${themeColors.cardBorder}`,
+                    backgroundColor: themeColors.cardBg,
                     fontSize: '14px',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    color: '#374151',
+                    color: themeColors.textPrimary,
                   }}
                 >
                   Annuler
@@ -416,7 +421,7 @@ export default function PromoCodesPage() {
                     flex: 1,
                     padding: '10px 20px',
                     borderRadius: '8px',
-                    backgroundColor: '#8B5CF6',
+                    backgroundColor: themeColors.purplePrimary,
                     color: '#FFFFFF',
                     border: 'none',
                     fontSize: '14px',

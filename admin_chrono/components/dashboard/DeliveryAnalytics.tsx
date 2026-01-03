@@ -8,6 +8,7 @@ import { AnimatedCard } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { useDateFilter } from '@/contexts/DateFilterContext'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 export default function DeliveryAnalytics() {
   const { dateFilter, dateRange } = useDateFilter()
@@ -80,14 +81,15 @@ export default function DeliveryAnalytics() {
   }, [chartData, hasData])
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    border: `1px solid ${themeColors.cardBorder}`,
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
+    transition: 'background-color 0.3s ease, border-color 0.3s ease',
   }
 
   const headerStyle: React.CSSProperties = {
@@ -100,7 +102,7 @@ export default function DeliveryAnalytics() {
   const titleStyle: React.CSSProperties = {
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const legendContainerStyle: React.CSSProperties = {
@@ -123,7 +125,7 @@ export default function DeliveryAnalytics() {
 
   const legendTextStyle: React.CSSProperties = {
     fontSize: '12px',
-    color: '#4B5563',
+    color: themeColors.textSecondary,
   }
 
   const loadingContainerStyle: React.CSSProperties = {

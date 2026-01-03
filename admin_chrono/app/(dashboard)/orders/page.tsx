@@ -6,6 +6,7 @@ import { adminApiService } from "@/lib/adminApiService";
 import { adminSocketService } from "@/lib/adminSocketService";
 import { formatDeliveryId } from "@/utils/formatDeliveryId";
 import { logger } from "@/utils/logger";
+import { themeColors } from "@/utils/theme";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -341,24 +342,24 @@ export default function OrdersPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: "24px",
     fontWeight: 700,
-    color: "#111827",
+    color: themeColors.textPrimary,
     marginTop: "0",
   };
 
   const tabsContainerStyle: React.CSSProperties = {
     display: "flex",
     gap: "32px",
-    borderBottom: "1px solid #E5E7EB",
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
     paddingBottom: "8px",
   };
 
   const tabStyle = (isActive: boolean): React.CSSProperties => ({
     fontSize: "14px",
     fontWeight: 500,
-    color: isActive ? "#8B5CF6" : "#6B7280",
+    color: isActive ? themeColors.purplePrimary : themeColors.textSecondary,
     backgroundColor: "transparent",
     border: "none",
-    borderBottom: isActive ? "2px solid #8B5CF6" : "2px solid transparent",
+    borderBottom: isActive ? `2px solid ${themeColors.purplePrimary}` : "2px solid transparent",
     paddingBottom: "8px",
     cursor: "pointer",
     transition: "all 0.2s",
@@ -414,12 +415,12 @@ export default function OrdersPage() {
               style={tabStyle(activeTab === tab.key)}
               onMouseEnter={(e) => {
                 if (activeTab !== tab.key) {
-                  e.currentTarget.style.color = "#374151";
+                  e.currentTarget.style.color = themeColors.textPrimary;
                 }
               }}
               onMouseLeave={(e) => {
                 if (activeTab !== tab.key) {
-                  e.currentTarget.style.color = "#6B7280";
+                  e.currentTarget.style.color = themeColors.textSecondary;
                 }
               }}
             >
@@ -445,18 +446,18 @@ export default function OrdersPage() {
           </div>
         ) : orders.length === 0 ? (
           <div
-            style={{ padding: "48px", textAlign: "center", color: "#6B7280" }}
+            style={{ padding: "48px", textAlign: "center", color: themeColors.textSecondary }}
           >
             Aucune commande trouvée
           </div>
         ) : (
           <div
             style={{
-              backgroundColor: "#FFFFFF",
+              backgroundColor: themeColors.cardBg,
               borderRadius: "16px",
               padding: "24px",
               boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-              border: "1px solid #F3F4F6",
+              border: `1px solid ${themeColors.cardBorder}`,
             }}
           >
             <div
@@ -467,7 +468,7 @@ export default function OrdersPage() {
                 alignItems: "center",
               }}
             >
-              <p style={{ color: "#6B7280", fontSize: "14px" }}>
+              <p style={{ color: themeColors.textSecondary, fontSize: "14px" }}>
                 {orders.length} commande(s) trouvée(s)
               </p>
             </div>
@@ -481,9 +482,9 @@ export default function OrdersPage() {
                         padding: "12px",
                         fontSize: "12px",
                         fontWeight: 600,
-                        color: "#4B5563",
+                        color: themeColors.textSecondary,
                         textTransform: "uppercase",
-                        borderBottom: "1px solid #E5E7EB",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
                       Delivery ID
@@ -494,9 +495,9 @@ export default function OrdersPage() {
                         padding: "12px",
                         fontSize: "12px",
                         fontWeight: 600,
-                        color: "#4B5563",
+                        color: themeColors.textSecondary,
                         textTransform: "uppercase",
-                        borderBottom: "1px solid #E5E7EB",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
                       Date
@@ -507,9 +508,9 @@ export default function OrdersPage() {
                         padding: "12px",
                         fontSize: "12px",
                         fontWeight: 600,
-                        color: "#4B5563",
+                        color: themeColors.textSecondary,
                         textTransform: "uppercase",
-                        borderBottom: "1px solid #E5E7EB",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
                       Departure
@@ -520,9 +521,9 @@ export default function OrdersPage() {
                         padding: "12px",
                         fontSize: "12px",
                         fontWeight: 600,
-                        color: "#4B5563",
+                        color: themeColors.textSecondary,
                         textTransform: "uppercase",
-                        borderBottom: "1px solid #E5E7EB",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
                       Destination
@@ -533,9 +534,9 @@ export default function OrdersPage() {
                         padding: "12px",
                         fontSize: "12px",
                         fontWeight: 600,
-                        color: "#4B5563",
+                        color: themeColors.textSecondary,
                         textTransform: "uppercase",
-                        borderBottom: "1px solid #E5E7EB",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
                       Status
@@ -546,9 +547,9 @@ export default function OrdersPage() {
                         padding: "12px",
                         fontSize: "12px",
                         fontWeight: 600,
-                        color: "#4B5563",
+                        color: themeColors.textSecondary,
                         textTransform: "uppercase",
-                        borderBottom: "1px solid #E5E7EB",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
                       Actions
@@ -559,8 +560,8 @@ export default function OrdersPage() {
                   {paginatedOrders.map((order: Order, idx: number) => {
                     const status = statusConfig[order.status] || {
                       label: order.status,
-                      backgroundColor: "#F3F4F6",
-                      color: "#4B5563",
+                      backgroundColor: themeColors.grayLight,
+                      color: themeColors.textSecondary,
                     };
 
                     // Vérifier si cette commande doit être mise en évidence
@@ -604,22 +605,22 @@ export default function OrdersPage() {
                         id={`order-${order.id}`}
                         onClick={handleOrderClick}
                         style={{
-                          borderBottom: "1px solid #F3F4F6",
+                          borderBottom: `1px solid ${themeColors.cardBorder}`,
                           transition: "background-color 0.2s, box-shadow 0.2s",
                           backgroundColor: isHighlighted
-                            ? "#F3E8FF"
+                            ? `${themeColors.purplePrimary}20`
                             : "transparent",
                           boxShadow: isHighlighted
-                            ? "0 0 0 2px #8B5CF6"
+                            ? `0 0 0 2px ${themeColors.purplePrimary}`
                             : "none",
                           borderLeft: isHighlighted
-                            ? "4px solid #8B5CF6"
+                            ? `4px solid ${themeColors.purplePrimary}`
                             : "none",
                           cursor: "pointer",
                         }}
                         onMouseEnter={(e) => {
                           if (!isHighlighted) {
-                            e.currentTarget.style.backgroundColor = "#F9FAFB";
+                            e.currentTarget.style.backgroundColor = themeColors.grayLight;
                           }
                         }}
                         onMouseLeave={(e) => {
@@ -627,7 +628,7 @@ export default function OrdersPage() {
                             e.currentTarget.style.backgroundColor =
                               "transparent";
                           } else {
-                            e.currentTarget.style.backgroundColor = "#F3E8FF";
+                            e.currentTarget.style.backgroundColor = `${themeColors.purplePrimary}20`;
                           }
                         }}
                       >
@@ -636,7 +637,7 @@ export default function OrdersPage() {
                             <span
                               style={{
                                 fontSize: "13px",
-                                color: "#111827",
+                                color: themeColors.textPrimary,
                                 fontWeight: 500,
                               }}
                             >
@@ -681,13 +682,13 @@ export default function OrdersPage() {
                           </div>
                         </td>
                         <td style={{ padding: "12px" }}>
-                          <span style={{ fontSize: "14px", color: "#374151" }}>
+                          <span style={{ fontSize: "14px", color: themeColors.textPrimary }}>
                             {order.date}
                           </span>
                         </td>
                         <td style={{ padding: "12px" }}>
                           <span
-                            style={{ fontSize: "14px", color: "#374151" }}
+                            style={{ fontSize: "14px", color: themeColors.textPrimary }}
                             title={order.departure}
                           >
                             {order.departure.length > 30
@@ -697,7 +698,7 @@ export default function OrdersPage() {
                         </td>
                         <td style={{ padding: "12px" }}>
                           <span
-                            style={{ fontSize: "14px", color: "#374151" }}
+                            style={{ fontSize: "14px", color: themeColors.textPrimary }}
                             title={order.destination}
                           >
                             {order.destination.length > 30
@@ -772,10 +773,10 @@ export default function OrdersPage() {
                   justifyContent: "space-between",
                   marginTop: "16px",
                   paddingTop: "16px",
-                  borderTop: "1px solid #E5E7EB",
+                  borderTop: `1px solid ${themeColors.cardBorder}`,
                 }}
               >
-                <p style={{ color: "#6B7280", fontSize: "14px" }}>
+                <p style={{ color: themeColors.textSecondary, fontSize: "14px" }}>
                   Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
                   {Math.min(currentPage * itemsPerPage, orders.length)} of{" "}
                   {orders.length} entries
@@ -799,14 +800,14 @@ export default function OrdersPage() {
                     }}
                     onMouseEnter={(e) => {
                       if (currentPage !== 1) {
-                        e.currentTarget.style.backgroundColor = "#F9FAFB";
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight;
                       }
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }}
                   >
-                    <ChevronLeft size={20} style={{ color: "#4B5563" }} />
+                    <ChevronLeft size={20} style={{ color: themeColors.textSecondary }} />
                   </button>
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum: number;
@@ -832,16 +833,16 @@ export default function OrdersPage() {
                           fontSize: "14px",
                           fontWeight: 500,
                           backgroundColor:
-                            currentPage === pageNum ? "#8B5CF6" : "transparent",
+                            currentPage === pageNum ? themeColors.purplePrimary : "transparent",
                           color:
-                            currentPage === pageNum ? "#FFFFFF" : "#374151",
+                            currentPage === pageNum ? "#FFFFFF" : themeColors.textPrimary,
                           border: "none",
                           cursor: "pointer",
                           transition: "background-color 0.2s",
                         }}
                         onMouseEnter={(e) => {
                           if (currentPage !== pageNum) {
-                            e.currentTarget.style.backgroundColor = "#F3F4F6";
+                            e.currentTarget.style.backgroundColor = themeColors.grayLight;
                           }
                         }}
                         onMouseLeave={(e) => {
@@ -874,14 +875,14 @@ export default function OrdersPage() {
                     }}
                     onMouseEnter={(e) => {
                       if (currentPage < totalPages) {
-                        e.currentTarget.style.backgroundColor = "#F9FAFB";
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight;
                       }
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }}
                   >
-                    <ChevronRight size={20} style={{ color: "#4B5563" }} />
+                    <ChevronRight size={20} style={{ color: themeColors.textSecondary }} />
                   </button>
                 </div>
               </div>

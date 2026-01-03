@@ -122,7 +122,7 @@ export default function DashboardLayout({
   const containerStyle: React.CSSProperties = {
     display: "flex",
     height: "100vh",
-    backgroundColor: "#F5F6FA",
+    backgroundColor: "var(--background)",
   };
 
   const contentWrapperStyle: React.CSSProperties = {

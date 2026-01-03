@@ -7,6 +7,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { useRouter } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 interface UserData {
   id: string
@@ -269,7 +270,7 @@ export default function NewB2BShippingModal({
   }
 
   const modalStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '12px',
     width: '90%',
     maxWidth: '600px',
@@ -281,7 +282,7 @@ export default function NewB2BShippingModal({
 
   const headerStyle: React.CSSProperties = {
     padding: '20px',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -290,7 +291,7 @@ export default function NewB2BShippingModal({
   const titleStyle: React.CSSProperties = {
     fontSize: '20px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const closeButtonStyle: React.CSSProperties = {
@@ -312,17 +313,19 @@ export default function NewB2BShippingModal({
     width: '100%',
     padding: '10px 16px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
     marginTop: '8px',
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textPrimary,
   }
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#111827',
+    color: themeColors.textPrimary,
     marginBottom: '8px',
   }
 
@@ -345,9 +348,11 @@ export default function NewB2BShippingModal({
     padding: '10px 16px',
     paddingLeft: '40px',
     borderRadius: '8px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textPrimary,
   }
 
   const userListStyle: React.CSSProperties = {
@@ -367,7 +372,7 @@ export default function NewB2BShippingModal({
 
   const footerStyle: React.CSSProperties = {
     padding: '20px',
-    borderTop: '1px solid #E5E7EB',
+    borderTop: `1px solid ${themeColors.cardBorder}`,
     display: 'flex',
     gap: '12px',
     justifyContent: 'flex-end',
@@ -379,7 +384,7 @@ export default function NewB2BShippingModal({
     gap: '8px',
     marginBottom: '20px',
     paddingBottom: '16px',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const stepItemStyle: (isActive: boolean, isCompleted: boolean) => React.CSSProperties = (isActive, isCompleted) => ({
@@ -387,8 +392,8 @@ export default function NewB2BShippingModal({
     borderRadius: '6px',
     fontSize: '12px',
     fontWeight: 600,
-    backgroundColor: isActive ? '#8B5CF6' : isCompleted ? '#D1FAE5' : '#F3F4F6',
-    color: isActive ? '#FFFFFF' : isCompleted ? '#059669' : '#6B7280',
+    backgroundColor: isActive ? themeColors.purplePrimary : isCompleted ? themeColors.greenLight : themeColors.grayLight,
+    color: isActive ? themeColors.textPrimary : isCompleted ? themeColors.greenPrimary : themeColors.textSecondary,
   })
 
   return (
@@ -400,8 +405,8 @@ export default function NewB2BShippingModal({
             <span style={{
               padding: '4px 8px',
               borderRadius: '6px',
-              backgroundColor: '#FEF3C7',
-              color: '#92400E',
+              backgroundColor: themeColors.yellowLight,
+              color: themeColors.yellowDark,
               fontSize: '11px',
               fontWeight: 600,
             }}>
@@ -412,24 +417,24 @@ export default function NewB2BShippingModal({
             style={closeButtonStyle}
             onClick={onClose}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6'
+              e.currentTarget.style.backgroundColor = themeColors.grayLight
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
-            <X size={20} style={{ color: '#6B7280' }} />
+            <X size={20} style={{ color: themeColors.textSecondary }} />
           </button>
         </div>
 
         <div style={contentStyle}>
           <div style={stepIndicatorStyle}>
             <span style={stepItemStyle(step === 'client', false)}>1. Client</span>
-            <span style={{ color: '#D1D5DB' }}>→</span>
+            <span style={{ color: themeColors.textTertiary }}>→</span>
             <span style={stepItemStyle(step === 'pickup', step === 'dropoff' || step === 'details')}>2. Pickup</span>
-            <span style={{ color: '#D1D5DB' }}>→</span>
+            <span style={{ color: themeColors.textTertiary }}>→</span>
             <span style={stepItemStyle(step === 'dropoff', step === 'details')}>3. Dropoff</span>
-            <span style={{ color: '#D1D5DB' }}>→</span>
+            <span style={{ color: themeColors.textTertiary }}>→</span>
             <span style={stepItemStyle(step === 'details', false)}>4. Détails</span>
           </div>
 
@@ -443,7 +448,7 @@ export default function NewB2BShippingModal({
                     left: '12px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    color: '#6B7280',
+                    color: themeColors.textSecondary,
                   }}
                 />
                 <input
@@ -457,11 +462,11 @@ export default function NewB2BShippingModal({
 
               <div style={userListStyle}>
                 {isLoading ? (
-                  <div style={{ padding: '20px', textAlign: 'center', color: '#6B7280' }}>
+                  <div style={{ padding: '20px', textAlign: 'center', color: themeColors.textSecondary }}>
                     Chargement...
                   </div>
                 ) : filteredUsers.length === 0 ? (
-                  <div style={{ padding: '20px', textAlign: 'center', color: '#6B7280' }}>
+                  <div style={{ padding: '20px', textAlign: 'center', color: themeColors.textSecondary }}>
                     Aucun client trouvé
                   </div>
                 ) : (
@@ -471,7 +476,7 @@ export default function NewB2BShippingModal({
                       style={userItemStyle}
                       onClick={() => handleClientSelect(user)}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB'
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = 'transparent'
@@ -494,11 +499,11 @@ export default function NewB2BShippingModal({
                             width: '40px',
                             height: '40px',
                             borderRadius: '50%',
-                            backgroundColor: '#E5E7EB',
+                            backgroundColor: themeColors.cardBorder,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#6B7280',
+                            color: themeColors.textSecondary,
                             fontSize: '14px',
                             fontWeight: 600,
                           }}
@@ -512,15 +517,15 @@ export default function NewB2BShippingModal({
                         </div>
                       )}
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                           {getUserDisplayName(user)}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#6B7280' }}>{user.email}</div>
+                        <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{user.email}</div>
                         {user.phone && (
-                          <div style={{ fontSize: '12px', color: '#6B7280' }}>{user.phone}</div>
+                          <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{user.phone}</div>
                         )}
                       </div>
-                      <User size={20} style={{ color: '#2563EB' }} />
+                      <User size={20} style={{ color: themeColors.bluePrimary }} />
                     </div>
                   ))
                 )}
@@ -531,9 +536,9 @@ export default function NewB2BShippingModal({
           {step === 'pickup' && (
             <>
               {selectedClient && (
-                <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#F3F4F6', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Client sélectionné</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Client sélectionné</div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                     {getUserDisplayName(selectedClient)}
                   </div>
                 </div>
@@ -549,7 +554,7 @@ export default function NewB2BShippingModal({
                   placeholder="Ex: Cocody, Abidjan"
                   label={
                     <span>
-                      <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280', verticalAlign: 'middle' }} />
+                      <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary, verticalAlign: 'middle' }} />
                       Adresse de pickup
                     </span>
                   }
@@ -559,20 +564,20 @@ export default function NewB2BShippingModal({
               {/* Warning pour coordonnées optionnelles */}
               <div style={{
                 padding: '12px',
-                backgroundColor: '#FEF3C7',
+                backgroundColor: themeColors.yellowLight,
                 borderRadius: '8px',
-                border: '1px solid #F59E0B',
+                border: `1px solid ${themeColors.yellowDark}`,
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '8px',
                 marginTop: '12px',
               }}>
-                <AlertTriangle size={16} style={{ color: '#F59E0B', marginTop: '2px', flexShrink: 0 }} />
+                <AlertTriangle size={16} style={{ color: themeColors.yellowDark, marginTop: '2px', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#92400E', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: themeColors.yellowDark, marginBottom: '4px' }}>
                     Commande B2B - Coordonnées GPS optionnelles
                   </div>
-                  <div style={{ fontSize: '12px', color: '#92400E' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
                     Les coordonnées GPS peuvent être approximatives. Le livreur appellera le client pour obtenir la position exacte.
                   </div>
                 </div>
@@ -592,7 +597,7 @@ export default function NewB2BShippingModal({
                   placeholder="Ex: Yopougon, Abidjan"
                   label={
                     <span>
-                      <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280', verticalAlign: 'middle' }} />
+                      <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary, verticalAlign: 'middle' }} />
                       Adresse de livraison
                     </span>
                   }
@@ -600,9 +605,9 @@ export default function NewB2BShippingModal({
               </div>
 
               {distance !== null && price !== null && (
-                <div style={{ padding: '12px', backgroundColor: '#F3E8FF', borderRadius: '8px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Estimation</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                <div style={{ padding: '12px', backgroundColor: themeColors.purpleLight, borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Estimation</div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                     Distance: {distance} km • Prix: {price.toLocaleString('fr-FR')} FCFA
                   </div>
                 </div>
@@ -613,9 +618,9 @@ export default function NewB2BShippingModal({
           {step === 'details' && (
             <>
               {/* Date et heure planifiée */}
-              <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#F3E8FF', borderRadius: '8px', border: '1px solid #8B5CF6' }}>
+              <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: themeColors.purpleLight, borderRadius: '8px', border: `1px solid ${themeColors.purplePrimary}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Calendar size={16} style={{ color: '#8B5CF6' }} />
+                  <Calendar size={16} style={{ color: themeColors.purplePrimary }} />
                   <label style={{ ...labelStyle, marginBottom: 0 }}>
                     Date et heure planifiée
                   </label>
@@ -643,7 +648,7 @@ export default function NewB2BShippingModal({
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
-                  <Package size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280' }} />
+                  <Package size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary }} />
                   Méthode de livraison
                 </label>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -656,9 +661,9 @@ export default function NewB2BShippingModal({
                         flex: 1,
                         padding: '12px',
                         borderRadius: '8px',
-                        border: `1px solid ${deliveryMethod === method ? '#8B5CF6' : '#E5E7EB'}`,
-                        backgroundColor: deliveryMethod === method ? '#F3E8FF' : '#FFFFFF',
-                        color: deliveryMethod === method ? '#8B5CF6' : '#6B7280',
+                        border: `1px solid ${deliveryMethod === method ? themeColors.purplePrimary : themeColors.cardBorder}`,
+                        backgroundColor: deliveryMethod === method ? themeColors.purpleLight : themeColors.cardBg,
+                        color: deliveryMethod === method ? themeColors.purplePrimary : themeColors.textSecondary,
                         fontSize: '14px',
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -672,9 +677,9 @@ export default function NewB2BShippingModal({
               </div>
 
               {distance !== null && price !== null && (
-                <div style={{ padding: '12px', backgroundColor: '#F3E8FF', borderRadius: '8px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Estimation</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                <div style={{ padding: '12px', backgroundColor: themeColors.purpleLight, borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Estimation</div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                     Distance: {distance} km • Prix: {price.toLocaleString('fr-FR')} FCFA
                   </div>
                 </div>
@@ -682,7 +687,7 @@ export default function NewB2BShippingModal({
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
-                  <DollarSign size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280' }} />
+                  <DollarSign size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary }} />
                   Méthode de paiement
                 </label>
                 <select
@@ -747,15 +752,15 @@ export default function NewB2BShippingModal({
               {/* Badge B2B toujours visible */}
               <div style={{
                 padding: '12px',
-                backgroundColor: '#FEF3C7',
+                backgroundColor: themeColors.yellowLight,
                 borderRadius: '8px',
-                border: '1px solid #F59E0B',
+                border: `1px solid ${themeColors.yellowDark}`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
               }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#F59E0B' }}>📞</span>
-                <span style={{ fontSize: '12px', color: '#92400E' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: themeColors.yellowDark }}>📞</span>
+                <span style={{ fontSize: '12px', color: themeColors.yellowDark }}>
                   Cette commande sera marquée comme &quot;Commande téléphonique B2B&quot;. Les coordonnées GPS sont optionnelles.
                 </span>
               </div>
@@ -778,9 +783,9 @@ export default function NewB2BShippingModal({
               }}
               style={{
                 ...buttonStyle,
-                backgroundColor: '#FFFFFF',
-                color: '#374151',
-                border: '1px solid #E5E7EB',
+                backgroundColor: themeColors.cardBg,
+                color: themeColors.textPrimary,
+                border: `1px solid ${themeColors.cardBorder}`,
               }}
             >
               Retour
@@ -792,9 +797,9 @@ export default function NewB2BShippingModal({
               onClick={onClose}
               style={{
                 ...buttonStyle,
-                backgroundColor: '#FFFFFF',
-                color: '#374151',
-                border: '1px solid #E5E7EB',
+                backgroundColor: themeColors.cardBg,
+                color: themeColors.textPrimary,
+                border: `1px solid ${themeColors.cardBorder}`,
               }}
             >
               Annuler
@@ -807,8 +812,8 @@ export default function NewB2BShippingModal({
               disabled={!pickupAddress}
               style={{
                 ...buttonStyle,
-                backgroundColor: '#8B5CF6',
-                color: '#FFFFFF',
+                backgroundColor: themeColors.purplePrimary,
+                color: themeColors.textPrimary,
                 opacity: !pickupAddress ? 0.5 : 1,
                 cursor: !pickupAddress ? 'not-allowed' : 'pointer',
               }}
@@ -823,8 +828,8 @@ export default function NewB2BShippingModal({
               disabled={!dropoffAddress}
               style={{
                 ...buttonStyle,
-                backgroundColor: '#8B5CF6',
-                color: '#FFFFFF',
+                backgroundColor: themeColors.purplePrimary,
+                color: themeColors.textPrimary,
                 opacity: !dropoffAddress ? 0.5 : 1,
                 cursor: !dropoffAddress ? 'not-allowed' : 'pointer',
               }}
@@ -839,8 +844,8 @@ export default function NewB2BShippingModal({
               disabled={isCreating || !distance || !price || !scheduledDateValue || !scheduledTimeValue}
               style={{
                 ...buttonStyle,
-                backgroundColor: '#8B5CF6',
-                color: '#FFFFFF',
+                backgroundColor: themeColors.purplePrimary,
+                color: themeColors.textPrimary,
                 opacity: isCreating || !distance || !price || !scheduledDateValue || !scheduledTimeValue ? 0.5 : 1,
                 cursor: isCreating || !distance || !price || !scheduledDateValue || !scheduledTimeValue ? 'not-allowed' : 'pointer',
               }}
