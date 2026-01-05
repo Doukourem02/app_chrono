@@ -9,6 +9,7 @@ import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
 import { broadcastOrderUpdateToAdmins } from './adminSocket.js';
 import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
+import { autoLogDeliveryMileage } from '../controllers/fleetController.js';
 import logger from '../utils/logger.js';
 import type { SocketAckCallback, UpdateDeliveryStatusData, SendProofData } from '../types/socketEvents.js';
 interface OrderCoordinates {
@@ -1155,6 +1156,28 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               commissionError
             );
             // Ne pas bloquer la livraison
+          }
+
+          // Enregistrer automatiquement le kilométrage après la livraison
+          try {
+            // Récupérer la distance depuis order (distance_km ou distance)
+            const distanceKm = (order as any).distance_km || order.distance || null;
+            // Récupérer le prix depuis order (price_cfa ou price)
+            const revenue = (order as any).price_cfa || order.price || null;
+            
+            if (distanceKm && distanceKm > 0) {
+              await autoLogDeliveryMileage(orderId, driverId, distanceKm, revenue);
+            } else {
+              logger.debug(
+                `[autoLogDeliveryMileage] Pas de distance valide pour commande ${maskOrderId(orderId)}, skip`
+              );
+            }
+          } catch (mileageError: any) {
+            // Ne pas bloquer la livraison si l'enregistrement du kilométrage échoue
+            logger.error(
+              `Erreur enregistrement kilométrage automatique pour ${maskOrderId(orderId)}:`,
+              mileageError
+            );
           }
 
           // CRITIQUE : Toujours retirer les commandes complétées de activeOrders

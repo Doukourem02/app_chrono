@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { config } from '../../config/index';
 import { logger } from '../../utils/logger';
+import { showUserFriendlyError } from '../../utils/errorFormatter';
 
 export default function OTPMethodScreen() {
   const [selectedMethod, setSelectedMethod] = useState<'email' | 'sms'>('email');
@@ -51,17 +52,13 @@ export default function OTPMethodScreen() {
       setTempData(email, phoneNumber, selectedMethod);
       router.push('./verification' as any);
     } catch (error) {
+      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
       logger.error('Erreur lors de l\'envoi OTP:', undefined, error);
       
-      // Gérer spécifiquement les erreurs réseau
-      let errorMessage = 'Une erreur est survenue. Veuillez réessayer.';
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        errorMessage = 'Impossible de se connecter au serveur. Vérifiez que le backend est démarré et votre connexion internet.';
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      Alert.alert('Erreur', errorMessage);
+      // Afficher un message user-friendly (jamais les détails techniques)
+      showUserFriendlyError(error, 'envoi du code OTP', () => {
+        handleContinue();
+      });
     } finally {
       setIsLoading(false);
     }

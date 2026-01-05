@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
+import { showUserFriendlyError } from '../../utils/errorFormatter';
 
 
 export default function PartnerOnboardingScreen() {
@@ -79,8 +80,10 @@ export default function PartnerOnboardingScreen() {
         ]
       );
     } catch (error: any) {
+      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
       logger.error('Erreur complétion profil:', undefined, error);
-      Alert.alert('Erreur', error.message || 'Une erreur est survenue lors de la complétion de votre profil');
+      // Afficher un message user-friendly (jamais les détails techniques)
+      showUserFriendlyError(error, 'complétion du profil');
     } finally {
       setIsLoading(false);
     }

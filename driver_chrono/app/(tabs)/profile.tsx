@@ -8,6 +8,7 @@ import { useDriverStore } from '../../store/useDriverStore';
 import { formatUserName } from '../../utils/formatName';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
+import { showUserFriendlyError } from '../../utils/errorFormatter';
 
 interface DriverStatistics {
   completedDeliveries: number;
@@ -190,11 +191,14 @@ export default function ProfilePage() {
 
         Alert.alert('Succès', 'Votre avatar a été mis à jour');
       } else {
-        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour l\'avatar');
+        // Afficher un message user-friendly (jamais les détails techniques)
+        showUserFriendlyError(new Error(result.message || 'Impossible de mettre à jour l\'avatar'), 'mise à jour de l\'avatar');
       }
     } catch (error) {
+      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
       logger.error('Erreur upload avatar:', undefined, error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour l\'avatar');
+      // Afficher un message user-friendly (jamais les détails techniques)
+      showUserFriendlyError(error, 'mise à jour de l\'avatar');
     } finally {
       setUploadingAvatar(false);
     }
@@ -388,11 +392,8 @@ export default function ProfilePage() {
                 // Ne pas afficher d'erreur si c'est une session expirée (déjà géré par logout)
                 const errorMessage = error instanceof Error ? error.message : '';
                 if (!errorMessage.includes('Session expirée')) {
-                  Alert.alert(
-                    'Erreur',
-                    'Impossible de synchroniser votre statut avec le serveur.',
-                    [{ text: 'OK' }]
-                  );
+                  // Afficher un message user-friendly (jamais les détails techniques)
+                  showUserFriendlyError(error, 'synchronisation du statut');
                 }
               }
             }

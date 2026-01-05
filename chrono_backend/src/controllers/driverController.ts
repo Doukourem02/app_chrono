@@ -1289,6 +1289,110 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
 
     const result = await (pool as any).query(updateQuery, values);
 
+    // Si une plaque d'immatriculation a été fournie, créer/mettre à jour le véhicule dans fleet_vehicles
+    const finalVehiclePlate = vehicle_plate || result.rows[0]?.vehicle_plate;
+    const finalVehicleType = vehicle_type || result.rows[0]?.vehicle_type;
+    
+    if (finalVehiclePlate && finalVehicleType) {
+      try {
+        // Vérifier si le véhicule existe déjà dans fleet_vehicles
+        const vehicleCheck = await (pool as any).query(
+          'SELECT id, current_driver_id FROM fleet_vehicles WHERE vehicle_plate = $1',
+          [finalVehiclePlate]
+        );
+
+        if (vehicleCheck.rows.length === 0) {
+          // Créer le véhicule dans fleet_vehicles
+          const insertVehicleQuery = `
+            INSERT INTO fleet_vehicles (
+              vehicle_plate, vehicle_type, vehicle_brand, vehicle_model, vehicle_color,
+              current_driver_id, current_odometer, status
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, 0, 'active')
+            ON CONFLICT (vehicle_plate) DO NOTHING
+            RETURNING id
+          `;
+
+          await (pool as any).query(insertVehicleQuery, [
+            finalVehiclePlate,
+            finalVehicleType,
+            vehicle_brand || result.rows[0]?.vehicle_brand || null,
+            vehicle_model || result.rows[0]?.vehicle_model || null,
+            vehicle_color || result.rows[0]?.vehicle_color || null,
+            userId, // Assigner le livreur comme conducteur actuel
+          ]);
+
+          logger.info(`Véhicule créé automatiquement dans fleet_vehicles: ${finalVehiclePlate}`, {
+            driver_id: userId,
+            vehicle_type: finalVehicleType,
+          });
+        } else {
+          // Mettre à jour le véhicule existant si nécessaire
+          const existingVehicle = vehicleCheck.rows[0];
+          const updateVehicleFields: string[] = [];
+          const updateVehicleValues: any[] = [];
+          let updateParamIndex = 1;
+
+          // Mettre à jour le conducteur actuel si différent
+          if (existingVehicle.current_driver_id !== userId) {
+            updateVehicleFields.push(`current_driver_id = $${updateParamIndex}`);
+            updateVehicleValues.push(userId);
+            updateParamIndex++;
+          }
+
+          // Mettre à jour les autres champs si fournis
+          if (vehicle_brand !== undefined) {
+            updateVehicleFields.push(`vehicle_brand = $${updateParamIndex}`);
+            updateVehicleValues.push(vehicle_brand);
+            updateParamIndex++;
+          }
+
+          if (vehicle_model !== undefined) {
+            updateVehicleFields.push(`vehicle_model = $${updateParamIndex}`);
+            updateVehicleValues.push(vehicle_model);
+            updateParamIndex++;
+          }
+
+          if (vehicle_color !== undefined) {
+            updateVehicleFields.push(`vehicle_color = $${updateParamIndex}`);
+            updateVehicleValues.push(vehicle_color);
+            updateParamIndex++;
+          }
+
+          if (vehicle_type !== undefined) {
+            updateVehicleFields.push(`vehicle_type = $${updateParamIndex}`);
+            updateVehicleValues.push(vehicle_type);
+            updateParamIndex++;
+          }
+
+          if (updateVehicleFields.length > 0) {
+            updateVehicleFields.push(`updated_at = NOW()`);
+            updateVehicleValues.push(finalVehiclePlate);
+
+            const updateVehicleQuery = `
+              UPDATE fleet_vehicles
+              SET ${updateVehicleFields.join(', ')}
+              WHERE vehicle_plate = $${updateParamIndex}
+            `;
+
+            await (pool as any).query(updateVehicleQuery, updateVehicleValues);
+
+            logger.info(`Véhicule mis à jour dans fleet_vehicles: ${finalVehiclePlate}`, {
+              driver_id: userId,
+              updated_fields: updateVehicleFields.length - 1, // -1 pour updated_at
+            });
+          }
+        }
+      } catch (fleetError: any) {
+        // Ne pas bloquer la mise à jour du driver_profiles si la création dans fleet_vehicles échoue
+        // (peut arriver si la table n'existe pas encore ou en cas d'erreur)
+        logger.warn(`Erreur lors de la création/mise à jour dans fleet_vehicles: ${fleetError.message}`, {
+          vehicle_plate: finalVehiclePlate,
+          driver_id: userId,
+        });
+      }
+    }
+
     logger.info(`Informations véhicule mises à jour pour ${maskUserId(userId)}`, {
       vehicle_type: vehicle_type !== undefined,
       vehicle_plate: vehicle_plate !== undefined,

@@ -12,7 +12,8 @@ const translations = {
 export type TranslationKey = string
 
 // Type pour les valeurs de traduction (peut être un objet ou une chaîne)
-type TranslationValue = string | Record<string, TranslationValue>
+// Utilisation de unknown pour éviter la référence circulaire
+type TranslationValue = string | Record<string, unknown>
 
 /**
  * Récupère une traduction pour une clé donnée
@@ -32,14 +33,14 @@ export function getTranslation(
   // Naviguer dans l'objet de traduction
   for (const k of keys) {
     if (value && typeof value === 'object' && k in value) {
-      value = value[k]
+      value = value[k] as TranslationValue
     } else {
       // Si la clé n'existe pas, essayer en français comme fallback
       if (language !== 'fr') {
         let fallbackValue: TranslationValue = translations.fr
         for (const fallbackKey of keys) {
           if (fallbackValue && typeof fallbackValue === 'object' && fallbackKey in fallbackValue) {
-            fallbackValue = fallbackValue[fallbackKey]
+            fallbackValue = fallbackValue[fallbackKey] as TranslationValue
           } else {
             return key // Retourner la clé si même le fallback échoue
           }

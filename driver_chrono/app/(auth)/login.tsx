@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { config } from '../../config/index';
 import { logger } from '../../utils/logger';
+import { showUserFriendlyError } from '../../utils/errorFormatter';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -56,17 +57,13 @@ export default function Login() {
       router.push('/(auth)/verification' as any);
       
     } catch (error) {
+      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
       logger.error('Erreur lors de l\'envoi OTP:', undefined, error);
       
-      // Gérer spécifiquement les erreurs réseau
-      let errorMessage = 'Erreur lors de l\'envoi de l\'OTP';
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        errorMessage = 'Impossible de se connecter au serveur. Vérifiez que le backend est démarré et votre connexion internet.';
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      Alert.alert('Erreur', errorMessage);
+      // Afficher un message user-friendly (jamais les détails techniques)
+      showUserFriendlyError(error, 'envoi du code OTP', () => {
+        handleSendOTP();
+      });
     } finally {
       setLoading(false);
     }

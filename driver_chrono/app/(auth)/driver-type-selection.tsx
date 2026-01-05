@@ -6,6 +6,7 @@ import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
+import { showUserFriendlyError } from '../../utils/errorFormatter';
 
 export default function DriverTypeSelectionScreen() {
   const [selectedType, setSelectedType] = useState<'partner' | 'internal' | null>(null);
@@ -61,8 +62,10 @@ export default function DriverTypeSelectionScreen() {
         throw new Error(response.message || 'Erreur lors de la mise à jour du type de livreur');
       }
     } catch (error: any) {
+      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
       logger.error('Erreur mise à jour type livreur:', undefined, error);
-      Alert.alert('Erreur', error.message || 'Une erreur est survenue lors de la sélection du type de livreur');
+      // Afficher un message user-friendly (jamais les détails techniques)
+      showUserFriendlyError(error, 'sélection du type de livreur');
     } finally {
       setIsLoading(false);
     }

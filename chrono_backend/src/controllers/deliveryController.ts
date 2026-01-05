@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { activeOrders, connectedUsers } from '../sockets/orderSocket.js';
 import { deductCommissionAfterDelivery } from '../services/commissionService.js';
+import { autoLogDeliveryMileage } from './fleetController.js';
 import logger from '../utils/logger.js';
 
 interface RequestWithApp extends Request {
@@ -356,6 +357,28 @@ export const updateDeliveryStatus = async (
         } catch (commissionError: any) {
           logger.error(`Erreur prélèvement commission (REST) pour ${driverId}:`, commissionError);
           // Ne pas bloquer la livraison
+        }
+
+        // Enregistrer automatiquement le kilométrage après la livraison
+        try {
+          // Récupérer la distance depuis order (distance_km ou distance)
+          const distanceKm = (order as any).distance_km || order.distance || null;
+          // Récupérer le prix depuis order (price_cfa ou price)
+          const revenue = (order as any).price_cfa || order.price || null;
+          
+          if (distanceKm && distanceKm > 0) {
+            await autoLogDeliveryMileage(orderId, driverId, distanceKm, revenue);
+          } else {
+            logger.debug(
+              `[autoLogDeliveryMileage] Pas de distance valide pour commande ${orderId}, skip`
+            );
+          }
+        } catch (mileageError: any) {
+          // Ne pas bloquer la livraison si l'enregistrement du kilométrage échoue
+          logger.error(
+            `Erreur enregistrement kilométrage automatique (REST) pour ${orderId}:`,
+            mileageError
+          );
         }
       }
 

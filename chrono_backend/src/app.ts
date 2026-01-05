@@ -20,6 +20,7 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import multiDeliveryRoutes from './routes/multiDeliveryRoutes.js';
 import demandForecastRoutes from './routes/demandForecastRoutes.js';
+import fleetRoutes from './routes/fleetRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSwagger } from './config/swagger.js';
 import { isOriginAllowed } from './config/cors.js';
@@ -109,6 +110,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/multi-delivery', multiDeliveryRoutes);
 app.use('/api/forecast', demandForecastRoutes);
+app.use('/api/fleet', fleetRoutes);
 
 app.use(errorHandler);
 

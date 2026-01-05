@@ -942,6 +942,138 @@ class ApiService {
   }
 
   /**
+   * 📄 Récupérer les documents légaux d'un véhicule
+   */
+  async getVehicleDocuments(vehiclePlate: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      id: string;
+      vehicle_plate: string;
+      document_type: string;
+      document_number: string | null;
+      issue_date: string | null;
+      expiry_date: string | null;
+      document_url: string | null;
+      is_valid: boolean;
+      notes: string | null;
+      created_at: string;
+      updated_at: string;
+    }[];
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/fleet/vehicles/${encodeURIComponent(vehiclePlate)}/documents`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la récupération des documents');
+      }
+
+      return result;
+    } catch (error) {
+      logger.error('Erreur getVehicleDocuments:', 'apiService', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
+   * 📄 Uploader un document légal (carte grise, assurance, etc.)
+   */
+  async uploadVehicleDocument(
+    vehiclePlate: string,
+    documentType: 'carte_grise' | 'assurance' | 'controle_technique' | 'permis_conduire',
+    documentData: {
+      document_number?: string;
+      issue_date?: string;
+      expiry_date?: string;
+      imageBase64?: string;
+      mimeType?: string;
+      notes?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      id: string;
+      vehicle_plate: string;
+      document_type: string;
+      document_number: string | null;
+      issue_date: string | null;
+      expiry_date: string | null;
+      document_url: string | null;
+      is_valid: boolean;
+      notes: string | null;
+      created_at: string;
+      updated_at: string;
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      // Enregistrer ou mettre à jour le document (l'upload de l'image est géré côté backend)
+      const response = await fetch(`${API_BASE_URL}/api/fleet/vehicles/${encodeURIComponent(vehiclePlate)}/documents`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          document_type: documentType,
+          document_number: documentData.document_number,
+          issue_date: documentData.issue_date,
+          expiry_date: documentData.expiry_date,
+          imageBase64: documentData.imageBase64,
+          mimeType: documentData.mimeType || 'image/jpeg',
+          is_valid: true,
+          notes: documentData.notes,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de l\'enregistrement du document');
+      }
+
+      return result;
+    } catch (error) {
+      logger.error('Erreur uploadVehicleDocument:', 'apiService', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion'
+      };
+    }
+  }
+
+  /**
    * 🔄 Mettre à jour le type de livreur (internal/partner)
    */
   async updateDriverType(

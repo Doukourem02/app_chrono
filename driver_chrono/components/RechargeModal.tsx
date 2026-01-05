@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCommissionStore } from '../store/useCommissionStore';
+import { showUserFriendlyError } from '../utils/errorFormatter';
 
 interface RechargeModalProps {
   visible: boolean;
@@ -75,10 +76,13 @@ export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }
           ]
         );
       } else {
-        Alert.alert('Erreur', result.message || 'Erreur lors de la recharge');
+        // Afficher un message user-friendly (jamais les détails techniques)
+        showUserFriendlyError(new Error(result.message || 'Erreur lors de la recharge'), 'recharge de la commission');
       }
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Erreur de connexion');
+      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
+      // Afficher un message user-friendly (jamais les détails techniques)
+      showUserFriendlyError(error, 'recharge de la commission');
     }
   };
 

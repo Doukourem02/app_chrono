@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
+import { showUserFriendlyError } from '../../utils/errorFormatter';
 
 export default function PersonalInfoPage() {
   const { user, profile } = useDriverStore();
@@ -74,11 +75,14 @@ export default function PersonalInfoPage() {
           { text: 'OK', onPress: () => router.back() },
         ]);
       } else {
-        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour vos informations');
+        // Afficher un message user-friendly (jamais les détails techniques)
+        showUserFriendlyError(new Error(result.message || 'Impossible de mettre à jour vos informations'), 'mise à jour de vos informations');
       }
     } catch (error) {
+      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
       logger.error('Erreur mise à jour profil:', undefined, error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour vos informations');
+      // Afficher un message user-friendly (jamais les détails techniques)
+      showUserFriendlyError(error, 'mise à jour de vos informations');
     } finally {
       setIsLoading(false);
     }

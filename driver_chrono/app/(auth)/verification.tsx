@@ -6,6 +6,7 @@ import { useDriverStore } from '../../store/useDriverStore';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { config } from '../../config/index';
 import { logger } from '../../utils/logger';
+import { showUserFriendlyError } from '../../utils/errorFormatter';
 
 export default function VerificationScreen() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -110,17 +111,14 @@ export default function VerificationScreen() {
       // (les informations véhicule sont optionnelles et peuvent être complétées plus tard)
       router.push('./success' as any);
     } catch (error) {
+      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
       logger.error('Erreur lors de la vérification:', undefined, error);
       
-      // Gérer spécifiquement les erreurs réseau
-      let errorMessage = 'Code de vérification incorrect. Veuillez réessayer.';
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        errorMessage = 'Impossible de se connecter au serveur. Vérifiez que le backend est démarré et votre connexion internet.';
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
+      // Afficher un message user-friendly (jamais les détails techniques)
+      showUserFriendlyError(error, 'vérification du code', () => {
+        handleConfirm();
+      });
       
-      Alert.alert('Erreur', errorMessage);
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {

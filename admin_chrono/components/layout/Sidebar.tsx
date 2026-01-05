@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,Car,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -63,6 +63,18 @@ const navigationSectionsKeys = [
       { href: "/users", icon: Users, key: "users" },
       { href: "/drivers", icon: Truck, key: "drivers" },
       { href: "/gamification", icon: Trophy, key: "performance" },
+    ],
+  },
+  {
+    id: "maintenance",
+    key: "maintenance",
+    icon: Car,
+    items: [
+      { href: "/maintenance", icon: Car, key: "overview" },
+      { href: "/maintenance/vehicles", icon: Truck, key: "vehicles" },
+      { href: "/maintenance/repairs", icon: Settings, key: "repairs" },
+      { href: "/maintenance/documents", icon: FileText, key: "documents" },
+      { href: "/maintenance/budget", icon: Wallet, key: "budget" },
     ],
   },
   {
@@ -478,13 +490,13 @@ export default function Sidebar() {
 
   const getNavButtonStyle = (active: boolean): React.CSSProperties => ({
     width: isExpanded ? '100%' : collapsedWidth,
-    height: 62,
-    borderRadius: 18,
+    height: 48,
+    borderRadius: 12,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: isExpanded ? 14 : 0,
-    paddingLeft: isExpanded ? 16 : collapsedIconOffset,
+    justifyContent: isExpanded ? 'flex-start' : 'center',
+    gap: isExpanded ? 12 : 0,
+    paddingLeft: collapsedIconOffset, // TOUJOURS le même padding pour garder les icônes alignées
     paddingRight: isExpanded ? 16 : collapsedIconOffset,
     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
     backgroundColor: active ? themeColors.purplePrimary : 'transparent',
@@ -500,10 +512,13 @@ export default function Sidebar() {
   const iconWrapperStyle: React.CSSProperties = {
     width: iconSlotSize,
     height: iconSlotSize,
+    minWidth: iconSlotSize,
+    minHeight: iconSlotSize,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    flexGrow: 0,
   }
 
   const getNavLabelStyle = (active: boolean): React.CSSProperties => ({
@@ -514,6 +529,9 @@ export default function Sidebar() {
     whiteSpace: 'nowrap',
     overflow: 'visible',
     textOverflow: 'clip',
+    display: 'flex',
+    alignItems: 'center',
+    lineHeight: '1.5',
   })
 
   const avatarContainerStyle: React.CSSProperties = {
@@ -792,7 +810,7 @@ export default function Sidebar() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingLeft: 16,
+                  paddingLeft: collapsedIconOffset, // Même padding que les items principaux pour alignement vertical
                   paddingRight: 12,
                   backgroundColor: hasActiveItem ? '#F3F4F6' : 'transparent',
                   border: 'none',
@@ -807,7 +825,9 @@ export default function Sidebar() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-                  <SectionIcon size={18} color={hasActiveItem ? '#8B5CF6' : '#6B7280'} />
+                  <span style={iconWrapperStyle}>
+                    <SectionIcon size={18} color={hasActiveItem ? '#8B5CF6' : '#6B7280'} />
+                  </span>
                   <span style={{
                     fontSize: '13px',
                     fontWeight: 600,
@@ -836,7 +856,7 @@ export default function Sidebar() {
                 }}>
                   {section.items.map((item, index) => {
                     const ItemIcon = item.icon;
-                    let active = pathname === item.href || pathname.startsWith(item.href + "/");
+                    let active = false;
                     
                     // Détection spéciale pour les pages Finance/Commissions
                     if (item.href === "/finances") {
@@ -844,6 +864,24 @@ export default function Sidebar() {
                         active = pathname === "/finance" || pathname.startsWith("/finance/");
                       } else if (item.key === "driverCommissions") {
                         active = pathname === "/commissions" || pathname.startsWith("/commissions/");
+                      }
+                    } else {
+                      // Pour les autres routes, vérifier d'abord les correspondances exactes
+                      if (pathname === item.href) {
+                        active = true;
+                      } else if (pathname.startsWith(item.href + "/")) {
+                        // Vérifier qu'il n'y a pas d'autre item de la même section avec un href plus spécifique qui correspond
+                        // Un item est "plus spécifique" si son href est plus long et commence par l'href de l'item actuel + "/"
+                        const hasMoreSpecificMatch = section.items.some(otherItem => {
+                          if (otherItem.href === item.href) return false; // Ignorer l'item actuel
+                          // Si l'autre item a un href qui est plus long et commence par l'href de l'item actuel
+                          if (otherItem.href.startsWith(item.href + "/")) {
+                            // Vérifier si le pathname correspond à cet autre item (exactement ou avec un "/" après)
+                            return pathname === otherItem.href || pathname.startsWith(otherItem.href + "/");
+                          }
+                          return false;
+                        });
+                        active = !hasMoreSpecificMatch;
                       }
                     }
 
@@ -857,13 +895,14 @@ export default function Sidebar() {
                         href={actualHref}
                         style={{
                           ...getNavButtonStyle(active),
-                          height: 44,
-                          paddingLeft: 12,
+                          height: 40,
+                          paddingLeft: collapsedIconOffset + 16, // Aligné avec les items principaux + indentation
                           marginLeft: 0,
+                          minHeight: 40,
                         }}
                       >
-                        <span style={iconWrapperStyle}>
-                          <ItemIcon size={18} />
+                        <span style={{...iconWrapperStyle, width: 32, height: 32, minWidth: 32, minHeight: 32}}>
+                          <ItemIcon size={16} />
                         </span>
                         <span style={getNavLabelStyle(active)}>{item.label}</span>
                       </Link>

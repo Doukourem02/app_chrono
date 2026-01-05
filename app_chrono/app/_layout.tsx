@@ -39,7 +39,7 @@ export default function RootLayout() {
           }
         } catch (error) {
           // En cas d'erreur, ne pas déconnecter (peut être une erreur réseau temporaire)
-          logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', error);
+          logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', undefined, error);
         }
       }
     };
