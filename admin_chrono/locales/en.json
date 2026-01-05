@@ -1,0 +1,207 @@
+{
+  "common": {
+    "search": "Search",
+    "loading": "Loading...",
+    "noResults": "No results found",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "sidebar": {
+    "logo": "tracking",
+    "mainNav": {
+      "dashboard": "Dashboard",
+      "tracking": "Tracking Orders",
+      "orders": "Orders",
+      "message": "Message"
+    },
+    "sections": {
+      "analyses": {
+        "title": "Analyses & Reports",
+        "analytics": "Analytics",
+        "reports": "Reports"
+      },
+      "finances": {
+        "title": "Finances",
+        "clientTransactions": "Client Transactions",
+        "driverCommissions": "Driver Commissions"
+      },
+      "gestion": {
+        "title": "Management",
+        "users": "Users",
+        "drivers": "Drivers",
+        "performance": "Performance"
+      },
+      "administration": {
+        "title": "Administration",
+        "planning": "Planning",
+        "promoCodes": "Promo Codes",
+        "disputes": "Disputes",
+        "settings": "Settings"
+      }
+    },
+    "profile": {
+      "myProfile": "My Profile",
+      "settings": "Settings",
+      "logout": "Logout"
+    }
+  },
+  "header": {
+    "searchPlaceholder": "Search orders, drivers, customers...",
+    "searching": "Searching...",
+    "filters": {
+      "title": "Filters",
+      "ongoingOrders": "Ongoing Orders",
+      "completedOrders": "Completed Orders",
+      "activeDrivers": "Active Drivers"
+    },
+    "dateFilter": {
+      "today": "Today",
+      "thisWeek": "This Week",
+      "thisMonth": "This Month",
+      "lastMonth": "Last Month",
+      "all": "All"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "markAllRead": "Mark all as read",
+      "noNotifications": "No notifications",
+      "noNotificationsDesc": "You will be notified of new activities",
+      "ago": "ago",
+      "minutes": "min",
+      "hours": "h",
+      "days": "d",
+      "justNow": "Just now"
+    },
+    "searchResults": {
+      "orders": "ORDERS",
+      "drivers": "DRIVERS",
+      "clients": "CLIENTS",
+      "status": {
+        "completed": "Completed",
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "cancelled": "Cancelled",
+        "enroute": "En Route",
+        "picked_up": "Picked Up"
+      },
+      "client": "Client",
+      "driver": "Driver",
+      "online": "Online",
+      "offline": "Offline",
+      "deliveries": "deliveries",
+      "registeredOn": "Registered on"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "dateFormat": "dddd, MMMM D, YYYY",
+    "kpis": {
+      "satisfactionRate": {
+        "title": "Satisfaction Rate",
+        "subtitle": "ratings"
+      },
+      "averageTime": {
+        "title": "Average Time",
+        "subtitle": "Delivery time"
+      },
+      "cancellationRate": {
+        "title": "Cancellation Rate",
+        "subtitle": "Cancelled orders"
+      },
+      "activeClients": {
+        "title": "Active Clients",
+        "subtitle": "Clients this month"
+      },
+      "activeDrivers": {
+        "title": "Active Drivers",
+        "subtitle": "Drivers this month"
+      },
+      "onDelivery": {
+        "title": "On Delivery",
+        "subtitle": "ongoing deliveries",
+        "updating": "Updating..."
+      },
+      "successDeliveries": {
+        "title": "Success Deliveries",
+        "subtitle": "Since last week"
+      },
+      "revenue": {
+        "title": "Revenue",
+        "subtitle": "Since last week"
+      }
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage application settings",
+    "notifications": {
+      "title": "Notifications",
+      "email": {
+        "label": "Email notifications",
+        "description": "Receive email notifications for important events"
+      },
+      "push": {
+        "label": "Push notifications",
+        "description": "Receive real-time notifications in your browser"
+      },
+      "sound": {
+        "label": "Sound notifications",
+        "description": "Enable sounds for important notifications"
+      }
+    },
+    "security": {
+      "title": "Security",
+      "2fa": {
+        "label": "Two-factor authentication",
+        "description": "Add an extra layer of security to your account"
+      },
+      "history": {
+        "label": "Login history",
+        "description": "View your recent login history"
+      }
+    },
+    "preferences": {
+      "title": "Preferences",
+      "language": {
+        "label": "Language",
+        "description": "Choose the interface language",
+        "french": "French",
+        "english": "English"
+      },
+      "theme": {
+        "label": "Theme",
+        "description": "Customize the application appearance",
+        "light": "Light",
+        "dark": "Dark"
+      },
+      "timezone": {
+        "label": "Timezone",
+        "description": "Set your timezone"
+      }
+    },
+    "system": {
+      "title": "System",
+      "backup": {
+        "label": "Automatic backup",
+        "description": "Configure automatic data backups"
+      },
+      "logs": {
+        "label": "System logs",
+        "description": "View system logs and errors"
+      }
+    },
+    "comingSoon": "Coming soon"
+  }
+}

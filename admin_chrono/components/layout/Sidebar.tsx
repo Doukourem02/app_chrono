@@ -6,16 +6,19 @@ import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Us
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/utils/logger";
 import { themeColors } from "@/utils/theme";
 import { useThemeStore } from "@/stores/themeStore";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface NavItem {
   href: string;
   icon: React.ComponentType<{ size?: number; color?: string }>;
   label: string;
+  key?: string; // Clé pour les traductions
 }
 
 interface NavSection {
@@ -25,51 +28,52 @@ interface NavSection {
   items: NavItem[];
 }
 
-const mainNavigation: NavItem[] = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/tracking", icon: MapPin, label: "Tracking Orders" },
-  { href: "/orders", icon: Package, label: "Orders" },
-  { href: "/message", icon: MessageSquare, label: "Message" },
+// Les labels seront traduits dynamiquement dans le composant
+const mainNavigationKeys = [
+  { href: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { href: "/tracking", icon: MapPin, key: "tracking" },
+  { href: "/orders", icon: Package, key: "orders" },
+  { href: "/message", icon: MessageSquare, key: "message" },
 ];
 
-const navigationSections: NavSection[] = [
+const navigationSectionsKeys = [
   {
     id: "analyses",
-    label: "Analyses & Rapports",
+    key: "analyses",
     icon: TrendingUp,
     items: [
-      { href: "/analytics", icon: TrendingUp, label: "Analytics" },
-      { href: "/reports", icon: FileText, label: "Reports" },
+      { href: "/analytics", icon: TrendingUp, key: "analytics" },
+      { href: "/reports", icon: FileText, key: "reports" },
     ],
   },
   {
     id: "finances",
-    label: "Finances",
+    key: "finances",
     icon: Wallet,
     items: [
-      { href: "/finances", icon: CreditCard, label: "Transactions Clients" },
-      { href: "/finances", icon: Coins, label: "Commissions Livreurs" },
+      { href: "/finances", icon: CreditCard, key: "clientTransactions" },
+      { href: "/finances", icon: Coins, key: "driverCommissions" },
     ],
   },
   {
     id: "gestion",
-    label: "Gestion",
+    key: "gestion",
     icon: Users,
     items: [
-      { href: "/users", icon: Users, label: "Users" },
-      { href: "/drivers", icon: Truck, label: "Drivers" },
-      { href: "/gamification", icon: Trophy, label: "Performance" },
+      { href: "/users", icon: Users, key: "users" },
+      { href: "/drivers", icon: Truck, key: "drivers" },
+      { href: "/gamification", icon: Trophy, key: "performance" },
     ],
   },
   {
     id: "administration",
-    label: "Administration",
+    key: "administration",
     icon: Settings,
     items: [
-      { href: "/planning", icon: Calendar, label: "Planning" },
-      { href: "/promo-codes", icon: Tag, label: "Promo-codes" },
-      { href: "/disputes", icon: AlertTriangle, label: "Réclamations" },
-      { href: "/settings", icon: Settings, label: "Settings" },
+      { href: "/planning", icon: Calendar, key: "planning" },
+      { href: "/promo-codes", icon: Tag, key: "promoCodes" },
+      { href: "/disputes", icon: AlertTriangle, key: "disputes" },
+      { href: "/settings", icon: Settings, key: "settings" },
     ],
   },
 ];
@@ -80,6 +84,22 @@ export default function Sidebar() {
   const { user, signOut } = useAuthStore();
   const theme = useThemeStore((state) => state.theme);
   const isDarkMode = theme === 'dark';
+  const t = useTranslation();
+  
+  // Construire la navigation avec les traductions
+  const mainNavigation: NavItem[] = mainNavigationKeys.map(item => ({
+    ...item,
+    label: t(`sidebar.mainNav.${item.key}`)
+  }));
+  
+  const navigationSections: NavSection[] = navigationSectionsKeys.map(section => ({
+    ...section,
+    label: t(`sidebar.sections.${section.key}.title`),
+    items: section.items.map(item => ({
+      ...item,
+      label: t(`sidebar.sections.${section.key}.${item.key}`)
+    }))
+  }));
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -88,6 +108,8 @@ export default function Sidebar() {
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; transform?: string } | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['analyses', 'gestion', 'administration']));
+  const isOpeningMenuRef = useRef(false);
+  const menuJustOpenedRef = useRef(false);
 
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -172,7 +194,7 @@ export default function Sidebar() {
           last_name: undefined,
         });
     }
-  }, [user]);
+  }, [user, setAvatarUrl, setUserProfile]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -236,31 +258,58 @@ export default function Sidebar() {
   const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
 
   useEffect(() => {
+    if (!showProfileMenu || !menuPosition) return;
+
     const handleClickOutside = (event: MouseEvent) => {
+      // Ignorer si on est en train d'ouvrir le menu ou si le menu vient d'être ouvert
+      if (isOpeningMenuRef.current || menuJustOpenedRef.current) {
+        logger.debug('[Sidebar] Ignoring click outside - menu is opening or just opened');
+        return;
+      }
+      
       const target = event.target as Node;
-      const isClickInsideButton = profileMenuRef.current?.contains(target);
+      const clickedElement = target as HTMLElement;
+      
+      // Vérifier si le clic est dans le bouton (en vérifiant le conteneur et le bouton lui-même)
+      const buttonElement = profileMenuRef.current?.querySelector('button');
+      const isClickInsideButton = profileMenuRef.current?.contains(target) || 
+                                  buttonElement?.contains(target) ||
+                                  clickedElement === buttonElement;
+      
+      // Vérifier si le clic est dans le menu
       const isClickInsideMenu = profileDropdownRef.current?.contains(target);
       
-      // Ne fermer le menu que si le clic est en dehors du bouton ET du menu
+      logger.debug('[Sidebar] Click outside check:', {
+        isClickInsideButton,
+        isClickInsideMenu,
+        isOpening: isOpeningMenuRef.current,
+        justOpened: menuJustOpenedRef.current,
+        target: clickedElement?.tagName,
+      });
+      
+      // Ne fermer le menu que si le clic est vraiment en dehors du bouton ET du menu
       if (!isClickInsideButton && !isClickInsideMenu) {
+        logger.debug('[Sidebar] Closing profile menu - click outside');
         setShowProfileMenu(false);
         setMenuPosition(null);
+      } else {
+        logger.debug('[Sidebar] Click is inside button or menu - keeping menu open');
       }
     };
 
-    if (showProfileMenu) {
-      // Utiliser 'click' au lieu de 'mousedown' pour éviter les conflits
-      // et ajouter un petit délai pour laisser le clic sur le bouton se propager
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside, true);
-      }, 0);
+    // Ajouter le listener après un délai pour laisser le onClick se terminer
+    // et éviter que le clic sur le bouton ne ferme immédiatement le menu
+    const timeoutId = setTimeout(() => {
+      logger.debug('[Sidebar] Adding click outside listener');
+      // Utiliser 'mousedown' avec capture pour détecter les clics en dehors
+      document.addEventListener('mousedown', handleClickOutside, true);
+    }, 800);
 
-      return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleClickOutside, true);
-      };
-    }
-  }, [showProfileMenu]);
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu, menuPosition]);
 
   // Mettre à jour la position du menu quand le sidebar se redimensionne
   // Utiliser un debounce pour éviter les recalculs trop fréquents
@@ -577,6 +626,15 @@ export default function Sidebar() {
     logger.debug('🔄 [Sidebar] avatarUrl changed:', avatarUrl);
   }, [avatarUrl]);
 
+  // Log pour déboguer le menu de profil
+  useEffect(() => {
+    logger.debug('🔍 [Sidebar] Profile menu state:', {
+      showProfileMenu,
+      menuPosition,
+      shouldDisplay: showProfileMenu && menuPosition !== null,
+    });
+  }, [showProfileMenu, menuPosition]);
+
   const avatarNameStyle: React.CSSProperties = {
     fontSize: '13px',
     fontWeight: 500,
@@ -590,7 +648,7 @@ export default function Sidebar() {
     paddingBottom: 0,
   }
 
-  const profileMenuStyle: React.CSSProperties = {
+  const profileMenuStyle: React.CSSProperties = useMemo(() => ({
     position: 'fixed',
     top: menuPosition ? `${menuPosition.top}px` : '0',
     left: menuPosition ? `${menuPosition.left}px` : '0',
@@ -602,11 +660,11 @@ export default function Sidebar() {
     minWidth: '220px',
     maxHeight: typeof window !== 'undefined' ? `${window.innerHeight - 40}px` : 'auto',
     overflowY: 'auto',
-    zIndex: 99999, // Augmenté pour être au-dessus de tout
+    zIndex: 999999, // Très élevé pour être au-dessus de tout
     padding: '0',
-    display: showProfileMenu && menuPosition ? 'block' : 'none',
-    pointerEvents: 'auto', // S'assurer que le menu peut recevoir les clics
-  }
+    display: 'block', // Toujours afficher quand le composant est rendu
+    pointerEvents: 'auto',
+  }), [menuPosition])
 
   const profileMenuHeaderStyle: React.CSSProperties = {
     padding: '16px',
@@ -680,7 +738,7 @@ export default function Sidebar() {
           />
         </div>
         <p style={logoTextStyle}>
-          tracking
+          {t('sidebar.logo')}
         </p>
       </div>
 
@@ -782,16 +840,16 @@ export default function Sidebar() {
                     
                     // Détection spéciale pour les pages Finance/Commissions
                     if (item.href === "/finances") {
-                      if (item.label === "Transactions Clients") {
+                      if (item.key === "clientTransactions") {
                         active = pathname === "/finance" || pathname.startsWith("/finance/");
-                      } else if (item.label === "Commissions Livreurs") {
+                      } else if (item.key === "driverCommissions") {
                         active = pathname === "/commissions" || pathname.startsWith("/commissions/");
                       }
                     }
 
-                    // Clé unique basée sur l'index et le label pour éviter les doublons
-                    const uniqueKey = `${section.id}-${item.label}-${index}`;
-                    const actualHref = item.label === "Transactions Clients" ? "/finance" : item.label === "Commissions Livreurs" ? "/commissions" : item.href;
+                    // Clé unique basée sur l'index et la clé pour éviter les doublons
+                    const uniqueKey = `${section.id}-${item.key}-${index}`;
+                    const actualHref = item.key === "clientTransactions" ? "/finance" : item.key === "driverCommissions" ? "/commissions" : item.href;
 
                     return (
                       <Link
@@ -868,6 +926,21 @@ export default function Sidebar() {
             style={avatarButtonStyle}
             onClick={(e) => {
               e.stopPropagation(); // Empêcher la propagation du clic
+              e.preventDefault(); // Empêcher le comportement par défaut
+              
+              // Si le menu est déjà ouvert, le fermer
+              if (showProfileMenu) {
+                setShowProfileMenu(false);
+                setMenuPosition(null);
+                isOpeningMenuRef.current = false;
+                menuJustOpenedRef.current = false;
+                return;
+              }
+              
+              // Marquer qu'on est en train d'ouvrir le menu IMMÉDIATEMENT
+              isOpeningMenuRef.current = true;
+              
+              // Ouvrir le menu et calculer la position
               if (profileMenuRef.current) {
                 const rect = profileMenuRef.current.getBoundingClientRect();
                 const sidebarWidth = isExpanded ? expandedWidth : collapsedWidth;
@@ -875,29 +948,62 @@ export default function Sidebar() {
                 // Hauteur estimée du menu (header + 3 items + padding)
                 const menuHeight = 200; // Approximatif : header (~60px) + 3 items (~120px) + padding
                 const windowHeight = window.innerHeight;
-                const buttonCenterY = rect.top + rect.height / 2;
+                const buttonTop = rect.top;
+                const buttonBottom = rect.bottom;
                 
-                // Vérifier si le menu dépasse en bas de l'écran
-                const menuBottomIfCentered = buttonCenterY + menuHeight / 2;
-                const shouldPositionAbove = menuBottomIfCentered > windowHeight - 20; // 20px de marge
+                // Calculer les positions possibles
+                const spaceAbove = buttonTop;
+                const spaceBelow = windowHeight - buttonBottom;
+                const menuTopIfAbove = buttonTop - menuHeight - 8; // 8px d'espace
+                const menuTopIfBelow = buttonBottom + 8; // 8px d'espace
                 
                 let top: number;
+                let transform: string;
                 
-                if (shouldPositionAbove) {
-                  // Positionner le menu au-dessus du bouton
-                  top = rect.top - menuHeight - 8; // 8px d'espace entre le bouton et le menu
+                // Déterminer la meilleure position pour garder le menu visible
+                if (menuTopIfAbove >= 0 && spaceAbove >= menuHeight) {
+                  // Assez d'espace au-dessus : positionner au-dessus
+                  top = menuTopIfAbove;
+                  transform = 'none';
+                } else if (spaceBelow >= menuHeight) {
+                  // Assez d'espace en dessous : positionner en dessous
+                  top = menuTopIfBelow;
+                  transform = 'none';
+                } else if (spaceAbove >= spaceBelow) {
+                  // Plus d'espace au-dessus : positionner au-dessus même si ça dépasse un peu
+                  top = Math.max(8, buttonTop - menuHeight - 8); // Minimum 8px du haut
+                  transform = 'none';
                 } else {
-                  // Centrer le menu verticalement
-                  top = buttonCenterY;
+                  // Plus d'espace en dessous : positionner en dessous même si ça dépasse un peu
+                  top = Math.min(windowHeight - menuHeight - 8, menuTopIfBelow); // Maximum jusqu'au bas
+                  transform = 'none';
                 }
                 
-                setMenuPosition({
+                // Définir la position et ouvrir le menu en même temps
+                const newPosition = {
                   top,
                   left: rect.left + sidebarWidth + 16,
-                  transform: shouldPositionAbove ? 'none' : 'translateY(-50%)',
+                  transform,
+                };
+                
+                logger.debug('[Sidebar] Opening profile menu with position:', newPosition);
+                
+                // Marquer que le menu vient d'être ouvert
+                menuJustOpenedRef.current = true;
+                
+                // Utiliser requestAnimationFrame pour s'assurer que le state est mis à jour
+                requestAnimationFrame(() => {
+                  setMenuPosition(newPosition);
+                  setShowProfileMenu(true);
+                  
+                  // Réinitialiser les flags après un délai pour laisser le menu s'afficher
+                  setTimeout(() => {
+                    isOpeningMenuRef.current = false;
+                    menuJustOpenedRef.current = false;
+                    logger.debug('[Sidebar] Menu opening flags reset');
+                  }, 1000);
                 });
               }
-              setShowProfileMenu(!showProfileMenu);
             }}
             onMouseDown={(e) => {
               e.stopPropagation(); // Empêcher la propagation du mousedown
@@ -962,8 +1068,17 @@ export default function Sidebar() {
             )}
           </button>
 
-          {showProfileMenu && menuPosition && (
-            <div ref={profileDropdownRef} style={profileMenuStyle}>
+          {typeof window !== 'undefined' && showProfileMenu && menuPosition && createPortal(
+            <div 
+              ref={profileDropdownRef} 
+              style={profileMenuStyle}
+              onClick={(e) => {
+                e.stopPropagation(); // Empêcher la fermeture quand on clique dans le menu
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation(); // Empêcher aussi le mousedown
+              }}
+            >
               <div style={profileMenuHeaderStyle}>
                 <div style={profileMenuUserNameStyle}>{getUserName()}</div>
                 <div style={profileMenuUserEmailStyle}>{user?.email || ''}</div>
@@ -979,7 +1094,7 @@ export default function Sidebar() {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <span>Mon profil</span>
+                <span>{t('sidebar.profile.myProfile')}</span>
               </Link>
               <Link
                 href="/settings"
@@ -992,7 +1107,7 @@ export default function Sidebar() {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <span>Paramètres</span>
+                <span>{t('sidebar.profile.settings')}</span>
               </Link>
               <div style={profileMenuDividerStyle} />
               <button
@@ -1008,9 +1123,10 @@ export default function Sidebar() {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <span>Déconnexion</span>
+                <span>{t('sidebar.profile.logout')}</span>
               </button>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ErrorModalsProvider } from '@/components/error/ErrorModalsProvider'
 import { ThemeProvider } from '@/components/ThemeProvider'
+import { LanguageProvider } from '@/components/LanguageProvider'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -33,11 +34,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <ErrorModalsProvider>
-            {children}
-          </ErrorModalsProvider>
-        </ThemeProvider>
+        <LanguageProvider>
+          <ThemeProvider>
+            <ErrorModalsProvider>
+              {children}
+            </ErrorModalsProvider>
+          </ThemeProvider>
+        </LanguageProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   )

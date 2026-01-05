@@ -48,8 +48,9 @@ PROJET_CHRONO/
 - Node.js ≥ 18
 - npm ou yarn
 - PostgreSQL 14+ ou Supabase
+- Redis (optionnel, recommandé pour production - scaling Socket.IO)
 - Expo CLI (pour les apps mobiles)
-- Google Maps API key
+- Google Maps API key (avec APIs activées : Maps JavaScript API, Places API, Geocoding API)
 - Compte Supabase (recommandé)
 
 ---
@@ -95,10 +96,12 @@ cp chrono_backend/.env.example chrono_backend/.env
 
 Variables clés :
 
-- `DATABASE_URL`
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-- `JWT_SECRET`
-- `EMAIL_*`, `VONAGE_*` (optionnel)
+- `DATABASE_URL` - URL de connexion PostgreSQL
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` - Configuration Supabase
+- `JWT_SECRET` - Secret pour les tokens JWT
+- `REDIS_URL` - (Optionnel) URL Redis pour scaling Socket.IO
+- `EMAIL_*`, `VONAGE_*` - (Optionnel) Configuration email/SMS
+- `SENTRY_DSN` - (Optionnel) Monitoring d'erreurs Sentry
 
 #### Dashboard admin (`admin_chrono/.env.local`)
 
@@ -139,6 +142,7 @@ Variables clés :
 # Backend
 cd chrono_backend
 npm run dev          # http://localhost:4000
+# Documentation API Swagger : http://localhost:4000/api-docs
 
 # Dashboard admin
 cd admin_chrono
@@ -205,28 +209,159 @@ app_chrono/
 
 ---
 
-## 🔌 Documentation API (extraits)
+## 🔌 Documentation API
 
-### Auth
+> **Note :** Le backend expose une documentation Swagger interactive. Une fois le backend démarré, accédez à `/api-docs` pour explorer toutes les routes disponibles avec leurs paramètres et réponses.
 
-- `POST /api/auth-simple/send-otp`
-- `POST /api/auth-simple/verify-otp`
-- `GET /api/auth-simple/check/:email`
+### Auth (`/api/auth-simple/*`)
 
-### Commandes
+### Auth (`/api/auth-simple/*`)
 
-- Socket `create-order`, `accept-order`, `update-order-status`
+- `POST /api/auth-simple/send-otp` - Envoi d'un code OTP
+- `POST /api/auth-simple/verify-otp` - Vérification du code OTP
+- `GET /api/auth-simple/check/:email` - Vérifier si un utilisateur existe
+- `POST /api/auth-simple/register` - Inscription
+- `POST /api/auth-simple/login` - Connexion
+- `POST /api/auth-simple/refresh-token` - Rafraîchir le token
+- `GET /api/auth-simple/users/:userId/profile` - Profil utilisateur
+- `PUT /api/auth-simple/users/:userId/profile` - Mettre à jour le profil
+- `POST /api/auth-simple/users/:userId/avatar` - Upload avatar
 
-### Chauffeurs
+### Commandes (`/api/deliveries/*`)
 
-- `GET /api/drivers/nearby`
-- `POST /api/drivers/update-location`
+- `POST /api/deliveries/` - Créer une commande
+- `GET /api/deliveries/:userId` - Liste des commandes utilisateur
+- `GET /api/deliveries/:userId/statistics` - Statistiques utilisateur
+- `POST /api/deliveries/:orderId/cancel` - Annuler une commande
+- `POST /api/deliveries/:orderId/status` - Mettre à jour le statut
+- `POST /api/deliveries/:orderId/proof` - Upload preuve de livraison
 
-### WebSocket (Server → Client)
+### Chauffeurs (`/api/drivers/*`)
 
-- `order:status:update`
-- `driver:location:update`
-- `new-order-request`
+- `GET /api/drivers/online` - Liste des chauffeurs en ligne
+- `GET /api/drivers/:driverId/details` - Détails d'un chauffeur
+- `PUT /api/drivers/:userId/status` - Mettre à jour le statut (online/offline)
+- `GET /api/drivers/:userId/revenues` - Revenus du chauffeur
+- `GET /api/drivers/:userId/statistics` - Statistiques du chauffeur
+- `GET /api/drivers/:userId/work-time` - Temps de travail
+- `PUT /api/drivers/:userId/vehicle` - Mettre à jour le véhicule
+- `PUT /api/drivers/:userId/driver-type` - Changer le type (partenaire/interne)
+
+### Admin (`/api/admin/*`)
+
+- `GET /api/admin/dashboard-stats` - Statistiques du dashboard
+- `GET /api/admin/delivery-analytics` - Analytics de livraison
+- `GET /api/admin/recent-activities` - Activités récentes
+- `GET /api/admin/ongoing-deliveries` - Livraisons en cours
+- `GET /api/admin/orders` - Liste des commandes (filtrées par statut)
+- `POST /api/admin/orders` - Créer une commande admin
+- `POST /api/admin/orders/:orderId/cancel` - Annuler une commande
+- `GET /api/admin/users` - Liste des utilisateurs
+- `GET /api/admin/drivers` - Liste des chauffeurs
+- `GET /api/admin/drivers/:driverId` - Détails complets d'un chauffeur
+- `PUT /api/admin/drivers/:driverId/status` - Modifier le statut d'un chauffeur
+- `POST /api/admin/drivers/:driverId/commission/recharge` - Recharger commission
+- `PUT /api/admin/drivers/:driverId/commission/suspend` - Suspendre commission
+- `PUT /api/admin/drivers/:driverId/commission/rate` - Modifier taux commission
+- `GET /api/admin/drivers/:driverId/commission/transactions` - Historique commission
+- `GET /api/admin/financial-stats` - Statistiques financières
+- `GET /api/admin/transactions` - Transactions
+- `GET /api/admin/reports/deliveries` - Rapport livraisons
+- `GET /api/admin/reports/revenues` - Rapport revenus
+- `GET /api/admin/reports/clients` - Rapport clients
+- `GET /api/admin/reports/drivers` - Rapport chauffeurs
+- `GET /api/admin/reports/payments` - Rapport paiements
+- `GET /api/admin/ratings` - Liste des évaluations
+- `DELETE /api/admin/ratings/:ratingId` - Supprimer une évaluation
+- `GET /api/admin/promo-codes` - Liste des codes promo
+- `POST /api/admin/promo-codes` - Créer un code promo
+- `GET /api/admin/disputes` - Liste des réclamations
+- `PUT /api/admin/disputes/:disputeId` - Mettre à jour une réclamation
+- `GET /api/admin/search` - Recherche globale
+
+### Paiements (`/api/payments/*`)
+
+- `POST /api/payments/methods` - Créer une méthode de paiement
+- `GET /api/payments/methods` - Liste des méthodes de paiement
+- `POST /api/payments/calculate-price` - Calculer le prix
+- `POST /api/payments/initiate` - Initier un paiement
+- `GET /api/payments/transactions` - Liste des transactions
+- `GET /api/payments/transactions/:transactionId` - Détails transaction
+- `POST /api/payments/disputes` - Créer une réclamation
+- `GET /api/payments/deferred/limits` - Limites paiement différé
+- `GET /api/payments/deferred/debts` - Dettes différées
+
+### Messagerie (`/api/messages/*`)
+
+- `GET /api/messages/conversations` - Liste des conversations
+- `GET /api/messages/conversations/:conversationId` - Détails conversation
+- `POST /api/messages/conversations` - Créer une conversation
+- `GET /api/messages/conversations/:conversationId/messages` - Messages
+- `POST /api/messages/conversations/:conversationId/messages` - Envoyer message
+- `PUT /api/messages/conversations/:conversationId/read` - Marquer comme lu
+- `GET /api/messages/unread-count` - Nombre de messages non lus
+
+### QR Codes (`/api/qr-codes/*`)
+
+- `POST /api/qr-codes/orders/:orderId/qr-codes/generate` - Générer QR code
+- `GET /api/qr-codes/orders/:orderId/qr-codes` - Récupérer QR code
+- `GET /api/qr-codes/orders/:orderId/qr-codes/scans` - Historique scans
+- `POST /api/qr-codes/qr-codes/scan` - Scanner un QR code
+
+### Commissions (`/api/commissions/*`)
+
+- `GET /api/commissions/:userId/balance` - Solde commission
+- `GET /api/commissions/:userId/transactions` - Transactions commission
+- `POST /api/commissions/:userId/recharge` - Recharger commission
+
+### Gamification (`/api/gamification/*`)
+
+- `GET /api/gamification/badges/:driverId` - Badges d'un chauffeur
+- `POST /api/gamification/badges/:driverId/check` - Vérifier badges
+- `GET /api/gamification/leaderboard` - Classement
+- `GET /api/gamification/score/:driverId` - Score d'un chauffeur
+
+### Analytics (`/api/analytics/*`)
+
+- `GET /api/analytics/kpis` - KPIs en temps réel
+- `GET /api/analytics/performance` - Données de performance
+- `GET /api/analytics/export` - Exporter analytics
+
+### Support (`/api/support/*`)
+
+- `GET /api/support/faq` - Recherche FAQ
+- `POST /api/support/tickets` - Créer un ticket
+- `GET /api/support/tickets` - Liste des tickets
+
+### Météo (`/api/weather/*`)
+
+- `GET /api/weather/:latitude/:longitude` - Données météo
+
+### Multi-livraison (`/api/multi-delivery/*`)
+
+- `POST /api/multi-delivery/optimize` - Optimiser route
+- `GET /api/multi-delivery/zones` - Zones avec commandes
+
+### Prévision de demande (`/api/demand-forecast/*`)
+
+- `GET /api/demand-forecast/demand` - Prévision demande
+- `GET /api/demand-forecast/peaks` - Heures de pointe
+- `GET /api/demand-forecast/recommendations` - Recommandations zones
+
+### WebSocket Events
+
+**Client → Server:**
+- `create-order` - Créer une commande
+- `accept-order` - Accepter une commande
+- `update-order-status` - Mettre à jour le statut
+- `update-location` - Mettre à jour la position
+
+**Server → Client:**
+- `order:status:update` - Mise à jour statut commande
+- `driver:location:update` - Mise à jour position chauffeur
+- `new-order-request` - Nouvelle demande de commande
+- `order:accepted` - Commande acceptée
+- `order:cancelled` - Commande annulée
 
 ---
 
@@ -234,27 +369,46 @@ app_chrono/
 
 ### Backend
 
-- Node.js / Express
-- Socket.IO
-- PostgreSQL / Supabase
-- JWT, Joi, Winston, Nodemailer
+- **Runtime:** Node.js / Express 5
+- **WebSocket:** Socket.IO avec Redis Adapter (scaling)
+- **Base de données:** PostgreSQL / Supabase
+- **Authentification:** JWT, Supabase Auth
+- **Validation:** Joi
+- **Logging:** Winston
+- **Email:** Nodemailer, Resend
+- **SMS:** Vonage
+- **Monitoring:** Sentry
+- **Documentation API:** Swagger
+- **QR Codes:** qrcode
+- **Cache:** Redis (optionnel)
+- **Sécurité:** Helmet, CORS, Rate Limiting, Brute Force Protection
 
 ### Dashboard (`admin_chrono`)
 
-- Next.js 16 (App Router)
-- React Query + Zustand
-- Socket.IO client
-- Google Maps JS API
-- Content Security Policy (CSP) configuré dynamiquement
+- **Framework:** Next.js 16 (App Router)
+- **State Management:** React Query (TanStack Query) + Zustand
+- **WebSocket:** Socket.IO client
+- **Cartes:** Google Maps JS API
+- **Graphiques:** Recharts
+- **Export:** jsPDF, xlsx
+- **Animations:** Framer Motion
+- **UI:** Tailwind CSS 4, Lucide React
+- **Sécurité:** Content Security Policy (CSP) configuré dynamiquement
+- **Authentification:** Supabase Auth Helpers
 
 ### Apps mobiles
 
-- Expo + React Native
-- Expo Router
-- Zustand
-- Socket.IO client
-- React Native Maps
-- Expo Barcode Scanner (nécessite développement build pour `driver_chrono`)
+- **Framework:** Expo ~54, React Native 0.81
+- **Routing:** Expo Router 6
+- **State Management:** Zustand
+- **WebSocket:** Socket.IO client
+- **Cartes:** React Native Maps
+- **Scanner:** Expo Barcode Scanner (nécessite développement build pour `driver_chrono`)
+- **Localisation:** Expo Location
+- **Monitoring:** Sentry React Native
+- **Stockage:** AsyncStorage
+- **Images:** Expo Image
+- **Animations:** React Native Reanimated, Worklets
 
 ---
 
@@ -262,18 +416,32 @@ app_chrono/
 
 ```bash
 # Backend
-npm run dev
-npm run simulate
+npm run dev              # Développement
+npm run build            # Build production
+npm run start            # Production
+npm run simulate         # Simuler un flux de livraison
+npm run test             # Tests
+npm run test:coverage    # Tests avec couverture
+npm run backup:postgres  # Backup PostgreSQL
+npm run backup:supabase  # Backup Supabase
+npm run backup:all       # Backup complet
+npm run recovery:list    # Lister les backups
+npm run recovery:restore # Restaurer un backup
 
 # Dashboard admin
-npm run dev
-npm run lint
+npm run dev              # Développement
+npm run build            # Build production
+npm run start            # Production
+npm run lint             # Linter
+npm run create-admin     # Créer un admin
+npm run create-avatars-bucket # Créer bucket avatars
 
 # Apps mobiles
-npm start
-npm run android
-npm run ios
-npm run lint
+npm start                # Démarrer Expo
+npm run android          # Build Android
+npm run ios              # Build iOS
+npm run lint             # Linter
+npm run update-ip        # Mettre à jour l'IP dans .env
 ```
 
 ---
@@ -282,30 +450,81 @@ npm run lint
 
 ### Dashboard Admin (`admin_chrono`)
 
-- 📊 Tableau de bord avec statistiques en temps réel
-- 🗺️ Suivi des livraisons en direct sur carte Google Maps
-- 👥 Gestion des chauffeurs et clients
-- 📈 Analytics et rapports
-- 💬 Système de messagerie intégré
-- 🔐 Authentification sécurisée avec Supabase
+- 📊 **Tableau de bord** avec statistiques en temps réel (KPIs, revenus, livraisons)
+- 🗺️ **Suivi des livraisons** en direct sur carte Google Maps
+- 👥 **Gestion des utilisateurs** :
+  - `/users` - Vue globale de tous les utilisateurs (clients, livreurs, admins)
+    - Gestion administrative (création, modification, suppression)
+    - Recherche globale par nom, email, téléphone
+    - Filtres par rôle
+  - `/drivers` - Vue spécialisée pour les livreurs avec gestion opérationnelle
+    - Distinction Partenaire/Interne avec badges visuels
+    - Gestion des soldes commission avec alertes (vert/orange/rouge)
+    - Statut opérationnel (Actif/Suspendu selon solde)
+    - Statistiques de performance (livraisons, rating)
+    - Recharge et suspension des commissions
+    - Rafraîchissement automatique toutes les 30 secondes
+  - **Note :** Voir `admin_chrono/docs/DIFFERENCE_USERS_VS_DRIVERS.md` pour plus de détails
+- 📈 **Analytics** (`/analytics`) - Analyses détaillées et KPIs
+- 📋 **Rapports** (`/reports`) - Rapports exportables (livraisons, revenus, clients, chauffeurs, paiements)
+- 💰 **Finances** (`/finances`, `/commissions`) :
+  - Transactions clients
+  - Commissions livreurs
+  - Statistiques financières
+- 💬 **Messagerie** (`/message`) - Système de messagerie intégré
+- ⭐ **Évaluations** (`/ratings`) - Gestion des notes et avis
+- 🎁 **Codes promo** (`/promo-codes`) - Création et gestion
+- ⚠️ **Réclamations** (`/disputes`) - Gestion des réclamations
+- 📅 **Planning** (`/planning`) - Planification des livraisons
+- 🏆 **Gamification** (`/gamification`) - Performance et classements
+- 🔐 **Authentification** sécurisée avec Supabase (rôles admin/super_admin)
+- ⚙️ **Paramètres** (`/settings`) - Configuration système
+- 👤 **Profil** (`/profile`) - Gestion du profil admin
 
 ### App Client (`app_chrono`)
 
-- 📦 Création de commandes de livraison
-- 🗺️ Suivi en temps réel de la livraison
-- 💳 Paiement intégré (Orange Money, Wave, Cash, Paiement différé)
-- 💬 Messagerie avec le chauffeur
-- ⭐ Système d'évaluation
-- 📍 Géolocalisation automatique
+- 📦 **Création de commandes** de livraison avec géolocalisation automatique
+- 🗺️ **Suivi en temps réel** de la livraison sur carte interactive
+- 💳 **Paiement intégré** :
+  - Orange Money
+  - Wave
+  - Cash
+  - Paiement différé (avec limites)
+- 💬 **Messagerie** avec le chauffeur en temps réel
+- ⭐ **Système d'évaluation** après chaque livraison
+- 📍 **Géolocalisation** automatique pour adresses pickup/delivery
+- 📱 **Historique des commandes** avec statuts détaillés
+- 🎁 **Points de fidélité** et récompenses
+- 💰 **Méthodes de paiement** sauvegardées
+- 🔔 **Notifications** en temps réel
+- 📊 **Statistiques personnelles** (commandes, dépenses)
 
 ### App Driver (`driver_chrono`)
 
-- 📱 Acceptation/refus de commandes
-- 🗺️ Navigation avec carte interactive
-- 📸 Scanner QR code pour validation (nécessite développement build)
-- 💬 Messagerie avec les clients
-- 📊 Statistiques personnelles
-- 📍 Partage de position en temps réel
+- 📱 **Acceptation/refus de commandes** avec notifications en temps réel
+- 🗺️ **Navigation** avec carte interactive et calcul d'ETA
+- 📸 **Scanner QR code** pour validation de livraison (nécessite développement build)
+- 💬 **Messagerie** avec les clients en temps réel
+- 📊 **Statistiques personnelles** :
+  - Livraisons du jour
+  - Revenus totaux
+  - Note moyenne
+  - Temps de travail
+- 💰 **Revenus** (`/revenus`) :
+  - Revenus par période (jour, semaine, mois, tout)
+  - Revenus par méthode de livraison (moto, véhicule, cargo)
+  - Historique détaillé des commandes
+  - Statistiques de distance
+- 📍 **Partage de position** en temps réel avec mise à jour automatique
+- 🚗 **Gestion du véhicule** (type, informations)
+- 🔄 **Statut online/offline** avec toggle
+- 🎯 **Géofencing** pour détection d'arrivée
+- 🌤️ **Météo** intégrée pour planification
+- 🏆 **Gamification** : badges, classements, scores
+- 💳 **Commissions** (pour partenaires) :
+  - Solde commission
+  - Historique des transactions
+  - Recharges
 
 ## 🔧 Améliorations récentes
 
@@ -316,6 +535,13 @@ npm run lint
 3. **Protection contre les crashes** - Gestion améliorée des appels multiples à `createOrder()`
 4. **Nettoyage des sockets** - Prévention des listeners dupliqués
 5. **Scanner QR code** - Gestion gracieuse de l'absence du module natif
+6. **Système de commissions** - Gestion complète pour livreurs partenaires
+7. **Gamification** - Badges, classements et scores pour les chauffeurs
+8. **Analytics avancés** - KPIs en temps réel et rapports exportables
+9. **Multi-livraison** - Optimisation de routes pour plusieurs commandes
+10. **Prévision de demande** - Analyse des heures de pointe et recommandations
+11. **Support client** - Système de tickets et FAQ
+12. **Météo intégrée** - Données météo pour planification des livraisons
 
 ## 🧪 Tests
 
@@ -433,12 +659,16 @@ PROJET_CHRONO/
 ├── docs/
 │   └── ENV_VARIABLES_GUIDE.md          # Guide des variables d'environnement
 ├── admin_chrono/docs/
-│   └── GOOGLE_MAPS_BILLING_FIX.md
+│   ├── GOOGLE_MAPS_BILLING_FIX.md      # Résolution erreurs Google Maps
+│   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers
+│   ├── NOTIFICATIONS_BEHAVIOR.md       # Comportement des notifications
+│   └── PROPOSITION_GESTION_LIVREURS_PARTENAIRES.md
 ├── driver_chrono/docs/
-│   └── TROUBLESHOOTING.md
+│   └── TROUBLESHOOTING.md              # Dépannage app chauffeur
 └── chrono_backend/docs/
     ├── SCALING_SETUP.md                # Configuration Redis et PostgreSQL Pool
-    └── BACKUP_RECOVERY.md
+    ├── BACKUP_RECOVERY.md              # Backup et restauration
+    └── SWAGGER_ADDITIONS.md            # Documentation Swagger
 ```
 
 ## 📚 Ressources

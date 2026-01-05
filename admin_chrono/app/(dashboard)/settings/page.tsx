@@ -2,11 +2,15 @@
 
 import React, { useState } from 'react'
 import { ScreenTransition } from '@/components/animations'
-import { Bell, Shield, Palette, Database, Sun, Moon } from 'lucide-react'
+import { Bell, Shield, Palette, Database, Sun, Moon, Languages } from 'lucide-react'
 import { useThemeStore } from '@/stores/themeStore'
+import { useLanguageStore } from '@/stores/languageStore'
+import { useTranslation } from '@/hooks/useTranslation'
 
 export default function SettingsPage() {
   const { theme, toggleTheme } = useThemeStore()
+  const { language, setLanguage } = useLanguageStore()
+  const t = useTranslation()
   const [mounted] = useState(() => typeof window !== 'undefined')
 
   const containerStyle: React.CSSProperties = {
@@ -115,6 +119,36 @@ export default function SettingsPage() {
     justifyContent: 'center',
   }
 
+  const languageToggleButtonStyle: React.CSSProperties = {
+    position: 'relative',
+    width: '56px',
+    height: '32px',
+    borderRadius: '16px',
+    backgroundColor: language === 'en' ? '#8B5CF6' : '#9CA3AF',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s ease',
+    outline: 'none',
+  }
+
+  const languageToggleThumbStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '4px',
+    left: language === 'en' ? '28px' : '4px',
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    backgroundColor: '#FFFFFF',
+    transition: 'left 0.3s ease',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '10px',
+    fontWeight: 600,
+    color: language === 'en' ? '#8B5CF6' : '#9CA3AF',
+  }
+
   if (!mounted) {
     return null
   }
@@ -123,42 +157,42 @@ export default function SettingsPage() {
     <ScreenTransition direction="fade" duration={0.3}>
       <div style={containerStyle}>
         <div style={headerStyle}>
-          <h1 style={titleStyle}>Paramètres</h1>
-          <p style={subtitleStyle}>Gérez les paramètres de l&apos;application</p>
+          <h1 style={titleStyle}>{t('settings.title')}</h1>
+          <p style={subtitleStyle}>{t('settings.subtitle')}</p>
         </div>
 
         {/* Notifications */}
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>
             <Bell size={24} style={{ color: '#8B5CF6' }} />
-            Notifications
+            {t('settings.notifications.title')}
           </h2>
           <div style={settingItemStyle}>
             <div>
-              <div style={settingLabelStyle}>Notifications par email</div>
+              <div style={settingLabelStyle}>{t('settings.notifications.email.label')}</div>
               <div style={settingDescriptionStyle}>
-                Recevez des notifications par email pour les événements importants
+                {t('settings.notifications.email.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
           </div>
           <div style={settingItemStyle}>
             <div>
-              <div style={settingLabelStyle}>Notifications push</div>
+              <div style={settingLabelStyle}>{t('settings.notifications.push.label')}</div>
               <div style={settingDescriptionStyle}>
-                Recevez des notifications en temps réel dans votre navigateur
+                {t('settings.notifications.push.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
           </div>
           <div style={settingItemLastStyle}>
             <div>
-              <div style={settingLabelStyle}>Notifications sonores</div>
+              <div style={settingLabelStyle}>{t('settings.notifications.sound.label')}</div>
               <div style={settingDescriptionStyle}>
-                Activez les sons pour les notifications importantes
+                {t('settings.notifications.sound.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
           </div>
         </div>
 
@@ -166,25 +200,25 @@ export default function SettingsPage() {
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>
             <Shield size={24} style={{ color: '#8B5CF6' }} />
-            Sécurité
+            {t('settings.security.title')}
           </h2>
           <div style={settingItemStyle}>
             <div>
-              <div style={settingLabelStyle}>Authentification à deux facteurs</div>
+              <div style={settingLabelStyle}>{t('settings.security.2fa.label')}</div>
               <div style={settingDescriptionStyle}>
-                Ajoutez une couche de sécurité supplémentaire à votre compte
+                {t('settings.security.2fa.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
           </div>
           <div style={settingItemLastStyle}>
             <div>
-              <div style={settingLabelStyle}>Historique de connexion</div>
+              <div style={settingLabelStyle}>{t('settings.security.history.label')}</div>
               <div style={settingDescriptionStyle}>
-                Consultez l&apos;historique de vos connexions récentes
+                {t('settings.security.history.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
           </div>
         </div>
 
@@ -192,22 +226,35 @@ export default function SettingsPage() {
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>
             <Palette size={24} style={{ color: '#8B5CF6' }} />
-            Préférences
+            {t('settings.preferences.title')}
           </h2>
           <div style={settingItemStyle}>
             <div>
-              <div style={settingLabelStyle}>Langue</div>
+              <div style={settingLabelStyle}>{t('settings.preferences.language.label')}</div>
               <div style={settingDescriptionStyle}>
-                Choisissez la langue de l&apos;interface
+                {t('settings.preferences.language.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={toggleContainerStyle}>
+              <Languages size={18} style={{ color: language === 'fr' ? '#8B5CF6' : 'var(--text-tertiary)' }} />
+              <button
+                type="button"
+                onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')}
+                style={languageToggleButtonStyle}
+                aria-label={`Switch to ${language === 'fr' ? 'English' : 'French'}`}
+              >
+                <div style={languageToggleThumbStyle}>
+                  {language === 'fr' ? 'FR' : 'EN'}
+                </div>
+              </button>
+              <Languages size={18} style={{ color: language === 'en' ? '#8B5CF6' : 'var(--text-tertiary)' }} />
+            </div>
           </div>
           <div style={settingItemStyle}>
             <div>
-              <div style={settingLabelStyle}>Thème</div>
+              <div style={settingLabelStyle}>{t('settings.preferences.theme.label')}</div>
               <div style={settingDescriptionStyle}>
-                Personnalisez l&apos;apparence de l&apos;application
+                {t('settings.preferences.theme.description')}
               </div>
             </div>
             <div style={toggleContainerStyle}>
@@ -216,7 +263,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={toggleTheme}
                 style={toggleButtonStyle}
-                aria-label={`Basculer vers le thème ${theme === 'light' ? 'sombre' : 'clair'}`}
+                aria-label={t('settings.preferences.theme.description')}
               >
                 <div style={toggleThumbStyle}>
                   {theme === 'dark' ? (
@@ -231,12 +278,12 @@ export default function SettingsPage() {
           </div>
           <div style={settingItemLastStyle}>
             <div>
-              <div style={settingLabelStyle}>Fuseau horaire</div>
+              <div style={settingLabelStyle}>{t('settings.preferences.timezone.label')}</div>
               <div style={settingDescriptionStyle}>
-                Définissez votre fuseau horaire
+                {t('settings.preferences.timezone.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
           </div>
         </div>
 
@@ -244,28 +291,29 @@ export default function SettingsPage() {
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>
             <Database size={24} style={{ color: '#8B5CF6' }} />
-            Système
+            {t('settings.system.title')}
           </h2>
           <div style={settingItemStyle}>
             <div>
-              <div style={settingLabelStyle}>Sauvegarde automatique</div>
+              <div style={settingLabelStyle}>{t('settings.system.backup.label')}</div>
               <div style={settingDescriptionStyle}>
-                Configurez les sauvegardes automatiques des données
+                {t('settings.system.backup.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
           </div>
           <div style={settingItemLastStyle}>
             <div>
-              <div style={settingLabelStyle}>Logs système</div>
+              <div style={settingLabelStyle}>{t('settings.system.logs.label')}</div>
               <div style={settingDescriptionStyle}>
-                Consultez les logs et les erreurs du système
+                {t('settings.system.logs.description')}
               </div>
             </div>
-            <div style={comingSoonStyle}>Bientôt disponible</div>
+            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
           </div>
         </div>
       </div>
     </ScreenTransition>
   )
 }
+

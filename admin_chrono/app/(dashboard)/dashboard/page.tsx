@@ -17,27 +17,28 @@ import type { Delivery } from '@/hooks/types'
 import NewShippingModal from '@/components/orders/NewShippingModal'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 export default function DashboardPage() {
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   const [isNewShippingModalOpen, setIsNewShippingModalOpen] = useState(false)
-  
+  const t = useTranslation()
 
   const getPeriodLabel = () => {
     switch (dateFilter) {
       case 'today':
-        return "Aujourd'hui"
+        return t('header.dateFilter.today')
       case 'thisWeek':
-        return 'Cette semaine'
+        return t('header.dateFilter.thisWeek')
       case 'thisMonth':
-        return 'Ce mois'
+        return t('header.dateFilter.thisMonth')
       case 'lastMonth':
-        return 'Mois dernier'
+        return t('header.dateFilter.lastMonth')
       case 'all':
-        return 'Tout'
+        return t('header.dateFilter.all')
       default:
-        return 'Cette semaine'
+        return t('header.dateFilter.thisWeek')
     }
   }
   
@@ -272,27 +273,27 @@ export default function DashboardPage() {
         marginBottom: '16px',
       }}>
         <KPICard
-          title="Taux de satisfaction"
+          title={t('dashboard.kpis.satisfactionRate.title')}
           value={stats?.averageRating ? `${stats.averageRating.toFixed(1)} ⭐` : 'N/A'}
           change={0}
-          subtitle={statsLoading ? 'Chargement...' : `${stats?.totalRatings || 0} évaluations`}
+          subtitle={statsLoading ? t('common.loading') : `${stats?.totalRatings || 0} ${t('dashboard.kpis.satisfactionRate.subtitle')}`}
           icon={Star}
           iconColor="text-yellow-600"
           isLoading={statsLoading}
           index={0}
         />
         <KPICard
-          title="Temps moyen"
+          title={t('dashboard.kpis.averageTime.title')}
           value={stats?.averageDeliveryTime ? `${stats.averageDeliveryTime} min` : 'N/A'}
           change={0}
-          subtitle="Temps de livraison"
+          subtitle={t('dashboard.kpis.averageTime.subtitle')}
           icon={Clock}
           iconColor="text-blue-600"
           isLoading={statsLoading}
           index={1}
         />
           <KPICard
-            title="Taux d'annulation"
+            title={t('dashboard.kpis.cancellationRate.title')}
             value={stats?.cancellationRate ? `${stats.cancellationRate.toFixed(1)}%` : '0%'}
             change={0}
             subtitle={getPeriodLabel()}
@@ -302,7 +303,7 @@ export default function DashboardPage() {
             index={2}
           />
           <KPICard
-            title="Clients actifs"
+            title={t('dashboard.kpis.activeClients.title')}
             value={stats?.activeClients || 0}
             change={0}
             subtitle={getPeriodLabel()}
@@ -312,7 +313,7 @@ export default function DashboardPage() {
             index={3}
           />
           <KPICard
-            title="Drivers actifs"
+            title={t('dashboard.kpis.activeDrivers.title')}
             value={stats?.activeDrivers || 0}
             change={0}
             subtitle={getPeriodLabel()}
@@ -327,15 +328,15 @@ export default function DashboardPage() {
         {/* Colonne gauche : 3 cartes KPI empilées */}
         <div style={leftColumnStyle}>
           <KPICard
-            title="On Delivery"
+            title={t('dashboard.kpis.onDelivery.title')}
           value={ongoingDeliveriesLoading ? '...' : liveOnDeliveryCount}
           change={stats?.onDeliveryChange || 0}
           subtitle={
             ongoingDeliveriesLoading
-              ? 'Mise à jour...'
+              ? t('dashboard.kpis.onDelivery.updating')
               : liveOnDeliveryCount === 1
-                ? '1 livraison en cours'
-                : `${liveOnDeliveryCount} livraisons en cours`
+                ? `1 ${t('dashboard.kpis.onDelivery.subtitle')}`
+                : `${liveOnDeliveryCount} ${t('dashboard.kpis.onDelivery.subtitle')}`
           }
             icon={Truck}
             iconColor="text-blue-600"
@@ -343,20 +344,20 @@ export default function DashboardPage() {
             index={0}
           />
           <KPICard
-            title="Success Deliveries"
+            title={t('dashboard.kpis.successDeliveries.title')}
             value={statsLoading ? '...' : stats?.successDeliveries || 0}
             change={stats?.successDeliveriesChange || 0}
-            subtitle="Since last week"
+            subtitle={t('dashboard.kpis.successDeliveries.subtitle')}
             icon={ShieldCheck}
             iconColor="text-green-600"
             isLoading={statsLoading}
             index={1}
           />
           <KPICard
-            title="Revenue"
+            title={t('dashboard.kpis.revenue.title')}
             value={statsLoading ? '...' : formatRevenue(stats?.revenue || 0)}
             change={stats?.revenueChange || 0}
-            subtitle="Since last week"
+            subtitle={t('dashboard.kpis.revenue.subtitle')}
             icon={DollarSign}
             iconColor="text-purple-600"
             isLoading={statsLoading}

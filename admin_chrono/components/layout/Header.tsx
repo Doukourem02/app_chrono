@@ -10,6 +10,7 @@ import { useNotificationStore } from '@/stores/useNotificationStore'
 import { useNotifications } from '@/hooks/useNotifications'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface SearchOrder {
   id: string
@@ -60,6 +61,7 @@ interface SearchClient {
 export default function Header() {
   const router = useRouter()
   const { dateFilter, setDateFilter } = useDateFilter()
+  const t = useTranslation()
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [showSearchResults, setShowSearchResults] = useState(false)
@@ -112,22 +114,26 @@ export default function Header() {
   // Fermer les menus quand on clique en dehors
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowSearchResults(false)
-      }
-      if (filtersRef.current && !filtersRef.current.contains(event.target as Node)) {
-        setShowFilters(false)
-      }
-      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
-        setShowDatePicker(false)
-      }
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
-        setShowNotifications(false)
-      }
+      // Utiliser un petit délai pour laisser le onClick du bouton se déclencher en premier
+      setTimeout(() => {
+        if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+          setShowSearchResults(false)
+        }
+        if (filtersRef.current && !filtersRef.current.contains(event.target as Node)) {
+          setShowFilters(false)
+        }
+        if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+          setShowDatePicker(false)
+        }
+        if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+          setShowNotifications(false)
+        }
+      }, 0)
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    // Utiliser 'click' au lieu de 'mousedown' pour que le onClick du bouton se déclenche en premier
+    document.addEventListener('click', handleClickOutside, true)
+    return () => document.removeEventListener('click', handleClickOutside, true)
   }, [])
 
   const handleSearchResultClick = (type: 'order' | 'driver' | 'client', id?: string, orderStatus?: string) => {
@@ -181,23 +187,16 @@ export default function Header() {
   }
 
   const getStatusLabel = (status: string) => {
-    const statusMap: Record<string, string> = {
-      completed: 'Complété',
-      pending: 'En attente',
-      accepted: 'Accepté',
-      cancelled: 'Annulé',
-      enroute: 'En route',
-      picked_up: 'Récupéré',
-    }
-    return statusMap[status?.toLowerCase()] || status
+    const statusKey = status?.toLowerCase() || ''
+    return t(`header.searchResults.status.${statusKey}`) || status
   }
 
   const dateOptions: { value: DateFilterType; label: string }[] = [
-    { value: 'today', label: "Aujourd'hui" },
-    { value: 'thisWeek', label: 'Cette semaine' },
-    { value: 'thisMonth', label: 'Ce mois' },
-    { value: 'lastMonth', label: 'Mois dernier' },
-    { value: 'all', label: 'Tout' },
+    { value: 'today', label: t('header.dateFilter.today') },
+    { value: 'thisWeek', label: t('header.dateFilter.thisWeek') },
+    { value: 'thisMonth', label: t('header.dateFilter.thisMonth') },
+    { value: 'lastMonth', label: t('header.dateFilter.lastMonth') },
+    { value: 'all', label: t('header.dateFilter.all') },
   ]
 
   const headerStyle: React.CSSProperties = {
@@ -348,16 +347,16 @@ export default function Header() {
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
 
     if (diffInSeconds < 60) {
-      return 'À l\'instant'
+      return t('header.notifications.justNow')
     } else if (diffInSeconds < 3600) {
       const minutes = Math.floor(diffInSeconds / 60)
-      return `Il y a ${minutes} min`
+      return `${t('header.notifications.ago')} ${minutes} ${t('header.notifications.minutes')}`
     } else if (diffInSeconds < 86400) {
       const hours = Math.floor(diffInSeconds / 3600)
-      return `Il y a ${hours}h`
+      return `${t('header.notifications.ago')} ${hours}${t('header.notifications.hours')}`
     } else if (diffInSeconds < 604800) {
       const days = Math.floor(diffInSeconds / 86400)
-      return `Il y a ${days}j`
+      return `${t('header.notifications.ago')} ${days}${t('header.notifications.days')}`
     } else {
       return date.toLocaleDateString('fr-FR', {
         day: '2-digit',
@@ -422,7 +421,7 @@ export default function Header() {
             setQuery(e.target.value)
             setShowSearchResults(e.target.value.length > 2)
           }}
-          placeholder="Search orders, drivers, customers..."
+          placeholder={t('header.searchPlaceholder')}
           style={inputStyle}
           onFocus={(e) => {
             e.target.style.boxShadow = '0 0 0 2px rgba(139, 92, 246, 0.2)'
@@ -470,7 +469,7 @@ export default function Header() {
           <div style={searchResultsStyle}>
             {isSearching ? (
               <div style={{ padding: '24px', textAlign: 'center', color: themeColors.textSecondary }}>
-                Recherche en cours...
+                {t('header.searching')}
               </div>
             ) : searchResults?.data && (searchResults.data.orders.length > 0 || searchResults.data.drivers.length > 0 || searchResults.data.clients.length > 0) ? (
               <>
@@ -653,7 +652,7 @@ export default function Header() {
                             <Fragment key="orders">
                               {/* Commandes */}
                               <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
-                                COMMANDES ({searchResults.data?.orders?.length || 0})
+                                {t('header.searchResults.orders')} ({searchResults.data?.orders?.length || 0})
                               </div>
                               {((searchResults.data?.orders as SearchOrder[]) || []).map((order: SearchOrder) => (
                                 <div
@@ -696,9 +695,9 @@ export default function Header() {
                                     )}
                                     {(order.clientName || order.driverName) && (
                                       <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '4px' }}>
-                                        {order.clientName && `Client: ${order.clientName}`}
+                                        {order.clientName && `${t('header.searchResults.client')}: ${order.clientName}`}
                                         {order.clientName && order.driverName && ' • '}
-                                        {order.driverName && `Livreur: ${order.driverName}`}
+                                        {order.driverName && `${t('header.searchResults.driver')}: ${order.driverName}`}
                                       </div>
                                     )}
                                     <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
@@ -716,7 +715,7 @@ export default function Header() {
                             <Fragment key="drivers">
                               {/* Livreurs */}
                               <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
-                                LIVREURS ({searchResults.data?.drivers?.length || 0})
+                                {t('header.searchResults.drivers')} ({searchResults.data?.drivers?.length || 0})
                               </div>
                               {((searchResults.data?.drivers as SearchDriver[]) || []).map((driver: SearchDriver) => {
                                 const displayName = driver.fullName || driver.email
@@ -763,7 +762,7 @@ export default function Header() {
                                             flexShrink: 0,
                                           }}
                                         >
-                                          {driver.is_online ? 'En ligne' : 'Hors ligne'}
+                                          {driver.is_online ? t('header.searchResults.online') : t('header.searchResults.offline')}
                                         </span>
                                       </div>
                                       {driver.fullName && (
@@ -779,7 +778,7 @@ export default function Header() {
                                           {driver.vehicle_type_label} {driver.license_number ? `• ${driver.license_number}` : ''}
                                         </div>
                                         <div style={{ fontSize: '11px', color: themeColors.textTertiary }}>
-                                          ⭐ {driver.rating} ({driver.total_deliveries} livraisons)
+                                          ⭐ {driver.rating} ({driver.total_deliveries} {t('header.searchResults.deliveries')})
                                         </div>
                                         {driver.commission_balance && (
                                           <div style={{ fontSize: '11px', color: themeColors.purplePrimary, fontWeight: 600 }}>
@@ -788,7 +787,7 @@ export default function Header() {
                                         )}
                                       </div>
                                       <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
-                                        Inscrit le {driver.createdAt}
+                                        {t('header.searchResults.registeredOn')} {driver.createdAt}
                                       </div>
                                     </div>
                                   </div>
@@ -803,7 +802,7 @@ export default function Header() {
                             <Fragment key="clients">
                               {/* Clients */}
                               <div style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary, textTransform: 'uppercase', borderBottom: `1px solid ${themeColors.cardBorder}`, borderTop: categoryIndex > 0 ? `1px solid ${themeColors.cardBorder}` : 'none', marginTop: categoryIndex > 0 ? '8px' : '0' }}>
-                                CLIENTS ({searchResults.data?.clients?.length || 0})
+                                {t('header.searchResults.clients')} ({searchResults.data?.clients?.length || 0})
                               </div>
                               {((searchResults.data?.clients as SearchClient[]) || []).map((client: SearchClient) => {
                                 const displayName = client.fullName || client.email
@@ -837,7 +836,7 @@ export default function Header() {
                                             flexShrink: 0,
                                           }}
                                         >
-                                          Client
+                                          {t('header.searchResults.client')}
                                         </span>
                                       </div>
                                       {client.fullName && (
@@ -849,7 +848,7 @@ export default function Header() {
                                         {client.phone}
                                       </div>
                                       <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginTop: '2px' }}>
-                                        Inscrit le {client.createdAt}
+                                        {t('header.searchResults.registeredOn')} {client.createdAt}
                                       </div>
                                     </div>
                                   </div>
@@ -867,7 +866,7 @@ export default function Header() {
               </>
             ) : (
               <div style={{ padding: '24px', textAlign: 'center', color: themeColors.textSecondary }}>
-                Aucun résultat trouvé
+                {t('common.noResults')}
               </div>
             )}
           </div>
@@ -899,7 +898,7 @@ export default function Header() {
           {showFilters && (
             <div style={dropdownStyle}>
               <div style={{ padding: '12px', fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, borderBottom: `1px solid ${themeColors.cardBorder}`, marginBottom: '8px' }}>
-                Filtres
+                {t('header.filters.title')}
               </div>
               <div
                 style={dropdownItemStyle}
@@ -914,7 +913,7 @@ export default function Header() {
                   setShowFilters(false)
                 }}
               >
-                Commandes en cours
+                {t('header.filters.ongoingOrders')}
               </div>
               <div
                 style={dropdownItemStyle}
@@ -929,7 +928,7 @@ export default function Header() {
                   setShowFilters(false)
                 }}
               >
-                Commandes complétées
+                {t('header.filters.completedOrders')}
               </div>
               <div
                 style={dropdownItemStyle}
@@ -944,7 +943,7 @@ export default function Header() {
                   setShowFilters(false)
                 }}
               >
-                Livreurs actifs
+                {t('header.filters.activeDrivers')}
               </div>
             </div>
           )}
@@ -970,7 +969,7 @@ export default function Header() {
             }}
           >
             <span style={{ color: showDatePicker ? '#FFFFFF' : themeColors.textSecondary }}>
-              {dateOptions.find((opt) => opt.value === dateFilter)?.label || 'Ce mois'}
+              {dateOptions.find((opt) => opt.value === dateFilter)?.label || t('header.dateFilter.thisMonth')}
             </span>
             <ChevronDown size={16} style={{ color: showDatePicker ? '#FFFFFF' : themeColors.textSecondary }} />
           </button>
@@ -1032,7 +1031,7 @@ export default function Header() {
           {showNotifications && (
             <div style={{ ...dropdownStyle, minWidth: '360px', maxHeight: '500px', overflowY: 'auto', padding: 0 }}>
               <div style={{ padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary, borderBottom: `1px solid ${themeColors.cardBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: themeColors.cardBg, zIndex: 10 }}>
-                <span>Notifications {unreadCount > 0 && `(${unreadCount})`}</span>
+                <span>{t('header.notifications.title')} {unreadCount > 0 && `(${unreadCount})`}</span>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   {unreadCount > 0 && (
                     <button
@@ -1059,7 +1058,7 @@ export default function Header() {
                       }}
                     >
                       <CheckCheck size={14} />
-                      Tout marquer comme lu
+                      {t('header.notifications.markAllRead')}
                     </button>
                   )}
                   <button
@@ -1088,9 +1087,9 @@ export default function Header() {
               {notifications.length === 0 ? (
                 <div style={{ padding: '48px 24px', textAlign: 'center', color: themeColors.textSecondary }}>
                   <Bell size={48} style={{ color: themeColors.textTertiary, margin: '0 auto 16px', opacity: 0.5 }} />
-                  <div style={{ fontSize: '14px', fontWeight: 500 }}>Aucune notification</div>
+                  <div style={{ fontSize: '14px', fontWeight: 500 }}>{t('header.notifications.noNotifications')}</div>
                   <div style={{ fontSize: '12px', color: themeColors.textTertiary, marginTop: '4px' }}>
-                    Vous serez notifié des nouvelles activités
+                    {t('header.notifications.noNotificationsDesc')}
                   </div>
                 </div>
               ) : (

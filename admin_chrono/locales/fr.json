@@ -1,0 +1,207 @@
+{
+  "common": {
+    "search": "Rechercher",
+    "loading": "Chargement...",
+    "noResults": "Aucun résultat trouvé",
+    "error": "Erreur",
+    "success": "Succès",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "view": "Voir",
+    "close": "Fermer",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Précédent",
+    "confirm": "Confirmer",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "sidebar": {
+    "logo": "tracking",
+    "mainNav": {
+      "dashboard": "Dashboard",
+      "tracking": "Suivi des commandes",
+      "orders": "Commandes",
+      "message": "Messages"
+    },
+    "sections": {
+      "analyses": {
+        "title": "Analyses & Rapports",
+        "analytics": "Analytics",
+        "reports": "Rapports"
+      },
+      "finances": {
+        "title": "Finances",
+        "clientTransactions": "Transactions Clients",
+        "driverCommissions": "Commissions Livreurs"
+      },
+      "gestion": {
+        "title": "Gestion",
+        "users": "Utilisateurs",
+        "drivers": "Livreurs",
+        "performance": "Performance"
+      },
+      "administration": {
+        "title": "Administration",
+        "planning": "Planning",
+        "promoCodes": "Codes promo",
+        "disputes": "Réclamations",
+        "settings": "Paramètres"
+      }
+    },
+    "profile": {
+      "myProfile": "Mon profil",
+      "settings": "Paramètres",
+      "logout": "Déconnexion"
+    }
+  },
+  "header": {
+    "searchPlaceholder": "Rechercher commandes, livreurs, clients...",
+    "searching": "Recherche en cours...",
+    "filters": {
+      "title": "Filtres",
+      "ongoingOrders": "Commandes en cours",
+      "completedOrders": "Commandes complétées",
+      "activeDrivers": "Livreurs actifs"
+    },
+    "dateFilter": {
+      "today": "Aujourd'hui",
+      "thisWeek": "Cette semaine",
+      "thisMonth": "Ce mois",
+      "lastMonth": "Mois dernier",
+      "all": "Tout"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "markAllRead": "Tout marquer comme lu",
+      "noNotifications": "Aucune notification",
+      "noNotificationsDesc": "Vous serez notifié des nouvelles activités",
+      "ago": "Il y a",
+      "minutes": "min",
+      "hours": "h",
+      "days": "j",
+      "justNow": "À l'instant"
+    },
+    "searchResults": {
+      "orders": "COMMANDES",
+      "drivers": "LIVREURS",
+      "clients": "CLIENTS",
+      "status": {
+        "completed": "Complété",
+        "pending": "En attente",
+        "accepted": "Accepté",
+        "cancelled": "Annulé",
+        "enroute": "En route",
+        "picked_up": "Récupéré"
+      },
+      "client": "Client",
+      "driver": "Livreur",
+      "online": "En ligne",
+      "offline": "Hors ligne",
+      "deliveries": "livraisons",
+      "registeredOn": "Inscrit le"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "dateFormat": "dddd D MMMM YYYY",
+    "kpis": {
+      "satisfactionRate": {
+        "title": "Taux de satisfaction",
+        "subtitle": "évaluations"
+      },
+      "averageTime": {
+        "title": "Temps moyen",
+        "subtitle": "Temps de livraison"
+      },
+      "cancellationRate": {
+        "title": "Taux d'annulation",
+        "subtitle": "Commandes annulées"
+      },
+      "activeClients": {
+        "title": "Clients actifs",
+        "subtitle": "Clients ce mois"
+      },
+      "activeDrivers": {
+        "title": "Drivers actifs",
+        "subtitle": "Drivers ce mois"
+      },
+      "onDelivery": {
+        "title": "En livraison",
+        "subtitle": "livraisons en cours",
+        "updating": "Mise à jour..."
+      },
+      "successDeliveries": {
+        "title": "Livraisons réussies",
+        "subtitle": "Depuis la semaine dernière"
+      },
+      "revenue": {
+        "title": "Revenus",
+        "subtitle": "Depuis la semaine dernière"
+      }
+    }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "subtitle": "Gérez les paramètres de l'application",
+    "notifications": {
+      "title": "Notifications",
+      "email": {
+        "label": "Notifications par email",
+        "description": "Recevez des notifications par email pour les événements importants"
+      },
+      "push": {
+        "label": "Notifications push",
+        "description": "Recevez des notifications en temps réel dans votre navigateur"
+      },
+      "sound": {
+        "label": "Notifications sonores",
+        "description": "Activez les sons pour les notifications importantes"
+      }
+    },
+    "security": {
+      "title": "Sécurité",
+      "2fa": {
+        "label": "Authentification à deux facteurs",
+        "description": "Ajoutez une couche de sécurité supplémentaire à votre compte"
+      },
+      "history": {
+        "label": "Historique de connexion",
+        "description": "Consultez l'historique de vos connexions récentes"
+      }
+    },
+    "preferences": {
+      "title": "Préférences",
+      "language": {
+        "label": "Langue",
+        "description": "Choisissez la langue de l'interface",
+        "french": "Français",
+        "english": "Anglais"
+      },
+      "theme": {
+        "label": "Thème",
+        "description": "Personnalisez l'apparence de l'application",
+        "light": "Clair",
+        "dark": "Sombre"
+      },
+      "timezone": {
+        "label": "Fuseau horaire",
+        "description": "Définissez votre fuseau horaire"
+      }
+    },
+    "system": {
+      "title": "Système",
+      "backup": {
+        "label": "Sauvegarde automatique",
+        "description": "Configurez les sauvegardes automatiques des données"
+      },
+      "logs": {
+        "label": "Logs système",
+        "description": "Consultez les logs et les erreurs du système"
+      }
+    },
+    "comingSoon": "Bientôt disponible"
+  }
+}
