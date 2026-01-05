@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import { formatDeliveryId } from '../utils/formatDeliveryId.js';
 
 /**
  * GET /api/analytics/kpis
@@ -228,8 +229,33 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
+    // Helper pour gérer les erreurs de connexion DB
+    const safeQuery = async (query: string, params: any[] = []) => {
+      try {
+        return await pool.query(query, params);
+      } catch (dbError: any) {
+        const errorMessage = dbError?.message || (dbError instanceof Error ? dbError.message : String(dbError));
+        const errorCode = dbError?.code || dbError?.errno;
+        logger.error('Erreur requête SQL dans getPerformanceData:', {
+          code: errorCode,
+          message: errorMessage,
+          query: query.substring(0, 100)
+        });
+        // Si c'est une erreur de connexion/timeout, retourner des données vides
+        if (dbError.code === 'ENOTFOUND' || 
+            errorMessage?.includes('getaddrinfo') || 
+            dbError.code === 'ECONNREFUSED' ||
+            errorMessage?.includes('timeout') ||
+            errorMessage?.includes('Connection terminated')) {
+          logger.warn('Erreur connexion base de données, retour de données vides');
+          return { rows: [] };
+        }
+        throw dbError;
+      }
+    };
+
     // Détecter la colonne de prix (price_cfa ou price)
-    const priceColumnsInfo = await pool.query(
+    const priceColumnsInfo = await safeQuery(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -243,7 +269,7 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
     }
 
     // Données par jour
-    const dailyDataResult = await pool.query(
+    const dailyDataResult = await safeQuery(
       `SELECT 
         DATE(created_at) as date,
         COUNT(*) FILTER (WHERE status = 'completed') as completed,
@@ -257,7 +283,7 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
     );
 
     // Détecter la colonne pickup (pickup_address ou pickup JSON)
-    const pickupColumnsInfo = await pool.query(
+    const pickupColumnsInfo = await safeQuery(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -301,7 +327,7 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
     }
 
     // Données par zone
-    const zoneDataResult = await pool.query(
+    const zoneDataResult = await safeQuery(
       `SELECT 
         ${zoneCondition} as zone,
         COUNT(*) FILTER (WHERE status = 'completed') as completed,
@@ -316,7 +342,7 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
     // Évolution des ratings dans le temps
     let ratingTrend: Array<{ date: string; average: number; count: number }> = [];
     try {
-      const ratingsTableCheck = await pool.query(
+      const ratingsTableCheck = await safeQuery(
         `SELECT EXISTS (
           SELECT 1 FROM information_schema.tables 
           WHERE table_schema = 'public' AND table_name = 'ratings'
@@ -324,7 +350,7 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
       );
       
       if (ratingsTableCheck.rows[0]?.exists) {
-        const ratingTrendResult = await pool.query(
+        const ratingTrendResult = await safeQuery(
           `SELECT 
             DATE(created_at) as date,
             COALESCE(AVG(rating::numeric), 0) as average,
@@ -343,7 +369,8 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
         }));
       }
     } catch (ratingError: any) {
-      logger.warn('Erreur calcul évolution ratings:', ratingError);
+      const errorMessage = ratingError?.message || (ratingError instanceof Error ? ratingError.message : String(ratingError));
+      logger.warn('Erreur calcul évolution ratings:', { error: errorMessage, code: ratingError?.code });
     }
 
     res.json({
@@ -352,7 +379,13 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
       ratingTrend,
     });
   } catch (error: any) {
-    logger.error('Error getting performance data:', error);
+    const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
+    const errorCode = error?.code || error?.errno;
+    logger.error('Error getting performance data:', { 
+      error: errorMessage, 
+      code: errorCode,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     res.status(500).json({ error: 'Erreur serveur' });
   }
 };
@@ -363,13 +396,42 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
  */
 export const exportAnalytics = async (req: Request, res: Response): Promise<void> => {
   try {
+    logger.debug('[Export] Début export analytics', { format: req.query.format, days: req.query.days });
     const format = req.query.format as 'csv' | 'json' || 'json';
     const days = parseInt(req.query.days as string) || 30;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
+    // Helper pour gérer les erreurs de connexion DB
+    const safeQuery = async (query: string, params: any[] = []) => {
+      try {
+        logger.debug('[Export] Exécution requête SQL:', { query: query.substring(0, 100), paramsCount: params.length });
+        const result = await pool.query(query, params);
+        logger.debug('[Export] Requête SQL réussie, rows:', result.rows.length);
+        return result;
+      } catch (dbError: any) {
+        const errorMessage = dbError?.message || (dbError instanceof Error ? dbError.message : String(dbError));
+        const errorCode = dbError?.code || dbError?.errno;
+        logger.error('[Export] Erreur requête SQL dans exportAnalytics:', {
+          code: errorCode,
+          message: errorMessage,
+          query: query.substring(0, 100)
+        });
+        // Si c'est une erreur de connexion/timeout, retourner des données vides
+        if (dbError.code === 'ENOTFOUND' || 
+            errorMessage?.includes('getaddrinfo') || 
+            dbError.code === 'ECONNREFUSED' ||
+            errorMessage?.includes('timeout') ||
+            errorMessage?.includes('Connection terminated')) {
+          logger.warn('[Export] Erreur connexion base de données, retour de données vides');
+          return { rows: [] };
+        }
+        throw dbError;
+      }
+    };
+
     // Détecter la colonne de prix (price_cfa ou price)
-    const priceColumnsInfo = await pool.query(
+    const priceColumnsInfo = await safeQuery(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -378,10 +440,11 @@ export const exportAnalytics = async (req: Request, res: Response): Promise<void
     const priceColumnSet = new Set(priceColumnsInfo.rows.map((row: any) => row.column_name));
     const priceColumn = priceColumnSet.has('price_cfa') ? 'price_cfa' : priceColumnSet.has('price') ? 'price' : null;
 
-    const result = await pool.query(
+    logger.debug('[Export] Colonne de prix détectée:', priceColumn);
+
+    const result = await safeQuery(
       `SELECT 
         o.id,
-        o.order_number,
         o.status,
         ${priceColumn ? `o.${priceColumn}` : '0'} as price,
         o.created_at,
@@ -396,36 +459,68 @@ export const exportAnalytics = async (req: Request, res: Response): Promise<void
       [startDate]
     );
 
+    // Générer le deliveryId officiel (format: CHLV–YYMMDD-XXXX) et order_number (format: CMD-XXXXXXXX)
+    const formattedResults = result.rows.map((row: any) => {
+      const deliveryId = formatDeliveryId(row.id, row.created_at); // Format officiel CHLV–YYMMDD-XXXX
+      return {
+        ...row,
+        delivery_id: deliveryId, // Format officiel CHLV–YYMMDD-XXXX
+        id_livraison: deliveryId, // Alias pour plus de clarté
+        order_number: `CMD-${row.id.substring(0, 8).toUpperCase()}`, // Format simplifié pour compatibilité
+      };
+    });
+
+    logger.debug('[Export] Résultats récupérés:', { count: formattedResults.length, format });
+
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=analytics-${Date.now()}.csv`);
       
       // En-têtes CSV
-      const headers = ['ID', 'Numéro', 'Statut', 'Prix', 'Créé le', 'Complété le', 'Client', 'Livreur'];
+      const headers = ['ID', 'ID Livraison', 'Numéro Commande', 'Statut', 'Prix', 'Créé le', 'Complété le', 'Client', 'Livreur'];
       res.write(headers.join(',') + '\n');
       
-      // Données CSV
-      result.rows.forEach(row => {
+      // Données CSV - échapper les valeurs pour éviter les problèmes avec les virgules
+      formattedResults.forEach((row: any) => {
+        const escapeCSV = (value: any) => {
+          if (value === null || value === undefined) return '';
+          const str = String(value);
+          // Si la valeur contient une virgule, des guillemets ou un saut de ligne, l'entourer de guillemets
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
+
         const values = [
-          row.id,
-          row.order_number || '',
-          row.status || '',
-          row.price || 0,
-          row.created_at || '',
-          row.completed_at || '',
-          row.client_email || '',
-          row.driver_id || '',
+          escapeCSV(row.id),
+          escapeCSV(row.delivery_id), // Format officiel CHLV–YYMMDD-XXXX
+          escapeCSV(row.order_number), // Format simplifié CMD-XXXXXXXX
+          escapeCSV(row.status),
+          escapeCSV(row.price),
+          escapeCSV(row.created_at),
+          escapeCSV(row.completed_at),
+          escapeCSV(row.client_email),
+          escapeCSV(row.driver_id),
         ];
         res.write(values.join(',') + '\n');
       });
       
       res.end();
+      logger.debug('[Export] Fichier CSV envoyé');
     } else {
-      res.json({ data: result.rows });
+      res.json({ data: formattedResults });
+      logger.debug('[Export] Fichier JSON envoyé');
     }
   } catch (error: any) {
-    logger.error('Error exporting analytics:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
+    const errorCode = error?.code || error?.errno;
+    logger.error('[Export] Error exporting analytics:', { 
+      error: errorMessage, 
+      code: errorCode,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    res.status(500).json({ error: 'Erreur serveur', details: errorMessage });
   }
 };
 

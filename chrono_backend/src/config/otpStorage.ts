@@ -148,7 +148,8 @@ export async function storeOTP(
       );
     }
   } catch (error: any) {
-    logger.error('Erreur lors du stockage OTP:', error);
+    const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
+    logger.error('Erreur lors du stockage OTP:', { error: errorMessage, code: error?.code });
     return fallbackToMemory(
       'Erreur stockage OTP en base',
       error,
@@ -184,7 +185,8 @@ export async function verifyOTP(
         return true;
       }
     } catch (error: any) {
-      logger.error('Erreur lors de la vérification OTP:', error);
+      const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
+      logger.error('Erreur lors de la vérification OTP:', { error: errorMessage, code: error?.code });
     }
   }
 
@@ -211,7 +213,8 @@ export async function getOTP(
         return result.rows[0];
       }
     } catch (error: any) {
-      logger.error('Erreur lors de la récupération OTP:', error);
+      const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
+      logger.error('Erreur lors de la récupération OTP:', { error: errorMessage, code: error?.code });
     }
   }
 
@@ -248,12 +251,13 @@ export async function cleanupExpiredOTP(): Promise<number> {
 
     return result.rows?.length || 0;
   } catch (error: any) {
-    if (error.message && error.message.includes('does not exist')) {
+    const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
+    if (errorMessage && errorMessage.includes('does not exist')) {
       return 0;
-    } else if (error.message && error.message.includes('password must be a string')) {
+    } else if (errorMessage && errorMessage.includes('password must be a string')) {
       logger.warn('Connexion DB non configurée correctement, nettoyage OTP ignoré');
     } else {
-      logger.error('Erreur lors du nettoyage OTP:', error.message);
+      logger.error('Erreur lors du nettoyage OTP:', { error: errorMessage, code: error?.code });
     }
     return 0;
   }

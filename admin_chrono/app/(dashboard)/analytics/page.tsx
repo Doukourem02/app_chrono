@@ -8,6 +8,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { exportToPDF, exportToExcel } from '@/utils/exportUtils'
 
 interface ZoneData {
   zone: string
@@ -17,10 +18,22 @@ interface ZoneData {
 
 type TabType = 'overview' | 'ratings'
 
+interface ExportOrder {
+  id: string
+  delivery_id?: string
+  order_number?: string
+  status: string
+  price: string | number
+  created_at?: string
+  completed_at?: string | null
+  client_email?: string
+  driver_id?: string
+}
+
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [days, setDays] = useState(7)
-  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json')
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv' | 'pdf' | 'excel'>('json')
   
   // État pour l'onglet Ratings
   const [ratingsPage, setRatingsPage] = useState(1)
@@ -89,21 +102,40 @@ export default function AnalyticsPage() {
 
   const handleExport = async () => {
     try {
+      logger.debug('[Analytics] Début export, format:', exportFormat, 'days:', days)
+      
       // Récupérer le token depuis Supabase
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        logger.error('[Analytics] Erreur session Supabase:', sessionError)
+        alert('Erreur d\'authentification. Veuillez vous reconnecter.')
+        return
+      }
+      
       const token = session?.access_token
       
       if (!token) {
+        logger.warn('[Analytics] Pas de token disponible')
         alert('Vous devez être connecté pour exporter les données')
         return
       }
 
+      logger.debug('[Analytics] Appel API export:', { format: exportFormat, days })
       const response = await fetch(`/api/analytics/export?format=${exportFormat}&days=${days}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       })
-      if (!response.ok) throw new Error('Erreur export')
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error('[Analytics] Erreur export API:', { status: response.status, statusText: response.statusText, error: errorText })
+        alert(`Erreur lors de l'export: ${response.status} ${response.statusText}`)
+        return
+      }
+      
+      logger.debug('[Analytics] Export réussi, traitement du fichier')
       
       if (exportFormat === 'csv') {
         const blob = await response.blob()
@@ -111,19 +143,62 @@ export default function AnalyticsPage() {
         const a = document.createElement('a')
         a.href = url
         a.download = `analytics-${Date.now()}.csv`
+        document.body.appendChild(a)
         a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        logger.debug('[Analytics] Fichier CSV téléchargé')
+      } else if (exportFormat === 'pdf' || exportFormat === 'excel') {
+        // Pour PDF et Excel, on récupère les données JSON et on les transforme
+        const data = await response.json()
+        const orders: ExportOrder[] = data.data || []
+        
+        // Préparer les données pour l'export
+        const headers = ['ID', 'ID Livraison', 'Numéro Commande', 'Statut', 'Prix', 'Créé le', 'Complété le', 'Client', 'Livreur']
+        const rows = orders.map((order: ExportOrder) => [
+          order.id || '',
+          order.delivery_id || '',
+          order.order_number || '',
+          order.status || '',
+          order.price || '0',
+          order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : '',
+          order.completed_at ? new Date(order.completed_at).toLocaleDateString('fr-FR') : '',
+          order.client_email || '',
+          order.driver_id || '',
+        ])
+        
+        const exportData = {
+          title: `Analytics - ${days} derniers jours`,
+          headers,
+          rows,
+          filename: `analytics-${days}j-${Date.now()}.${exportFormat === 'pdf' ? 'pdf' : 'xlsx'}`,
+        }
+        
+        if (exportFormat === 'pdf') {
+          await exportToPDF(exportData)
+          logger.debug('[Analytics] Fichier PDF généré')
+        } else {
+          exportToExcel(exportData)
+          logger.debug('[Analytics] Fichier Excel généré')
+        }
       } else {
+        // JSON
         const data = await response.json()
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
         a.download = `analytics-${Date.now()}.json`
+        document.body.appendChild(a)
         a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        logger.debug('[Analytics] Fichier JSON téléchargé')
       }
     } catch (error) {
-      logger.error('Error exporting:', error)
-      alert('Erreur lors de l\'export')
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue'
+      logger.error('[Analytics] Erreur export:', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      alert(`Erreur lors de l'export: ${errorMessage}`)
     }
   }
 
@@ -360,13 +435,16 @@ export default function AnalyticsPage() {
           </select>
           <select
             value={exportFormat}
-            onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv')}
+            onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv' | 'pdf' | 'excel')}
             style={{ padding: '8px 12px', borderRadius: '6px', border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary }}
           >
             <option value="json">JSON</option>
             <option value="csv">CSV</option>
+            <option value="pdf">PDF</option>
+            <option value="excel">Excel</option>
           </select>
           <button
+            type="button"
             onClick={handleExport}
             style={{
               padding: '8px 16px',
@@ -378,6 +456,7 @@ export default function AnalyticsPage() {
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
+              fontWeight: 600,
             }}
           >
             <Download style={{ width: '16px', height: '16px' }} />

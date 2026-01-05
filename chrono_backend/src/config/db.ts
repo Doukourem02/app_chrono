@@ -59,7 +59,9 @@ if (process.env.DATABASE_URL) {
     // Test de connexion initial
     pool.query('SELECT 1', (err) => {
       if (err) {
-        logger.warn(' Test de connexion PostgreSQL échoué:', err.message);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        const errorCode = (err as any)?.code || undefined;
+        logger.warn(' Test de connexion PostgreSQL échoué:', { error: errorMessage, code: errorCode });
       } else {
         logger.info(`Pool PostgreSQL initialisé (max: ${poolConfig.max}, min: ${poolConfig.min})`);
       }
@@ -80,7 +82,8 @@ if (process.env.DATABASE_URL) {
     }
 
   } catch (error: any) {
-    logger.warn(' Erreur lors de la création du pool PostgreSQL:', error.message);
+    const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
+    logger.warn(' Erreur lors de la création du pool PostgreSQL:', { error: errorMessage, code: error?.code });
     pool = null;
   }
 } else {

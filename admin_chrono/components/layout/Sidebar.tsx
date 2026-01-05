@@ -231,7 +231,7 @@ export default function Sidebar() {
   }, [loadProfile]);
 
   const collapsedWidth = 72
-  const expandedWidth = 290
+  const expandedWidth = 340
   const iconSlotSize = 44
   const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
 

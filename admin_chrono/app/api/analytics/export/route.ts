@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
 
     // Faire le proxy vers le backend
     const backendUrl = `${API_BASE_URL}/api/analytics/export?format=${format}&days=${days}`
+    logger.debug('[API Route] Appel backend export:', { url: backendUrl, format, days })
+    
     const response = await fetch(backendUrl, {
       method: 'GET',
       headers: {
@@ -72,12 +74,19 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text()
-      logger.error('Backend error:', errorText)
+      logger.error('[API Route] Backend error export:', { 
+        status: response.status, 
+        statusText: response.statusText,
+        error: errorText,
+        url: backendUrl
+      })
       return NextResponse.json(
         { error: 'Backend error', details: errorText },
         { status: response.status }
       )
     }
+    
+    logger.debug('[API Route] Export réussi, format:', format)
 
     // Si c'est un CSV, retourner le blob directement
     if (format === 'csv') {
@@ -95,7 +104,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error'
-    logger.error('Error in analytics/export API:', errorMessage)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    logger.error('[API Route] Error in analytics/export API:', { 
+      error: errorMessage, 
+      stack: errorStack 
+    })
     return NextResponse.json(
       { error: 'Internal server error', details: errorMessage },
       { status: 500 }
