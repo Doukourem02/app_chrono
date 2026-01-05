@@ -9,6 +9,7 @@ import { AnimatedCard } from '@/components/animations'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { useThemeStore } from '@/stores/themeStore'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
@@ -67,6 +68,8 @@ type LocalDateFilter = 'thisWeek' | 'thisMonth' | 'thisYear'
 
 export default function ActivityTable() {
   const router = useRouter()
+  const theme = useThemeStore((state) => state.theme)
+  const isDarkMode = theme === 'dark'
   const [localDateFilter, setLocalDateFilter] = useState<LocalDateFilter>('thisMonth')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 3 // Limité à 3 comme demandé
@@ -243,18 +246,41 @@ export default function ActivityTable() {
     color: themeColors.textPrimary,
   }
 
-  const statusBadgeStyle = (status: typeof statusConfig[string]): React.CSSProperties => ({
-    paddingLeft: '12px',
-    paddingRight: '12px',
-    paddingTop: '4px',
-    paddingBottom: '4px',
-    borderRadius: '8px',
-    fontSize: '12px',
-    fontWeight: 600,
-    backgroundColor: status.backgroundColor,
-    color: status.color,
-    display: 'inline-block',
-  })
+  // Adapter les couleurs des badges selon le thème
+  const getStatusBadgeStyle = (statusKey: string, status: typeof statusConfig[string]): React.CSSProperties => {
+    // Pour le mode sombre, utiliser des couleurs plus sombres et contrastées
+    let bgColor = status.backgroundColor
+    let textColor = status.color
+    
+    if (isDarkMode) {
+      // Adapter les couleurs pour le mode sombre
+      const darkModeColors: Record<string, { bg: string; text: string }> = {
+        pending: { bg: '#7C2D12', text: '#FED7AA' },
+        accepted: { bg: '#1E3A8A', text: '#DBEAFE' },
+        enroute: { bg: '#1E3A8A', text: '#DBEAFE' },
+        picked_up: { bg: '#6B21A8', text: '#E9D5FF' },
+        completed: { bg: '#166534', text: '#D1FAE5' },
+        declined: { bg: '#991B1B', text: '#FEE2E2' },
+        cancelled: { bg: '#7F1D1D', text: '#FEE2E2' },
+      }
+      const darkColors = darkModeColors[statusKey] || { bg: status.backgroundColor, text: status.color }
+      bgColor = darkColors.bg
+      textColor = darkColors.text
+    }
+    
+    return {
+      paddingLeft: '12px',
+      paddingRight: '12px',
+      paddingTop: '4px',
+      paddingBottom: '4px',
+      borderRadius: '8px',
+      fontSize: '12px',
+      fontWeight: 600,
+      backgroundColor: bgColor,
+      color: textColor,
+      display: 'inline-block',
+    }
+  }
 
   const paginationStyle: React.CSSProperties = {
     display: 'flex',
@@ -308,10 +334,10 @@ export default function ActivityTable() {
           style={{ ...titleStyle, cursor: 'pointer' }}
           onClick={() => router.push('/orders')}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = '#8B5CF6'
+            e.currentTarget.style.color = themeColors.purplePrimary
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = '#111827'
+            e.currentTarget.style.color = themeColors.textPrimary
           }}
         >
           Données d&apos;activité
@@ -330,29 +356,29 @@ export default function ActivityTable() {
             style={filterButtonStyle}
             onClick={() => router.push('/orders')}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6'
+              e.currentTarget.style.backgroundColor = themeColors.grayLight
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
-            <Filter size={20} style={{ color: '#4B5563' }} />
+            <Filter size={20} style={{ color: themeColors.textSecondary }} />
           </button>
         </div>
       </div>
 
       {isLoading ? (
         <div style={{ paddingTop: '48px', paddingBottom: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ color: '#6B7280' }}>Chargement des activités...</div>
+          <div style={{ color: themeColors.textSecondary }}>Chargement des activités...</div>
         </div>
       ) : isError ? (
         <div style={{ paddingTop: '48px', paddingBottom: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-          <div style={{ color: '#DC2626', fontSize: '14px', fontWeight: 500 }}>Erreur lors du chargement des activités</div>
-          <div style={{ color: '#6B7280', fontSize: '12px' }}>Vérifiez votre connexion et réessayez</div>
+          <div style={{ color: themeColors.redPrimary, fontSize: '14px', fontWeight: 500 }}>Erreur lors du chargement des activités</div>
+          <div style={{ color: themeColors.textSecondary, fontSize: '12px' }}>Vérifiez votre connexion et réessayez</div>
         </div>
       ) : paginatedData.length === 0 ? (
         <div style={{ paddingTop: '48px', paddingBottom: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ color: '#6B7280' }}>Aucune activité récente</div>
+          <div style={{ color: themeColors.textSecondary }}>Aucune activité récente</div>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -368,15 +394,16 @@ export default function ActivityTable() {
             </thead>
             <tbody>
               {paginatedData.map((row, idx) => {
-                const status = statusConfig[row.status] || {
+                const statusKey = row.status
+                const status = statusConfig[statusKey] || {
                   label: row.status,
-                  backgroundColor: '#F3F4F6',
-                  color: '#4B5563',
+                  backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+                  color: isDarkMode ? '#D1D5DB' : '#4B5563',
                 }
 
                 const rowStyle: React.CSSProperties = {
                   ...tdStyle,
-                  backgroundColor: row.deliveryId === 'NY-12321-SF' ? '#EFF6FF' : 'transparent',
+                  backgroundColor: row.deliveryId === 'NY-12321-SF' ? themeColors.blueLight : 'transparent',
                   transition: 'background-color 0.2s',
                 }
 
@@ -386,7 +413,7 @@ export default function ActivityTable() {
                     style={rowStyle}
                     onMouseEnter={(e) => {
                       if (row.deliveryId !== 'NY-12321-SF') {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB'
+                        e.currentTarget.style.backgroundColor = themeColors.grayLight
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -396,25 +423,25 @@ export default function ActivityTable() {
                     }}
                   >
                     <td style={tdStyle}>
-                      <span style={{ fontSize: '13px', color: '#111827', fontWeight: 500 }}>
+                      <span style={{ fontSize: '13px', color: themeColors.textPrimary, fontWeight: 500 }}>
                         {formatDeliveryId(row.deliveryId, parseDateToISO(row.date) || row.date)}
                       </span>
                     </td>
                     <td style={tdStyle}>
-                      <span style={{ fontSize: '14px', color: '#374151' }}>{row.date}</span>
+                      <span style={{ fontSize: '14px', color: themeColors.textPrimary }}>{row.date}</span>
                     </td>
                     <td style={tdStyle}>
-                      <span style={{ fontSize: '14px', color: '#374151' }} title={row.departure}>
+                      <span style={{ fontSize: '14px', color: themeColors.textPrimary }} title={row.departure}>
                         {row.departure.length > 30 ? `${row.departure.substring(0, 30)}...` : row.departure}
                       </span>
                     </td>
                     <td style={tdStyle}>
-                      <span style={{ fontSize: '14px', color: '#374151' }} title={row.destination}>
+                      <span style={{ fontSize: '14px', color: themeColors.textPrimary }} title={row.destination}>
                         {row.destination.length > 30 ? `${row.destination.substring(0, 30)}...` : row.destination}
                       </span>
                     </td>
                     <td style={tdStyle}>
-                      <span style={statusBadgeStyle(status)}>
+                      <span style={getStatusBadgeStyle(statusKey, status)}>
                         {status.label}
                       </span>
                     </td>
@@ -442,14 +469,14 @@ export default function ActivityTable() {
               }}
               onMouseEnter={(e) => {
                 if (currentPage !== 1) {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB'
+                  e.currentTarget.style.backgroundColor = themeColors.grayLight
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent'
               }}
             >
-              <ChevronLeft size={20} style={{ color: '#4B5563' }} />
+              <ChevronLeft size={20} style={{ color: themeColors.textSecondary }} />
             </button>
             {Array.from({ length: Math.min(4, totalPages) }, (_, i) => {
               const page = i + 1
@@ -460,7 +487,7 @@ export default function ActivityTable() {
                   style={pageButtonStyle(currentPage === page)}
                   onMouseEnter={(e) => {
                     if (currentPage !== page) {
-                      e.currentTarget.style.backgroundColor = '#F3F4F6'
+                      e.currentTarget.style.backgroundColor = themeColors.grayLight
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -483,14 +510,14 @@ export default function ActivityTable() {
               }}
               onMouseEnter={(e) => {
                 if (currentPage < totalPages) {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB'
+                  e.currentTarget.style.backgroundColor = themeColors.grayLight
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent'
               }}
             >
-              <ChevronRight size={20} style={{ color: '#4B5563' }} />
+              <ChevronRight size={20} style={{ color: themeColors.textSecondary }} />
             </button>
           </div>
         </div>

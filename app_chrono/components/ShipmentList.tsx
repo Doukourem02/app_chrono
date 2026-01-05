@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {RefreshControl,ScrollView,StyleSheet,Text,View,} from "react-native";
+import {RefreshControl,ScrollView,StyleSheet,Text,View,useColorScheme,} from "react-native";
 import {estimateDurationMinutes,formatDurationLabel,} from "../services/orderApi";
 import { userApiService } from "../services/userApiService";
 import { useAuthStore } from "../store/useAuthStore";
@@ -64,6 +64,8 @@ const PENDING_AUTO_CANCEL_DELAY_MS = 30 * 1000;
 
 export default function ShipmentList() {
   const { user } = useAuthStore();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const activeOrdersFromStore = useOrderStore((s) => s.activeOrders);
   const [orders, setOrders] = useState<OrderWithDB[]>([]);
   const [loading, setLoading] = useState(true);
@@ -769,7 +771,7 @@ export default function ShipmentList() {
   if (orders.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Aucune commande pour le moment</Text>
+        <Text style={[styles.emptyText, { color: isDark ? '#D1D5DB' : '#666' }]}>Aucune commande pour le moment</Text>
       </View>
     );
   }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrderStore } from '../store/useOrderStore';
 
@@ -55,12 +55,14 @@ const formatPrice = (price?: number): string => {
 
 export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ onOrderSelect }) => {
   const { activeOrders, selectedOrderId, setSelectedOrder } = useOrderStore();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   if (activeOrders.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="cube-outline" size={48} color="#9CA3AF" />
-        <Text style={styles.emptyText}>Aucune commande active</Text>
+        <Ionicons name="cube-outline" size={48} color={isDark ? '#6B7280' : '#9CA3AF'} />
+        <Text style={[styles.emptyText, { color: isDark ? '#D1D5DB' : '#9CA3AF' }]}>Aucune commande active</Text>
       </View>
     );
   }
