@@ -15,7 +15,7 @@ interface OrderWithDB extends OrderRequest {
   cancelled_at?: string;
 }
 
-type FilterKey = 'all' | 'pending' | 'accepted' | 'enroute' | 'completed' | 'cancelled';
+type FilterKey = 'all' | 'active' | 'completed';
 
 interface PaginationState {
   page: number;
@@ -29,14 +29,11 @@ interface FilterItem {
   label: string;
 }
 
-const FILTER_KEYS: FilterKey[] = ['all', 'pending', 'accepted', 'enroute', 'completed', 'cancelled'];
+const FILTER_KEYS: FilterKey[] = ['all', 'active', 'completed'];
 
 const FILTER_STATUS_MAP: Record<Exclude<FilterKey, 'all'>, OrderStatus[]> = {
-  pending: ['pending'],
-  accepted: ['accepted', 'enroute', 'picked_up'],
-  enroute: ['enroute', 'picked_up'],
+  active: ['pending', 'accepted', 'enroute', 'picked_up', 'delivering'],
   completed: ['completed'],
-  cancelled: ['cancelled', 'declined'],
 };
 
 const normalizeDateValue = (value?: string | Date | null): string | undefined => {
@@ -152,7 +149,7 @@ export default function BoxPage() {
         const result = await userApiService.getUserDeliveries(user.id, {
           page,
           limit: 20,
-          status: filter !== 'all' ? filter : undefined,
+          status: filter !== 'all' && filter !== 'active' ? filter : undefined,
         });
 
         if (result.success && result.data) {
@@ -451,14 +448,11 @@ export default function BoxPage() {
     });
   };
 
-  const filters: FilterItem[] = [
+  const filters: FilterItem[] = useMemo(() => [
     { key: 'all', label: 'Toutes' },
-    { key: 'pending', label: 'En attente' },
-    { key: 'accepted', label: 'Acceptées' },
-    { key: 'enroute', label: 'En route' },
+    { key: 'active', label: 'En cours' },
     { key: 'completed', label: 'Terminées' },
-    { key: 'cancelled', label: 'Annulées' },
-  ];
+  ], []);
 
   const normalizedActiveOrders = useMemo(
     () => activeOrders.map(normalizeStoreOrder),
@@ -508,9 +502,6 @@ export default function BoxPage() {
 
   const renderOrder = ({ item: order }: { item: OrderWithDB }) => {
     const orderName = order.dropoff?.address?.split(',')[0] || `Commande #${order.id.slice(0, 8)}`;
-    const routeText = order.pickup?.address && order.dropoff?.address
-      ? `${order.pickup.address.split(',').pop()?.trim() || 'Départ'} → ${order.dropoff.address.split(',').pop()?.trim() || 'Destination'}`
-      : 'Route non définie';
 
     return (
       <TouchableOpacity
@@ -531,27 +522,24 @@ export default function BoxPage() {
             </View>
             <View style={styles.orderCardInfo}>
               <Text style={styles.orderCardTitle}>{orderName}</Text>
-              <Text style={styles.orderCardRoute}>{routeText}</Text>
-            </View>
-          </View>
-          <View style={styles.orderCardRight}>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: `${getStatusColor(order.status)}20` },
-              ]}
-            >
-              <Text
+              <View
                 style={[
-                  styles.statusText,
-                  { color: getStatusColor(order.status) },
+                  styles.statusBadge,
+                  { backgroundColor: `${getStatusColor(order.status)}20` },
                 ]}
               >
-                {getStatusLabel(order.status)}
-              </Text>
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: getStatusColor(order.status) },
+                  ]}
+                >
+                  {getStatusLabel(order.status)}
+                </Text>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </View>
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
         </View>
       </TouchableOpacity>
     );
@@ -665,7 +653,9 @@ export default function BoxPage() {
                 <Text style={styles.detailSectionTitle}>Informations</Text>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>ID Commande</Text>
-                  <Text style={styles.detailValue}>{selectedOrder.id}</Text>
+                  <Text style={[styles.detailValue, { fontSize: 13 }]} numberOfLines={1} ellipsizeMode="middle">
+                    {selectedOrder.id}
+                  </Text>
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Statut</Text>
@@ -858,10 +848,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     marginHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 20,
+    color: '#1F2937',
+    letterSpacing: -0.5,
   },
   filtersWrapper: {
     marginTop: 16,
@@ -886,13 +878,14 @@ const styles = StyleSheet.create({
     borderColor: '#8B5CF6',
   },
   filterText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
     color: '#6B7280',
   },
   filterTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
+    fontSize: 15,
   },
   ordersListContent: {
     paddingHorizontal: 20,
@@ -915,19 +908,28 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginTop: 20,
     marginBottom: 8,
+    letterSpacing: -0.3,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6B7280',
     textAlign: 'center',
     paddingHorizontal: 40,
+    lineHeight: 22,
+    fontWeight: '500',
   },
   orderCard: {
     backgroundColor: '#FFFFFF',
     padding: 16,
     marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   orderCardContent: {
     flexDirection: 'row',
@@ -958,26 +960,20 @@ const styles = StyleSheet.create({
   orderCardTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  orderCardRoute: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  orderCardRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    color: '#1F2937',
+    marginBottom: 6,
+    letterSpacing: -0.2,
   },
   statusBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   loadMoreButton: {
     padding: 16,
@@ -1005,11 +1001,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
-    color: '#000000',
+    color: '#1F2937',
+    letterSpacing: -0.5,
   },
   modalCloseButton: {
     padding: 4,
@@ -1020,38 +1022,44 @@ const styles = StyleSheet.create({
   },
   detailSection: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#F3F4F6',
   },
   detailSectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 18,
+    marginBottom: 16,
     letterSpacing: -0.3,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
+    paddingVertical: 2,
   },
   detailLabel: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6B7280',
+    fontWeight: '500',
   },
   detailValue: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1F2937',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: 12,
+    flexShrink: 1,
   },
   detailValueWithIcon: {
     flexDirection: 'row',
@@ -1068,9 +1076,9 @@ const styles = StyleSheet.create({
   },
   addressCard: {
     backgroundColor: '#F9FAFB',
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
@@ -1086,38 +1094,44 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   addressLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   addressText: {
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 20,
+    fontSize: 15,
+    color: '#1F2937',
+    lineHeight: 22,
+    fontWeight: '500',
   },
   driverCard: {
     backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   driverName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: -0.2,
   },
   driverPhone: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6B7280',
     marginBottom: 8,
+    fontWeight: '500',
   },
   driverRating: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   driverRatingText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#F59E0B',
     marginLeft: 4,
@@ -1128,15 +1142,16 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   proofType: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   proofDate: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6B7280',
     marginBottom: 12,
+    fontWeight: '500',
   },
   proofImage: {
     width: '100%',
@@ -1149,14 +1164,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 20,
     marginBottom: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
     backgroundColor: '#FEF2F2',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#EF444430',
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#EF4444',
     fontWeight: '600',
     marginLeft: 6,

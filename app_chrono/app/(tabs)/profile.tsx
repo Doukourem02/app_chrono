@@ -3,7 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Switch,Text,TouchableOpacity,View,} from "react-native";
+import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
 import { userApiService } from "../../services/userApiService";
 import { useAuthStore } from "../../store/useAuthStore";
 import { formatUserName } from "../../utils/formatName";
@@ -17,8 +17,6 @@ interface UserStatistics {
 
 export default function ProfilePage() {
   const { user, logout, setUser } = useAuthStore();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [locationEnabled, setLocationEnabled] = useState(true);
   const [statistics, setStatistics] = useState<UserStatistics>({
     completedOrders: 0,
     loyaltyPoints: 0,
@@ -227,63 +225,24 @@ export default function ProfilePage() {
     {
       icon: "person-outline",
       title: "Informations personnelles",
-      subtitle: "Nom, téléphone, email",
       onPress: () => router.push("/profile/personal-info"),
       color: "#8B5CF6",
     },
     {
-      icon: "location-outline",
-      title: "Mes adresses",
-      subtitle: "Domicile, bureau, favoris",
-      onPress: () => router.push("/profile/addresses"),
-      color: "#10B981",
-    },
-    {
-      icon: "card-outline",
-      title: "Moyens de paiement",
-      subtitle: "Cartes, portefeuille mobile",
-      onPress: () => router.push("/profile/payment-methods"),
-      color: "#F59E0B",
-    },
-    {
-      icon: "receipt-outline",
-      title: "Mes transactions",
-      subtitle: "Historique et réclamations",
-      onPress: () => router.push("/profile/transactions"),
-      color: "#3B82F6",
-    },
-    {
-      icon: "receipt-outline",
-      title: "Mes dettes",
-      subtitle: "Gérer mes paiements différés",
-      onPress: () => router.push("/profile/debts"),
-      color: "#EF4444",
-    },
-    {
-      icon: "time-outline",
-      title: "Historique des commandes",
-      subtitle: "Voir toutes vos livraisons",
+      icon: "cube-outline",
+      title: "Mes commandes",
       onPress: () => router.push("/profile/order-history"),
       color: "#3B82F6",
     },
     {
-      icon: "star-outline",
-      title: "Mes évaluations",
-      subtitle: "Évaluations et commentaires",
-      onPress: () => router.push("/profile/ratings"),
-      color: "#EF4444",
+      icon: "card-outline",
+      title: "Paiements",
+      onPress: () => router.push("/profile/payment-methods"),
+      color: "#F59E0B",
     },
     {
       icon: "gift-outline",
-      title: "Codes promo",
-      subtitle: "Mes réductions et offres",
-      onPress: () => router.push("/profile/promo-codes"),
-      color: "#EC4899",
-    },
-    {
-      icon: "trophy-outline",
-      title: "Points de fidélité",
-      subtitle: "Utilisez vos points pour des avantages",
+      title: "Récompenses",
       onPress: () => {
         Alert.alert(
           "Points de fidélité",
@@ -294,32 +253,22 @@ export default function ProfilePage() {
           [{ text: "OK" }]
         );
       },
-      color: "#F59E0B",
+      color: "#EC4899",
     },
-  ];
-
-  const supportItems = [
     {
       icon: "settings-outline",
       title: "Paramètres",
       onPress: () => router.push("/profile/settings"),
+      color: "#6B7280",
     },
     {
       icon: "help-circle-outline",
       title: "Aide & Support",
       onPress: () => router.push("/profile/support"),
-    },
-    {
-      icon: "shield-checkmark-outline",
-      title: "Politique de confidentialité",
-      onPress: () => router.push("/profile/privacy"),
-    },
-    {
-      icon: "information-circle-outline",
-      title: "À propos",
-      onPress: () => router.push("/profile/about"),
+      color: "#6B7280",
     },
   ];
+
 
   // Ne rien afficher pendant la redirection
   if (!user) {
@@ -373,67 +322,25 @@ export default function ProfilePage() {
                 {isLoadingStats ? "..." : statistics.completedOrders}
               </Text>
               <Text style={styles.statLabel}>Commandes</Text>
-              <Text style={styles.statSubLabel}>Complétées</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>
                 {isLoadingStats ? "..." : formatCurrency(statistics.totalSaved)}
               </Text>
               <Text style={styles.statLabel}>Reste à payer</Text>
-              <Text style={styles.statSubLabel}>Paiement différé</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>
                 {isLoadingStats ? "..." : statistics.loyaltyPoints}
               </Text>
               <Text style={styles.statLabel}>Points</Text>
-              <Text style={styles.statSubLabel}>Fidélité</Text>
             </View>
           </View>
         </View>
 
-        {/* Paramètres rapides */}
-        <View style={styles.quickSettings}>
-          <View style={styles.quickSettingItem}>
-            <View style={styles.quickSettingInfo}>
-              <Ionicons name="notifications" size={24} color="#8B5CF6" />
-              <View style={styles.quickSettingText}>
-                <Text style={styles.quickSettingTitle}>Notifications</Text>
-                <Text style={styles.quickSettingSubtitle}>
-                  Recevoir les alertes
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
-              thumbColor={notificationsEnabled ? "#FFFFFF" : "#9CA3AF"}
-            />
-          </View>
-
-          <View style={styles.quickSettingItem}>
-            <View style={styles.quickSettingInfo}>
-              <Ionicons name="location" size={24} color="#10B981" />
-              <View style={styles.quickSettingText}>
-                <Text style={styles.quickSettingTitle}>Localisation</Text>
-                <Text style={styles.quickSettingSubtitle}>
-                  Partager ma position
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={locationEnabled}
-              onValueChange={setLocationEnabled}
-              trackColor={{ false: "#E5E7EB", true: "#10B981" }}
-              thumbColor={locationEnabled ? "#FFFFFF" : "#9CA3AF"}
-            />
-          </View>
-        </View>
 
         {/* Menu principal */}
         <View style={styles.menuContainer}>
-          <Text style={styles.sectionTitle}>Mon compte</Text>
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -453,29 +360,6 @@ export default function ProfilePage() {
                     color={item.color}
                   />
                 </View>
-                <View style={styles.menuItemText}>
-                  <Text style={styles.menuItemTitle}>{item.title}</Text>
-                  <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Support et paramètres */}
-        <View style={styles.menuContainer}>
-          <Text style={styles.sectionTitle}>Support</Text>
-          {supportItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.menuItem}
-              onPress={item.onPress}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIcon}>
-                  <Ionicons name={item.icon as any} size={24} color="#6B7280" />
-                </View>
                 <Text style={styles.menuItemTitle}>{item.title}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -488,11 +372,6 @@ export default function ProfilePage() {
           <Ionicons name="log-out-outline" size={24} color="#EF4444" />
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </TouchableOpacity>
-
-        {/* Version de l'app */}
-        <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Version 1.0.0</Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -588,58 +467,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: 2,
   },
-  statSubLabel: {
-    fontSize: 10,
-    color: "#9CA3AF",
-    marginTop: 2,
-  },
-  quickSettings: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderRadius: 12,
-    paddingVertical: 8,
-  },
-  quickSettingItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  quickSettingInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  quickSettingText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  quickSettingTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1F2937",
-    marginBottom: 2,
-  },
-  quickSettingSubtitle: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
   menuContainer: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
     borderRadius: 12,
     marginBottom: 20,
     paddingVertical: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginHorizontal: 20,
-    marginBottom: 12,
-    marginTop: 8,
   },
   menuItem: {
     flexDirection: "row",
@@ -664,18 +497,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-  menuItemText: {
-    flex: 1,
-  },
   menuItemTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#1F2937",
-    marginBottom: 2,
-  },
-  menuItemSubtitle: {
-    fontSize: 14,
-    color: "#6B7280",
   },
   logoutButton: {
     backgroundColor: "#FEF2F2",
@@ -692,14 +517,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#EF4444",
-  },
-  versionContainer: {
-    alignItems: "center",
-    paddingBottom: 40,
-  },
-  versionText: {
-    fontSize: 12,
-    color: "#9CA3AF",
   },
   // Anciens styles conservés pour compatibilité
   headerTitle: {

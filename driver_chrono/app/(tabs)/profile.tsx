@@ -17,7 +17,6 @@ interface DriverStatistics {
 
 export default function ProfilePage() {
   const { user, profile, isOnline, logout, setOnlineStatus, setUser, updateProfile } = useDriverStore();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [statistics, setStatistics] = useState<DriverStatistics>({
     completedDeliveries: 0,
     averageRating: 5.0,
@@ -223,37 +222,21 @@ export default function ProfilePage() {
     {
       icon: 'person-outline',
       title: 'Informations personnelles',
-      subtitle: 'Gérer vos données personnelles',
       onPress: () => router.push('/profile/personal-info'),
     },
     {
       icon: 'car-outline',
       title: 'Mon véhicule',
-      subtitle: 'Gérer les informations du véhicule',
       onPress: () => router.push('/profile/vehicle'),
     },
     ...(profile?.driver_type === 'partner' ? [{
       icon: 'wallet-outline',
-      title: 'Commission',
-      subtitle: 'Gérer votre solde commission',
+      title: 'Mes gains',
       onPress: () => router.push('/commission' as any),
     }] : []),
     {
-      icon: 'card-outline',
-      title: 'Paiements',
-      subtitle: 'Gérer vos moyens de paiement',
-      onPress: () => router.push('/profile/payments'),
-    },
-    {
-      icon: 'stats-chart-outline',
-      title: 'Statistiques',
-      subtitle: 'Voir vos performances',
-      onPress: () => router.push('/profile/statistics'),
-    },
-    {
       icon: 'star-outline',
       title: 'Ma note',
-      subtitle: 'Votre évaluation par les clients',
       onPress: () => {
         Alert.alert(
           'Ma note moyenne',
@@ -272,13 +255,11 @@ export default function ProfilePage() {
     {
       icon: 'settings-outline',
       title: 'Paramètres',
-      subtitle: 'Préférences de l\'application',
       onPress: () => router.push('/profile/settings' as any),
     },
     {
       icon: 'help-circle-outline',
       title: 'Aide et support',
-      subtitle: 'Besoin d\'aide ?',
       onPress: () => router.push('/profile/support' as any),
     },
   ];
@@ -344,25 +325,12 @@ export default function ProfilePage() {
               {isLoadingStats ? '...' : statistics.completedDeliveries}
             </Text>
             <Text style={styles.statLabel}>Livraisons</Text>
-            <Text style={styles.statSubLabel}>Complétées</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {isLoadingStats ? '...' : statistics.averageRating.toFixed(1)}
-            </Text>
-            <Text style={styles.statLabel}>Note moyenne</Text>
-            <Text style={styles.statSubLabel}>
-              {statistics.completedDeliveries > 0 
-                ? `${statistics.completedDeliveries} évaluation${statistics.completedDeliveries > 1 ? 's' : ''}` 
-                : 'Aucune évaluation'}
-            </Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>
               {isLoadingStats ? '...' : formatCurrency(statistics.totalEarnings ?? profile?.total_earnings ?? 0)}
             </Text>
             <Text style={styles.statLabel}>Gains</Text>
-            <Text style={styles.statSubLabel}>Total</Text>
           </View>
         </View>
       </View>
@@ -446,33 +414,12 @@ export default function ProfilePage() {
               <View style={styles.menuIcon}>
                 <Ionicons name={item.icon as any} size={24} color="#8B5CF6" />
               </View>
-              <View style={styles.menuItemText}>
-                <Text style={styles.menuItemTitle}>{item.title}</Text>
-                <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
-              </View>
+              <Text style={styles.menuItemTitle}>{item.title}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         ))}
 
-        {/* Notifications toggle */}
-        <View style={styles.menuItem}>
-          <View style={styles.menuItemLeft}>
-            <View style={styles.menuIcon}>
-              <Ionicons name="notifications-outline" size={24} color="#8B5CF6" />
-            </View>
-            <View style={styles.menuItemText}>
-              <Text style={styles.menuItemTitle}>Notifications</Text>
-              <Text style={styles.menuItemSubtitle}>Recevoir les notifications push</Text>
-            </View>
-          </View>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{ false: '#E5E7EB', true: '#8B5CF6' }}
-            thumbColor={notificationsEnabled ? '#FFFFFF' : '#9CA3AF'}
-          />
-        </View>
       </View>
 
       {/* Bouton déconnexion */}
@@ -480,11 +427,6 @@ export default function ProfilePage() {
         <Ionicons name="log-out-outline" size={24} color="#EF4444" />
         <Text style={styles.logoutText}>Se déconnecter</Text>
       </TouchableOpacity>
-
-      {/* Version de l'app */}
-      <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>Version 1.0.0</Text>
-      </View>
     </ScrollView>
   );
 }
@@ -614,22 +556,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 2,
   },
-  statSubLabel: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-  },
-  ratingMax: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9CA3AF',
-    marginLeft: 2,
-  },
   onlineToggleContainer: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 20,
@@ -688,18 +614,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  menuItemText: {
-    flex: 1,
-  },
   menuItemTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 2,
-  },
-  menuItemSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
   },
   logoutButton: {
     backgroundColor: '#FEF2F2',
@@ -716,13 +634,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#EF4444',
-  },
-  versionContainer: {
-    alignItems: 'center',
-    paddingBottom: 40,
-  },
-  versionText: {
-    fontSize: 12,
-    color: '#9CA3AF',
   },
 });

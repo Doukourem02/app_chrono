@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, FlatList, Image } from 'react-native';
 import { useDriverStore } from '../../store/useDriverStore';
@@ -42,7 +41,6 @@ export default function RevenusPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('all'); // Commencer par 'all' pour voir toutes les données
   const [revenuesData, setRevenuesData] = useState<RevenuesData | null>(null);
-  const [highlightedDay, setHighlightedDay] = useState<string | null>(null);
 
   const loadRevenues = useCallback(async () => {
     if (!user?.id) {
@@ -130,15 +128,6 @@ export default function RevenusPage() {
     return `${amount.toFixed(0)} FCFA`;
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
   const getMethodIcon = (method: string) => {
     switch (method) {
       case 'moto':
@@ -167,7 +156,6 @@ export default function RevenusPage() {
 
   const periods: { key: Period; label: string }[] = [
     { key: 'today', label: "Aujourd'hui" },
-    { key: 'week', label: 'Cette semaine' },
     { key: 'month', label: 'Ce mois' },
     { key: 'all', label: 'Tout' },
   ];
@@ -179,8 +167,6 @@ export default function RevenusPage() {
         return earnings !== 0 || deliveries !== 0;
       })
     : [];
-
-  const recentOrders = revenuesData ? revenuesData.orders.slice(0, 10) : [];
 
   const renderPeriodItem = ({ item }: { item: { key: Period; label: string } }) => (
     <TouchableOpacity
@@ -205,85 +191,6 @@ export default function RevenusPage() {
     </TouchableOpacity>
   );
 
-  // Graphique simple de revenus par jour
-  const renderEarningsChart = () => {
-    if (!revenuesData || !revenuesData.earningsByDay) return null;
-
-    const days = Object.keys(revenuesData.earningsByDay).sort();
-    if (days.length === 0) {
-      return (
-        <View style={styles.chartContainer}>
-          <Text style={styles.chartTitle}>Revenus par jour</Text>
-          <Text style={styles.emptySectionText}>Aucune donnée pour cette période.</Text>
-        </View>
-      );
-    }
-
-    const chartData = days.map((day) => {
-      const value = revenuesData.earningsByDay[day];
-      const date = new Date(day);
-      const label = date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-      const miniLabel = date.toLocaleDateString('fr-FR', { weekday: 'short' });
-      return { day, value, label, miniLabel };
-    });
-
-    const maxEarning = Math.max(...chartData.map((d) => d.value), 1);
-
-    return (
-      <View style={styles.chartContainer}>
-        <View style={styles.chartHeader}>
-          <View>
-            <Text style={styles.chartTitle}>Revenus par jour</Text>
-            <Text style={styles.chartSubtitle}>Somme totale • {formatCurrency(chartData.reduce((sum, d) => sum + d.value, 0))}</Text>
-          </View>
-          {highlightedDay && (
-            <View style={styles.chartChip}>
-              <Text style={styles.chartChipText}>{formatCurrency(revenuesData.earningsByDay[highlightedDay])}</Text>
-            </View>
-          )}
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chartScrollContent}
-        >
-          <View style={styles.chartBarsRow}>
-            {chartData.map((point, index) => {
-              const height = Math.max((point.value / maxEarning) * 160, 8);
-              const isActive = highlightedDay === point.day;
-
-              return (
-                <TouchableOpacity
-                  key={point.day}
-                  activeOpacity={0.8}
-                  style={[
-                    styles.chartBarTouchable,
-                    index === chartData.length - 1 && styles.chartBarTouchableLast,
-                  ]}
-                  onPress={() => setHighlightedDay((prev) => (prev === point.day ? null : point.day))}
-                >
-                  <LinearGradient
-                    colors={isActive ? ['#7C3AED', '#6D28D9'] : ['#E0E7FF', '#C7D2FE']}
-                    start={{ x: 0, y: 1 }}
-                    end={{ x: 0, y: 0 }}
-                    style={[styles.chartBarGradient, { height }]}
-                  >
-                    {isActive && (
-                      <View style={styles.chartBarValueBubble}>
-                        <Text style={styles.chartBarValueText}>{formatCurrency(point.value)}</Text>
-                      </View>
-                    )}
-                  </LinearGradient>
-                  <Text style={styles.chartBarDay}>{point.miniLabel}</Text>
-                  <Text style={styles.chartBarLabel}>{point.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
-      </View>
-    );
-  };
 
   if (loading && !revenuesData) {
     return (
@@ -299,11 +206,7 @@ export default function RevenusPage() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerEyebrow}>Performances</Text>
         <Text style={styles.headerTitle}>Mes Revenus</Text>
-        <Text style={styles.headerSubtitle}>
-          {revenuesData?.totalDeliveries || 0} livraison{(revenuesData?.totalDeliveries || 0) > 1 ? 's' : ''}
-        </Text>
       </View>
 
       <View style={styles.filtersWrapper}>
@@ -333,7 +236,6 @@ export default function RevenusPage() {
             <Text style={[styles.summaryValue, styles.summaryValuePrimary]}>
               {formatCurrency(revenuesData?.totalEarnings || 0)}
             </Text>
-            <Text style={[styles.summaryHelper, styles.summaryHelperPrimary]}>Période sélectionnée</Text>
           </View>
 
           <View style={styles.summaryCard}>
@@ -346,57 +248,13 @@ export default function RevenusPage() {
             <Text style={styles.summaryValue}>
               {revenuesData?.totalDeliveries || 0}
             </Text>
-            <Text style={styles.summaryHelper}>Courses effectuées</Text>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryCardHeader}>
-              <View style={[styles.summaryIcon, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="navigate" size={20} color="#1D4ED8" />
-              </View>
-              <Text style={styles.summaryLabel}>Distance</Text>
-            </View>
-            <Text style={styles.summaryValue}>
-              {(revenuesData?.totalDistance ?? 0).toFixed(1)} km
-            </Text>
-            <Text style={styles.summaryHelper}>Parcourus</Text>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryCardHeader}>
-              <View style={[styles.summaryIcon, { backgroundColor: '#DCFCE7' }]}>
-                <Ionicons name="trending-up" size={20} color="#047857" />
-              </View>
-              <Text style={styles.summaryLabel}>Gain moyen</Text>
-            </View>
-            <Text style={styles.summaryValue}>
-              {formatCurrency(revenuesData?.averageEarningPerDelivery || 0)}
-            </Text>
-            <Text style={styles.summaryHelper}>Par livraison</Text>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryCardHeader}>
-              <View style={[styles.summaryIcon, { backgroundColor: '#E0F2FE' }]}>
-                <Ionicons name="speedometer-outline" size={20} color="#0369A1" />
-              </View>
-              <Text style={styles.summaryLabel} numberOfLines={1} ellipsizeMode="tail">Distance moyenne</Text>
-            </View>
-            <Text style={styles.summaryValue}>
-              {(revenuesData?.averageDistance ?? 0).toFixed(2)} km
-            </Text>
-            <Text style={styles.summaryHelper}>Par course</Text>
           </View>
         </View>
 
-        {renderEarningsChart()}
-
-        <View style={styles.methodsContainer}>
-          <Text style={styles.sectionTitle}>Revenus par type de livraison</Text>
-          {methodKeys.length === 0 ? (
-            <Text style={styles.emptySectionText}>Aucune donnée pour cette période.</Text>
-          ) : (
-            methodKeys.map((method, index) => {
+        {methodKeys.length > 0 && (
+          <View style={styles.methodsContainer}>
+            <Text style={styles.sectionTitle}>Par type de livraison</Text>
+            {methodKeys.map((method, index) => {
               const earnings = revenuesData?.earningsByMethod[method] || 0;
               const deliveries = revenuesData?.deliveriesByMethod[method] || 0;
               const isLast = index === methodKeys.length - 1;
@@ -428,43 +286,7 @@ export default function RevenusPage() {
                   </View>
                 </View>
               );
-            })
-          )}
-        </View>
-
-        {recentOrders.length > 0 && (
-          <View style={styles.historyContainer}>
-            <Text style={styles.sectionTitle}>Livraisons récentes</Text>
-            {recentOrders.map((order, index) => (
-              <View
-                key={order.id}
-                style={[styles.historyCard, index === recentOrders.length - 1 && styles.historyCardLast]}
-              >
-                <View style={styles.historyHeader}>
-                  <Image
-                    source={getMethodIcon(order.delivery_method)}
-                    style={styles.historyIconImage}
-                    resizeMode="contain"
-                  />
-                  <View style={styles.historyInfo}>
-                    <Text style={styles.historyId}>
-                      Commande #{order.id.slice(0, 8)}
-                    </Text>
-                    <Text style={styles.historyDate}>
-                      {formatDate(order.completed_at)}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.historyFooter}>
-                  <Text style={styles.historyDistance}>
-                    {order.distance.toFixed(1)} km
-                  </Text>
-                  <Text style={styles.historyPrice}>
-                    {formatCurrency(order.price)}
-                  </Text>
-                </View>
-              </View>
-            ))}
+            })}
           </View>
         )}
 
@@ -508,23 +330,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  headerEyebrow: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
     color: '#111827',
-    marginTop: 8,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 6,
   },
   filtersWrapper: {
     backgroundColor: '#FFFFFF',
@@ -630,110 +439,6 @@ const styles = StyleSheet.create({
   summaryHelperPrimary: {
     color: '#9CA3AF',
   },
-  chartContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: 24,
-  },
-  chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  chartSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  chartChip: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  chartChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4C1D95',
-  },
-  chartScrollContent: {
-    paddingVertical: 8,
-    paddingRight: 12,
-  },
-  chartBarsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  chartBarTouchable: {
-    alignItems: 'center',
-    marginRight: 18,
-  },
-  chartBarTouchableLast: {
-    marginRight: 0,
-  },
-  chartBarGradient: {
-    width: 36,
-    borderRadius: 18,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 6,
-    position: 'relative',
-  },
-  chartBarValueBubble: {
-    position: 'absolute',
-    top: -28,
-    backgroundColor: '#111827',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  chartBarValueText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  chartBarContainer: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  chartBarWrapper: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    height: 140,
-  },
-  chartBar: {
-    width: 24,
-    backgroundColor: '#6366F1',
-    borderRadius: 6,
-    minHeight: 8,
-  },
-  chartBarValue: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#6366F1',
-    marginTop: 6,
-  },
-  chartBarDay: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#4C1D95',
-    marginTop: 10,
-    textTransform: 'capitalize',
-  },
-  chartBarLabel: {
-    fontSize: 10,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
   methodsContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -805,60 +510,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#4C1D95',
-  },
-  historyContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: 24,
-  },
-  historyCard: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    paddingVertical: 14,
-  },
-  historyCardLast: {
-    borderBottomWidth: 0,
-    paddingBottom: 0,
-  },
-  historyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  historyIconImage: {
-    width: 24,
-    height: 24,
-    marginRight: 12,
-  },
-  historyInfo: {
-    flex: 1,
-  },
-  historyId: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 2,
-  },
-  historyDate: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  historyFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  historyDistance: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  historyPrice: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
   },
   emptyContainer: {
     backgroundColor: '#FFFFFF',
