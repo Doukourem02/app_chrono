@@ -56,114 +56,7 @@
         "vehicles": "Vehicles",
         "repairs": "Repairs",
         "documents": "Documents",
-        "budget": "Budget",
-        "stats": {
-          "totalVehicles": "Total vehicles",
-          "active": "Active",
-          "maintenance": "In maintenance",
-          "avgOdometer": "Average odometer"
-        },
-        "alerts": {
-          "expiringDocuments": "document(s) expiring soon"
-        },
-        "filters": {
-          "search": "Search by plate, brand, model...",
-          "all": "All",
-          "active": "Active",
-          "maintenance": "Maintenance",
-          "retired": "Retired",
-          "moto": "Motorcycle",
-          "vehicle": "Vehicle",
-          "cargo": "Cargo"
-        },
-        "table": {
-          "plate": "Plate",
-          "type": "Type",
-          "vehicle": "Vehicle",
-          "driver": "Driver",
-          "odometer": "Odometer",
-          "status": "Status",
-          "actions": "Actions",
-          "viewDetails": "View details",
-          "noDriver": "Not assigned",
-          "noVehicles": "No vehicles found",
-          "noVehiclesDesc": "Vehicles will appear here once registered by drivers",
-          "tryFilters": "Try modifying your search filters"
-        },
-        "detail": {
-          "title": "Vehicle details",
-          "tabs": {
-            "overview": "Overview",
-            "finances": "Finances",
-            "mileage": "Mileage",
-            "maintenance": "Maintenance",
-            "documents": "Documents"
-          },
-          "info": {
-            "odometer": "Odometer",
-            "currentDriver": "Current driver",
-            "fuelType": "Fuel type",
-            "notAssigned": "Not assigned",
-            "notSpecified": "Not specified",
-            "updatedOn": "Updated on"
-          },
-          "stats": {
-            "totalRevenue": "Total revenue",
-            "fuelCost": "Fuel cost",
-            "maintenanceCost": "Maintenance cost",
-            "netProfit": "Net profit",
-            "roi": "ROI",
-            "totalDistance": "Total distance",
-            "deliveries": "Deliveries",
-            "avgDistance": "Average distance"
-          },
-          "sections": {
-            "recentFuel": "Recent refueling",
-            "scheduledMaintenance": "Scheduled maintenance",
-            "financialSummary": "Financial summary (last period)",
-            "maintenanceHistory": "Maintenance history",
-            "legalDocuments": "Legal documents",
-            "deliveryHistory": "Delivery history"
-          },
-          "maintenance": {
-            "schedule": "Schedule maintenance",
-            "noMaintenance": "No maintenance recorded",
-            "status": {
-              "completed": "Completed",
-              "scheduled": "Scheduled",
-              "overdue": "Overdue",
-              "cancelled": "Cancelled"
-            },
-            "scheduled": "Scheduled",
-            "completed": "Completed",
-            "atOdometer": "at odometer"
-          },
-          "documents": {
-            "noDocuments": "No documents recorded",
-            "noDocumentsDesc": "Documents will be recorded by drivers in their application",
-            "viewDocument": "View document",
-            "issueDate": "Issue date",
-            "expiryDate": "Expiry date",
-            "expired": "Expired",
-            "expiringSoon": "Expiring soon"
-          },
-          "mileage": {
-            "noMileage": "No mileage recorded",
-            "noMileageDesc": "Mileage will be automatically recorded after each delivery",
-            "date": "Date",
-            "distance": "Distance",
-            "odometer": "Odometer",
-            "revenue": "Revenue"
-          },
-          "finances": {
-            "noData": "No financial data available",
-            "noDataDesc": "Financial data will be calculated automatically after the first deliveries",
-            "period": "Period",
-            "revenue": "Revenue",
-            "fuelCost": "Fuel cost",
-            "maintenanceCost": "Maintenance cost"
-          }
-        }
+        "budget": "Budget"
       }
     },
     "profile": {
@@ -318,5 +211,123 @@
       }
     },
     "comingSoon": "Coming soon"
+  },
+  "maintenance": {
+    "stats": {
+      "totalVehicles": "Total vehicles",
+      "active": "Active",
+      "maintenance": "In maintenance",
+      "retiredVehicles": "Retired vehicles",
+      "avgOdometer": "Average odometer",
+      "expiringDocuments": "document(s) expiring soon",
+      "expiringSoon": "Expiring soon",
+      "noExpiringDocuments": "No documents expiring soon"
+    },
+    "alerts": {
+      "expiringDocuments": "document(s) expiring soon"
+    },
+    "filters": {
+      "search": "Search by plate, brand, model...",
+      "all": "All",
+      "active": "Active",
+      "maintenance": "In maintenance",
+      "retired": "Retired",
+      "reserved": "Reserved",
+      "moto": "Motorcycle",
+      "vehicule": "Vehicle",
+      "cargo": "Cargo"
+    },
+    "table": {
+      "plate": "Plate",
+      "type": "Type",
+      "vehicle": "Vehicle",
+      "driver": "Driver",
+      "odometer": "Odometer",
+      "status": "Status",
+      "actions": "Actions",
+      "viewDetails": "View details",
+      "active": "Active",
+      "maintenance": "In maintenance",
+      "retired": "Retired",
+      "reserved": "Reserved",
+      "noDriver": "Not assigned",
+      "noVehicles": "No vehicles found",
+      "noVehiclesDesc": "Vehicles will appear here once registered by drivers",
+      "tryFilters": "Try modifying your search filters"
+    },
+    "detail": {
+      "title": "Vehicle details",
+      "tabs": {
+        "overview": "Overview",
+        "finances": "Finances",
+        "mileage": "Mileage",
+        "maintenance": "Repairs",
+        "documents": "Documents"
+      },
+      "info": {
+        "purchaseDate": "Purchase date",
+        "purchasePrice": "Purchase price",
+        "fuelType": "Fuel type",
+        "lastOdometerUpdate": "Last odometer update",
+        "driver": "Current driver",
+        "noDriver": "Not assigned"
+      },
+      "stats": {
+        "totalRevenue": "Total revenue",
+        "totalFuelCost": "Total fuel cost",
+        "totalMaintenanceCost": "Total maintenance cost",
+        "netProfit": "Net profit",
+        "roi": "ROI",
+        "totalDistance": "Total distance",
+        "totalDeliveries": "Total deliveries"
+      },
+      "sections": {
+        "recentFuel": "Recent fuel logs",
+        "scheduledMaintenance": "Scheduled repairs",
+        "financialSummary": "Financial summary (last period)",
+        "maintenanceHistory": "Repair history",
+        "legalDocuments": "Legal documents",
+        "deliveryHistory": "Delivery history"
+      },
+      "maintenance": {
+        "schedule": "Schedule repair",
+        "noMaintenance": "No repairs recorded",
+        "status": {
+          "completed": "Completed",
+          "scheduled": "Scheduled",
+          "overdue": "Overdue",
+          "cancelled": "Cancelled"
+        },
+        "scheduled": "Scheduled",
+        "completed": "Completed",
+        "atOdometer": "at odometer"
+      },
+      "documents": {
+        "noDocuments": "No documents recorded",
+        "noDocumentsDesc": "Documents will be recorded by drivers in their app",
+        "viewDocument": "View document",
+        "issueDate": "Issue date",
+        "expiryDate": "Expiry date",
+        "expired": "Expired",
+        "expiringSoon": "Expiring soon",
+        "isValid": "Valid"
+      },
+      "mileage": {
+        "noMileage": "No mileage recorded",
+        "noMileageDesc": "Mileage will be recorded automatically after each delivery",
+        "date": "Date",
+        "distance": "Distance",
+        "odometer": "Odometer",
+        "revenue": "Revenue"
+      },
+      "finances": {
+        "noData": "No financial data available",
+        "noDataDesc": "Financial data will be calculated automatically after the first deliveries",
+        "period": "Period",
+        "revenue": "Revenue",
+        "fuelCost": "Fuel cost",
+        "maintenanceCost": "Maintenance cost"
+      }
+    }
   }
 }

@@ -140,27 +140,22 @@ export default function FleetPage() {
     return new Intl.NumberFormat('fr-FR').format(km)
   }
 
-  const pageContainerStyle: React.CSSProperties = {
+  const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
-    padding: '24px',
+    gap: '24px',
   }
 
   const headerRowStyle: React.CSSProperties = {
     display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     gap: '16px',
-    marginBottom: '8px',
   }
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '30px',
+    fontSize: '24px',
     fontWeight: 700,
     color: themeColors.textPrimary,
-    lineHeight: '1.2',
   }
 
   const subtitleStyle: React.CSSProperties = {
@@ -169,9 +164,52 @@ export default function FleetPage() {
     marginTop: '4px',
   }
 
+  const filtersContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '16px',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  }
+
+  const searchContainerStyle: React.CSSProperties = {
+    position: 'relative',
+    flex: 1,
+    minWidth: '250px',
+  }
+
+  const searchInputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '12px 16px 12px 44px',
+    borderRadius: '12px',
+    border: `1px solid ${themeColors.cardBorder}`,
+    fontSize: '14px',
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textPrimary,
+    outline: 'none',
+    transition: 'all 0.2s',
+  }
+
+  const selectStyle: React.CSSProperties = {
+    padding: '10px 16px',
+    paddingRight: '40px',
+    borderRadius: '8px',
+    border: `1px solid ${themeColors.cardBorder}`,
+    backgroundColor: themeColors.cardBg,
+    color: themeColors.textPrimary,
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    outline: 'none',
+    appearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
+    transition: 'all 0.2s',
+  }
+
   return (
     <ScreenTransition>
-      <div style={pageContainerStyle}>
+      <div style={containerStyle}>
         {/* Header */}
         <div style={headerRowStyle}>
           <div>
@@ -284,90 +322,53 @@ export default function FleetPage() {
         )}
 
         {/* Filtres et recherche */}
-        <AnimatedCard index={0} delay={0} style={{
-          backgroundColor: themeColors.cardBg,
-          borderRadius: '16px',
-          padding: '20px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          border: `1px solid ${themeColors.cardBorder}`,
-        }}>
-          <div className="flex flex-col md:flex-row gap-4">
+        <div style={filtersContainerStyle}>
             {/* Recherche */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: themeColors.textSecondary }} />
+            <div style={searchContainerStyle}>
+              <Search
+                size={20}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: themeColors.textTertiary,
+                  pointerEvents: 'none',
+                }}
+              />
               <input
                 type="text"
                 placeholder={t('maintenance.filters.search')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border transition-all focus:outline-none focus:ring-2"
-                style={{
-                  backgroundColor: themeColors.background,
-                  borderColor: themeColors.cardBorder,
-                  color: themeColors.textPrimary,
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = themeColors.purplePrimary
-                  e.target.style.boxShadow = `0 0 0 3px ${themeColors.purplePrimary}20`
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = themeColors.cardBorder
-                  e.target.style.boxShadow = 'none'
-                }}
+                style={searchInputStyle}
               />
             </div>
 
             {/* Filtre statut */}
-            <div className="flex gap-2 flex-wrap">
-              {(['all', 'active', 'maintenance', 'retired'] as VehicleStatus[]).map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-80"
-                  style={
-                    statusFilter === status
-                      ? {
-                          backgroundColor: themeColors.purplePrimary,
-                          color: 'white',
-                          boxShadow: `0 2px 8px ${themeColors.purplePrimary}40`,
-                        }
-                      : {
-                          backgroundColor: '#F3F4F6',
-                          color: themeColors.textSecondary,
-                        }
-                  }
-                >
-                  {status === 'all' ? t('maintenance.filters.all') : status === 'active' ? t('maintenance.filters.active') : status === 'maintenance' ? t('maintenance.filters.maintenance') : t('maintenance.filters.retired')}
-                </button>
-              ))}
-            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as VehicleStatus)}
+              style={selectStyle}
+            >
+              <option value="all">Tous les statuts</option>
+              <option value="active">{t('maintenance.filters.active')}</option>
+              <option value="maintenance">{t('maintenance.filters.maintenance')}</option>
+              <option value="retired">{t('maintenance.filters.retired')}</option>
+            </select>
 
             {/* Filtre type */}
-            <div className="flex gap-2 flex-wrap">
-              {(['all', 'moto', 'vehicule', 'cargo'] as VehicleType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setTypeFilter(type)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-80"
-                  style={
-                    typeFilter === type
-                      ? {
-                          backgroundColor: themeColors.purplePrimary,
-                          color: 'white',
-                          boxShadow: `0 2px 8px ${themeColors.purplePrimary}40`,
-                        }
-                      : {
-                          backgroundColor: '#F3F4F6',
-                          color: themeColors.textSecondary,
-                        }
-                  }
-                >
-                  {type === 'all' ? t('maintenance.filters.all') : type === 'moto' ? t('maintenance.filters.moto') : type === 'vehicule' ? t('maintenance.filters.vehicle') : t('maintenance.filters.cargo')}
-                </button>
-              ))}
-            </div>
-          </div>
-        </AnimatedCard>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as VehicleType)}
+              style={selectStyle}
+            >
+              <option value="all">Tous les types</option>
+              <option value="moto">{t('maintenance.filters.moto')}</option>
+              <option value="vehicule">{t('maintenance.filters.vehicule')}</option>
+              <option value="cargo">{t('maintenance.filters.cargo')}</option>
+            </select>
+        </div>
 
         {/* Liste des véhicules */}
         <AnimatedCard index={0} delay={0} style={{

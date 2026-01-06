@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Settings,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,Car,} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,Car,Wrench,Shield,Sliders,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -72,7 +72,7 @@ const navigationSectionsKeys = [
     items: [
       { href: "/maintenance", icon: Car, key: "overview" },
       { href: "/maintenance/vehicles", icon: Truck, key: "vehicles" },
-      { href: "/maintenance/repairs", icon: Settings, key: "repairs" },
+      { href: "/maintenance/repairs", icon: Wrench, key: "repairs" },
       { href: "/maintenance/documents", icon: FileText, key: "documents" },
       { href: "/maintenance/budget", icon: Wallet, key: "budget" },
     ],
@@ -80,12 +80,12 @@ const navigationSectionsKeys = [
   {
     id: "administration",
     key: "administration",
-    icon: Settings,
+    icon: Shield,
     items: [
       { href: "/planning", icon: Calendar, key: "planning" },
       { href: "/promo-codes", icon: Tag, key: "promoCodes" },
       { href: "/disputes", icon: AlertTriangle, key: "disputes" },
-      { href: "/settings", icon: Settings, key: "settings" },
+      { href: "/settings", icon: Sliders, key: "settings" },
     ],
   },
 ];

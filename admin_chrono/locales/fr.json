@@ -56,114 +56,7 @@
         "vehicles": "Véhicules",
         "repairs": "Entretien",
         "documents": "Documents",
-        "budget": "Budget",
-        "stats": {
-          "totalVehicles": "Total véhicules",
-          "active": "Actifs",
-          "maintenance": "En maintenance",
-          "avgOdometer": "Kilométrage moyen"
-        },
-        "alerts": {
-          "expiringDocuments": "document(s) expirant bientôt"
-        },
-        "filters": {
-          "search": "Rechercher par plaque, marque, modèle...",
-          "all": "Tous",
-          "active": "Actifs",
-          "maintenance": "Maintenance",
-          "retired": "Retirés",
-          "moto": "Moto",
-          "vehicle": "Véhicule",
-          "cargo": "Cargo"
-        },
-        "table": {
-          "plate": "Plaque",
-          "type": "Type",
-          "vehicle": "Véhicule",
-          "driver": "Livreur",
-          "odometer": "Kilométrage",
-          "status": "Statut",
-          "actions": "Actions",
-          "viewDetails": "Voir détails",
-          "noDriver": "Non assigné",
-          "noVehicles": "Aucun véhicule trouvé",
-          "noVehiclesDesc": "Les véhicules apparaîtront ici une fois enregistrés par les livreurs",
-          "tryFilters": "Essayez de modifier vos filtres de recherche"
-        },
-        "detail": {
-          "title": "Détails du véhicule",
-          "tabs": {
-            "overview": "Vue d'ensemble",
-            "finances": "Finances",
-            "mileage": "Kilométrage",
-            "maintenance": "Maintenance",
-            "documents": "Documents"
-          },
-          "info": {
-            "odometer": "Kilométrage",
-            "currentDriver": "Livreur actuel",
-            "fuelType": "Type de carburant",
-            "notAssigned": "Non assigné",
-            "notSpecified": "Non spécifié",
-            "updatedOn": "Mis à jour le"
-          },
-          "stats": {
-            "totalRevenue": "Revenus totaux",
-            "fuelCost": "Coût carburant",
-            "maintenanceCost": "Coût maintenance",
-            "netProfit": "Profit net",
-            "roi": "ROI",
-            "totalDistance": "Distance totale",
-            "deliveries": "Livraisons",
-            "avgDistance": "Distance moyenne"
-          },
-          "sections": {
-            "recentFuel": "Ravitaillements récents",
-            "scheduledMaintenance": "Maintenances planifiées",
-            "financialSummary": "Résumé financier (dernière période)",
-            "maintenanceHistory": "Historique des maintenances",
-            "legalDocuments": "Documents légaux",
-            "deliveryHistory": "Historique des livraisons"
-          },
-          "maintenance": {
-            "schedule": "Planifier une maintenance",
-            "noMaintenance": "Aucune maintenance enregistrée",
-            "status": {
-              "completed": "Terminée",
-              "scheduled": "Planifiée",
-              "overdue": "En retard",
-              "cancelled": "Annulée"
-            },
-            "scheduled": "Planifiée",
-            "completed": "Terminée",
-            "atOdometer": "au kilométrage"
-          },
-          "documents": {
-            "noDocuments": "Aucun document enregistré",
-            "noDocumentsDesc": "Les documents seront enregistrés par les livreurs dans leur application",
-            "viewDocument": "Voir le document",
-            "issueDate": "Date d'émission",
-            "expiryDate": "Date d'expiration",
-            "expired": "Expiré",
-            "expiringSoon": "Expire bientôt"
-          },
-          "mileage": {
-            "noMileage": "Aucun kilométrage enregistré",
-            "noMileageDesc": "Le kilométrage sera enregistré automatiquement après chaque livraison",
-            "date": "Date",
-            "distance": "Distance",
-            "odometer": "Kilométrage",
-            "revenue": "Revenu"
-          },
-          "finances": {
-            "noData": "Aucune donnée financière disponible",
-            "noDataDesc": "Les données financières seront calculées automatiquement après les premières livraisons",
-            "period": "Période",
-            "revenue": "Revenus",
-            "fuelCost": "Coût carburant",
-            "maintenanceCost": "Coût maintenance"
-          }
-        }
+        "budget": "Budget"
       }
     },
     "profile": {
@@ -318,5 +211,123 @@
       }
     },
     "comingSoon": "Bientôt disponible"
+  },
+  "maintenance": {
+    "stats": {
+      "totalVehicles": "Total véhicules",
+      "active": "Actifs",
+      "maintenance": "En maintenance",
+      "retiredVehicles": "Véhicules retirés",
+      "avgOdometer": "Kilométrage moyen",
+      "expiringDocuments": "document(s) expirant bientôt",
+      "expiringSoon": "Expire bientôt",
+      "noExpiringDocuments": "Aucun document n'expire bientôt"
+    },
+    "alerts": {
+      "expiringDocuments": "document(s) expirant bientôt"
+    },
+    "filters": {
+      "search": "Rechercher par plaque, marque, modèle...",
+      "all": "Tous",
+      "active": "Actifs",
+      "maintenance": "En maintenance",
+      "retired": "Retirés",
+      "reserved": "Réservés",
+      "moto": "Moto",
+      "vehicule": "Véhicule",
+      "cargo": "Cargo"
+    },
+    "table": {
+      "plate": "Plaque",
+      "type": "Type",
+      "vehicle": "Véhicule",
+      "driver": "Livreur",
+      "odometer": "Kilométrage",
+      "status": "Statut",
+      "actions": "Actions",
+      "viewDetails": "Voir détails",
+      "active": "Actif",
+      "maintenance": "En maintenance",
+      "retired": "Retiré",
+      "reserved": "Réservé",
+      "noDriver": "Non assigné",
+      "noVehicles": "Aucun véhicule trouvé",
+      "noVehiclesDesc": "Les véhicules apparaîtront ici une fois enregistrés par les livreurs",
+      "tryFilters": "Essayez de modifier vos filtres de recherche"
+    },
+    "detail": {
+      "title": "Détails du véhicule",
+      "tabs": {
+        "overview": "Vue d'ensemble",
+        "finances": "Finances",
+        "mileage": "Kilométrage",
+        "maintenance": "Entretien",
+        "documents": "Documents"
+      },
+      "info": {
+        "purchaseDate": "Date d'achat",
+        "purchasePrice": "Prix d'achat",
+        "fuelType": "Type de carburant",
+        "lastOdometerUpdate": "Dernière mise à jour du kilométrage",
+        "driver": "Livreur actuel",
+        "noDriver": "Non assigné"
+      },
+      "stats": {
+        "totalRevenue": "Revenus totaux",
+        "totalFuelCost": "Coût carburant total",
+        "totalMaintenanceCost": "Coût entretien total",
+        "netProfit": "Profit net",
+        "roi": "ROI",
+        "totalDistance": "Distance totale",
+        "totalDeliveries": "Total livraisons"
+      },
+      "sections": {
+        "recentFuel": "Ravitaillements récents",
+        "scheduledMaintenance": "Entretiens planifiés",
+        "financialSummary": "Résumé financier (dernière période)",
+        "maintenanceHistory": "Historique des entretiens",
+        "legalDocuments": "Documents légaux",
+        "deliveryHistory": "Historique des livraisons"
+      },
+      "maintenance": {
+        "schedule": "Planifier un entretien",
+        "noMaintenance": "Aucun entretien enregistré",
+        "status": {
+          "completed": "Terminé",
+          "scheduled": "Planifié",
+          "overdue": "En retard",
+          "cancelled": "Annulé"
+        },
+        "scheduled": "Planifié",
+        "completed": "Terminé",
+        "atOdometer": "au kilométrage"
+      },
+      "documents": {
+        "noDocuments": "Aucun document enregistré",
+        "noDocumentsDesc": "Les documents seront enregistrés par les livreurs dans leur application",
+        "viewDocument": "Voir le document",
+        "issueDate": "Date d'émission",
+        "expiryDate": "Date d'expiration",
+        "expired": "Expiré",
+        "expiringSoon": "Expire bientôt",
+        "isValid": "Valide"
+      },
+      "mileage": {
+        "noMileage": "Aucun kilométrage enregistré",
+        "noMileageDesc": "Le kilométrage sera enregistré automatiquement après chaque livraison",
+        "date": "Date",
+        "distance": "Distance",
+        "odometer": "Kilométrage",
+        "revenue": "Revenu"
+      },
+      "finances": {
+        "noData": "Aucune donnée financière disponible",
+        "noDataDesc": "Les données financières seront calculées automatiquement après les premières livraisons",
+        "period": "Période",
+        "revenue": "Revenus",
+        "fuelCost": "Coût carburant",
+        "maintenanceCost": "Coût entretien"
+      }
+    }
   }
 }
