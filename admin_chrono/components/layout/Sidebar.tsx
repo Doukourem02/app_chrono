@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,Car,Wrench,Shield,Sliders,} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,Car,CarFront,Wrench,Shield,Sliders,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/logo.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -68,9 +68,9 @@ const navigationSectionsKeys = [
   {
     id: "maintenance",
     key: "maintenance",
-    icon: Car,
+    icon: CarFront,
     items: [
-      { href: "/maintenance", icon: Car, key: "overview" },
+      { href: "/maintenance", icon: CarFront, key: "overview" },
       { href: "/maintenance/vehicles", icon: Truck, key: "vehicles" },
       { href: "/maintenance/repairs", icon: Wrench, key: "repairs" },
       { href: "/maintenance/documents", icon: FileText, key: "documents" },

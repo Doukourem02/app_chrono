@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Search, Car, Truck, Package, AlertTriangle, TrendingUp, Gauge, Wrench } from 'lucide-react'
+import { Search, Car, CarFront, Truck, Package, AlertTriangle, TrendingUp, Gauge, Wrench } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
@@ -229,7 +229,7 @@ export default function FleetPage() {
             value={stats.total}
             change={0}
             subtitle="Total véhicules"
-            icon={Car}
+            icon={CarFront}
             iconColor="text-purple-600"
             isLoading={isLoading}
             index={0}
