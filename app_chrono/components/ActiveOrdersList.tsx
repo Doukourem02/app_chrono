@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrderStore } from '../store/useOrderStore';
+import { formatDeliveryId } from '../utils/formatDeliveryId';
 
 interface ActiveOrdersListProps {
   onOrderSelect?: (orderId: string) => void;
@@ -89,7 +90,7 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ onOrderSelec
           >
             <View style={styles.orderHeader}>
               <View style={styles.orderInfo}>
-                <Text style={styles.orderId}>Commande #{order.id.slice(0, 8)}</Text>
+                <Text style={styles.orderId}>{formatDeliveryId(order.id, order.createdAt)}</Text>
                 <View style={[styles.statusBadge, { backgroundColor: `${statusColor}20` }]}>
                   <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                   <Text style={[styles.statusText, { color: statusColor }]}>

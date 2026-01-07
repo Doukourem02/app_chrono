@@ -404,7 +404,7 @@ export default function OrderTrackingPage() {
                 if (router.canGoBack()) {
                   router.back();
                 } else {
-                  router.replace('/(tabs)/box');
+                  router.replace('/profile/order-history');
                 }
               } else {
                 logger.error('Erreur lors de l\'annulation', 'order-tracking', { message: result.message });
@@ -490,7 +490,7 @@ export default function OrderTrackingPage() {
             if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace('/(tabs)/box');
+              router.replace('/profile/order-history');
             }
           }}
         >
@@ -514,7 +514,7 @@ export default function OrderTrackingPage() {
               if (router.canGoBack()) {
                 router.back();
               } else {
-                router.replace('/(tabs)/box');
+                router.replace('/profile/order-history');
               }
             }}
           >
@@ -538,7 +538,7 @@ export default function OrderTrackingPage() {
                 if (router.canGoBack()) {
                   router.back();
                 } else {
-                  router.replace('/(tabs)/box');
+                  router.replace('/profile/order-history');
                 }
               }}
             >
@@ -557,7 +557,7 @@ export default function OrderTrackingPage() {
             if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace('/(tabs)/box');
+              router.replace('/profile/order-history');
             }
           }}
         >

@@ -229,13 +229,18 @@ export default function RevenusPage() {
           <View style={[styles.summaryCard, styles.summaryCardPrimary, styles.summaryCardFull]}>
             <View style={styles.summaryCardHeader}>
               <View style={[styles.summaryIcon, styles.summaryIconPrimary]}>
-                <Ionicons name="wallet" size={20} color="#FFFFFF" />
+                <Ionicons name="wallet" size={24} color="#FFFFFF" />
               </View>
-              <Text style={[styles.summaryLabel, styles.summaryLabelPrimary]}>Revenus totaux</Text>
+              <Text style={[styles.summaryLabel, styles.summaryLabelPrimary]}>REVENUS TOTAUX</Text>
             </View>
             <Text style={[styles.summaryValue, styles.summaryValuePrimary]}>
               {formatCurrency(revenuesData?.totalEarnings || 0)}
             </Text>
+            {revenuesData && revenuesData.totalDeliveries > 0 && (
+              <Text style={styles.summaryHelperPrimary}>
+                Moyenne: {formatCurrency(revenuesData.averageEarningPerDelivery || 0)} / livraison
+              </Text>
+            )}
           </View>
 
           <View style={styles.summaryCard}>
@@ -243,12 +248,31 @@ export default function RevenusPage() {
               <View style={[styles.summaryIcon, { backgroundColor: '#EEF2FF' }]}>
                 <Ionicons name="cube" size={20} color="#4C1D95" />
               </View>
-              <Text style={styles.summaryLabel}>Livraisons</Text>
+              <Text style={styles.summaryLabel}>LIVRAISONS</Text>
             </View>
             <Text style={styles.summaryValue}>
               {revenuesData?.totalDeliveries || 0}
             </Text>
           </View>
+
+          {revenuesData && revenuesData.totalDistance > 0 && (
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryCardHeader}>
+                <View style={[styles.summaryIcon, { backgroundColor: '#F0FDF4' }]}>
+                  <Ionicons name="map" size={20} color="#16A34A" />
+                </View>
+                <Text style={styles.summaryLabel}>DISTANCE</Text>
+              </View>
+              <Text style={styles.summaryValue}>
+                {revenuesData.totalDistance.toFixed(1)} km
+              </Text>
+              {revenuesData.totalDeliveries > 0 && (
+                <Text style={styles.summaryHelper}>
+                  Moyenne: {(revenuesData.totalDistance / revenuesData.totalDeliveries).toFixed(1)} km
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
         {methodKeys.length > 0 && (
@@ -290,12 +314,55 @@ export default function RevenusPage() {
           </View>
         )}
 
+        {revenuesData && revenuesData.orders && revenuesData.orders.length > 0 && (
+          <View style={styles.ordersContainer}>
+            <Text style={styles.sectionTitle}>Historique des commandes</Text>
+            <View style={styles.ordersList}>
+              {revenuesData.orders.slice(0, 10).map((order, index) => (
+                <View key={order.id} style={[styles.orderItem, index === revenuesData.orders.length - 1 && styles.orderItemLast]}>
+                  <View style={styles.orderItemLeft}>
+                    <View style={styles.orderIconContainer}>
+                      <Ionicons 
+                        name={order.delivery_method === 'moto' ? 'bicycle' : order.delivery_method === 'vehicule' ? 'car' : 'cube'} 
+                        size={18} 
+                        color="#4C1D95" 
+                      />
+                    </View>
+                    <View style={styles.orderInfo}>
+                      <Text style={styles.orderMethod}>{getMethodLabel(order.delivery_method)}</Text>
+                      <Text style={styles.orderDate}>
+                        {new Date(order.completed_at || order.created_at).toLocaleDateString('fr-FR', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.orderItemRight}>
+                    <Text style={styles.orderPrice}>{formatCurrency(order.price || 0)}</Text>
+                    {order.distance && (
+                      <Text style={styles.orderDistance}>{order.distance.toFixed(1)} km</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+            {revenuesData.orders.length > 10 && (
+              <Text style={styles.moreOrdersText}>
+                +{revenuesData.orders.length - 10} autres commandes
+              </Text>
+            )}
+          </View>
+        )}
+
         {revenuesData && revenuesData.totalDeliveries === 0 && (
           <View style={styles.emptyContainer}>
             <Ionicons name="card-outline" size={72} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>Aucun revenu</Text>
             <Text style={styles.emptyText}>
-              Vous n’avez pas encore de livraisons {selectedPeriod === 'today' ? 'aujourd’hui' :
+              Vous n&apos;avez pas encore de livraisons {selectedPeriod === 'today' ? 'aujourd&apos;hui' :
               selectedPeriod === 'week' ? 'cette semaine' :
               selectedPeriod === 'month' ? 'ce mois' : ''}
             </Text>
@@ -386,6 +453,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   summaryCardFull: {
     width: '100%',
@@ -393,6 +465,11 @@ const styles = StyleSheet.create({
   summaryCardPrimary: {
     backgroundColor: '#111827',
     borderColor: '#111827',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   summaryCardHeader: {
     flexDirection: 'row',
@@ -424,13 +501,14 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
   },
   summaryValue: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   summaryValuePrimary: {
     color: '#FFFFFF',
+    fontSize: 32,
   },
   summaryHelper: {
     fontSize: 12,
@@ -446,6 +524,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   sectionTitle: {
     fontSize: 18,
@@ -503,11 +586,13 @@ const styles = StyleSheet.create({
   methodEarningsContainer: {
     backgroundColor: '#EEF2FF',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minWidth: 100,
+    alignItems: 'flex-end',
   },
   methodEarnings: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#4C1D95',
   },
@@ -531,5 +616,80 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     paddingHorizontal: 20,
+  },
+  ordersContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  ordersList: {
+    marginTop: 12,
+  },
+  orderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  orderItemLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
+  orderItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  orderIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  orderInfo: {
+    flex: 1,
+  },
+  orderMethod: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  orderDate: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  orderItemRight: {
+    alignItems: 'flex-end',
+  },
+  orderPrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4C1D95',
+    marginBottom: 2,
+  },
+  orderDistance: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  moreOrdersText: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic',
   },
 });

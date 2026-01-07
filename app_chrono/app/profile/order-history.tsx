@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
 import { logger } from '../../utils/logger';
+import { formatDeliveryId } from '../../utils/formatDeliveryId';
 
 interface Order {
   id: string;
@@ -14,6 +15,7 @@ interface Order {
   pickup_address_text?: string;
   dropoff_address_text?: string;
   price?: number;
+  price_cfa?: number;
   created_at: string;
   completed_at?: string;
 }
@@ -82,9 +84,11 @@ export default function OrderHistoryPage() {
     });
   };
 
-  const formatPrice = (price?: number) => {
-    if (!price) return 'N/A';
-    return `${price.toLocaleString()} FCFA`;
+  const formatPrice = (order: Order) => {
+    // Essayer price d'abord, puis price_cfa en fallback
+    const price = order.price ?? order.price_cfa;
+    if (!price || price === 0) return 'N/A';
+    return `${price.toLocaleString('fr-FR')} FCFA`;
   };
 
   return (
@@ -143,7 +147,9 @@ export default function OrderHistoryPage() {
             >
               <View style={styles.orderHeader}>
                 <View style={styles.orderInfo}>
-                  <Text style={styles.orderId}>Commande #{order.id.slice(0, 8)}</Text>
+                  <Text style={styles.orderId}>
+                    {formatDeliveryId(order.id, order.created_at)}
+                  </Text>
                   <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(order.status)}20` }]}>
                     <View style={[styles.statusDot, { backgroundColor: getStatusColor(order.status) }]} />
                     <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>
@@ -151,7 +157,7 @@ export default function OrderHistoryPage() {
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.orderPrice}>{formatPrice(order.price)}</Text>
+                <Text style={styles.orderPrice}>{formatPrice(order)}</Text>
               </View>
 
               <View style={styles.orderDetails}>

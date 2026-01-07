@@ -5,6 +5,7 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { OrderRequest } from "../store/useOrderStore";
 import { formatDurationLabel } from "../services/orderApi";
+import { formatDeliveryId } from "../utils/formatDeliveryId";
 
 interface ShipmentCardProps {
   order: OrderRequest;
@@ -60,7 +61,7 @@ export default function ShipmentCard({
   // Extraire le nom du produit depuis l'adresse ou utiliser un placeholder
   const productName = dropoffAddress 
     ? (dropoffAddress.split(',')[0] || dropoffAddress.substring(0, 30))
-    : `Commande #${order.id.slice(0, 8)}`;
+    : formatDeliveryId(order.id, order.createdAt);
   
   // Naviguer vers la page dédiée au tracking de cette commande
   const handleCardPress = () => {
@@ -91,7 +92,7 @@ export default function ShipmentCard({
           </View>
           <View style={styles.productDetails}>
             <Text style={styles.productName} numberOfLines={1}>{productName}</Text>
-            <Text style={styles.productId}>ID: {order.id.slice(0, 12)}</Text>
+            <Text style={styles.productId}>ID: {formatDeliveryId(order.id, order.createdAt)}</Text>
           </View>
         </View>
       </View>

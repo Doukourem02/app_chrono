@@ -304,78 +304,212 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
       {isExpanded && (
         <View style={styles.expandedCard}>
-          <Text style={styles.title}>Statut de la commande</Text>
+          {/* Afficher la timeline uniquement pour les commandes en cours */}
+          {!isCompleted && status !== 'cancelled' && status !== 'declined' && (
+            <>
+              <Text style={styles.title}>Statut de la commande</Text>
 
-          {isCompleted && (
+              <View style={styles.timelineContainer}>
+                {statusSteps.map((step, index) => {
+                  const anim = stepAnimations[index];
+                  
+                  const circleColor = anim.color.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['#E0E0E0', '#7C3AED'],
+                  });
+                  
+                  const lineColor = anim.color.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['#E0E0E0', '#7C3AED'],
+                  });
+                  
+                  const textColor = anim.color.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['#aaa', '#000'],
+                  });
+
+                  return (
+                    <View key={step.key} style={styles.stepContainer}>
+                      {index !== 0 && (
+                        <Animated.View
+                          style={[
+                            styles.line,
+                            { backgroundColor: lineColor },
+                          ]}
+                        />
+                      )}
+                      <Animated.View
+                        style={[
+                          styles.circle,
+                          {
+                            backgroundColor: circleColor,
+                            borderColor: circleColor,
+                            transform: [{ scale: anim.scale }],
+                          },
+                        ]}
+                      />
+                      <Animated.Text
+                        style={[
+                          styles.stepText,
+                          { 
+                            color: textColor,
+                            opacity: anim.opacity,
+                          },
+                        ]}
+                      >
+                        {step.label}
+                      </Animated.Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {currentOrder?.proof?.uploadedAt && (
+                <View style={styles.proofRow}>
+                  <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                  <Text style={styles.proofText}>
+                    Preuve de livraison reçue
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Pour les commandes terminées/annulées, afficher un message de statut */}
+          {(isCompleted || status === 'cancelled' || status === 'declined') && (
             <View style={styles.completedBanner}>
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              <Ionicons 
+                name={isCompleted ? "checkmark-circle" : "close-circle"} 
+                size={20} 
+                color="#fff" 
+              />
               <Text style={styles.completedBannerText}>
-                Course terminée{currentOrder?.proof?.uploadedAt ? ' — preuve reçue' : ''}
+                {isCompleted 
+                  ? `Course terminée${currentOrder?.proof?.uploadedAt ? ' — preuve reçue' : ''}`
+                  : status === 'cancelled' 
+                  ? 'Commande annulée'
+                  : 'Commande refusée'}
               </Text>
             </View>
           )}
 
-          <View style={styles.timelineContainer}>
-            {statusSteps.map((step, index) => {
-              const anim = stepAnimations[index];
+          {/* Section Détails de la commande pour les commandes terminées/annulées */}
+          {(isCompleted || status === 'cancelled' || status === 'declined') && (
+            <View style={styles.orderDetailsSection}>
+              <Text style={styles.sectionTitle}>Détails de la commande</Text>
               
-              const circleColor = anim.color.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['#E0E0E0', '#7C3AED'],
-              });
-              
-              const lineColor = anim.color.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['#E0E0E0', '#7C3AED'],
-              });
-              
-              const textColor = anim.color.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['#aaa', '#000'],
-              });
-
-              return (
-                <View key={step.key} style={styles.stepContainer}>
-                  {index !== 0 && (
-                    <Animated.View
-                      style={[
-                        styles.line,
-                        { backgroundColor: lineColor },
-                      ]}
-                    />
-                  )}
-                  <Animated.View
-                    style={[
-                      styles.circle,
-                      {
-                        backgroundColor: circleColor,
-                        borderColor: circleColor,
-                        transform: [{ scale: anim.scale }],
-                      },
-                    ]}
-                  />
-                  <Animated.Text
-                    style={[
-                      styles.stepText,
-                      { 
-                        color: textColor,
-                        opacity: anim.opacity,
-                      },
-                    ]}
-                  >
-                    {step.label}
-                  </Animated.Text>
+              {/* Informations de livraison */}
+              <View style={styles.detailRow}>
+                <Ionicons name="location" size={16} color="#8B5CF6" />
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailLabel}>Point de collecte</Text>
+                  <Text style={styles.detailValue} numberOfLines={2}>
+                    {currentOrder?.pickup?.address || 'Adresse non disponible'}
+                  </Text>
                 </View>
-              );
-            })}
-          </View>
-
-          {currentOrder?.proof?.uploadedAt && (
-            <View style={styles.proofRow}>
-              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-              <Text style={styles.proofText}>
-                Preuve de livraison reçue
-              </Text>
+              </View>
+              
+              <View style={styles.detailRow}>
+                <Ionicons name="location-outline" size={16} color="#10B981" />
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailLabel}>Point de livraison</Text>
+                  <Text style={styles.detailValue} numberOfLines={2}>
+                    {currentOrder?.dropoff?.address || 'Adresse non disponible'}
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Informations du livreur */}
+              {currentOrder?.driver && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="person" size={16} color="#6B7280" />
+                  <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Livreur</Text>
+                    <Text style={styles.detailValue}>
+                      {formatUserName(currentOrder.driver, 'Livreur')}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {/* Informations financières */}
+              {currentOrder?.price && typeof currentOrder.price === 'number' && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="cash" size={16} color="#10B981" />
+                  <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Montant</Text>
+                    <Text style={styles.detailValue}>
+                      {currentOrder.price.toLocaleString('fr-FR')} FCFA
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {/* Distance */}
+              {currentOrder?.distance && typeof currentOrder.distance === 'number' && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="map" size={16} color="#3B82F6" />
+                  <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Distance</Text>
+                    <Text style={styles.detailValue}>
+                      {currentOrder.distance.toFixed(1)} km
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {/* Méthode de livraison */}
+              {currentOrder?.deliveryMethod && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="car" size={16} color="#F59E0B" />
+                  <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Méthode</Text>
+                    <Text style={[styles.detailValue, { textTransform: 'capitalize' }]}>
+                      {currentOrder.deliveryMethod === 'moto' ? 'Moto' : 
+                       currentOrder.deliveryMethod === 'vehicule' ? 'Véhicule' : 
+                       currentOrder.deliveryMethod === 'cargo' ? 'Cargo' : 
+                       currentOrder.deliveryMethod}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {/* Dates */}
+              {currentOrder?.createdAt && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="calendar" size={16} color="#6B7280" />
+                  <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Créée le</Text>
+                    <Text style={styles.detailValue}>
+                      {new Date(currentOrder.createdAt).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {currentOrder?.completed_at && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Terminée le</Text>
+                    <Text style={styles.detailValue}>
+                      {new Date(currentOrder.completed_at).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
           )}
 
@@ -413,72 +547,9 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
             </View>
           )}
 
-          <View style={styles.actionBar}>
-            {/* Avatar du livreur à l'extrémité gauche */}
-            {currentOrder?.driver && (
-              <View style={styles.driverAvatarContainer}>
-                {getDriverAvatar() ? (
-                  <Image 
-                    source={{ uri: getDriverAvatar() }} 
-                    style={styles.driverAvatar}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.driverAvatarPlaceholder}>
-                    <Text style={styles.driverAvatarText}>{getDriverInitials()}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-            {/* Actions contextuelles selon le statut */}
-            <View style={styles.actionButtons}>
-              {status === 'pending' || status === 'accepted' ? (
-                // Pending/Accepted : Annuler + Message
-                <>
-                  {canCancel && (
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.cancelButton]} 
-                      onPress={onCancel}
-                    >
-                      <Ionicons name="close-circle" size={20} color="#fff" />
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity 
-                    style={styles.actionButton}
-                    onPress={onMessage}
-                  >
-                    <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
-                  </TouchableOpacity>
-                </>
-              ) : status === 'enroute' || status === 'picked_up' || status === 'delivering' ? (
-                // En route/Picked up/Delivering : Message + QR code (moment critique)
-                <>
-                  <TouchableOpacity 
-                    style={styles.actionButton}
-                    onPress={onMessage}
-                  >
-                    <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.actionButton}
-                    onPress={() => setShowQRCode(true)}
-                  >
-                    <Ionicons name="qr-code-outline" size={20} color="#fff" />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                // Completed : Message uniquement
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={onMessage}
-                >
-                  <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
 
-          {onNewOrder && (
+          {/* Afficher le bouton "Nouvelle commande" uniquement pour les commandes en cours */}
+          {onNewOrder && !isCompleted && status !== 'cancelled' && status !== 'declined' && (
             <TouchableOpacity 
               style={styles.newOrderButton}
               onPress={onNewOrder}
@@ -748,6 +819,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
+  },
+  orderDetailsSection: {
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  detailContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#1F2937',
+    lineHeight: 20,
   },
   ratingSection: {
     marginTop: 16,

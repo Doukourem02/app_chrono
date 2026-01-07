@@ -42,19 +42,6 @@ export default function TabLayout() {
           }}
         />
 
-        {/* COLIS */}
-        <Tabs.Screen
-          name="box"
-          options={{
-            title: 'Colis',
-            tabBarIcon: ({ focused }) => (
-              <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-                <Ionicons name="cube" size={20} color={focused ? '#fff' : '#555'} />
-              </View>
-            ),
-          }}
-        />
-
         {/* PROFIL */}
         <Tabs.Screen
           name="profile"

@@ -15,7 +15,7 @@ export default function ActionCards() {
 
   const handleTrackPackage = () => {
     requireAuth(() => {
-      router.push("/(tabs)/box" as any);
+      router.push("/profile/order-history" as any);
     });
   };
 
