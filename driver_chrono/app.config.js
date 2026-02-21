@@ -34,6 +34,7 @@ module.exports = {
       favicon: "./assets/images/favicon.png"
     },
     plugins: [
+      "./plugins/withDisplayName.js",
       "expo-router",
       [
         "expo-camera",
