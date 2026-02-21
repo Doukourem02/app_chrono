@@ -1,6 +1,6 @@
 /**
  * Service pour récupérer les directions via Mapbox Directions API
- * Remplace Google Directions API
+ * Service Mapbox Directions
  */
 
 const MAPBOX_DIRECTIONS_URL = "https://api.mapbox.com/directions/v5/mapbox/driving-traffic";
@@ -41,7 +41,7 @@ export async function fetchMapboxDirections(
     return null;
   }
 
-  // Mapbox utilise lng,lat (inversé par rapport à Google)
+  // Mapbox utilise lng,lat
   const coords = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
   const url = `${MAPBOX_DIRECTIONS_URL}/${coords}?geometries=geojson&access_token=${accessToken}`;
 

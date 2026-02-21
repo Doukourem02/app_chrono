@@ -1,17 +1,16 @@
 /**
- * Utilitaires pour gérer les données de trafic (Mapbox / Google)
+ * Utilitaires pour gérer les données de trafic (Mapbox)
  */
 
 export interface TrafficData {
-  durationInTraffic?: number // Durée en secondes avec trafic (Mapbox: duration_typical, Google: duration_in_traffic)
+  durationInTraffic?: number // Durée en secondes avec trafic (Mapbox: duration_typical)
   durationBase?: number // Durée en secondes sans trafic
   hasTrafficData: boolean
 }
 
 /**
- * Extrait les données de trafic depuis une réponse Mapbox ou Google Directions
+ * Extrait les données de trafic depuis une réponse Mapbox Directions
  * Mapbox: duration_typical | duration
- * Google: duration_in_traffic | duration
  */
 export function extractTrafficData(leg: {
   duration_typical?: number;

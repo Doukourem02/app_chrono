@@ -307,9 +307,9 @@ export const ErrorTypes = {
       navigation: {
         title: 'Application de navigation non disponible',
         message: 'Impossible d\'ouvrir l\'application de navigation.',
-        explanation: 'Votre appareil ne peut pas ouvrir une application de navigation. Cela peut être dû à l\'absence d\'une application de navigation installée (Google Maps, Waze, etc.).',
+        explanation: 'Votre appareil ne peut pas ouvrir une application de navigation. Cela peut être dû à l\'absence d\'une application de navigation installée (Maps, Waze, etc.).',
         suggestions: [
-          'Installez une application de navigation (Google Maps, Waze, etc.)',
+          'Installez une application de navigation (Maps, Waze, etc.)',
           'Réessayez après installation',
         ],
       },

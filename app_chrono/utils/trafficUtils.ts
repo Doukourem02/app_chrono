@@ -1,5 +1,5 @@
 /**
- * Utilitaires pour gérer les données de trafic Google Maps
+ * Utilitaires pour gérer les données de trafic (Mapbox)
  */
 
 export interface TrafficData {
@@ -9,7 +9,7 @@ export interface TrafficData {
 }
 
 /**
- * Extrait les données de trafic depuis une réponse Google Directions API
+ * Extrait les données de trafic depuis une réponse Mapbox Directions
  */
 export function extractTrafficData(leg: any): TrafficData {
   const durationInTraffic = leg.duration_in_traffic?.value

@@ -147,7 +147,7 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const { latitude, longitude } = order.dropoff.coordinates;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    const url = `geo:${latitude},${longitude}`;
     Linking.openURL(url).catch(() => {
       Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application de navigation');
     });

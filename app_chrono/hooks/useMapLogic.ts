@@ -397,7 +397,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         setRegion(newRegion);
         setPickupCoords({ latitude, longitude });
 
-        // Reverse geocoding : Mapbox (priorité) > Nominatim > Google > Expo (via locationService)
+        // Reverse geocoding : Mapbox (priorité) > Nominatim > Expo (via locationService)
         const address = await locationService.reverseGeocode({
           latitude,
           longitude,

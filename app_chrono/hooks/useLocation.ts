@@ -22,7 +22,7 @@ export const useLocation = () => {
 
   const reverseGeocodeWithCache = useCallback(async (coords: { latitude: number; longitude: number }) => {
     // Utiliser le service centralisé de localisation pour le reverse geocoding
-    // Le service utilisera automatiquement Google Geocoding API si disponible
+    // Le service utilise Mapbox pour le géocodage
     try {
       const address = await locationService.reverseGeocode({
         latitude: coords.latitude,

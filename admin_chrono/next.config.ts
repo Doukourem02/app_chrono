@@ -88,7 +88,6 @@ const nextConfig: NextConfig = {
       "'self'",
       "https://*.supabase.co",
       "wss://*.supabase.co",
-      "https://maps.googleapis.com",
       "https://api.mapbox.com",
       "https://events.mapbox.com",
       "https://*.tiles.mapbox.com",
@@ -128,12 +127,12 @@ const nextConfig: NextConfig = {
       "default-src 'self'",
       // En prod: on retire 'unsafe-eval' (utile surtout en dev). On garde 'unsafe-inline' car Next.js émet
       // des scripts inline sans nonce/hashes configurés dans ce projet.
-      `script-src 'self' ${isDevelopment ? "'unsafe-eval' " : ''}'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://api.mapbox.com`,
+      `script-src 'self' ${isDevelopment ? "'unsafe-eval' " : ''}'unsafe-inline' https://api.mapbox.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "img-src 'self' data: https: blob: http://maps.google.com http://maps.gstatic.com https://api.mapbox.com",
+      "img-src 'self' data: https: blob: https://api.mapbox.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       `connect-src ${connectSrcDirectives.join(' ')}`,
-      "frame-src 'self' https://maps.googleapis.com https://api.mapbox.com",
+      "frame-src 'self' https://api.mapbox.com",
       "worker-src 'self' blob:",
       "child-src 'self' blob:",
       "object-src 'none'",

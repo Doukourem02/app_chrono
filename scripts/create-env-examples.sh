@@ -110,10 +110,10 @@ NEXT_PUBLIC_API_URL=https://api.yourdomain.com
 NEXT_PUBLIC_SOCKET_URL=https://api.yourdomain.com
 
 # ============================================
-# GOOGLE MAPS
+# MAPBOX
 # ============================================
-# Clé API Google Maps pour les cartes
-NEXT_PUBLIC_GOOGLE_API_KEY=your-google-maps-api-key
+# Token Mapbox pour les cartes
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your-mapbox-access-token
 EOF
 
 # App Client
@@ -140,10 +140,10 @@ EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 
 # ============================================
-# GOOGLE MAPS
+# MAPBOX
 # ============================================
-# Clé API Google Maps pour les cartes
-EXPO_PUBLIC_GOOGLE_API_KEY=your-google-maps-api-key
+# Token Mapbox pour les cartes
+EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=your-mapbox-access-token
 
 # ============================================
 # SENTRY (Optionnel)
@@ -176,10 +176,10 @@ EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 
 # ============================================
-# GOOGLE MAPS
+# MAPBOX
 # ============================================
-# Clé API Google Maps pour les cartes
-EXPO_PUBLIC_GOOGLE_API_KEY=your-google-maps-api-key
+# Token Mapbox pour les cartes
+EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=your-mapbox-access-token
 
 # ============================================
 # SENTRY (Optionnel)

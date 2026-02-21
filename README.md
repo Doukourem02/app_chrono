@@ -555,11 +555,9 @@ Tests automatisés à venir (TODO commun aux 4 projets).
 | ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | WebSocket indisponible                   | Vérifier backend, `*_SOCKET_URL`, CORS                                                                   |
 | DB inaccessible                          | Migrations exécutées ? `DATABASE_URL` correct ?                                                          |
-| Google Maps vide                         | Permissions + `EXPO/NEXT_PUBLIC_GOOGLE_API_KEY`                                                          |
+| Carte vide                               | Vérifier `MAPBOX_ACCESS_TOKEN` / `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN`                                       |
 | Dashboard boucle de fetch                | Tenir compte des instructions dans `admin_chrono/README` local (filtres de dates, query keys stabilisés) |
 | **Erreur CSP (Content Security Policy)** | Voir [Configuration CSP](#configuration-csp-pour-admin_chrono)                                           |
-| **Erreur Google Maps Billing**           | Voir [Guide Google Maps](#google-maps-configuration)                                                     |
-| **Erreur DeletedApiProjectMapError**     | Voir [Guide Google Maps](#google-maps-configuration)                                                     |
 | **Scanner QR code ne fonctionne pas**    | Nécessite un développement build (voir [Apps mobiles](#apps-mobiles))                                    |
 | **Crash lors de la 2ème commande**       | Vérifier que le backend est à jour avec les dernières corrections                                        |
 | **Erreur "aucun userId"**                | L'utilisateur doit être connecté avant de créer une commande                                             |
@@ -574,34 +572,9 @@ Le dashboard admin utilise Content Security Policy (CSP) pour la sécurité. Si 
 
 **Note :** Le CSP est configuré dynamiquement pour autoriser l'URL du backend définie dans `NEXT_PUBLIC_API_URL`.
 
-### Google Maps Configuration
+### Mapbox Configuration
 
-#### Erreurs de facturation (`BillingNotEnabledMapError`)
-
-Même si vous avez configuré un compte de facturation, cette erreur peut survenir si :
-
-1. **Les APIs ne sont pas activées** dans Google Cloud Console :
-
-   - Maps JavaScript API (obligatoire)
-   - Places API (obligatoire)
-   - Geocoding API (recommandé)
-
-2. **Le projet n'est pas lié au compte de facturation**
-
-3. **La clé API n'est pas correctement configurée**
-
-**Guide complet :** Voir `admin_chrono/docs/GOOGLE_MAPS_BILLING_FIX.md`
-
-#### Erreur projet supprimé (`DeletedApiProjectMapError`)
-
-Si vous voyez cette erreur, le projet Google Cloud associé à votre clé API a été supprimé. Vous devez :
-
-1. Créer un nouveau projet Google Cloud
-2. Activer les APIs nécessaires
-3. Créer une nouvelle clé API
-4. Mettre à jour `NEXT_PUBLIC_GOOGLE_API_KEY` dans `.env.local`
-
-**Guide complet :** Voir `admin_chrono/docs/GOOGLE_MAPS_BILLING_FIX.md`
+Les cartes utilisent Mapbox. Configurez `MAPBOX_ACCESS_TOKEN` (backend) et `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` / `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` (apps) dans vos fichiers `.env`. Obtenez un token sur [account.mapbox.com](https://account.mapbox.com).
 
 ### Apps mobiles - Développement Build
 
@@ -641,12 +614,6 @@ npx expo run:android
 
 ### Guides de dépannage
 
-- **Google Maps (Admin)** : `admin_chrono/docs/GOOGLE_MAPS_BILLING_FIX.md`
-
-  - Résolution des erreurs de facturation
-  - Résolution de l'erreur `DeletedApiProjectMapError`
-  - Configuration des APIs Google Cloud
-
 - **Scanner QR Code (Driver)** : `driver_chrono/docs/TROUBLESHOOTING.md`
   - Configuration du développement build
   - Résolution des erreurs de modules natifs
@@ -659,7 +626,6 @@ PROJET_CHRONO/
 ├── docs/
 │   └── ENV_VARIABLES_GUIDE.md          # Guide des variables d'environnement
 ├── admin_chrono/docs/
-│   ├── GOOGLE_MAPS_BILLING_FIX.md      # Résolution erreurs Google Maps
 │   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers
 │   ├── NOTIFICATIONS_BEHAVIOR.md       # Comportement des notifications
 │   └── PROPOSITION_GESTION_LIVREURS_PARTENAIRES.md
@@ -678,7 +644,7 @@ PROJET_CHRONO/
 - [Socket.IO docs](https://socket.io/docs/)
 - [Next.js docs](https://nextjs.org/docs)
 - [React Query docs](https://tanstack.com/query)
-- [Google Maps Platform](https://developers.google.com/maps)
+- [Mapbox](https://docs.mapbox.com/)
 
 ---
 

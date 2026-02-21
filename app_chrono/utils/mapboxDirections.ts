@@ -1,6 +1,6 @@
 /**
  * Service pour récupérer les directions via Mapbox Directions API
- * Remplace Google Directions API
+ * Service Mapbox Directions
  */
 
 const MAPBOX_DIRECTIONS_URL = "https://api.mapbox.com/directions/v5/mapbox/driving-traffic";
