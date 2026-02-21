@@ -30,7 +30,7 @@ export default function VehiclePage() {
   });
 
   // État pour les documents légaux
-  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [, setLoadingDocuments] = useState(false);
   const [documents, setDocuments] = useState<{
     carte_grise: DocumentData;
     assurance: DocumentData;
@@ -530,7 +530,7 @@ export default function VehiclePage() {
             <View style={styles.documentCard}>
               <Text style={styles.documentTitle}>Contrôle technique</Text>
               <View style={styles.dateInput}>
-                <Text style={styles.dateLabel}>Date d'expiration</Text>
+                <Text style={styles.dateLabel}>Date d&apos;expiration</Text>
                 <TextInput
                   style={styles.input}
                   value={documents.controle_technique.expiry_date || ''}
@@ -583,7 +583,7 @@ export default function VehiclePage() {
             <View style={styles.documentCard}>
               <Text style={styles.documentTitle}>Permis de conduire</Text>
               <View style={styles.dateInput}>
-                <Text style={styles.dateLabel}>Date d'expiration</Text>
+                <Text style={styles.dateLabel}>Date d&apos;expiration</Text>
                 <TextInput
                   style={styles.input}
                   value={documents.permis_conduire.expiry_date || ''}

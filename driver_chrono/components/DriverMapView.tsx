@@ -25,19 +25,19 @@ interface DriverMapViewProps {
   orderFullRouteCoords: Coordinates[];
   currentPickupCoord: Coordinates | null;
   currentDropoffCoord: Coordinates | null;
-  activeOrders: Array<{
+  activeOrders: {
     id: string;
     pickup?: unknown;
     dropoff?: unknown;
     status?: string;
     user?: { name?: string };
-  }>;
-  pendingOrders: Array<{
+  }[];
+  pendingOrders: {
     id: string;
     pickup?: unknown;
     dropoff?: unknown;
     status?: string;
-  }>;
+  }[];
   resolveCoords: (candidate?: unknown) => Coordinates | null;
   calculateDistanceToPickup: (order: unknown) => number | null;
   setSelectedOrder: (orderId: string) => void;
@@ -56,7 +56,6 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
   activeOrders,
   pendingOrders,
   resolveCoords,
-  calculateDistanceToPickup,
   setSelectedOrder,
   realTimeETA,
   isOnline,
@@ -97,7 +96,7 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
   if (Platform.OS === 'web') {
     return (
       <View style={styles.map}>
-        <Text>Mapbox n'est pas disponible sur web. Utilisez un dev build iOS/Android.</Text>
+        <Text>Mapbox n&apos;est pas disponible sur web. Utilisez un dev build iOS/Android.</Text>
       </View>
     );
   }
@@ -164,7 +163,6 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
         const dropoffCoord = resolveCoords(order.dropoff);
         const status = String(order.status || '');
         const isPending = status === 'pending';
-        const distance = calculateDistanceToPickup(order);
 
         return (
           <React.Fragment key={order.id}>

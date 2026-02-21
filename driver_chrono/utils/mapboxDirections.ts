@@ -5,19 +5,19 @@
 const MAPBOX_DIRECTIONS_URL = "https://api.mapbox.com/directions/v5/mapbox/driving-traffic";
 
 export interface MapboxRouteResult {
-  coordinates: Array<{ lat: number; lng: number }>;
+  coordinates: { lat: number; lng: number }[];
   duration: number;
   durationTypical?: number;
   distance: number;
 }
 
 export interface MapboxDirectionsResponse {
-  routes?: Array<{
+  routes?: {
     geometry?: { coordinates?: [number, number][] };
-    legs?: Array<{ duration?: number; duration_typical?: number; distance?: number }>;
+    legs?: { duration?: number; duration_typical?: number; distance?: number }[];
     duration?: number;
     distance?: number;
-  }>;
+  }[];
   code?: string;
   message?: string;
 }

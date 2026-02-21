@@ -266,6 +266,8 @@ export const useAnimatedRoute = ({
 
     const timeoutId = setTimeout(loadRoute, 300);
     return () => clearTimeout(timeoutId);
+    // originKey/destKey = équivalents stables de origin/destination (évite boucles infinies)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [originKey, destKey, enabled, fetchRoute, animateRoute, onRouteCalculated]);
 
   // Recalcul périodique pour tenir compte du trafic en temps réel
@@ -298,6 +300,8 @@ export const useAnimatedRoute = ({
     // Vérifier toutes les 2 minutes si un recalcul est nécessaire
     const intervalId = setInterval(recalculateRoute, TRAFFIC_RECALC_INTERVAL);
     return () => clearInterval(intervalId);
+    // originKey/destKey = équivalents stables ; TRAFFIC_RECALC_INTERVAL constant
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, originKey, destKey, routeCoordinates.length, fetchRoute]);
 
   // Nettoyer l'animation au démontage
