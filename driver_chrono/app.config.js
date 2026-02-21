@@ -3,7 +3,7 @@ require('dotenv').config({ path: '.env' });
 module.exports = {
   expo: {
     owner: "doukourem02",
-    name: "driver_chrono",
+    name: "Chrono Pro",
     slug: "driver_chrono",
     version: "1.0.0",
     orientation: "portrait",
@@ -14,6 +14,9 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.driver-chrono",
       supportsTablet: true,
+      infoPlist: {
+        CFBundleDisplayName: "Chrono Pro",
+      },
     },
     android: {
       package: "com.anonymous.driver_chrono",

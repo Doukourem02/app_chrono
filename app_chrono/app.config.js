@@ -3,7 +3,7 @@ require('dotenv').config({ path: '.env' });
 module.exports = {
   expo: {
     owner: "doukourem02",
-    name: "app_chrono",
+    name: "Chrono",
     slug: "app_chrono",
     version: "1.0.0",
     orientation: "portrait",
@@ -14,6 +14,9 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       supportsTablet: true,
+      infoPlist: {
+        CFBundleDisplayName: "Chrono",
+      },
     },
     android: {
       package: "com.anonymous.app_chrono",

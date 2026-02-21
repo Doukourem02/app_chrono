@@ -59,7 +59,9 @@ export interface OrderRequest {
 interface OrderStore {
   activeOrders: OrderRequest[]; 
   selectedOrderId: string | null; 
-  driverCoords: Map<string, { latitude: number; longitude: number }>; 
+  driverCoords: Map<string, { latitude: number; longitude: number }>;
+  /** Quand true, afficher le formulaire de création au lieu du suivi (ex: retour depuis Détails de la course) */
+  preferCreationForm: boolean;
   
   addOrder: (order: OrderRequest) => void;
   updateOrder: (orderId: string, updates: Partial<OrderRequest>) => void;
@@ -69,6 +71,7 @@ interface OrderStore {
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   updateFromSocket: (payload: { order?: Partial<OrderRequest> | null; location?: { latitude?: number; longitude?: number } | null; proof?: any }) => void;
   clear: () => void;
+  setPreferCreationForm: (value: boolean) => void;
   
   getCurrentOrder: () => OrderRequest | null;
   getPendingOrder: () => OrderRequest | null;
@@ -80,6 +83,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   activeOrders: [],
   selectedOrderId: null,
   driverCoords: new Map(),
+  preferCreationForm: false,
 
   addOrder: (order) => set((state) => {
     // Ne pas ajouter les commandes complétées, annulées ou déclinées
@@ -147,6 +151,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   }),
 
   setSelectedOrder: (orderId) => set({ selectedOrderId: orderId }),
+  setPreferCreationForm: (value) => set({ preferCreationForm: value }),
 
   setDriverCoordsForOrder: (orderId, coords) => set((state) => {
     const newCoords = new Map(state.driverCoords);
@@ -328,10 +333,11 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     }
   },
 
-  clear: () => set({ 
+  clear: () => set({
     activeOrders: [],
     selectedOrderId: null,
     driverCoords: new Map(),
+    preferCreationForm: false,
   }),
 
   getCurrentOrder: () => {

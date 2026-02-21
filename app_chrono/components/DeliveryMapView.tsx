@@ -363,12 +363,13 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             allowOverlap
           >
             <View style={styles.driverMarkerWithETA}>
-              {realTimeETA && (
-                <ETABadge
-                  value={realTimeETA.formattedETA.toLowerCase().includes('arrivé') ? '✓' : realTimeETA.etaMinutes.toString()}
-                  unit={realTimeETA.formattedETA.toLowerCase().includes('arrivé') ? 'Arrivé' : 'min'}
-                />
-              )}
+              {realTimeETA && (() => {
+                const isArrived = realTimeETA.formattedETA.toLowerCase().includes('arrivé')
+                const isAtDropoff = orderStatus === 'picked_up' || orderStatus === 'delivering'
+                const badgeUnit = isArrived && isAtDropoff ? 'Livrer à signer' : isArrived ? 'Arrivé' : 'min'
+                const badgeValue = isArrived ? '✓' : realTimeETA.etaMinutes.toString()
+                return <ETABadge value={badgeValue} unit={badgeUnit} />
+              })()}
               <AnimatedVehicleMarker
                 vehicleType={selectedMethod === 'moto' ? 'moto' : selectedMethod === 'cargo' ? 'cargo' : 'vehicule'}
                 bearing={driverBearing}

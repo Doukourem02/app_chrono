@@ -121,6 +121,8 @@ export default function MapPage() {
     selectedOrderId,
     driverCoords: orderDriverCoordsMap,
     setSelectedOrder,
+    preferCreationForm,
+    setPreferCreationForm,
   } = useOrderStore();
 
   const {
@@ -492,6 +494,13 @@ export default function MapPage() {
       }
     }
   }, [currentOrder, showRatingBottomSheet, ratingOrderId]);
+
+  // Réinitialiser preferCreationForm quand l'utilisateur sélectionne une commande ou lance une recherche
+  useEffect(() => {
+    if ((selectedOrderId || isSearchingDriver) && preferCreationForm) {
+      setPreferCreationForm(false);
+    }
+  }, [selectedOrderId, isSearchingDriver, preferCreationForm, setPreferCreationForm]);
 
   useEffect(() => {
     logger.debug("🔍 RatingBottomSheet state changed", "map.tsx", {
@@ -1114,10 +1123,11 @@ export default function MapPage() {
             {/* Si selectedOrderId est null, on ignore currentOrder pour permettre la création d'une nouvelle commande */}
             {!deliveryMethodIsExpanded && 
              !orderDetailsIsExpanded && 
-             isCreatingNewOrder && 
+             (isCreatingNewOrder || preferCreationForm) && 
              !isSearchingDriver && 
              !pendingOrder && 
                 (selectedOrderId === null ||
+                  preferCreationForm ||
                   !(
                     currentOrder?.status === "accepted" && currentOrder?.driver
                   )) && (
@@ -1283,6 +1293,7 @@ export default function MapPage() {
                 const shouldShowSearch =
                   isSearchingDriver || (pendingOrder && !isCreatingNewOrder);
                 const shouldShowAccepted =
+                  !preferCreationForm &&
                   orderToDisplay?.status === "accepted" &&
                   orderToDisplay?.driver &&
                   !showPaymentSheet;
@@ -1329,9 +1340,16 @@ export default function MapPage() {
                     }}
                     onDetails={() => {
                       if (orderToDisplay) {
-                          router.push(
-                            `/order-tracking/${orderToDisplay.id}` as any
-                          );
+                        // Réinitialiser la map : au retour, afficher le formulaire de création
+                        setPreferCreationForm(true);
+                        setIsCreatingNewOrder(true);
+                        setSelectedOrder(null);
+                        userManuallyClosedRef.current = false;
+                        hasAutoOpenedRef.current = false;
+                        expandBottomSheet();
+                        router.push(
+                          `/order-tracking/${orderToDisplay.id}` as any
+                        );
                       }
                     }}
                     onBack={async () => {

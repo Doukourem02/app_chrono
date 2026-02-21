@@ -22,9 +22,7 @@ import { logger } from '../../utils/logger';
 import { useMapCamera } from '../../hooks/useMapCamera';
 import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
 import { useAnimatedPosition } from '../../hooks/useAnimatedPosition';
-import { calculateFullETA } from '../../utils/etaCalculator';
 import { useGeofencing } from '../../hooks/useGeofencing';
-import { useWeather } from '../../hooks/useWeather';
 import MessageBottomSheet from "../../components/MessageBottomSheet";
 import { formatUserName } from '../../utils/formatName';
 
@@ -193,7 +191,7 @@ export default function Index() {
     maybeEmit();
     const iv = setInterval(maybeEmit, 3000);
     return () => clearInterval(iv);
-  }, [currentOrder?.id, currentOrder?.status, location?.latitude, location?.longitude]);
+  }, [currentOrder?.id, currentOrder?.status, location]);
 
   // Bottom sheet pour les détails de la commande (remplace RecipientDetailsSheet)
   const {
@@ -268,14 +266,6 @@ export default function Index() {
   const destination = getCurrentDestination();
   const currentPickupCoord = currentOrder ? resolveCoords(currentOrder.pickup) : null;
   const currentDropoffCoord = currentOrder ? resolveCoords(currentOrder.dropoff) : null;
-  
-  // Données météo pour ajuster l'ETA
-  const weatherData = useWeather({
-    latitude: location?.latitude || destination?.latitude || null,
-    longitude: location?.longitude || destination?.longitude || null,
-    vehicleType: profile?.vehicle_type as 'moto' | 'vehicule' | 'cargo' | null || null,
-    enabled: isOnline && !!location && !!destination,
-  });
   
   // Géofencing : détection automatique d'arrivée
   // CRITIQUE : Désactiver le géofencing si le statut est 'accepted'
@@ -365,41 +355,6 @@ export default function Index() {
       previousLocationRef.current = location;
     }
   }, [location]);
-  
-  // Calculer l'ETA en temps réel vers la destination
-  const realTimeETA = React.useMemo(() => {
-    if (!animatedDriverPosition || !currentOrder || !location) return null;
-    
-    // Calculer la destination directement selon le statut de la commande
-    const status = String(currentOrder.status || '');
-    const pickupCoord = resolveCoords(currentOrder.pickup);
-    const dropoffCoord = resolveCoords(currentOrder.dropoff);
-    
-    let destination = null;
-    if ((status === 'accepted' || status === 'enroute' || status === 'in_progress') && pickupCoord) {
-      destination = pickupCoord;
-    } else if ((status === 'picked_up' || status === 'delivering') && dropoffCoord) {
-      destination = dropoffCoord;
-    }
-    
-    if (!destination) return null;
-    
-    const vehicleType = profile?.vehicle_type as 'moto' | 'vehicule' | 'cargo' | null;
-    
-    // Utiliser les données de trafic de la route active
-    const activeRoute = (status === 'accepted' || status === 'enroute' || status === 'in_progress')
-      ? animatedRoute
-      : orderFullRoute;
-    const trafficData = activeRoute?.trafficData || null;
-    
-    return calculateFullETA(
-      animatedDriverPosition,
-      destination,
-      vehicleType,
-      trafficData,
-      weatherData.adjustment || null
-    );
-  }, [animatedDriverPosition, currentOrder, location, profile?.vehicle_type, animatedRoute, orderFullRoute, weatherData.adjustment]);
   
   const polyPulseIntervalRef = useRef<number | null>(null);
   const animationTimeoutsRef = useRef<number[]>([]);
@@ -780,7 +735,6 @@ export default function Index() {
           setSelectedOrder(orderId);
           logger.info('Commande sélectionnée depuis marqueur', 'driver-index', { orderId });
         }}
-        realTimeETA={realTimeETA}
         isOnline={!!isOnline}
       />
 

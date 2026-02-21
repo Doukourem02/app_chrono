@@ -131,7 +131,12 @@ export default function MapboxMiniMap({ routePath }: { routePath?: LatLng[] }) {
     markersRef.current = []
 
     if (computedRoute.length >= 2) {
+      let cancelled = false
       import('mapbox-gl').then(({ default: mapboxgl }) => {
+        // Guard: map may have been removed by the first effect's cleanup (race condition)
+        if (cancelled || !mapRef.current || mapRef.current !== map) return
+        if (!map.getCanvasContainer?.()) return
+
         map.addSource('route', {
           type: 'geojson',
           data: {
@@ -155,6 +160,7 @@ export default function MapboxMiniMap({ routePath }: { routePath?: LatLng[] }) {
           },
         })
         const addMarker = (pos: LatLng, color: string) => {
+          if (cancelled || !map.getCanvasContainer?.()) return
           const el = document.createElement('div')
           el.style.width = '16px'
           el.style.height = '16px'
@@ -168,6 +174,9 @@ export default function MapboxMiniMap({ routePath }: { routePath?: LatLng[] }) {
         addMarker(computedRoute[0], '#2563eb')
         addMarker(computedRoute[computedRoute.length - 1], '#EF4444')
       })
+      return () => {
+        cancelled = true
+      }
     }
   }, [computedRoute])
 

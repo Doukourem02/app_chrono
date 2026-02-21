@@ -650,6 +650,7 @@ export default function MapboxTrackingMap({
   useEffect(() => {
     const container = mapContainerRef.current
     if (!container || !accessToken || !isLoaded || loadError) return
+    if (typeof window === 'undefined') return
 
     let cleanup: (() => void) | null = null
     let didCancel = false
@@ -657,15 +658,26 @@ export default function MapboxTrackingMap({
     const initMap = async () => {
       const mapboxgl = (await import('mapbox-gl')).default
       if (didCancel) return
+      if (!mapContainerRef.current || !document.body.contains(mapContainerRef.current)) return
       mapboxglRef.current = mapboxgl
       mapboxgl.accessToken = accessToken
 
       if (mapRef.current) {
-        mapRef.current.remove()
+        try {
+          mapRef.current.remove()
+        } catch {
+          // Ignorer si la map a déjà été supprimée
+        }
         mapRef.current = null
       }
 
-      markersRef.current.forEach((m) => m.remove())
+      markersRef.current.forEach((m) => {
+        try {
+          m.remove()
+        } catch {
+          // Ignorer
+        }
+      })
       markersRef.current = []
 
       const map = new mapboxgl.Map({
@@ -676,8 +688,6 @@ export default function MapboxTrackingMap({
         center: [center.lng, center.lat],
         zoom: selectedDelivery && routePathFallback.length > 0 ? DELIVERY_ZOOM : OVERVIEW_ZOOM,
       })
-
-      map.addControl(new mapboxgl.NavigationControl(), 'top-right')
 
       map.on('zoom', () => {
         const z = map.getZoom()
@@ -740,6 +750,14 @@ export default function MapboxTrackingMap({
       map.on('style.load', onStyleData)
       map.once('load', () => {
         if (didCancel) return
+        try {
+          const containerEl = map.getContainer()
+          if (containerEl && document.body.contains(containerEl)) {
+            map.addControl(new mapboxgl.NavigationControl(), 'top-right')
+          }
+        } catch (err) {
+          logger.warn('[MapboxTrackingMap] Impossible d\'ajouter NavigationControl:', err)
+        }
         map.resize()
         applyWaterPurpleStyle()
         addWaterOverlayLayer()

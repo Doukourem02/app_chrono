@@ -17,6 +17,34 @@ function coordsToLineGeoJSON(coords: Coordinates[]): GeoJSON.LineString {
   };
 }
 
+/** Décale le point de départ de la ligne pour qu'elle s'arrête au bord du cercle (comme image 1) */
+const OFFSET_METERS = 55;
+
+function offsetLineStartFromMarker(
+  markerPos: Coordinates,
+  routeCoords: Coordinates[]
+): Coordinates[] {
+  if (routeCoords.length < 2) return routeCoords;
+  const next = routeCoords[1];
+  const R = 6371000;
+  const lat1 = (markerPos.latitude * Math.PI) / 180;
+  const lat2 = (next.latitude * Math.PI) / 180;
+  const dLat = ((next.latitude - markerPos.latitude) * Math.PI) / 180;
+  const dLon = ((next.longitude - markerPos.longitude) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const totalDist = R * c;
+  if (totalDist < OFFSET_METERS) return routeCoords;
+  const f = OFFSET_METERS / totalDist;
+  const start: Coordinates = {
+    latitude: markerPos.latitude + f * (next.latitude - markerPos.latitude),
+    longitude: markerPos.longitude + f * (next.longitude - markerPos.longitude),
+  };
+  return [start, ...routeCoords.slice(1)];
+}
+
 interface DriverMapViewProps {
   mapRef: React.RefObject<MapRefHandle | null>;
   location: Coordinates | null;
@@ -41,7 +69,6 @@ interface DriverMapViewProps {
   resolveCoords: (candidate?: unknown) => Coordinates | null;
   calculateDistanceToPickup: (order: unknown) => number | null;
   setSelectedOrder: (orderId: string) => void;
-  realTimeETA: { formattedETA: string } | null;
   isOnline: boolean;
 }
 
@@ -57,7 +84,6 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
   pendingOrders,
   resolveCoords,
   setSelectedOrder,
-  realTimeETA,
   isOnline,
 }) => {
   const cameraRef = useRef<Camera>(null);
@@ -117,43 +143,37 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
         animationDuration={0}
       />
 
-      {/* Marqueur driver - collapsable={false} évite l'erreur "max 1 subview" (RN 0.76+ New Arch) */}
+      {/* Marqueur driver - simple comme app_chrono (userLocationDot) */}
       {isOnline && driverPos && (
         <PointAnnotation id="driver" coordinate={toLngLat(driverPos)} anchor={{ x: 0.5, y: 0.5 }}>
-          <View style={styles.driverMarkerContainer} collapsable={false}>
-            <View style={styles.driverPulseOuter} />
-            <View style={styles.driverMarkerInner} />
+          <View style={styles.driverMarker} collapsable={false}>
+            <View style={styles.driverPin} />
           </View>
         </PointAnnotation>
       )}
 
-      {/* Badge ETA temps réel */}
-      {realTimeETA && driverPos && isOnline && (
-        <PointAnnotation id="eta-badge" coordinate={toLngLat(driverPos)} anchor={{ x: 0.5, y: 1.2 }}>
-          <View style={styles.realTimeETABadge} collapsable={false}>
-            <Text style={styles.realTimeETAText}>{realTimeETA.formattedETA}</Text>
-          </View>
-        </PointAnnotation>
-      )}
-
-      {/* Route complète pickup -> dropoff (ligne grise) */}
-      {currentPickupCoord && currentDropoffCoord && orderFullRouteCoords.length >= 2 && (
+      {/* Route complète pickup -> dropoff - uniquement si pas de route-active (évite double ligne) */}
+      {currentPickupCoord && currentDropoffCoord && orderFullRouteCoords.length >= 2 &&
+       !(isOnline && driverPos && animatedRouteCoords.length >= 2) && (
         <ShapeSource
           id="route-full"
-          shape={coordsToLineGeoJSON(orderFullRouteCoords)}
+          shape={coordsToLineGeoJSON(offsetLineStartFromMarker(currentPickupCoord, orderFullRouteCoords))}
         >
-          <LineLayer id="route-full-line" style={{ lineColor: 'rgba(229,231,235,0.9)', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }} />
+          <LineLayer id="route-full-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 5, lineJoin: 'round', lineCap: 'butt' }} />
+          <LineLayer id="route-full-line" style={{ lineColor: '#5B21B6', lineWidth: 3, lineJoin: 'round', lineCap: 'butt' }} />
         </ShapeSource>
       )}
 
-      {/* Route animée active (violet, bien visible) */}
+      {/* Route animée active (violet) - seule route affichée quand driver a une commande en cours */}
       {isOnline && driverPos && animatedRouteCoords.length >= 2 && (
         <ShapeSource
           id="route-active"
-          shape={coordsToLineGeoJSON([driverPos, ...animatedRouteCoords.slice(1)])}
+          shape={coordsToLineGeoJSON(
+            offsetLineStartFromMarker(driverPos, [driverPos, ...animatedRouteCoords.slice(1)])
+          )}
         >
-          <LineLayer id="route-active-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 5, lineJoin: 'round', lineCap: 'round' }} />
-          <LineLayer id="route-active-line" style={{ lineColor: '#5B21B6', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }} />
+          <LineLayer id="route-active-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 5, lineJoin: 'round', lineCap: 'butt' }} />
+          <LineLayer id="route-active-line" style={{ lineColor: '#5B21B6', lineWidth: 3, lineJoin: 'round', lineCap: 'butt' }} />
         </ShapeSource>
       )}
 
@@ -209,7 +229,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#10B981',
+    backgroundColor: '#5B21B6',
     borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
@@ -237,51 +257,23 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  driverMarkerContainer: {
-    width: 48,
-    height: 48,
+  driverMarker: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: 20,
+    height: 20,
   },
-  driverPulseOuter: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  driverPin: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#5B21B6',
     borderWidth: 2,
-    borderColor: '#3B82F6',
-    backgroundColor: 'rgba(59,130,246,0.15)',
-  },
-  driverMarkerInner: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#3B82F6',
-    borderWidth: 3,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 6,
-    position: 'absolute',
-  },
-  realTimeETABadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
     elevation: 5,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  realTimeETAText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
   },
 });
