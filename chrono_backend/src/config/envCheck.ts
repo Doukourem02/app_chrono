@@ -66,6 +66,11 @@ export function validateEnvironment(): void {
         'HTTPS n\'est pas forcé. Considérez FORCE_HTTPS=true en production'
       );
     }
+
+    // SÉCURITÉ: CORS strict requis en production (admin + site(s) autorisés seulement)
+    if (!process.env.ALLOWED_ORIGINS) {
+      errors.push('ALLOWED_ORIGINS est requis en production (CORS strict).');
+    }
   }
 
   if (errors.length > 0) {

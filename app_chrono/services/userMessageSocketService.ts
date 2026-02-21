@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { logger } from '../utils/logger';
 import { Conversation, Message } from './userMessageService';
 import { config } from '../config';
+import { useAuthStore } from '../store/useAuthStore';
 
 class UserMessageSocketService {
   private socket: Socket | null = null;
@@ -27,6 +28,11 @@ class UserMessageSocketService {
     this.userId = userId;
     // Utiliser la configuration centralisée qui fonctionne avec Expo Go
     const socketUrl = config.socketUrl;
+    const token = useAuthStore.getState().accessToken;
+    if (!token) {
+      logger.warn('Impossible de connecter le socket de messagerie: accessToken manquant', 'userMessageSocketService');
+      return;
+    }
     logger.info('🔌 Connexion au socket de messagerie...', 'userMessageSocketService', { socketUrl });
     this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
@@ -38,6 +44,9 @@ class UserMessageSocketService {
       forceNew: false,
       upgrade: true,
       autoConnect: true,
+      auth: {
+        token,
+      },
     });
 
     this.socket.on('connect', () => {

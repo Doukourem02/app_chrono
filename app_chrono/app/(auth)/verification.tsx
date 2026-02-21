@@ -1,12 +1,5 @@
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import {View,Text,TextInput,TouchableOpacity,StyleSheet,Alert,} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -18,7 +11,7 @@ export default function VerificationScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const setUser = useAuthStore((state) => state.setUser);
-  const setTokens = useAuthStore((state) => state.setTokens);
+  const setTokensAndWait = useAuthStore((state) => state.setTokensAndWait);
   const { email, phoneNumber, otpMethod, clearTempData } = useTempAuthStore();
 
   const handleCodeChange = (text: string, index: number) => {
@@ -89,7 +82,7 @@ export default function VerificationScreen() {
         
         setUser(userData);
         const tokens = data.data.tokens || {};
-        setTokens({
+        await setTokensAndWait({
           accessToken: tokens.accessToken ?? null,
           refreshToken: tokens.refreshToken ?? null,
         });

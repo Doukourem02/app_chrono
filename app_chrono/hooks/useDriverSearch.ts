@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { logger } from '../utils/logger';
 import { errorHandler } from '../utils/errorHandler';
 import { config } from '../config';
+import { useAuthStore } from '../store/useAuthStore';
 
 type Coordinates = {
   latitude: number;
@@ -22,13 +23,19 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
   useEffect(() => {
     let socket: any;
     try {
-      socket = io(config.socketUrl);
+      const token = useAuthStore.getState().accessToken;
+      socket = io(config.socketUrl, {
+        auth: token ? { token } : undefined,
+        transports: ['websocket', 'polling'],
+      });
       socket.on('connect', () => logger.info('Socket connected'));
-      socket.on('driver_position', (payload: any) => {
-        const coords = payload.coords || payload;
+      // SÉCURITÉ: la position ne doit pas être "broadcast" publiquement.
+      // On écoute plutôt les mises à jour liées à la commande (envoyées au client concerné).
+      socket.on('order:status:update', (payload: any) => {
+        const coords = payload?.location || payload?.order?.location || null;
         if (coords && coords.latitude && coords.longitude) {
           setDriverCoords({ latitude: coords.latitude, longitude: coords.longitude });
-          logger.debug('Driver position updated');
+          logger.debug('Driver position updated (order:status:update)');
         }
       });
     } catch (err) {

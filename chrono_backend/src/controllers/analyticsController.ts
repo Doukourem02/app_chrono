@@ -296,15 +296,15 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
     // Construire la condition de zone selon le type de colonne
     let zoneCondition = '';
     if (hasPickupAddress) {
-      // Si pickup_address est une colonne texte
+      // pickup_address peut être text ou jsonb → cast en text pour LIKE
       zoneCondition = `
         CASE 
-          WHEN pickup_address LIKE '%Cocody%' THEN 'Cocody'
-          WHEN pickup_address LIKE '%Marcory%' THEN 'Marcory'
-          WHEN pickup_address LIKE '%Yopougon%' THEN 'Yopougon'
-          WHEN pickup_address LIKE '%Abobo%' THEN 'Abobo'
-          WHEN pickup_address LIKE '%Plateau%' THEN 'Plateau'
-          WHEN pickup_address LIKE '%Adjamé%' THEN 'Adjamé'
+          WHEN pickup_address::text LIKE '%Cocody%' THEN 'Cocody'
+          WHEN pickup_address::text LIKE '%Marcory%' THEN 'Marcory'
+          WHEN pickup_address::text LIKE '%Yopougon%' THEN 'Yopougon'
+          WHEN pickup_address::text LIKE '%Abobo%' THEN 'Abobo'
+          WHEN pickup_address::text LIKE '%Plateau%' THEN 'Plateau'
+          WHEN pickup_address::text LIKE '%Adjamé%' THEN 'Adjamé'
           ELSE 'Autre'
         END
       `;

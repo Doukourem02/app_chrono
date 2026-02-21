@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client'
 import { logger } from '@/utils/logger'
 import { Message, Conversation } from './adminMessageService'
+import { supabase } from '@/lib/supabase'
 
 const SOCKET_URL = 
   process.env.NEXT_PUBLIC_SOCKET_URL || 
@@ -14,14 +15,23 @@ class AdminMessageSocketService {
   private messageCallbacks: ((message: Message, conversation: Conversation) => void)[] = []
   private typingCallbacks: ((data: { userId: string; isTyping: boolean }) => void)[] = []
 
-  connect(adminId: string) {
+  async connect(adminId: string) {
     if (this.socket && this.isConnected) {
       return
     }
 
     this.adminId = adminId
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) {
+      logger.error('[adminMessageSocketService] No access token available')
+      return
+    }
     this.socket = io(SOCKET_URL, {
       transports: ['websocket'],
+      auth: {
+        token,
+      },
     })
 
     this.socket.on('connect', () => {

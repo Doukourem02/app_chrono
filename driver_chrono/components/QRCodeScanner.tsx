@@ -1,19 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { logger } from '../utils/logger';
-
-// Import conditionnel du scanner QR code
-let BarCodeScanner: any = null;
-
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const barcodeModule = require('expo-barcode-scanner');
-  BarCodeScanner = barcodeModule.BarCodeScanner;
-} catch {
-  logger.warn('expo-barcode-scanner non disponible. Un développement build est requis.', undefined);
-}
 
 interface QRCodeScannerProps {
   onScan: (data: string) => void;
@@ -26,56 +16,31 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   onClose,
   visible,
 }) => {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      requestCameraPermission();
       setScanned(false);
     }
   }, [visible]);
 
-  const requestCameraPermission = async () => {
-    if (!BarCodeScanner) {
-      setHasPermission(false);
-      Alert.alert(
-        'Module non disponible',
-        'Le scanner QR code nécessite un développement build. Veuillez créer un développement build avec "npx expo run:ios" ou "npx expo run:android".',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    
-    try {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
-      setHasPermission(status === 'granted');
-    } catch (error) {
-      logger.error('Erreur demande permission caméra:', undefined, error);
-      setHasPermission(false);
-    }
-  };
-
-  const handleBarCodeScanned = async (result: any) => {
-    if (scanned || isLoading || !BarCodeScanner) return;
+  const handleBarCodeScanned = async (result: { data: string }) => {
+    if (scanned || isLoading) return;
 
     setScanned(true);
     setIsLoading(true);
 
     try {
       const { data } = result;
-      // Vibration de succès
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Appeler le callback avec les données scannées
       onScan(data);
     } catch (error) {
       logger.error('Erreur lors du scan:', undefined, error);
       Alert.alert('Erreur', 'Impossible de traiter le QR code scanné');
     } finally {
       setIsLoading(false);
-      // Réinitialiser après 2 secondes pour permettre un nouveau scan
       setTimeout(() => {
         setScanned(false);
       }, 2000);
@@ -84,41 +49,12 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 
   if (!visible) return null;
 
-  // Vérifier si le module est disponible
-  if (!BarCodeScanner) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.permissionContainer}>
-          <Ionicons name="build-outline" size={64} color="#EF4444" />
-          <Text style={styles.permissionText}>Module natif requis</Text>
-          <Text style={styles.permissionSubtext}>
-            Le scanner QR code nécessite un développement build.{'\n'}
-            Veuillez créer un développement build avec :
-          </Text>
-          <View style={styles.codeBlock}>
-            <Text style={styles.codeText}>
-              {Platform.OS === 'ios' 
-                ? 'npx expo run:ios'
-                : 'npx expo run:android'}
-            </Text>
-          </View>
-          <Text style={styles.permissionSubtext}>
-            Ou utilisez Expo Go avec un développement build personnalisé.
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <Ionicons name="close" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.permissionText}>Demande de permission caméra...</Text>
+          <Text style={styles.permissionText}>Chargement des permissions...</Text>
         </View>
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <Ionicons name="close" size={24} color="#fff" />
@@ -127,7 +63,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
@@ -138,7 +74,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           </Text>
           <TouchableOpacity
             style={styles.permissionButton}
-            onPress={requestCameraPermission}
+            onPress={requestPermission}
           >
             <Text style={styles.permissionButtonText}>Réessayer</Text>
           </TouchableOpacity>
@@ -152,12 +88,15 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 
   return (
     <View style={styles.container}>
-      <BarCodeScanner
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+      <CameraView
         style={StyleSheet.absoluteFillObject}
-        barCodeTypes={[BarCodeScanner.Constants.BarCodeType.qr]}
+        facing="back"
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{
+          barcodeTypes: ['qr'],
+        }}
       />
-      
+
       {/* Overlay avec zone de scan */}
       <View style={styles.overlay}>
         <View style={styles.scanArea}>
@@ -166,14 +105,14 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           <View style={[styles.scanCorner, styles.bottomLeft]} />
           <View style={[styles.scanCorner, styles.bottomRight]} />
         </View>
-        
+
         {isLoading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#6366F1" />
             <Text style={styles.loadingText}>Traitement du QR code...</Text>
           </View>
         )}
-        
+
         {scanned && !isLoading && (
           <View style={styles.successOverlay}>
             <Ionicons name="checkmark-circle" size={64} color="#10B981" />
@@ -339,19 +278,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 15,
   },
-  codeBlock: {
-    backgroundColor: '#1F2937',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  codeText: {
-    color: '#10B981',
-    fontSize: 14,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontWeight: '600',
-  },
 });
-

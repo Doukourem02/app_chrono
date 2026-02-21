@@ -1,20 +1,32 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { AppState, AppStateStatus } from "react-native";
+import { AppState, AppStateStatus, Platform } from "react-native";
 import { initSentry } from "../utils/sentry";
+import Constants from "expo-constants";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
 import { soundService } from "../services/soundService";
 import { useAuthStore } from "../store/useAuthStore";
 import { userApiService } from "../services/userApiService";
 import { logger } from "../utils/logger";
-// Validation des variables d'environnement au démarrage
 import "../config/envCheck";
+
+// Mapbox : initialiser le token au démarrage (iOS/Android uniquement, pas web)
+if (Platform.OS !== "web") {
+  import("@rnmapbox/maps")
+    .then(({ default: Mapbox }) => {
+      const token = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN ?? Constants.expoConfig?.extra?.mapboxAccessToken;
+      if (token) Mapbox.setAccessToken(token);
+    })
+    .catch(() => {
+      // @rnmapbox/maps non disponible (ex: Expo Go)
+    });
+}
 
 initSentry();
 
 export default function RootLayout() {
-  const { isAuthenticated, user, logout } = useAuthStore();
+  const { isAuthenticated, user, logout, hydrateTokens } = useAuthStore();
 
   useEffect(() => {
     // Initialiser le service de son au démarrage
@@ -22,6 +34,11 @@ export default function RootLayout() {
       logger.warn('[RootLayout] Erreur initialisation service son:', err);
     });
   }, []);
+
+  useEffect(() => {
+    // Charger le refresh token depuis SecureStore avant tout check de session
+    hydrateTokens().catch(() => {});
+  }, [hydrateTokens]);
 
   // Vérifier et rafraîchir la session quand l'app revient en arrière-plan
   // Cela évite les problèmes de session expirée après une longue période d'inactivité
@@ -32,13 +49,11 @@ export default function RootLayout() {
         try {
           const token = await userApiService.ensureAccessToken();
           if (!token) {
-            // Token invalide ou impossible à rafraîchir, déconnecter silencieusement
-            // L'utilisateur sera redirigé à la prochaine action nécessitant une authentification
-            logger.warn('[RootLayout] Session expirée lors du retour en arrière-plan');
-            logout();
+            // Ne pas déconnecter : null peut être une erreur réseau temporaire.
+            // Si la session est vraiment expirée, l'utilisateur aura une erreur à la prochaine action.
+            logger.warn('[RootLayout] Impossible de rafraîchir le token (réseau?) - on garde la session');
           }
         } catch (error) {
-          // En cas d'erreur, ne pas déconnecter (peut être une erreur réseau temporaire)
           logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', undefined, error);
         }
       }

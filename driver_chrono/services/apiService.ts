@@ -58,118 +58,116 @@ class ApiService {
   }
 
   /**
-   * Vérifie et rafraîchit le token d'accès si nécessaire
-   * Méthode publique pour permettre la vérification de session avant des actions critiques
+   * Vérifie et rafraîchit le token d'accès si nécessaire (comme app_chrono userApiService)
+   * Ne déconnecte que si le token est explicitement révoqué (401), pas sur erreur réseau
    */
   async ensureAccessToken(): Promise<{ token: string | null; reason?: 'missing' | 'refresh_failed' }> {
-    const { accessToken, refreshToken, setTokens, logout } = useDriverStore.getState();
+    try {
+      let { accessToken, refreshToken, setTokens, logout, hydrateTokens } = useDriverStore.getState();
 
-    // Vérifier si le token existe et s'il n'est pas expiré
-    if (accessToken && this.isTokenValid(accessToken)) {
-      return { token: accessToken };
-    }
-
-    // Si le token est expiré ou absent, essayer de le rafraîchir
-    if (!refreshToken) {
-      if (__DEV__) {
-        logger.warn('Pas de refreshToken disponible - session expirée', 'apiService');
+      // Vérifier si le token existe et s'il n'est pas expiré
+      if (accessToken && this.isTokenValid(accessToken)) {
+        return { token: accessToken };
       }
-      // Déconnecter l'utilisateur car la session est expirée
-      logout();
-      return { token: null, reason: 'missing' };
-    }
 
-    // Vérifier si le refresh token est encore valide avant d'essayer de rafraîchir
-    if (!this.isTokenValid(refreshToken)) {
-      if (__DEV__) {
+      // Si pas de refreshToken en mémoire : attendre persist + charger SecureStore (comme app_chrono)
+      if (!refreshToken) {
+        if (!useDriverStore.persist.hasHydrated()) {
+          await new Promise<void>((resolve) => {
+            const unsub = useDriverStore.persist.onFinishHydration(() => {
+              unsub?.();
+              resolve();
+            });
+          });
+        }
+        refreshToken = useDriverStore.getState().refreshToken;
+        if (!refreshToken) {
+          await hydrateTokens();
+          refreshToken = useDriverStore.getState().refreshToken;
+        }
+      }
+
+      if (!refreshToken) {
+        logger.warn('Pas de refreshToken disponible', 'apiService');
+        return { token: null, reason: 'missing' };
+      }
+
+      // Vérifier si le refresh token est encore valide avant d'essayer de rafraîchir
+      if (!this.isTokenValid(refreshToken)) {
         logger.warn('Refresh token expiré - session expirée', 'apiService');
+        logout();
+        return { token: null, reason: 'refresh_failed' };
       }
-      // Déconnecter l'utilisateur car la session est expirée
-      logout();
+
+      logger.debug('🔄 Token expiré ou absent, rafraîchissement en cours...', 'apiService');
+      const { token: newAccessToken, revoked } = await this.refreshAccessToken(refreshToken);
+      if (newAccessToken) {
+        setTokens({ accessToken: newAccessToken, refreshToken });
+        logger.debug('Token rafraîchi et sauvegardé avec succès', 'apiService');
+        return { token: newAccessToken };
+      }
+
+      // Déconnecter uniquement si le backend a explicitement refusé le token (401)
+      // Pas de déconnexion sur erreur réseau - l'utilisateur peut réessayer
+      if (revoked) {
+        logger.warn('Token révoqué par le serveur - déconnexion', 'apiService');
+        logout();
+      } else {
+        logger.warn('Impossible de rafraîchir (réseau?) - on garde la session', 'apiService');
+      }
       return { token: null, reason: 'refresh_failed' };
+    } catch (error) {
+      // Ne PAS déconnecter sur erreur réseau/timeout - la session peut encore être valide
+      logger.warn('Erreur ensureAccessToken (réseau?) - pas de déconnexion', 'apiService', error);
+      return { token: null };
     }
-
-    const newAccessToken = await this.refreshAccessToken(refreshToken);
-    if (newAccessToken) {
-      setTokens({ accessToken: newAccessToken, refreshToken });
-      return { token: newAccessToken };
-    }
-
-    // Impossible de rafraîchir => déconnecter l'utilisateur
-    if (__DEV__) {
-      logger.warn('Impossible de rafraîchir le token - session expirée', 'apiService');
-    }
-    logout();
-    return { token: null, reason: 'refresh_failed' };
   }
 
-  private async refreshAccessToken(refreshToken: string): Promise<string | null> {
-    const TIMEOUT_MS = 10000; // 10 secondes
-    
+  private async refreshAccessToken(refreshToken: string): Promise<{ token: string | null; revoked?: boolean }> {
+    const TIMEOUT_MS = 10000;
     try {
-      // Créer un AbortController pour gérer le timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
           signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
-
         const result = await response.json();
 
-        if (!response.ok || !result.success || !result.data?.accessToken) {
-          logger.warn('Refresh token échoué (driver):', 'apiService', result);
-          return null;
+        if (!response.ok) {
+          return { token: null, revoked: response.status === 401 };
+        }
+        if (!result.success || !result.data?.accessToken) {
+          return { token: null, revoked: false };
         }
 
-        return result.data.accessToken as string;
+        return { token: result.data.accessToken as string };
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
-        
-        // Si c'est une erreur d'abort (timeout), lancer une erreur spécifique
         if (fetchError.name === 'AbortError' || controller.signal.aborted) {
           throw new Error('Network request timed out');
         }
-        
         throw fetchError;
       }
     } catch (error: any) {
-      // Distinguer les erreurs réseau des autres erreurs
       const errorMessage = error?.message || '';
-      
-      if (error instanceof TypeError && (errorMessage.includes('Network request failed') || errorMessage.includes('Network request timed out'))) {
+      if (
+        error instanceof TypeError &&
+        (errorMessage.includes('Network request failed') || errorMessage.includes('Network request timed out'))
+      ) {
         if (__DEV__) {
-          logger.error(
-            'Erreur réseau lors du rafraîchissement du token. Backend inaccessible sur',
-            API_BASE_URL,
-            'apiService'
-          );
+          logger.debug('Backend inaccessible lors du rafraîchissement:', 'apiService', API_BASE_URL);
         }
-        // Ne pas déconnecter l'utilisateur en cas d'erreur réseau temporaire
-        // Le token pourra être rafraîchi lors de la prochaine tentative
-        return null;
+      } else {
+        logger.warn('Erreur lors du rafraîchissement du token:', 'apiService', error);
       }
-      
-      if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
-        if (__DEV__) {
-          logger.warn(
-            `Timeout lors du rafraîchissement du token (${TIMEOUT_MS}ms). Backend peut être lent ou inaccessible.`,
-            'apiService'
-          );
-        }
-        return null;
-      }
-      
-      logger.error('Erreur refreshAccessToken (driver):', 'apiService', error);
-      return null;
+      return { token: null, revoked: false };
     }
   }
   

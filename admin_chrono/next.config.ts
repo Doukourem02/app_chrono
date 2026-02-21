@@ -82,18 +82,27 @@ const nextConfig: NextConfig = {
 
     // Extraire l'URL de l'API depuis les variables d'environnement
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || apiUrl
     
     // Construire les directives connect-src pour l'API backend
     const connectSrcDirectives = [
       "'self'",
-      "http://localhost:*",
-      "ws://localhost:*",
-      "wss://localhost:*",
       "https://*.supabase.co",
       "wss://*.supabase.co",
       "https://maps.googleapis.com",
+      "https://api.mapbox.com",
+      "https://events.mapbox.com",
+      "https://*.tiles.mapbox.com",
+      "https://nominatim.openstreetmap.org",
     ]
+
+    // En dev uniquement: autoriser localhost / réseau local pour API & sockets
+    if (isDevelopment) {
+      connectSrcDirectives.push(
+        "http://localhost:*",
+        "ws://localhost:*",
+        "wss://localhost:*"
+      )
+    }
     
     // Ajouter l'URL de l'API backend si elle n'est pas localhost
     if (apiUrl && !apiUrl.includes('localhost')) {
@@ -110,19 +119,23 @@ const nextConfig: NextConfig = {
         }
       } catch (e) {
         // Si l'URL n'est pas valide, on continue sans l'ajouter
-        logger.warn('Invalid API URL in CSP configuration:', apiUrl)
+        console.warn('Invalid API URL in CSP configuration:', apiUrl)
       }
     }
     
     // CSP avec ou sans upgrade-insecure-requests selon l'environnement
     const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com",
+      // En prod: on retire 'unsafe-eval' (utile surtout en dev). On garde 'unsafe-inline' car Next.js émet
+      // des scripts inline sans nonce/hashes configurés dans ce projet.
+      `script-src 'self' ${isDevelopment ? "'unsafe-eval' " : ''}'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://api.mapbox.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "img-src 'self' data: https: blob: http://maps.google.com http://maps.gstatic.com",
+      "img-src 'self' data: https: blob: http://maps.google.com http://maps.gstatic.com https://api.mapbox.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       `connect-src ${connectSrcDirectives.join(' ')}`,
-      "frame-src 'self' https://maps.googleapis.com",
+      "frame-src 'self' https://maps.googleapis.com https://api.mapbox.com",
+      "worker-src 'self' blob:",
+      "child-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

@@ -11,6 +11,13 @@ import { setupAdminSocket } from './sockets/adminSocket.js';
 import { setupMessageSocket } from './sockets/messageSocket.js';
 import logger from './utils/logger.js';
 import { initializeRedis, closeRedis, pubClient, subClient } from './config/redis.js';
+import { createClient } from '@supabase/supabase-js';
+import pool from './config/db.js';
+import { verifyAccessToken } from './utils/jwt.js';
+import { getAllowedOrigins } from './config/cors.js';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -45,16 +52,8 @@ try {
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const server = http.createServer(app);
 
-const allowedOrigins =
-  process.env.ALLOWED_ORIGINS?.split(',') || [
-    'http://localhost:808',
-    'http://localhost:9006',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://192.168.1.85:3000',
-    'http://192.168.1.91:3000', // Ajout explicite de cette IP
-    'exp://localhost:808',
-  ];
+// SÉCURITÉ: en prod, ALLOWED_ORIGINS doit être défini (pas de fallback permissif)
+const allowedOrigins = getAllowedOrigins();
 
 // En développement, accepter toutes les origines localhost et 192.168.*
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -63,8 +62,8 @@ const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
       if (!origin) {
-        // Permettre les connexions sans origin (par exemple depuis Postman ou des outils de test)
-        return callback(null, true);
+        // En prod: refuser les origins manquantes (évite certains contournements). En dev: ok.
+        return isDevelopment ? callback(null, true) : callback(new Error('Not allowed by CORS'));
       }
 
       // En développement (ou si NODE_ENV n'est pas défini), accepter toutes les origines localhost et 192.168.*
@@ -89,6 +88,63 @@ const io = new Server(server, {
   },
 });
 
+// Auth Socket.IO (obligatoire en production)
+// Supporte: 1) JWT backend (app/driver), 2) JWT Supabase (admin dashboard)
+io.use(async (socket, next) => {
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const allowUnauthenticated =
+    isDevelopment && process.env.ALLOW_UNAUTHENTICATED_SOCKETS === 'true';
+
+  const authToken =
+    (socket.handshake.auth as any)?.token ||
+    (typeof socket.handshake.query?.token === 'string' ? socket.handshake.query.token : undefined) ||
+    (typeof socket.handshake.headers?.authorization === 'string'
+      ? socket.handshake.headers.authorization
+      : undefined);
+
+  if (!authToken) {
+    if (allowUnauthenticated) return next();
+    return next(new Error('Unauthorized'));
+  }
+
+  const token = authToken.startsWith('Bearer ') ? authToken.slice('Bearer '.length) : authToken;
+
+  // 1) Essayer le JWT backend (app_chrono, driver_chrono)
+  try {
+    const decoded = verifyAccessToken(token);
+    (socket.data as any).user = decoded;
+    (socket as any).userId = decoded.id;
+    (socket as any).userRole = decoded.role;
+    return next();
+  } catch {
+    // 2) Fallback: JWT Supabase (admin_chrono)
+    if (supabaseUrl && supabaseServiceKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (!error && user) {
+          const result = await (pool as any).query(
+            'SELECT id, role FROM users WHERE id = $1 OR email = $2',
+            [user.id, user.email ?? '']
+          );
+          if (result.rows.length > 0) {
+            const dbUser = result.rows[0];
+            (socket.data as any).user = { id: dbUser.id, role: dbUser.role };
+            (socket as any).userId = dbUser.id;
+            (socket as any).userRole = dbUser.role;
+            return next();
+          }
+        }
+      } catch {
+        // Ignorer, on échoue à la fin
+      }
+    }
+  }
+
+  if (allowUnauthenticated) return next();
+  return next(new Error('Unauthorized'));
+});
+
 // Initialiser Redis Adapter pour le scaling horizontal (optionnel)
 // Si Redis n'est pas disponible, Socket.IO fonctionnera en mode standalone
 (async () => {
@@ -110,6 +166,15 @@ const io = new Server(server, {
 
 io.on('connection', (socket) => {
   logger.info('🟢 Client connecté', { socketId: socket.id });
+
+  // Rooms utiles pour limiter les broadcasts (évite fuite de données)
+  const user = (socket.data as any)?.user as { id?: string; role?: string } | undefined;
+  if (user?.id) {
+    socket.join(`user:${user.id}`);
+    if (user.role === 'driver') socket.join('drivers');
+    if (user.role === 'admin' || user.role === 'super_admin') socket.join('admins');
+  }
+
   deliverySocket(io, socket);
 
   socket.on('disconnect', () => {

@@ -1,5 +1,5 @@
-import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 import { logger } from '../utils/logger';
 
 const SOUND_ENABLED_KEY = '@chrono_sound_enabled';
@@ -75,4 +75,3 @@ class SoundService {
 }
 
 export const soundService = new SoundService();
-

@@ -2,65 +2,14 @@
 
 import { Phone, MessageSquare, MapPin, Navigation } from 'lucide-react'
 import React, { useMemo } from 'react'
-import { GoogleMap, Marker, Polyline } from '@react-google-maps/api'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { useGoogleMaps } from '@/contexts/GoogleMapsContext'
+import MapboxMiniMap from '@/components/dashboard/MapboxMiniMap'
 import { AnimatedCard } from '@/components/animations'
 import type { Delivery } from '@/hooks/types'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
-import { GoogleMapsBillingError } from '@/components/error/GoogleMapsBillingError'
-import { GoogleMapsDeletedProjectError } from '@/components/error/GoogleMapsDeletedProjectError'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
-
-interface GoogleMapsWindow extends Window {
-  google?: {
-    maps?: {
-      Size?: new (width: number, height: number) => {
-        width: number
-        height: number
-        equals: (other: { width: number; height: number } | null) => boolean
-      }
-    }
-  }
-}
-
-// Helper pour créer un Size Google Maps de manière sûre
-const createGoogleMapsSize = (width: number, height: number) => {
-  if (typeof window === 'undefined') return undefined
-  
-  const googleMaps = (window as GoogleMapsWindow).google?.maps
-  if (!googleMaps?.Size) return undefined
-  
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return new googleMaps.Size(width, height) as any
-  } catch {
-    return undefined
-  }
-}
-
-const mapContainerStyle = {
-  width: '100%',
-  height: '150px',
-  borderRadius: '12px',
-}
-
-interface LatLng {
-  lat: number
-  lng: number
-}
-
-const defaultCenter: LatLng = {
-  lat: 5.3600, 
-  lng: -4.0083,
-}
-
-const defaultRoutePath: LatLng[] = [
-  { lat: 5.3600, lng: -4.0083 }, 
-  { lat: 5.3204, lng: -4.0267 }, 
-]
 
 const statusSteps: Array<{ key: string; label: string }> = [
   { key: 'pending', label: 'Commande créée' },
@@ -69,113 +18,6 @@ const statusSteps: Array<{ key: string; label: string }> = [
   { key: 'picked_up', label: 'Colis récupéré' },
   { key: 'completed', label: 'Livraison terminée' },
 ]
-
-function MapComponent({ routePath }: { routePath?: LatLng[] }) {
-  const { isLoaded, loadError, billingError, deletedProjectError } = useGoogleMaps()
-
-  const computedRoute = routePath && routePath.length >= 2 ? routePath : defaultRoutePath
-  const computedCenter = computedRoute[0] ?? defaultCenter
-
-  const mapOptions = useMemo(
-    () => ({
-      disableDefaultUI: true,
-      zoomControl: true,
-      styles: [
-        {
-          featureType: 'poi',
-          elementType: 'labels',
-          stylers: [{ visibility: 'off' }],
-        },
-      ],
-    }),
-    []
-  )
-
-  const mapPlaceholderStyle: React.CSSProperties = {
-    width: '100%',
-    height: '200px',
-    backgroundColor: themeColors.grayLight,
-    borderRadius: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  }
-
-  const mapPlaceholderTextStyle: React.CSSProperties = {
-    fontSize: '14px',
-    color: themeColors.textSecondary,
-  }
-
-  const mapPlaceholderErrorStyle: React.CSSProperties = {
-    ...mapPlaceholderTextStyle,
-    color: '#EF4444',
-  }
-
-  if (loadError) {
-    return (
-      <div style={mapPlaceholderStyle}>
-        {deletedProjectError ? (
-          <GoogleMapsDeletedProjectError style={{ padding: '16px', maxWidth: '500px' }} />
-        ) : billingError ? (
-          <GoogleMapsBillingError style={{ padding: '16px', maxWidth: '500px' }} />
-        ) : (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <p style={mapPlaceholderErrorStyle}>Erreur de chargement de la carte</p>
-            {loadError.message && (
-              <p style={{ ...mapPlaceholderTextStyle, fontSize: '11px', marginTop: '8px', color: '#6B7280' }}>
-                {loadError.message}
-              </p>
-          )}
-        </div>
-        )}
-      </div>
-    )
-  }
-
-  if (!isLoaded) {
-    return (
-      <div style={mapPlaceholderStyle}>
-        <p style={mapPlaceholderTextStyle}>Chargement de la carte...</p>
-      </div>
-    )
-  }
-
-  return (
-    <GoogleMap
-      mapContainerStyle={mapContainerStyle}
-      center={computedCenter}
-      zoom={12}
-      options={mapOptions}
-    >
-      {computedRoute.length >= 2 && (
-        <>
-          <Polyline
-            path={computedRoute}
-            options={{
-              strokeColor: '#2563eb',
-              strokeWeight: 3,
-              strokeOpacity: 0.8,
-            }}
-          />
-          <Marker
-            position={computedRoute[0]}
-            icon={{
-              url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-              scaledSize: createGoogleMapsSize(32, 32),
-            }}
-          />
-          <Marker
-            position={computedRoute[computedRoute.length - 1]}
-            icon={{
-              url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-              scaledSize: createGoogleMapsSize(32, 32),
-            }}
-          />
-        </>
-      )}
-    </GoogleMap>
-  )
-}
 
 interface TrackerCardProps {
   deliveries?: Delivery[]
@@ -523,7 +365,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   return (
     <AnimatedCard index={0} delay={150} style={cardStyle}>
       <div style={sectionStyle}>
-        <MapComponent routePath={computedRoute} />
+        <MapboxMiniMap routePath={computedRoute} />
       </div>
 
       {activeDelivery ? (

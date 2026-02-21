@@ -15,7 +15,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Routes API publiques (comme google-maps-config qui gère sa propre auth)
+  // Routes API
   if (pathname.startsWith('/api/')) {
     return NextResponse.next()
   }

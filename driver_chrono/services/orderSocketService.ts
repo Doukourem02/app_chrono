@@ -28,6 +28,11 @@ class OrderSocketService {
     }
 
     this.driverId = driverId;
+    const token = useDriverStore.getState().accessToken;
+    if (!token) {
+      logger.warn('Impossible de connecter le socket: accessToken manquant', undefined);
+      return;
+    }
     this.socket = io(config.socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -38,6 +43,9 @@ class OrderSocketService {
       forceNew: false,
       upgrade: true,
       autoConnect: true,
+      auth: {
+        token,
+      },
     });
 
     // CRITIQUE : Installer TOUS les listeners AVANT le connect
@@ -402,6 +410,19 @@ class OrderSocketService {
     });
 
     // Attendre la confirmation du serveur ('order-declined-confirmation') pour mettre à jour le store local
+  }
+
+  /**
+   * Envoyer la position du livreur pour le suivi temps réel client.
+   * À appeler avec throttle (2-5s) et distance filter (10-20m).
+   */
+  emitDriverLocation(orderId: string, location: { latitude: number; longitude: number }) {
+    if (!this.socket || !this.socket.connected) return;
+    this.socket.emit('order:driver:location', {
+      orderId,
+      location: { lat: location.latitude, lng: location.longitude },
+      ts: new Date().toISOString(),
+    });
   }
 
   // Mettre à jour le statut de livraison

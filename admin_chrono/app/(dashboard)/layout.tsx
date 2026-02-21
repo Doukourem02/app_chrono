@@ -4,7 +4,7 @@ import { SkeletonLoader } from "@/components/animations";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { DateFilterProvider } from "@/contexts/DateFilterContext";
-import { GoogleMapsProvider } from "@/contexts/GoogleMapsContext";
+import { MapboxProvider } from "@/contexts/MapboxContext";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { usePathname, useRouter } from "next/navigation";
@@ -158,7 +158,7 @@ export default function DashboardLayout({
 
   return (
     <DateFilterProvider>
-      <GoogleMapsProvider>
+      <MapboxProvider>
         <div style={containerStyle}>
           <Sidebar />
           <div style={contentWrapperStyle}>
@@ -176,7 +176,7 @@ export default function DashboardLayout({
             </div>
           </div>
         </div>
-      </GoogleMapsProvider>
+      </MapboxProvider>
     </DateFilterProvider>
   );
 }

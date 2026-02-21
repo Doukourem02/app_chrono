@@ -2,6 +2,7 @@ require('dotenv').config({ path: '.env' });
 
 module.exports = {
   expo: {
+    owner: "doukourem02",
     name: "driver_chrono",
     slug: "driver_chrono",
     version: "1.0.0",
@@ -13,9 +14,6 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.driver-chrono",
       supportsTablet: true,
-      config: {
-        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
-      },
     },
     android: {
       package: "com.anonymous.driver_chrono",
@@ -27,11 +25,6 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      config: {
-        googleMaps: {
-          apiKey: process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
-        },
-      },
     },
     web: {
       output: "static",
@@ -39,7 +32,18 @@ module.exports = {
     },
     plugins: [
       "expo-router",
-      "expo-barcode-scanner",
+      [
+        "expo-camera",
+        {
+          cameraPermission: "Cette application a besoin de la caméra pour scanner les QR codes.",
+        },
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          RNMapboxMapsImpl: "mapbox",
+        },
+      ],
       [
         "expo-location",
         {
@@ -67,8 +71,12 @@ module.exports = {
       reactCompiler: true
     },
     extra: {
+      eas: {
+        projectId: "9618f8cb-2c98-4b1c-b50c-9f24fe1a2526",
+      },
       // Exposer les variables d'environnement
-      googleApiKey: process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
+      // Fallback: NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN (admin) si EXPO_PUBLIC non défini
+      mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
       socketUrl: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,

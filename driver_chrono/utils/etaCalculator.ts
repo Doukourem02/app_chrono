@@ -88,11 +88,11 @@ export function formatETA(etaMinutes: number): string {
 
 /**
  * Calcule l'ETA complet entre la position actuelle du driver et la destination
- * Utilise les données de trafic Google Maps si disponibles, sinon calcule basé sur la distance
+ * Utilise les données de trafic (Mapbox duration_typical) si disponibles, sinon calcule basé sur la distance
  * @param driverPosition Position actuelle du driver
  * @param destination Position de destination
  * @param vehicleType Type de véhicule (optionnel)
- * @param trafficData Données de trafic Google Maps (optionnel)
+ * @param trafficData Données de trafic Mapbox/Google (optionnel)
  * @param weatherAdjustment Ajustement météo (optionnel)
  * @returns Objet avec distance (mètres) et ETA (minutes)
  */

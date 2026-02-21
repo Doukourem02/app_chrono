@@ -1,10 +1,11 @@
 @import "tailwindcss";
+@import "mapbox-gl/dist/mapbox-gl.css";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
   --purple-primary: #8B5CF6;
-  --purple-light: #A78BFA;
+  --purple-light: #C4B5FD;
   --purple-dark: #7C3AED;
   --gray-light: #F3F4F6;
   --gray-medium: #9CA3AF;
@@ -76,3 +77,4 @@ body {
     transform: rotate(360deg);
   }
 }
+

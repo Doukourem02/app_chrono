@@ -2,6 +2,7 @@ require('dotenv').config({ path: '.env' });
 
 module.exports = {
   expo: {
+    owner: "doukourem02",
     name: "app_chrono",
     slug: "app_chrono",
     version: "1.0.0",
@@ -13,9 +14,6 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       supportsTablet: true,
-      config: {
-        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
-      },
     },
     android: {
       package: "com.anonymous.app_chrono",
@@ -27,11 +25,6 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      config: {
-        googleMaps: {
-          apiKey: process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
-        },
-      },
     },
     web: {
       output: "static",
@@ -39,6 +32,12 @@ module.exports = {
     },
     plugins: [
       "expo-router",
+      [
+        "@rnmapbox/maps",
+        {
+          RNMapboxMapsImpl: "mapbox",
+        },
+      ],
       [
         "expo-location",
         {
@@ -66,8 +65,11 @@ module.exports = {
       reactCompiler: true
     },
     extra: {
+      eas: {
+        projectId: "02928131-25c4-40be-9a4c-77f251406a82",
+      },
       // Exposer les variables d'environnement
-      googleApiKey: process.env.EXPO_PUBLIC_GOOGLE_API_KEY,
+      mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
       socketUrl: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,

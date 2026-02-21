@@ -1,25 +1,47 @@
 /**
- * Utilitaires pour gérer les données de trafic Google Maps
+ * Utilitaires pour gérer les données de trafic
+ * Supporte Google Directions API et Mapbox Directions API
  */
 
 export interface TrafficData {
-  durationInTraffic?: number // Durée en secondes avec trafic
-  durationBase?: number // Durée en secondes sans trafic
-  hasTrafficData: boolean // Indique si les données de trafic sont disponibles
+  durationInTraffic?: number; // Durée en secondes avec trafic
+  durationBase?: number; // Durée en secondes sans trafic
+  hasTrafficData: boolean; // Indique si les données de trafic sont disponibles
+}
+
+/** Structure minimale d'un leg Google Directions (pour compatibilité) */
+interface DirectionsLegLike {
+  duration?: { value?: number };
+  duration_in_traffic?: { value?: number };
 }
 
 /**
  * Extrait les données de trafic depuis une réponse Google Directions API
  */
-export function extractTrafficData(leg: google.maps.DirectionsLeg): TrafficData {
-  const durationInTraffic = leg.duration_in_traffic?.value
-  const durationBase = leg.duration?.value
+export function extractTrafficData(leg: DirectionsLegLike): TrafficData {
+  const durationInTraffic = leg.duration_in_traffic?.value;
+  const durationBase = leg.duration?.value;
 
   return {
     durationInTraffic,
     durationBase,
     hasTrafficData: !!durationInTraffic,
-  }
+  };
+}
+
+/**
+ * Extrait les données de trafic depuis une réponse Mapbox Directions API
+ * Mapbox driving-traffic: duration = avec trafic, duration_typical = sans trafic (historique)
+ */
+export function extractMapboxTrafficData(
+  duration: number,
+  durationTypical?: number
+): TrafficData {
+  return {
+    durationInTraffic: duration,
+    durationBase: durationTypical ?? duration,
+    hasTrafficData: !!durationTypical && durationTypical !== duration,
+  };
 }
 
 /**

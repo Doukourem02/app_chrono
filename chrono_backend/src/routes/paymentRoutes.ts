@@ -1,17 +1,20 @@
 import express, { Router } from 'express';
 import { createPaymentMethod, getPaymentMethods, calculatePrice,initiatePayment,checkPayment,getTransactions,createDispute,getDeferredPaymentLimits,getDeferredDebts,} from '../controllers/paymentController.js';
-import { authLimiter } from '../middleware/rateLimiter.js'; const router: Router = express.Router(); // Méthodes de paiement
+import { apiLimiter, orderLimiter } from '../middleware/rateLimiter.js';
+import { verifyJWT } from '../middleware/verifyToken.js';
+
+const router: Router = express.Router();
 
 
-router.post('/methods', authLimiter, createPaymentMethod);
-router.get('/methods', authLimiter, getPaymentMethods); 
+router.post('/methods', verifyJWT, apiLimiter, createPaymentMethod);
+router.get('/methods', verifyJWT, apiLimiter, getPaymentMethods); 
 router.post('/calculate-price', calculatePrice); 
-router.post('/initiate', authLimiter, initiatePayment);
-router.get('/transactions', authLimiter, getTransactions);
-router.get('/transactions/:transactionId', authLimiter, checkPayment); 
-router.post('/disputes', authLimiter, createDispute);
-router.get('/deferred/limits', authLimiter, getDeferredPaymentLimits);
-router.get('/deferred/debts', authLimiter, getDeferredDebts);
+router.post('/initiate', verifyJWT, orderLimiter, initiatePayment);
+router.get('/transactions', verifyJWT, apiLimiter, getTransactions);
+router.get('/transactions/:transactionId', verifyJWT, apiLimiter, checkPayment); 
+router.post('/disputes', verifyJWT, apiLimiter, createDispute);
+router.get('/deferred/limits', verifyJWT, apiLimiter, getDeferredPaymentLimits);
+router.get('/deferred/debts', verifyJWT, apiLimiter, getDeferredDebts);
 
 export default router;
 

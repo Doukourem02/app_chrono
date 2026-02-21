@@ -30,6 +30,7 @@ export default function VehiclePage() {
   });
 
   // État pour les documents légaux
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [documents, setDocuments] = useState<{
     carte_grise: DocumentData;
     assurance: DocumentData;

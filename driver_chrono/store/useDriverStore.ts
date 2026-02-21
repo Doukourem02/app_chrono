@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { config } from '../config/index';
+import { clearSecureTokens, getRefreshToken, setRefreshToken } from '../utils/secureTokenStorage';
 
 export interface DriverProfile {
   id: string;
@@ -55,6 +56,7 @@ interface DriverStore {
   setTokens: (tokens: { accessToken: string; refreshToken: string }) => void;
   logout: () => void;
   validateUserExists: () => Promise<boolean | 'not_found' | null>;
+  hydrateTokens: () => Promise<void>;
 
   // Actions driver
   setOnlineStatus: (isOnline: boolean) => void;
@@ -105,6 +107,7 @@ export const useDriverStore = create<DriverStore>()(
       },
 
       setTokens: (tokens) => {
+        setRefreshToken(tokens.refreshToken).catch(() => {});
         set({
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken
@@ -112,6 +115,7 @@ export const useDriverStore = create<DriverStore>()(
       },
 
       logout: () => {
+        clearSecureTokens().catch(() => {});
         set({
           isAuthenticated: false,
           user: null,
@@ -126,6 +130,13 @@ export const useDriverStore = create<DriverStore>()(
             hours: 0,
           },
         });
+      },
+
+      hydrateTokens: async () => {
+        const rt = await getRefreshToken();
+        if (rt) {
+          set({ refreshToken: rt });
+        }
       },
 
       validateUserExists: async () => {
@@ -235,13 +246,13 @@ export const useDriverStore = create<DriverStore>()(
       name: 'driver-store',
       storage: createJSONStorage(() => AsyncStorage),
       // Ne pas persister la localisation et le statut online
+      // Persister refreshToken pour survivre au hot reload (comme app_chrono)
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         user: state.user,
         profile: state.profile,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         todayStats: state.todayStats,
+        refreshToken: state.refreshToken,
       }),
     }
   )

@@ -1,12 +1,15 @@
 /**
  * Service centralisé de localisation
  * Gère le suivi continu de la position avec cache et optimisation de la batterie
+ * Reverse geocoding : Mapbox (priorité) > Google > Expo - aligné avec admin_chrono
  */
 
 import * as Location from 'expo-location';
 import { logger } from '../utils/logger';
 import { useLocationStore } from '../store/useLocationStore';
 import { config } from '../config';
+import { mapboxReverseGeocode } from '../utils/mapboxReverseGeocode';
+import { nominatimReverseGeocode } from '../utils/nominatimReverseGeocode';
 
 export interface LocationCoords {
   latitude: number;
@@ -89,9 +92,9 @@ class LocationService {
         }
       }
 
-      // Utiliser Balanced au lieu de BestForNavigation pour économiser la batterie
+      // Haute précision pour obtenir l'adresse exacte (rue, numéro)
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced, // Équilibre entre précision et consommation
+        accuracy: Location.Accuracy.High,
       });
 
       const coords: LocationCoords = {
@@ -140,11 +143,10 @@ class LocationService {
         }
       }
 
-      // Configuration optimisée pour économiser la batterie
       const watchOptions: Location.LocationOptions = {
-        accuracy: options?.accuracy || Location.Accuracy.Balanced, // Balanced au lieu de BestForNavigation
-        timeInterval: options?.timeInterval || 10000, // Mise à jour toutes les 10 secondes
-        distanceInterval: options?.distanceInterval || 50, // Mise à jour tous les 50 mètres
+        accuracy: options?.accuracy || Location.Accuracy.High,
+        timeInterval: options?.timeInterval || 5000,
+        distanceInterval: options?.distanceInterval || 10,
       };
 
       this.watchSubscription = await Location.watchPositionAsync(
@@ -191,27 +193,71 @@ class LocationService {
   }
 
   /**
-   * Géocodage inverse avec Google Geocoding API pour correspondre à Google Maps
-   * Utilise l'API Google au lieu d'Expo Location pour garantir la cohérence
+   * Géocodage inverse : Mapbox (priorité) > Google > Expo
+   * Mapbox donne des adresses précises (ex: Rue Panama City, 772) comme admin_chrono
    */
   async reverseGeocode(coords: LocationCoords, googleApiKey?: string): Promise<string | null> {
-    // Utiliser une clé de cache plus précise (6 décimales au lieu de 4)
-    // Cela évite les problèmes de cache pour des positions proches mais différentes
     const cacheKey = `${coords.latitude.toFixed(6)},${coords.longitude.toFixed(6)}`;
     const now = Date.now();
 
-    // Vérifier le cache
     const cached = this.reverseGeocodeCache.get(cacheKey);
+    const isVagueNeighborhood = (addr: string) =>
+      !/(\d+|rue|avenue|boulevard|route|street|av\.|bd|impasse|allée)/i.test(addr);
     if (cached && now - cached.timestamp < this.REVERSE_GEOCODE_CACHE_EXPIRY) {
-      this.lastKnownAddress = cached.address;
-      return cached.address;
+      // Ne pas réutiliser un cache de quartier vague (ex: "Cité Colombe")
+      if (!isVagueNeighborhood(cached.address)) {
+        this.lastKnownAddress = cached.address;
+        return cached.address;
+      }
+      this.reverseGeocodeCache.delete(cacheKey);
     }
 
-    // Vérifier si on a une clé Google API
-    const apiKey = googleApiKey || config.googleApiKey || process.env.GOOGLE_API_KEY || process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
+    const saveAndReturn = (address: string): string => {
+      this.lastKnownAddress = address;
+      this.reverseGeocodeCache.set(cacheKey, { address, timestamp: now });
+      const store = useLocationStore.getState();
+      if (store.currentLocation) {
+        store.setCurrentLocation({ ...store.currentLocation, address });
+      }
+      return address;
+    };
+
+    // 1. Mapbox en priorité (aligné admin_chrono)
+    const mapboxToken = config.mapboxAccessToken || process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    if (mapboxToken && !mapboxToken.startsWith('<')) {
+      try {
+        const address = await mapboxReverseGeocode(
+          coords.latitude,
+          coords.longitude,
+          mapboxToken,
+          { language: 'fr', country: 'ci', types: 'address' }
+        );
+        // Rejeter les quartiers vagues (ex: "Cité Colombe") sans rue/numéro → laisser Nominatim essayer
+        const hasStreetOrNumber = /(\d+|rue|avenue|boulevard|route|street|av\.|bd|impasse|allée)/i.test(address || '');
+        if (address && address.length > 5 && !/^Abidjan(,|$)/.test(address) && hasStreetOrNumber) {
+          logger.debug('Mapbox reverse geocoding success', 'locationService', { coords: cacheKey, address });
+          return saveAndReturn(address);
+        }
+      } catch (err) {
+        logger.warn('Mapbox reverse geocoding failed', 'locationService', { error: err });
+      }
+    }
+
+    // 2. Nominatim (OSM) - bonne couverture Abidjan, rues précises (Rue Panama City, etc.)
+    try {
+      const address = await nominatimReverseGeocode(coords.latitude, coords.longitude);
+      if (address && address.length > 5) {
+        logger.debug('Nominatim reverse geocoding success', 'locationService', { coords: cacheKey, address });
+        return saveAndReturn(address);
+      }
+    } catch (err) {
+      logger.warn('Nominatim reverse geocoding failed', 'locationService', { error: err });
+    }
+
+    // 3. Google Geocoding API
+    const apiKey = googleApiKey || process.env.GOOGLE_API_KEY || process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
     
     if (!apiKey || apiKey.startsWith('<')) {
-      // Fallback sur Expo Location si pas de clé Google
       try {
         const geocoded = await Location.reverseGeocodeAsync({
           latitude: coords.latitude,
@@ -220,32 +266,9 @@ class LocationService {
 
         if (geocoded && geocoded.length > 0) {
           const place = geocoded[0];
-          const addressParts = [
-            place.name,
-            place.street,
-            place.district,
-            place.city || place.region,
-          ];
+          const addressParts = [place.name, place.street, place.district, place.city || place.region];
           const address = addressParts.filter(Boolean).join(', ');
-
-          if (address) {
-            this.lastKnownAddress = address;
-            this.reverseGeocodeCache.set(cacheKey, {
-              address,
-              timestamp: now,
-            });
-
-            // Mettre à jour le store
-            const store = useLocationStore.getState();
-            if (store.currentLocation) {
-              store.setCurrentLocation({
-                ...store.currentLocation,
-                address,
-              });
-            }
-
-            return address;
-          }
+          if (address) return saveAndReturn(address);
         }
       } catch (error) {
         logger.warn('Expo reverse geocoding failed', 'locationService', { error, coords });
@@ -374,28 +397,13 @@ class LocationService {
 
           // Vérifier une dernière fois qu'on n'a pas un Plus Code
           if (bestAddress && !isPlusCode(bestAddress) && bestAddress.length > 5) {
-            this.lastKnownAddress = bestAddress;
-            this.reverseGeocodeCache.set(cacheKey, {
-              address: bestAddress,
-              timestamp: now,
-            });
-
-            // Mettre à jour le store
-            const store = useLocationStore.getState();
-            if (store.currentLocation) {
-              store.setCurrentLocation({
-                ...store.currentLocation,
-                address: bestAddress,
-              });
-            }
-
             logger.debug('Google reverse geocoding success', 'locationService', {
               coords: `${coords.latitude}, ${coords.longitude}`,
               address: bestAddress,
               types: bestResult?.types || [],
             });
 
-            return bestAddress;
+            return saveAndReturn(bestAddress);
           } else {
             logger.warn('Address is Plus Code or too short, skipping', 'locationService', {
               address: bestAddress,
@@ -434,23 +442,9 @@ class LocationService {
 
         if (geocoded && geocoded.length > 0) {
           const place = geocoded[0];
-          const addressParts = [
-            place.name,
-            place.street,
-            place.district,
-            place.city || place.region,
-          ];
+          const addressParts = [place.name, place.street, place.district, place.city || place.region];
           const address = addressParts.filter(Boolean).join(', ');
-
-          if (address) {
-            this.lastKnownAddress = address;
-            this.reverseGeocodeCache.set(cacheKey, {
-              address,
-              timestamp: now,
-            });
-
-            return address;
-          }
+          if (address) return saveAndReturn(address);
         }
       } catch (error) {
         logger.warn('Expo reverse geocoding fallback failed', 'locationService', { error });

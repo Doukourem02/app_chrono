@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Text } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import type { MapRefHandle } from "../../hooks/useMapCamera";
+import { DriverMapView } from "../../components/DriverMapView";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusToggle } from "../../components/StatusToggle";
 import { StatsCards } from "../../components/StatsCards";
@@ -58,7 +59,7 @@ export default function Index() {
   const isOnline = storeIsOnline;
   
   const { location, error } = useDriverLocation(isOnline);
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<MapRefHandle | null>(null);
 
   const resolveCoords = (candidate?: any) => {
     if (!candidate) return null;
@@ -160,7 +161,40 @@ export default function Index() {
     // Fallback : retourner la première commande active valide si aucune n'est sélectionnée
     return validActiveOrders[0] || null;
   });
-  
+
+  // Suivi temps réel : envoyer position au client (throttle 3s + distance filter 15m)
+  const lastEmitRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
+  useEffect(() => {
+    const status = String(currentOrder?.status || '');
+    const needsTracking = ['accepted', 'enroute', 'picked_up', 'delivering', 'in_progress'].includes(status);
+    if (!currentOrder?.id || !location || !needsTracking) return;
+
+    const distMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
+      const R = 6371000;
+      const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+      const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
+      const x = Math.sin(dLat / 2) ** 2 + Math.cos((a.latitude * Math.PI) / 180) * Math.cos((b.latitude * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+    };
+
+    const maybeEmit = () => {
+      const now = Date.now();
+      const last = lastEmitRef.current;
+      const shouldEmit = !last ||
+        now - last.ts >= 3000 ||
+        distMeters(location, { latitude: last.lat, longitude: last.lng }) >= 15;
+
+      if (shouldEmit) {
+        orderSocketService.emitDriverLocation(currentOrder.id, location);
+        lastEmitRef.current = { lat: location.latitude, lng: location.longitude, ts: now };
+      }
+    };
+
+    maybeEmit();
+    const iv = setInterval(maybeEmit, 3000);
+    return () => clearInterval(iv);
+  }, [currentOrder?.id, currentOrder?.status, location?.latitude, location?.longitude]);
+
   // Bottom sheet pour les détails de la commande (remplace RecipientDetailsSheet)
   const {
     animatedHeight: orderBottomSheetAnimatedHeight,
@@ -308,7 +342,7 @@ export default function Index() {
   }, [selectedOrderId, currentOrder?.id, currentOrder, location]);
 
   const { fitToRoute, centerOnDriver } = useMapCamera(
-    mapRef as React.RefObject<MapView>,
+    mapRef,
     location,
     animatedRoute.routeCoordinates.length > 0 ? { coordinates: animatedRoute.routeCoordinates } : null,
     currentOrder,
@@ -401,6 +435,10 @@ export default function Index() {
 
   const handleAcceptOrder = (orderId: string) => {
     orderSocketService.acceptOrder(orderId);
+    // Émettre immédiatement la position pour que le client voie la route dès l'acceptation
+    if (location) {
+      orderSocketService.emitDriverLocation(orderId, location);
+    }
   };
 
   const handleDeclineOrder = (orderId: string) => {
@@ -712,158 +750,39 @@ export default function Index() {
     }
   }, [user?.id, isAuthenticated, isOnline, updateTodayStats]);
 
+  const orderFullRouteCoords =
+    currentPickupCoord && currentDropoffCoord
+      ? orderFullRoute.routeCoordinates.length > 0
+        ? orderFullRoute.routeCoordinates
+        : [currentPickupCoord, currentDropoffCoord]
+      : [];
+
+  const animatedRouteCoords =
+    isOnline && location && currentOrder && animatedRoute.animatedCoordinates.length > 0
+      ? [animatedDriverPosition || location, ...animatedRoute.animatedCoordinates.slice(1)]
+      : [];
+
   return (
     <View style={styles.container}>
-      <MapView
-        provider={PROVIDER_GOOGLE}
-        style={StyleSheet.absoluteFillObject}
-        ref={mapRef}
-        initialRegion={location ? {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        } : {
-          latitude: 5.345317,
-          longitude: -4.024429,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
+      <DriverMapView
+        mapRef={mapRef}
+        location={location}
+        animatedDriverPosition={animatedDriverPosition || null}
+        animatedRouteCoords={animatedRouteCoords}
+        orderFullRouteCoords={orderFullRouteCoords}
+        currentPickupCoord={currentPickupCoord}
+        currentDropoffCoord={currentDropoffCoord}
+        activeOrders={activeOrders}
+        pendingOrders={pendingOrders}
+        resolveCoords={resolveCoords}
+        calculateDistanceToPickup={calculateDistanceToPickup as (order: unknown) => number | null}
+        setSelectedOrder={(orderId) => {
+          setSelectedOrder(orderId);
+          logger.info('Commande sélectionnée depuis marqueur', 'driver-index', { orderId });
         }}
-        customMapStyle={minimalMapStyle}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-        showsCompass={false}
-        showsScale={false}
-        showsBuildings={false}
-        showsTraffic={true}
-        showsIndoors={false}
-        showsPointsOfInterest={false}
-        mapType="standard"
-        toolbarEnabled={false}
-        rotateEnabled={true}
-        pitchEnabled={false}
-        scrollEnabled={true}
-        zoomEnabled={true}
-        followsUserLocation={false}
-      >
-        {isOnline && (animatedDriverPosition || location) && (
-          <Marker
-            coordinate={{
-              latitude: (animatedDriverPosition || location)!.latitude,
-              longitude: (animatedDriverPosition || location)!.longitude,
-            }}
-            title="Ma position"
-            description={realTimeETA ? `Arrivée dans ${realTimeETA.formattedETA}` : 'Chauffeur en ligne'}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
-          >
-            <View style={styles.driverMarkerContainer}>
-              <View style={styles.driverPulseOuter} />
-              <View style={styles.driverMarkerInner} />
-            </View>
-          </Marker>
-        )}
-        
-        {/* Affichage ETA en temps réel */}
-        {realTimeETA && animatedDriverPosition && isOnline && (
-          <Marker
-            coordinate={animatedDriverPosition}
-            anchor={{ x: 0.5, y: 1.2 }}
-            tracksViewChanges={false}
-          >
-            <View style={styles.realTimeETABadge}>
-              <Text style={styles.realTimeETAText}>{realTimeETA.formattedETA}</Text>
-            </View>
-          </Marker>
-        )}
-
-        {/* Route animée vers la destination */}
-        {isOnline && location && currentOrder && animatedRoute.animatedCoordinates.length > 0 && (
-          <>
-            {/* Route complète pickup -> dropoff (ligne grise discrète) */}
-            {currentPickupCoord && currentDropoffCoord && (
-              <Polyline
-                coordinates={
-                  orderFullRoute.routeCoordinates.length > 0
-                    ? orderFullRoute.routeCoordinates
-                    : [currentPickupCoord, currentDropoffCoord]
-                }
-                strokeColor="rgba(229,231,235,0.9)"
-                strokeWidth={3}
-                lineCap="round"
-                lineJoin="round"
-              />
-            )}
-
-            {/* Route animée active (violet comme admin_chrono) */}
-            {animatedDriverPosition && (
-              <Polyline
-                coordinates={[
-                  animatedDriverPosition,
-                  ...animatedRoute.animatedCoordinates.slice(1),
-                ]}
-                strokeColor="#8B5CF6"
-                strokeWidth={6}
-                lineCap="round"
-                lineJoin="round"
-              />
-            )}
-          </>
-        )}
-
-        {/* Afficher toutes les commandes - toujours visibles */}
-        {[...activeOrders, ...pendingOrders].map((order) => {
-          const pickupCoord = resolveCoords(order.pickup);
-          const dropoffCoord = resolveCoords(order.dropoff);
-          const status = String(order.status || '');
-          const isPending = status === 'pending';
-          const distance = calculateDistanceToPickup(order);
-
-          return (
-            <React.Fragment key={order.id}>
-              {/* Marqueur pickup (vert comme admin_chrono) */}
-              {pickupCoord && (
-                <Marker
-                  coordinate={pickupCoord}
-                  title={order.user?.name ? `Récupérer : ${order.user.name}` : `Récupérer #${order.id.slice(0, 8)}`}
-                  description={
-                    distance !== null 
-                      ? `${order.pickup?.address} • ${distance} km`
-                      : order.pickup?.address
-                  }
-                  onPress={() => {
-                    setSelectedOrder(order.id);
-                    logger.info('Commande sélectionnée depuis marqueur pickup', 'driver-index', { orderId: order.id });
-                  }}
-                  tracksViewChanges={false}
-                >
-                  <View style={styles.pickupMarker}>
-                    <View style={styles.pickupPin} />
-                  </View>
-                </Marker>
-              )}
-
-              {/* Marqueur dropoff (violet comme admin_chrono) */}
-              {dropoffCoord && !isPending && (
-                <Marker
-                  coordinate={dropoffCoord}
-                  title={`Livrer #${order.id.slice(0, 8)}`}
-                  description={order.dropoff?.address}
-                  onPress={() => {
-                    setSelectedOrder(order.id);
-                    logger.info('Commande sélectionnée depuis marqueur dropoff', 'driver-index', { orderId: order.id });
-                  }}
-                  tracksViewChanges={false}
-                >
-                  <View style={styles.dropoffMarker}>
-                    <View style={styles.dropoffPin} />
-                  </View>
-                </Marker>
-              )}
-            </React.Fragment>
-          );
-        })}
-      </MapView>
+        realTimeETA={realTimeETA}
+        isOnline={!!isOnline}
+      />
 
       <StatusToggle 
         isOnline={isOnline} 
@@ -988,21 +907,6 @@ export default function Index() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  driverMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#8B5CF6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   floatingMenu: {
     position: "absolute",
     bottom: 30,
@@ -1097,144 +1001,4 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  // Marqueurs uniformisés comme admin_chrono
-  pickupMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 20,
-    height: 20,
-  },
-  pickupPin: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#10B981',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  dropoffMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 20,
-    height: 20,
-  },
-  dropoffPin: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#8B5CF6',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  // Driver marker avec cercle extérieur comme admin_chrono
-  driverMarkerContainer: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  driverPulseOuter: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-    backgroundColor: 'rgba(59,130,246,0.15)',
-  },
-  driverMarkerInner: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#3B82F6',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 6,
-    position: 'absolute',
-  },
-  realTimeETABadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  realTimeETAText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
 });
-
-// Style minimal de la carte (similaire à admin_chrono)
-const minimalMapStyle = [
-  {
-    elementType: 'geometry',
-    stylers: [{ color: '#F7F8FC' }],
-  },
-  {
-    elementType: 'labels.icon',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#94A3B8' }],
-  },
-  {
-    elementType: 'labels.text.stroke',
-    stylers: [{ color: '#FFFFFF' }],
-  },
-  {
-    featureType: 'administrative',
-    elementType: 'geometry',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'poi',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry',
-    stylers: [{ color: '#E4E7EC' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#A0AEC0' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry',
-    stylers: [{ color: '#C7D2FE' }],
-  },
-  {
-    featureType: 'transit',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'geometry',
-    stylers: [{ color: '#D8E7FB' }],
-  },
-];

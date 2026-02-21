@@ -1,7 +1,22 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { AppState, AppStateStatus } from "react-native";
+import { AppState, AppStateStatus, Platform } from "react-native";
+import Constants from "expo-constants";
 import { useDriverStore } from "../store/useDriverStore";
+
+// Mapbox : initialiser le token au démarrage (iOS/Android uniquement, pas web)
+if (Platform.OS !== "web") {
+  try {
+    const Mapbox = require("@rnmapbox/maps").default;
+    const token =
+      process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN ??
+      Constants.expoConfig?.extra?.mapboxAccessToken ??
+      process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    if (token) Mapbox.setAccessToken(token);
+  } catch {
+    // @rnmapbox/maps non disponible (ex: Expo Go)
+  }
+}
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
@@ -14,69 +29,33 @@ import { logger } from "../utils/logger";
 initSentry();
 
 export default function RootLayout() {
-  const { isAuthenticated, user, validateUserExists, logout } = useDriverStore();
+  const { isAuthenticated, user, logout, hydrateTokens } = useDriverStore();
 
+  // Charger le refresh token depuis SecureStore avant tout check de session (comme app_chrono)
   useEffect(() => {
-    // Vérification optionnelle en arrière-plan (non bloquante)
-    const checkUserValidity = async () => {
-      if (user?.id) {
-        // Vérifier et rafraîchir le token si nécessaire
-        try {
-          const tokenResult = await apiService.ensureAccessToken();
-          if (!tokenResult.token) {
-            // Token invalide ou impossible à rafraîchir, déconnecter
-            logout();
-            return;
-          }
-        } catch (error) {
-          // En cas d'erreur, continuer avec la validation normale
-          logger.warn('Erreur lors de la vérification du token:', undefined, error);
-        }
+    hydrateTokens().catch(() => {});
+  }, [hydrateTokens]);
 
-        const result = await validateUserExists();
-        if (result === false) {
-          logout();
-        }
-      }
-    };
-
-    checkUserValidity();
-  }, [user?.id, validateUserExists, logout]);
-
+  // Vérifier et rafraîchir la session quand l'app revient au premier plan (comme app_chrono)
   useEffect(() => {
-    // Vérification et rafraîchissement du token quand l'app devient active
-    // Cela évite les problèmes de session expirée après une longue période d'inactivité
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active' && isAuthenticated && user?.id) {
-        // L'app revient au premier plan, vérifier et rafraîchir le token si nécessaire
+      if (nextAppState === 'active' && isAuthenticated && user) {
         try {
           const tokenResult = await apiService.ensureAccessToken();
           if (!tokenResult.token) {
-            // Token invalide ou impossible à rafraîchir, déconnecter silencieusement
-            // L'utilisateur sera redirigé à la prochaine action nécessitant une authentification
-            logger.warn('[RootLayout] Session expirée lors du retour en arrière-plan');
-            logout();
-            return;
+            // Ne pas déconnecter : null peut être une erreur réseau temporaire.
+            // Si la session est vraiment expirée, l'utilisateur aura une erreur à la prochaine action.
+            logger.warn('[RootLayout] Impossible de rafraîchir le token (réseau?) - on garde la session');
           }
         } catch (error) {
-          // En cas d'erreur, ne pas déconnecter (peut être une erreur réseau temporaire)
           logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', undefined, error);
         }
-
-        // Valider aussi l'existence de l'utilisateur
-        validateUserExists().then((result) => {
-          if (result === false) {
-            logout();
-          }
-        }).catch(() => {
-          // ignorer
-        });
       }
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription?.remove();
-  }, [isAuthenticated, user?.id, validateUserExists, logout]);
+    return () => subscription.remove();
+  }, [isAuthenticated, user, logout]);
 
   useEffect(() => {
     // Initialiser le service de son au démarrage

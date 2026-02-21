@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { logger } from '../utils/logger';
 import { Message, Conversation } from './driverMessageService';
 import { config } from '../config/index';
+import { useDriverStore } from '../store/useDriverStore';
 
 const SOCKET_URL = config.socketUrl || 'http://localhost:4000';
 
@@ -27,6 +28,11 @@ class DriverMessageSocketService {
     }
 
     this.driverId = driverId;
+    const token = useDriverStore.getState().accessToken;
+    if (!token) {
+      logger.warn('Impossible de connecter le socket de messagerie: accessToken manquant', 'driverMessageSocketService');
+      return;
+    }
     this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -37,6 +43,9 @@ class DriverMessageSocketService {
       forceNew: false,
       upgrade: true,
       autoConnect: true,
+      auth: {
+        token,
+      },
     });
 
     this.socket.on('connect', () => {

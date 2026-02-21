@@ -13,7 +13,6 @@ router.post('/refresh-token', validateRefreshToken, refreshToken);
 router.get('/check/:email', checkUserInPostgreSQL);
 router.post('/register', registerLimiter, bruteForceProtection, validateRegister, registerUserWithPostgreSQL);
 router.post('/login', authLimiter, bruteForceProtection, validateLogin, loginUserWithPostgreSQL);
-router.get('/users', getAllUsersFromPostgreSQL);
 router.get('/users/:userId/profile', verifyJWT, getUserProfile);
 router.put('/users/:userId/profile', verifyJWT, updateUserProfile);
 router.post('/users/:userId/avatar', verifyJWT, uploadAvatar);

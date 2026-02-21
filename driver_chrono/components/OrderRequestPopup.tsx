@@ -54,7 +54,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   const timerAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const soundRef = useRef<Audio.Sound | null>(null);
-  
+
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [timeLeft, setTimeLeft] = React.useState(autoDeclineTimer);
 

@@ -6,66 +6,68 @@ import { userApiService } from '../services/userApiService';
 import { logger } from '../utils/logger';
 
 export default function RootIndex() {
-  const { isAuthenticated, user, validateUser, logout } = useAuthStore();
+  const { validateUser, logout, hydrateTokens } = useAuthStore();
 
   useEffect(() => {
     let cancelled = false;
 
     const checkSession = async () => {
-      if (isAuthenticated && user) {
-        // Vérifier et rafraîchir le token si nécessaire avant de valider la session
-        // Cela évite les problèmes de session expirée après une longue période d'inactivité
+      await hydrateTokens();
+      const state = useAuthStore.getState();
+      const { isAuthenticated: auth, user: u } = state;
+
+      if (auth && u) {
+        let token: string | null = null;
         try {
-          const token = await userApiService.ensureAccessToken();
-          if (!token) {
-            // Token invalide ou impossible à rafraîchir, déconnecter
-            if (!cancelled) {
-              logout();
-              router.replace('/(tabs)' as any);
-            }
-            return;
-          }
-        } catch (error) {
-          // En cas d'erreur, continuer avec la validation normale
-          logger.warn('Erreur lors de la vérification du token:', undefined, error);
+          token = await userApiService.ensureAccessToken();
+        } catch {
+          logger.warn('Erreur lors de la vérification du token:', undefined);
         }
 
-        // Si l'utilisateur est authentifié, valider sa session
-        const validationResult = await validateUser();
+        if (cancelled) return;
 
-        if (cancelled) {
+        // Session incomplète (user en persist mais pas de token) → déconnecter et aller à l'auth
+        if (!token) {
+          logout();
+          router.replace('/(auth)/register' as any);
           return;
         }
 
+        const validationResult = await validateUser();
+
+        if (cancelled) return;
+
         if (validationResult === true || validationResult === null || validationResult === 'not_found') {
-          // Session valide, rediriger vers l'application
           router.replace('/(tabs)' as any);
         } else {
-          // Session invalide, déconnecter et permettre l'accès en mode invité
           logout();
           router.replace('/(tabs)' as any);
         }
       } else {
-        // Pas d'authentification : permettre l'accès en mode invité
-        // L'utilisateur pourra explorer l'application et s'inscrire quand il le souhaite
         router.replace('/(tabs)' as any);
       }
     };
 
-    const timer = setTimeout(() => {
+    const runCheck = () => {
+      if (cancelled) return;
       checkSession().catch(() => {
-        if (!cancelled) {
-          // En cas d'erreur, permettre l'accès en mode invité
-          router.replace('/(tabs)' as any);
-        }
+        if (!cancelled) router.replace('/(tabs)' as any);
       });
-    }, 800);
+    };
+
+    // Attendre que le persist Zustand ait rechargé user/isAuthenticated
+    const unsub = useAuthStore.persist.onFinishHydration(runCheck);
+    if (useAuthStore.persist.hasHydrated()) {
+      runCheck();
+    }
+    const fallback = setTimeout(runCheck, 2500);
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      unsub?.();
+      clearTimeout(fallback);
     };
-  }, [isAuthenticated, user, validateUser, logout]);
+  }, [validateUser, logout, hydrateTokens]);
 
   return (
     <View style={{ 

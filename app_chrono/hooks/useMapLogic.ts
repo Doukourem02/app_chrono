@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated } from 'react-native';
+import { Alert, Animated, Dimensions } from 'react-native';
 import * as Location from 'expo-location';
-import MapView, { Region } from 'react-native-maps';
 import { useShipmentStore } from '../store/useShipmentStore';
 import { logger } from '../utils/logger';
 import { useErrorHandler } from '../utils/errorHandler';
 import { config } from '../config';
 import { locationService } from '../services/locationService';
+import { fetchMapboxDirections } from '../utils/mapboxDirections';
 
 type Coordinates = {
   latitude: number;
   longitude: number;
 };
 
+export interface MapRefHandle {
+  fitToCoordinates: (coords: Coordinates[], opts: { edgePadding: { top: number; right: number; bottom: number; left: number }; animated: boolean }) => void;
+  animateToRegion: (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }, duration: number) => void;
+}
+
 interface UseMapLogicParams {
-  mapRef: React.RefObject<MapView>;
+  mapRef: React.RefObject<MapRefHandle | null>;
 }
 
 export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
@@ -28,49 +33,20 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
   
   const { handleError } = useErrorHandler();
   
-  const [region, setRegion] = useState<Region | null>(null);
+  const [region, setRegion] = useState<{ latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null>(null);
   const [pickupCoords, setPickupCoords] = useState<Coordinates | null>(null);
   const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
   const [displayedRouteCoords, setDisplayedRouteCoords] = useState<Coordinates[]>([]);
   const [durationText, setDurationText] = useState<string | null>(null);
+  const [arrivalTimeText, setArrivalTimeText] = useState<string | null>(null);
   const [driverCoords, setDriverCoords] = useState<Coordinates | null>(null);
   const [showMethodSelection, setShowMethodSelection] = useState(false);
+  const [cameraAnimationDuration, setCameraAnimationDuration] = useState(0);
 
-  const polylineAnimRef = useRef<any>(null);
+  const polylineAnimRef = useRef<number | null>(null);
   const destinationPulseAnim = useRef(new Animated.Value(0)).current;
   const userPulseAnim = useRef(new Animated.Value(0)).current;
-  const GOOGLE_API_KEY = config.googleApiKey;
-
-  // Décoder polyline Google
-  const decodePolyline = (t: string) => {
-    let points: Coordinates[] = [];
-    let index = 0, len = t.length;
-    let lat = 0, lng = 0;
-
-    while (index < len) {
-      let b, shift = 0, result = 0;
-      do {
-        b = t.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = t.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
-    }
-    return points;
-  };
+  const MAPBOX_TOKEN = config.mapboxAccessToken;
 
   const simplifyRoute = (points: Coordinates[], tolerance = 0.00002): Coordinates[] => {
     if (!points || points.length <= 2) return points;
@@ -186,7 +162,8 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     let totalKm = 0;
     for (let i = 1; i < points.length; i++) totalKm += haversineKm(points[i - 1], points[i]);
 
-    const totalDuration = Math.min(Math.max(200 + totalKm * 350, 200), 1200);
+    // Durée visible : ~1s min, ~2.5s max - juste milieu entre trop rapide et trop lent
+    const totalDuration = Math.min(Math.max(1000 + totalKm * 500, 1000), 2500);
     const start = Date.now();
 
     const step = () => {
@@ -255,6 +232,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
 
     setDisplayedRouteCoords([]);
     setDurationText(null);
+    setArrivalTimeText(null);
     stopDestinationPulse();
   };
 
@@ -274,60 +252,49 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     stopDestinationPulse();
   };
 
-  // Récupérer l'itinéraire
+  // Récupérer l'itinéraire via Mapbox Directions API
   const fetchRoute = async (pickup: Coordinates, dropoff: Coordinates) => {
-    if (!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('<')) {
-      logger.warn('Google API key not set - cannot fetch directions', 'useMapLogic');
+    if (!MAPBOX_TOKEN || MAPBOX_TOKEN.startsWith('<')) {
+      logger.warn('Mapbox token not set - cannot fetch directions', 'useMapLogic');
       return;
     }
 
     try {
-      const departureTs = Math.floor(Date.now() / 1000);
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickup.latitude},${pickup.longitude}&destination=${dropoff.latitude},${dropoff.longitude}&mode=driving&departure_time=${departureTs}&traffic_model=best_guess&key=${GOOGLE_API_KEY}`;
-      
-      const res = await fetch(url);
-      const json = await res.json();
-      
-      if (json.routes && json.routes.length > 0) {
-        const route = json.routes[0];
-        let points = decodePolyline(route.overview_polyline.points);
+      const result = await fetchMapboxDirections(
+        { lat: pickup.latitude, lng: pickup.longitude },
+        { lat: dropoff.latitude, lng: dropoff.longitude },
+        MAPBOX_TOKEN
+      );
+
+      if (result && result.coordinates.length > 0) {
+        let points = result.coordinates.map((c) => ({ latitude: c.lat, longitude: c.lng }));
         points = simplifyRoute(points);
 
-        const almostEqual = (a: Coordinates, b: Coordinates, eps = 0.0001) =>
-          Math.abs(a.latitude - b.latitude) < eps && Math.abs(a.longitude - b.longitude) < eps;
-        
-        if (pickup && points.length > 0 && !almostEqual(points[0], pickup)) {
-          points = [{ latitude: pickup.latitude, longitude: pickup.longitude }, ...points];
-        }
-
-        if (dropoff && points.length > 0 && !almostEqual(points[points.length - 1], dropoff)) {
-          points = [...points, { latitude: dropoff.latitude, longitude: dropoff.longitude }];
+        // Forcer le premier et dernier point exactement sur pickup/dropoff pour que la polyline soit collée aux marqueurs
+        const exactPickup = { latitude: pickup.latitude, longitude: pickup.longitude };
+        const exactDropoff = { latitude: dropoff.latitude, longitude: dropoff.longitude };
+        if (points.length > 0) {
+          points[0] = exactPickup;
+          points[points.length - 1] = exactDropoff;
         }
 
         animatePolyline(points);
-        
-        // Démarrer l'animation pulse pour la destination
         startDestinationPulse();
-        
-        const leg = route.legs && route.legs[0];
-        if (leg) {
-          const durationTraffic = leg.duration_in_traffic && leg.duration_in_traffic.value;
-          const durationBase = leg.duration && leg.duration.value;
-          const vehicleMultiplier = selectedMethod === 'moto' ? 0.85 : selectedMethod === 'cargo' ? 1.25 : 1.0;
-          const chosenSeconds = durationTraffic || durationBase;
-          
-          if (chosenSeconds) {
-            const adjustedSeconds = Math.round(chosenSeconds * vehicleMultiplier);
-            const text = (leg.duration_in_traffic && leg.duration_in_traffic.text) || 
-                        (leg.duration && leg.duration.text) || 
-                        `${Math.round(adjustedSeconds / 60)} min`;
-            setDurationText(text);
-          } else {
-            setDurationText(leg.duration?.text || null);
-          }
+
+        const vehicleMultiplier = selectedMethod === 'moto' ? 0.85 : selectedMethod === 'cargo' ? 1.25 : 1.0;
+        const chosenSeconds = result.durationTypical ?? result.duration;
+        if (chosenSeconds) {
+          const adjustedSeconds = Math.round(chosenSeconds * vehicleMultiplier);
+          setDurationText(adjustedSeconds < 60 ? `${adjustedSeconds} sec` : `${Math.round(adjustedSeconds / 60)} min`);
+          const arrivalDate = new Date(Date.now() + adjustedSeconds * 1000);
+          const hours = arrivalDate.getHours();
+          const minutes = arrivalDate.getMinutes();
+          setArrivalTimeText(`arrive à ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+        } else {
+          setDurationText(null);
+          setArrivalTimeText(null);
         }
 
-        // Animation automatique de la caméra pour montrer l'itinéraire complet
         fitRoute(points);
       }
     } catch (err) {
@@ -335,200 +302,83 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     }
   };
 
-  // Gestion de la caméra
+  // Gestion de la caméra : zoom arrière animé pour voir toute la polyline
   const fitRoute = (coords: Coordinates[]) => {
-    if (!mapRef.current || coords.length === 0) return;
+    if (coords.length === 0) return;
+    const lngs = coords.map((c) => c.longitude);
+    const lats = coords.map((c) => c.latitude);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    // Padding en degrés : plus généreux pour que la polyline soit visible au-dessus du bottom sheet
+    const { height: screenHeight } = Dimensions.get('window');
+    const bottomSheetHeight = screenHeight * 0.55;
+    const padLat = Math.max(0.004, (maxLat - minLat) * 0.4);
+    const padLng = Math.max(0.005, (maxLng - minLng) * 0.4);
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+    const latDelta = (maxLat - minLat) + padLat * 2;
+    const lngDelta = (maxLng - minLng) + padLng * 2;
+    setRegion({
+      latitude: centerLat,
+      longitude: centerLng,
+      latitudeDelta: latDelta,
+      longitudeDelta: lngDelta,
+    });
+    setCameraAnimationDuration(1200);
+    // Appel impératif pour l'animation fluide (si disponible)
     try {
-      mapRef.current.fitToCoordinates(coords, {
-        edgePadding: { top: 80, right: 40, bottom: 200, left: 40 },
+      mapRef.current?.fitToCoordinates?.(coords, {
+        edgePadding: { top: 80, right: 40, bottom: bottomSheetHeight, left: 40 },
         animated: true,
       });
     } catch {
-      // Ignorer les erreurs de fitToCoordinates
+      // Fallback : region déjà mise à jour ci-dessus
     }
   };
 
-  // Centrer la caméra sur une position spécifique
-  const animateToCoordinate = (coordinate: Coordinates, zoomLevel = 0.01) => {
-    if (!mapRef.current) return;
+  const animateToCoordinate = (coordinate: Coordinates, delta = 0.01) => {
+    const newRegion = {
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+      latitudeDelta: delta,
+      longitudeDelta: delta,
+    };
+    setRegion(newRegion);
+    setCameraAnimationDuration(1000);
     try {
-      mapRef.current.animateToRegion({
-        latitude: coordinate.latitude,
-        longitude: coordinate.longitude,
-        latitudeDelta: zoomLevel,
-        longitudeDelta: zoomLevel,
-      }, 1000); // Animation de 1 seconde
+      mapRef.current?.animateToRegion?.(newRegion, 1000);
     } catch {
-      // Ignorer les erreurs d'animation
+      // Fallback : region déjà mise à jour
+    }
+  };
+
+  /** Dézoomer / revenir à la vue complète : route si disponible, sinon zone élargie autour de la position */
+  const zoomOutToFit = () => {
+    const coordsToFit: Coordinates[] = [];
+    if (displayedRouteCoords.length > 0) {
+      coordsToFit.push(...displayedRouteCoords);
+    } else if (pickupCoords && dropoffCoords) {
+      coordsToFit.push(pickupCoords, dropoffCoords);
+    }
+    if (coordsToFit.length > 0) {
+      fitRoute(coordsToFit);
+    } else if (pickupCoords) {
+      animateToCoordinate(pickupCoords, 0.025);
+    } else if (region) {
+      animateToCoordinate({ latitude: region.latitude, longitude: region.longitude }, 0.03);
     }
   };
 
   // Initialiser la position
   useEffect(() => {
     let isMounted = true;
-    
-    // Fonction de géolocalisation inverse plus précise avec Google
-    const getReverseGeocode = async (latitude: number, longitude: number) => {
-      if (!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('<')) {
-        // Fallback sur l'API Expo si pas de clé Google
-        try {
-          const geocoded = await Location.reverseGeocodeAsync({ latitude, longitude });
-          if (!isMounted) return;
-          
-          if (geocoded && geocoded.length > 0) {
-            const place = geocoded[0];
-            const addressParts = [place.name, place.street, place.district || place.city, place.region];
-            const address = addressParts.filter(Boolean).join(', ');
-            if (address && isMounted) {
-              useShipmentStore.getState().setPickupLocation(address);
-            }
-          }
-        } catch (err: any) {
-          logger.warn('Expo reverse geocode failed', 'useMapLogic', { 
-            message: err?.message || 'Unknown error' 
-          });
-        }
-        return;
-      }
 
-      // Utilisation de Google Geocoding API pour plus de précision
-      try {
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_API_KEY}&language=fr&region=ci`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!isMounted) return;
-
-        if (data.status === 'OK' && data.results && data.results.length > 0) {
-          // Fonction pour détecter si une adresse contient un Plus Code
-          const isPlusCode = (address: string): boolean => {
-            const plusCodePattern = /^[A-Z0-9]{4,8}\+[A-Z0-9]{2,6}/i;
-            return plusCodePattern.test(address);
-          };
-
-          // Fonction pour vérifier si un résultat contient une vraie adresse (pas un Plus Code)
-          const hasRealAddress = (result: any): boolean => {
-            const address = result.formatted_address || '';
-            return !isPlusCode(address) && address.length > 10;
-          };
-
-          // Filtrer les résultats pour exclure les Plus Codes
-          const realAddressResults = data.results.filter(hasRealAddress);
-          
-          // Chercher l'adresse la plus précise (exclure les Plus Codes)
-          let bestAddress = '';
-          let bestResult: any = null;
-          
-          // Priorité 1: Rechercher une adresse avec numéro de rue (exclure les Plus Codes)
-          const streetAddress = realAddressResults.find((result: any) => 
-            (result.types.includes('street_address') || 
-             result.types.includes('premise')) && hasRealAddress(result)
-          );
-          
-          if (streetAddress) {
-            bestResult = streetAddress;
-          } else {
-            // Priorité 2: Rechercher une route (nom de rue)
-            const route = realAddressResults.find((result: any) => 
-              result.types.includes('route') && hasRealAddress(result)
-            );
-            
-            if (route) {
-              bestResult = route;
-            } else {
-              // Priorité 3: Rechercher un point d'intérêt proche (exclure les Plus Codes)
-              const poi = realAddressResults.find((result: any) => 
-                (result.types.includes('point_of_interest') ||
-                 result.types.includes('establishment')) && hasRealAddress(result)
-              );
-              
-              if (poi) {
-                bestResult = poi;
-              } else if (realAddressResults.length > 0) {
-                // Priorité 4: Prendre le premier résultat valide (pas un Plus Code)
-                bestResult = realAddressResults[0];
-              }
-            }
-          }
-
-          if (bestResult) {
-            bestAddress = bestResult.formatted_address;
-          }
-
-          // Nettoyer l'adresse pour la Côte d'Ivoire
-          if (bestAddress && !isPlusCode(bestAddress)) {
-            // Supprimer les informations redondantes et garder les plus pertinentes
-            bestAddress = bestAddress
-              .replace(/, Côte d'Ivoire$/, '') // Supprimer le pays à la fin
-              .replace(/,\s*Abidjan,\s*Abidjan/g, ', Abidjan') // Supprimer doublons
-              .replace(/^Unnamed Road,?\s*/, '') // Supprimer "Unnamed Road"
-              .replace(/^Route sans nom,?\s*/, '') // Supprimer "Route sans nom"
-              .trim();
-            
-            if (bestAddress && bestAddress.length > 5 && isMounted) {
-              useShipmentStore.getState().setPickupLocation(bestAddress);
-              logger.info('Precise location found', 'useMapLogic', { address: bestAddress });
-            }
-          }
-        } else {
-          // Si l'API n'est pas activée (REQUEST_DENIED), ne pas logger de warning
-          // C'est un cas attendu si la facturation n'est pas activée
-          const isApiNotEnabled = data.status === 'REQUEST_DENIED' || 
-                                  data.error_message?.includes('not authorized') ||
-                                  data.error_message?.includes('not enabled');
-          
-          if (!isApiNotEnabled) {
-            logger.warn('Google Geocoding API failed', 'useMapLogic', { 
-              status: data.status,
-              errorMessage: data.error_message 
-            });
-          }
-          
-          // Fallback sur l'API Expo
-          const geocoded = await Location.reverseGeocodeAsync({ latitude, longitude });
-          if (!isMounted) return;
-          
-          if (geocoded && geocoded.length > 0) {
-            const place = geocoded[0];
-            const addressParts = [place.name, place.street, place.district || place.city];
-            const address = addressParts.filter(Boolean).join(', ');
-            if (address && isMounted) {
-              useShipmentStore.getState().setPickupLocation(address + ', Abidjan');
-            }
-          }
-        }
-      } catch (err: any) {
-        logger.error('Google Geocoding request failed', 'useMapLogic', { 
-          message: err?.message || 'Unknown error' 
-        });
-        
-        // Fallback final sur Expo
-        try {
-          const geocoded = await Location.reverseGeocodeAsync({ latitude, longitude });
-          if (!isMounted) return;
-          
-          if (geocoded && geocoded.length > 0) {
-            const place = geocoded[0];
-            const addressParts = [place.name, place.street, place.district || place.city];
-            const address = addressParts.filter(Boolean).join(', ');
-            if (address && isMounted) {
-              useShipmentStore.getState().setPickupLocation(address + ', Abidjan');
-            }
-          }
-        } catch {
-          // Échec total - utiliser coordonnées
-          if (isMounted) {
-            useShipmentStore.getState().setPickupLocation(`Position: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-          }
-        }
-      }
-    };
-    
     (async () => {
       try {
-        // Utiliser le service centralisé de localisation
-        const coords = await locationService.getCurrentPosition();
-        
+        const coords = await locationService.getCurrentPosition(true);
+
         if (!coords || !isMounted) {
           if (!isMounted) return;
           Alert.alert('Permission refusée', 'Activez la localisation pour utiliser la carte.');
@@ -537,35 +387,45 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
 
         const { latitude, longitude } = coords;
 
-        const newRegion: Region = {
+        const newRegion = {
           latitude,
           longitude,
-          latitudeDelta: 0.005, // Zoom plus précis
+          latitudeDelta: 0.005,
           longitudeDelta: 0.005,
         };
 
         setRegion(newRegion);
         setPickupCoords({ latitude, longitude });
 
-        // Utiliser le service centralisé de localisation pour le reverse geocoding
-        // Cela garantit la cohérence avec Google Maps
+        // Reverse geocoding : Mapbox (priorité) > Nominatim > Google > Expo (via locationService)
         const address = await locationService.reverseGeocode({
           latitude,
           longitude,
           timestamp: Date.now(),
-        }, GOOGLE_API_KEY);
-        
-        // Si le service centralisé n'a pas retourné d'adresse, utiliser la fonction locale
-        if (!address && GOOGLE_API_KEY && !GOOGLE_API_KEY.startsWith('<')) {
-          await getReverseGeocode(latitude, longitude);
-        } else if (address) {
-          // Mettre à jour l'adresse de pickup avec l'adresse du service
+        });
+
+        if (address && isMounted) {
           useShipmentStore.getState().setPickupLocation(address);
+        } else if (isMounted) {
+          // Fallback Expo si le service n'a rien retourné
+          try {
+            const geocoded = await Location.reverseGeocodeAsync({ latitude, longitude });
+            if (geocoded?.length > 0 && isMounted) {
+              const place = geocoded[0];
+              const parts = [place.name, place.street, place.district || place.city, place.region];
+              const addr = parts.filter(Boolean).join(', ');
+              if (addr) useShipmentStore.getState().setPickupLocation(addr);
+            } else {
+              useShipmentStore.getState().setPickupLocation(`Position: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+            }
+          } catch {
+            if (isMounted) {
+              useShipmentStore.getState().setPickupLocation(`Position: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+            }
+          }
         }
-        
-        // Démarrer le suivi continu de la position (optimisé pour la batterie)
+
         await locationService.startWatching();
-        
       } catch (error) {
         if (isMounted) {
           logger.error('Location permission or access failed', 'useMapLogic', error);
@@ -576,10 +436,8 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
 
     return () => {
       isMounted = false;
-      // Ne pas arrêter le watch ici car il peut être utilisé ailleurs
-      // Le service gère son propre cycle de vie
     };
-  }, [GOOGLE_API_KEY]);
+  }, []);
 
   // Générer des véhicules disponibles
   const getAvailableVehicles = () => {
@@ -621,13 +479,22 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     ];
   };
 
+  useEffect(() => {
+    if (cameraAnimationDuration > 0) {
+      const t = setTimeout(() => setCameraAnimationDuration(0), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [cameraAnimationDuration]);
+
   return {
     // États
     region,
+    cameraAnimationDuration,
     pickupCoords,
     dropoffCoords,
     displayedRouteCoords,
     durationText,
+    arrivalTimeText,
     driverCoords,
     pickupLocation,
     deliveryLocation,
@@ -646,6 +513,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     getAvailableVehicles,
     fitRoute,
     animateToCoordinate,
+    zoomOutToFit,
     startMethodSelection,
     stopDestinationPulse,
     stopUserPulse,

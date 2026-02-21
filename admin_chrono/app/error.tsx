@@ -12,7 +12,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Logger l'erreur en production (dans les logs, pas visible à l'utilisateur)
+    
     logger.error("Page error caught:", {
       message: error.message,
       stack: error.stack,

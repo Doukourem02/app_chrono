@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View,Text,TouchableOpacity, Animated,ScrollView,Image,Alert} from 'react-native';
-import PlacesAutocomplete from './PlacesAutocomplete';
+import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 import { useShipmentStore } from '../store/useShipmentStore';
 
 type Coordinates = {
@@ -82,7 +82,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
           <Text style={styles.title}>ENVOYER UN COLIS</Text>
 
           <View style={styles.inputContainer}>
-            <PlacesAutocomplete
+            <MapboxAddressAutocomplete
               placeholder="Où récupérer"
               country="ci"
               initialValue={pickupLocation}
@@ -91,7 +91,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
 
             <View style={styles.inputSeparator} />
 
-            <PlacesAutocomplete
+            <MapboxAddressAutocomplete
               placeholder="Où livrer"
               country="ci"
               initialValue={deliveryLocation}
@@ -272,8 +272,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
   },
-  
-  
   tripInfo: {
     backgroundColor: '#F8FAFC',
     borderRadius: 16,

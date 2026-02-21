@@ -478,15 +478,53 @@ async function notifyDriversForOrder(
 
 const setupOrderSocket = (io: SocketIOServer): void => {
   const DEBUG = process.env.DEBUG_SOCKETS === 'true'; io.on('connection', (socket: ExtendedSocket) => {
-    if (DEBUG) logger.debug(`Nouvelle connexion Socket: ${socket.id}`); socket.on('driver-connect', (driverId: string) => { connectedDrivers.set(driverId, socket.id); socket.driverId = driverId; logger.debug(`[DIAGNOSTIC] Driver connecté: ${maskUserId(driverId)} (socket: ${socket.id})`); logger.debug(` - Total drivers connectés: ${connectedDrivers.size}`); }); socket.on('user-connect', (userId: string) => {
+    if (DEBUG) logger.debug(`Nouvelle connexion Socket: ${socket.id}`);
+
+    // SÉCURITÉ: préférer l'identité authentifiée (middleware Socket.IO dans server.ts)
+    const authUserId = (socket as any).userId as string | undefined;
+    const authRole = (socket as any).userRole as string | undefined;
+
+    if (authUserId && authRole === 'driver') {
+      connectedDrivers.set(authUserId, socket.id);
+      socket.driverId = authUserId;
+      if (DEBUG) logger.debug(`[DIAGNOSTIC] Driver auto-auth: ${maskUserId(authUserId)} (socket: ${socket.id})`);
+    } else if (authUserId && authRole === 'client') {
+      connectedUsers.set(authUserId, socket.id);
+      socket.userId = authUserId;
+      if (DEBUG) logger.debug(`[DIAGNOSTIC] User auto-auth: ${maskUserId(authUserId)} (socket: ${socket.id})`);
+    }
+
+    // Backward-compat: accepter l'event connect mais seulement si l'ID correspond au token
+    socket.on('driver-connect', (driverId: string) => {
+      if (!authUserId || authRole !== 'driver') {
+        logger.warn(`[DIAGNOSTIC] driver-connect refusé (non authentifié) socket=${socket.id}`);
+        return;
+      }
+      if (driverId && driverId !== authUserId) {
+        logger.warn(`[DIAGNOSTIC] driver-connect mismatch (ignored): provided=${maskUserId(driverId)} auth=${maskUserId(authUserId)}`);
+      }
+      connectedDrivers.set(authUserId, socket.id);
+      socket.driverId = authUserId;
+      logger.debug(`[DIAGNOSTIC] Driver connecté: ${maskUserId(authUserId)} (socket: ${socket.id})`);
+      logger.debug(` - Total drivers connectés: ${connectedDrivers.size}`);
+    });
+
+    socket.on('user-connect', (userId: string) => {
       // Toujours mettre à jour l'association userId -> socketId
       // Cela garantit que même si le socket se reconnecte, l'association est correcte
-      const previousSocketId = connectedUsers.get(userId);
-      connectedUsers.set(userId, socket.id);
-      socket.userId = userId;
+      if (!authUserId || authRole !== 'client') {
+        logger.warn(`[DIAGNOSTIC] user-connect refusé (non authentifié) socket=${socket.id}`);
+        return;
+      }
+      if (userId && userId !== authUserId) {
+        logger.warn(`[DIAGNOSTIC] user-connect mismatch (ignored): provided=${maskUserId(userId)} auth=${maskUserId(authUserId)}`);
+      }
+      const previousSocketId = connectedUsers.get(authUserId);
+      connectedUsers.set(authUserId, socket.id);
+      socket.userId = authUserId;
 
       if (DEBUG || previousSocketId !== socket.id) {
-        logger.info(`[DIAGNOSTIC] User connecté: ${maskUserId(userId)} (socket: ${socket.id})`);
+        logger.info(`[DIAGNOSTIC] User connecté: ${maskUserId(authUserId)} (socket: ${socket.id})`);
         if (previousSocketId && previousSocketId !== socket.id) {
           logger.debug(`[DIAGNOSTIC] Socket précédent remplacé: ${previousSocketId} → ${socket.id}`);
         }
@@ -494,7 +532,12 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       }
     }); socket.on('create-order', async (orderData: CreateOrderData, ack?: SocketAckCallback) => {
       try {
-        if (DEBUG) logger.debug(`Nouvelle commande de ${maskUserId(socket.userId || 'unknown')}`); const { pickup, dropoff, deliveryMethod, userId, userInfo,
+        if (!authUserId || authRole !== 'client') {
+          socket.emit('unauthorized', { message: 'User not authenticated on socket' });
+          if (typeof ack === 'function') ack({ success: false, message: 'User not authenticated on socket' });
+          return;
+        }
+        if (DEBUG) logger.debug(`Nouvelle commande de ${maskUserId(authUserId)}`); let { pickup, dropoff, deliveryMethod, userId, userInfo,
           orderId: providedOrderId,
           price: providedPrice,
           distance: providedDistance,
@@ -509,6 +552,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           recipientUserId,
           recipientIsRegistered,
         } = orderData;
+        // SÉCURITÉ: ne jamais faire confiance au userId fourni par le client
+        if (userId && userId !== authUserId) {
+          logger.warn(`[create-order] userId mismatch (ignored): provided=${maskUserId(userId)} auth=${maskUserId(authUserId)}`);
+        }
+        userId = authUserId;
 
         if (!pickup || !dropoff || !pickup.coordinates || !dropoff.coordinates) {
           socket.emit('order-error', { success: false, message: 'Coordinates manquantes' }); if (typeof ack === 'function') ack({ success: false, message: 'Coordinates manquantes' }); return;
@@ -732,7 +780,15 @@ const setupOrderSocket = (io: SocketIOServer): void => {
     });
 
     socket.on('accept-order', async (data: { orderId: string; driverId: string }) => {
-      const { orderId, driverId } = data;
+      const { orderId } = data;
+      const driverId = socket.driverId;
+      if (!driverId || authRole !== 'driver') {
+        socket.emit('unauthorized', { message: 'Driver not authenticated on socket' });
+        return;
+      }
+      if (data.driverId && data.driverId !== driverId) {
+        logger.warn(`[accept-order] driverId mismatch (ignored): provided=${maskUserId(data.driverId)} auth=${maskUserId(driverId)}`);
+      }
       const order = activeOrders.get(orderId);
 
       if (!order) {
@@ -850,14 +906,36 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         try {
           const { realDriverStatuses } = await import('../controllers/driverController.js');
           const driverData: any = realDriverStatuses.get(driverId) || {};
+          // Enrichir avec le profil users/driver_profiles pour éviter que le client appelle getUserProfile (403)
+          let firstName = driverData.first_name;
+          let lastName = driverData.last_name;
+          let phone = driverData.phone;
+          let profileImageUrl = driverData.profile_image_url;
+          if (!firstName || firstName === 'Livreur') {
+            try {
+              const userResult = await (pool as any).query(
+                'SELECT u.first_name, u.last_name, u.phone, dp.profile_image_url FROM users u LEFT JOIN driver_profiles dp ON dp.user_id = u.id WHERE u.id = $1',
+                [driverId]
+              );
+              if (userResult?.rows?.[0]) {
+                const row = userResult.rows[0];
+                firstName = row.first_name || 'Livreur';
+                lastName = row.last_name || driverId?.substring(0, 8) || null;
+                phone = row.phone || phone;
+                profileImageUrl = row.profile_image_url || profileImageUrl;
+              }
+            } catch (dbErr: any) {
+              logger.warn(`Enrichissement profil driver ${maskUserId(driverId)}:`, dbErr?.message);
+            }
+          }
           const driverInfo = {
             id: driverId,
-            first_name: driverData.first_name || 'Livreur',
-            last_name: driverData.last_name || driverId?.substring(0, 8) || null,
+            first_name: firstName || 'Livreur',
+            last_name: lastName || driverId?.substring(0, 8) || null,
             current_latitude: driverData.current_latitude || null,
             current_longitude: driverData.current_longitude || null,
-            phone: driverData.phone || null,
-            profile_image_url: driverData.profile_image_url || null,
+            phone: phone || null,
+            profile_image_url: profileImageUrl || null,
           };
 
           // Vérifier une dernière fois que le socket est toujours connecté avant d'envoyer
@@ -914,7 +992,15 @@ const setupOrderSocket = (io: SocketIOServer): void => {
     });
 
     socket.on('decline-order', (data: { orderId: string; driverId: string }) => {
-      const { orderId, driverId } = data;
+      const { orderId } = data;
+      const driverId = socket.driverId;
+      if (!driverId || authRole !== 'driver') {
+        socket.emit('unauthorized', { message: 'Driver not authenticated on socket' });
+        return;
+      }
+      if (data.driverId && data.driverId !== driverId) {
+        logger.warn(`[decline-order] driverId mismatch (ignored): provided=${maskUserId(data.driverId)} auth=${maskUserId(driverId)}`);
+      }
       const order = activeOrders.get(orderId);
 
       if (!order) {
@@ -1205,6 +1291,38 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         if (typeof ack === 'function') {
           ack({ success: false, message: 'Server error' });
         }
+      }
+    });
+
+    // Événement location livreur (fréquent) — suivi temps réel client
+    // Contrat: { orderId, location: { lat, lng, heading?, speed?, accuracy? }, ts? }
+    socket.on('order:driver:location', async (data: { orderId: string; location: { lat: number; lng: number; heading?: number; speed?: number; accuracy?: number }; ts?: string }) => {
+      try {
+        const { orderId, location: loc } = data || {};
+        if (!orderId || !loc?.lat || !loc?.lng) return;
+
+        const driverId = socket.driverId;
+        if (!driverId) return;
+
+        // Mettre à jour realDriverStatuses pour garder la position à jour (matching, etc.)
+        const { realDriverStatuses } = await import('../controllers/driverController.js');
+        const existing = realDriverStatuses.get(driverId) || { user_id: driverId };
+        realDriverStatuses.set(driverId, { ...existing, current_latitude: loc.lat, current_longitude: loc.lng, updated_at: new Date().toISOString() });
+
+        const order = activeOrders.get(orderId);
+        if (!order || order.driverId !== driverId) return;
+
+        const userSocketId = connectedUsers.get(order.user.id);
+        if (userSocketId) {
+          io.to(userSocketId).emit('driver:location:update', {
+            orderId,
+            latitude: loc.lat,
+            longitude: loc.lng,
+            ts: data.ts || new Date().toISOString(),
+          });
+        }
+      } catch (err: any) {
+        if (DEBUG) logger.warn('order:driver:location error:', err?.message);
       }
     });
 

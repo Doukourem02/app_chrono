@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { fetchMapboxDirections } from '../utils/mapboxDirections';
 
 interface Coordinates {
   latitude: number;
@@ -11,6 +12,7 @@ interface RouteResult {
   coordinates: Coordinates[];
   duration: number; // en secondes
   distance: number; // en mètres
+  durationTypical?: number; // trafic Mapbox
 }
 
 export const useRouteTracking = (
@@ -21,104 +23,39 @@ export const useRouteTracking = (
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const GOOGLE_API_KEY = config.googleApiKey;
-
-  const decodePolyline = useCallback((encoded: string): Coordinates[] => {
-    const points: Coordinates[] = [];
-    let index = 0;
-    const len = encoded.length;
-    let lat = 0;
-    let lng = 0;
-
-    while (index < len) {
-      let b: number;
-      let shift = 0;
-      let result = 0;
-
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-
-      const dlat = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-
-      const dlng = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.push({
-        latitude: lat * 1e-5,
-        longitude: lng * 1e-5,
-      });
-    }
-
-    return points;
-  }, []);
+  const MAPBOX_TOKEN = config.mapboxAccessToken;
 
   const fetchRoute = useCallback(async (origin: Coordinates, dest: Coordinates): Promise<RouteResult | null> => {
-    if (!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('<')) {
-      logger.warn('Google API key not configured', 'useRouteTracking');
+    if (!MAPBOX_TOKEN || MAPBOX_TOKEN.startsWith('<')) {
+      logger.warn('Mapbox token not configured', 'useRouteTracking');
       return null;
     }
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/directions/json?` +
-        `origin=${origin.latitude},${origin.longitude}` +
-        `&destination=${dest.latitude},${dest.longitude}` +
-        `&mode=driving` +
-        `&departure_time=now` +
-        `&traffic_model=best_guess` +
-        `&alternatives=false` +
-        `&key=${GOOGLE_API_KEY}`;
+      const result = await fetchMapboxDirections(
+        { lat: origin.latitude, lng: origin.longitude },
+        { lat: dest.latitude, lng: dest.longitude },
+        MAPBOX_TOKEN
+      );
 
-      const response = await fetch(url);
-      const data = await response.json();
+      if (!result) return null;
 
-      if (data.status === 'OK' && data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
-        const leg = route.legs[0];
+      const coordinates: Coordinates[] = result.coordinates.map((c) => ({
+        latitude: c.lat,
+        longitude: c.lng,
+      }));
 
-        const coordinates = decodePolyline(route.overview_polyline.points);
-        const startPoint = { latitude: origin.latitude, longitude: origin.longitude };
-        const endPoint = { latitude: dest.latitude, longitude: dest.longitude };
-
-        const isClose = (a: Coordinates, b: Coordinates, threshold = 0.001) => {
-          return Math.abs(a.latitude - b.latitude) < threshold &&
-                Math.abs(a.longitude - b.longitude) < threshold;
-        };
-
-        if (coordinates.length > 0 && !isClose(coordinates[0], startPoint)) {
-          coordinates.unshift(startPoint);
-        }
-
-        if (coordinates.length > 0 && !isClose(coordinates[coordinates.length - 1], endPoint)) {
-          coordinates.push(endPoint);
-        }
-
-        return {
-          coordinates,
-          duration: leg.duration.value,
-          distance: leg.distance.value,
-        };
-      } else {
-        logger.warn(`Google Directions API error: ${data.status}`, 'useRouteTracking');
-        return null;
-      }
+      return {
+        coordinates,
+        duration: result.duration,
+        distance: result.distance,
+        durationTypical: result.durationTypical,
+      };
     } catch (err) {
       logger.error('Error fetching route', 'useRouteTracking', err);
       return null;
     }
-  }, [GOOGLE_API_KEY, decodePolyline]);
+  }, [MAPBOX_TOKEN]);
 
   useEffect(() => {
     if (!enabled || !currentLocation || !destination) {
@@ -145,7 +82,7 @@ export const useRouteTracking = (
       }
     };
 
-    const timeoutId = setTimeout(calculateRoute, 500); // Debounce pour éviter trop de requêtes
+    const timeoutId = setTimeout(calculateRoute, 500);
     return () => clearTimeout(timeoutId);
   }, [currentLocation, destination, enabled, fetchRoute]);
 
@@ -161,7 +98,7 @@ export const useRouteTracking = (
       } catch (err) {
         logger.warn('Periodic route update failed', 'useRouteTracking', err);
       }
-    }, 30000); // Recalcul périodique pour prendre en compte le trafic
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [currentLocation, destination, enabled, route, fetchRoute]);
@@ -177,4 +114,3 @@ export const useRouteTracking = (
     },
   };
 };
-

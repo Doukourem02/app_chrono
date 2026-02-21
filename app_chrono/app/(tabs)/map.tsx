@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {Alert,Animated,Dimensions,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
-import MapView from "react-native-maps";
+import type { MapRefHandle } from "../../hooks/useMapLogic";
 import { DeliveryBottomSheet } from "../../components/DeliveryBottomSheet";
 import { DeliveryMapView } from "../../components/DeliveryMapView";
 import { DeliveryMethodBottomSheet } from "../../components/DeliveryMethodBottomSheet";
@@ -25,6 +25,7 @@ import {calculatePrice,estimateDurationMinutes,formatDurationLabel,getDistanceIn
 import { userApiService } from "../../services/userApiService";
 import { userOrderSocketService } from "../../services/userOrderSocketService";
 import { useAuthStore } from "../../store/useAuthStore";
+import { useLocationStore } from "../../store/useLocationStore";
 import type { OrderStatus } from "../../store/useOrderStore";
 import { useOrderStore } from "../../store/useOrderStore";
 import { usePaymentErrorStore } from "../../store/usePaymentErrorStore";
@@ -41,8 +42,12 @@ type Coordinates = {
   longitude: number;
 };
 
+const MAP_STYLES = ['standard', 'light', 'dark', 'streets'] as const;
+type MapStyleType = (typeof MAP_STYLES)[number];
+
 export default function MapPage() {
-  const [isCreatingNewOrder, setIsCreatingNewOrder] = React.useState(false);
+  const [isCreatingNewOrder, setIsCreatingNewOrder] = React.useState(true);
+  const [mapStyle, setMapStyle] = React.useState<MapStyleType>('light');
   const { setSelectedMethod } = useShipmentStore();
   const { user } = useAuthStore();
   const { loadPaymentMethods } = usePaymentStore();
@@ -53,7 +58,7 @@ export default function MapPage() {
   const paymentErrorCode = usePaymentErrorStore((s) => s.errorCode);
   const hidePaymentError = usePaymentErrorStore((s) => s.hideError);
   
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<MapRefHandle | null>(null);
 
   // Ne plus rediriger automatiquement vers l'authentification
   // L'utilisateur peut explorer la carte en mode invité
@@ -81,13 +86,18 @@ export default function MapPage() {
     return () => {};
   }, []);
 
+  // Position utilisateur en temps réel (pour le marqueur sur la carte)
+  const currentLocation = useLocationStore((s) => s.currentLocation);
+
   // Hooks personnalisés pour séparer la logique de la map
   const {
     region,
+    cameraAnimationDuration,
     pickupCoords,
     dropoffCoords,
     displayedRouteCoords,
     durationText,
+    arrivalTimeText,
     pickupLocation,
     deliveryLocation,
     selectedMethod,
@@ -101,9 +111,10 @@ export default function MapPage() {
     setDeliveryLocation,
     fetchRoute,
     animateToCoordinate,
+    zoomOutToFit,
     startMethodSelection,
     resetAfterDriverSearch,
-  } = useMapLogic({ mapRef: mapRef as React.RefObject<MapView> });
+  } = useMapLogic({ mapRef });
 
   // Hooks personnalisés pour séparer la logique
   const {
@@ -940,11 +951,60 @@ export default function MapPage() {
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
 
+      {/* Bouton "Centrer sur ma position" */}
+      {(currentLocation || pickupCoords) && (
+        <TouchableOpacity
+          style={styles.centerOnMeButton}
+          onPress={() => {
+            Haptics.selectionAsync();
+            const coords = currentLocation || pickupCoords;
+            if (coords) {
+              animateToCoordinate(
+                { latitude: coords.latitude, longitude: coords.longitude },
+                0.005
+              );
+            }
+          }}
+        >
+          <Ionicons name="locate" size={22} color="#8B5CF6" />
+        </TouchableOpacity>
+      )}
+
+      {/* Bouton "Dézoomer / Vue d'ensemble" */}
+      <TouchableOpacity
+        style={styles.zoomOutButton}
+        onPress={() => {
+          Haptics.selectionAsync();
+          zoomOutToFit();
+        }}
+      >
+        <Ionicons name="expand-outline" size={22} color="#8B5CF6" />
+      </TouchableOpacity>
+
+      {/* Bouton style de carte */}
+      <TouchableOpacity
+        style={styles.mapStyleButton}
+        onPress={() => {
+          Haptics.selectionAsync();
+          const idx = MAP_STYLES.indexOf(mapStyle);
+          setMapStyle(MAP_STYLES[(idx + 1) % MAP_STYLES.length]);
+        }}
+      >
+        <Ionicons
+          name={mapStyle === 'dark' ? 'moon' : mapStyle === 'light' ? 'sunny' : 'layers'}
+          size={20}
+          color="#8B5CF6"
+        />
+      </TouchableOpacity>
+
       {/* Carte */}
       <DeliveryMapView
+        mapStyle={mapStyle}
         mapRef={mapRef}
         region={region}
+        cameraAnimationDuration={cameraAnimationDuration}
         pickupCoords={pickupCoords}
+        userLocationCoords={currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : null}
         dropoffCoords={dropoffCoords}
         displayedRouteCoords={displayedRouteCoords}
         driverCoords={searchDriverCoords}
@@ -955,6 +1015,7 @@ export default function MapPage() {
         destinationPulseAnim={destinationPulseAnim}
         userPulseAnim={userPulseAnim}
         durationText={durationText}
+        arrivalTimeText={arrivalTimeText}
         searchSeconds={searchSeconds}
         selectedMethod={selectedMethod}
         availableVehicles={[]}
@@ -969,6 +1030,7 @@ export default function MapPage() {
           
           if (!isActiveOrder) {
             userManuallyClosedRef.current = false;
+            setIsCreatingNewOrder(true);
             expandBottomSheet();
           }
         }}
@@ -1335,6 +1397,57 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 60,
     left: 20,
+    width: 50,
+    height: 50,
+    backgroundColor: "#fff",
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  zoomOutButton: {
+    position: "absolute",
+    top: 120,
+    right: 20,
+    width: 50,
+    height: 50,
+    backgroundColor: "#fff",
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  mapStyleButton: {
+    position: 'absolute',
+    top: 175,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  centerOnMeButton: {
+    position: "absolute",
+    top: 60,
+    right: 20,
     width: 50,
     height: 50,
     backgroundColor: "#fff",

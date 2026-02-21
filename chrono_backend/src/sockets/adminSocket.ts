@@ -17,17 +17,34 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
   io.on('connection', (socket: ExtendedSocket) => {
     socket.on('admin-connect', (adminId: string) => {
       try {
-        if (!adminId) {
-          logger.warn('[adminSocket] admin-connect appelé sans adminId');
+        const authAdminId = (socket as any).userId as string | undefined;
+        const role = (socket as any).userRole as string | undefined;
+
+        if (!authAdminId) {
+          logger.warn('[adminSocket] admin-connect appelé sans authentification');
           return;
         }
 
-        connectedAdmins.set(adminId, socket.id);
-        adminSockets.set(socket.id, adminId);
-        socket.adminId = adminId;
+        if (role !== 'admin' && role !== 'super_admin') {
+          logger.warn('[adminSocket] admin-connect bloqué (rôle non admin)', { socketId: socket.id, role });
+          return;
+        }
+
+        // Ne jamais faire confiance à l'adminId fourni par le client
+        if (adminId && adminId !== authAdminId) {
+          logger.warn('[adminSocket] adminId mismatch (ignored)', {
+            socketId: socket.id,
+            provided: maskUserId(adminId),
+            authenticated: maskUserId(authAdminId),
+          });
+        }
+
+        connectedAdmins.set(authAdminId, socket.id);
+        adminSockets.set(socket.id, authAdminId);
+        socket.adminId = authAdminId;
 
         if (DEBUG) {
-          logger.info(`[adminSocket] Admin connecté: ${maskUserId(adminId)} (socket: ${socket.id})`);
+          logger.info(`[adminSocket] Admin connecté: ${maskUserId(authAdminId)} (socket: ${socket.id})`);
           logger.info(`[adminSocket] Total admins connectés: ${connectedAdmins.size}`);
         }
         
@@ -65,7 +82,7 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
         socket.emit('admin:connected', {
           success: true,
           message: 'Admin connecté avec succès',
-          adminId: maskUserId(adminId),
+          adminId: maskUserId(authAdminId),
         });
       } catch (error: any) {
         logger.error('[adminSocket] Erreur lors de admin-connect:', error);

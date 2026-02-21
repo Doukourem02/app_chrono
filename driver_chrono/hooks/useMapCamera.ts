@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from 'react';
-import MapView from 'react-native-maps';
 import { logger } from '../utils/logger';
 
 interface Coordinates {
@@ -7,12 +6,17 @@ interface Coordinates {
   longitude: number;
 }
 
+export interface MapRefHandle {
+  fitToCoordinates: (coords: Coordinates[], opts: { edgePadding: { top: number; right: number; bottom: number; left: number }; animated: boolean }) => void;
+  animateToRegion: (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }, duration: number) => void;
+}
+
 interface RouteCoordinates {
   coordinates: Coordinates[];
 }
 
 export const useMapCamera = (
-  mapRef: React.RefObject<MapView>,
+  mapRef: React.RefObject<MapRefHandle | null>,
   driverLocation: Coordinates | null,
   route: RouteCoordinates | null,
   currentOrder: any | null,

@@ -81,6 +81,10 @@ class AdminSocketService {
         upgrade: true,
         autoConnect: true,
         withCredentials: true,
+        // Auth Socket.IO (requis côté backend en production)
+        auth: {
+          token: session.access_token,
+        },
         // Options supplémentaires pour améliorer la stabilité
         rememberUpgrade: true,
       })

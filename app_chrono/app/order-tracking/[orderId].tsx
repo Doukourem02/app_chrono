@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert, Animated } from 'react-native';
-import MapView from 'react-native-maps';
+import type { MapRefHandle } from '../../hooks/useMapLogic';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { DeliveryMapView } from '../../components/DeliveryMapView';
@@ -32,7 +32,7 @@ export default function OrderTrackingPage() {
   const { driverCoords: orderDriverCoordsMap, setSelectedOrder } = useOrderStore();
   const { showRatingBottomSheet, orderId: ratingOrderId, driverName: ratingDriverName, resetRatingBottomSheet } = useRatingStore();
   
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<MapRefHandle | null>(null);
 
   const [loadedOrder, setLoadedOrder] = React.useState<any>(null);
   const [isLoadingOrder, setIsLoadingOrder] = React.useState(false);
@@ -375,6 +375,33 @@ export default function OrderTrackingPage() {
     }
   }, [currentOrder]);
 
+  // Fit caméra sur driver + pickup + dropoff dès que le livreur est assigné (une fois par changement de statut)
+  const hasFittedForDriverRef = useRef<string | null>(null);
+  useEffect(() => {
+    const status = currentOrder?.status;
+    const pickup = currentOrder?.pickup?.coordinates;
+    const dropoff = currentOrder?.dropoff?.coordinates;
+    const hasDriver = orderDriverCoords && (status === 'accepted' || status === 'enroute' || status === 'picked_up' || status === 'delivering');
+
+    if (!hasDriver || !pickup || !dropoff || !mapRef.current?.fitToCoordinates) return;
+
+    const fitKey = `${orderId}-${status}`;
+    if (hasFittedForDriverRef.current === fitKey) return;
+    hasFittedForDriverRef.current = fitKey;
+
+    const coords = [
+      { latitude: orderDriverCoords!.latitude, longitude: orderDriverCoords!.longitude },
+      { latitude: pickup.latitude, longitude: pickup.longitude },
+      { latitude: dropoff.latitude, longitude: dropoff.longitude },
+    ];
+    setTimeout(() => {
+      mapRef.current?.fitToCoordinates(coords, {
+        edgePadding: { top: 80, right: 40, bottom: 200, left: 40 },
+        animated: true,
+      });
+    }, 400);
+  }, [currentOrder?.status, orderDriverCoords, currentOrder?.pickup?.coordinates, currentOrder?.dropoff?.coordinates, orderId]);
+
   const handleCancelOrder = useCallback(async (orderIdToCancel: string) => {
     if (currentOrder && currentOrder.status !== 'pending' && currentOrder.status !== 'accepted') {
       const statusMessages: Record<string, string> = {
@@ -579,7 +606,7 @@ export default function OrderTrackingPage() {
           if (router.canGoBack()) {
             router.back();
           } else {
-            router.replace('/(tabs)/box');
+            router.replace('/(tabs)');
           }
         }}
       >

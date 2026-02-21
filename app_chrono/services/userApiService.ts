@@ -302,11 +302,12 @@ class UserApiService {
    */
   async ensureAccessToken(): Promise<string | null> {
     try {
-      const {
+      let {
         accessToken,
         refreshToken,
         setTokens,
         logout,
+        hydrateTokens,
       } = useAuthStore.getState();
 
       // Vérifier si le token existe et s'il n'est pas expiré
@@ -314,11 +315,25 @@ class UserApiService {
         return accessToken;
       }
 
-      // Si le token est expiré ou absent, essayer de le rafraîchir
+      // Si pas de refreshToken en mémoire : attendre persist + charger SecureStore (hot reload peut afficher tabs avant index)
       if (!refreshToken) {
-        logger.warn('Pas de refreshToken disponible - session expirée', 'userApiService');
-        // Déconnecter l'utilisateur car la session est expirée
-        logout();
+        if (!useAuthStore.persist.hasHydrated()) {
+          await new Promise<void>((resolve) => {
+            const unsub = useAuthStore.persist.onFinishHydration(() => {
+              unsub?.();
+              resolve();
+            });
+          });
+        }
+        refreshToken = useAuthStore.getState().refreshToken;
+        if (!refreshToken) {
+          await hydrateTokens();
+          refreshToken = useAuthStore.getState().refreshToken;
+        }
+      }
+
+      if (!refreshToken) {
+        logger.warn('Pas de refreshToken disponible', 'userApiService');
         return null;
       }
 
@@ -331,22 +346,25 @@ class UserApiService {
       }
 
       logger.debug('🔄 Token expiré ou absent, rafraîchissement en cours...', 'userApiService');
-      const newAccessToken = await this.refreshAccessToken(refreshToken);
+      const { token: newAccessToken, revoked } = await this.refreshAccessToken(refreshToken);
       if (newAccessToken) {
         setTokens({ accessToken: newAccessToken, refreshToken });
         logger.debug('Token rafraîchi et sauvegardé avec succès', 'userApiService');
         return newAccessToken;
       }
 
-      // Impossible de rafraîchir => déconnecter l'utilisateur
-      logger.warn('Impossible de rafraîchir le token - session expirée', 'userApiService');
-      logout();
+      // Déconnecter uniquement si le backend a explicitement refusé le token (401)
+      // Pas de déconnexion sur erreur réseau - l'utilisateur peut réessayer
+      if (revoked) {
+        logger.warn('Token révoqué par le serveur - déconnexion', 'userApiService');
+        logout();
+      } else {
+        logger.warn('Impossible de rafraîchir (réseau?) - on garde la session', 'userApiService');
+      }
       return null;
     } catch (error) {
-      logger.error('Erreur ensureAccessToken:', 'userApiService', error);
-      // En cas d'erreur, déconnecter pour éviter un état incohérent
-      const { logout } = useAuthStore.getState();
-      logout();
+      // Ne PAS déconnecter sur erreur réseau/timeout - la session peut encore être valide
+      logger.warn('Erreur ensureAccessToken (réseau?) - pas de déconnexion', 'userApiService', error);
       return null;
     }
   }
@@ -392,7 +410,7 @@ class UserApiService {
     }
   }
 
-  private async refreshAccessToken(refreshToken: string): Promise<string | null> {
+  private async refreshAccessToken(refreshToken: string): Promise<{ token: string | null; revoked?: boolean }> {
     try {
       logger.debug('🔄 Tentative de rafraîchissement du token...', 'userApiService');
 
@@ -408,34 +426,32 @@ class UserApiService {
 
       if (!response.ok) {
         logger.error('Erreur HTTP lors du rafraîchissement:', 'userApiService', { status: response.status, message: result.message });
-        return null;
+        // 401 = token révoqué/invalide → déconnecter
+        return { token: null, revoked: response.status === 401 };
       }
 
       if (!result.success) {
         logger.error('Échec du rafraîchissement:', 'userApiService', result.message);
-        return null;
+        return { token: null, revoked: false };
       }
 
       if (!result.data?.accessToken) {
         logger.error('Pas de accessToken dans la réponse:', 'userApiService', result);
-        return null;
+        return { token: null, revoked: false };
       }
 
       logger.debug('Token rafraîchi avec succès', 'userApiService');
-      return result.data.accessToken as string;
+      return { token: result.data.accessToken as string };
     } catch (error) {
-      // Ne logger les erreurs réseau que si ce n'est pas une erreur de connexion temporaire
-      // (backend inaccessible en développement)
+      // Erreur réseau → ne pas déconnecter, garder la session
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        // Logger seulement en mode debug pour éviter le bruit dans les logs
         if (__DEV__) {
-          logger.debug('Backend inaccessible lors du rafraîchissement du token:', 'userApiService', API_BASE_URL);
+          logger.debug('Backend inaccessible lors du rafraîchissement:', 'userApiService', API_BASE_URL);
         }
       } else {
-        // Pour les autres erreurs, logger normalement
         logger.warn('Erreur lors du rafraîchissement du token:', 'userApiService', error);
       }
-      return null;
+      return { token: null, revoked: false };
     }
   }
 

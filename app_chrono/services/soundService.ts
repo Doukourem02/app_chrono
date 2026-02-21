@@ -1,4 +1,3 @@
-import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../utils/logger';
 
@@ -8,11 +7,19 @@ const SOUND_ENABLED_KEY = '@chrono_sound_enabled';
 const ORDER_ACCEPTED_SOUND = require('../assets/sounds/orderaccept.wav');
 const ORDER_COMPLETED_SOUND = require('../assets/sounds/ordercompleted.wav');
 
+type AudioPlayerLike = {
+  pause: () => void;
+  play: () => void;
+  seekTo: (seconds: number) => Promise<void>;
+  remove: () => void;
+};
+
 class SoundService {
-  private orderAcceptedSound: Audio.Sound | null = null;
-  private orderCompletedSound: Audio.Sound | null = null;
+  private orderAcceptedPlayer: AudioPlayerLike | null = null;
+  private orderCompletedPlayer: AudioPlayerLike | null = null;
   private isInitialized = false;
   private soundEnabled = true;
+  private audioAvailable = false;
 
   async initialize() {
     if (this.isInitialized) return;
@@ -22,22 +29,28 @@ class SoundService {
       const savedPreference = await AsyncStorage.getItem(SOUND_ENABLED_KEY);
       this.soundEnabled = savedPreference !== 'false';
 
-      // Charger les sons
-      const { sound: acceptedSound } = await Audio.Sound.createAsync(ORDER_ACCEPTED_SOUND);
-      const { sound: completedSound } = await Audio.Sound.createAsync(ORDER_COMPLETED_SOUND);
+      // Import dynamique pour éviter le crash si le module natif ExpoAudio n'est pas lié
+      // (nécessite un rebuild: npx expo prebuild && npx expo run:ios)
+      const { createAudioPlayer, setAudioModeAsync } = await import('expo-audio');
 
-      this.orderAcceptedSound = acceptedSound;
-      this.orderCompletedSound = completedSound;
+      this.orderAcceptedPlayer = createAudioPlayer(ORDER_ACCEPTED_SOUND);
+      this.orderCompletedPlayer = createAudioPlayer(ORDER_COMPLETED_SOUND);
 
-      // Configurer le mode audio
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
       });
 
+      this.audioAvailable = true;
       this.isInitialized = true;
     } catch (error) {
-      logger.warn('[SoundService] Erreur initialisation:', undefined, error);
+      logger.warn(
+        '[SoundService] expo-audio non disponible (rebuild requis). Sons désactivés.',
+        undefined,
+        error
+      );
+      this.audioAvailable = false;
+      this.isInitialized = true;
     }
   }
 
@@ -54,24 +67,24 @@ class SoundService {
   }
 
   async playOrderAccepted() {
-    if (!this.soundEnabled || !this.orderAcceptedSound) return;
+    if (!this.soundEnabled || !this.audioAvailable || !this.orderAcceptedPlayer) return;
 
     try {
-      await this.orderAcceptedSound.stopAsync();
-      await this.orderAcceptedSound.setPositionAsync(0);
-      await this.orderAcceptedSound.playAsync();
+      this.orderAcceptedPlayer.pause();
+      await this.orderAcceptedPlayer.seekTo(0);
+      this.orderAcceptedPlayer.play();
     } catch (error) {
       logger.warn('[SoundService] Erreur lecture son commande acceptée:', undefined, error);
     }
   }
 
   async playOrderCompleted() {
-    if (!this.soundEnabled || !this.orderCompletedSound) return;
+    if (!this.soundEnabled || !this.audioAvailable || !this.orderCompletedPlayer) return;
 
     try {
-      await this.orderCompletedSound.stopAsync();
-      await this.orderCompletedSound.setPositionAsync(0);
-      await this.orderCompletedSound.playAsync();
+      this.orderCompletedPlayer.pause();
+      await this.orderCompletedPlayer.seekTo(0);
+      this.orderCompletedPlayer.play();
     } catch (error) {
       logger.warn('[SoundService] Erreur lecture son commande complétée:', undefined, error);
     }
@@ -79,15 +92,16 @@ class SoundService {
 
   async cleanup() {
     try {
-      if (this.orderAcceptedSound) {
-        await this.orderAcceptedSound.unloadAsync();
-        this.orderAcceptedSound = null;
+      if (this.orderAcceptedPlayer) {
+        this.orderAcceptedPlayer.remove();
+        this.orderAcceptedPlayer = null;
       }
-      if (this.orderCompletedSound) {
-        await this.orderCompletedSound.unloadAsync();
-        this.orderCompletedSound = null;
+      if (this.orderCompletedPlayer) {
+        this.orderCompletedPlayer.remove();
+        this.orderCompletedPlayer = null;
       }
       this.isInitialized = false;
+      this.audioAvailable = false;
     } catch (error) {
       logger.warn('[SoundService] Erreur cleanup:', undefined, error);
     }
@@ -95,4 +109,3 @@ class SoundService {
 }
 
 export const soundService = new SoundService();
-

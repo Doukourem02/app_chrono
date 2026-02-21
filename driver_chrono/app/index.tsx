@@ -6,36 +6,36 @@ import { apiService } from "../services/apiService";
 import { logger } from "../utils/logger";
 
 export default function RootIndex() {
-  const { isAuthenticated, user, accessToken, profile, validateUserExists, logout } =
-    useDriverStore();
+  const { validateUserExists, logout, hydrateTokens } = useDriverStore();
 
   useEffect(() => {
     let cancelled = false;
 
     const checkSession = async () => {
-      if (isAuthenticated && user) {
-        // Vérifier et rafraîchir le token si nécessaire avant de valider la session
-        // Cela évite les problèmes de session expirée après une longue période d'inactivité
+      // Charger le refresh token depuis SecureStore AVANT tout check (comme app_chrono)
+      await hydrateTokens();
+      const state = useDriverStore.getState();
+      const { isAuthenticated: auth, user: u, profile: p } = state;
+
+      if (auth && u) {
+        let tokenResult: { token: string | null } = { token: null };
         try {
-          const tokenResult = await apiService.ensureAccessToken();
-          if (!tokenResult.token) {
-            // Token invalide ou impossible à rafraîchir, déconnecter
-            if (!cancelled) {
-              logout();
-              router.replace("/(auth)/register" as any);
-            }
-            return;
-          }
+          tokenResult = await apiService.ensureAccessToken();
         } catch (error) {
-          // En cas d'erreur, continuer avec la validation normale
           logger.warn('Erreur lors de la vérification du token:', undefined, error);
+        }
+
+        if (cancelled) return;
+
+        if (!tokenResult.token) {
+          logout();
+          router.replace("/(auth)/register" as any);
+          return;
         }
 
         const validationResult = await validateUserExists();
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         if (
           validationResult === true ||
@@ -46,7 +46,7 @@ export default function RootIndex() {
           // (le profil persisté pourrait être obsolète)
           let freshProfile = null;
           try {
-            const profileResult = await apiService.getDriverProfile(user.id);
+            const profileResult = await apiService.getDriverProfile(u.id);
             if (profileResult.success && profileResult.data) {
               freshProfile = profileResult.data;
               // Mettre à jour le profil dans le store avec les données fraîches du backend
@@ -59,7 +59,7 @@ export default function RootIndex() {
           }
 
           // Utiliser le profil frais si disponible, sinon utiliser celui du store
-          const currentProfile = freshProfile || profile;
+          const currentProfile = freshProfile || p;
           
           // ÉTAPE 1 : Vérifier si driver_type manquant (PRIORITÉ - TOUJOURS EN PREMIER)
           if (!currentProfile || !currentProfile.driver_type) {
@@ -81,20 +81,26 @@ export default function RootIndex() {
       }
     };
 
-    // Attendre que le layout soit monté avant de naviguer
-    const timer = setTimeout(() => {
+    const runCheck = () => {
+      if (cancelled) return;
       checkSession().catch(() => {
-        if (!cancelled) {
-          router.replace("/(tabs)" as any);
-        }
+        if (!cancelled) router.replace("/(tabs)" as any);
       });
-    }, 800);
+    };
+
+    // Attendre que le persist Zustand ait rechargé user/isAuthenticated (comme app_chrono)
+    const unsub = useDriverStore.persist.onFinishHydration(runCheck);
+    if (useDriverStore.persist.hasHydrated()) {
+      runCheck();
+    }
+    const fallback = setTimeout(runCheck, 2500);
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      unsub?.();
+      clearTimeout(fallback);
     };
-  }, [isAuthenticated, user, accessToken, profile, validateUserExists, logout]);
+  }, [validateUserExists, logout, hydrateTokens]);
 
   return (
     <View

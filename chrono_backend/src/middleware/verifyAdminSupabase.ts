@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import { verifyAccessToken } from '../utils/jwt.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -40,48 +41,41 @@ export const verifyAdminSupabase = async (
   const token = parts[1];
 
   try {
-    // Vérifier le token avec Supabase
+    // Vérifier le token avec Supabase (mode normal en production)
     if (!supabaseUrl || !supabaseServiceKey) {
-      logger.warn('Supabase credentials not configured, skipping Supabase token verification');
-      // Fallback: vérifier dans la base de données PostgreSQL directement
-      const decoded = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-      const userId = decoded.sub || decoded.user_id;
+      // IMPORTANT: ne jamais "décoder" un JWT sans vérifier sa signature (risque d'usurpation).
+      // En prod, l'admin doit fonctionner avec un SUPABASE_SERVICE_ROLE_KEY correctement configuré.
+      const allowJwtFallback = process.env.ALLOW_ADMIN_JWT_FALLBACK === 'true';
 
-      if (!userId) {
-        res.status(401).json({
+      if (!allowJwtFallback) {
+        logger.error(
+          'Supabase credentials not configured (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY). ' +
+            'Admin routes are disabled for security.'
+        );
+        res.status(500).json({
           success: false,
-          message: 'Token invalide - userId non trouvé',
+          message: 'Configuration serveur incomplète (admin auth).',
         });
         return;
       }
 
-      // Vérifier le rôle admin dans la base de données
-      const result = await (pool as any).query(
-        'SELECT id, role FROM users WHERE id = $1',
-        [userId]
-      );
+      // Fallback DEV (optionnel): accepter uniquement nos JWT signés (JWT_SECRET) + rôle admin.
+      const decoded = verifyAccessToken(token);
+      const userId = decoded.id;
 
+      const result = await (pool as any).query('SELECT id, role FROM users WHERE id = $1', [userId]);
       if (result.rows.length === 0) {
-        res.status(401).json({
-          success: false,
-          message: 'Utilisateur non trouvé',
-        });
+        res.status(401).json({ success: false, message: 'Utilisateur non trouvé' });
         return;
       }
 
       const user = result.rows[0];
-      logger.debug('🔍 [verifyAdminSupabase] User found:', { id: user.id, role: user.role });
       if (user.role !== 'admin' && user.role !== 'super_admin') {
-        logger.warn('⚠️ [verifyAdminSupabase] User is not admin:', user.role);
-        res.status(403).json({
-          success: false,
-          message: 'Accès refusé - Rôle admin requis',
-        });
+        res.status(403).json({ success: false, message: 'Accès refusé - Rôle admin requis' });
         return;
       }
 
       (req as any).user = { id: user.id, role: user.role };
-      logger.debug('[verifyAdminSupabase] Auth successful, calling next()');
       next();
       return;
     }

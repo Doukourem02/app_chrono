@@ -509,15 +509,20 @@ const sendOTPCode = async (
       const emailResult = await sendOTPEmail(email, otpCode, role);
       if (!emailResult.success) {
         logger.error('Échec envoi email:', emailResult.error);
-        logger.info(
-          ` ======================================== FALLBACK EMAIL OTP pour ${role.toUpperCase()} ======================================== À: ${email} Sujet: Code de vérification ${role}
-          
-          Votre code de vérification est: ${otpCode}
-          
-          Ce code expire dans 5 minutes.
-          ========================================
-        `
-        );
+        // SÉCURITÉ: ne jamais logguer un OTP en production (risque de fuite via logs).
+        if (process.env.NODE_ENV !== 'production') {
+          logger.info(
+            ` ======================================== FALLBACK EMAIL OTP pour ${role.toUpperCase()} ======================================== À: ${email} Sujet: Code de vérification ${role}
+            
+            Votre code de vérification est: ${otpCode}
+            
+            Ce code expire dans 5 minutes.
+            ========================================
+          `
+          );
+        } else {
+          logger.warn(`Fallback OTP email déclenché pour ${maskEmail(email)} (envoi email KO)`);
+        }
       } else {
         logger.info('Email OTP envoyé avec succès !');
       }
@@ -948,6 +953,18 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
     const { userId } = req.params;
     const { first_name, last_name, phone, avatar_url } = req.body;
 
+    // SÉCURITÉ: empêcher les accès IDOR (un user ne doit pas modifier un autre user)
+    const authUser = (req as any).user as { id?: string; role?: string } | undefined;
+    if (!authUser?.id) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+    const isAdmin = authUser.role === 'admin' || authUser.role === 'super_admin';
+    if (!isAdmin && authUser.id !== userId) {
+      res.status(403).json({ success: false, message: 'Accès refusé' });
+      return;
+    }
+
     // Vérifier que l'utilisateur existe
     const userResult = await (pool as any).query(
       'SELECT id FROM users WHERE id = $1',
@@ -1044,6 +1061,18 @@ export const getUserProfile = async (req: Request, res: Response): Promise<void>
   try {
     const { userId } = req.params;
 
+    // SÉCURITÉ: empêcher les accès IDOR
+    const authUser = (req as any).user as { id?: string; role?: string } | undefined;
+    if (!authUser?.id) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+    const isAdmin = authUser.role === 'admin' || authUser.role === 'super_admin';
+    if (!isAdmin && authUser.id !== userId) {
+      res.status(403).json({ success: false, message: 'Accès refusé' });
+      return;
+    }
+
     const result = await (pool as any).query(
       'SELECT id, email, phone, first_name, last_name, avatar_url, role, created_at, updated_at FROM users WHERE id = $1',
       [userId]
@@ -1079,6 +1108,18 @@ export const uploadAvatar = async (req: Request, res: Response): Promise<void> =
   try {
     const { userId } = req.params;
     const { imageBase64, mimeType = 'image/jpeg' } = req.body;
+
+    // SÉCURITÉ: empêcher les accès IDOR
+    const authUser = (req as any).user as { id?: string; role?: string } | undefined;
+    if (!authUser?.id) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+    const isAdmin = authUser.role === 'admin' || authUser.role === 'super_admin';
+    if (!isAdmin && authUser.id !== userId) {
+      res.status(403).json({ success: false, message: 'Accès refusé' });
+      return;
+    }
 
     if (!imageBase64) {
       res.status(400).json({

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { config } from '../config';
-import { extractTrafficData, type TrafficData } from '../utils/trafficUtils';
+import { type TrafficData } from '../utils/trafficUtils';
 import { logger } from '../utils/logger';
+import { fetchMapboxDirections } from '../utils/mapboxDirections';
 
 type Coordinates = {
   latitude: number;
@@ -16,8 +17,7 @@ interface UseAnimatedRouteOptions {
 }
 
 /**
- * Hook pour obtenir une route animée entre deux points en utilisant Google Directions API
- * Retourne les coordonnées progressives pour animer le dessin de la polyline
+ * Hook pour obtenir une route animée entre deux points via Mapbox Directions API
  */
 export const useAnimatedRoute = ({
   origin,
@@ -32,107 +32,46 @@ export const useAnimatedRoute = ({
   const [error, setError] = useState<string | null>(null);
   const animationRef = useRef<number | null>(null);
   const lastRecalcRef = useRef<number>(0);
-  const GOOGLE_API_KEY = config.googleApiKey;
-  
-  // Intervalle de recalcul pour tenir compte du trafic en temps réel (2 minutes)
-  const TRAFFIC_RECALC_INTERVAL = 2 * 60 * 1000; // 2 minutes
+  const MAPBOX_TOKEN = config.mapboxAccessToken;
+  const TRAFFIC_RECALC_INTERVAL = 2 * 60 * 1000;
 
-  // Décoder polyline Google
-  const decodePolyline = useCallback((encoded: string): Coordinates[] => {
-    const points: Coordinates[] = [];
-    let index = 0;
-    const len = encoded.length;
-    let lat = 0;
-    let lng = 0;
-
-    while (index < len) {
-      let b: number;
-      let shift = 0;
-      let result = 0;
-
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-
-      const dlat = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-
-      const dlng = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.push({
-        latitude: lat * 1e-5,
-        longitude: lng * 1e-5,
-      });
-    }
-
-    return points;
-  }, []);
-
-  // Obtenir la route depuis Google Directions API
-  const fetchRoute = useCallback(async (origin: Coordinates, dest: Coordinates): Promise<Coordinates[] | null> => {
-    if (!GOOGLE_API_KEY || GOOGLE_API_KEY.startsWith('<')) {
-      return null;
-    }
+  // Obtenir la route depuis Mapbox Directions API
+  const fetchRoute = useCallback(async (orig: Coordinates, dest: Coordinates): Promise<Coordinates[] | null> => {
+    if (!MAPBOX_TOKEN || MAPBOX_TOKEN.startsWith('<')) return null;
 
     try {
-      const departureTs = Math.floor(Date.now() / 1000);
-      const url = `https://maps.googleapis.com/maps/api/directions/json?` +
-        `origin=${origin.latitude},${origin.longitude}` +
-        `&destination=${dest.latitude},${dest.longitude}` +
-        `&mode=driving` +
-        `&departure_time=${departureTs}` +
-        `&traffic_model=best_guess` +
-        `&alternatives=false` +
-        `&key=${GOOGLE_API_KEY}`;
+      const result = await fetchMapboxDirections(
+        { lat: orig.latitude, lng: orig.longitude },
+        { lat: dest.latitude, lng: dest.longitude },
+        MAPBOX_TOKEN
+      );
 
-      const response = await fetch(url);
-      const data = await response.json();
+      if (result && result.coordinates.length > 0) {
+        setTrafficData({
+          durationInTraffic: result.durationTypical ?? result.duration,
+          durationBase: result.duration,
+          hasTrafficData: !!result.durationTypical,
+        });
 
-      if (data.status === 'OK' && data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
-        const leg = route.legs?.[0];
-        
-        // Extraire les données de trafic
-        if (leg) {
-          const traffic = extractTrafficData(leg);
-          setTrafficData(traffic);
-        }
-        
-        let points = decodePolyline(route.overview_polyline.points);
-
-        // S'assurer que les points de départ et d'arrivée sont inclus
+        let points = result.coordinates.map((c) => ({ latitude: c.lat, longitude: c.lng }));
         const almostEqual = (a: Coordinates, b: Coordinates, eps = 0.0001) =>
           Math.abs(a.latitude - b.latitude) < eps && Math.abs(a.longitude - b.longitude) < eps;
 
-        if (points.length > 0 && !almostEqual(points[0], origin)) {
-          points = [{ latitude: origin.latitude, longitude: origin.longitude }, ...points];
+        if (points.length > 0 && !almostEqual(points[0], orig)) {
+          points = [{ latitude: orig.latitude, longitude: orig.longitude }, ...points];
         }
-
         if (points.length > 0 && !almostEqual(points[points.length - 1], dest)) {
           points = [...points, { latitude: dest.latitude, longitude: dest.longitude }];
         }
 
         return points;
-      } else {
-        return null;
       }
+      return null;
     } catch (err) {
       logger.error('Error fetching route:', undefined, err);
       return null;
     }
-  }, [GOOGLE_API_KEY, decodePolyline]);
+  }, [MAPBOX_TOKEN]);
 
   // Animer le dessin progressif de la route
   const animateRoute = useCallback((points: Coordinates[]) => {
