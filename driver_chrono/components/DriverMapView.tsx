@@ -152,8 +152,8 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
           id="route-active"
           shape={coordsToLineGeoJSON([driverPos, ...animatedRouteCoords.slice(1)])}
         >
-          <LineLayer id="route-active-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 8, lineJoin: 'round', lineCap: 'round' }} />
-          <LineLayer id="route-active-line" style={{ lineColor: '#5B21B6', lineWidth: 6, lineJoin: 'round', lineCap: 'round' }} />
+          <LineLayer id="route-active-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 5, lineJoin: 'round', lineCap: 'round' }} />
+          <LineLayer id="route-active-line" style={{ lineColor: '#5B21B6', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }} />
         </ShapeSource>
       )}
 

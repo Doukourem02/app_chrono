@@ -1304,10 +1304,19 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         const driverId = socket.driverId;
         if (!driverId) return;
 
-        // Mettre à jour realDriverStatuses pour garder la position à jour (matching, etc.)
+        // Mettre à jour realDriverStatuses UNIQUEMENT si le driver est déjà en ligne
+        // Ne jamais réinsérer un driver supprimé (offline) — la position ne doit être mise à jour
+        // que pour les livreurs qui ont is_online === true
         const { realDriverStatuses } = await import('../controllers/driverController.js');
-        const existing = realDriverStatuses.get(driverId) || { user_id: driverId };
-        realDriverStatuses.set(driverId, { ...existing, current_latitude: loc.lat, current_longitude: loc.lng, updated_at: new Date().toISOString() });
+        const existing = realDriverStatuses.get(driverId);
+        if (existing && existing.is_online === true) {
+          realDriverStatuses.set(driverId, {
+            ...existing,
+            current_latitude: loc.lat,
+            current_longitude: loc.lng,
+            updated_at: new Date().toISOString(),
+          });
+        }
 
         const order = activeOrders.get(orderId);
         if (!order || order.driverId !== driverId) return;

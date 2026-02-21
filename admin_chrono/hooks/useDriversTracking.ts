@@ -49,6 +49,9 @@ export function useDriversTracking(isSocketConnected: boolean) {
         const driversMap = new Map<string, OnlineDriver>()
         
         result.data.forEach((driver) => {
+          // Ne garder que les livreurs explicitement en ligne (is_online === true)
+          if (driver.is_online !== true) return
+
           const onlineDriver: OnlineDriver = {
             userId: driver.user_id,
             is_online: driver.is_online,
@@ -58,7 +61,7 @@ export function useDriversTracking(isSocketConnected: boolean) {
             // L'API ne retourne pas updated_at, on utilise la date actuelle comme approximation
             updated_at: new Date().toISOString(),
           }
-          
+
           if (isDriverValid(onlineDriver)) {
             driversMap.set(driver.user_id, onlineDriver)
           }
@@ -117,6 +120,8 @@ export function useDriversTracking(isSocketConnected: boolean) {
         
         const driversMap = new Map<string, OnlineDriver>()
         typedData.drivers.forEach((driver) => {
+          // Ne garder que les livreurs explicitement en ligne (is_online === true)
+          if (driver.is_online !== true) return
           if (isDriverValid(driver)) {
             driversMap.set(driver.userId, driver)
           }

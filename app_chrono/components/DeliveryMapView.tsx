@@ -347,8 +347,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
 
       {!isSearchingDriver && displayedRouteCoords.length > 0 && orderStatus !== 'completed' && orderStatus !== 'cancelled' && orderStatus !== 'declined' && (
         <ShapeSource id="route-main" shape={coordsToLineGeoJSON(displayedRouteCoords)}>
-          <LineLayer id="route-main-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 8, lineJoin: 'round', lineCap: 'round' }} />
-          <LineLayer id="route-main-line" style={{ lineColor: '#5B21B6', lineWidth: 6, lineJoin: 'round', lineCap: 'round' }} />
+          <LineLayer id="route-main-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 5, lineJoin: 'round', lineCap: 'round' }} />
+          <LineLayer id="route-main-line" style={{ lineColor: '#5B21B6', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }} />
         </ShapeSource>
       )}
 
@@ -384,8 +384,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
               shape={coordsToLineGeoJSON([animatedDriverPosition, ...driverToPickupRoute.animatedCoordinates.slice(1)])}
             >
               {/* Contour blanc pour contraste sur fond clair */}
-              <LineLayer id="route-driver-pickup-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 8, lineJoin: 'round', lineCap: 'round' }} />
-              <LineLayer id="route-driver-pickup-line" style={{ lineColor: '#5B21B6', lineWidth: 6, lineJoin: 'round', lineCap: 'round' }} />
+              <LineLayer id="route-driver-pickup-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 5, lineJoin: 'round', lineCap: 'round' }} />
+              <LineLayer id="route-driver-pickup-line" style={{ lineColor: '#5B21B6', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }} />
             </ShapeSource>
           )}
 
@@ -394,8 +394,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
               id="route-driver-dropoff"
               shape={coordsToLineGeoJSON([animatedDriverPosition, ...driverToDropoffRoute.animatedCoordinates.slice(1)])}
             >
-              <LineLayer id="route-driver-dropoff-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 8, lineJoin: 'round', lineCap: 'round' }} />
-              <LineLayer id="route-driver-dropoff-line" style={{ lineColor: '#5B21B6', lineWidth: 6, lineJoin: 'round', lineCap: 'round' }} />
+              <LineLayer id="route-driver-dropoff-line-outline" style={{ lineColor: '#FFFFFF', lineWidth: 5, lineJoin: 'round', lineCap: 'round' }} />
+              <LineLayer id="route-driver-dropoff-line" style={{ lineColor: '#5B21B6', lineWidth: 3, lineJoin: 'round', lineCap: 'round' }} />
             </ShapeSource>
           )}
 
