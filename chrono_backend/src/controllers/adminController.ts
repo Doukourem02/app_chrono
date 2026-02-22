@@ -375,8 +375,8 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
     }
     params.push(limit);
     query += ` ORDER BY created_at DESC LIMIT $${params.length}`;
-    logger.info('📝 [getAdminRecentActivities] Requête SQL:', query);
-    logger.info('📝 [getAdminRecentActivities] Paramètres:', params);
+    logger.info('📝 [getAdminRecentActivities] Requête SQL:', { query });
+    logger.info('📝 [getAdminRecentActivities] Paramètres:', { params });
 
     let result;
     try {
@@ -885,7 +885,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
                    WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')
                    ORDER BY created_at DESC`;
 
-    logger.info('📝 [getAdminOngoingDeliveries] Requête SQL:', query);
+    logger.info('📝 [getAdminOngoingDeliveries] Requête SQL:', { query });
 
     let result;
     try {
@@ -1121,8 +1121,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
 
     query += ' ORDER BY created_at DESC';
 
-    logger.info('📝 [getAdminOrdersByStatus] Requête SQL:', query);
-    logger.info('📝 [getAdminOrdersByStatus] Paramètres:', queryParams);
+    logger.info('📝 [getAdminOrdersByStatus] Requête SQL:', { query, params: queryParams });
 
     let result;
     try {
@@ -1301,7 +1300,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
     // Récupérer tous les utilisateurs avec leurs informations
     const query = `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url FROM users ORDER BY created_at DESC`;
 
-    logger.info('📝 [getAdminUsers] Requête SQL:', query);
+    logger.info('📝 [getAdminUsers] Requête SQL:', { query });
 
     let result;
     try {

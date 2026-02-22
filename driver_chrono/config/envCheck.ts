@@ -65,7 +65,13 @@ export function validateEnvironment(): {
 
   // Vérifier les variables optionnelles
   for (const envVar of optionalEnvVars) {
-    const value = getEnvVar(envVar.name);
+    let value = getEnvVar(envVar.name);
+    // Mapbox: accepter aussi mapboxAccessToken (extra) ou NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+    if (!value && envVar.name === 'EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN') {
+      value =
+        Constants.expoConfig?.extra?.mapboxAccessToken ||
+        process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    }
     if (!value) {
       warnings.push(
         `⚠️ ${envVar.name} non défini: ${envVar.description}`
