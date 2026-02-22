@@ -57,7 +57,6 @@ interface DeliveryMapViewProps {
   region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null;
   cameraAnimationDuration?: number;
   pickupCoords: Coordinates | { lat?: number; lng?: number } | null;
-  /** Position utilisateur en temps réel (mise à jour par le GPS) */
   userLocationCoords?: Coordinates | null;
   dropoffCoords: Coordinates | { lat?: number; lng?: number } | null;
   displayedRouteCoords: Coordinates[];
@@ -76,7 +75,6 @@ interface DeliveryMapViewProps {
   showMethodSelection: boolean;
   onMapPress?: () => void;
   radarCoords?: Coordinates | null;
-  /** Style de la carte : standard (avec numéros), light, dark, streets */
   mapStyle?: 'standard' | 'light' | 'dark' | 'streets';
 }
 
