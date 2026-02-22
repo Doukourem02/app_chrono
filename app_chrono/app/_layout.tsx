@@ -40,17 +40,13 @@ export default function RootLayout() {
     hydrateTokens().catch(() => {});
   }, [hydrateTokens]);
 
-  // Vérifier et rafraîchir la session quand l'app revient en arrière-plan
-  // Cela évite les problèmes de session expirée après une longue période d'inactivité
+  // Rafraîchir la session quand l'app revient au premier plan
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active' && isAuthenticated && user) {
-        // L'app revient au premier plan, vérifier et rafraîchir le token si nécessaire
         try {
           const token = await userApiService.ensureAccessToken();
           if (!token) {
-            // Ne pas déconnecter : null peut être une erreur réseau temporaire.
-            // Si la session est vraiment expirée, l'utilisateur aura une erreur à la prochaine action.
             logger.warn('[RootLayout] Impossible de rafraîchir le token (réseau?) - on garde la session');
           }
         } catch (error) {
@@ -60,11 +56,27 @@ export default function RootLayout() {
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, [isAuthenticated, user, logout]);
+
+  // Rafraîchissement proactif du token toutes les 10 min quand l'app est active
+  // Évite les déconnexions après inactivité prolongée (écran allumé sans interaction)
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+    const intervalId = setInterval(async () => {
+      const appState = AppState.currentState;
+      if (appState !== 'active') return; // Ne pas rafraîchir en arrière-plan
+      try {
+        await userApiService.ensureAccessToken();
+      } catch {
+        // Silencieux - la prochaine action déclenchera un refresh
+      }
+    }, REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, user]);
 
   return (
     <ErrorBoundary>

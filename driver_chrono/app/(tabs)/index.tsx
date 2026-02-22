@@ -514,8 +514,7 @@ export default function Index() {
             current_latitude: location.latitude,
             current_longitude: location.longitude
           });
-          
-          // Si la session est expirée, marquer le ref pour éviter les appels futurs
+
           if (!result.success && result.message?.includes('Session expirée')) {
             sessionExpiredRef.current = true;
             if (__DEV__) {
@@ -523,7 +522,7 @@ export default function Index() {
             }
             return;
           }
-          
+
           if (result.success) {
             sessionExpiredRef.current = false;
           }
@@ -536,7 +535,11 @@ export default function Index() {
     };
 
     const timeoutId = setTimeout(syncLocation, 5000);
-    return () => clearTimeout(timeoutId);
+    const heartbeatInterval = setInterval(syncLocation, 2 * 60 * 1000); // Heartbeat toutes les 2 min pour rester dans la liste
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(heartbeatInterval);
+    };
   }, [location, isOnline, user?.id, isAuthenticated]);
 
   useEffect(() => {

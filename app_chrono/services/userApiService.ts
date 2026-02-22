@@ -4,7 +4,23 @@ import { logger } from '../utils/logger';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? 'http://localhost:4000' : 'https://votre-api.com');
 
+/** Erreurs réseau/serveur : JAMAIS de logout, retry possible */
+function isNetworkOrServerError(status: number, message: string): boolean {
+  const msg = (message || '').toLowerCase();
+  const serverStatuses = [408, 500, 502, 503, 504];
+  if (serverStatuses.includes(status)) return true;
+  const networkPatterns = [
+    'connection terminated', 'connection timeout', 'econnrefused', 'etimedout',
+    'enotfound', 'socket hang up', 'fetch failed', 'network request failed',
+    'network request timed out', 'service temporairement indisponible',
+    'aborted', 'timeout', 'econnreset',
+  ];
+  return networkPatterns.some((p) => msg.includes(p));
+}
+
 class UserApiService {
+  /** Une seule requête refresh à la fois - les autres attendent */
+  private refreshPromise: Promise<{ token: string | null; revoked?: boolean }> | null = null;
 
   /**
    * 🚗 GESTION DES CHAUFFEURS
@@ -297,8 +313,8 @@ class UserApiService {
   }
 
   /**
-   * Vérifie et rafraîchit le token d'accès si nécessaire
-   * Méthode publique pour permettre la vérification de session avant des actions critiques
+   * Vérifie et rafraîchit le token d'accès si nécessaire.
+   * Règle d'or : timeout / erreur réseau → JAMAIS de logout, on garde la session.
    */
   async ensureAccessToken(): Promise<string | null> {
     try {
@@ -310,12 +326,10 @@ class UserApiService {
         hydrateTokens,
       } = useAuthStore.getState();
 
-      // Vérifier si le token existe et s'il n'est pas expiré
       if (accessToken && this.isTokenValid(accessToken)) {
         return accessToken;
       }
 
-      // Si pas de refreshToken en mémoire : attendre persist + charger SecureStore (hot reload peut afficher tabs avant index)
       if (!refreshToken) {
         if (!useAuthStore.persist.hasHydrated()) {
           await new Promise<void>((resolve) => {
@@ -337,24 +351,25 @@ class UserApiService {
         return null;
       }
 
-      // Vérifier si le refresh token est encore valide
       if (!this.isTokenValid(refreshToken)) {
         logger.warn('Refresh token expiré - session expirée', 'userApiService');
-        // Déconnecter l'utilisateur car la session est expirée
         logout();
         return null;
       }
 
-      logger.debug('🔄 Token expiré ou absent, rafraîchissement en cours...', 'userApiService');
-      const { token: newAccessToken, revoked } = await this.refreshAccessToken(refreshToken);
+      // Une seule refresh à la fois : les appels concurrents attendent le même résultat
+      if (!this.refreshPromise) {
+        this.refreshPromise = this.doRefreshWithRetry(refreshToken);
+      }
+      const { token: newAccessToken, revoked } = await this.refreshPromise;
+      this.refreshPromise = null;
+
       if (newAccessToken) {
         setTokens({ accessToken: newAccessToken, refreshToken });
         logger.debug('Token rafraîchi et sauvegardé avec succès', 'userApiService');
         return newAccessToken;
       }
 
-      // Déconnecter uniquement si le backend a explicitement refusé le token (401)
-      // Pas de déconnexion sur erreur réseau - l'utilisateur peut réessayer
       if (revoked) {
         logger.warn('Token révoqué par le serveur - déconnexion', 'userApiService');
         logout();
@@ -363,10 +378,30 @@ class UserApiService {
       }
       return null;
     } catch (error) {
-      // Ne PAS déconnecter sur erreur réseau/timeout - la session peut encore être valide
+      this.refreshPromise = null;
       logger.warn('Erreur ensureAccessToken (réseau?) - pas de déconnexion', 'userApiService', error);
       return null;
     }
+  }
+
+  /** Retry exponentiel : 1s, 2s, 4s. Uniquement sur erreurs réseau. */
+  private async doRefreshWithRetry(refreshToken: string): Promise<{ token: string | null; revoked?: boolean }> {
+    const MAX_RETRIES = 3;
+    const DELAYS = [1000, 2000, 4000];
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const result = await this.refreshAccessToken(refreshToken);
+      if (result.token) return result;
+      if (result.revoked) return result; // Pas de retry si token invalide
+
+      if (attempt < MAX_RETRIES) {
+        logger.debug(`Retry refresh dans ${DELAYS[attempt]}ms (tentative ${attempt + 2}/${MAX_RETRIES + 1})`, 'userApiService');
+        await new Promise((r) => setTimeout(r, DELAYS[attempt]));
+      } else {
+        return result;
+      }
+    }
+    return { token: null, revoked: false };
   }
 
   /**
@@ -411,43 +446,47 @@ class UserApiService {
   }
 
   private async refreshAccessToken(refreshToken: string): Promise<{ token: string | null; revoked?: boolean }> {
+    const TIMEOUT_MS = 15000;
     try {
       logger.debug('🔄 Tentative de rafraîchissement du token...', 'userApiService');
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
       const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+        signal: controller.signal,
       });
 
-      const result = await response.json();
+      clearTimeout(timeoutId);
+      const result = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
 
       if (!response.ok) {
-        logger.error('Erreur HTTP lors du rafraîchissement:', 'userApiService', { status: response.status, message: result.message });
-        // 401 = token révoqué/invalide → déconnecter
-        return { token: null, revoked: response.status === 401 };
+        const msg = result?.message || '';
+        const networkOrServer = isNetworkOrServerError(response.status, msg);
+        // revoked = true UNIQUEMENT si 401 ET ce n'est PAS une erreur réseau/serveur
+        const revoked = response.status === 401 && !networkOrServer;
+        if (networkOrServer) {
+          logger.warn('Erreur réseau/serveur lors du refresh (pas de logout):', 'userApiService', { status: response.status, message: msg });
+        } else {
+          logger.error('Erreur HTTP lors du rafraîchissement:', 'userApiService', { status: response.status, message: msg });
+        }
+        return { token: null, revoked };
       }
 
-      if (!result.success) {
-        logger.error('Échec du rafraîchissement:', 'userApiService', result.message);
-        return { token: null, revoked: false };
-      }
-
-      if (!result.data?.accessToken) {
-        logger.error('Pas de accessToken dans la réponse:', 'userApiService', result);
+      if (!result.success || !result.data?.accessToken) {
         return { token: null, revoked: false };
       }
 
       logger.debug('Token rafraîchi avec succès', 'userApiService');
       return { token: result.data.accessToken as string };
-    } catch (error) {
-      // Erreur réseau → ne pas déconnecter, garder la session
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        if (__DEV__) {
-          logger.debug('Backend inaccessible lors du rafraîchissement:', 'userApiService', API_BASE_URL);
-        }
+    } catch (error: any) {
+      const msg = error?.message || '';
+      const isTimeout = msg.includes('abort') || msg.includes('timeout') || msg.includes('Network request failed');
+      if (isTimeout) {
+        logger.warn('Timeout lors du refresh (pas de logout):', 'userApiService', API_BASE_URL);
       } else {
         logger.warn('Erreur lors du rafraîchissement du token:', 'userApiService', error);
       }

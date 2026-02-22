@@ -37,15 +37,13 @@ export default function RootLayout() {
     hydrateTokens().catch(() => {});
   }, [hydrateTokens]);
 
-  // Vérifier et rafraîchir la session quand l'app revient au premier plan (comme app_chrono)
+  // Rafraîchir la session quand l'app revient au premier plan
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active' && isAuthenticated && user) {
         try {
           const tokenResult = await apiService.ensureAccessToken();
           if (!tokenResult.token) {
-            // Ne pas déconnecter : null peut être une erreur réseau temporaire.
-            // Si la session est vraiment expirée, l'utilisateur aura une erreur à la prochaine action.
             logger.warn('[RootLayout] Impossible de rafraîchir le token (réseau?) - on garde la session');
           }
         } catch (error) {
@@ -57,6 +55,23 @@ export default function RootLayout() {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
   }, [isAuthenticated, user, logout]);
+
+  // Rafraîchissement proactif du token toutes les 10 min quand l'app est active
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+    const intervalId = setInterval(async () => {
+      if (AppState.currentState !== 'active') return;
+      try {
+        await apiService.ensureAccessToken();
+      } catch {
+        // Silencieux - la prochaine action déclenchera un refresh
+      }
+    }, REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     // Initialiser le service de son au démarrage

@@ -8,10 +8,12 @@ import { useAnimatedRoute } from '../hooks/useAnimatedRoute';
 import { useAnimatedPosition } from '../hooks/useAnimatedPosition';
 import { calculateFullETA } from '../utils/etaCalculator';
 import { calculateDriverOffsets } from '../utils/markerOffset';
+import { useAnimatedDriverPositions } from '../hooks/useAnimatedDriverPositions';
 import { useWeather } from '../hooks/useWeather';
 import { calculateBearing } from '../utils/bearingCalculator';
 import { AnimatedVehicleMarker } from './AnimatedVehicleMarker';
 import { ETABadge } from './ETABadge';
+import { OnlineDriverMarker } from './OnlineDriverMarker';
 
 type Coordinates = {
   latitude: number;
@@ -231,6 +233,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
     [filteredOnlineDrivers, zoomLevel]
   );
 
+  const animatedDriverPositions = useAnimatedDriverPositions(filteredOnlineDrivers, driverOffsets);
+
   // Centre : priorité region (GPS) > pickupCoords (adresse sélectionnée) > Abidjan par défaut
   const centerCoords = region
     ? toLngLat(region)
@@ -282,10 +286,13 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       />
 
       {filteredOnlineDrivers.map((driver) => {
-        const offset = driverOffsets.get(driver.user_id);
-        const pos = offset
-          ? [offset.lng, offset.lat] as [number, number]
-          : ([driver.current_longitude, driver.current_latitude] as [number, number]);
+        const animPos = animatedDriverPositions.get(driver.user_id);
+        const fallback = driverOffsets.get(driver.user_id);
+        const pos: [number, number] = animPos
+          ? [animPos.lng, animPos.lat]
+          : fallback
+            ? [fallback.lng, fallback.lat]
+            : [driver.current_longitude, driver.current_latitude];
         return (
           <PointAnnotation
             key={driver.user_id}
@@ -293,7 +300,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             coordinate={pos}
             anchor={{ x: 0.5, y: 0.5 }}
           >
-            <View style={styles.driverMarker} />
+            <OnlineDriverMarker color="#8B5CF6" size={14} />
           </PointAnnotation>
         );
       })}

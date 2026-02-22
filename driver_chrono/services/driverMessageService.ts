@@ -1,6 +1,6 @@
-import { useDriverStore } from '../store/useDriverStore';
 import { logger } from '../utils/logger';
 import { config } from '../config/index';
+import { apiService } from './apiService';
 
 const API_BASE_URL = config.apiUrl;
 
@@ -55,134 +55,9 @@ export interface Message {
 }
 
 class DriverMessageService {
-  /**
-   * Vérifie et rafraîchit le token d'accès si nécessaire
-   */
-  private async ensureAccessToken(): Promise<string | null> {
-    try {
-      const {
-        accessToken,
-        refreshToken,
-        setTokens,
-        logout,
-      } = useDriverStore.getState();
-
-      // Vérifier si le token existe et s'il n'est pas expiré
-      if (accessToken && this.isTokenValid(accessToken)) {
-        return accessToken;
-      }
-
-      // Si le token est expiré ou absent, essayer de le rafraîchir
-      if (!refreshToken) {
-        logger.warn('Pas de refreshToken disponible - session expirée');
-        logout();
-        return null;
-      }
-
-      // Vérifier si le refresh token est encore valide
-      if (!this.isTokenValid(refreshToken)) {
-        logger.warn('Refresh token expiré - session expirée');
-        logout();
-        return null;
-      }
-
-      logger.info('🔄 Token expiré ou absent, rafraîchissement en cours...');
-      const newAccessToken = await this.refreshAccessToken(refreshToken);
-      if (newAccessToken) {
-        setTokens({ accessToken: newAccessToken, refreshToken });
-        logger.info('Token rafraîchi et sauvegardé avec succès');
-        return newAccessToken;
-      }
-
-      logger.warn('Impossible de rafraîchir le token - session expirée');
-      logout();
-      return null;
-    } catch (error: any) {
-      logger.error('Erreur ensureAccessToken:', error);
-      const { logout } = useDriverStore.getState();
-      logout();
-      return null;
-    }
-  }
-
-  /**
-   * Vérifie si un token JWT est valide (non expiré)
-   */
-  private isTokenValid(token: string): boolean {
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        return false;
-      }
-
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-
-      if (payload.exp) {
-        const expirationTime = payload.exp * 1000;
-        const now = Date.now();
-        const isExpired = now >= expirationTime;
-        
-        if (isExpired) {
-          logger.warn('Token expiré, expiration:', new Date(expirationTime).toISOString());
-          return false;
-        }
-        
-        return true;
-      }
-
-      logger.warn('Token sans expiration définie');
-      return true;
-    } catch (error: any) {
-      logger.error('Erreur vérification token:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Rafraîchit le token d'accès
-   */
-  private async refreshAccessToken(refreshToken: string): Promise<string | null> {
-    try {
-      logger.info('🔄 Tentative de rafraîchissement du token...');
-      
-      const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        logger.error(`Erreur HTTP lors du rafraîchissement: ${response.status}`, result.message);
-        return null;
-      }
-
-      if (!result.success) {
-        logger.error('Échec du rafraîchissement:', result.message);
-        return null;
-      }
-
-      if (!result.data?.accessToken) {
-        logger.error('Pas de accessToken dans la réponse:', result);
-        return null;
-      }
-
-      logger.info('Token rafraîchi avec succès');
-      return result.data.accessToken as string;
-    } catch (error: any) {
-      logger.error('Erreur réseau lors du rafraîchissement:', error);
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        logger.error('Impossible de se connecter au serveur. Vérifiez que le backend est démarré sur', API_BASE_URL);
-      }
-      return null;
-    }
-  }
-
+  /** Délègue à apiService (queue + retry + classification stricte) */
   private async fetchWithAuth(url: string, options: RequestInit = {}) {
-    const token = await this.ensureAccessToken();
+    const { token } = await apiService.ensureAccessToken();
     if (!token) {
       throw new Error('Non autorisé - Session expirée. Veuillez vous reconnecter.');
     }

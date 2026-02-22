@@ -929,10 +929,28 @@ const refreshToken = async (
         data: { accessToken },
       });
     } catch (error: any) {
-      res.status(401).json({
-        success: false,
-        message: error.message || 'Refresh token invalide ou expiré',
-      });
+      const msg = (error.message || '').toLowerCase();
+      // Erreurs DB/réseau → 500 (JAMAIS 401, pas de déconnexion côté client)
+      const isServerError =
+        msg.includes('connection terminated') ||
+        msg.includes('connection timeout') ||
+        msg.includes('econnrefused') ||
+        msg.includes('etimedout') ||
+        msg.includes('enotfound') ||
+        msg.includes('econnreset') ||
+        msg.includes('socket hang up');
+      if (isServerError) {
+        logger.warn('Erreur serveur lors du refresh token:', msg);
+        res.status(500).json({
+          success: false,
+          message: 'Service temporairement indisponible. Veuillez réessayer.',
+        });
+      } else {
+        res.status(401).json({
+          success: false,
+          message: msg || 'Refresh token invalide ou expiré',
+        });
+      }
       return;
     }
   } catch (error: any) {

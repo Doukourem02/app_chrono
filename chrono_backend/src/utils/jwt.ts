@@ -21,7 +21,7 @@ if (JWT_SECRET_ENV.length < 32) {
 
 
 const JWT_SECRET: string = JWT_SECRET_ENV;
-const JWT_EXPIRES_IN = '5m'; // 5 minutes
+const JWT_EXPIRES_IN = '15m'; // 15 minutes - évite les déconnexions après courte inactivité
 const REFRESH_EXPIRES_IN = '7d'; // 7 jours
 
 

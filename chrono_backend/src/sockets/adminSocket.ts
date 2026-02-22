@@ -126,21 +126,22 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
   setInterval(() => {
     const currentStatuses = new Map<string, any>();
     const now = new Date();
-    
+    // 30 min : chauffeur en attente peut rester immobile ; en arrière-plan, iOS/Android suspendent les mises à jour
+    const INACTIVITY_MINUTES = 30;
+
     // Nettoyer les drivers inactifs de realDriverStatuses
     const inactiveDrivers: string[] = [];
     for (const [userId, status] of realDriverStatuses.entries()) {
       if (status.is_online === true && status.updated_at) {
         const updatedAt = new Date(status.updated_at);
         const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
-        if (diffInMinutes > 5) {
+        if (diffInMinutes > INACTIVITY_MINUTES) {
           inactiveDrivers.push(userId);
           if (DEBUG) {
-            logger.debug(`[adminSocket] Driver inactif détecté (>5 min): ${maskUserId(userId)}`);
+            logger.debug(`[adminSocket] Driver inactif détecté (>${INACTIVITY_MINUTES} min): ${maskUserId(userId)}`);
           }
         }
       } else if (status.is_online === true && !status.updated_at) {
-        // Si pas de updated_at mais marqué comme online, considérer comme inactif
         inactiveDrivers.push(userId);
         if (DEBUG) {
           logger.debug(`[adminSocket] Driver sans updated_at mais marqué online: ${maskUserId(userId)} - considéré comme inactif`);
@@ -159,14 +160,13 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
     });
     
     for (const [userId, status] of realDriverStatuses.entries()) {
-      // Vérifier que le driver est actif avant de le traiter
+      // Vérifier que le driver est actif avant de le traiter (même seuil que le nettoyage)
       let isActive = true;
       if (status.updated_at) {
         const updatedAt = new Date(status.updated_at);
         const diffInMinutes = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
-        isActive = diffInMinutes <= 5;
+        isActive = diffInMinutes <= INACTIVITY_MINUTES;
       } else if (status.is_online === true) {
-        // Si pas de updated_at mais marqué comme online, considérer comme inactif
         isActive = false;
       }
       
