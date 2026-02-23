@@ -27,8 +27,26 @@ interface DriverOrderBottomSheetProps {
   onToggle: () => void;
   onUpdateStatus: (status: string) => void;
   location?: { latitude: number; longitude: number } | null;
-  onMessage?: () => void; // Callback pour ouvrir la messagerie
+  onMessage?: () => void;
+  /** Ouvre la navigation intégrée (Mapbox) vers pickup ou dropoff selon le statut */
+  onStartNavigation?: () => void;
 }
+
+const resolveCoords = (candidate?: any): { latitude: number; longitude: number } | null => {
+  if (!candidate) return null;
+  const c = candidate.coordinates || candidate.coords || candidate.location || candidate;
+  // GeoJSON : [lng, lat]
+  if (Array.isArray(c) && c.length >= 2) {
+    const lng = Number(c[0]);
+    const lat = Number(c[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { latitude: lat, longitude: lng };
+    return null;
+  }
+  const lat = c?.latitude ?? c?.lat ?? c?.Lat ?? c?.y;
+  const lng = c?.longitude ?? c?.lng ?? c?.Lng ?? c?.x;
+  if (lat == null || lng == null) return null;
+  return { latitude: Number(lat), longitude: Number(lng) };
+};
 
 const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   currentOrder,
@@ -39,6 +57,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   onUpdateStatus,
   location,
   onMessage,
+  onStartNavigation,
 }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('details');
@@ -176,16 +195,31 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   };
 
   const handleNavigate = () => {
-    if (!currentOrder?.dropoff?.coordinates) {
+    if (!currentOrder) return;
+    const status = String(currentOrder.status);
+    const pickupCoord = resolveCoords(currentOrder.pickup);
+    const dropoffCoord = resolveCoords(currentOrder.dropoff);
+    const coords = (status === 'accepted' || status === 'enroute' || status === 'in_progress') ? pickupCoord : dropoffCoord;
+    if (!coords?.latitude || !coords?.longitude) {
       Alert.alert('Information', 'Coordonnées non disponibles');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const { latitude, longitude } = currentOrder.dropoff.coordinates;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application de navigation');
-    });
+    if (onStartNavigation) {
+      onStartNavigation();
+    } else {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${coords.latitude},${coords.longitude}`;
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application de navigation');
+      });
+    }
+  };
+
+  const hasPickupCoords = !!resolveCoords(currentOrder?.pickup);
+  const hasDropoffCoords = !!resolveCoords(currentOrder?.dropoff);
+  const showNavButton = (status: string) => {
+    if (['accepted', 'enroute', 'in_progress'].includes(status)) return hasPickupCoords;
+    return hasDropoffCoords;
   };
 
   const handleOpenMessage = () => {
@@ -231,6 +265,14 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
               </View>
             </View>
             <View style={styles.collapsedActions}>
+              {showNavButton(String(currentOrder.status)) && (
+                <TouchableOpacity
+                  style={[styles.collapsedActionButton, { backgroundColor: '#7C3AED' }]}
+                  onPress={handleNavigate}
+                >
+                  <Ionicons name="navigate" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
               {availableActions.slice(0, 2).map((action) => (
                 <TouchableOpacity
                   key={action.id}
@@ -358,6 +400,32 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   </View>
                 )}
 
+                {/* Point de collecte - visible en phase 1 (avant récupération du colis) */}
+                {['accepted', 'enroute', 'in_progress'].includes(String(currentOrder.status)) && currentOrder.pickup?.address && (
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <Ionicons name="cube-outline" size={20} color="#7C3AED" />
+                      <Text style={styles.sectionTitle}>Point de collecte</Text>
+                    </View>
+                    <View style={styles.addressCard}>
+                      <Text style={styles.addressText}>{currentOrder.pickup.address}</Text>
+                    </View>
+                    {hasPickupCoords ? (
+                      <TouchableOpacity style={styles.navigateButton} onPress={handleNavigate}>
+                        <LinearGradient
+                          colors={['#7C3AED', '#6366F1']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.navigateButtonGradient}
+                        >
+                          <Ionicons name="navigate" size={20} color="#fff" />
+                          <Text style={styles.navigateButtonText}>{onStartNavigation ? 'Démarrer la navigation' : 'Ouvrir la navigation'}</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                )}
+
                 {/* Adresse de livraison */}
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
@@ -367,7 +435,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   <View style={styles.addressCard}>
                     <Text style={styles.addressText}>{currentOrder.dropoff.address}</Text>
                   </View>
-                  {currentOrder.dropoff.coordinates ? (
+                  {hasDropoffCoords ? (
                     <TouchableOpacity style={styles.navigateButton} onPress={handleNavigate}>
                       <LinearGradient
                         colors={['#7C3AED', '#6366F1']}
@@ -376,7 +444,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                         style={styles.navigateButtonGradient}
                       >
                         <Ionicons name="navigate" size={20} color="#fff" />
-                        <Text style={styles.navigateButtonText}>Ouvrir la navigation</Text>
+                        <Text style={styles.navigateButtonText}>{onStartNavigation ? 'Démarrer la navigation' : 'Ouvrir la navigation'}</Text>
                       </LinearGradient>
                     </TouchableOpacity>
                   ) : isPhoneOrder ? (

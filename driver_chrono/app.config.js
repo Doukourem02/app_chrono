@@ -34,6 +34,8 @@ module.exports = {
       favicon: "./assets/images/favicon.png"
     },
     plugins: [
+      "@driveapp/expo-plugin-pod-disable-paths",
+      "./plugins/withPodfileAssetsCarFix.js",
       "./plugins/withDisplayName.js",
       "expo-router",
       [
@@ -46,6 +48,8 @@ module.exports = {
         "@rnmapbox/maps",
         {
           RNMapboxMapsImpl: "mapbox",
+          // MapboxMaps v10 requis pour @fleetbase/react-native-mapbox-navigation
+          RNMapboxMapsVersion: "10.12.1",
         },
       ],
       [

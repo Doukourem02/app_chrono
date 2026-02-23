@@ -631,36 +631,31 @@ export const getDriverDetails = async (req: Request, res: Response): Promise<voi
   try {
     const { driverId } = req.params;
 
-    const { data: driver, error } = await supabase
-      .from('driver_profiles')
-      .select(`
-        id,
-        user_id,
-        email,
-        phone,
-        first_name,
-        last_name,
-        vehicle_type,
-        vehicle_plate,
-        vehicle_model,
-        vehicle_brand,
-        vehicle_color,
-        license_number,
-        driver_type,
-        current_latitude,
-        current_longitude,
-        is_online,
-        is_available,
-        total_deliveries,
-        completed_deliveries,
-        profile_image_url,
-        created_at,
-        updated_at
-      `)
-      .eq('user_id', driverId)
-      .single();
+    // Utiliser PostgreSQL (pool) - driver_profiles est dans la DB principale (comme getAdminDriverDetails)
+    let driver: any = null;
+    try {
+      const profileResult = await (pool as any).query(
+        `SELECT * FROM driver_profiles WHERE user_id = $1`,
+        [driverId]
+      );
+      if (profileResult.rows.length > 0) {
+        driver = profileResult.rows[0];
+      }
+    } catch (dbError) {
+      logger.warn('Table driver_profiles non disponible, essai Supabase:', dbError);
+      // Fallback Supabase si driver_profiles n'existe pas en PostgreSQL
+      const { data: supabaseDriver, error } = await supabase
+        .from('driver_profiles')
+        .select(`id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate,
+                 vehicle_model, vehicle_brand, vehicle_color, license_number, driver_type,
+                 current_latitude, current_longitude, is_online, is_available, total_deliveries,
+                 completed_deliveries, profile_image_url, created_at, updated_at`)
+        .eq('user_id', driverId)
+        .single();
+      if (!error && supabaseDriver) driver = supabaseDriver;
+    }
 
-    if (error || !driver) {
+    if (!driver) {
       res.status(404).json({
         success: false,
         message: 'Chauffeur non trouvé'

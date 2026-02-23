@@ -24,6 +24,7 @@ import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
 import { useAnimatedPosition } from '../../hooks/useAnimatedPosition';
 import { useGeofencing } from '../../hooks/useGeofencing';
 import MessageBottomSheet from "../../components/MessageBottomSheet";
+import { MapboxNavigationScreen } from "../../components/MapboxNavigationScreen";
 import { formatUserName } from '../../utils/formatName';
 
 export default function Index() {
@@ -63,9 +64,16 @@ export default function Index() {
     if (!candidate) return null;
 
     const c = candidate.coordinates || candidate.coords || candidate.location || candidate;
-    const lat = c?.latitude ?? c?.lat ?? c?.latitude ?? c?.Lat ?? c?.y;
-    const lng = c?.longitude ?? c?.lng ?? c?.longitude ?? c?.Lng ?? c?.x;
-    
+    // GeoJSON : [lng, lat]
+    if (Array.isArray(c) && c.length >= 2) {
+      const lng = Number(c[0]);
+      const lat = Number(c[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { latitude: lat, longitude: lng };
+      return null;
+    }
+    const lat = c?.latitude ?? c?.lat ?? c?.Lat ?? c?.y;
+    const lng = c?.longitude ?? c?.lng ?? c?.Lng ?? c?.x;
+
     if (lat == null || lng == null) return null;
     return { latitude: Number(lat), longitude: Number(lng) };
   };
@@ -222,6 +230,7 @@ export default function Index() {
   } = useMessageBottomSheet();
 
   const [showMessageBottomSheet, setShowMessageBottomSheet] = useState(false);
+  const [isNavigationActive, setIsNavigationActive] = useState(false);
 
   const handleOpenMessage = () => {
     if (!currentOrder || !currentOrder.user || !currentOrder.user.id) {
@@ -266,7 +275,31 @@ export default function Index() {
   const destination = getCurrentDestination();
   const currentPickupCoord = currentOrder ? resolveCoords(currentOrder.pickup) : null;
   const currentDropoffCoord = currentOrder ? resolveCoords(currentOrder.dropoff) : null;
-  
+
+  // Auto-démarrage navigation : Livreur accepte → phase 1 (pickup), Colis récupéré → phase 2 (dropoff)
+  useEffect(() => {
+    if (!currentOrder) {
+      lastOrderStatusRef.current = null;
+      return;
+    }
+    if (!location || !destination) return;
+
+    const status = String(currentOrder.status || '');
+    const prevStatus = lastOrderStatusRef.current;
+    lastOrderStatusRef.current = status;
+
+    // Phase 1 : transition vers accepted (ouverture avec commande acceptée)
+    if (status === 'accepted' && prevStatus !== 'accepted') {
+      logger.info('Auto-démarrage navigation phase 1 (point de collecte)', 'driver-index');
+      setIsNavigationActive(true);
+    }
+    // Phase 2 : transition vers picked_up (colis récupéré → navigation vers livraison)
+    if ((status === 'picked_up' || status === 'delivering') && (prevStatus === 'enroute' || prevStatus === 'in_progress')) {
+      logger.info('Auto-démarrage navigation phase 2 (adresse de livraison)', 'driver-index');
+      setIsNavigationActive(true);
+    }
+  }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination]);
+
   // Géofencing : détection automatique d'arrivée
   // CRITIQUE : Désactiver le géofencing si le statut est 'accepted'
   // Le livreur doit d'abord cliquer sur "Je pars" pour passer à 'enroute'
@@ -614,18 +647,20 @@ export default function Index() {
   useEffect(() => {
     const status = String(currentOrder?.status || '');
     const lastStatus = lastOrderStatusRef.current;
-    const isTransitioningToPickedUp = 
-      (status === 'picked_up' || status === 'delivering') && 
-      lastStatus !== status && 
-      lastStatus !== 'picked_up' && 
+    const isTransitioningToAccepted =
+      status === 'accepted' && lastStatus !== status && lastStatus !== 'accepted';
+    const isTransitioningToPickedUp =
+      (status === 'picked_up' || status === 'delivering') &&
+      lastStatus !== status &&
+      lastStatus !== 'picked_up' &&
       lastStatus !== 'delivering';
-    
+
     lastOrderStatusRef.current = status;
-    if (currentOrder && isTransitioningToPickedUp && !userClosedBottomSheetRef.current) {
+    if (currentOrder && (isTransitioningToAccepted || isTransitioningToPickedUp) && !userClosedBottomSheetRef.current) {
       userClosedBottomSheetRef.current = false;
       setTimeout(() => {
         expandOrderBottomSheet();
-      }, 500);
+      }, isTransitioningToAccepted ? 300 : 500);
     } else if (status === 'completed' || !currentOrder) {
       userClosedBottomSheetRef.current = false;
       collapseOrderBottomSheet();
@@ -829,6 +864,11 @@ export default function Index() {
           }}
           location={location}
           onMessage={handleOpenMessage}
+          onStartNavigation={
+            currentOrder && location && destination
+              ? () => setIsNavigationActive(true)
+              : undefined
+          }
         />
       )}
 
@@ -841,6 +881,18 @@ export default function Index() {
           onOrderSelect={(orderId) => {
             logger.info('Commande sélectionnée', 'driver-index', { orderId });
           }}
+        />
+      )}
+
+      {/* Navigation intégrée Mapbox (style Yango) - full screen */}
+      {isNavigationActive && currentOrder && location && destination && (
+        <MapboxNavigationScreen
+          origin={location}
+          destination={destination}
+          onArrive={() => {
+            setIsNavigationActive(false);
+          }}
+          onCancel={() => setIsNavigationActive(false)}
         />
       )}
 
