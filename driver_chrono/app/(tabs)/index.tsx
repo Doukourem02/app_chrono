@@ -276,6 +276,11 @@ export default function Index() {
   const currentPickupCoord = currentOrder ? resolveCoords(currentOrder.pickup) : null;
   const currentDropoffCoord = currentOrder ? resolveCoords(currentOrder.dropoff) : null;
 
+  // Cacher la tab bar quand la navigation full-screen est active
+  useEffect(() => {
+    setHideTabBar(isNavigationActive);
+  }, [isNavigationActive, setHideTabBar]);
+
   // Auto-démarrage navigation : Livreur accepte → phase 1 (pickup), Colis récupéré → phase 2 (dropoff)
   useEffect(() => {
     if (!currentOrder) {

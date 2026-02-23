@@ -35,6 +35,7 @@ module.exports = {
     },
     plugins: [
       "@driveapp/expo-plugin-pod-disable-paths",
+      "./plugins/withMapboxToken.js",
       "./plugins/withPodfileAssetsCarFix.js",
       "./plugins/withDisplayName.js",
       "expo-router",

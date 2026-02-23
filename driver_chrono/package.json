@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "update-ip": "node ./scripts/update-env-ip.js",
+    "postinstall": "patch-package && node scripts/apply-mapbox-navigation-patch.js",
     "prestart": "npm run update-ip",
     "start": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo start",
     "reset-project": "node ./scripts/reset-project.js",

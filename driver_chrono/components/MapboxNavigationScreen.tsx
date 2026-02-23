@@ -32,6 +32,8 @@ interface MapboxNavigationScreenProps {
 
 let MapboxNavigation: React.ComponentType<any> | null = null;
 try {
+  // Optional native module - use require for sync try/catch when module may not be linked
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const nav = require('@fleetbase/react-native-mapbox-navigation');
   MapboxNavigation = nav.default || nav;
 } catch (e: unknown) {
@@ -117,13 +119,13 @@ export function MapboxNavigationScreen({
   }
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <View style={[StyleSheet.absoluteFill, styles.navContainer]}>
       <MapboxNavigation
+        style={styles.mapboxNav}
         origin={originArr}
         destination={destArr}
         mute={false}
         showsEndOfRouteFeedback
-        hideStatusView
         onLocationChange={() => {}}
         onRouteProgressChange={() => {}}
         onError={handleError}
@@ -142,6 +144,14 @@ export function MapboxNavigationScreen({
 }
 
 const styles = StyleSheet.create({
+  navContainer: {
+    flex: 1,
+  },
+  mapboxNav: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   fallback: {
     flex: 1,
     backgroundColor: '#1F2937',

@@ -195,15 +195,19 @@ Le bouton "Démarrer la navigation" ouvre l'écran de navigation full-screen ave
 
 > ⚠️ **Expo Go ne supporte pas** les modules natifs comme Mapbox Navigation. Utilisez un development build.
 
-### Patches automatiques (post_install)
+### Patches automatiques
 
-Le fichier `ios/react-native-mapbox-navigation-pods.rb` applique automatiquement lors de `pod install` :
+**postinstall (npm)** : `scripts/apply-mapbox-navigation-patch.js` copie `MapboxNavigationView.swift` patché pour activer la navigation turn-by-turn complète (bannière instructions, ligne bleue, vitesse, style 3D). Le package Fleetbase d’origine n’affiche que la carte sans calculer la route.
+
+**post_install (Podfile)** :
 
 1. **ViewAnnotationManager.swift** (MapboxMaps) – correctif Xcode 16 / Swift 6 (`compactMapValues`)
-2. **RNMBXModelLayer, RNMBXModels, RNMBXNativeUserLocation, RNMBXStyle** (@rnmapbox/maps) – APIs v11-only (ModelLayer, PuckBearing, addStyleModel) wrappées en `#if RNMBX_11`
+2. **RNMBXModelLayer, RNMBXModels, RNMBXNativeUserLocation, RNMBXStyle** (@rnmapbox/maps) – APIs v11-only wrappées en `#if RNMBX_11`
 3. **Expression.swift** (MapboxNavigation) – désambiguïsation `MapboxMaps.Expression`
+4. **UIImage.swift** (MapboxNavigation) – fallback pour assets manquants (évite crash `locationImage` / ResumeButton)
+5. **RouteVoiceController.swift** (MapboxNavigation) – fallback pour asset `reroute-sound` manquant (évite crash à l’init)
 
-> Après `npm install`, exécutez toujours `cd ios && pod install` pour appliquer ces patches.
+> Après `npm install`, exécutez `node scripts/apply-mapbox-navigation-patch.js` (ou `npm run postinstall`), puis `cd ios && pod install`.
 
 ### Autres
 

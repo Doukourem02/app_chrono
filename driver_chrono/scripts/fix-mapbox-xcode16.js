@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* eslint-env node */
+/* global __dirname */
 /**
  * Patch MapboxMaps ViewAnnotationManager.swift for Xcode 16 compatibility.
  * Fixes: "cannot convert return expression of type '[UIView : ViewAnnotationOptions]' to return type '[String : Any?]'"
