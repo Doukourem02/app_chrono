@@ -10,8 +10,6 @@ import { calculateFullETA } from '../utils/etaCalculator';
 import { calculateDriverOffsets } from '../utils/markerOffset';
 import { useAnimatedDriverPositions } from '../hooks/useAnimatedDriverPositions';
 import { useWeather } from '../hooks/useWeather';
-import { calculateBearing } from '../utils/bearingCalculator';
-import { AnimatedVehicleMarker } from './AnimatedVehicleMarker';
 import { ETABadge } from './ETABadge';
 import { OnlineDriverMarker } from './OnlineDriverMarker';
 
@@ -129,17 +127,6 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   useEffect(() => {
     if (orderDriverCoords) previousDriverCoordsRef.current = orderDriverCoords;
   }, [orderDriverCoords]);
-
-  const driverBearing = useMemo(() => {
-    if (!animatedDriverPosition) return 0;
-    if (!previousDriverCoordsRef.current && destination) {
-      return calculateBearing(animatedDriverPosition, destination);
-    }
-    if (previousDriverCoordsRef.current) {
-      return calculateBearing(previousDriverCoordsRef.current, animatedDriverPosition);
-    }
-    return 0;
-  }, [animatedDriverPosition, destination]);
 
   useEffect(() => {
     if (animatedDriverPosition) previousDriverCoordsRef.current = animatedDriverPosition;
@@ -294,14 +281,14 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             ? [fallback.lng, fallback.lat]
             : [driver.current_longitude, driver.current_latitude];
         return (
-          <PointAnnotation
+          <MarkerView
             key={driver.user_id}
-            id={`driver-${driver.user_id}`}
             coordinate={pos}
             anchor={{ x: 0.5, y: 0.5 }}
+            allowOverlap
           >
             <OnlineDriverMarker color="#8B5CF6" size={14} />
-          </PointAnnotation>
+          </MarkerView>
         );
       })}
 
@@ -369,18 +356,17 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
           >
             <View style={styles.driverMarkerWithETA}>
               {realTimeETA && (() => {
-                const isArrived = realTimeETA.formattedETA.toLowerCase().includes('arrivé')
+                const rawIsArrived = realTimeETA.formattedETA.toLowerCase().includes('arrivé')
                 const isAtDropoff = orderStatus === 'picked_up' || orderStatus === 'delivering'
+                const isGoingToPickup = orderStatus === 'accepted' || orderStatus === 'pending'
+                // Ne jamais afficher "Arrivé" quand le livreur vient d'être assigné (accepted)
+                const isArrived = rawIsArrived && !isGoingToPickup
                 const badgeUnit = isArrived && isAtDropoff ? 'Livrer à signer' : isArrived ? 'Arrivé' : 'min'
-                const badgeValue = isArrived ? '✓' : realTimeETA.etaMinutes.toString()
+                const displayMinutes = isGoingToPickup && realTimeETA.etaMinutes < 1 ? 1 : Math.max(1, Math.ceil(realTimeETA.etaMinutes))
+                const badgeValue = isArrived ? '✓' : displayMinutes.toString()
                 return <ETABadge value={badgeValue} unit={badgeUnit} />
               })()}
-              <AnimatedVehicleMarker
-                vehicleType={selectedMethod === 'moto' ? 'moto' : selectedMethod === 'cargo' ? 'cargo' : 'vehicule'}
-                bearing={driverBearing}
-                size={64}
-                coordinate={animatedDriverPosition || orderDriverCoords!}
-              />
+              <OnlineDriverMarker color="#8B5CF6" size={20} />
             </View>
           </MarkerView>
 

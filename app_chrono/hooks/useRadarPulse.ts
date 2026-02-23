@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
 
-interface RadarPulseOptions {
+export interface RadarPulseOptions {
   duration?: number;
+  /** Si false, pas de pulse (radar statique) - le marqueur client ne doit pas pulser */
+  pulseEnabled?: boolean;
 }
 
 export const useRadarPulse = (
   isActive: boolean,
   options?: RadarPulseOptions
 ) => {
+  const pulseEnabled = options?.pulseEnabled ?? true;
   const outerPulse = useRef(new Animated.Value(0)).current;
   const innerPulse = useRef(new Animated.Value(0)).current;
   const outerAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -68,7 +71,7 @@ export const useRadarPulse = (
   }, [duration, outerPulse, innerPulse, phaseOffset, stopPulse]);
 
   useEffect(() => {
-    if (isActive) {
+    if (isActive && pulseEnabled) {
       startPulse();
     } else {
       stopPulse();
@@ -77,7 +80,7 @@ export const useRadarPulse = (
     return () => {
       stopPulse();
     };
-  }, [isActive, startPulse, stopPulse]);
+  }, [isActive, pulseEnabled, startPulse, stopPulse]);
 
   return {
     outerPulse,
