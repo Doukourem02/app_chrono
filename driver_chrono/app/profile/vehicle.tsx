@@ -131,7 +131,7 @@ export default function VehiclePage() {
         }
 
         Alert.alert('Succès', 'Les informations du véhicule ont été mises à jour', [
-          { text: 'OK', onPress: () => router.back() },
+          { text: 'Fermer', onPress: () => router.back() },
         ]);
       } else {
         // Afficher un message user-friendly (jamais les détails techniques)

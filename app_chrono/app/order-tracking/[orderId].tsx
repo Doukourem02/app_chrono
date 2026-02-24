@@ -405,8 +405,9 @@ export default function OrderTrackingPage() {
   const handleCancelOrder = useCallback(async (orderIdToCancel: string) => {
     if (currentOrder && currentOrder.status !== 'pending' && currentOrder.status !== 'accepted') {
       const statusMessages: Record<string, string> = {
+        'enroute': 'Impossible d\'annuler une commande dont le livreur est déjà en route',
         'picked_up': 'Impossible d\'annuler une commande dont le colis a déjà été récupéré',
-        'enroute': 'Impossible d\'annuler une commande en cours de livraison',
+        'delivering': 'Impossible d\'annuler une commande en cours de livraison',
         'completed': 'Impossible d\'annuler une commande déjà terminée',
         'cancelled': 'Cette commande a déjà été annulée',
         'declined': 'Cette commande a été refusée',

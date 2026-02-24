@@ -1047,7 +1047,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           pending: ['accepted', 'cancelled'],
           accepted: ['enroute', 'cancelled'],
           enroute: ['picked_up', 'cancelled'],
-          picked_up: ['completed', 'cancelled'],
+          picked_up: ['delivering', 'completed', 'cancelled'],
+          delivering: ['completed', 'cancelled'],
           completed: [],
           cancelled: []
         };

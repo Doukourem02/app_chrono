@@ -187,7 +187,7 @@ export class UserFriendlyError {
     Alert.alert(
       'Succès',
       message,
-      [{ text: 'OK', onPress, style: 'default' }]
+      [{ text: 'Fermer', onPress, style: 'default' }]
     );
   }
 
@@ -198,7 +198,7 @@ export class UserFriendlyError {
     Alert.alert(
       title,
       message,
-      [{ text: 'OK', style: 'default' }]
+      [{ text: 'Fermer', style: 'default' }]
     );
   }
 

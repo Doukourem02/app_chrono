@@ -58,6 +58,7 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
       embed()
     } else if let vc = navViewController {
       vc.view.frame = bounds
+      hideResumeButton(in: vc.view)
     }
   }
 
@@ -85,7 +86,9 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     ))
 
     let waypointsArray = [originWaypoint, destinationWaypoint]
-    let options = NavigationRouteOptions(waypoints: waypointsArray, profileIdentifier: .automobileAvoidingTraffic)
+    var options = NavigationRouteOptions(waypoints: waypointsArray, profileIdentifier: .automobileAvoidingTraffic)
+    options.locale = Locale(identifier: "fr_FR")
+    options.distanceMeasurementSystem = .metric
 
     Directions.shared.calculate(options) { [weak self] (_, result) in
       guard let strongSelf = self, let parentVC = strongSelf.parentViewController else {
@@ -111,7 +114,10 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
           routeOptions: options,
           simulating: strongSelf.shouldSimulateRoute ? .always : .never
         )
-        let navigationOptions = NavigationOptions(navigationService: navigationService)
+        let navigationOptions = NavigationOptions(
+          styles: [ChronoDayStyle(), ChronoNightStyle()],
+          navigationService: navigationService
+        )
         let vc = NavigationViewController(
           for: response,
           routeIndex: 0,
@@ -120,8 +126,10 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
         )
 
         vc.showsEndOfRouteFeedback = strongSelf.showsEndOfRouteFeedback
+        vc.showsReportFeedback = false
         StatusView.appearance().isHidden = strongSelf.hideStatusView
         NavigationSettings.shared.voiceMuted = strongSelf.mute
+        NavigationSettings.shared.distanceUnit = .kilometer
         vc.delegate = strongSelf
 
         parentVC.addChild(vc)
@@ -130,6 +138,13 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
         vc.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         vc.didMove(toParent: parentVC)
         strongSelf.navViewController = vc
+
+        // Masquer les boutons natifs (boussole, recentrer) et "Tun pada" (Reprendre)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+          strongSelf.hideNativeFloatingButtons(in: vc.view)
+          strongSelf.hideResumeButton(in: vc.view)
+          strongSelf.hideMapOrnaments(in: vc)
+        }
       }
 
       strongSelf.embedding = false
@@ -140,6 +155,55 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
   private func requestRoute() {
     if embedded || embedding { return }
     embed()
+  }
+
+  /// Masque les boutons natifs Mapbox (boussole, recentrer) qui ont le cercle blanc au centre
+  private func hideNativeFloatingButtons(in view: UIView) {
+    for subview in view.subviews {
+      if String(describing: type(of: subview)).contains("FloatingButton") {
+        subview.isHidden = true
+      }
+      hideNativeFloatingButtons(in: subview)
+    }
+  }
+
+  /// Masque les ornements de la carte (boussole, barre d'échelle) - app ivoirienne, UI épurée
+  private func hideMapOrnaments(in vc: NavigationViewController) {
+    guard let mapView = vc.navigationMapView?.mapView else { return }
+    var opts = mapView.ornaments.options
+    opts.compass.visibility = .hidden
+    opts.scaleBar.visibility = .hidden
+    mapView.ornaments.options = opts
+  }
+
+  /// Masque le bouton Resume (Tun pada, Atunjade, etc.) - tout en français pour Côte d'Ivoire
+  private func hideResumeButton(in view: UIView) {
+    let typeName = String(describing: type(of: view))
+    if typeName.contains("ResumeButton") {
+      view.isHidden = true
+      return
+    }
+    if let btn = view as? UIButton {
+      let title = (btn.title(for: .normal) ?? btn.title(for: .selected) ?? "").lowercased()
+      let resumeTerms = ["tun pada", "atunjade", "resume", "reprendre", "continue", "retry", "réessayer"]
+      if resumeTerms.contains(where: { title.contains($0) }) {
+        view.isHidden = true
+        return
+      }
+    }
+    if let label = view as? UILabel {
+      let text = (label.text ?? "").lowercased()
+      if !text.isEmpty {
+        let resumeTerms = ["tun pada", "atunjade", "resume", "reprendre", "continue", "retry", "réessayer"]
+        if resumeTerms.contains(where: { text.contains($0) }) {
+          view.superview?.isHidden = true
+          return
+        }
+      }
+    }
+    for subview in view.subviews {
+      hideResumeButton(in: subview)
+    }
   }
 
   func navigationViewController(
@@ -171,5 +235,49 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
   ) -> Bool {
     onArrive?(["message": ""])
     return true
+  }
+}
+
+// MARK: - Styles personnalisés (thème sombre type référence, adapté Côte d'Ivoire)
+private let chronoBlue = UIColor(red: 0.16, green: 0.41, blue: 0.86, alpha: 1)    // Bannière bleue
+private let chronoDarkBg = UIColor(red: 0.14, green: 0.14, blue: 0.18, alpha: 0.9) // Boutons gris foncé
+private let chronoWhite = UIColor.white
+
+class ChronoDayStyle: DayStyle {
+  required init() {
+    super.init()
+    styleType = .day
+    if let url = URL(string: "mapbox://styles/mapbox/streets-v12") { mapStyleURL = url }
+  }
+  override func apply() {
+    super.apply()
+    let traitCollection = UIScreen.main.traitCollection
+    TopBannerView.appearance(for: traitCollection).backgroundColor = chronoBlue
+    InstructionsBannerView.appearance(for: traitCollection).backgroundColor = chronoBlue
+    ManeuverView.appearance(for: traitCollection).backgroundColor = chronoBlue
+    NextBannerView.appearance(for: traitCollection).backgroundColor = chronoBlue
+    FloatingButton.appearance(for: traitCollection).backgroundColor = chronoDarkBg
+    FloatingButton.appearance(for: traitCollection).tintColor = chronoWhite
+    NavigationMapView.appearance(for: traitCollection).tintColor = chronoBlue
+  }
+}
+
+class ChronoNightStyle: NightStyle {
+  required init() {
+    super.init()
+    styleType = .night
+    if let url = URL(string: "mapbox://styles/mapbox/dark-v11") { mapStyleURL = url }
+  }
+  override func apply() {
+    super.apply()
+    let traitCollection = UIScreen.main.traitCollection
+    TopBannerView.appearance(for: traitCollection).backgroundColor = chronoBlue
+    InstructionsBannerView.appearance(for: traitCollection).backgroundColor = chronoBlue
+    ManeuverView.appearance(for: traitCollection).backgroundColor = chronoBlue
+    NextBannerView.appearance(for: traitCollection).backgroundColor = chronoBlue
+    BottomBannerView.appearance(for: traitCollection).backgroundColor = chronoDarkBg
+    FloatingButton.appearance(for: traitCollection).backgroundColor = chronoDarkBg
+    FloatingButton.appearance(for: traitCollection).tintColor = chronoWhite
+    NavigationMapView.appearance(for: traitCollection).tintColor = chronoBlue
   }
 }

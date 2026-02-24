@@ -72,7 +72,7 @@ export default function PersonalInfoPage() {
         }
 
         Alert.alert('Succès', 'Vos informations ont été mises à jour', [
-          { text: 'OK', onPress: () => router.back() },
+          { text: 'Fermer', onPress: () => router.back() },
         ]);
       } else {
         // Afficher un message user-friendly (jamais les détails techniques)

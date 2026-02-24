@@ -137,6 +137,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       case 'enroute':
         return [0, 1];
       case 'picked_up':
+        return [0, 1, 2];
       case 'delivering':
         return [0, 1, 2, 3];
       case 'completed':

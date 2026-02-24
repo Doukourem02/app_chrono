@@ -183,6 +183,7 @@ Le bouton "Démarrer la navigation" ouvre l'écran de navigation full-screen ave
 | Carte vide / crash au lancement | Tokens Mapbox non configurés | Vérifier `MBXAccessToken` dans Info.plist (iOS) et `MAPBOX_ACCESS_TOKEN` dans AndroidManifest |
 | Ouvre Google Maps au lieu de Mapbox | `onStartNavigation` non passé (destination null) | Vérifier que pickup/dropoff ont des `coordinates` valides selon le statut |
 | Pas de voix / instructions | UIBackgroundModes manquant | Ajouter `audio` et `location` dans Info.plist |
+| Navigation "tourne en boucle" | Route très courte, rues à sens unique, ou recalcule constant | Tester avec une destination plus éloignée ; vérifier que `shouldSimulateRoute` est `false` ; utiliser un appareil réel plutôt que simulateur pour le GPS |
 | Erreur pod install | Token secret manquant | Créer `~/.netrc` avec le token secret (scope Downloads:Read) |
 | Erreur "multiple commands produce" | Conflit CocoaPods | Ajouter `install! 'cocoapods', :disable_input_output_paths => true` en haut du Podfile |
 
@@ -207,7 +208,7 @@ Le bouton "Démarrer la navigation" ouvre l'écran de navigation full-screen ave
 4. **UIImage.swift** (MapboxNavigation) – fallback pour assets manquants (évite crash `locationImage` / ResumeButton)
 5. **RouteVoiceController.swift** (MapboxNavigation) – fallback pour asset `reroute-sound` manquant (évite crash à l’init)
 
-> Après `npm install`, exécutez `node scripts/apply-mapbox-navigation-patch.js` (ou `npm run postinstall`), puis `cd ios && pod install`.
+> Après `npm install`, exécutez `node scripts/apply-mapbox-navigation-patch.js` (ou `npm run postinstall`), puis `cd ios && pod install`. **Important** : revenez à la racine (`cd ..`) avant `npx expo run:ios`, car Expo attend le `package.json` à la racine du projet.
 
 ### Autres
 

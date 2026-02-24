@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { searchOverpassPoi, type OverpassPoiResult } from '../utils/overpassPoiSearch';
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest';
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
@@ -33,7 +34,7 @@ interface MapboxSuggestion {
   full_address?: string;
   place_formatted: string;
   coordinates?: { lat: number; lng: number };
-  source?: 'searchbox' | 'geocode' | 'nominatim';
+  source?: 'searchbox' | 'geocode' | 'nominatim' | 'overpass';
 }
 
 interface MapboxRetrieveFeature {
@@ -171,6 +172,16 @@ export default function MapboxAddressAutocomplete({
           ),
         ];
 
+        // Overpass : POI OSM (pharmacies, restaurants, écoles, KFC, etc.) - Côte d'Ivoire
+        const [proxLng, proxLat] = proximity.split(',').map((x) => parseFloat(x.trim()));
+        const overpassPromise = searchOverpassPoi(
+          trimmed,
+          Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined
+        ).catch((err) => {
+          logger.warn('[MapboxAddressAutocomplete] Overpass non disponible:', err);
+          return [] as OverpassPoiResult[];
+        });
+
         // Nominatim : rues, quartiers, POI visibles sur la carte (comme admin)
         const nominatimQ = trimmed.toLowerCase().includes('abidjan') ? trimmed : `${trimmed}, Abidjan`;
         const nominatimPromise = fetch(
@@ -190,11 +201,12 @@ export default function MapboxAddressAutocomplete({
             return [];
           });
 
-        const results = await Promise.all([...fetches, nominatimPromise]);
+        const results = await Promise.all([...fetches, overpassPromise, nominatimPromise]);
         const suggestRes = results[0];
         const geocodeRes = results[1];
         const geocodeStreetRes = results[2];
-        const nominatimData = results[3] as NominatimResult[];
+        const overpassData = results[3] as OverpassPoiResult[];
+        const nominatimData = results[4] as NominatimResult[];
 
         const suggestData = await suggestRes.json();
         const geocodeData = await geocodeRes.json();
@@ -268,16 +280,27 @@ export default function MapboxAddressAutocomplete({
             source: 'nominatim' as const,
           }));
 
+        const fromOverpass: MapboxSuggestion[] = (overpassData || []).map((o) => ({
+          name: o.name,
+          mapbox_id: o.mapbox_id,
+          feature_type: o.feature_type,
+          full_address: o.full_address,
+          place_formatted: o.place_formatted,
+          coordinates: o.coordinates,
+          source: 'overpass' as const,
+        }));
+
+        // Ordre de merge : POI (Search Box + Overpass) en premier, puis Geocode, rues, Nominatim
         const seen = new Set<string>();
         const merged: MapboxSuggestion[] = [];
-        for (const s of [...fromGeocodeStreet, ...fromGeocode, ...fromSearchBox, ...fromNominatim]) {
+        for (const s of [...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]) {
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`;
           if (key && !seen.has(key) && s.name) {
             seen.add(key);
             merged.push(s);
           }
         }
-        setSuggestions(merged.slice(0, 10));
+        setSuggestions(merged.slice(0, 15));
       } catch (err) {
         logger.error('Mapbox suggest error', 'MapboxAddressAutocomplete', err);
         setSuggestions([]);

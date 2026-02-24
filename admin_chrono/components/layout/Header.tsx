@@ -144,6 +144,7 @@ export default function Header() {
         'accepted': 'onProgress',
         'enroute': 'onProgress',
         'picked_up': 'onProgress',
+        'delivering': 'onProgress',
         'completed': 'successful',
         'cancelled': 'canceled',
         'canceled': 'canceled',
@@ -180,6 +181,7 @@ export default function Header() {
         return '#EF4444'
       case 'enroute':
       case 'picked_up':
+      case 'delivering':
         return '#8B5CF6'
       default:
         return '#6B7280'

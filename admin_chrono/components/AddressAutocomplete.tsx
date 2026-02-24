@@ -2,9 +2,16 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useMapbox } from '@/contexts/MapboxContext'
+import { searchOverpassPoi, type OverpassPoiResult } from '@/utils/overpassPoiSearch'
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest'
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve'
+const MAPBOX_GEOCODE_URL = 'https://api.mapbox.com/search/geocode/v6/forward'
+const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
+
+const NOMINATIM_HEADERS: HeadersInit = {
+  'User-Agent': 'ChronoLivraison/1.0 (admin-address-autocomplete)',
+}
 
 interface MapboxSuggestion {
   name: string
@@ -13,6 +20,8 @@ interface MapboxSuggestion {
   address?: string
   full_address?: string
   place_formatted: string
+  coordinates?: { lat: number; lng: number }
+  source?: 'searchbox' | 'geocode' | 'nominatim' | 'overpass'
 }
 
 interface MapboxRetrieveFeature {
@@ -77,31 +86,153 @@ export default function AddressAutocomplete({
 
   const fetchSuggestions = useCallback(
     async (searchText: string) => {
-      if (!searchText.trim() || searchText.length < 2 || !accessToken) {
+      const trimmed = searchText.trim()
+      if (!trimmed || trimmed.length < 2 || !accessToken) {
         setSuggestions([])
         return
       }
 
       setIsLoading(true)
       try {
-        const params = new URLSearchParams({
-          q: searchText,
-          access_token: accessToken,
-          session_token: sessionToken,
-          country: 'ci',
-          language: 'fr',
-          limit: '10',
-          proximity: '-4.0083,5.36',
-        })
-        const res = await fetch(`${MAPBOX_SUGGEST_URL}?${params}`)
-        const data = await res.json()
+        const baseParams = { country: 'ci', language: 'fr', proximity: '-4.0083,5.36' }
 
-        if (data.suggestions && Array.isArray(data.suggestions)) {
-          setSuggestions(data.suggestions)
-          setIsOpen(true)
-        } else {
-          setSuggestions([])
+        const [suggestRes, geocodeRes, overpassData, nominatimData] = await Promise.all([
+          fetch(
+            `${MAPBOX_SUGGEST_URL}?${new URLSearchParams({
+              q: trimmed,
+              access_token: accessToken,
+              session_token: sessionToken,
+              ...baseParams,
+              limit: '8',
+            })}`
+          ),
+          fetch(
+            `${MAPBOX_GEOCODE_URL}?${new URLSearchParams({
+              q: trimmed,
+              access_token: accessToken,
+              ...baseParams,
+              limit: '8',
+              autocomplete: 'true',
+            })}`
+          ),
+          searchOverpassPoi(trimmed, { lat: 5.36, lng: -4.0083 }).catch(() => [] as OverpassPoiResult[]),
+          fetch(
+            `${NOMINATIM_URL}?${new URLSearchParams({
+              q: trimmed.toLowerCase().includes('abidjan') ? trimmed : `${trimmed}, Abidjan`,
+              format: 'json',
+              limit: '8',
+              countrycodes: 'ci',
+              viewbox: '-4.15,5.2,-3.85,5.45',
+            })}`,
+            { headers: NOMINATIM_HEADERS }
+          )
+            .then((r) => (r.ok ? r.json() : []))
+            .catch(() => []),
+        ])
+
+        const suggestData = await suggestRes.json()
+        const geocodeData = await geocodeRes.json()
+
+        interface GeocodeFeature {
+          geometry?: { coordinates: [number, number] | [number, number][] }
+          properties?: {
+            name?: string
+            name_preferred?: string
+            full_address?: string
+            place_formatted?: string
+            mapbox_id?: string
+            feature_type?: string
+            context?: {
+              street?: { name?: string } | string
+              place?: { name?: string }
+              locality?: { name?: string }
+              district?: { name?: string }
+              neighborhood?: { name?: string }
+            }
+          }
         }
+
+        const parseGeocode = (f: GeocodeFeature): MapboxSuggestion | null => {
+          const coords = f.geometry?.coordinates
+          let lng: number | null = null
+          let lat: number | null = null
+          if (Array.isArray(coords) && coords.length > 0) {
+            const first = coords[0]
+            if (typeof first === 'number') {
+              ;[lng, lat] = coords as [number, number]
+            } else if (Array.isArray(first)) {
+              ;[lng, lat] = first as [number, number]
+            }
+          }
+          if (lat == null || lng == null) return null
+          const props = f.properties || {}
+          const ctx = props.context || {}
+          const streetVal = ctx.street
+          const streetName =
+            (typeof streetVal === 'string' ? streetVal : (streetVal as { name?: string })?.name) ??
+            null
+          const name =
+            props.name ||
+            props.name_preferred ||
+            props.full_address ||
+            streetName ||
+            (props.place_formatted ? String(props.place_formatted).split(',')[0]?.trim() : '') ||
+            ''
+          if (!name) return null
+          const placeParts = [
+            ctx.place?.name,
+            ctx.locality?.name,
+            ctx.district?.name,
+            ctx.neighborhood?.name,
+          ].filter(Boolean)
+          return {
+            name,
+            mapbox_id: props.mapbox_id || '',
+            feature_type: props.feature_type || 'address',
+            full_address: props.full_address,
+            place_formatted: props.place_formatted || placeParts.join(', ') || '',
+            coordinates: { lat, lng },
+            source: 'geocode',
+          }
+        }
+
+        const fromSearchBox: MapboxSuggestion[] = (suggestData?.suggestions || []).map(
+          (s: Record<string, unknown>) => ({ ...s, source: 'searchbox' as const })
+        )
+        const fromGeocode = (geocodeData?.features || []).map(parseGeocode).filter(Boolean) as MapboxSuggestion[]
+        const fromOverpass: MapboxSuggestion[] = (overpassData || []).map((o) => ({
+          name: o.name,
+          mapbox_id: o.mapbox_id,
+          feature_type: o.feature_type,
+          full_address: o.full_address,
+          place_formatted: o.place_formatted,
+          coordinates: o.coordinates,
+          source: 'overpass',
+        }))
+        const fromNominatim: MapboxSuggestion[] = (nominatimData || [])
+          .filter((r: { lat?: string; lon?: string }) => r.lat && r.lon)
+          .map((r: { place_id: string; lat: string; lon: string; display_name: string }) => ({
+          name: r.display_name.split(',')[0]?.trim() || r.display_name,
+          mapbox_id: `nominatim-${r.place_id}`,
+          feature_type: 'place',
+          full_address: r.display_name,
+          place_formatted: r.display_name,
+          coordinates: { lat: parseFloat(r.lat), lng: parseFloat(r.lon) },
+          source: 'nominatim',
+        }))
+
+        const seen = new Set<string>()
+        const merged: MapboxSuggestion[] = []
+        for (const s of [...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromNominatim]) {
+          const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`
+          if (key && !seen.has(key) && s.name) {
+            seen.add(key)
+            merged.push(s)
+          }
+        }
+
+        setSuggestions(merged.slice(0, 15))
+        setIsOpen(true)
       } catch (err) {
         console.error('[AddressAutocomplete] Suggest error:', err)
         setSuggestions([])
@@ -127,12 +258,22 @@ export default function AddressAutocomplete({
 
   const handleSelectSuggestion = useCallback(
     async (suggestion: MapboxSuggestion) => {
-      setQuery(suggestion.full_address || suggestion.name)
+      const address = suggestion.full_address || suggestion.name
+      setQuery(address)
       setIsOpen(false)
       setSuggestions([])
 
+      // Coordonnées directes (Overpass, Geocode, Nominatim) : pas d'appel retrieve
+      if (suggestion.coordinates) {
+        onChange(address, {
+          latitude: suggestion.coordinates.lat,
+          longitude: suggestion.coordinates.lng,
+        })
+        return
+      }
+
       if (!accessToken) {
-        onChange(suggestion.full_address || suggestion.name)
+        onChange(address)
         return
       }
 
@@ -147,7 +288,6 @@ export default function AddressAutocomplete({
         const data = await res.json()
 
         const feature = data?.features?.[0] as MapboxRetrieveFeature | undefined
-        const address = suggestion.full_address || suggestion.name
         let coordinates: { latitude: number; longitude: number } | undefined
 
         if (feature?.geometry?.coordinates) {
@@ -163,7 +303,7 @@ export default function AddressAutocomplete({
         onChange(address, coordinates)
       } catch (err) {
         console.error('[AddressAutocomplete] Retrieve error:', err)
-        onChange(suggestion.full_address || suggestion.name)
+        onChange(address)
       }
     },
     [accessToken, sessionToken, onChange]

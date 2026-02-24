@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* eslint-env node */
+/* global __dirname */
 /**
  * Supprime Assets.car des outputPaths de [CP] Copy Pods Resources
  * pour corriger l'erreur "Multiple commands produce Assets.car"
@@ -17,8 +19,8 @@ if (!fs.existsSync(pbxPath)) {
 let content = fs.readFileSync(pbxPath, 'utf8');
 
 // Supprimer la ligne Assets.car des outputPaths dans [CP] Copy Pods Resources
-// Match line: tabs/spaces + "....Assets.car",
-const assetsCarLine = /^\s*"[^"]*Assets\.car",\r?\n/gm;
+// Match line with Assets.car in outputPaths (various path formats)
+const assetsCarLine = /^\s*"[^"]*Assets\.car",?\s*\r?\n/gm;
 const newContent = content.replace(assetsCarLine, '');
 if (newContent !== content) {
   fs.writeFileSync(pbxPath, newContent);

@@ -23,9 +23,11 @@ import { useMapCamera } from '../../hooks/useMapCamera';
 import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
 import { useAnimatedPosition } from '../../hooks/useAnimatedPosition';
 import { useGeofencing } from '../../hooks/useGeofencing';
+import { calculateDistance, GEOFENCE_RADIUS } from '../../utils/geofencingUtils';
 import MessageBottomSheet from "../../components/MessageBottomSheet";
 import { MapboxNavigationScreen } from "../../components/MapboxNavigationScreen";
 import { formatUserName } from '../../utils/formatName';
+import * as Speech from 'expo-speech';
 
 export default function Index() {
   const { setHideTabBar } = useUIStore();
@@ -301,6 +303,11 @@ export default function Index() {
     // Phase 2 : transition vers picked_up (colis récupéré → navigation vers livraison)
     if ((status === 'picked_up' || status === 'delivering') && (prevStatus === 'enroute' || prevStatus === 'in_progress')) {
       logger.info('Auto-démarrage navigation phase 2 (adresse de livraison)', 'driver-index');
+      // Annonce vocale personnalisée : "Colis pris en charge, nous pouvons entamer la course"
+      Speech.speak('Colis pris en charge. Nous pouvons entamer la course.', {
+        language: 'fr-FR',
+        rate: 0.9,
+      });
       setIsNavigationActive(true);
     }
   }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination]);
@@ -328,6 +335,28 @@ export default function Index() {
       logger.info('Livraison validée automatiquement', 'geofencing');
     },
   });
+
+  // Auto-transition picked_up → delivering quand le livreur quitte la zone de collecte
+  // (1 clic obligatoire : "Je pars" — le reste est automatique)
+  const hasAutoTransitionedToDeliveringRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentOrder?.id) {
+      hasAutoTransitionedToDeliveringRef.current = null;
+      return;
+    }
+    if (!location || !currentPickupCoord || !isOnline) return;
+    const status = String(currentOrder.status || '');
+    if (status !== 'picked_up') {
+      hasAutoTransitionedToDeliveringRef.current = null;
+      return;
+    }
+    const dist = calculateDistance(location, currentPickupCoord);
+    if (dist > GEOFENCE_RADIUS && hasAutoTransitionedToDeliveringRef.current !== currentOrder.id) {
+      hasAutoTransitionedToDeliveringRef.current = currentOrder.id;
+      logger.info('Départ du point de collecte détecté → En cours de livraison', 'driver-index');
+      orderSocketService.updateDeliveryStatus(currentOrder.id, 'delivering', location);
+    }
+  }, [currentOrder?.id, currentOrder?.status, location, currentPickupCoord, isOnline]);
 
   
   // Route animée vers la destination
@@ -459,7 +488,7 @@ export default function Index() {
       Alert.alert(
         "Erreur de localisation", 
         "Impossible de vous mettre en ligne sans accès à votre localisation.",
-        [{ text: "OK" }]
+        [{ text: "Fermer" }]
       );
       return;
     }
@@ -502,7 +531,7 @@ export default function Index() {
             Alert.alert(
               "Erreur de synchronisation",
               result.message || "Impossible de synchroniser votre statut avec le serveur.",
-              [{ text: "OK" }]
+              [{ text: "Fermer" }]
             );
           }
         } else {
@@ -524,7 +553,7 @@ export default function Index() {
           Alert.alert(
             "Erreur",
             "Impossible de synchroniser votre statut avec le serveur.",
-            [{ text: "OK" }]
+            [{ text: "Fermer" }]
           );
         }
       });
@@ -857,7 +886,6 @@ export default function Index() {
               const dropoffCoord = resolveCoords(currentOrder.dropoff);
               await orderSocketService.updateDeliveryStatus(currentOrder.id, status, location);
               if (location && dropoffCoord) {
-                // Animation gérée par useAnimatedPosition
                 setTimeout(() => {
                   animatedRoute.refetch();
                   fitToRoute();
@@ -874,6 +902,10 @@ export default function Index() {
               ? () => setIsNavigationActive(true)
               : undefined
           }
+          onCancelOrder={() => {
+            setIsNavigationActive(false);
+            orderSocketService.updateDeliveryStatus(currentOrder.id, 'cancelled', location);
+          }}
         />
       )}
 
@@ -894,10 +926,12 @@ export default function Index() {
         <MapboxNavigationScreen
           origin={location}
           destination={destination}
-          onArrive={() => {
-            setIsNavigationActive(false);
-          }}
+          onArrive={() => setIsNavigationActive(false)}
           onCancel={() => setIsNavigationActive(false)}
+          onMessagePress={() => setShowMessageBottomSheet(true)}
+          onSettingsPress={() => {
+            // Paramètres navigation - pourrait ouvrir un modal
+          }}
         />
       )}
 

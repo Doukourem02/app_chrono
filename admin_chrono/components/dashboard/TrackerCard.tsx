@@ -13,10 +13,11 @@ import { themeColors } from '@/utils/theme'
 
 const statusSteps: Array<{ key: string; label: string }> = [
   { key: 'pending', label: 'Commande créée' },
-  { key: 'accepted', label: 'Driver assigné' },
-  { key: 'enroute', label: 'Driver en route' },
-  { key: 'picked_up', label: 'Colis récupéré' },
-  { key: 'completed', label: 'Livraison terminée' },
+  { key: 'accepted', label: 'Livreur assigné' },
+  { key: 'enroute', label: 'Livreur en route pour récupérer le colis' },
+  { key: 'picked_up', label: 'Colis pris en charge' },
+  { key: 'delivering', label: 'En cours de livraison' },
+  { key: 'completed', label: 'Colis livré' },
 ]
 
 interface TrackerCardProps {
@@ -82,10 +83,11 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     { label: string; backgroundColor: string; color: string }
   > = {
     pending: { label: 'En attente', backgroundColor: '#FEF3C7', color: '#D97706' },
-    accepted: { label: 'Acceptée', backgroundColor: '#E0E7FF', color: '#4338CA' },
-    enroute: { label: 'En route', backgroundColor: '#DBEAFE', color: '#1D4ED8' },
-    picked_up: { label: 'Pris en charge', backgroundColor: '#E0F2FE', color: '#0369A1' },
-    completed: { label: 'Livrée', backgroundColor: '#DCFCE7', color: '#166534' },
+    accepted: { label: 'Livreur assigné', backgroundColor: '#E0E7FF', color: '#4338CA' },
+    enroute: { label: 'En route pour récupérer', backgroundColor: '#DBEAFE', color: '#1D4ED8' },
+    picked_up: { label: 'Colis pris en charge', backgroundColor: '#E0F2FE', color: '#0369A1' },
+    delivering: { label: 'En cours de livraison', backgroundColor: '#E9D5FF', color: '#7C3AED' },
+    completed: { label: 'Colis livré', backgroundColor: '#DCFCE7', color: '#166534' },
     cancelled: { label: 'Annulée', backgroundColor: '#FEE2E2', color: '#B91C1C' },
     declined: { label: 'Refusée', backgroundColor: '#FEE2E2', color: '#B91C1C' },
   }
@@ -117,12 +119,19 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     }).format(date)
   }
 
-  const currentStepIndex = activeDelivery
-    ? Math.max(
-        statusSteps.findIndex((step) => step.key === activeDelivery.status),
-        0
-      )
+  const statusToStepIndex: Record<string, number> = {
+    pending: 0,
+    accepted: 1,
+    enroute: 2,
+    in_progress: 2,
+    picked_up: 3,
+    delivering: 4,
+    completed: 5,
+  }
+  const rawIndex = activeDelivery
+    ? (statusToStepIndex[activeDelivery.status] ?? statusSteps.findIndex((s) => s.key === activeDelivery.status))
     : 0
+  const currentStepIndex = Math.max(0, Math.min(rawIndex, statusSteps.length - 1))
 
   const timelineItems = statusSteps.map((step, index) => ({
     ...step,

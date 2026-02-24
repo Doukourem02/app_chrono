@@ -36,22 +36,27 @@ const statusConfig: Record<
     color: "#EA580C",
   },
   accepted: {
-    label: "Accepted",
+    label: "Livreur assigné",
     backgroundColor: "#DBEAFE",
     color: "#2563EB",
   },
   enroute: {
-    label: "On Progress",
+    label: "En route pour récupérer",
     backgroundColor: "#DBEAFE",
     color: "#2563EB",
   },
   picked_up: {
-    label: "Picked Up",
+    label: "Colis pris en charge",
     backgroundColor: "#F3E8FF",
     color: "#9333EA",
   },
+  delivering: {
+    label: "En cours de livraison",
+    backgroundColor: "#E9D5FF",
+    color: "#7C3AED",
+  },
   completed: {
-    label: "Delivered",
+    label: "Colis livré",
     backgroundColor: "#D1FAE5",
     color: "#16A34A",
   },
@@ -92,6 +97,7 @@ export default function OrdersPage() {
         accepted: "onProgress",
         enroute: "onProgress",
         picked_up: "onProgress",
+        delivering: "onProgress",
         completed: "successful",
         cancelled: "canceled",
         canceled: "canceled",
@@ -729,6 +735,7 @@ export default function OrdersPage() {
                             "accepted",
                             "enroute",
                             "picked_up",
+                            "delivering",
                           ].includes(order.status.toLowerCase()) && (
                             <button
                               onClick={(e) => {

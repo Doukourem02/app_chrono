@@ -251,7 +251,7 @@ export default function ProfilePage() {
           `Continuez à offrir un excellent service pour maintenir une note élevée !`,
           [
             { text: 'Rafraîchir', onPress: () => loadStatistics() },
-            { text: 'OK' }
+            { text: 'Fermer' }
           ]
         );
       },
@@ -381,7 +381,7 @@ export default function ProfilePage() {
                   Alert.alert(
                     'Erreur',
                     result.message || 'Impossible de synchroniser votre statut avec le serveur.',
-                    [{ text: 'OK' }]
+                    [{ text: 'Fermer' }]
                   );
                 }
               } catch (error) {

@@ -336,40 +336,15 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   }),
 
   cancelOrder: (orderId) => set((state) => {
-    // Trouver la commande pour vérifier si elle était acceptée
-    const activeOrder = state.activeOrders.find(o => o.id === orderId);
-
-    const wasAccepted = activeOrder && (
-      activeOrder.status === 'accepted' ||
-      activeOrder.status === 'enroute' ||
-      activeOrder.status === 'picked_up' ||
-      activeOrder.status === 'delivering' ||
-      activeOrder.status === 'in_progress'
-    );
-
     const updatedHistory = state.orderHistory.map(order =>
       order.id === orderId ? { ...order, status: 'cancelled' as OrderStatus } : order
     );
 
-    // Si la commande était acceptée, la garder dans activeOrders avec le statut 'cancelled'
-    // pour que le livreur puisse toujours la voir
-    // Sinon, la retirer normalement
-    if (wasAccepted) {
-      const updatedActive = state.activeOrders.map(order =>
-        order.id === orderId ? { ...order, status: 'cancelled' as OrderStatus } : order
-      );
-
-      return {
-        activeOrders: updatedActive,
-        pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
-        orderHistory: updatedHistory,
-      };
-    }
-
-    // Si c'était une commande pending, la retirer normalement
+    // Retirer la commande annulée de partout - ne plus l'afficher au livreur
     return {
       activeOrders: state.activeOrders.filter(o => o.id !== orderId),
       pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
+      selectedOrderId: state.selectedOrderId === orderId ? null : state.selectedOrderId,
       orderHistory: updatedHistory,
     };
   }),

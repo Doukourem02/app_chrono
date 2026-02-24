@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* eslint-env node */
+/* global __dirname */
 /**
  * Patch MapboxNavigation UIImage.swift to avoid crash when bundle assets are missing.
  * Crash: assertionFailure in locationImage -> ResumeButton -> NavigationView
@@ -34,9 +36,35 @@ const helper = `    private static func mapboxNavigationImage(named name: String
         let size = CGSize(width: 24, height: 24)
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { ctx in
-            UIColor.systemBlue.setFill()
-            ctx.cgContext.fillEllipse(in: CGRect(origin: .zero, size: size))
-        }
+            let rect = CGRect(origin: .zero, size: size)
+            UIColor.clear.setFill()
+            ctx.cgContext.fill(rect)
+            UIColor.white.setStroke()
+            UIColor.white.setFill()
+            ctx.cgContext.setLineWidth(2)
+            let center = CGPoint(x: size.width/2, y: size.height/2)
+            if name.lowercased().contains("zoom") && name.lowercased().contains("in") {
+                ctx.cgContext.strokeEllipse(in: rect.insetBy(dx: 4, dy: 4))
+                ctx.cgContext.move(to: CGPoint(x: center.x, y: center.y - 6))
+                ctx.cgContext.addLine(to: CGPoint(x: center.x, y: center.y + 6))
+                ctx.cgContext.move(to: CGPoint(x: center.x - 6, y: center.y))
+                ctx.cgContext.addLine(to: CGPoint(x: center.x + 6, y: center.y))
+                ctx.cgContext.strokePath()
+            } else if name.lowercased().contains("zoom") && name.lowercased().contains("out") {
+                ctx.cgContext.strokeEllipse(in: rect.insetBy(dx: 4, dy: 4))
+                ctx.cgContext.move(to: CGPoint(x: center.x - 6, y: center.y))
+                ctx.cgContext.addLine(to: CGPoint(x: center.x + 6, y: center.y))
+                ctx.cgContext.strokePath()
+            } else if name.lowercased().contains("location") || name.lowercased().contains("recenter") || name.lowercased().contains("compass") {
+                ctx.cgContext.strokeEllipse(in: rect.insetBy(dx: 4, dy: 4))
+                ctx.cgContext.move(to: CGPoint(x: center.x, y: center.y - 4))
+                ctx.cgContext.addLine(to: CGPoint(x: center.x, y: center.y + 6))
+                ctx.cgContext.strokePath()
+            } else {
+                UIColor.systemBlue.setFill()
+                ctx.cgContext.fillEllipse(in: rect.insetBy(dx: 2, dy: 2))
+            }
+        }.withRenderingMode(.alwaysTemplate)
     }
 
 `;

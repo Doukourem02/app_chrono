@@ -30,6 +30,8 @@ interface DriverOrderBottomSheetProps {
   onMessage?: () => void;
   /** Ouvre la navigation intégrée (Mapbox) vers pickup ou dropoff selon le statut */
   onStartNavigation?: () => void;
+  /** Annule la course en cours (avec confirmation) */
+  onCancelOrder?: () => void;
 }
 
 const resolveCoords = (candidate?: any): { latitude: number; longitude: number } | null => {
@@ -58,6 +60,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   location,
   onMessage,
   onStartNavigation,
+  onCancelOrder,
 }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('details');
@@ -83,7 +86,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
         Alert.alert(
           'QR Code invalide',
           result.error || 'Le QR code scanné n\'est pas valide pour cette commande',
-          [{ text: 'OK', onPress: () => setShowQRScanner(false) }]
+          [{ text: 'Fermer', onPress: () => setShowQRScanner(false) }]
         );
       }
     } catch (error: any) {
@@ -99,15 +102,17 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     }
   };
 
-  // Déterminer les actions disponibles selon le statut
-  // Doit être appelé avant tout return conditionnel pour respecter les règles des hooks
+  // Un seul bouton "Départ" : tout le reste se fait par géofencing
+  // - accepted → "Je pars" (obligatoire pour activer le géofencing)
+  // - Colis récupéré, Terminé → détection auto par géofencing (zone pickup/dropoff)
+  // - Scanner QR : optionnel à l'arrivée (gardé pour preuve de livraison)
   const availableActions = useMemo(() => {
     if (!currentOrder) return [];
-    
     const status = String(currentOrder.status);
     const actions = [];
-    
-    // Étape 1: "Je pars" - disponible uniquement si statut est 'accepted'
+
+    // Seul bouton manuel : "Je pars" (Départ) — obligatoire pour passer à enroute
+    // Sans ça, le géofencing reste désactivé (évite validation prématurée)
     if (status === 'accepted') {
       actions.push({
         id: 'enroute',
@@ -118,54 +123,17 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
       });
     }
 
-    // Étape 2: "Colis récupéré" - disponible uniquement si statut est 'enroute' (pas 'accepted')
-    // Cela force le livreur à cliquer sur "Je pars" avant de pouvoir récupérer le colis
-    if (status === 'enroute' || status === 'in_progress') {
-      actions.push({
-        id: 'picked_up',
-        label: 'Colis récupéré',
-        icon: 'cube-outline',
-        color: '#F59E0B',
-        onPress: () => onUpdateStatus('picked_up'),
-      });
-    }
-
-    // Étape 3: "En cours de livraison" - disponible si statut est 'picked_up'
-    // Cette étape intermédiaire est nécessaire avant de terminer
-    if (status === 'picked_up') {
-      actions.push({
-        id: 'delivering',
-        label: 'En cours de livraison',
-        icon: 'bicycle-outline',
-        color: '#8B5CF6',
-        onPress: () => onUpdateStatus('delivering'),
-      });
-    }
-
-    // Scanner QR Code - disponible si statut est 'picked_up' ou 'delivering'
+    // Scanner QR : optionnel à l'arrivée (preuve de livraison)
     if (status === 'picked_up' || status === 'delivering') {
       actions.push({
         id: 'scan_qr',
-        label: 'Scanner QR Code',
+        label: 'Scanner QR',
         icon: 'qr-code-outline',
         color: '#6366F1',
         onPress: () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           setShowQRScanner(true);
         },
-      });
-    }
-
-    // Étape 4: "Terminé" - disponible uniquement si statut est 'delivering'
-    // Cela force le livreur à passer par l'étape "En cours de livraison" avant de terminer
-    // Note: Le scan QR code met automatiquement le statut à 'completed'
-    if (status === 'delivering' || status === 'in_progress') {
-      actions.push({
-        id: 'completed',
-        label: 'Terminé',
-        icon: 'checkmark-circle-outline',
-        color: '#10B981',
-        onPress: () => onUpdateStatus('completed'),
       });
     }
 
@@ -229,6 +197,24 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     }
   };
 
+  const handleCancelOrder = () => {
+    Alert.alert(
+      'Annuler la course',
+      'Êtes-vous sûr de vouloir annuler cette course ? Le client sera notifié.',
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Oui, annuler',
+          style: 'destructive',
+          onPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onCancelOrder?.();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Animated.View
       {...panResponder.panHandlers}
@@ -258,9 +244,11 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   {currentOrder.dropoff.address || 'Adresse de livraison'}
                 </Text>
                 <Text style={styles.collapsedSubtitle}>
-                  {availableActions.length > 0 
-                    ? `${availableActions.length} action${availableActions.length > 1 ? 's' : ''} pour cette commande`
-                    : 'Livraison en cours'}
+                  {String(currentOrder.status) === 'accepted'
+                    ? 'Appuyez sur Départ pour commencer'
+                    : String(currentOrder.status) === 'picked_up' || String(currentOrder.status) === 'delivering'
+                      ? 'Suivi automatique — Arrivée détectée par géofencing'
+                      : 'Livraison en cours'}
                 </Text>
               </View>
             </View>
@@ -282,6 +270,14 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   <Ionicons name={action.icon as any} size={18} color="#fff" />
                 </TouchableOpacity>
               ))}
+              {onCancelOrder && (
+                <TouchableOpacity
+                  style={[styles.collapsedActionButton, styles.cancelActionButton]}
+                  onPress={handleCancelOrder}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -398,6 +394,14 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                       ))}
                     </View>
                   </View>
+                )}
+
+                {/* Annuler la course */}
+                {onCancelOrder && (
+                  <TouchableOpacity style={styles.cancelOrderButton} onPress={handleCancelOrder}>
+                    <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
+                    <Text style={styles.cancelOrderButtonText}>Annuler la course</Text>
+                  </TouchableOpacity>
                 )}
 
                 {/* Point de collecte - visible en phase 1 (avant récupération du colis) */}
@@ -648,6 +652,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cancelActionButton: {
+    backgroundColor: '#EF4444',
+  },
   expandedCard: {
     width: '92%',
     backgroundColor: '#fff',
@@ -772,6 +779,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  cancelOrderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+  },
+  cancelOrderButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
   },
   addressCard: {
     backgroundColor: '#F9FAFB',

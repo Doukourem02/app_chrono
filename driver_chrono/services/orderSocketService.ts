@@ -363,7 +363,7 @@ class OrderSocketService {
           Alert.alert(
             'Session expirée',
             'Votre session a expiré. Veuillez vous reconnecter.',
-            [{ text: 'OK' }]
+            [{ text: 'Fermer' }]
           );
           return;
         }
@@ -446,12 +446,9 @@ class OrderSocketService {
     useOrderStore.getState().updateOrderStatus(orderId, status as any);
 
     // Si le driver marque la commande comme complétée, la déplacer vers l'historique / vider currentOrder
-    // pour que la carte et l'UI reviennent à un état normal (sans marqueurs/lignes restants) immédiatement
     if (String(status) === 'completed') {
       try {
         useOrderStore.getState().completeOrder(orderId);
-        
-        // Jouer le son de commande complétée
         soundService.initialize().then(() => {
           soundService.playOrderCompleted();
         }).catch((err) => {
@@ -459,6 +456,15 @@ class OrderSocketService {
         });
       } catch (err) {
         logger.warn('Failed to complete order locally', undefined, err);
+      }
+    }
+
+    // Si le driver annule la course, retirer de activeOrders
+    if (String(status) === 'cancelled') {
+      try {
+        useOrderStore.getState().cancelOrder(orderId);
+      } catch (err) {
+        logger.warn('Failed to cancel order locally', undefined, err);
       }
     }
   }

@@ -18,6 +18,8 @@ const getStatusColor = (status: string): string => {
       return '#8B5CF6'; 
     case 'picked_up':
       return '#10B981'; 
+    case 'delivering':
+      return '#059669'; 
     case 'completed':
       return '#6B7280'; 
     case 'cancelled':
@@ -33,13 +35,15 @@ const getStatusLabel = (status: string): string => {
     case 'pending':
       return 'En attente';
     case 'accepted':
-      return 'Acceptée';
+      return 'Livreur assigné';
     case 'enroute':
-      return 'En route';
+      return 'Livreur en route pour récupérer le colis';
     case 'picked_up':
-      return 'Récupérée';
+      return 'Colis pris en charge';
+    case 'delivering':
+      return 'En cours de livraison';
     case 'completed':
-      return 'Terminée';
+      return 'Colis livré';
     case 'cancelled':
       return 'Annulée';
     case 'declined':

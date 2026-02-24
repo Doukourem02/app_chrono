@@ -36,7 +36,7 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
         return updated
       } else {
         // Si la livraison n'existe pas, l'ajouter seulement si elle est en cours
-        if (['pending', 'accepted', 'enroute', 'picked_up'].includes(delivery.status)) {
+        if (['pending', 'accepted', 'enroute', 'picked_up', 'delivering'].includes(delivery.status)) {
           return [...prev, delivery]
         }
         return prev

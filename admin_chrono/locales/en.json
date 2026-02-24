@@ -97,12 +97,13 @@
       "drivers": "DRIVERS",
       "clients": "CLIENTS",
       "status": {
-        "completed": "Completed",
+        "completed": "Delivered",
         "pending": "Pending",
-        "accepted": "Accepted",
+        "accepted": "Driver assigned",
         "cancelled": "Cancelled",
-        "enroute": "En Route",
-        "picked_up": "Picked Up"
+        "enroute": "En route to pick up",
+        "picked_up": "Package picked up",
+        "delivering": "In delivery"
       },
       "client": "Client",
       "driver": "Driver",

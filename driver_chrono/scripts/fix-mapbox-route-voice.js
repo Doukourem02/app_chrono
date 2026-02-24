@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* eslint-env node */
+/* global __dirname */
 /**
  * Patch MapboxNavigation RouteVoiceController.swift to avoid crash when reroute-sound asset is missing.
  * Crash: NSDataAsset(name: "reroute-sound", bundle: .mapboxNavigation)! force unwrap

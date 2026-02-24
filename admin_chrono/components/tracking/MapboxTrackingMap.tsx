@@ -10,6 +10,7 @@ import { extractMapboxTrafficData, type TrafficData } from '@/utils/trafficUtils
 import { calculateDriverOffsets } from '@/utils/markerOffset'
 import { useAnimatedPosition } from '@/hooks/useAnimatedPosition'
 import { logger } from '@/utils/logger'
+import { searchOverpassPoi, type OverpassPoiResult } from '@/utils/overpassPoiSearch'
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest'
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve'
@@ -69,7 +70,7 @@ interface MapboxSuggestion {
   place_formatted: string
   /** Coordonnées directes (API Geocoding / Nominatim) - évite l'appel retrieve */
   coordinates?: { lat: number; lng: number }
-  source?: 'searchbox' | 'geocode' | 'nominatim'
+  source?: 'searchbox' | 'geocode' | 'nominatim' | 'overpass'
 }
 
 interface MapboxRetrieveFeature {
@@ -352,6 +353,12 @@ export default function MapboxTrackingMap({
           )
         )
 
+        // Overpass : POI OSM (pharmacies, restaurants, écoles, KFC, etc.) - Côte d'Ivoire
+        const overpassPromise = searchOverpassPoi(trimmed, { lat: 5.36, lng: -4.0083 }).catch((err) => {
+          logger.warn('[MapboxTrackingMap] Overpass non disponible:', err)
+          return [] as OverpassPoiResult[]
+        })
+
         // Nominatim en parallèle, ne pas faire échouer la recherche si bloqué (CSP, etc.)
         const nominatimQ = trimmed.toLowerCase().includes('abidjan') ? trimmed : `${trimmed}, Abidjan`
         const nominatimParams: Record<string, string> = {
@@ -372,13 +379,14 @@ export default function MapboxTrackingMap({
             return []
           })
 
-        const allFetches = [...fetches, nominatimPromise, ...structuredFetches]
+        const allFetches = [...fetches, overpassPromise, nominatimPromise, ...structuredFetches]
         const results = await Promise.all(allFetches)
         const suggestRes = results[0]
         const geocodeRes = results[1]
         const geocodeStreetRes = results[2]
-        const nominatimData = results[3]
-        const structuredRes = structuredFetches.length > 0 ? results[4] : null
+        const overpassData = results[3] as OverpassPoiResult[]
+        const nominatimData = results[4]
+        const structuredRes = structuredFetches.length > 0 ? results[5] : null
 
         const suggestData = await suggestRes.json()
         const geocodeData = await geocodeRes.json()
@@ -453,6 +461,17 @@ export default function MapboxTrackingMap({
           }
         }
 
+        // Overpass : POI OSM (pharmacies, restaurants, écoles, etc.)
+        const fromOverpass: MapboxSuggestion[] = (overpassData || []).map((o) => ({
+          name: o.name,
+          mapbox_id: o.mapbox_id,
+          feature_type: o.feature_type,
+          full_address: o.full_address,
+          place_formatted: o.place_formatted,
+          coordinates: o.coordinates,
+          source: 'overpass' as const,
+        }))
+
         // Nominatim (OSM) : quartiers, rues, POI visibles sur la carte
         const fromNominatim: MapboxSuggestion[] = (nominatimData || [])
           .filter((r: NominatimResult) => r.lat && r.lon && r.display_name)
@@ -468,15 +487,15 @@ export default function MapboxTrackingMap({
 
         const seen = new Set<string>()
         const merged: MapboxSuggestion[] = []
-        // Priorité : adresses structurées > rues > geocode > searchbox > Nominatim
-        for (const s of [...fromStructured, ...fromGeocodeStreet, ...fromGeocode, ...fromSearchBox, ...fromNominatim]) {
+        // Priorité : structurées > POI (searchbox + overpass) > geocode > rues > Nominatim
+        for (const s of [...fromStructured, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]) {
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`
           if (key && !seen.has(key) && s.name) {
             seen.add(key)
             merged.push(s)
           }
         }
-        setSearchSuggestions(merged.slice(0, 10))
+        setSearchSuggestions(merged.slice(0, 15))
       } catch (err) {
         logger.warn('[MapboxTrackingMap] Erreur suggest:', err)
         setSearchSuggestions([])

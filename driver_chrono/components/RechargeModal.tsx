@@ -66,7 +66,7 @@ export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }
           'Votre demande de recharge a été envoyée. Vous serez redirigé vers votre application de paiement.',
           [
             {
-              text: 'OK',
+              text: 'Fermer',
               onPress: () => {
                 setAmount('');
                 setSelectedMethod(null);

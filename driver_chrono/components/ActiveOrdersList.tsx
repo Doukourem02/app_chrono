@@ -89,9 +89,13 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({
     }
   };
 
+  // Exclure les commandes annulées/complétées de l'affichage
+  const validActive = activeOrders.filter(o => 
+    o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'declined'
+  );
   const allOrders = showPending 
-    ? [...pendingOrders, ...activeOrders]
-    : activeOrders;
+    ? [...pendingOrders, ...validActive]
+    : validActive;
 
   if (allOrders.length === 0) {
     return (
@@ -110,15 +114,13 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({
     if (a.status === 'pending' && b.status !== 'pending') return -1;
     if (a.status !== 'pending' && b.status === 'pending') return 1;
     
-    // Trier par statut (picked_up > enroute > accepted > cancelled)
-    // Les commandes annulées restent visibles mais en bas de la liste
+    // Trier par statut (picked_up > enroute > accepted)
     const statusPriority: Record<string, number> = {
       'picked_up': 4,
       'delivering': 4,
       'enroute': 3,
       'in_progress': 3,
       'accepted': 2,
-      'cancelled': 1, // Les commandes annulées restent visibles mais en bas
       'pending': 0,
     };
     
@@ -135,7 +137,6 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({
   });
 
   const sortedPending = sortedOrders.filter(o => o.status === 'pending');
-  // Inclure toutes les commandes non-pending, y compris les annulées
   const sortedActive = sortedOrders.filter(o => o.status !== 'pending');
 
   return (

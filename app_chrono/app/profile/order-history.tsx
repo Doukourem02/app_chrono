@@ -52,6 +52,15 @@ export default function OrderHistoryPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'pending':
+        return '#F59E0B';
+      case 'accepted':
+        return '#3B82F6';
+      case 'enroute':
+        return '#8B5CF6';
+      case 'picked_up':
+      case 'delivering':
+        return '#10B981';
       case 'completed':
         return '#10B981';
       case 'cancelled':
@@ -64,8 +73,18 @@ export default function OrderHistoryPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
+      case 'pending':
+        return 'En attente';
+      case 'accepted':
+        return 'Livreur assigné';
+      case 'enroute':
+        return 'Livreur en route pour récupérer le colis';
+      case 'picked_up':
+        return 'Colis pris en charge';
+      case 'delivering':
+        return 'En cours de livraison';
       case 'completed':
-        return 'Terminée';
+        return 'Colis livré';
       case 'cancelled':
         return 'Annulée';
       case 'declined':
