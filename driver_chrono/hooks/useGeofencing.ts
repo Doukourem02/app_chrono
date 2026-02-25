@@ -24,7 +24,8 @@ interface UseGeofencingOptions {
   orderStatus: string | null;
   enabled?: boolean;
   onEnteredZone?: () => void;
-  onValidated?: () => void;
+  /** Appelé après validation auto, avec le nouveau statut (picked_up ou completed) */
+  onValidated?: (newStatus: 'picked_up' | 'completed') => void;
 }
 
 /**
@@ -125,7 +126,7 @@ export function useGeofencing({
         status: GeofenceStatus.VALIDATED,
       }));
 
-      onValidatedRef.current?.();
+      onValidatedRef.current?.(newStatus as 'picked_up' | 'completed');
     },
     []
   );

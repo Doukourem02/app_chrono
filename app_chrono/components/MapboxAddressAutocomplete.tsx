@@ -15,6 +15,7 @@ import {
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { searchOverpassPoi, type OverpassPoiResult } from '../utils/overpassPoiSearch';
+import { searchCuratedPoi } from '../utils/poiAbidjan';
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest';
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
@@ -82,6 +83,50 @@ function generateSessionToken(): string {
 
 function isNumericQuery(q: string): boolean {
   return /^\d[\d\s]*$/.test(q.trim());
+}
+
+/** Exclut les lignes de bus (gbaka), routes de transport, résultats non pertinents (style Yango) */
+function shouldExcludeSuggestion(s: MapboxSuggestion, query: string): boolean {
+  const name = (s.name || '').toLowerCase();
+  const desc = (s.place_formatted || s.full_address || '').toLowerCase();
+  const combined = `${name} ${desc}`;
+
+  // Exclure lignes de bus / gbaka / abaka (pas des adresses livrables)
+  if (/(gbaka|abaka)\s*[:\s→]/i.test(combined)) return true;
+  if (/^gbaka\s|^abaka\s/i.test(name)) return true;
+  if (/[→↔].*[→↔]|liberté\s*→|azur\s*→|dokui\s*azur/i.test(combined)) return true;
+  if (/^\s*\w+\s*:\s*\w+\s*→\s*\w+/i.test(name)) return true; // "X : Y → Z" = ligne bus
+
+  // Exclure résultats "Zoo" non pertinents : pharmacie, station, etc. qui contiennent "zoo" dans le nom
+  const q = query.trim().toLowerCase();
+  if (q.includes('zoo')) {
+    const isNonZooWithZooInName =
+      (name.includes('pharmac') || name.includes('pharmacy') || name.includes('station') ||
+        name.includes('oil') || name.includes('gas') || name.includes('veterinary')) &&
+      name.includes('zoo');
+    if (isNonZooWithZooInName) return true;
+    // Exclure "ZOO, Avenue... Williamsville" (mauvais zoo)
+    if (name.includes('zoo') && desc.includes('williamsville')) return true;
+  }
+
+  return false;
+}
+
+/** Score de pertinence pour réordonner (Zoo d'Abidjan en premier, etc.) */
+function getRelevanceScore(s: MapboxSuggestion, query: string): number {
+  const name = (s.name || '').toLowerCase();
+  const desc = (s.place_formatted || s.full_address || '').toLowerCase();
+  const q = query.trim().toLowerCase();
+
+  if (q.includes('zoo')) {
+    if (name.includes('zoo d\'abidjan') && !name.includes('pharmacy')) return 100;
+    if (name.includes('zoo national')) return 95;
+    if (name.includes('zoo') && (desc.includes('route du zoo') || desc.includes('cocody'))) return 80;
+    if (name.includes('zoo') && desc.includes('williamsville')) return -50;
+    if (name.includes('pharmacy') || name.includes('station') || name.includes('oil')) return -100;
+  }
+
+  return 0;
 }
 
 /** Affiche "à proximité" au lieu de "Category" pour les POI (comme admin_chrono) */
@@ -290,16 +335,31 @@ export default function MapboxAddressAutocomplete({
           source: 'overpass' as const,
         }));
 
-        // Ordre de merge : POI (Search Box + Overpass) en premier, puis Geocode, rues, Nominatim
+        // POI curatés (O'Takkos, etc.) — toutes les succursales, style Yango
+        const curatedData = searchCuratedPoi(trimmed);
+        const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
+          name: p.name,
+          mapbox_id: `curated-${p.name.toLowerCase().replace(/\s/g, '-')}-${i}`,
+          feature_type: p.category,
+          full_address: p.full_address,
+          place_formatted: p.place_formatted + (p.hours ? ` · ${p.hours}` : '') + (p.phone ? ` · ${p.phone}` : ''),
+          coordinates: p.coordinates,
+          source: 'searchbox' as const,
+        }));
+
+        // Ordre de merge : curatés en premier, puis Search Box, Overpass, Geocode, Nominatim (100 % gratuit)
         const seen = new Set<string>();
         const merged: MapboxSuggestion[] = [];
-        for (const s of [...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]) {
+        for (const s of [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]) {
+          if (shouldExcludeSuggestion(s, trimmed)) continue;
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`;
           if (key && !seen.has(key) && s.name) {
             seen.add(key);
             merged.push(s);
           }
         }
+        // Réordonner : Zoo d'Abidjan en premier, etc. (style Yango)
+        merged.sort((a, b) => getRelevanceScore(b, trimmed) - getRelevanceScore(a, trimmed));
         setSuggestions(merged.slice(0, 15));
       } catch (err) {
         logger.error('Mapbox suggest error', 'MapboxAddressAutocomplete', err);
@@ -331,7 +391,7 @@ export default function MapboxAddressAutocomplete({
       setQuery(address);
       setSuggestions([]);
 
-      // Coordonnées directes (geocode/nominatim) : pas d'appel retrieve
+      // Coordonnées directes (geocode/nominatim/curated) : pas d'appel retrieve
       if (suggestion.coordinates) {
         onPlaceSelected({
           description: address,

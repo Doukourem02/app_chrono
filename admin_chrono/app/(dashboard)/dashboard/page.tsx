@@ -5,8 +5,9 @@ import DeliveryAnalytics from '@/components/dashboard/DeliveryAnalytics'
 import ActivityTable from '@/components/dashboard/ActivityTable'
 import TrackerCard from '@/components/dashboard/TrackerCard'
 import QuickMessage from '@/components/dashboard/QuickMessage'
-import { useQuery } from '@tanstack/react-query'
-import React, { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import React, { useState, useEffect } from 'react'
+import { adminSocketService } from '@/lib/adminSocketService'
 import { getDashboardStats } from '@/lib/dashboardApi'
 import { adminApiService } from '@/lib/adminApiService'
 import { Truck, ShieldCheck, DollarSign, Calendar, Star, Clock, XCircle, Users, UserCheck } from 'lucide-react'
@@ -20,10 +21,19 @@ import { themeColors } from '@/utils/theme'
 import { useTranslation } from '@/hooks/useTranslation'
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient()
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   const [isNewShippingModalOpen, setIsNewShippingModalOpen] = useState(false)
   const t = useTranslation()
+
+  // Rafraîchir les livraisons en cours dès qu'un statut change (sync temps réel)
+  useEffect(() => {
+    const unsubscribe = adminSocketService.on('order:status:update', () => {
+      queryClient.invalidateQueries({ queryKey: ['ongoing-delivery-card'] })
+    })
+    return () => unsubscribe()
+  }, [queryClient])
 
   const getPeriodLabel = () => {
     switch (dateFilter) {

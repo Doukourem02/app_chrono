@@ -22,11 +22,21 @@ import { useWeather } from '../hooks/useWeather';
 
 type Coords = { latitude: number; longitude: number };
 
+interface RouteProgressEvent {
+  nativeEvent?: {
+    durationRemaining?: number;
+    distanceRemaining?: number;
+    fractionTraveled?: number;
+    distanceTraveled?: number;
+  };
+}
+
 interface MapboxNavigationScreenProps {
   origin: Coords;
   destination: Coords;
   onArrive: () => void;
   onCancel: () => void;
+  onRouteProgressChange?: (event: RouteProgressEvent) => void;
   onMessagePress?: () => void;
   onSettingsPress?: () => void;
 }
@@ -50,12 +60,15 @@ export function MapboxNavigationScreen({
   destination,
   onArrive,
   onCancel,
+  onRouteProgressChange,
   onMessagePress,
   onSettingsPress,
 }: MapboxNavigationScreenProps) {
   const insets = useSafeAreaInsets();
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState<number | null>(null);
   const [navLocation, setNavLocation] = useState<Coords | null>(null);
+  // Attendre que le conteneur ait des dimensions avant d'afficher la carte (évite MapboxCommon "Invalid size 64x64")
+  const [mapLayout, setMapLayout] = useState<{ width: number; height: number } | null>(null);
 
   const { weather } = useWeather({
     latitude: navLocation?.latitude ?? null,
@@ -74,6 +87,13 @@ export function MapboxNavigationScreen({
     }
     if (ev?.latitude != null && ev?.longitude != null) {
       setNavLocation({ latitude: ev.latitude, longitude: ev.longitude });
+    }
+  }, []);
+
+  const handleMapLayout = useCallback((e: { nativeEvent: { layout: { width: number; height: number } } }) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width > 0 && height > 0) {
+      setMapLayout({ width, height });
     }
   }, []);
 
@@ -154,7 +174,8 @@ export function MapboxNavigationScreen({
   };
 
   return (
-    <View style={[StyleSheet.absoluteFill, styles.navContainer]}>
+    <View style={[StyleSheet.absoluteFill, styles.navContainer]} onLayout={handleMapLayout}>
+      {mapLayout && mapLayout.width > 64 && mapLayout.height > 64 ? (
       <MapboxNavigation
         style={styles.mapboxNav}
         origin={originArr}
@@ -163,11 +184,12 @@ export function MapboxNavigationScreen({
         showsEndOfRouteFeedback={false}
         hideStatusView={true}
         onLocationChange={handleLocationChange}
-        onRouteProgressChange={() => {}}
+        onRouteProgressChange={onRouteProgressChange}
         onError={handleError}
         onCancelNavigation={onCancel}
         onArrive={onArrive}
       />
+      ) : null}
       {/* Bouton Retour (gauche haut) */}
       <TouchableOpacity
         style={[styles.overlayBack, { top: insets.top + 8 }]}

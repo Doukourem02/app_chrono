@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert, Text } from "react-native";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator } from "react-native";
 import type { MapRefHandle } from "../../hooks/useMapCamera";
 import { DriverMapView } from "../../components/DriverMapView";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,11 +23,10 @@ import { useMapCamera } from '../../hooks/useMapCamera';
 import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
 import { useAnimatedPosition } from '../../hooks/useAnimatedPosition';
 import { useGeofencing } from '../../hooks/useGeofencing';
-import { calculateDistance, GEOFENCE_RADIUS } from '../../utils/geofencingUtils';
 import MessageBottomSheet from "../../components/MessageBottomSheet";
 import { MapboxNavigationScreen } from "../../components/MapboxNavigationScreen";
 import { formatUserName } from '../../utils/formatName';
-import * as Speech from 'expo-speech';
+import { speakAnnouncement } from '../../utils/speechAnnouncement';
 
 export default function Index() {
   const { setHideTabBar } = useUIStore();
@@ -256,6 +255,9 @@ export default function Index() {
   
   const userClosedBottomSheetRef = useRef(false);
   const lastOrderStatusRef = useRef<string | null>(null);
+  const [showRecalcOverlay, setShowRecalcOverlay] = useState(false);
+  // Commande terminée mais navigation gardée ouverte : le livreur quitte quand il veut
+  const [navigationCompletedOrder, setNavigationCompletedOrder] = useState<typeof currentOrder | null>(null);
 
   const getCurrentDestination = () => {
     if (!currentOrder || !location) return null;
@@ -275,6 +277,9 @@ export default function Index() {
   };
 
   const destination = getCurrentDestination();
+  // Ordre affiché en navigation : currentOrder ou commande terminée (reste jusqu'à fermeture manuelle)
+  const navDisplayOrder = currentOrder || navigationCompletedOrder;
+  const navDestination = destination || (navigationCompletedOrder ? resolveCoords(navigationCompletedOrder.dropoff) : null);
   const currentPickupCoord = currentOrder ? resolveCoords(currentOrder.pickup) : null;
   const currentDropoffCoord = currentOrder ? resolveCoords(currentOrder.dropoff) : null;
 
@@ -296,21 +301,41 @@ export default function Index() {
     lastOrderStatusRef.current = status;
 
     // Phase 1 : transition vers accepted (ouverture avec commande acceptée)
+    // Auto-enroute pour synchroniser app/admin : "Livreur en route pour récupérer le colis"
     if (status === 'accepted' && prevStatus !== 'accepted') {
       logger.info('Auto-démarrage navigation phase 1 (point de collecte)', 'driver-index');
       setIsNavigationActive(true);
+      if (location) {
+        setTimeout(() => {
+          orderSocketService.updateDeliveryStatus(currentOrder.id, 'enroute', location);
+        }, 600);
+      }
     }
     // Phase 2 : transition vers picked_up (colis récupéré → navigation vers livraison)
+    // Annonce faite dans onArrive si on était en navigation ; sinon (géofencing seul) on ouvre sans annonce
+    // Dès que la navigation vers la destination démarre → delivering pour synchroniser app/admin (En cours de livraison)
     if ((status === 'picked_up' || status === 'delivering') && (prevStatus === 'enroute' || prevStatus === 'in_progress')) {
       logger.info('Auto-démarrage navigation phase 2 (adresse de livraison)', 'driver-index');
-      // Annonce vocale personnalisée : "Colis pris en charge, nous pouvons entamer la course"
-      Speech.speak('Colis pris en charge. Nous pouvons entamer la course.', {
-        language: 'fr-FR',
-        rate: 0.9,
-      });
+      setShowRecalcOverlay(true);
+      if (!isNavigationActive) {
+        speakAnnouncement('Colis pris en charge. Nous pouvons entamer la course.');
+      }
       setIsNavigationActive(true);
+      // Synchroniser avec app_chrono/admin_chrono : "En cours de livraison" (délai pour laisser le backend traiter picked_up)
+      if (status === 'picked_up' && location) {
+        setTimeout(() => {
+          orderSocketService.updateDeliveryStatus(currentOrder.id, 'delivering', location);
+        }, 400);
+      }
     }
-  }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination]);
+  }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination, isNavigationActive]);
+
+  // Masquer l'overlay "Recalcul..." après 7 secondes (temps typique de chargement Mapbox)
+  useEffect(() => {
+    if (!showRecalcOverlay) return;
+    const t = setTimeout(() => setShowRecalcOverlay(false), 7000);
+    return () => clearTimeout(t);
+  }, [showRecalcOverlay]);
 
   // Géofencing : détection automatique d'arrivée
   // CRITIQUE : Désactiver le géofencing si le statut est 'accepted'
@@ -329,36 +354,64 @@ export default function Index() {
     orderStatus: currentOrder?.status || null,
     enabled: shouldEnableGeofencing,
     onEnteredZone: () => {
-      logger.info('Vous êtes arrivé dans la zone de livraison', 'geofencing');
+      logger.info('Vous êtes arrivé dans la zone', 'geofencing');
     },
-    onValidated: () => {
-      logger.info('Livraison validée automatiquement', 'geofencing');
+    onValidated: (newStatus) => {
+      logger.info('Validation automatique géofencing', 'geofencing', { newStatus });
+      const orderId = currentOrder?.id;
+      if (!orderId) return;
+      if (hasValidatedViaMapboxRef.current.has(orderId)) return;
+      if (newStatus === 'picked_up') {
+        speakAnnouncement('Vous êtes arrivés au point de collecte de colis.');
+        setTimeout(() => {
+          speakAnnouncement('Colis pris en charge. Nous pouvons entamer la course.');
+        }, 2000);
+      } else if (newStatus === 'completed') {
+        speakAnnouncement('Vous êtes arrivés à destination.');
+        if (currentOrder && isNavigationActive) {
+          setNavigationCompletedOrder(currentOrder);
+        }
+      }
     },
   });
 
-  // Auto-transition picked_up → delivering quand le livreur quitte la zone de collecte
-  // (1 clic obligatoire : "Je pars" — le reste est automatique)
-  const hasAutoTransitionedToDeliveringRef = useRef<string | null>(null);
+  const lastOnArrivePickupRef = useRef<{ orderId: string; ts: number } | null>(null);
+  const hasProcessedPickupArrivalRef = useRef<Set<string>>(new Set());
+  const hasValidatedViaMapboxRef = useRef<Set<string>>(new Set());
+  const lastEtaAnnouncedMinRef = useRef<number>(99); // Dernier seuil annoncé (3, 2 ou 1 min)
+
   useEffect(() => {
     if (!currentOrder?.id) {
-      hasAutoTransitionedToDeliveringRef.current = null;
-      return;
+      lastOnArrivePickupRef.current = null;
+      hasProcessedPickupArrivalRef.current.clear();
+      hasValidatedViaMapboxRef.current.clear();
+      lastEtaAnnouncedMinRef.current = 99;
     }
-    if (!location || !currentPickupCoord || !isOnline) return;
-    const status = String(currentOrder.status || '');
-    if (status !== 'picked_up') {
-      hasAutoTransitionedToDeliveringRef.current = null;
-      return;
-    }
-    const dist = calculateDistance(location, currentPickupCoord);
-    if (dist > GEOFENCE_RADIUS && hasAutoTransitionedToDeliveringRef.current !== currentOrder.id) {
-      hasAutoTransitionedToDeliveringRef.current = currentOrder.id;
-      logger.info('Départ du point de collecte détecté → En cours de livraison', 'driver-index');
-      orderSocketService.updateDeliveryStatus(currentOrder.id, 'delivering', location);
-    }
-  }, [currentOrder?.id, currentOrder?.status, location, currentPickupCoord, isOnline]);
+  }, [currentOrder?.id]); // Reset refs quand la commande change
 
-  
+  // Annonces pré-arrivée : "Arrivée à destination dans X minutes" (3, 2, 1 min)
+  const handleRouteProgressChange = useCallback((event: { nativeEvent?: { durationRemaining?: number }; durationRemaining?: number }) => {
+    const status = String(currentOrder?.status || '');
+    if (status !== 'picked_up' && status !== 'delivering') return;
+
+    const durationRemaining = event?.nativeEvent?.durationRemaining ?? event?.durationRemaining;
+    if (durationRemaining == null || durationRemaining <= 0) return;
+
+    const minsRemaining = Math.ceil(durationRemaining / 60);
+    const last = lastEtaAnnouncedMinRef.current;
+
+    if (minsRemaining <= 3 && last > 3) {
+      lastEtaAnnouncedMinRef.current = 3;
+      speakAnnouncement('Arrivée à destination dans 3 minutes.');
+    } else if (minsRemaining <= 2 && last > 2) {
+      lastEtaAnnouncedMinRef.current = 2;
+      speakAnnouncement('Arrivée à destination dans 2 minutes.');
+    } else if (minsRemaining <= 1 && last > 1) {
+      lastEtaAnnouncedMinRef.current = 1;
+      speakAnnouncement('Arrivée à destination dans 1 minute.');
+    }
+  }, [currentOrder?.status]);
+
   // Route animée vers la destination
   const animatedRoute = useAnimatedRoute({
     origin: location,
@@ -456,7 +509,12 @@ export default function Index() {
   }, [user?.id]);
 
   const handleAcceptOrder = (orderId: string) => {
+    // Mise à jour optimiste : afficher la commande et ouvrir la navigation immédiatement
+    useOrderStore.getState().acceptOrder(orderId, user?.id || '');
     orderSocketService.acceptOrder(orderId);
+    // Annonce vocale dès l'acceptation
+    speakAnnouncement('Course acceptée, en route pour récupérer le colis.');
+    setIsNavigationActive(true);
     // Émettre immédiatement la position pour que le client voie la route dès l'acceptation
     if (location) {
       orderSocketService.emitDriverLocation(orderId, location);
@@ -838,6 +896,8 @@ export default function Index() {
         </View>
       )}
 
+      {/* Menu Carte/Liste : uniquement quand il y a des commandes actives (évite apparition confuse après fin de course) */}
+      {activeOrders.length > 0 && (
       <View style={styles.floatingMenu}>
         <TouchableOpacity 
           style={[styles.menuButton, !ordersListIsExpanded && styles.activeButton]}
@@ -862,6 +922,7 @@ export default function Index() {
           )}
         </TouchableOpacity>
       </View>
+      )}
 
       {/* Les actions sont maintenant dans le DriverOrderBottomSheet */}
 
@@ -882,6 +943,9 @@ export default function Index() {
           isExpanded={orderBottomSheetIsExpanded}
           onToggle={toggleOrderBottomSheet}
           onUpdateStatus={async (status: string) => {
+            if (status === 'completed') {
+              speakAnnouncement('Vous êtes arrivés à destination.');
+            }
             if (status === 'picked_up') {
               const dropoffCoord = resolveCoords(currentOrder.dropoff);
               await orderSocketService.updateDeliveryStatus(currentOrder.id, status, location);
@@ -922,17 +986,64 @@ export default function Index() {
       )}
 
       {/* Navigation intégrée Mapbox (style Yango) - full screen */}
-      {isNavigationActive && currentOrder && location && destination && (
-        <MapboxNavigationScreen
-          origin={location}
-          destination={destination}
-          onArrive={() => setIsNavigationActive(false)}
-          onCancel={() => setIsNavigationActive(false)}
+      {/* Reste affichée après livraison (navDisplayOrder) jusqu'à fermeture manuelle par le livreur */}
+      {isNavigationActive && navDisplayOrder && location && navDestination && (
+        <View style={StyleSheet.absoluteFill}>
+          <MapboxNavigationScreen
+            key={`nav-${navDestination.latitude}-${navDestination.longitude}`}
+            origin={location}
+            destination={navDestination}
+          onArrive={() => {
+            const order = navDisplayOrder;
+            if (!order) return;
+            const status = String(order.status || '');
+            // Phase 1 : arrivée au point de collecte → mise à jour immédiate pour transition fluide
+            // (accepted/enroute/in_progress = en route vers pickup ; évite la boucle et le clic manuel)
+            if (status === 'accepted' || status === 'enroute' || status === 'in_progress') {
+              const now = Date.now();
+              const last = lastOnArrivePickupRef.current;
+              // Debounce 8s + éviter doublons si déjà traité pour cette commande
+              if (hasProcessedPickupArrivalRef.current.has(order.id)) return;
+              if (last?.orderId === order.id && now - last.ts < 8000) return;
+              lastOnArrivePickupRef.current = { orderId: order.id, ts: now };
+              hasProcessedPickupArrivalRef.current.add(order.id);
+
+              logger.info('Arrivée au point de collecte (Mapbox) → picked_up immédiat, recalcul route', 'driver-index');
+              hasValidatedViaMapboxRef.current.add(order.id);
+              orderSocketService.updateDeliveryStatus(order.id, 'picked_up', location);
+              speakAnnouncement('Vous êtes arrivés au point de collecte de colis.');
+              speakAnnouncement('Colis pris en charge. Nous pouvons entamer la course.');
+              // La destination change (pickup→dropoff), Mapbox re-embede automatiquement, navigation reste ouverte
+            }
+            // Phase 2 : arrivée à la destination de livraison → annonce puis compléter, navigation reste ouverte
+            else if (status === 'picked_up' || status === 'delivering') {
+              logger.info('Arrivée à la destination (Mapbox) → completed, navigation reste ouverte', 'driver-index');
+              hasValidatedViaMapboxRef.current.add(order.id);
+              speakAnnouncement('Vous êtes arrivés à destination.');
+              setNavigationCompletedOrder(order);
+              orderSocketService.updateDeliveryStatus(order.id, 'completed', location);
+              // Navigation reste affichée au point de livraison jusqu'à fermeture manuelle par le livreur
+            }
+          }}
+          onCancel={() => {
+            setShowRecalcOverlay(false);
+            setNavigationCompletedOrder(null);
+            setIsNavigationActive(false);
+          }}
+          onRouteProgressChange={handleRouteProgressChange}
           onMessagePress={() => setShowMessageBottomSheet(true)}
           onSettingsPress={() => {
             // Paramètres navigation - pourrait ouvrir un modal
           }}
         />
+          {/* Overlay "Recalcul..." pendant transition pickup→dropoff (masque latence chargement) */}
+          {showRecalcOverlay && (
+            <View style={styles.recalcOverlay} pointerEvents="none">
+              <ActivityIndicator size="large" color="#fff" />
+              <Text style={styles.recalcOverlayText}>Recalcul de l&apos;itinéraire vers la livraison...</Text>
+            </View>
+          )}
+        </View>
       )}
 
       {/* Message Bottom Sheet - Rendu en dernier pour être au-dessus */}
@@ -1048,5 +1159,19 @@ const styles = StyleSheet.create({
   actionText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  recalcOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  recalcOverlayText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 16,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });

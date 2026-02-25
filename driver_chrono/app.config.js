@@ -34,6 +34,7 @@ module.exports = {
       favicon: "./assets/images/favicon.png"
     },
     plugins: [
+      "expo-audio",
       "@driveapp/expo-plugin-pod-disable-paths",
       "./plugins/withMapboxToken.js",
       "./plugins/withPodfileAssetsCarFix.js",

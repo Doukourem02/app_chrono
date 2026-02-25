@@ -21,17 +21,32 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
   var navigationRouteOptions: NavigationRouteOptions!
   var embedded: Bool
   var embedding: Bool
+  private var lastEmbeddedDestination: (Double, Double)?
 
   @objc var origin: NSArray = [] {
     didSet { if origin.count == 2 && destination.count == 2 { requestRoute() } }
   }
   @objc var destination: NSArray = [] {
-    didSet { if origin.count == 2 && destination.count == 2 { requestRoute() } }
+    didSet {
+      guard origin.count == 2 && destination.count == 2 else { return }
+      let destLng = (destination[0] as? CLLocationDegrees) ?? 0
+      let destLat = (destination[1] as? CLLocationDegrees) ?? 0
+      if embedded || embedding {
+        let last = lastEmbeddedDestination
+        if last == nil || abs(last!.0 - destLng) > 0.00001 || abs(last!.1 - destLat) > 0.00001 {
+          reEmbedWithNewDestination()
+        }
+      } else {
+        requestRoute()
+      }
+    }
   }
   @objc var shouldSimulateRoute: Bool = false
   @objc var showsEndOfRouteFeedback: Bool = false
   @objc var hideStatusView: Bool = false
-  @objc var mute: Bool = false
+  @objc var mute: Bool = false {
+    didSet { NavigationSettings.shared.voiceMuted = mute }
+  }
 
   @objc var onLocationChange: RCTDirectEventBlock?
   @objc var onRouteProgressChange: RCTDirectEventBlock?
@@ -138,6 +153,10 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
         vc.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         vc.didMove(toParent: parentVC)
         strongSelf.navViewController = vc
+        strongSelf.lastEmbeddedDestination = (
+          (strongSelf.destination[0] as? CLLocationDegrees) ?? 0,
+          (strongSelf.destination[1] as? CLLocationDegrees) ?? 0
+        )
 
         // Masquer les boutons natifs (boussole, recentrer) et "Tun pada" (Reprendre)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -154,6 +173,23 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
 
   private func requestRoute() {
     if embedded || embedding { return }
+    embed()
+  }
+
+  /// Recalcule la route quand la destination change (ex: pickup → dropoff) sans fermer la navigation
+  private func reEmbedWithNewDestination() {
+    guard embedded, let vc = navViewController else { return }
+    let destLat = (destination[1] as? CLLocationDegrees) ?? 0
+    let destLng = (destination[0] as? CLLocationDegrees) ?? 0
+    if destLat == 0 && destLng == 0 { return }
+
+    lastEmbeddedDestination = nil
+    vc.willMove(toParent: nil)
+    vc.view.removeFromSuperview()
+    vc.removeFromParent()
+    navViewController = nil
+    embedded = false
+    embedding = false
     embed()
   }
 

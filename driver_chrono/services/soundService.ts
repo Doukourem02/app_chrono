@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 import { logger } from '../utils/logger';
 
 const SOUND_ENABLED_KEY = '@chrono_sound_enabled';
@@ -8,7 +9,7 @@ const SOUND_ENABLED_KEY = '@chrono_sound_enabled';
 const ORDER_COMPLETED_SOUND = require('../assets/sounds/ordercompleted.wav');
 
 class SoundService {
-  private orderCompletedSound: Audio.Sound | null = null;
+  private orderCompletedPlayer: AudioPlayer | null = null;
   private isInitialized = false;
   private soundEnabled = true;
 
@@ -20,15 +21,12 @@ class SoundService {
       const savedPreference = await AsyncStorage.getItem(SOUND_ENABLED_KEY);
       this.soundEnabled = savedPreference !== 'false';
 
-      // Charger le son
-      const { sound: completedSound } = await Audio.Sound.createAsync(ORDER_COMPLETED_SOUND);
-
-      this.orderCompletedSound = completedSound;
+      // Charger le son (expo-audio)
+      this.orderCompletedPlayer = createAudioPlayer(ORDER_COMPLETED_SOUND);
 
       // Configurer le mode audio
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
+      await setAudioModeAsync({
+        playsInSilentMode: true,
       });
 
       this.isInitialized = true;
@@ -50,12 +48,11 @@ class SoundService {
   }
 
   async playOrderCompleted() {
-    if (!this.soundEnabled || !this.orderCompletedSound) return;
+    if (!this.soundEnabled || !this.orderCompletedPlayer) return;
 
     try {
-      await this.orderCompletedSound.stopAsync();
-      await this.orderCompletedSound.setPositionAsync(0);
-      await this.orderCompletedSound.playAsync();
+      this.orderCompletedPlayer.seekTo(0);
+      this.orderCompletedPlayer.play();
     } catch (error) {
       logger.warn('[SoundService] Erreur lecture son commande complétée:', undefined, error);
     }
@@ -63,9 +60,9 @@ class SoundService {
 
   async cleanup() {
     try {
-      if (this.orderCompletedSound) {
-        await this.orderCompletedSound.unloadAsync();
-        this.orderCompletedSound = null;
+      if (this.orderCompletedPlayer) {
+        this.orderCompletedPlayer.release();
+        this.orderCompletedPlayer = null;
       }
       this.isInitialized = false;
     } catch (error) {

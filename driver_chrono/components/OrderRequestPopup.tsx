@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {View,Text,TouchableOpacity,StyleSheet,Animated,Dimensions,Image,StatusBar,} from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 import { AdminOrderInfo } from './AdminOrderInfo';
 import { logger } from '../utils/logger';
 
@@ -53,36 +53,10 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const timerAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const orderSoundPlayer = useAudioPlayer(ORDER_SOUND);
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [timeLeft, setTimeLeft] = React.useState(autoDeclineTimer);
-
-  // Charger le son une fois
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        const { sound } = await Audio.Sound.createAsync(ORDER_SOUND);
-        if (!isMounted) {
-          await sound.unloadAsync();
-          return;
-        }
-        soundRef.current = sound;
-        await sound.setVolumeAsync(1);
-        await sound.setPositionAsync(0);
-      } catch (err) {
-        logger.warn('[OrderRequestPopup] Impossible de charger le son', undefined, err);
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
-  }, []);
 
   // Animation d'entrée
   useEffect(() => {
@@ -97,17 +71,12 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
       // Haptic feedback
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       // Lecture du son de notification
-      (async () => {
-        try {
-          const sound = soundRef.current;
-          if (!sound) return;
-          await sound.stopAsync().catch(() => undefined);
-          await sound.setPositionAsync(0);
-          await sound.playAsync();
-        } catch (err) {
-          logger.warn('[OrderRequestPopup] Lecture son échouée', undefined, err);
-        }
-      })();
+      try {
+        orderSoundPlayer.seekTo(0);
+        orderSoundPlayer.play();
+      } catch (err) {
+        logger.warn('[OrderRequestPopup] Lecture son échouée', undefined, err);
+      }
 
       // Animation d'entrée sophistiquée
       Animated.parallel([

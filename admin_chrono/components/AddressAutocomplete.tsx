@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useMapbox } from '@/contexts/MapboxContext'
 import { searchOverpassPoi, type OverpassPoiResult } from '@/utils/overpassPoiSearch'
+import { searchCuratedPoi } from '@/utils/poiAbidjan'
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest'
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve'
@@ -209,6 +210,19 @@ export default function AddressAutocomplete({
           coordinates: o.coordinates,
           source: 'overpass',
         }))
+
+        // POI curatés (O'Takkos, etc.) — toutes les succursales, style Yango
+        const curatedData = searchCuratedPoi(trimmed)
+        const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
+          name: p.name,
+          mapbox_id: `curated-${p.name.toLowerCase().replace(/\s/g, '-')}-${i}`,
+          feature_type: p.category,
+          full_address: p.full_address,
+          place_formatted: p.place_formatted + (p.hours ? ` · ${p.hours}` : '') + (p.phone ? ` · ${p.phone}` : ''),
+          coordinates: p.coordinates,
+          source: 'searchbox',
+        }))
+
         const fromNominatim: MapboxSuggestion[] = (nominatimData || [])
           .filter((r: { lat?: string; lon?: string }) => r.lat && r.lon)
           .map((r: { place_id: string; lat: string; lon: string; display_name: string }) => ({
@@ -223,7 +237,7 @@ export default function AddressAutocomplete({
 
         const seen = new Set<string>()
         const merged: MapboxSuggestion[] = []
-        for (const s of [...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromNominatim]) {
+        for (const s of [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromNominatim]) {
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`
           if (key && !seen.has(key) && s.name) {
             seen.add(key)

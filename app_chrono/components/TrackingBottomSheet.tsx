@@ -137,8 +137,8 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       case 'enroute':
         return [0, 1];
       case 'picked_up':
-        return [0, 1, 2];
       case 'delivering':
+        // Colis pris en charge = déjà en cours de livraison (même étape pour le suivi)
         return [0, 1, 2, 3];
       case 'completed':
         return [0, 1, 2, 3, 4];

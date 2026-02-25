@@ -11,6 +11,7 @@ import { calculateDriverOffsets } from '@/utils/markerOffset'
 import { useAnimatedPosition } from '@/hooks/useAnimatedPosition'
 import { logger } from '@/utils/logger'
 import { searchOverpassPoi, type OverpassPoiResult } from '@/utils/overpassPoiSearch'
+import { searchCuratedPoi } from '@/utils/poiAbidjan'
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest'
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve'
@@ -472,6 +473,18 @@ export default function MapboxTrackingMap({
           source: 'overpass' as const,
         }))
 
+        // POI curatés (O'Takkos, etc.) — toutes les succursales, style Yango
+        const curatedData = searchCuratedPoi(trimmed)
+        const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
+          name: p.name,
+          mapbox_id: `curated-${p.name.toLowerCase().replace(/\s/g, '-')}-${i}`,
+          feature_type: p.category,
+          full_address: p.full_address,
+          place_formatted: p.place_formatted + (p.hours ? ` · ${p.hours}` : '') + (p.phone ? ` · ${p.phone}` : ''),
+          coordinates: p.coordinates,
+          source: 'searchbox' as const,
+        }))
+
         // Nominatim (OSM) : quartiers, rues, POI visibles sur la carte
         const fromNominatim: MapboxSuggestion[] = (nominatimData || [])
           .filter((r: NominatimResult) => r.lat && r.lon && r.display_name)
@@ -488,7 +501,7 @@ export default function MapboxTrackingMap({
         const seen = new Set<string>()
         const merged: MapboxSuggestion[] = []
         // Priorité : structurées > POI (searchbox + overpass) > geocode > rues > Nominatim
-        for (const s of [...fromStructured, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]) {
+        for (const s of [...fromCurated, ...fromStructured, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]) {
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`
           if (key && !seen.has(key) && s.name) {
             seen.add(key)

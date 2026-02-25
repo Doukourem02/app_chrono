@@ -124,7 +124,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     accepted: 1,
     enroute: 2,
     in_progress: 2,
-    picked_up: 3,
+    picked_up: 4, // Colis pris en charge = déjà en cours de livraison
     delivering: 4,
     completed: 5,
   }
