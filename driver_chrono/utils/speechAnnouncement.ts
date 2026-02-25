@@ -36,11 +36,19 @@ async function getFrenchFemaleVoice(): Promise<string | null> {
   return null;
 }
 
+export interface SpeakAnnouncementOptions {
+  /** Appelé quand l'annonce est terminée (permet de réactiver Mapbox après) */
+  onDone?: () => void;
+}
+
 /**
  * Parle le texte avec une voix féminine française.
  * Cohérent avec la navigation Mapbox (voix féminine forcée via fix-mapbox-voice-female.js).
  */
-export async function speakAnnouncement(text: string): Promise<void> {
+export async function speakAnnouncement(
+  text: string,
+  options?: SpeakAnnouncementOptions
+): Promise<void> {
   try {
     const Speech = await import('expo-speech');
     const voiceId = await getFrenchFemaleVoice();
@@ -48,9 +56,10 @@ export async function speakAnnouncement(text: string): Promise<void> {
       language: 'fr-FR',
       rate: 0.9,
       ...(voiceId && { voice: voiceId }),
+      onDone: options?.onDone,
     });
   } catch {
-    // no-op si module indisponible
+    options?.onDone?.();
   }
 }
 

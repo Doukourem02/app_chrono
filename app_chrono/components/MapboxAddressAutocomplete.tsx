@@ -85,6 +85,16 @@ function isNumericQuery(q: string): boolean {
   return /^\d[\d\s]*$/.test(q.trim());
 }
 
+/** Détecte si la requête ressemble à une recherche de rue/adresse (Rue L29, Avenue X, etc.) */
+function isStreetLikeQuery(q: string): boolean {
+  const t = q.trim().toLowerCase();
+  return (
+    /^(rue|avenue|av\.?|boulevard|bd|bd\.?|route|impasse|allée)\s+/i.test(t) ||
+    /^r\d+|^l\d+|^rue\s*l?\d+/i.test(t) ||
+    t.length >= 2 && /^[a-z]?\d+/.test(t)
+  );
+}
+
 /** Exclut les lignes de bus (gbaka), routes de transport, résultats non pertinents (style Yango) */
 function shouldExcludeSuggestion(s: MapboxSuggestion, query: string): boolean {
   const name = (s.name || '').toLowerCase();
@@ -186,51 +196,83 @@ export default function MapboxAddressAutocomplete({
       try {
         const baseParams = { country, language: 'fr', proximity };
         const extraTypes = isNumericQuery(trimmed) ? 'postcode,address' : undefined;
+        const streetLike = isStreetLikeQuery(trimmed);
 
-        // Appels parallèles : Search Box + Geocoding général + Geocoding rues/adresses
-        const fetches: Promise<Response>[] = [
-          fetch(
-            `${MAPBOX_SUGGEST_URL}?${new URLSearchParams({
-              q: trimmed,
-              access_token: accessToken,
-              session_token: sessionToken,
-              ...baseParams,
-              limit: '8',
-            })}`
-          ),
+        // Pour "Rue L29" etc. : prioriser Geocode (rues) + Nominatim, éviter Search Box (retourne districts/landmarks)
+        const streetTypes = extraTypes || 'street,address';
+
+        const fetches: Promise<Response>[] = [];
+        let suggestRes: Response | null = null;
+        let geocodeRes: Response | null = null;
+        let geocodeStreetRes: Response | null = null;
+
+        if (!streetLike) {
+          fetches.push(
+            fetch(
+              `${MAPBOX_SUGGEST_URL}?${new URLSearchParams({
+                q: trimmed,
+                access_token: accessToken,
+                session_token: sessionToken,
+                ...baseParams,
+                limit: '6',
+                types: streetTypes,
+              })}`
+            ).then((r) => {
+              suggestRes = r;
+              return r;
+            })
+          );
+        }
+
+        // Pour "Rue L29" : 1 seul appel Geocode (plus rapide), sinon 2 pour diversité
+        const geocodeQ = streetLike ? `${trimmed}, Abidjan` : trimmed;
+        fetches.push(
           fetch(
             `${MAPBOX_GEOCODE_URL}?${new URLSearchParams({
-              q: trimmed,
+              q: geocodeQ,
               access_token: accessToken,
               ...baseParams,
-              limit: '10',
+              limit: streetLike ? '15' : '6',
               autocomplete: 'true',
-              ...(extraTypes ? { types: extraTypes } : {}),
+              types: streetTypes,
             })}`
-          ),
-          fetch(
-            `${MAPBOX_GEOCODE_URL}?${new URLSearchParams({
-              q: trimmed,
-              access_token: accessToken,
-              ...baseParams,
-              limit: '8',
-              autocomplete: 'true',
-              types: extraTypes || 'street,address',
-            })}`
-          ),
-        ];
+          ).then((r) => {
+            geocodeRes = r;
+            return r;
+          })
+        );
 
-        // Overpass : POI OSM (pharmacies, restaurants, écoles, KFC, etc.) - Côte d'Ivoire
+        if (!streetLike) {
+          fetches.push(
+            fetch(
+              `${MAPBOX_GEOCODE_URL}?${new URLSearchParams({
+                q: `${trimmed}, Abidjan`,
+                access_token: accessToken,
+                ...baseParams,
+                limit: '6',
+                autocomplete: 'true',
+                types: streetTypes,
+              })}`
+            ).then((r) => {
+              geocodeStreetRes = r;
+              return r;
+            })
+          );
+        } else {
+          geocodeStreetRes = null;
+        }
+
         const [proxLng, proxLat] = proximity.split(',').map((x) => parseFloat(x.trim()));
-        const overpassPromise = searchOverpassPoi(
-          trimmed,
-          Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined
-        ).catch((err) => {
-          logger.warn('[MapboxAddressAutocomplete] Overpass non disponible:', err);
-          return [] as OverpassPoiResult[];
-        });
+        const overpassPromise = !streetLike
+          ? searchOverpassPoi(
+              trimmed,
+              Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined
+            ).catch((err) => {
+              logger.warn('[MapboxAddressAutocomplete] Overpass non disponible:', err);
+              return [] as OverpassPoiResult[];
+            })
+          : Promise.resolve([] as OverpassPoiResult[]);
 
-        // Nominatim : rues, quartiers, POI visibles sur la carte (comme admin)
         const nominatimQ = trimmed.toLowerCase().includes('abidjan') ? trimmed : `${trimmed}, Abidjan`;
         const nominatimPromise = fetch(
           `${NOMINATIM_URL}?${new URLSearchParams({
@@ -250,20 +292,17 @@ export default function MapboxAddressAutocomplete({
           });
 
         const results = await Promise.all([...fetches, overpassPromise, nominatimPromise]);
-        const suggestRes = results[0];
-        const geocodeRes = results[1];
-        const geocodeStreetRes = results[2];
-        const overpassData = results[3] as OverpassPoiResult[];
-        const nominatimData = results[4] as NominatimResult[];
+        const overpassData = results[results.length - 2] as OverpassPoiResult[];
+        const nominatimData = results[results.length - 1] as NominatimResult[];
 
-        const suggestData = await suggestRes.json();
-        const geocodeData = await geocodeRes.json();
-        const geocodeStreetData = await geocodeStreetRes.json();
-
+        const suggestData = suggestRes ? await (suggestRes as Response).json() : { suggestions: [] };
         const fromSearchBox: MapboxSuggestion[] = (suggestData?.suggestions || []).map((s: Record<string, unknown>) => ({
           ...s,
           source: 'searchbox' as const,
         })) as MapboxSuggestion[];
+
+        const geocodeData = geocodeRes ? await (geocodeRes as Response).json() : { features: [] };
+        const geocodeStreetData = geocodeStreetRes ? await (geocodeStreetRes as Response).json() : { features: [] };
 
         const parseGeocodeFeature = (f: GeocodeFeature): MapboxSuggestion | null => {
           const coords = f.geometry?.coordinates;
@@ -316,6 +355,7 @@ export default function MapboxAddressAutocomplete({
           .map(parseGeocodeFeature)
           .filter(Boolean) as MapboxSuggestion[];
 
+        // Pour requêtes type "Rue L29" : prioriser Geocode + Nominatim (rues réelles)
         const fromNominatim: MapboxSuggestion[] = (nominatimData || [])
           .filter((r: NominatimResult) => r.lat && r.lon && r.display_name)
           .map((r: NominatimResult) => ({
@@ -350,10 +390,12 @@ export default function MapboxAddressAutocomplete({
           source: 'searchbox' as const,
         }));
 
-        // Ordre de merge : curatés, Search Box, Overpass, Geocode, Nominatim
+        // Ordre de merge : pour "Rue L29" → Geocode rues + Nominatim en premier
         const seen = new Set<string>();
         const merged: MapboxSuggestion[] = [];
-        const sourcesToMerge = [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim];
+        const sourcesToMerge = streetLike
+          ? [...fromGeocodeStreet, ...fromGeocode, ...fromNominatim, ...fromCurated, ...fromSearchBox, ...fromOverpass]
+          : [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim];
         for (const s of sourcesToMerge) {
           if (shouldExcludeSuggestion(s, trimmed)) continue;
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`;
@@ -383,7 +425,7 @@ export default function MapboxAddressAutocomplete({
       if (debounceRef.current) clearTimeout(debounceRef.current);
       const minLen = isNumericQuery(text) ? 1 : 2;
       if (text.trim().length >= minLen) {
-        debounceRef.current = setTimeout(() => fetchSuggestions(text), 300);
+        debounceRef.current = setTimeout(() => fetchSuggestions(text), 450);
       }
     },
     [fetchSuggestions]
@@ -509,6 +551,7 @@ const styles = StyleSheet.create({
     width: '100%',
     position: 'relative',
     zIndex: 1000,
+    overflow: 'visible',
   },
   inputBox: {
     backgroundColor: '#f8f8f8',

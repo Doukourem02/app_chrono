@@ -123,12 +123,29 @@ io.use(async (socket, next) => {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
         const { data: { user }, error } = await supabase.auth.getUser(token);
         if (!error && user) {
-          const result = await (pool as any).query(
-            'SELECT id, role FROM users WHERE id = $1 OR email = $2',
-            [user.id, user.email ?? '']
-          );
-          if (result.rows.length > 0) {
-            const dbUser = result.rows[0];
+          let dbUser: { id: string; role: string } | null = null;
+
+          // Essayer PostgreSQL d'abord
+          try {
+            const result = await (pool as any).query(
+              'SELECT id, role FROM users WHERE id = $1 OR email = $2',
+              [user.id, user.email ?? '']
+            );
+            if (result.rows.length > 0) dbUser = result.rows[0];
+          } catch (_dbErr) {
+            // Fallback: requête via Supabase si PostgreSQL timeout/inaccessible
+            const orFilter = user.email
+              ? `id.eq.${user.id},email.eq.${user.email}`
+              : `id.eq.${user.id}`;
+            const { data: supabaseUser } = await supabase
+              .from('users')
+              .select('id, role')
+              .or(orFilter)
+              .single();
+            if (supabaseUser) dbUser = supabaseUser;
+          }
+
+          if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'super_admin')) {
             (socket.data as any).user = { id: dbUser.id, role: dbUser.role };
             (socket as any).userId = dbUser.id;
             (socket as any).userRole = dbUser.role;

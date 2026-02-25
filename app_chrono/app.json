@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.app-chrono"
+      "bundleIdentifier": "com.anonymous.app-chrono",
+      "infoPlist": {
+        "NSContactsUsageDescription": "Chrono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -39,6 +42,12 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Chrono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire."
         }
       ]
     ],

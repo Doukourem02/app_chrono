@@ -18,6 +18,7 @@ import { useMapLogic } from "../../hooks/useMapLogic";
 import { useOnlineDrivers } from "../../hooks/useOnlineDrivers";
 import { useMapPayment } from "../../hooks/useMapPayment";
 import { useMapOrderManagement } from "../../hooks/useMapOrderManagement";
+import { useOrderStatusPolling } from "../../hooks/useOrderStatusPolling";
 import { useMapUI } from "../../hooks/useMapUI";
 import { useMapNewOrder } from "../../hooks/useMapNewOrder";
 import { locationService } from "../../services/locationService";
@@ -73,6 +74,9 @@ export default function MapPage() {
       userOrderSocketService.disconnect();
     };
   }, [user?.id]);
+
+  // Polling de secours pour sync statut completed (si socket n'a pas transmis)
+  useOrderStatusPolling();
 
   useEffect(() => {
     if (user?.id) {

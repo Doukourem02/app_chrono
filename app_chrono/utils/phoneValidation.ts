@@ -27,5 +27,5 @@ export function isValidCIPhone(phone: string): boolean {
 export function getPhoneValidationError(phone: string): string | null {
   if (!phone || !phone.trim()) return null;
   if (isValidCIPhone(phone)) return null;
-  return 'Numéro invalide. Format attendu : 07 XX XX XX XX (Orange), 05 XX XX XX XX (MTN) ou 01 XX XX XX XX (Moov).';
+  return 'Numéro de téléphone invalide';
 }

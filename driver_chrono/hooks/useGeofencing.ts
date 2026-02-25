@@ -24,7 +24,11 @@ interface UseGeofencingOptions {
   orderStatus: string | null;
   enabled?: boolean;
   onEnteredZone?: () => void;
-  /** Appelé après validation auto, avec le nouveau statut (picked_up ou completed) */
+  /** Appelé quand le livreur entre dans la zone de pickup (pas de validation auto, le livreur clique "Colis récupéré") */
+  onEnteredPickupZone?: () => void;
+  /** Appelé quand le livreur entre dans la zone de dropoff → affiche bouton "Livraison effectuée" */
+  onEnteredDropoffZone?: () => void;
+  /** Appelé après validation auto pour completed uniquement (dropoff) */
   onValidated?: (newStatus: 'picked_up' | 'completed') => void;
 }
 
@@ -39,6 +43,8 @@ export function useGeofencing({
   orderStatus,
   enabled = true,
   onEnteredZone,
+  onEnteredPickupZone,
+  onEnteredDropoffZone,
   onValidated,
 }: UseGeofencingOptions) {
   const [geofenceState, setGeofenceState] = useState<GeofenceState>({
@@ -53,13 +59,16 @@ export function useGeofencing({
   const hasValidatedRef = useRef<boolean>(false);
   const lastDriverPositionRef = useRef<Coordinates | null>(null);
   const onEnteredZoneRef = useRef(onEnteredZone);
+  const onEnteredPickupZoneRef = useRef(onEnteredPickupZone);
+  const onEnteredDropoffZoneRef = useRef(onEnteredDropoffZone);
   const onValidatedRef = useRef(onValidated);
 
-  // Mettre à jour les refs des callbacks à chaque render
   useEffect(() => {
     onEnteredZoneRef.current = onEnteredZone;
+    onEnteredPickupZoneRef.current = onEnteredPickupZone;
+    onEnteredDropoffZoneRef.current = onEnteredDropoffZone;
     onValidatedRef.current = onValidated;
-  }, [onEnteredZone, onValidated]);
+  }, [onEnteredZone, onEnteredPickupZone, onEnteredDropoffZone, onValidated]);
 
   const driverPositionRef = useRef(driverPosition);
   
@@ -91,8 +100,10 @@ export function useGeofencing({
       }
       
       if (currentStatus === 'enroute' || currentStatus === 'in_progress') {
-        // Si en route vers le pickup, marquer comme picked_up
-        newStatus = 'picked_up';
+        // Pickup : pas de validation auto, le livreur clique "Colis récupéré"
+        logger.warn('Géofencing: Validation pickup ne doit pas être appelée (bouton manuel)', 'useGeofencing');
+        hasValidatedRef.current = false;
+        return;
       } else if (currentStatus === 'picked_up' || currentStatus === 'delivering') {
         // Si a déjà récupéré, marquer comme completed
         newStatus = 'completed';
@@ -217,23 +228,29 @@ export function useGeofencing({
         'useGeofencing'
       );
       
-      // Notifier le client via Socket.IO
       if (orderId) {
         orderSocketService.emitGeofenceEvent(orderId, 'entered', driverPosition);
       }
       
       onEnteredZoneRef.current?.();
 
-      // Programmer la validation automatique après 10 secondes
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current);
-      }
-
-      validationTimeoutRef.current = setTimeout(() => {
-        if (!hasValidatedRef.current && orderId) {
-          handleAutoValidate(orderId, orderStatus);
+      // Pickup : annonce + bouton "Colis récupéré" (pas de validation auto)
+      if (orderStatus === 'enroute' || orderStatus === 'in_progress') {
+        onEnteredPickupZoneRef.current?.();
+        // Ne pas programmer la validation
+      } else if (orderStatus === 'picked_up' || orderStatus === 'delivering') {
+        // Dropoff : bouton "Livraison effectuée" + validation auto après 10 secondes (backup)
+        onEnteredDropoffZoneRef.current?.();
+        // Dropoff : validation auto après 10 secondes
+        if (validationTimeoutRef.current) {
+          clearTimeout(validationTimeoutRef.current);
         }
-      }, AUTO_VALIDATE_DELAY);
+        validationTimeoutRef.current = setTimeout(() => {
+          if (!hasValidatedRef.current && orderId) {
+            handleAutoValidate(orderId, orderStatus);
+          }
+        }, AUTO_VALIDATE_DELAY);
+      }
     }
 
     // Si sort de la zone, annuler la validation programmée

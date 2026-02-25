@@ -1,13 +1,15 @@
 import React, { useState, useRef } from 'react';
-import {StyleSheet,View,Text,TextInput,TouchableOpacity,ScrollView,Image,Animated,Dimensions,Alert,PanResponder,Switch} from 'react-native';
+import {StyleSheet,View,Text,TextInput,TouchableOpacity,ScrollView,Image,Animated,Dimensions,Alert,PanResponder,Switch,Platform} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import PaymentMethodSelector from './PaymentMethodSelector';
+import { ContactPicker } from './ContactPicker';
 import { PaymentMethodType } from '../services/paymentApi';
 import { usePaymentStore } from '../store/usePaymentStore';
 import { logger } from '../utils/logger';
 import { getPhoneValidationError } from '../utils/phoneValidation';
+import { useRecentPhoneNumbers } from '../hooks/useRecentPhoneNumbers';
 
 
 interface AddressDetails {
@@ -135,7 +137,6 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
 
     const phoneError = getPhoneValidationError(dropoffDetails.phone);
     if (phoneError) {
-      Alert.alert('Numéro invalide', phoneError);
       return;
     }
 
@@ -154,7 +155,8 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
+    addPhone(dropoffDetails.phone);
+
     // Récupérer l'ID de la méthode de paiement sélectionnée
     // Si une méthode est sélectionnée dans le store, utiliser son ID
     // Sinon, chercher la méthode correspondante au type sélectionné
@@ -184,6 +186,8 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
 
   const [showPickupOptional, setShowPickupOptional] = useState(false);
   const [showDropoffOptional, setShowDropoffOptional] = useState(false);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const { recentPhones, addPhone, formatForDisplay } = useRecentPhoneNumbers();
 
   const renderAddressSection = (
     title: string,
@@ -246,13 +250,44 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       {type === 'dropoff' && (
         <View style={styles.requiredField}>
           <Text style={styles.inputLabel}>Téléphone destinataire *</Text>
-          <TextInput
-            style={[styles.input, styles.requiredInput]}
-            placeholder="Numéro de téléphone"
-            value={details.phone}
-            onChangeText={(text) => updateDetails('phone', text)}
-            keyboardType="phone-pad"
-          />
+          {recentPhones.length > 0 && (
+            <View style={styles.recentPhonesRow}>
+              <Text style={styles.recentPhonesLabel}>Numéros récents</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recentPhonesScroll}>
+                {recentPhones.map((phone) => (
+                  <TouchableOpacity
+                    key={phone}
+                    style={styles.recentPhoneChip}
+                    onPress={() => updateDetails('phone', phone)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="time-outline" size={14} color="#8B5CF6" />
+                    <Text style={styles.recentPhoneChipText}>{formatForDisplay(phone)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          <View style={styles.phoneInputRow}>
+            <TextInput
+              style={[styles.input, styles.requiredInput, styles.phoneInput]}
+              placeholder={Platform.OS === 'web' ? 'Numéro de téléphone' : 'Numéro ou choisir dans les contacts'}
+              value={details.phone}
+              onChangeText={(text) => updateDetails('phone', text)}
+              keyboardType="phone-pad"
+            />
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity
+                style={styles.contactPickerButton}
+                onPress={() => setShowContactPicker(true)}
+              >
+                <Ionicons name="people-outline" size={22} color="#8B5CF6" />
+              </TouchableOpacity>
+            )}
+          </View>
+          {details.phone && getPhoneValidationError(details.phone) ? (
+            <Text style={styles.phoneErrorText}>{getPhoneValidationError(details.phone)}</Text>
+          ) : null}
         </View>
       )}
 
@@ -417,6 +452,16 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
 
           {/* Dropoff section */}
           {renderAddressSection('Livraison', deliveryLocation, dropoffDetails, updateDropoffDetails, 'dropoff')}
+
+          <ContactPicker
+            visible={showContactPicker}
+            onClose={() => setShowContactPicker(false)}
+            onSelect={(contact) => {
+              updateDropoffDetails('phone', contact.phone);
+              addPhone(contact.phone);
+              setShowContactPicker(false);
+            }}
+          />
 
           {/* Section Paiement */}
           <View style={styles.paymentSection}>
@@ -705,6 +750,51 @@ const styles = StyleSheet.create({
   requiredInput: {
     borderBottomColor: '#8B5CF6',
     borderBottomWidth: 2,
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  phoneInput: {
+    flex: 1,
+  },
+  phoneErrorText: {
+    fontSize: 13,
+    color: '#DC2626',
+    marginTop: 6,
+  },
+  contactPickerButton: {
+    padding: 10,
+    backgroundColor: '#F5F0FF',
+    borderRadius: 12,
+  },
+  recentPhonesRow: {
+    marginBottom: 10,
+  },
+  recentPhonesLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  recentPhonesScroll: {
+    flexGrow: 0,
+  },
+  recentPhoneChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#F5F0FF',
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  recentPhoneChipText: {
+    fontSize: 13,
+    color: '#5B21B6',
+    fontWeight: '500',
   },
   optionalToggle: {
     flexDirection: 'row',

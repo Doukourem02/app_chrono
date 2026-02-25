@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f8f8',
     borderRadius: 12,
     marginBottom: 25,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   inputSeparator: {
     height: 1,

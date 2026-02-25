@@ -104,8 +104,9 @@ export const verifyAdminSupabase = async (
       if (result.rows.length > 0) {
         dbUser = result.rows[0];
       }
-    } catch (dbError: any) {
-      logger.warn('⚠️ [verifyAdminSupabase] Erreur de connexion PostgreSQL, utilisation de Supabase comme fallback:', dbError.message);
+    } catch (dbError: unknown) {
+      const errMsg = dbError instanceof Error ? dbError.message : String(dbError);
+      logger.warn('⚠️ [verifyAdminSupabase] Erreur de connexion PostgreSQL, utilisation de Supabase comme fallback:', { error: errMsg });
       
       // Fallback: utiliser Supabase pour vérifier le rôle
       if (supabaseUrl && supabaseServiceKey) {

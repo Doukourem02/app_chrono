@@ -23,8 +23,8 @@ if (process.env.DATABASE_URL) {
       // Temps d'inactivité avant fermeture d'une connexion (30 secondes)
       idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || '30000', 10),
       
-      // Timeout pour obtenir une connexion du pool (2 secondes)
-      connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT || '2000', 10),
+      // Timeout pour obtenir une connexion du pool (10 secondes par défaut)
+      connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT || '10000', 10),
       
       // Temps maximum d'exécution d'une requête (30 secondes)
       query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || '30000', 10),

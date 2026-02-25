@@ -39,6 +39,13 @@ interface MapboxNavigationScreenProps {
   onRouteProgressChange?: (event: RouteProgressEvent) => void;
   onMessagePress?: () => void;
   onSettingsPress?: () => void;
+  mute?: boolean;
+  /** Afficher le bouton "Colis récupéré" (livreur dans la zone de pickup) */
+  showColisRecupereButton?: boolean;
+  onColisRecupere?: () => void;
+  /** Afficher le bouton "Livraison effectuée" (livreur dans la zone de dropoff) */
+  showLivraisonEffectueeButton?: boolean;
+  onLivraisonEffectuee?: () => void;
 }
 
 let MapboxNavigation: React.ComponentType<any> | null = null;
@@ -63,6 +70,11 @@ export function MapboxNavigationScreen({
   onRouteProgressChange,
   onMessagePress,
   onSettingsPress,
+  mute = false,
+  showColisRecupereButton = false,
+  onColisRecupere,
+  showLivraisonEffectueeButton = false,
+  onLivraisonEffectuee,
 }: MapboxNavigationScreenProps) {
   const insets = useSafeAreaInsets();
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState<number | null>(null);
@@ -180,7 +192,7 @@ export function MapboxNavigationScreen({
         style={styles.mapboxNav}
         origin={originArr}
         destination={destArr}
-        mute={false}
+        mute={mute}
         showsEndOfRouteFeedback={false}
         hideStatusView={true}
         onLocationChange={handleLocationChange}
@@ -220,6 +232,30 @@ export function MapboxNavigationScreen({
           activeOpacity={0.8}
         >
           <Ionicons name="chatbubble-outline" size={22} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* Bouton Colis récupéré (visible quand livreur dans zone pickup) */}
+      {showColisRecupereButton && onColisRecupere && (
+        <TouchableOpacity
+          style={[styles.colisRecupereButton, { bottom: insets.bottom + 100 }]}
+          onPress={onColisRecupere}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="cube" size={24} color="#fff" />
+          <Text style={styles.colisRecupereButtonText}>Colis récupéré</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Bouton Livraison effectuée (visible quand livreur dans zone dropoff) */}
+      {showLivraisonEffectueeButton && onLivraisonEffectuee && (
+        <TouchableOpacity
+          style={[styles.colisRecupereButton, styles.livraisonEffectueeButton, { bottom: insets.bottom + 100 }]}
+          onPress={onLivraisonEffectuee}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="checkmark-circle" size={24} color="#fff" />
+          <Text style={styles.colisRecupereButtonText}>Livraison effectuée</Text>
         </TouchableOpacity>
       )}
 
@@ -366,5 +402,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  colisRecupereButton: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  colisRecupereButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  livraisonEffectueeButton: {
+    backgroundColor: '#16A34A',
   },
 });
