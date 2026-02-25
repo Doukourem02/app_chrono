@@ -211,7 +211,7 @@ export default function AddressAutocomplete({
           source: 'overpass',
         }))
 
-        // POI curatés (O'Takkos, etc.) — toutes les succursales, style Yango
+        // POI curatés — toutes les succursales, style Yango
         const curatedData = searchCuratedPoi(trimmed)
         const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
           name: p.name,
@@ -235,9 +235,16 @@ export default function AddressAutocomplete({
           source: 'nominatim',
         }))
 
+        // Overpass en fallback uniquement si sources primaires renvoient peu de résultats (< 5)
+        const primaryCount = fromCurated.length + fromSearchBox.length + fromGeocode.length + fromNominatim.length
+        const includeOverpass = primaryCount < 5
+        const sourcesToMerge = includeOverpass
+          ? [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromNominatim]
+          : [...fromCurated, ...fromSearchBox, ...fromGeocode, ...fromNominatim]
+
         const seen = new Set<string>()
         const merged: MapboxSuggestion[] = []
-        for (const s of [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromNominatim]) {
+        for (const s of sourcesToMerge) {
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`
           if (key && !seen.has(key) && s.name) {
             seen.add(key)
@@ -246,7 +253,7 @@ export default function AddressAutocomplete({
         }
 
         setSuggestions(merged.slice(0, 15))
-        setIsOpen(true)
+        setIsOpen(true) // Ouvre même si vide pour afficher "Aucun résultat"
       } catch (err) {
         console.error('[AddressAutocomplete] Suggest error:', err)
         setSuggestions([])
@@ -411,6 +418,31 @@ export default function AddressAutocomplete({
           }
         }}
       />
+      {isOpen && suggestions.length === 0 && !isLoading && query.trim().length >= 2 && (
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '4px',
+            padding: '16px',
+            backgroundColor: '#fff',
+            border: '1px solid #E5E7EB',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            zIndex: 1000,
+          }}
+        >
+          <div style={{ fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+            Aucun résultat pour « {query.trim()} »
+          </div>
+          <div style={{ fontSize: '12px', color: '#6B7280' }}>
+            Essayez une autre orthographe ou ajoutez un quartier (ex: Cocody, Marcory, Yopougon).
+          </div>
+        </div>
+      )}
       {isOpen && suggestions.length > 0 && (
         <div
           ref={dropdownRef}

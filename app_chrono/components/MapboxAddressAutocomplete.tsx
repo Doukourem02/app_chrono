@@ -335,7 +335,7 @@ export default function MapboxAddressAutocomplete({
           source: 'overpass' as const,
         }));
 
-        // POI curatés (O'Takkos, etc.) — toutes les succursales, style Yango
+        // POI curatés — toutes les succursales, style Yango
         const curatedData = searchCuratedPoi(trimmed);
         const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
           name: p.name,
@@ -347,10 +347,18 @@ export default function MapboxAddressAutocomplete({
           source: 'searchbox' as const,
         }));
 
-        // Ordre de merge : curatés en premier, puis Search Box, Overpass, Geocode, Nominatim (100 % gratuit)
+        // Overpass en fallback uniquement si Mapbox/curated/geocode/nominatim renvoient peu de résultats (< 5)
+        const primaryCount =
+          fromCurated.length + fromSearchBox.length + fromGeocode.length + fromGeocodeStreet.length + fromNominatim.length;
+        const includeOverpass = primaryCount < 5;
+
+        // Ordre de merge : curatés en premier, puis Search Box, Overpass (si fallback), Geocode, Nominatim
         const seen = new Set<string>();
         const merged: MapboxSuggestion[] = [];
-        for (const s of [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]) {
+        const sourcesToMerge = includeOverpass
+          ? [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]
+          : [...fromCurated, ...fromSearchBox, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim];
+        for (const s of sourcesToMerge) {
           if (shouldExcludeSuggestion(s, trimmed)) continue;
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`;
           if (key && !seen.has(key) && s.name) {
@@ -438,6 +446,8 @@ export default function MapboxAddressAutocomplete({
   );
 
   const showSuggestions = suggestions.length > 0;
+  const showNoResults =
+    !loading && query.trim().length >= 2 && suggestions.length === 0 && query.trim().length > 0;
 
   if (!accessToken) {
     return (
@@ -494,6 +504,15 @@ export default function MapboxAddressAutocomplete({
               );
             })}
           </ScrollView>
+        </View>
+      )}
+
+      {showNoResults && (
+        <View style={styles.noResultsBox}>
+          <Text style={styles.noResultsTitle}>Aucun résultat pour « {query.trim()} »</Text>
+          <Text style={styles.noResultsHint}>
+            Essayez une autre orthographe ou ajoutez un quartier (ex: Cocody, Marcory, Yopougon).
+          </Text>
         </View>
       )}
     </View>
@@ -555,6 +574,32 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   suggestionSubtext: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  noResultsBox: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    elevation: 8,
+    zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  noResultsTitle: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  noResultsHint: {
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,

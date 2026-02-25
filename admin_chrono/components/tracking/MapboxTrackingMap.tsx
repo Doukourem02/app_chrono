@@ -473,7 +473,7 @@ export default function MapboxTrackingMap({
           source: 'overpass' as const,
         }))
 
-        // POI curatés (O'Takkos, etc.) — toutes les succursales, style Yango
+        // POI curatés — toutes les succursales, style Yango
         const curatedData = searchCuratedPoi(trimmed)
         const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
           name: p.name,
@@ -498,10 +498,18 @@ export default function MapboxTrackingMap({
             source: 'nominatim' as const,
           }))
 
+        // Overpass en fallback uniquement si sources primaires renvoient peu de résultats (< 5)
+        const primaryCount =
+          fromCurated.length + fromStructured.length + fromSearchBox.length +
+          fromGeocode.length + fromGeocodeStreet.length + fromNominatim.length
+        const includeOverpass = primaryCount < 5
+        const sourcesToMerge = includeOverpass
+          ? [...fromCurated, ...fromStructured, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]
+          : [...fromCurated, ...fromStructured, ...fromSearchBox, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]
+
         const seen = new Set<string>()
         const merged: MapboxSuggestion[] = []
-        // Priorité : structurées > POI (searchbox + overpass) > geocode > rues > Nominatim
-        for (const s of [...fromCurated, ...fromStructured, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]) {
+        for (const s of sourcesToMerge) {
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`
           if (key && !seen.has(key) && s.name) {
             seen.add(key)
