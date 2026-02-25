@@ -3,6 +3,7 @@ import {View,Text,StyleSheet,TouchableOpacity,ActivityIndicator,Alert,ScrollView
 import { Ionicons } from '@expo/vector-icons';
 import { paymentApi, PaymentMethodType, DeferredPaymentInfo } from '../services/paymentApi';
 import { usePaymentStore } from '../store/usePaymentStore';
+import { getPhoneValidationError } from '../utils/phoneValidation';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import PriceCalculationCard from './PriceCalculationCard';
 import { logger } from '../utils/logger';
@@ -47,7 +48,6 @@ export default function PaymentBottomSheet({
   const { paymentMethods, selectedPaymentMethod, loadPaymentMethods } = usePaymentStore();
   const [selectedMethodType, setSelectedMethodType] = useState<PaymentMethodType | null>(preselectedPaymentMethod || null);
   const [isProcessing, setIsProcessing] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isPartial, setIsPartial] = useState(initialIsPartial);
   const [partialAmount, setPartialAmount] = useState<string>(
@@ -97,9 +97,16 @@ export default function PaymentBottomSheet({
 
     if ((selectedMethodType === 'orange_money' || selectedMethodType === 'wave')) {
       const method = paymentMethods.find((m) => m.method_type === selectedMethodType);
-      if (!method?.provider_account && !phoneNumber) {
-        Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone');
-        return;
+      if (!method?.provider_account) {
+        if (!phoneNumber || !phoneNumber.trim()) {
+          Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone');
+          return;
+        }
+        const phoneError = getPhoneValidationError(phoneNumber);
+        if (phoneError) {
+          Alert.alert('Numéro invalide', phoneError);
+          return;
+        }
       }
     }
 
@@ -212,9 +219,21 @@ export default function PaymentBottomSheet({
           {(selectedMethodType === 'orange_money' || selectedMethodType === 'wave') && (
             <View style={styles.phoneInputContainer}>
               <Text style={styles.phoneLabel}>Numéro de téléphone</Text>
-              <Text style={styles.phoneHint}>
-                {selectedPaymentMethod?.provider_account || 'Entrez votre numéro'}
-              </Text>
+              {selectedPaymentMethod?.provider_account ? (
+                <Text style={styles.phoneHint}>{selectedPaymentMethod.provider_account}</Text>
+              ) : (
+                <>
+                  <TextInput
+                    style={styles.phoneInput}
+                    placeholder="07 12 34 56 78"
+                    placeholderTextColor="#9CA3AF"
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    keyboardType="phone-pad"
+                  />
+                  <Text style={styles.phoneHint}>Format : 07 (Orange), 05 (MTN) ou 01 (Moov)</Text>
+                </>
+              )}
             </View>
           )}
 
@@ -335,8 +354,19 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   phoneHint: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
+    marginTop: 4,
+  },
+  phoneInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1F2937',
   },
   payButton: {
     flexDirection: 'row',

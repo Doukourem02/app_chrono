@@ -7,6 +7,7 @@ import PaymentMethodSelector from './PaymentMethodSelector';
 import { PaymentMethodType } from '../services/paymentApi';
 import { usePaymentStore } from '../store/usePaymentStore';
 import { logger } from '../utils/logger';
+import { getPhoneValidationError } from '../utils/phoneValidation';
 
 
 interface AddressDetails {
@@ -129,6 +130,12 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
   const handleConfirm = () => {
     if (!dropoffDetails.phone || dropoffDetails.phone.trim() === '') {
       Alert.alert('Champ requis', 'Veuillez renseigner le numéro de téléphone du destinataire');
+      return;
+    }
+
+    const phoneError = getPhoneValidationError(dropoffDetails.phone);
+    if (phoneError) {
+      Alert.alert('Numéro invalide', phoneError);
       return;
     }
 

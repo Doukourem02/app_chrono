@@ -3,6 +3,7 @@
 import React, { useRef, useEffect } from 'react'
 import { useMapbox } from '@/contexts/MapboxContext'
 import { themeColors } from '@/utils/theme'
+import { COTE_IVOIRE_MAX_BOUNDS } from '@/utils/mapBounds'
 
 const mapContainerStyle: React.CSSProperties = {
   width: '100%',
@@ -65,6 +66,7 @@ export default function MapboxMiniMap({ routePath }: { routePath?: LatLng[] }) {
         style: 'mapbox://styles/mapbox/light-v11',
         center: [computedCenter.lng, computedCenter.lat],
         zoom: 12,
+        maxBounds: COTE_IVOIRE_MAX_BOUNDS,
       })
 
       mapRef.current = map

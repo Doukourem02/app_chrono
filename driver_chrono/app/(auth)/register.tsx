@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvo
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
+import { getPhoneValidationError } from '../../utils/phoneValidation';
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -22,8 +23,9 @@ export default function Register() {
       return;
     }
 
-    if (phoneNumber.length < 10) {
-      Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide');
+    const phoneError = getPhoneValidationError(phoneNumber);
+    if (phoneError) {
+      Alert.alert('Numéro invalide', phoneError);
       return;
     }
 
@@ -67,15 +69,15 @@ export default function Register() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.phoneLabel}>Numéro de téléphone</Text>
             <TextInput
-              style={[styles.input, styles.phoneInput]}
-              placeholder="+225 0778733971"
+              style={styles.input}
+              placeholder="Numéro de téléphone (ex: 07 12 34 56 78)"
               placeholderTextColor="#9CA3AF"
               value={phoneNumber}
               onChangeText={setPhoneNumber}
               keyboardType="phone-pad"
             />
+            <Ionicons name="call-outline" size={20} color="#8B5CF6" style={styles.inputIcon} />
           </View>
 
           <TouchableOpacity 
@@ -137,24 +139,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     position: 'relative',
   },
-  phoneLabel: {
-    fontSize: 14,
-    color: '#8B5CF6',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
   input: {
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 20,
+    paddingRight: 48,
     fontSize: 16,
     color: '#1F2937',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-  },
-  phoneInput: {
-    paddingLeft: 20,
   },
   inputIcon: {
     position: 'absolute',

@@ -3,6 +3,7 @@ import {View,Text,TextInput,TouchableOpacity,StyleSheet,KeyboardAvoidingView,Pla
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempAuthStore } from '../../store/useTempAuthStore';
+import { getPhoneValidationError } from '../../utils/phoneValidation';
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
@@ -23,8 +24,9 @@ export default function RegisterScreen() {
     }
 
   
-    if (phoneNumber.length < 10) {
-      Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide');
+    const phoneError = getPhoneValidationError(phoneNumber);
+    if (phoneError) {
+      Alert.alert('Numéro invalide', phoneError);
       return;
     }
 

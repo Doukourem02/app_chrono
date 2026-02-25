@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Platform } from 'react-native';
 import { MapView, Camera, PointAnnotation, ShapeSource, LineLayer } from '@rnmapbox/maps';
 import type { MapRefHandle } from '../hooks/useMapCamera';
+import { COTE_IVOIRE_MAX_BOUNDS } from '../utils/mapBounds';
 
 type Coordinates = {
   latitude: number;
@@ -141,6 +142,7 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
         centerCoordinate={defaultCenter}
         zoomLevel={defaultZoom}
         animationDuration={0}
+        maxBounds={COTE_IVOIRE_MAX_BOUNDS}
       />
 
       {/* Marqueur driver - simple comme app_chrono (userLocationDot) */}

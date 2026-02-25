@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Text, Animated, Platform } from 'react-native';
 import { MapView, Camera, PointAnnotation, MarkerView, ShapeSource, LineLayer, FillLayer, StyleImport } from '@rnmapbox/maps';
 import type { MapRefHandle } from '../hooks/useMapLogic';
+import { COTE_IVOIRE_MAX_BOUNDS } from '../utils/mapBounds';
 import { OnlineDriver } from '../hooks/useOnlineDrivers';
 import { useRadarPulse } from '../hooks/useRadarPulse';
 import { useAnimatedRoute } from '../hooks/useAnimatedRoute';
@@ -270,6 +271,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         zoomLevel={zoomLevel}
         animationDuration={cameraAnimationDuration}
         animationMode={cameraAnimationDuration > 0 ? 'easeTo' : 'none'}
+        maxBounds={COTE_IVOIRE_MAX_BOUNDS}
       />
 
       {filteredOnlineDrivers.map((driver) => {

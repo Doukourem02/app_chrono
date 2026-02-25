@@ -86,15 +86,15 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
               placeholder="Où récupérer"
               country="ci"
               initialValue={pickupLocation}
+              embedded
               onPlaceSelected={onPickupSelected}
             />
-
             <View style={styles.inputSeparator} />
-
             <MapboxAddressAutocomplete
               placeholder="Où livrer"
               country="ci"
               initialValue={deliveryLocation}
+              embedded
               onPlaceSelected={onDeliverySelected}
             />
           </View>
@@ -194,14 +194,13 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     backgroundColor: '#f8f8f8',
-    borderRadius: 15,
+    borderRadius: 12,
     marginBottom: 25,
-    paddingVertical: 5,
+    overflow: 'hidden',
   },
   inputSeparator: {
     height: 1,
-    backgroundColor: '#e0e0e0',
-    marginHorizontal: 20,
+    backgroundColor: 'rgba(0,0,0,0.06)',
   },
   deliveryMethodsContainer: {
     marginBottom: 25,

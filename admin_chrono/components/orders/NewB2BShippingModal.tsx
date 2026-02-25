@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { getPhoneValidationError } from '@/utils/phoneValidation'
 
 interface UserData {
   id: string
@@ -198,6 +199,14 @@ export default function NewB2BShippingModal({
     if (!scheduledDateValue || !scheduledTimeValue) {
       alert('Veuillez sélectionner une date et une heure pour la livraison planifiée')
       return
+    }
+
+    if (recipientPhone.trim()) {
+      const phoneError = getPhoneValidationError(recipientPhone)
+      if (phoneError) {
+        alert(phoneError)
+        return
+      }
     }
 
     setIsCreating(true)

@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTempAuthStore } from '../../store/useTempAuthStore';
 import { AnimatedButton, ScreenTransition } from '../../components/animations';
 import { logger } from '../../utils/logger';
+import { getPhoneValidationError } from '../../utils/phoneValidation';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -21,6 +22,12 @@ export default function LoginScreen() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Erreur', 'Veuillez entrer un email valide');
+      return;
+    }
+
+    const phoneError = getPhoneValidationError(phone);
+    if (phoneError) {
+      Alert.alert('Numéro invalide', phoneError);
       return;
     }
 

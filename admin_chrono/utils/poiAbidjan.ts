@@ -2,8 +2,6 @@
  * POI curatés Abidjan - restaurants, cinémas, etc.
  * Complète Mapbox/Overpass pour afficher toutes les succursales (style Yango)
  */
-import { matchesNormalized } from './searchNormalize'
-
 export interface CuratedPoi {
   name: string
   full_address: string
@@ -41,7 +39,7 @@ export function searchCuratedPoi(query: string): CuratedPoi[] {
 
   const results: CuratedPoi[] = []
   for (const entry of POI_ENTRIES) {
-    const matches = entry.keywords.some((kw) => matchesNormalized(q, kw))
+    const matches = entry.keywords.some((kw) => q.includes(kw.toLowerCase().replace(/'/g, '')))
     if (matches) {
       results.push(...entry.pois)
     }

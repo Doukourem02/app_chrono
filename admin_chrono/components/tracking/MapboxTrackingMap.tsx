@@ -12,6 +12,7 @@ import { useAnimatedPosition } from '@/hooks/useAnimatedPosition'
 import { logger } from '@/utils/logger'
 import { searchOverpassPoi, type OverpassPoiResult } from '@/utils/overpassPoiSearch'
 import { searchCuratedPoi } from '@/utils/poiAbidjan'
+import { COTE_IVOIRE_MAX_BOUNDS } from '@/utils/mapBounds'
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest'
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve'
@@ -498,14 +499,7 @@ export default function MapboxTrackingMap({
             source: 'nominatim' as const,
           }))
 
-        // Overpass en fallback uniquement si sources primaires renvoient peu de résultats (< 5)
-        const primaryCount =
-          fromCurated.length + fromStructured.length + fromSearchBox.length +
-          fromGeocode.length + fromGeocodeStreet.length + fromNominatim.length
-        const includeOverpass = primaryCount < 5
-        const sourcesToMerge = includeOverpass
-          ? [...fromCurated, ...fromStructured, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]
-          : [...fromCurated, ...fromStructured, ...fromSearchBox, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]
+        const sourcesToMerge = [...fromCurated, ...fromStructured, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim]
 
         const seen = new Set<string>()
         const merged: MapboxSuggestion[] = []
@@ -727,6 +721,7 @@ export default function MapboxTrackingMap({
           : 'mapbox://styles/mapbox/light-v11',
         center: [center.lng, center.lat],
         zoom: selectedDelivery && routePathFallback.length > 0 ? DELIVERY_ZOOM : OVERVIEW_ZOOM,
+        maxBounds: COTE_IVOIRE_MAX_BOUNDS,
       })
 
       map.on('zoom', () => {
