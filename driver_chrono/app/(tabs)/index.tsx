@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator, InteractionManager } from "react-native";
 import type { MapRefHandle } from "../../hooks/useMapCamera";
 import { DriverMapView } from "../../components/DriverMapView";
 import { Ionicons } from "@expo/vector-icons";
@@ -232,6 +232,9 @@ export default function Index() {
 
   const [showMessageBottomSheet, setShowMessageBottomSheet] = useState(false);
   const [isNavigationActive, setIsNavigationActive] = useState(false);
+  /** Mode minimisé : Mapbox reste monté (ETA continue), on affiche la carte avec bouton "Reprendre" */
+  const [isNavigationMinimized, setIsNavigationMinimized] = useState(false);
+  const [lastEtaMinutes, setLastEtaMinutes] = useState<number | null>(null);
 
   const handleOpenMessage = () => {
     if (!currentOrder || !currentOrder.user || !currentOrder.user.id) {
@@ -256,6 +259,8 @@ export default function Index() {
   const userClosedBottomSheetRef = useRef(false);
   const lastOrderStatusRef = useRef<string | null>(null);
   const [showRecalcOverlay, setShowRecalcOverlay] = useState(false);
+  /** Force unmount/remount Mapbox lors du passage pickup→dropoff (évite navigation figée) */
+  const [mapboxMountedForDropoff, setMapboxMountedForDropoff] = useState(true);
   const hasValidatedViaMapboxRef = useRef<Set<string>>(new Set());
   const lastEtaAnnouncedMinRef = useRef<number>(99);
   // Commande terminée mais navigation gardée ouverte : le livreur quitte quand il veut
@@ -295,11 +300,19 @@ export default function Index() {
   };
 
   const destination = getCurrentDestination();
-  // Ordre affiché en navigation : currentOrder ou commande terminée (reste jusqu'à fermeture manuelle)
   const navDisplayOrder = currentOrder || navigationCompletedOrder;
   const navDestination = destination || (navigationCompletedOrder ? resolveCoords(navigationCompletedOrder.dropoff) : null);
   const currentPickupCoord = currentOrder ? resolveCoords(currentOrder.pickup) : null;
   const currentDropoffCoord = currentOrder ? resolveCoords(currentOrder.dropoff) : null;
+
+  /** Pendant transition pickup→dropoff : passer directement au dropoff pour éviter navigation figée */
+  const effectiveNavDestination = navDestination;
+
+  /** Origine : vers dropoff le livreur part du pickup (calcul fiable). Sinon position actuelle. */
+  const navOrigin =
+    effectiveNavDestination === currentDropoffCoord && currentPickupCoord
+      ? currentPickupCoord
+      : location;
 
   // Cacher la tab bar quand la navigation full-screen est active
   useEffect(() => {
@@ -330,16 +343,21 @@ export default function Index() {
       }
     }
     // Phase 2 : transition vers picked_up (colis récupéré → navigation vers livraison)
-    // Annonce faite dans onArrive si on était en navigation ; sinon (géofencing seul) on ouvre sans annonce
-    // Dès que la navigation vers la destination démarre → delivering pour synchroniser app/admin (En cours de livraison)
+    // Unmount Mapbox 500ms puis remount avec dropoff pour éviter navigation figée
     if ((status === 'picked_up' || status === 'delivering') && (prevStatus === 'enroute' || prevStatus === 'in_progress')) {
       logger.info('Auto-démarrage navigation phase 2 (adresse de livraison)', 'driver-index');
       setShowRecalcOverlay(true);
+      setMapboxMountedForDropoff(false); // Unmount Mapbox pour reset état interne
+      setIsNavigationMinimized(false);
       if (!isNavigationActive) {
         speakWithMapboxMuted('Colis pris en charge. Nous pouvons entamer la course.');
       }
       setIsNavigationActive(true);
-      // Synchroniser avec app_chrono/admin_chrono : "En cours de livraison" (délai pour laisser le backend traiter picked_up)
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => {
+          setMapboxMountedForDropoff(true); // Remount avec destination = dropoff
+        }, 500);
+      });
       if (status === 'picked_up' && location) {
         setTimeout(() => {
           orderSocketService.updateDeliveryStatus(currentOrder.id, 'delivering', location);
@@ -348,12 +366,17 @@ export default function Index() {
     }
   }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination, isNavigationActive, speakWithMapboxMuted]);
 
-  // Masquer l'overlay "Recalcul..." après 7 secondes (temps typique de chargement Mapbox)
+  // Masquer l'overlay "Recalcul..." après 5 s (fallback si transition lente)
   useEffect(() => {
     if (!showRecalcOverlay) return;
-    const t = setTimeout(() => setShowRecalcOverlay(false), 7000);
+    const t = setTimeout(() => setShowRecalcOverlay(false), 5000);
     return () => clearTimeout(t);
   }, [showRecalcOverlay]);
+
+  // Réinitialiser la transition quand la commande change
+  useEffect(() => {
+    if (!currentOrder?.id) setMapboxMountedForDropoff(true);
+  }, [currentOrder?.id]);
 
   // Géofencing : détection automatique d'arrivée
   // CRITIQUE : Désactiver le géofencing si le statut est 'accepted'
@@ -426,6 +449,7 @@ export default function Index() {
       atDropoffZoneAnnouncedRef.current = false;
       setShowColisRecupereButton(false);
       setShowLivraisonEffectueeButton(false);
+      setLastEtaMinutes(null);
     }
   }, [currentOrder?.id]);
 
@@ -448,11 +472,15 @@ export default function Index() {
   }, [currentOrder, location, speakWithMapboxMuted]);
 
   // Annonces pré-arrivée : "Arrivée à destination dans X minutes" (3, 2, 1 min)
+  // Stocke aussi lastEtaMinutes pour la barre "Reprendre la navigation"
   const handleRouteProgressChange = useCallback((event: { nativeEvent?: { durationRemaining?: number }; durationRemaining?: number }) => {
+    const durationRemaining = event?.nativeEvent?.durationRemaining ?? event?.durationRemaining;
+    if (durationRemaining != null && durationRemaining > 0) {
+      setLastEtaMinutes(Math.ceil(durationRemaining / 60));
+    }
+
     const status = String(currentOrder?.status || '');
     if (status !== 'picked_up' && status !== 'delivering') return;
-
-    const durationRemaining = event?.nativeEvent?.durationRemaining ?? event?.durationRemaining;
     if (durationRemaining == null || durationRemaining <= 0) return;
 
     const minsRemaining = Math.ceil(durationRemaining / 60);
@@ -1053,13 +1081,40 @@ export default function Index() {
 
       {/* Navigation intégrée Mapbox (style Yango) - full screen */}
       {/* Reste affichée après livraison (navDisplayOrder) jusqu'à fermeture manuelle par le livreur */}
-      {isNavigationActive && navDisplayOrder && location && navDestination && (
-        <View style={StyleSheet.absoluteFill}>
-          <MapboxNavigationScreen
-            key={`nav-${navDestination.latitude}-${navDestination.longitude}`}
-            origin={location}
-            destination={navDestination}
-            mute={mapboxVoiceMuted}
+      {/* En mode minimisé : Mapbox reste monté (opacity 0) pour garder ETA et annonces, carte visible */}
+      {isNavigationActive && navDisplayOrder && (location || navOrigin) && effectiveNavDestination && (
+        <>
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                opacity: isNavigationMinimized ? 0 : 1,
+                pointerEvents: isNavigationMinimized ? 'none' : 'auto',
+              },
+            ]}
+          >
+            {/* Phase 2 : unmount/remount pour éviter navigation figée pickup→dropoff */}
+            {((currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress') || mapboxMountedForDropoff) && (
+            <MapboxNavigationScreen
+              key={`nav-${currentOrder?.status}-${mapboxMountedForDropoff}-${effectiveNavDestination.latitude}-${effectiveNavDestination.longitude}`}
+              origin={navOrigin || location!}
+              destination={effectiveNavDestination}
+              mute={mapboxVoiceMuted}
+              onBackPress={
+                navigationCompletedOrder
+                  ? () => {
+                      setShowRecalcOverlay(false);
+                      setNavigationCompletedOrder(null);
+                      setIsNavigationActive(false);
+                      setIsNavigationMinimized(false);
+                      setShowColisRecupereButton(false);
+                      setShowLivraisonEffectueeButton(false);
+                      setLastEtaMinutes(null);
+                      atPickupZoneAnnouncedRef.current = false;
+                      atDropoffZoneAnnouncedRef.current = false;
+                    }
+                  : () => setIsNavigationMinimized(true)
+              }
           onArrive={() => {
             const order = navDisplayOrder;
             if (!order) return;
@@ -1088,8 +1143,10 @@ export default function Index() {
             setShowRecalcOverlay(false);
             setNavigationCompletedOrder(null);
             setIsNavigationActive(false);
+            setIsNavigationMinimized(false);
             setShowColisRecupereButton(false);
             setShowLivraisonEffectueeButton(false);
+            setLastEtaMinutes(null);
             atPickupZoneAnnouncedRef.current = false;
             atDropoffZoneAnnouncedRef.current = false;
           }}
@@ -1099,6 +1156,7 @@ export default function Index() {
             // Paramètres navigation - pourrait ouvrir un modal
           }}
         />
+            )}
           {/* Overlay "Recalcul..." pendant transition pickup→dropoff (masque latence chargement) */}
           {showRecalcOverlay && (
             <View style={styles.recalcOverlay} pointerEvents="none">
@@ -1107,6 +1165,44 @@ export default function Index() {
             </View>
           )}
         </View>
+
+        {/* Barre "Reprendre la navigation" + boutons Colis/Livraison quand minimisé */}
+        {isNavigationMinimized && (
+          <>
+            {showColisRecupereButton && (
+              <TouchableOpacity
+                style={[styles.reprendreNavBar, { bottom: 180 }]}
+                onPress={handleColisRecupere}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="cube" size={24} color="#fff" />
+                <Text style={styles.reprendreNavText}>Colis récupéré</Text>
+              </TouchableOpacity>
+            )}
+            {showLivraisonEffectueeButton && (
+              <TouchableOpacity
+                style={[styles.reprendreNavBar, { bottom: 180, backgroundColor: '#16A34A' }]}
+                onPress={handleLivraisonEffectuee}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                <Text style={styles.reprendreNavText}>Livraison effectuée</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.reprendreNavBar}
+              onPress={() => setIsNavigationMinimized(false)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="navigate" size={24} color="#fff" />
+              <Text style={styles.reprendreNavText}>Reprendre la navigation</Text>
+              {lastEtaMinutes != null && (
+                <Text style={styles.reprendreNavEta}>{lastEtaMinutes} min</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
+        </>
       )}
 
       {/* Message Bottom Sheet - Rendu en dernier pour être au-dessus */}
@@ -1236,5 +1332,35 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: 'center',
     paddingHorizontal: 24,
+  },
+  reprendreNavBar: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    zIndex: 2000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  reprendreNavText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  reprendreNavEta: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

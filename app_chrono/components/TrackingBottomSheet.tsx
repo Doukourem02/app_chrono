@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
-import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet,Image} from "react-native";
+import {View,Text,Animated,Easing,PanResponderInstance,TouchableOpacity,StyleSheet,Image} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userApiService } from "../services/userApiService";
@@ -163,8 +163,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   useEffect(() => {
     const currentActiveIndexes = getActiveIndexes();
     const currentActiveIndex = Math.max(...currentActiveIndexes, 0);
-    
-    statusSteps.forEach((_, index) => {
+    const STAGGER_MS = 120;
+    const DURATION_MS = 480;
+
+    const animations = statusSteps.map((_, index) => {
       const isActive = currentActiveIndexes.includes(index);
       const targetColor = isActive ? 1 : 0;
       const targetOpacity = isActive ? 1 : 0.5;
@@ -174,43 +176,44 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       stepAnimations[index].scale.stopAnimation();
       stepAnimations[index].opacity.stopAnimation();
 
-      Animated.spring(stepAnimations[index].color, {
-        toValue: targetColor,
-        useNativeDriver: false,
-        tension: 65,
-        friction: 8,
-      }).start();
-
-      if (isCurrentStep && isActive) {
-        Animated.sequence([
-          Animated.spring(stepAnimations[index].scale, {
-            toValue: 1.25,
-            useNativeDriver: false,
-            tension: 65,
-            friction: 5,
-          }),
-          Animated.spring(stepAnimations[index].scale, {
-            toValue: 1,
-            useNativeDriver: false,
-            tension: 65,
-            friction: 7,
-          }),
-        ]).start();
-      } else {
-        Animated.spring(stepAnimations[index].scale, {
-          toValue: 1,
+      return Animated.parallel([
+        Animated.timing(stepAnimations[index].color, {
+          toValue: targetColor,
+          duration: DURATION_MS,
           useNativeDriver: false,
-          tension: 65,
-          friction: 7,
-        }).start();
-      }
-
-      Animated.timing(stepAnimations[index].opacity, {
-        toValue: targetOpacity,
-        duration: 400,
-        useNativeDriver: false,
-      }).start();
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        }),
+        Animated.timing(stepAnimations[index].opacity, {
+          toValue: targetOpacity,
+          duration: DURATION_MS,
+          useNativeDriver: false,
+          easing: Easing.out(Easing.cubic),
+        }),
+        isCurrentStep && isActive
+          ? Animated.sequence([
+              Animated.timing(stepAnimations[index].scale, {
+                toValue: 1.12,
+                duration: 220,
+                useNativeDriver: false,
+                easing: Easing.out(Easing.cubic),
+              }),
+              Animated.timing(stepAnimations[index].scale, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: false,
+                easing: Easing.bezier(0.33, 1, 0.68, 1),
+              }),
+            ])
+          : Animated.timing(stepAnimations[index].scale, {
+              toValue: 1,
+              duration: 220,
+              useNativeDriver: false,
+              easing: Easing.out(Easing.cubic),
+            }),
+      ]);
     });
+
+    Animated.stagger(STAGGER_MS, animations).start();
   }, [status, currentOrder?.status, statusSteps, getActiveIndexes, stepAnimations]);
 
   return (

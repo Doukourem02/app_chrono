@@ -1,10 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import Octicons from '@expo/vector-icons/Octicons';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useAuthStore } from '../../store/useAuthStore';
+import { userOrderSocketService } from '../../services/userOrderSocketService';
 
 export default function TabLayout() {
+  const { user } = useAuthStore();
+
+  useEffect(() => {
+    if (user?.id) {
+      userOrderSocketService.connect(user.id);
+    }
+    return () => {
+      userOrderSocketService.disconnect();
+    };
+  }, [user?.id]);
 
   return (
     <>

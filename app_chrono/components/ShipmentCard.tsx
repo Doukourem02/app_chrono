@@ -1,11 +1,41 @@
 import { Ionicons } from "@expo/vector-icons";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router } from "expo-router";
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useMemo, useRef } from "react";
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { OrderRequest } from "../store/useOrderStore";
 import { formatDurationLabel } from "../services/orderApi";
 import { formatDeliveryId } from "../utils/formatDeliveryId";
+
+/**
+ * 4 cercles : Commande acceptée → Colis pris en charge → En cours de livraison → Colis livré.
+ * "Livreur en route pour récupérer" est inclus dans la phase "Commande acceptée" (implicite).
+ */
+function getActiveStageIndex(status: string): number {
+  switch (status) {
+    case 'accepted':
+    case 'enroute':
+      return 0; // Commande acceptée (inclut en route pickup)
+    case 'picked_up':
+      return 1; // Colis pris en charge
+    case 'delivering':
+      return 2; // En cours de livraison
+    case 'completed':
+      return 3; // Colis livré
+    case 'pending':
+      return -1;
+    default:
+      return 0;
+  }
+}
+
+/** 4 étapes : acceptée, colis pris, en livraison, livré */
+const PROGRESS_STEPS = [
+  { key: 'accepted', icon: 'checkmark' as const },
+  { key: 'picked_up', icon: 'cube' as const },
+  { key: 'delivering', icon: 'navigate' as const },
+  { key: 'completed', icon: 'checkmark-done' as const },
+];
 
 interface ShipmentCardProps {
   order: OrderRequest;
@@ -63,6 +93,79 @@ export default function ShipmentCard({
     ? (dropoffAddress.split(',')[0] || dropoffAddress.substring(0, 30))
     : formatDeliveryId(order.id, order.createdAt);
   
+  const status = String(order.status || 'pending');
+  const activeStageIndex = useMemo(() => getActiveStageIndex(status), [status]);
+
+  /** Pour chaque étape : isCompleted = statut >= étape, isActive = étape courante (animée) */
+  const isStepCompleted = (index: number) => index <= activeStageIndex;
+  const isStepActive = (index: number) => index === activeStageIndex;
+
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const isInProgress =
+    status === "accepted" || status === "enroute" || status === "picked_up" || status === "delivering";
+
+  // Animations progressives type barre de chargement (cercles + segments)
+  const circleAnims = useRef(
+    PROGRESS_STEPS.map((_, i) => new Animated.Value(i <= activeStageIndex ? 1 : 0))
+  ).current;
+  const segmentAnims = useRef(
+    [0, 1, 2].map((i) => new Animated.Value(i < activeStageIndex ? 1 : 0))
+  ).current;
+
+  useEffect(() => {
+    const STAGGER_MS = 90;
+    const DURATION_MS = 420;
+    const easing = Easing.bezier(0.25, 0.1, 0.25, 1);
+
+    const anims: Animated.CompositeAnimation[] = [];
+    for (let i = 0; i < 4; i++) {
+      const target = i <= activeStageIndex ? 1 : 0;
+      circleAnims[i].stopAnimation();
+      anims.push(
+        Animated.timing(circleAnims[i], {
+          toValue: target,
+          duration: DURATION_MS,
+          useNativeDriver: false,
+          easing,
+        })
+      );
+      if (i < 3) {
+        const segTarget = i < activeStageIndex ? 1 : 0;
+        segmentAnims[i].stopAnimation();
+        anims.push(
+          Animated.timing(segmentAnims[i], {
+            toValue: segTarget,
+            duration: DURATION_MS,
+            useNativeDriver: false,
+            easing,
+          })
+        );
+      }
+    }
+    // Ordre : cercle0, seg0, cercle1, seg1, cercle2, seg2, cercle3
+    Animated.stagger(STAGGER_MS, anims).start();
+  }, [activeStageIndex, circleAnims, segmentAnims]);
+
+  useEffect(() => {
+    if (!isInProgress) return;
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.08,
+          duration: 700,
+          useNativeDriver: false,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, [pulseAnim, isInProgress]);
+
   // Naviguer vers la page dédiée au tracking de cette commande
   const handleCardPress = () => {
     // Seulement pour les commandes en cours (pas terminées)
@@ -97,48 +200,52 @@ export default function ShipmentCard({
         </View>
       </View>
 
-      {/* ==== BARRE DE PROGRESSION (comme l'image) ==== */}
+      {/* ==== BARRE DE PROGRESSION (alignée sur le statut, animation type chargement) ==== */}
       <View style={styles.progressContainer}>
         <View style={styles.progressLineContainer}>
-          {/* Point de départ */}
-          <View style={[styles.progressStartDot, { backgroundColor: progressColor }]} />
-          
-          {/* Ligne de progression (plus courte) */}
-          <View style={[styles.progressLine, { backgroundColor: progressColor }]} />
-          
-          {/* Cercle avec icône de camion */}
-          <View style={[styles.progressEndCircle, { backgroundColor: progressColor }]}>
-            <MaterialCommunityIcons name="truck-delivery" size={16} color="#fff" />
-          </View>
-          
-          {/* Petit espace après le camion */}
-          <View style={styles.spacer} />
-          
-          {/* Petites lignes inactives (3 au lieu de 5, plus grandes) */}
-          <View style={styles.dottedSection}>
-            <View style={[styles.dottedLine, { backgroundColor: inactiveColor }]} />
-            <View style={[styles.dottedLine, { backgroundColor: inactiveColor }]} />
-            <View style={[styles.dottedLine, { backgroundColor: inactiveColor }]} />
-          </View>
-          
-          {/* Petit espace avant la sphère */}
-          <View style={styles.spacer} />
-          
-          {/* Sphère inactive */}
-          <View style={[styles.inactiveSphere, { backgroundColor: inactiveColor }]} />
-          
-          {/* Petit espace après la sphère */}
-          <View style={styles.spacer} />
-          
-          {/* Petites lignes inactives (3 au lieu de 5, plus grandes) */}
-          <View style={styles.dottedSection}>
-            <View style={[styles.dottedLine, { backgroundColor: inactiveColor }]} />
-            <View style={[styles.dottedLine, { backgroundColor: inactiveColor }]} />
-            <View style={[styles.dottedLine, { backgroundColor: inactiveColor }]} />
-          </View>
-          
-          {/* Sphère inactive finale */}
-          <View style={[styles.inactiveSphere, { backgroundColor: inactiveColor }]} />
+          {PROGRESS_STEPS.map((step, index) => {
+            const active = isStepActive(index);
+            const circleAnim = circleAnims[index];
+            const circleBg = circleAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [inactiveColor, progressColor],
+            });
+
+            return (
+              <React.Fragment key={step.key}>
+                {index > 0 && (
+                  <Animated.View
+                    style={[
+                      styles.progressSegment,
+                      {
+                        backgroundColor: segmentAnims[index - 1].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [inactiveColor, progressColor],
+                        }),
+                      },
+                    ]}
+                  />
+                )}
+                {active && isInProgress ? (
+                  <Animated.View
+                    style={[
+                      styles.progressCircle,
+                      styles.progressCircleActive,
+                      { backgroundColor: circleBg, transform: [{ scale: pulseAnim }] },
+                    ]}
+                  >
+                    <MaterialCommunityIcons name="truck-delivery" size={16} color="#fff" />
+                  </Animated.View>
+                ) : (
+                  <Animated.View style={[styles.progressCircle, { backgroundColor: circleBg }]}>
+                    {isStepCompleted(index) ? (
+                      <Ionicons name={step.icon} size={12} color="#fff" />
+                    ) : null}
+                  </Animated.View>
+                )}
+              </React.Fragment>
+            );
+          })}
         </View>
       </View>
 
@@ -216,7 +323,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* ==== Progression stylée ==== */
+  /* ==== Progression alignée sur le statut ==== */
   progressContainer: {
     alignItems: "center",
     marginVertical: 25,
@@ -225,51 +332,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
-    position: "relative",
   },
-  // Point de départ (petit cercle)
-  progressStartDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  // Ligne de progression (plus courte et fixe)
-  progressLine: {
+  progressSegment: {
+    flex: 1,
     height: 4,
-    width: 60, // Longueur fixe plus courte
     borderRadius: 2,
-    marginLeft: 8,
+    marginHorizontal: 2,
+    minWidth: 12,
   },
-  // Cercle avec icône à la fin de la progression
-  progressEndCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  progressCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 8,
   },
-  // Section pointillés (maintenant des lignes)
-  dottedSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1, // Prend tout l'espace disponible
-    marginLeft: 0, // Supprime la marge pour toucher les sphères
-    marginRight: 0, // Supprime la marge pour toucher les sphères
-    gap: 1,
-  },
-  // Ligne pointillée individuelle (au lieu de point)
-  dottedLine: {
-    flex: 1, // Prend tout l'espace disponible pour s'étendre jusqu'aux sphères
-    height: 3, // Agrandi de 2 à 3
-    borderRadius: 1,
-  },
-  // Sphère inactive
-  inactiveSphere: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginLeft: 8,
+  progressCircleActive: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
 
   /* ==== Infos livraison ==== */
@@ -314,9 +395,5 @@ const styles = StyleSheet.create({
   centeredValue: {
     textAlign: "center",
     alignSelf: "center",
-  },
-  // Petit espace pour séparer les éléments
-  spacer: {
-    width: 4,
   },
 });

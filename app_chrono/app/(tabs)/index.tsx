@@ -5,9 +5,11 @@ import Header from "../../components/Header";
 import SearchBar from "../../components/SearchBar";
 import SectionHeader from "../../components/SectionHeader";
 import ShipmentList from "../../components/ShipmentList";
+import { useOrderStatusPolling } from "../../hooks/useOrderStatusPolling";
 import { logger } from "../../utils/logger";
 
 export default function Index() {
+  useOrderStatusPolling();
 
   return (
     <View style={styles.container}>

@@ -73,15 +73,15 @@ export function useMapOrderManagement({
     // 1. Son statut est 'pending' ET elle n'a pas de driver
     // 2. Elle n'est PAS 'accepted', 'completed', 'cancelled', ou 'declined'
     const allPendingOrders = activeOrders.filter((o) => {
-      // Si la commande est acceptée, elle n'est plus en attente, même si elle n'a pas encore de driver
-      if (o.status === 'accepted') {
+      // Commande avec driver assigné ou en cours : plus en attente de recherche
+      if (o.driver && ['accepted', 'enroute', 'picked_up', 'delivering'].includes(o.status)) {
         return false;
       }
       // Si la commande est dans un état final, elle n'est plus en attente
       if (['completed', 'cancelled', 'declined'].includes(o.status)) {
         return false;
       }
-      // Sinon, elle est en attente seulement si elle n'a pas de driver
+      // En attente seulement si status pending ET pas de driver
       return o.status === PENDING_STATUS && !o.driver;
     });
 

@@ -95,17 +95,22 @@ function isStreetLikeQuery(q: string): boolean {
   );
 }
 
-/** Exclut les lignes de bus (gbaka), routes de transport, résultats non pertinents (style Yango) */
+/** Exclut les lignes de bus (gbaka), woro woro, routes de transport, résultats non pertinents */
 function shouldExcludeSuggestion(s: MapboxSuggestion, query: string): boolean {
   const name = (s.name || '').toLowerCase();
   const desc = (s.place_formatted || s.full_address || '').toLowerCase();
   const combined = `${name} ${desc}`;
+
+  // Exclure woro woro (lignes de taxi partagé) — "woro woro : Zoo → Opera"
+  if (/woro\s*woro\s*[:\s→]|woro\s*woro\s*$/i.test(combined)) return true;
+  if (/^woro\s*woro\s/i.test(name)) return true;
 
   // Exclure lignes de bus / gbaka / abaka (pas des adresses livrables)
   if (/(gbaka|abaka)\s*[:\s→]/i.test(combined)) return true;
   if (/^gbaka\s|^abaka\s/i.test(name)) return true;
   if (/[→↔].*[→↔]|liberté\s*→|azur\s*→|dokui\s*azur/i.test(combined)) return true;
   if (/^\s*\w+\s*:\s*\w+\s*→\s*\w+/i.test(name)) return true; // "X : Y → Z" = ligne bus
+  if (/:\s*[^:]+(→|->)\s*\w+/i.test(combined)) return true; // "woro woro : Zoo → Opera" etc.
 
   // Exclure résultats "Zoo" non pertinents : pharmacie, station, etc. qui contiennent "zoo" dans le nom
   const q = query.trim().toLowerCase();

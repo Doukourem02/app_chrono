@@ -24,7 +24,6 @@ import { useMapNewOrder } from "../../hooks/useMapNewOrder";
 import { locationService } from "../../services/locationService";
 import {calculatePrice,estimateDurationMinutes,formatDurationLabel,getDistanceInKm,} from "../../services/orderApi";
 import { userApiService } from "../../services/userApiService";
-import { userOrderSocketService } from "../../services/userOrderSocketService";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useLocationStore } from "../../store/useLocationStore";
 import type { OrderStatus } from "../../store/useOrderStore";
@@ -65,15 +64,7 @@ export default function MapPage() {
   // L'utilisateur peut explorer la carte en mode invité
   // L'authentification sera demandée seulement lors de la création d'une commande
 
-  useEffect(() => {
-    if (user?.id) {
-      userOrderSocketService.connect(user.id);
-    }
-
-    return () => {
-      userOrderSocketService.disconnect();
-    };
-  }, [user?.id]);
+  // Socket connecté dans (tabs)/_layout.tsx pour Home + Map
 
   // Polling de secours pour sync statut completed (si socket n'a pas transmis)
   useOrderStatusPolling();
@@ -1282,25 +1273,29 @@ export default function MapPage() {
                   : null;
 
                 if (!orderToDisplay) {
-                  // Chercher d'abord une commande acceptée avec driver
-                  const acceptedOrder = store.activeOrders.find(
-                    (o) => o.status === "accepted" && o.driver
+                  // Chercher une commande avec driver (accepted, enroute, picked_up, delivering)
+                  const orderWithDriver = store.activeOrders.find(
+                    (o) =>
+                      (o.status === "accepted" || o.status === "enroute" || o.status === "picked_up" || o.status === "delivering") &&
+                      o.driver
                   );
-                  if (acceptedOrder) {
-                    orderToDisplay = acceptedOrder;
+                  if (orderWithDriver) {
+                    orderToDisplay = orderWithDriver;
                   } else {
-                    // Sinon, utiliser currentOrder ou pendingOrder
                     orderToDisplay = currentOrder || pendingOrder;
                   }
                 }
 
                 const shouldShowSearch =
                   isSearchingDriver || (pendingOrder && !isCreatingNewOrder);
-                const shouldShowAccepted =
-                  !preferCreationForm &&
-                  orderToDisplay?.status === "accepted" &&
+                const hasDriverAssigned =
                   orderToDisplay?.driver &&
-                  !showPaymentSheet;
+                  (orderToDisplay?.status === "accepted" ||
+                    orderToDisplay?.status === "enroute" ||
+                    orderToDisplay?.status === "picked_up" ||
+                    orderToDisplay?.status === "delivering");
+                const shouldShowAccepted =
+                  !preferCreationForm && !!hasDriverAssigned && !showPaymentSheet;
 
                 // Log pour debug
                 if (__DEV__ && (shouldShowSearch || shouldShowAccepted)) {
@@ -1328,14 +1323,12 @@ export default function MapPage() {
                   <DriverSearchBottomSheet
                       isSearching={
                         isSearchingDriver &&
-                        orderToDisplay?.status === PENDING_STATUS
+                        orderToDisplay?.status === PENDING_STATUS &&
+                        !orderToDisplay?.driver
                       }
                     searchSeconds={searchSeconds}
                       driver={
-                        orderToDisplay?.status === "accepted" &&
-                        orderToDisplay?.driver
-                          ? orderToDisplay.driver
-                          : null
+                        hasDriverAssigned ? orderToDisplay!.driver : null
                       }
                     onCancel={() => {
                       if (orderToDisplay) {

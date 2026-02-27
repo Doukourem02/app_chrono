@@ -36,6 +36,8 @@ interface MapboxNavigationScreenProps {
   destination: Coords;
   onArrive: () => void;
   onCancel: () => void;
+  /** Si fourni, le bouton Retour appelle ceci au lieu de onCancel (ex: minimiser au lieu de fermer) */
+  onBackPress?: () => void;
   onRouteProgressChange?: (event: RouteProgressEvent) => void;
   onMessagePress?: () => void;
   onSettingsPress?: () => void;
@@ -67,6 +69,7 @@ export function MapboxNavigationScreen({
   destination,
   onArrive,
   onCancel,
+  onBackPress,
   onRouteProgressChange,
   onMessagePress,
   onSettingsPress,
@@ -202,10 +205,10 @@ export function MapboxNavigationScreen({
         onArrive={onArrive}
       />
       ) : null}
-      {/* Bouton Retour (gauche haut) */}
+      {/* Bouton Retour (gauche haut) — minimise ou ferme selon onBackPress */}
       <TouchableOpacity
         style={[styles.overlayBack, { top: insets.top + 8 }]}
-        onPress={onCancel}
+        onPress={() => (onBackPress ?? onCancel)()}
         activeOpacity={0.8}
       >
         <Ionicons name="arrow-back" size={24} color="#fff" />
