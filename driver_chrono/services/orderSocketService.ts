@@ -274,6 +274,15 @@ class OrderSocketService {
           // Sélectionner automatiquement cette nouvelle commande active
           store.setSelectedOrder(order.id);
         } else if (existingOrder) {
+          // Si la commande est complétée (ex: par le client, QR code, admin), la retirer du store
+          if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'declined') {
+            if (order.status === 'completed') {
+              store.completeOrder(order.id);
+            } else if (order.status === 'cancelled') {
+              store.cancelOrder(order.id);
+            }
+            return;
+          }
           // Mettre à jour la commande existante
           store.updateOrder(order.id, order as Partial<OrderRequest>);
           // Si c'est une commande active et qu'aucune n'est sélectionnée, la sélectionner

@@ -8,19 +8,23 @@ import { formatDurationLabel } from "../services/orderApi";
 import { formatDeliveryId } from "../utils/formatDeliveryId";
 
 /**
- * 4 cercles : Commande acceptée → Colis pris en charge → En cours de livraison → Colis livré.
- * "Livreur en route pour récupérer" est inclus dans la phase "Commande acceptée" (implicite).
+ * 4 cercles : Livreur assigné → Colis pris en charge → En cours de livraison → Colis livré.
+ * La barre de progression évolue en fonction du statut réel de la commande.
  */
 function getActiveStageIndex(status: string): number {
-  switch (status) {
+  const s = String(status || '').toLowerCase().trim();
+  switch (s) {
     case 'accepted':
     case 'enroute':
-      return 0; // Commande acceptée (inclut en route pickup)
+    case 'in_progress':
+    case 'assigned':
+      return 0; // Livreur assigné (inclut en route pickup)
     case 'picked_up':
       return 1; // Colis pris en charge
     case 'delivering':
-      return 2; // En cours de livraison
+      return 2; // En cours de livraison (icône navigate)
     case 'completed':
+    case 'delivered':
       return 3; // Colis livré
     case 'pending':
       return -1;
@@ -29,12 +33,22 @@ function getActiveStageIndex(status: string): number {
   }
 }
 
-/** 4 étapes : acceptée, colis pris, en livraison, livré */
-const PROGRESS_STEPS = [
-  { key: 'accepted', icon: 'checkmark' as const },
-  { key: 'picked_up', icon: 'cube' as const },
-  { key: 'delivering', icon: 'navigate' as const },
-  { key: 'completed', icon: 'checkmark-done' as const },
+/** Quand le statut indique "en cours de livraison" (picked_up ou delivering), afficher l'icône navigate.
+ *  Aligné avec TrackingBottomSheet qui traite ces deux statuts comme la même étape. */
+function getDisplayStageIndex(status: string): number {
+  const s = String(status || '').toLowerCase().trim();
+  if (s === 'picked_up' || s === 'delivering') {
+    return 2; // Les deux = "En cours de livraison" → icône navigate
+  }
+  return getActiveStageIndex(status);
+}
+
+/** 4 étapes avec icône distincte : Livreur assigné (voiture) → Colis pris → En livraison → Livré */
+const PROGRESS_STEPS: { key: string; icon: string; iconSet: 'material' | 'ionicons' }[] = [
+  { key: 'accepted', icon: 'truck-delivery', iconSet: 'material' },      // Livreur assigné
+  { key: 'picked_up', icon: 'cube', iconSet: 'ionicons' },               // Colis pris en charge
+  { key: 'delivering', icon: 'navigate', iconSet: 'ionicons' },           // En cours de livraison
+  { key: 'completed', icon: 'checkmark-done', iconSet: 'ionicons' },      // Colis livré
 ];
 
 interface ShipmentCardProps {
@@ -50,7 +64,7 @@ export default function ShipmentCard({
   backgroundColor,
   progressPercentage,
   progressColor,
-  inactiveColor = "rgba(0,0,0,0.15)",
+  inactiveColor = "rgba(139, 92, 246, 0.35)",
 }: ShipmentCardProps) {
   // Extraire l'adresse directement depuis order.dropoff.address
   // Les données sont maintenant correctement formatées dans ShipmentList
@@ -94,7 +108,7 @@ export default function ShipmentCard({
     : formatDeliveryId(order.id, order.createdAt);
   
   const status = String(order.status || 'pending');
-  const activeStageIndex = useMemo(() => getActiveStageIndex(status), [status]);
+  const activeStageIndex = useMemo(() => getDisplayStageIndex(status), [status]);
 
   /** Pour chaque étape : isCompleted = statut >= étape, isActive = étape courante (animée) */
   const isStepCompleted = (index: number) => index <= activeStageIndex;
@@ -102,22 +116,24 @@ export default function ShipmentCard({
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const isInProgress =
-    status === "accepted" || status === "enroute" || status === "picked_up" || status === "delivering";
+    status === "accepted" || status === "enroute" || status === "in_progress" || status === "picked_up" || status === "delivering";
 
-  // Animations progressives type barre de chargement (cercles + segments)
+  // Animations progressives : cercles et segments selon le statut
   const circleAnims = useRef(
-    PROGRESS_STEPS.map((_, i) => new Animated.Value(i <= activeStageIndex ? 1 : 0))
+    PROGRESS_STEPS.map(() => new Animated.Value(0))
   ).current;
   const segmentAnims = useRef(
-    [0, 1, 2].map((i) => new Animated.Value(i < activeStageIndex ? 1 : 0))
+    [0, 1, 2].map(() => new Animated.Value(0))
   ).current;
 
   useEffect(() => {
-    const STAGGER_MS = 90;
-    const DURATION_MS = 420;
-    const easing = Easing.bezier(0.25, 0.1, 0.25, 1);
+    const STAGGER_MS = 220; // Délai entre chaque étape (style recherche de livreur)
+    const DURATION_MS = 480; // Animation fluide par élément
+    const easing = Easing.out(Easing.cubic);
 
+    // Ne pas setValue immédiatement : laisser l'animation remplir progressivement
     const anims: Animated.CompositeAnimation[] = [];
+    // Ordre gauche → droite : cercle 0, segment 0, cercle 1, segment 1, cercle 2, segment 2, cercle 3
     for (let i = 0; i < 4; i++) {
       const target = i <= activeStageIndex ? 1 : 0;
       circleAnims[i].stopAnimation();
@@ -142,7 +158,6 @@ export default function ShipmentCard({
         );
       }
     }
-    // Ordre : cercle0, seg0, cercle1, seg1, cercle2, seg2, cercle3
     Animated.stagger(STAGGER_MS, anims).start();
   }, [activeStageIndex, circleAnims, segmentAnims]);
 
@@ -234,13 +249,33 @@ export default function ShipmentCard({
                       { backgroundColor: circleBg, transform: [{ scale: pulseAnim }] },
                     ]}
                   >
-                    <MaterialCommunityIcons name="truck-delivery" size={16} color="#fff" />
+                    {step.iconSet === 'material' ? (
+                      <MaterialCommunityIcons name={step.icon as any} size={18} color="#fff" />
+                    ) : (
+                      <Ionicons name={step.icon as any} size={16} color="#fff" />
+                    )}
                   </Animated.View>
                 ) : (
-                  <Animated.View style={[styles.progressCircle, { backgroundColor: circleBg }]}>
-                    {isStepCompleted(index) ? (
-                      <Ionicons name={step.icon} size={12} color="#fff" />
-                    ) : null}
+                  <Animated.View
+                    style={[
+                      styles.progressCircle,
+                      { backgroundColor: circleBg },
+                      !isStepCompleted(index) && styles.progressCircleInactive,
+                    ]}
+                  >
+                    {step.iconSet === 'material' ? (
+                      <MaterialCommunityIcons
+                        name={step.icon as any}
+                        size={14}
+                        color={isStepCompleted(index) ? '#fff' : 'rgba(139, 92, 246, 0.6)'}
+                      />
+                    ) : (
+                      <Ionicons
+                        name={step.icon as any}
+                        size={12}
+                        color={isStepCompleted(index) ? '#fff' : 'rgba(139, 92, 246, 0.6)'}
+                      />
+                    )}
                   </Animated.View>
                 )}
               </React.Fragment>
@@ -346,6 +381,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+  },
+  progressCircleInactive: {
+    borderWidth: 2,
+    borderColor: "rgba(139, 92, 246, 0.5)",
   },
   progressCircleActive: {
     width: 36,

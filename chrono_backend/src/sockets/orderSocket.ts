@@ -1188,6 +1188,30 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           dbError: dbErrorStatus
         });
 
+        // CRITIQUE : Notifier aussi le livreur (ex: complétion via QR/client, reconnexion)
+        // Évite que l'app livreur reste en mode "en position d'aller livrer" après finalisation
+        const orderDriverId = order.driverId;
+        if (orderDriverId) {
+          const driverSocketId = connectedDrivers.get(orderDriverId);
+          if (driverSocketId) {
+            const orderToEmit = {
+              ...order,
+              status: status,
+              completedAt: status === 'completed' ? order.completedAt : order.completedAt,
+            };
+            const driverSocket = io.sockets.sockets.get(driverSocketId);
+            if (driverSocket?.connected) {
+              driverSocket.emit('order:status:update', {
+                order: orderToEmit,
+                location,
+                dbSaved: dbSavedStatus,
+                dbError: dbErrorStatus
+              });
+              if (DEBUG) logger.debug(`order:status:update émis au livreur ${maskUserId(orderDriverId)} pour commande ${maskOrderId(orderId)}`);
+            }
+          }
+        }
+
         if (typeof ack === 'function') {
           ack({
             success: true,

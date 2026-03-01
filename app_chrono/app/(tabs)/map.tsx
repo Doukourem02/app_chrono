@@ -120,6 +120,16 @@ export default function MapPage() {
     setPreferCreationForm,
   } = useOrderStore();
 
+  // Ne pas afficher le formulaire "envoyer colis" tant qu'un livreur est assigné
+  // (pour laisser le client accéder au bouton "Détails de la course")
+  const hasOrderWithAssignedDriver = useOrderStore((s) =>
+    s.activeOrders.some(
+      (o) =>
+        o.driver &&
+        ["accepted", "enroute", "picked_up", "delivering"].includes(o.status)
+    )
+  );
+
   const {
     animatedHeight,
     isExpanded,
@@ -1114,13 +1124,13 @@ export default function MapPage() {
         return (
           <>
             {/* Afficher le DeliveryBottomSheet UNIQUEMENT quand on crée une nouvelle commande ET qu'il n'y a PAS de livreur assigné */}
-            {/* Ne pas afficher si DriverSearchBottomSheet est visible (livreur assigné ou recherche en cours) */}
-            {/* Si selectedOrderId est null, on ignore currentOrder pour permettre la création d'une nouvelle commande */}
+            {/* Ne pas afficher tant qu'un livreur est assigné : le client doit pouvoir cliquer sur "Détails de la course" */}
             {!deliveryMethodIsExpanded && 
              !orderDetailsIsExpanded && 
              (isCreatingNewOrder || preferCreationForm) && 
              !isSearchingDriver && 
              !pendingOrder && 
+             !hasOrderWithAssignedDriver && 
                 (selectedOrderId === null ||
                   preferCreationForm ||
                   !(

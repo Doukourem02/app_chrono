@@ -18,8 +18,8 @@ if (!fs.existsSync(pbxPath)) {
 let content = fs.readFileSync(pbxPath, 'utf8');
 
 // Supprimer la ligne Assets.car des outputPaths dans [CP] Copy Pods Resources
-// Match line with Assets.car in outputPaths (various path formats: ${TARGET_BUILD_DIR}/.../Assets.car, etc.)
-const assetsCarLine = /^\s*"[^"]*\/Assets\.car",?\s*[\r\n]*/gm;
+// Match: "..../Assets.car", (avec ou sans virgule, variable paths)
+const assetsCarLine = /^\s*"[^"]*Assets\.car",?\s*\r?\n/gm;
 const newContent = content.replace(assetsCarLine, '');
 if (newContent !== content) {
   fs.writeFileSync(pbxPath, newContent);

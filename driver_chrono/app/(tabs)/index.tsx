@@ -261,6 +261,8 @@ export default function Index() {
   const [showRecalcOverlay, setShowRecalcOverlay] = useState(false);
   /** Force unmount/remount Mapbox lors du passage pickup→dropoff (évite navigation figée) */
   const [mapboxMountedForDropoff, setMapboxMountedForDropoff] = useState(true);
+  /** Délai avant montage Mapbox phase 1 (évite figement au démarrage) */
+  const [phase1MountReady, setPhase1MountReady] = useState(false);
   const hasValidatedViaMapboxRef = useRef<Set<string>>(new Set());
   const lastEtaAnnouncedMinRef = useRef<number>(99);
   // Commande terminée mais navigation gardée ouverte : le livreur quitte quand il veut
@@ -332,10 +334,14 @@ export default function Index() {
     lastOrderStatusRef.current = status;
 
     // Phase 1 : transition vers accepted (ouverture avec commande acceptée)
-    // Auto-enroute pour synchroniser app/admin : "Livreur en route pour récupérer le colis"
+    // Délai 400ms avant montage Mapbox pour éviter figement au démarrage
     if (status === 'accepted' && prevStatus !== 'accepted') {
       logger.info('Auto-démarrage navigation phase 1 (point de collecte)', 'driver-index');
+      setPhase1MountReady(false);
       setIsNavigationActive(true);
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => setPhase1MountReady(true), 400);
+      });
       if (location) {
         setTimeout(() => {
           orderSocketService.updateDeliveryStatus(currentOrder.id, 'enroute', location);
@@ -343,9 +349,10 @@ export default function Index() {
       }
     }
     // Phase 2 : transition vers picked_up (colis récupéré → navigation vers livraison)
-    // Unmount Mapbox 500ms puis remount avec dropoff pour éviter navigation figée
+    // Unmount Mapbox 450ms puis remount avec dropoff (délai suffisant pour reset natif)
     if ((status === 'picked_up' || status === 'delivering') && (prevStatus === 'enroute' || prevStatus === 'in_progress')) {
       logger.info('Auto-démarrage navigation phase 2 (adresse de livraison)', 'driver-index');
+      setPhase1MountReady(false);
       setShowRecalcOverlay(true);
       setMapboxMountedForDropoff(false); // Unmount Mapbox pour reset état interne
       setIsNavigationMinimized(false);
@@ -356,7 +363,7 @@ export default function Index() {
       InteractionManager.runAfterInteractions(() => {
         setTimeout(() => {
           setMapboxMountedForDropoff(true); // Remount avec destination = dropoff
-        }, 500);
+        }, 450);
       });
       if (status === 'picked_up' && location) {
         setTimeout(() => {
@@ -375,7 +382,10 @@ export default function Index() {
 
   // Réinitialiser la transition quand la commande change
   useEffect(() => {
-    if (!currentOrder?.id) setMapboxMountedForDropoff(true);
+    if (!currentOrder?.id) {
+      setMapboxMountedForDropoff(true);
+      setPhase1MountReady(false);
+    }
   }, [currentOrder?.id]);
 
   // Géofencing : détection automatique d'arrivée
@@ -853,6 +863,23 @@ export default function Index() {
     }
   }, [currentOrder?.status, currentOrder, expandOrderBottomSheet, collapseOrderBottomSheet]);
 
+  // CRITIQUE : Fermer la navigation quand la livraison est terminée et plus aucune commande active
+  // Évite que le livreur reste bloqué en mode "en position d'aller livrer" après finalisation
+  useEffect(() => {
+    if (!currentOrder && activeOrders.length === 0 && navigationCompletedOrder) {
+      setNavigationCompletedOrder(null);
+      setIsNavigationActive(false);
+      setIsNavigationMinimized(false);
+      setShowColisRecupereButton(false);
+      setShowLivraisonEffectueeButton(false);
+      setLastEtaMinutes(null);
+      atPickupZoneAnnouncedRef.current = false;
+      atDropoffZoneAnnouncedRef.current = false;
+      setShowRecalcOverlay(false);
+      setPhase1MountReady(false);
+    }
+  }, [currentOrder, activeOrders.length, navigationCompletedOrder]);
+
   useEffect(() => {
     if (!orderBottomSheetIsExpanded && currentOrder) {
       const status = String(currentOrder?.status || '');
@@ -1093,10 +1120,10 @@ export default function Index() {
               },
             ]}
           >
-            {/* Phase 2 : unmount/remount pour éviter navigation figée pickup→dropoff */}
-            {((currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress') || mapboxMountedForDropoff) && (
+            {/* Phase 1 : délai 400ms avant montage. Phase 2 : unmount/remount pickup→dropoff */}
+            {(((currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress') && phase1MountReady) || mapboxMountedForDropoff) && (
             <MapboxNavigationScreen
-              key={`nav-${currentOrder?.status}-${mapboxMountedForDropoff}-${effectiveNavDestination.latitude}-${effectiveNavDestination.longitude}`}
+              key={`nav-${currentOrder?.id}-${effectiveNavDestination === currentDropoffCoord ? 'dropoff' : 'pickup'}-${effectiveNavDestination.latitude}-${effectiveNavDestination.longitude}`}
               origin={navOrigin || location!}
               destination={effectiveNavDestination}
               mute={mapboxVoiceMuted}
@@ -1104,6 +1131,7 @@ export default function Index() {
                 navigationCompletedOrder
                   ? () => {
                       setShowRecalcOverlay(false);
+                      setPhase1MountReady(false);
                       setNavigationCompletedOrder(null);
                       setIsNavigationActive(false);
                       setIsNavigationMinimized(false);
@@ -1141,6 +1169,7 @@ export default function Index() {
           onLivraisonEffectuee={handleLivraisonEffectuee}
           onCancel={() => {
             setShowRecalcOverlay(false);
+            setPhase1MountReady(false);
             setNavigationCompletedOrder(null);
             setIsNavigationActive(false);
             setIsNavigationMinimized(false);
@@ -1157,11 +1186,15 @@ export default function Index() {
           }}
         />
             )}
-          {/* Overlay "Recalcul..." pendant transition pickup→dropoff (masque latence chargement) */}
-          {showRecalcOverlay && (
+          {/* Overlay phase 1 : lancement (évite figement). Phase 2 : recalcul pickup→dropoff */}
+          {((!phase1MountReady && (currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress')) || showRecalcOverlay) && (
             <View style={styles.recalcOverlay} pointerEvents="none">
               <ActivityIndicator size="large" color="#fff" />
-              <Text style={styles.recalcOverlayText}>Recalcul de l&apos;itinéraire vers la livraison...</Text>
+              <Text style={styles.recalcOverlayText}>
+                {showRecalcOverlay
+                  ? "Recalcul de l'itinéraire vers la livraison..."
+                  : "Lancement de la navigation..."}
+              </Text>
             </View>
           )}
         </View>

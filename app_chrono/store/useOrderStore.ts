@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { soundService } from '../services/soundService';
 import { logger } from '../utils/logger';
 
-export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'delivering' | 'completed' | 'declined' | 'cancelled';
+export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'in_progress' | 'picked_up' | 'delivering' | 'completed' | 'declined' | 'cancelled';
 
 export interface OrderRequest {
   id: string;

@@ -84,13 +84,17 @@ module.exports = {
       eas: {
         projectId: "9618f8cb-2c98-4b1c-b50c-9f24fe1a2526",
       },
-      // Exposer les variables d'environnement
-      // Fallback: NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN (admin) si EXPO_PUBLIC non défini
+      // Exposer les variables d'environnement (noms EXPO_PUBLIC_* pour envCheck)
       mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
       socketUrl: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+      EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL,
+      EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
     }
   }
 };

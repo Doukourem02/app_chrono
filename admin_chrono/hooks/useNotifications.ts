@@ -9,7 +9,10 @@ import { logger } from '@/utils/logger'
 
 /**
  * Hook pour gérer les notifications en temps réel
- * Écoute les événements Socket.IO et crée des notifications
+ * Écoute les événements Socket.IO et crée des notifications.
+ * Son uniquement pour les événements prioritaires (Nouvelle commande, Nouveau message).
+ * Pas de son pour les mises à jour de statut (livrée, annulée, refusée) pour éviter
+ * une avalanche de sons (ex: 100 commandes × 4 types = trop de bruits).
  */
 // Type for order:created event (similar structure to order:status:update)
 type OrderCreatedData = {
@@ -53,7 +56,7 @@ export function useNotifications() {
 
       const shipmentNumber = order.shipmentNumber || order.shipment_number || order.deliveryId || order.delivery_id
       
-      // Créer la notification
+      // Créer la notification + son (prioritaire : action requise)
       addNotification({
         type: 'order',
         title: 'Nouvelle commande',
@@ -64,8 +67,6 @@ export function useNotifications() {
           shipmentNumber: shipmentNumber,
         },
       })
-
-      // Jouer le son pour nouvelle commande
       soundService.playNewOrder().catch((err) => {
         if (process.env.NODE_ENV === 'development') {
           logger.warn('[useNotifications] Erreur lecture son nouvelle commande:', err)
@@ -83,33 +84,29 @@ export function useNotifications() {
       const importantStatuses = ['completed', 'cancelled', 'declined', 'canceled']
       if (!importantStatuses.includes(order.status?.toLowerCase())) return
 
-      const statusMessages: Record<string, string> = {
-        completed: 'Commande livrée',
-        cancelled: 'Commande annulée',
-        canceled: 'Commande annulée',
-        declined: 'Commande refusée',
+      const statusConfig: Record<string, { title: string; messageSuffix: string }> = {
+        completed: { title: 'Commande livrée', messageSuffix: 'livrée' },
+        cancelled: { title: 'Commande annulée', messageSuffix: 'annulée' },
+        canceled: { title: 'Commande annulée', messageSuffix: 'annulée' },
+        declined: { title: 'Commande refusée', messageSuffix: 'refusée' },
       }
 
-      const statusMessage = statusMessages[order.status?.toLowerCase()] || 'Statut de commande mis à jour'
+      const config = statusConfig[order.status?.toLowerCase()] || {
+        title: 'Statut de commande mis à jour',
+        messageSuffix: 'mise à jour',
+      }
       const shipmentNumber = order.shipmentNumber || order.shipment_number || order.deliveryId || order.delivery_id
 
-      // Créer la notification
+      // Notification uniquement (pas de son pour livrée/annulée/refusée - trop fréquent)
       addNotification({
         type: 'order',
-        title: statusMessage,
-        message: `La commande${shipmentNumber ? ` ${shipmentNumber}` : ''} a été ${statusMessage.toLowerCase()}`,
+        title: config.title,
+        message: `La commande${shipmentNumber ? ` ${shipmentNumber}` : ''} a été ${config.messageSuffix}`,
         link: `/orders?orderId=${order.id}`,
         metadata: {
           orderId: order.id,
           status: order.status,
         },
-      })
-
-      // Jouer le son pour mise à jour de commande (même son que nouvelle commande)
-      soundService.playNewOrder().catch((err) => {
-        if (process.env.NODE_ENV === 'development') {
-          logger.warn('[useNotifications] Erreur lecture son mise à jour commande:', err)
-        }
       })
     })
 
@@ -119,7 +116,7 @@ export function useNotifications() {
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
       if (currentPath.includes('/message')) return
 
-      // Créer la notification
+      // Créer la notification + son (prioritaire)
       addNotification({
         type: 'message',
         title: 'Nouveau message',

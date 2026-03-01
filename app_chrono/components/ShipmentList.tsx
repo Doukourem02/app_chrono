@@ -339,6 +339,7 @@ export default function ShipmentList() {
             order.status === "pending" ||
             order.status === "accepted" ||
             order.status === "enroute" ||
+            order.status === "in_progress" ||
             order.status === "picked_up" ||
             order.status === "delivering";
           return isInProgress;
@@ -361,7 +362,9 @@ export default function ShipmentList() {
         });
 
         // Mapper les commandes du store avec les bonnes propriétés
-        const storeActiveOrders: OrderWithDB[] = activeOrdersFromStore.map(
+        // CRITIQUE : Utiliser getState() pour avoir l'état frais du store (évite closure stale quand seul le statut change)
+        const freshStoreOrders = useOrderStore.getState().activeOrders;
+        const storeActiveOrders: OrderWithDB[] = freshStoreOrders.map(
           (order) => ({
             ...order,
             created_at: (order as any).createdAt || (order as any).created_at,
@@ -411,6 +414,7 @@ export default function ShipmentList() {
             order.status === "pending" ||
             order.status === "accepted" ||
             order.status === "enroute" ||
+            order.status === "in_progress" ||
             order.status === "picked_up" ||
             order.status === "delivering";
           return isInProgress;
@@ -454,18 +458,16 @@ export default function ShipmentList() {
         });
 
         // Construire la liste finale en priorisant les commandes en cours
-        const finalOrders: OrderWithDB[] = [];
+        let finalOrders: OrderWithDB[] = [];
 
-        // 1. Ajouter la première commande en cours (la plus récente)
-        if (inProgressCombined.length > 0) {
-          finalOrders.push(inProgressCombined[0]);
-        }
+        // 1. Ajouter TOUTES les commandes en cours (éviter disparition intermittente)
+        inProgressCombined.forEach((o) => finalOrders.push(o));
 
         // 2. Si on a de la place, ajouter les commandes complétées aujourd'hui
-        if (finalOrders.length < 2 && todayCompletedCombined.length > 0) {
+        if (finalOrders.length < 3 && todayCompletedCombined.length > 0) {
           for (
             let i = 0;
-            i < todayCompletedCombined.length && finalOrders.length < 2;
+            i < todayCompletedCombined.length && finalOrders.length < 3;
             i++
           ) {
             const alreadyAdded = finalOrders.some(
@@ -478,10 +480,10 @@ export default function ShipmentList() {
         }
 
         // 3. Si on a encore de la place, ajouter d'autres commandes complétées
-        if (finalOrders.length < 2 && completedCombined.length > 0) {
+        if (finalOrders.length < 3 && completedCombined.length > 0) {
           for (
             let i = 0;
-            i < completedCombined.length && finalOrders.length < 2;
+            i < completedCombined.length && finalOrders.length < 3;
             i++
           ) {
             const alreadyAdded = finalOrders.some(
@@ -493,13 +495,71 @@ export default function ShipmentList() {
           }
         }
 
+        // Ne jamais afficher vide si le store a des commandes en cours (évite "Aucune commande" pendant une course)
+        const storeInProgress = freshStoreOrders.filter(
+          (o) =>
+            o.status === "pending" ||
+            o.status === "accepted" ||
+            o.status === "enroute" ||
+            o.status === "in_progress" ||
+            o.status === "picked_up" ||
+            o.status === "delivering"
+        );
+        if (finalOrders.length === 0 && storeInProgress.length > 0) {
+          finalOrders = storeInProgress
+            .map((o) => ({
+              ...o,
+              created_at: (o as any).createdAt || (o as any).created_at,
+              accepted_at: (o as any).acceptedAt || (o as any).accepted_at,
+              completed_at: (o as any).completedAt || (o as any).completed_at,
+              cancelled_at: (o as any).cancelledAt || (o as any).cancelled_at,
+            }))
+            .sort((a, b) => {
+              const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return dateB - dateA;
+            });
+        }
+
         setOrders(finalOrders);
       } else {
-        setOrders([]);
+        // API vide : garder le store comme source de vérité pour les commandes en cours
+        const freshStore = useOrderStore.getState().activeOrders;
+        const storeInProgress = freshStore.filter(
+          (o) =>
+            o.status === "pending" ||
+            o.status === "accepted" ||
+            o.status === "enroute" ||
+            o.status === "in_progress" ||
+            o.status === "picked_up" ||
+            o.status === "delivering"
+        );
+        if (storeInProgress.length > 0) {
+          const fallback = storeInProgress.map((o) => ({
+            ...o,
+            created_at: (o as any).createdAt || (o as any).created_at,
+            accepted_at: (o as any).acceptedAt || (o as any).accepted_at,
+            completed_at: (o as any).completedAt || (o as any).completed_at,
+            cancelled_at: (o as any).cancelledAt || (o as any).cancelled_at,
+          })) as OrderWithDB[];
+          setOrders(fallback);
+        } else {
+          setOrders([]);
+        }
       }
     } catch (error) {
       logger.error("Erreur chargement commandes:", undefined, error);
-      setOrders([]);
+      // En cas d'erreur, ne pas vider si le store a des commandes en cours
+      const storeInProgress = useOrderStore.getState().activeOrders.filter(
+        (o) =>
+          o.status === "pending" ||
+          o.status === "accepted" ||
+          o.status === "enroute" ||
+          o.status === "in_progress" ||
+          o.status === "picked_up" ||
+          o.status === "delivering"
+      );
+      if (storeInProgress.length === 0) setOrders([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -551,41 +611,8 @@ export default function ShipmentList() {
             return order;
           }
 
-          if (!storeOrder) {
-            const wasInProgress =
-              order.status === "pending" ||
-              order.status === "accepted" ||
-              order.status === "enroute" ||
-              order.status === "picked_up" ||
-              order.status === "delivering";
-
-            if (wasInProgress) {
-              if (order.status === "pending") {
-                const createdAt = order.created_at || (order as any).createdAt;
-                const createdTime = createdAt
-                  ? new Date(createdAt).getTime()
-                  : 0;
-                const now = Date.now();
-                if (
-                  createdTime &&
-                  now - createdTime >= PENDING_AUTO_CANCEL_DELAY_MS
-                ) {
-                  return {
-                    ...order,
-                    status: "cancelled" as OrderStatus,
-                    cancelled_at: new Date().toISOString(),
-                  };
-                }
-              } else {
-                return {
-                  ...order,
-                  status: "completed" as OrderStatus,
-                  completed_at: new Date().toISOString(),
-                };
-              }
-            }
-          }
-
+          // Ordre absent du store : ne pas le marquer completed/cancelled automatiquement
+          // (évite disparition lors de races socket/API). loadOrders fera la sync.
           return order;
         });
 
@@ -738,6 +765,7 @@ export default function ShipmentList() {
         order.status === "pending" ||
         order.status === "accepted" ||
         order.status === "enroute" ||
+        order.status === "in_progress" ||
         order.status === "picked_up" ||
         order.status === "delivering"
     );

@@ -1,8 +1,9 @@
 /**
  * Polling de secours pour synchroniser le statut des commandes
- * quand le socket n'a pas transmis (ex: order-accepted, completed).
- * - Pending → accepted/enroute : polling toutes les 3s (fallback si socket échoue)
- * - Delivering/picked_up → completed : polling toutes les 12s
+ * quand le socket n'a pas transmis.
+ * - Pending → accepted/enroute : 3s (recherche livreur)
+ * - Accepted/enroute → picked_up/delivering : 5s (colis récupéré)
+ * - Delivering/picked_up → completed : 12s
  */
 import { useEffect, useRef } from 'react';
 import { useOrderStore } from '../store/useOrderStore';
@@ -10,8 +11,9 @@ import { useAuthStore } from '../store/useAuthStore';
 import { userApiService } from '../services/userApiService';
 import { logger } from '../utils/logger';
 
-const POLL_PENDING_MS = 3_000; // 3 secondes pour pending (recherche livreur)
-const POLL_ACTIVE_MS = 12_000; // 12 secondes pour delivering/picked_up
+const POLL_PENDING_MS = 3_000; // 3s pour pending (recherche livreur)
+const POLL_ENROUTE_MS = 5_000; // 5s pour accepted/enroute (colis récupéré)
+const POLL_ACTIVE_MS = 12_000; // 12s pour delivering/picked_up (livraison terminée)
 
 export function useOrderStatusPolling() {
   const user = useAuthStore((s) => s.user);
@@ -20,12 +22,16 @@ export function useOrderStatusPolling() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pendingIds = activeOrders.filter((o) => o.status === 'pending').map((o) => o.id);
+  const enrouteIds = activeOrders
+    .filter((o) => o.status === 'accepted' || o.status === 'enroute')
+    .map((o) => o.id);
   const activeToPollIds = activeOrders
     .filter((o) => o.status === 'delivering' || o.status === 'picked_up')
     .map((o) => o.id);
   const hasPending = pendingIds.length > 0;
+  const hasEnroute = enrouteIds.length > 0;
   const hasActiveToPoll = activeToPollIds.length > 0;
-  const ordersKey = [...pendingIds, ...activeToPollIds].join(',');
+  const ordersKey = [...pendingIds, ...enrouteIds, ...activeToPollIds].join(',');
 
   useEffect(() => {
     const cleanup = () => {
@@ -35,13 +41,13 @@ export function useOrderStatusPolling() {
       }
     };
 
-    if (!user?.id || (!hasPending && !hasActiveToPoll)) {
+    if (!user?.id || (!hasPending && !hasEnroute && !hasActiveToPoll)) {
       cleanup();
       return cleanup;
     }
 
-    const pollInterval = hasPending ? POLL_PENDING_MS : POLL_ACTIVE_MS;
-    const idsToPoll = [...pendingIds, ...activeToPollIds];
+    const pollInterval = hasPending ? POLL_PENDING_MS : hasEnroute ? POLL_ENROUTE_MS : POLL_ACTIVE_MS;
+    const idsToPoll = [...pendingIds, ...enrouteIds, ...activeToPollIds];
 
     const poll = async () => {
       try {
@@ -78,6 +84,26 @@ export function useOrderStatusPolling() {
               location: undefined,
             });
           }
+          // Accepted/enroute → picked_up/delivering : sync si socket a raté (colis récupéré)
+          else if (
+            (order.status === 'accepted' || order.status === 'enroute') &&
+            ['picked_up', 'delivering'].includes(newStatus)
+          ) {
+            logger.info(
+              '[useOrderStatusPolling] Colis récupéré détecté via API (socket raté)',
+              'useOrderStatusPolling',
+              { orderId: order.id, newStatus }
+            );
+            updateFromSocket({
+              order: {
+                ...order,
+                ...apiOrder,
+                id: apiOrder.id,
+                status: newStatus as any,
+              },
+              location: undefined,
+            });
+          }
           // Delivering/picked_up → completed
           else if ((order.status === 'delivering' || order.status === 'picked_up') && newStatus === 'completed') {
             logger.info(
@@ -106,6 +132,6 @@ export function useOrderStatusPolling() {
     intervalRef.current = setInterval(poll, pollInterval);
 
     return cleanup;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- ordersKey dérive de pendingIds/activeToPollIds, évite refs instables
-  }, [user?.id, ordersKey, hasPending, hasActiveToPoll, updateFromSocket]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ordersKey dérive des ids, évite refs instables
+  }, [user?.id, ordersKey, hasPending, hasEnroute, hasActiveToPoll, updateFromSocket]);
 }
