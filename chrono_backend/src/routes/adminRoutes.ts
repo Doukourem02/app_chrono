@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { cancelAdminOrder, createAdminOrder, createAdminPromoCode, deleteAdminRating, getAdminAdminDetails, getAdminClientDetails, getAdminClientStatistics, getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminDisputes, getAdminDriverDetails, getAdminDriverFullDetails, getAdminDrivers, getAdminFinancialStats, getAdminGlobalSearch, getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminPromoCodes, getAdminRatings, getAdminRecentActivities, getAdminReportClients, getAdminReportDeliveries, getAdminReportDrivers, getAdminReportPayments, getAdminReportRevenues, getAdminTransactions, getAdminUsers, rechargeAdminDriverCommission, suspendAdminDriverCommission, updateAdminDispute, updateAdminDriverCommissionRate, updateAdminDriverStatus, getAdminDriverCommissionTransactions } from '../controllers/adminController.js';
+import { cancelAdminOrder, createAdminOrder, createAdminPromoCode, deleteAdminRating, getAdminAdminDetails, getAdminClientDetails, getAdminClientStatistics, getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminDisputes, getAdminDriverDetails, getAdminDriverFullDetails, getAdminDrivers, getAdminFinancialStats, getAdminGlobalSearch, getAdminOngoingDeliveries, getAdminOrderById, getAdminOrderQRScans, getAdminOrdersByStatus, getAdminPromoCodes, getAdminRatings, getAdminRecentActivities, getAdminReportClients, getAdminReportDeliveries, getAdminReportDrivers, getAdminReportPayments, getAdminReportRevenues, getAdminTransactions, getAdminUsers, rechargeAdminDriverCommission, suspendAdminDriverCommission, updateAdminDispute, updateAdminDriverCommissionRate, updateAdminDriverStatus, getAdminDriverCommissionTransactions } from '../controllers/adminController.js';
 import { createConversation, getConversationById, getConversations, getMessages, getUnreadCount, markMessagesAsRead, sendMessage } from '../controllers/messageController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 
@@ -11,6 +11,8 @@ router.get('/delivery-analytics', verifyAdminSupabase, getAdminDeliveryAnalytics
 router.get('/recent-activities', verifyAdminSupabase, getAdminRecentActivities);
 router.get('/ongoing-deliveries', verifyAdminSupabase, getAdminOngoingDeliveries);
 router.get('/orders', verifyAdminSupabase, getAdminOrdersByStatus);
+router.get('/orders/:orderId/qr-scans', verifyAdminSupabase, getAdminOrderQRScans);
+router.get('/orders/:orderId', verifyAdminSupabase, getAdminOrderById);
 router.post('/orders', verifyAdminSupabase, createAdminOrder);
 router.post('/orders/:orderId/cancel', verifyAdminSupabase, cancelAdminOrder);
 router.get('/users', verifyAdminSupabase, getAdminUsers);

@@ -178,6 +178,34 @@ export const scanQRCode = async (req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
+    // Notifier le client que le QR a été scanné (pour masquer le bouton QR)
+    try {
+      const io = (req as any).app?.get?.('io');
+      const orderId = result.data?.orderId;
+      if (io && orderId) {
+        const orderRow = await pool.query(
+          'SELECT user_id, status, delivery_qr_scanned_at FROM orders WHERE id = $1',
+          [orderId]
+        );
+        if (orderRow.rows[0]?.user_id) {
+          const { connectedUsers } = await import('../sockets/orderSocket.js');
+          const userSocketId = connectedUsers.get(orderRow.rows[0].user_id);
+          if (userSocketId) {
+            io.to(userSocketId).emit('order:status:update', {
+              order: {
+                id: orderId,
+                status: 'completed',
+                delivery_qr_scanned_at: orderRow.rows[0].delivery_qr_scanned_at,
+              },
+              location: null,
+            });
+          }
+        }
+      }
+    } catch (socketErr: any) {
+      logger.warn('[scanQRCode] Échec notification socket:', socketErr?.message);
+    }
+
     res.json({
       success: true,
       message: 'QR code scanné avec succès',

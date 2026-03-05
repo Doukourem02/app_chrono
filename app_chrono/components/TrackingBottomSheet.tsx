@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { config } from "../config";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userApiService } from "../services/userApiService";
+import { qrCodeService } from "../services/qrCodeService";
 import { QRCodeDisplay } from "./QRCodeDisplay";
 import { formatUserName } from "../utils/formatName";
 import { logger } from "../utils/logger";
@@ -36,7 +37,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const [orderRating, setOrderRating] = useState<{ rating: number; comment: string | null } | null>(null);
   const [isLoadingRating, setIsLoadingRating] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
-  const [qrCodeData, setQrCodeData] = useState<{ qrCodeImage: string; qrCodeData?: { expiresAt: string; orderNumber: string } } | null>(null);
+  const [qrCodeData, setQrCodeData] = useState<{
+    qrCodeImage: string;
+    qrCodeData?: { expiresAt: string; orderNumber: string; [k: string]: unknown };
+  } | null>(null);
 
   // Helper pour obtenir les initiales du livreur
   const getDriverInitials = useCallback(() => {
@@ -94,6 +98,10 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   }, [currentOrder?.status, currentOrder?.id]);
   
   const isCompleted = status === 'completed';
+  // Afficher le QR code tant qu'il n'a pas été scanné (même si livreur a cliqué "colis livré" par erreur)
+  const qrNotScanned = !currentOrder?.delivery_qr_scanned_at && !currentOrder?.deliveryQrScannedAt;
+  const showQRCodeButton =
+    status === 'enroute' || status === 'picked_up' || status === 'delivering' || (isCompleted && qrNotScanned);
 
   useEffect(() => {
     if (currentOrder?.id) {
@@ -108,6 +116,28 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       }
     }
   }, [currentOrder?.id, isCompleted, loadOrderRating]);
+
+  // Charger le QR code quand le client ouvre la modal (picked_up / delivering)
+  useEffect(() => {
+    if (!showQRCode || !currentOrder?.id) return;
+    let cancelled = false;
+    const loadQRCode = async () => {
+      let data = await qrCodeService.getOrderQRCode(currentOrder.id);
+      if (!data && !cancelled) {
+        data = await qrCodeService.generateOrderQRCode(currentOrder.id);
+      }
+      if (!cancelled && data) {
+        setQrCodeData({
+          qrCodeImage: data.qrCodeImage,
+          qrCodeData: data.qrCodeData
+            ? { ...data.qrCodeData, expiresAt: data.qrCodeData.expiresAt, orderNumber: data.qrCodeData.orderNumber }
+            : undefined,
+        });
+      }
+    };
+    loadQRCode();
+    return () => { cancelled = true; };
+  }, [showQRCode, currentOrder?.id]);
   
   // Permettre l'annulation pour les commandes en pending ou accepted
   const canCancel = React.useMemo(() => {
@@ -235,7 +265,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       {!isExpanded && (
         <View style={styles.collapsedWrapper}>
           <View style={styles.collapsedContainer}>
-            {isCompleted ? (
+            {isCompleted && !showQRCodeButton ? (
               <View style={styles.completedBadge}>
                 <Ionicons name="checkmark" size={16} color="#fff" />
                 <Text style={styles.completedBadgeText}>Livré</Text>
@@ -277,7 +307,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                         <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
                       </TouchableOpacity>
                     </>
-                  ) : status === 'enroute' || status === 'picked_up' || status === 'delivering' ? (
+                  ) : (
                     <>
                       <TouchableOpacity 
                         style={styles.iconCircle}
@@ -285,22 +315,24 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                       >
                         <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
                       </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={styles.iconCircle}
-                        onPress={() => setShowQRCode(true)}
-                      >
-                        <Ionicons name="qr-code-outline" size={20} color="#fff" />
-                      </TouchableOpacity>
+                      {showQRCodeButton && (
+                        <TouchableOpacity 
+                          style={styles.iconCircle}
+                          onPress={() => setShowQRCode(true)}
+                        >
+                          <Ionicons name="qr-code-outline" size={20} color="#fff" />
+                        </TouchableOpacity>
+                      )}
                     </>
-                  ) : (
-                    <TouchableOpacity 
-                      style={styles.iconCircle}
-                      onPress={onMessage}
-                    >
-                      <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
-                    </TouchableOpacity>
                   )}
                 </View>
+                {/* Badge Livré à droite si completed mais QR pas encore scanné */}
+                {isCompleted && showQRCodeButton && (
+                  <View style={styles.completedBadge}>
+                    <Ionicons name="checkmark" size={16} color="#fff" />
+                    <Text style={styles.completedBadgeText}>Livré</Text>
+                  </View>
+                )}
               </>
             )}
           </View>
@@ -387,10 +419,11 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                     const baseUrl = (config as any).trackBaseUrl || 'http://localhost:3000';
                     const trackUrl = `${baseUrl.replace(/\/$/, '')}/track/${token}`;
                     try {
+                      // Ne pas utiliser `url` séparément : sur iOS, message+url génère du bplist corrompu.
+                      // Le message contient déjà l'URL en texte brut → lien cliquable et partage propre.
                       await Share.share({
                         message: `Suivez votre livraison Chrono en temps réel : ${trackUrl}`,
                         title: 'Lien de suivi Chrono',
-                        url: trackUrl,
                       });
                     } catch (err) {
                       logger.error('Erreur partage lien', undefined, err);
@@ -407,20 +440,37 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
           {/* Pour les commandes terminées/annulées, afficher un message de statut */}
           {(isCompleted || status === 'cancelled' || status === 'declined') && (
-            <View style={styles.completedBanner}>
-              <Ionicons 
-                name={isCompleted ? "checkmark-circle" : "close-circle"} 
-                size={20} 
-                color="#fff" 
-              />
-              <Text style={styles.completedBannerText}>
-                {isCompleted 
-                  ? `Course terminée${currentOrder?.proof?.uploadedAt ? ' — preuve reçue' : ''}`
-                  : status === 'cancelled' 
-                  ? 'Commande annulée'
-                  : 'Commande refusée'}
-              </Text>
-            </View>
+            <>
+              <View style={styles.completedBanner}>
+                <Ionicons 
+                  name={isCompleted ? "checkmark-circle" : "close-circle"} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <Text style={styles.completedBannerText}>
+                  {isCompleted 
+                    ? `Course terminée${currentOrder?.proof?.uploadedAt ? ' — preuve reçue' : ''}`
+                    : status === 'cancelled' 
+                    ? 'Commande annulée'
+                    : 'Commande refusée'}
+                </Text>
+              </View>
+              {/* QR code encore affichable si livré sans scan (livreur a cliqué trop tôt) */}
+              {showQRCodeButton && (
+                <TouchableOpacity
+                  style={styles.showQRCodeButton}
+                  onPress={() => setShowQRCode(true)}
+                >
+                  <Ionicons name="qr-code-outline" size={22} color="#7C3AED" />
+                  <Text style={styles.showQRCodeButtonText}>
+                    Afficher le QR code pour le livreur
+                  </Text>
+                  <Text style={styles.showQRCodeButtonHint}>
+                    Le livreur peut scanner pour confirmer la livraison
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
 
           {/* Section Détails de la commande pour les commandes terminées/annulées */}
@@ -599,6 +649,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         qrCodeImage={qrCodeData?.qrCodeImage || null}
         orderNumber={qrCodeData?.qrCodeData?.orderNumber}
         expiresAt={qrCodeData?.qrCodeData?.expiresAt}
+        fullQrCodeData={qrCodeData?.qrCodeData}
         onClose={() => {
           setShowQRCode(false);
           setQrCodeData(null); // Réinitialiser pour recharger au prochain affichage
@@ -845,6 +896,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
     fontSize: 15,
+  },
+  showQRCodeButton: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F0FF',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#7C3AED',
+  },
+  showQRCodeButtonText: {
+    color: '#7C3AED',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  showQRCodeButtonHint: {
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 4,
   },
   newOrderButton: {
     flexDirection: "row",

@@ -27,6 +27,7 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
         o.delivery_method,
         o.distance_km,
         o.created_at,
+        o.delivery_qr_scanned_at,
         d.first_name as driver_first_name,
         d.last_name as driver_last_name,
         dp.current_latitude as driver_lat,
@@ -62,7 +63,11 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
     }
 
     const status = row.status;
-    const showQRCode = ['picked_up', 'delivering'].includes(status);
+    const qrNotScanned = !row.delivery_qr_scanned_at;
+    // Afficher le QR tant qu'il n'a pas été scanné (même si completed - livreur a cliqué trop tôt)
+    const showQRCode =
+      ['picked_up', 'delivering'].includes(status) ||
+      (status === 'completed' && qrNotScanned);
     let qrCodeImage: string | null = null;
 
     if (showQRCode) {

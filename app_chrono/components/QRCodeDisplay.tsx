@@ -9,6 +9,8 @@ interface QRCodeDisplayProps {
   qrCodeImage: string | null;
   orderNumber?: string;
   expiresAt?: string;
+  /** Données complètes du QR (pour copie test en simulateur) */
+  fullQrCodeData?: Record<string, unknown>;
   onClose: () => void;
 }
 
@@ -17,6 +19,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
   qrCodeImage,
   orderNumber,
   expiresAt,
+  fullQrCodeData,
   onClose,
 }) => {
   const insets = useSafeAreaInsets();
@@ -126,6 +129,22 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
 
           {/* Actions */}
           <View style={styles.actions}>
+            {__DEV__ && fullQrCodeData && (
+              <TouchableOpacity
+                style={[styles.button, styles.copyTestButton]}
+                onPress={async () => {
+                  const json = JSON.stringify(fullQrCodeData);
+                  try {
+                    await Share.share({ message: json, title: 'QR Code (test)' });
+                  } catch {
+                    Alert.alert('Erreur', 'Impossible de partager les données');
+                  }
+                }}
+              >
+                <Ionicons name="copy-outline" size={20} color="#059669" />
+                <Text style={styles.copyTestButtonText}>Partager pour test</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.button, styles.shareButton]}
               onPress={handleShare}
@@ -251,6 +270,14 @@ const styles = StyleSheet.create({
   },
   shareButtonText: {
     color: '#6366F1',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  copyTestButton: {
+    backgroundColor: '#D1FAE5',
+  },
+  copyTestButtonText: {
+    color: '#059669',
     fontSize: 16,
     fontWeight: '600',
   },

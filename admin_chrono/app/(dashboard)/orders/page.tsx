@@ -2,6 +2,7 @@
 
 import { ScreenTransition, SkeletonLoader } from "@/components/animations";
 import StatusKPICard from "@/components/orders/StatusKPICard";
+import OrderDetailModal from "@/components/orders/OrderDetailModal";
 import { adminApiService } from "@/lib/adminApiService";
 import { adminSocketService } from "@/lib/adminSocketService";
 import { formatDeliveryId } from "@/utils/formatDeliveryId";
@@ -114,6 +115,8 @@ export default function OrdersPage() {
 
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
   const [currentPage, setCurrentPage] = useState(1);
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+  const [detailOrderDate, setDetailOrderDate] = useState<string | undefined>();
   const itemsPerPage = 10;
   const queryClient = useQueryClient();
   const lastStatusParamRef = useRef<string | null>(null);
@@ -231,8 +234,34 @@ export default function OrdersPage() {
     },
   };
 
-  // Lire le paramètre orderId pour mettre en évidence la commande
+  // Lire le paramètre orderId pour mettre en évidence la commande et ouvrir le détail
   const highlightedOrderId = searchParams.get("orderId");
+
+  // Ouvrir automatiquement le détail si on arrive avec orderId dans l'URL
+  const orderFromUrl = useMemo(() => {
+    if (!highlightedOrderId || isLoading || orders.length === 0) return null;
+    return (
+      orders.find(
+        (o) =>
+          o.id === highlightedOrderId ||
+          o.id.replace(/-/g, "").toUpperCase().slice(-4) ===
+            highlightedOrderId.replace(/-/g, "").toUpperCase().slice(-4)
+      ) ?? null
+    );
+  }, [highlightedOrderId, orders, isLoading]);
+
+  const effectiveDetailOrderId = detailOrderId ?? orderFromUrl?.id ?? null;
+  const effectiveDetailOrderDate = detailOrderDate ?? orderFromUrl?.date;
+
+  const handleCloseDetailModal = () => {
+    setDetailOrderId(null);
+    setDetailOrderDate(undefined);
+    if (highlightedOrderId) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("orderId");
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
 
   // Calculer targetOrderId et targetPage avec useMemo pour éviter les setState dans useEffect
   const { targetOrderId, targetPage } = useMemo(() => {
@@ -596,8 +625,11 @@ export default function OrdersPage() {
                       }
                     }
 
-                    // Gérer le clic sur une commande pour retirer la mise en évidence
-                    const handleOrderClick = () => {
+                    // Ouvrir le détail de la commande au clic
+                    const handleOrderClick = (e: React.MouseEvent) => {
+                      if ((e.target as HTMLElement).closest('button')) return;
+                      setDetailOrderId(order.id);
+                      setDetailOrderDate(order.date);
                       if (highlightedOrderId) {
                         const url = new URL(window.location.href);
                         url.searchParams.delete("orderId");
@@ -897,6 +929,14 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      <OrderDetailModal
+        isOpen={!!effectiveDetailOrderId}
+        onClose={handleCloseDetailModal}
+        orderId={effectiveDetailOrderId}
+        orderDate={effectiveDetailOrderDate}
+        onOrderCancelled={() => queryClient.invalidateQueries({ queryKey: ["orders", activeTab] })}
+      />
     </ScreenTransition>
   );
 }

@@ -1232,6 +1232,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
         departure: pickup?.address || pickup?.formatted_address || pickup?.name || pickup?.street || 'Adresse inconnue',
         destination: dropoff?.address || dropoff?.formatted_address || dropoff?.name || dropoff?.street || 'Adresse inconnue',
         status: order.status,
+        delivery_qr_scanned_at: order.delivery_qr_scanned_at,
       };
     });
 
@@ -1268,6 +1269,136 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
       return;
     }
 
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Récupère le détail d'une commande pour l'admin (avec preuve QR livraison)
+ * GET /api/admin/orders/:orderId
+ */
+export const getAdminOrderById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ success: false, message: 'orderId requis' });
+      return;
+    }
+
+    const result = await (pool as any).query(
+      `SELECT 
+        o.*,
+        d.first_name as driver_first_name,
+        d.last_name as driver_last_name,
+        d.phone as driver_phone,
+        d.email as driver_email,
+        u.first_name as client_first_name,
+        u.last_name as client_last_name,
+        u.phone as client_phone,
+        u.email as client_email,
+        scanned_by_u.first_name as scanned_by_first_name,
+        scanned_by_u.last_name as scanned_by_last_name
+      FROM orders o
+      LEFT JOIN users d ON o.driver_id = d.id
+      LEFT JOIN users u ON o.user_id = u.id
+      LEFT JOIN users scanned_by_u ON o.delivery_qr_scanned_by = scanned_by_u.id
+      WHERE o.id = $1`,
+      [orderId]
+    );
+
+    if (!result.rows?.length) {
+      res.status(404).json({ success: false, message: 'Commande introuvable' });
+      return;
+    }
+
+    const order = result.rows[0];
+    const parseJsonField = (field: any): any => {
+      if (!field) return null;
+      if (typeof field === 'string') {
+        try {
+          return JSON.parse(field);
+        } catch {
+          return field;
+        }
+      }
+      return field;
+    };
+
+    const pickup = parseJsonField(order.pickup_address || order.pickup);
+    const dropoff = parseJsonField(order.dropoff_address || order.dropoff);
+
+    res.json({
+      success: true,
+      data: {
+        id: order.id,
+        deliveryId: formatDeliveryId(order.id, order.created_at),
+        status: order.status,
+        createdAt: order.created_at,
+        completedAt: order.completed_at,
+        departure: pickup?.address || pickup?.formatted_address || pickup?.name || pickup?.street || 'Adresse inconnue',
+        destination: dropoff?.address || dropoff?.formatted_address || dropoff?.name || dropoff?.street || 'Adresse inconnue',
+        price: order.price_cfa ?? order.price,
+        deliveryMethod: order.delivery_method,
+        distance: order.distance_km,
+        delivery_qr_scanned_at: order.delivery_qr_scanned_at,
+        delivery_qr_scanned_by: order.delivery_qr_scanned_by
+          ? {
+              id: order.delivery_qr_scanned_by,
+              name: [order.scanned_by_first_name, order.scanned_by_last_name].filter(Boolean).join(' ') || order.delivery_qr_scanned_by,
+            }
+          : null,
+        driver: order.driver_id
+          ? {
+              id: order.driver_id,
+              name: [order.driver_first_name, order.driver_last_name].filter(Boolean).join(' ') || 'Livreur',
+              phone: order.driver_phone,
+              email: order.driver_email,
+            }
+          : null,
+        client: order.user_id
+          ? {
+              id: order.user_id,
+              name: [order.client_first_name, order.client_last_name].filter(Boolean).join(' ') || 'Client',
+              phone: order.client_phone,
+              email: order.client_email,
+            }
+          : null,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Erreur getAdminOrderById:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Récupère l'historique des scans QR pour une commande (admin)
+ * GET /api/admin/orders/:orderId/qr-scans
+ */
+export const getAdminOrderQRScans = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ success: false, message: 'orderId requis' });
+      return;
+    }
+
+    const history = await qrCodeService.getScanHistory(orderId);
+
+    res.json({
+      success: true,
+      data: history,
+    });
+  } catch (error: any) {
+    logger.error('Erreur getAdminOrderQRScans:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',

@@ -323,6 +323,7 @@ export default function ShipmentList() {
             accepted_at: order.accepted_at,
             completed_at: order.completed_at,
             cancelled_at: order.cancelled_at,
+            delivery_qr_scanned_at: order.delivery_qr_scanned_at,
           };
         }) as OrderWithDB[];
 

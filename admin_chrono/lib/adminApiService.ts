@@ -1588,6 +1588,82 @@ class AdminApiService {
   }
 
   /**
+   * Récupère le détail d'une commande (avec preuve QR livraison)
+   */
+  async getOrderById(orderId: string): Promise<{
+    success: boolean
+    data?: {
+      id: string
+      deliveryId: string
+      status: string
+      createdAt: string
+      completedAt?: string
+      departure: string
+      destination: string
+      price?: number
+      deliveryMethod?: string
+      distance?: number
+      delivery_qr_scanned_at?: string | null
+      delivery_qr_scanned_by?: { id: string; name: string } | null
+      driver?: { id: string; name: string; phone?: string; email?: string } | null
+      client?: { id: string; name: string; phone?: string; email?: string } | null
+    }
+    message?: string
+  }> {
+    try {
+      const url = `${API_BASE_URL}/api/admin/orders/${orderId}`
+      const response = await this.fetchWithAuth(url)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        return {
+          success: false,
+          message: errorData.message || 'Commande introuvable',
+        }
+      }
+      const result = await response.json()
+      return {
+        success: true,
+        data: result.data,
+      }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Error getOrderById:', getErrorMessage(error))
+      return { success: false, message: 'Erreur lors du chargement' }
+    }
+  }
+
+  /**
+   * Récupère l'historique des scans QR d'une commande
+   */
+  async getOrderQRScans(orderId: string): Promise<{
+    success: boolean
+    data?: Array<{
+      id: string
+      orderId: string
+      qrCodeType: string
+      scannedBy: { id: string; name: string }
+      scannedAt: string
+      location?: unknown
+      deviceInfo?: unknown
+      isValid: boolean
+      validationError?: string
+    }>
+    message?: string
+  }> {
+    try {
+      const url = `${API_BASE_URL}/api/admin/orders/${orderId}/qr-scans`
+      const response = await this.fetchWithAuth(url)
+      if (!response.ok) {
+        return { success: false, message: 'Historique introuvable' }
+      }
+      const result = await response.json()
+      return { success: true, data: result.data || [] }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Error getOrderQRScans:', getErrorMessage(error))
+      return { success: false, message: 'Erreur lors du chargement' }
+    }
+  }
+
+  /**
    * Annule une commande depuis l'admin
    */
   async cancelOrder(orderId: string, reason?: string): Promise<{
