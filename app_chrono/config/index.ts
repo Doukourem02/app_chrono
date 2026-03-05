@@ -6,6 +6,7 @@ export const config = {
   mapboxAccessToken: Constants.expoConfig?.extra?.mapboxAccessToken || process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
   apiUrl: Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
   socketUrl: Constants.expoConfig?.extra?.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
+  trackBaseUrl: Constants.expoConfig?.extra?.trackBaseUrl || process.env.EXPO_PUBLIC_TRACK_BASE_URL || 'http://localhost:3000',
   sentryDsn: Constants.expoConfig?.extra?.sentryDsn || process.env.EXPO_PUBLIC_SENTRY_DSN,
   
   // App Configuration

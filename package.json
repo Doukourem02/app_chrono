@@ -1,0 +1,8 @@
+{
+  "name": "projet-chrono",
+  "private": true,
+  "scripts": {
+    "set-local-ip": "node scripts/set-local-ip.js",
+    "update-ip": "node scripts/set-local-ip.js"
+  }
+}

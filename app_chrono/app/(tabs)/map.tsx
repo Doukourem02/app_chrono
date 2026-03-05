@@ -1152,6 +1152,8 @@ export default function MapPage() {
                 pickupLocation={pickupLocation}
                 deliveryLocation={deliveryLocation}
                 selectedMethod={selectedMethod}
+                userLocationCoords={currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : null}
+                pickupCoords={pickupCoords}
                 onPickupSelected={handlePickupSelected}
                 onDeliverySelected={handleDeliverySelected}
                 onMethodSelected={handleMethodSelected}
@@ -1340,6 +1342,7 @@ export default function MapPage() {
                       driver={
                         hasDriverAssigned ? orderToDisplay!.driver : null
                       }
+                    order={hasDriverAssigned ? orderToDisplay ?? null : null}
                     onCancel={() => {
                       if (orderToDisplay) {
                         _handleCancelOrder(orderToDisplay.id);

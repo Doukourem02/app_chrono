@@ -335,6 +335,7 @@ export default function Index() {
 
     // Phase 1 : transition vers accepted (ouverture avec commande acceptée)
     // Délai 400ms avant montage Mapbox pour éviter figement au démarrage
+    let phase1FallbackId: ReturnType<typeof setTimeout> | null = null;
     if (status === 'accepted' && prevStatus !== 'accepted') {
       logger.info('Auto-démarrage navigation phase 1 (point de collecte)', 'driver-index');
       setPhase1MountReady(false);
@@ -342,6 +343,8 @@ export default function Index() {
       InteractionManager.runAfterInteractions(() => {
         setTimeout(() => setPhase1MountReady(true), 400);
       });
+      // Fallback : débloquer après 2 s si InteractionManager ne se déclenche pas
+      phase1FallbackId = setTimeout(() => setPhase1MountReady(true), 2000);
       if (location) {
         setTimeout(() => {
           orderSocketService.updateDeliveryStatus(currentOrder.id, 'enroute', location);
@@ -371,6 +374,9 @@ export default function Index() {
         }, 400);
       }
     }
+    return () => {
+      if (phase1FallbackId) clearTimeout(phase1FallbackId);
+    };
   }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination, isNavigationActive, speakWithMapboxMuted]);
 
   // Masquer l'overlay "Recalcul..." après 5 s (fallback si transition lente)

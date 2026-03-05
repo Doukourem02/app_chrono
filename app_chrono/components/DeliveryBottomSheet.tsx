@@ -16,6 +16,10 @@ interface DeliveryBottomSheetProps {
   pickupLocation: string;
   deliveryLocation: string;
   selectedMethod: string;
+  /** Position utilisateur pour calcul des distances (Où récupérer) */
+  userLocationCoords?: Coordinates | null;
+  /** Coordonnées pickup pour calcul des distances (Où livrer) */
+  pickupCoords?: Coordinates | null;
   onPickupSelected: (data: { description: string; coords?: Coordinates }) => void;
   onDeliverySelected: (data: { description: string; coords?: Coordinates }) => void;
   onMethodSelected: (method: 'moto' | 'vehicule' | 'cargo') => void;
@@ -36,6 +40,8 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   pickupLocation,
   deliveryLocation,
   selectedMethod,
+  userLocationCoords = null,
+  pickupCoords = null,
   onPickupSelected,
   onDeliverySelected,
   onMethodSelected,
@@ -87,6 +93,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
               country="ci"
               initialValue={pickupLocation}
               embedded
+              proximityCoords={userLocationCoords ?? undefined}
               onPlaceSelected={onPickupSelected}
             />
             <View style={styles.inputSeparator} />
@@ -95,6 +102,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
               country="ci"
               initialValue={deliveryLocation}
               embedded
+              proximityCoords={pickupCoords ?? userLocationCoords ?? undefined}
               onPlaceSelected={onDeliverySelected}
             />
           </View>

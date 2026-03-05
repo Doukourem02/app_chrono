@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import { Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/db.js';
-import { saveOrder } from '../config/orderStorage.js';
+import { saveOrder, generateAndSaveTrackingToken } from '../config/orderStorage.js';
+import qrCodeService from '../services/qrCodeService.js';
 import { broadcastOrderUpdateToAdmins } from '../sockets/adminSocket.js';
 import { notifyDriversForOrder } from '../sockets/orderSocket.js';
 import { formatDeliveryId } from '../utils/formatDeliveryId.js';
@@ -3574,6 +3575,19 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     try {
       await saveOrder(order);
       logger.info(`[createAdminOrder] Commande ${orderId} créée par admin ${adminUser.id}`);
+
+      // Générer le token de suivi public et le QR code de livraison
+      try {
+        await generateAndSaveTrackingToken(orderId);
+        const recipientName = order.recipient?.phone ? `Destinataire (${order.recipient.phone})` : (order.dropoff?.details?.phone ? `Destinataire (${order.dropoff.details.phone})` : 'Destinataire');
+        const recipientPhone = order.recipient?.phone || order.dropoff?.details?.phone || '';
+        const creatorName = (order.user as any)?.name || 'Client';
+        if (recipientPhone) {
+          await qrCodeService.generateDeliveryQRCode(orderId, `CMD-${orderId.substring(0, 8).toUpperCase()}`, recipientName, recipientPhone, creatorName);
+        }
+      } catch (qrErr: any) {
+        logger.warn(`[createAdminOrder] Échec tracking_token/QR pour ${orderId}:`, qrErr?.message);
+      }
 
       // Diffuser la nouvelle commande aux admins via Socket.IO
       const io = (req.app as any).get('io') as SocketIOServer | undefined;

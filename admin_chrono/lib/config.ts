@@ -2,9 +2,9 @@ import { logger } from '@/utils/logger'
 
 export const config = {
   // API Configuration
-  googleApiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY || '',
   apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
   socketUrl: process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000',
+  mapboxAccessToken: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '',
   
   // App Configuration
   app: {
@@ -21,8 +21,8 @@ export const config = {
 }
 
 // Validation des variables critiques
-if (!config.googleApiKey) {
-  logger.warn('Google API Key not configured. Map features may not work properly.')
+if (!config.mapboxAccessToken) {
+  logger.warn('Mapbox access token not configured. Map features may not work properly.')
 }
 
 export default config

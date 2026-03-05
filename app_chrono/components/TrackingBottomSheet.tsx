@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
-import {View,Text,Animated,Easing,PanResponderInstance,TouchableOpacity,StyleSheet,Image} from "react-native";
+import {View,Text,Animated,Easing,PanResponderInstance,TouchableOpacity,StyleSheet,Image,Share,Alert} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { config } from "../config";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { userApiService } from "../services/userApiService";
 import { QRCodeDisplay } from "./QRCodeDisplay";
@@ -375,6 +376,31 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                     Preuve de livraison reçue
                   </Text>
                 </View>
+              )}
+
+              {/* Partager le lien au destinataire (sans compte Chrono) */}
+              {(currentOrder?.trackingToken || currentOrder?.tracking_token) && (
+                <TouchableOpacity
+                  style={styles.shareLinkButton}
+                  onPress={async () => {
+                    const token = currentOrder?.trackingToken || currentOrder?.tracking_token;
+                    const baseUrl = (config as any).trackBaseUrl || 'http://localhost:3000';
+                    const trackUrl = `${baseUrl.replace(/\/$/, '')}/track/${token}`;
+                    try {
+                      await Share.share({
+                        message: `Suivez votre livraison Chrono en temps réel : ${trackUrl}`,
+                        title: 'Lien de suivi Chrono',
+                        url: trackUrl,
+                      });
+                    } catch (err) {
+                      logger.error('Erreur partage lien', undefined, err);
+                      Alert.alert('Erreur', 'Impossible de partager le lien');
+                    }
+                  }}
+                >
+                  <Ionicons name="share-social-outline" size={18} color="#7C3AED" />
+                  <Text style={styles.shareLinkText}>Partager le lien au destinataire</Text>
+                </TouchableOpacity>
               )}
             </>
           )}
@@ -775,6 +801,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#065F46',
     fontWeight: '500',
+  },
+  shareLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#EDE9FE',
+    borderRadius: 12,
+  },
+  shareLinkText: {
+    fontSize: 14,
+    color: '#7C3AED',
+    fontWeight: '600',
   },
   completedBadge: {
     marginLeft: 'auto',

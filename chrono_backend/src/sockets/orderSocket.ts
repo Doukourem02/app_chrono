@@ -1,7 +1,7 @@
 import { Socket, Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/db.js';
-import {recordOrderAssignment,saveDeliveryProofRecord,saveOrder, updateOrderStatus as updateOrderStatusDB,getActiveOrdersByDriver,} from '../config/orderStorage.js';
+import {recordOrderAssignment,saveDeliveryProofRecord,saveOrder, generateAndSaveTrackingToken, updateOrderStatus as updateOrderStatusDB,getActiveOrdersByDriver,} from '../config/orderStorage.js';
 import qrCodeService from '../services/qrCodeService.js';
 import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionForOrder.js';
 import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
@@ -634,6 +634,14 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           await saveOrder(order);
           dbSaved = true;
           if (DEBUG) logger.debug(`Commande ${maskOrderId(order.id)} sauvegardée en DB`);
+
+          // Générer le token de suivi public (pour le destinataire sans compte)
+          try {
+            const trackingToken = await generateAndSaveTrackingToken(order.id);
+            if (trackingToken) (order as any).trackingToken = trackingToken;
+          } catch (tkErr: any) {
+            logger.warn(`Échec tracking_token pour ${maskOrderId(order.id)}:`, tkErr?.message);
+          }
 
           // Générer automatiquement le QR code de livraison
           try {

@@ -2,9 +2,11 @@
  * Autocomplete d'adresses - aligné sur admin_chrono
  * Combine Search Box + Geocoding + Nominatim pour rues, adresses, POI visibles sur la carte
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { searchOverpassPoi, type OverpassPoiResult } from '../utils/overpassPoiSearch';
@@ -152,11 +155,35 @@ function formatPlaceFormatted(s: MapboxSuggestion): string {
   return s.place_formatted || '';
 }
 
+/** Distance Haversine en km */
+function haversineKm(
+  lat1: number, lon1: number,
+  lat2: number, lon2: number
+): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/** Formate la distance style Yango : "878 m" ou "1.7 km" */
+function formatDistance(km: number): string {
+  if (km < 0.001) return '< 1 m';
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  return `${km.toFixed(1)} km`;
+}
+
 type Props = {
   placeholder?: string;
   initialValue?: string;
   country?: string;
   proximity?: string;
+  /** Coords de référence pour calculer la distance (position user ou pickup) */
+  proximityCoords?: { latitude: number; longitude: number } | null;
   /** Intégré dans un bloc groupé (ex: pickup + dropoff) — pas de fond ni bordure propres */
   embedded?: boolean;
   onPlaceSelected: (data: {
@@ -170,6 +197,7 @@ export default function MapboxAddressAutocomplete({
   initialValue = '',
   country = 'ci',
   proximity = PROXIMITY,
+  proximityCoords = null,
   embedded = false,
   onPlaceSelected,
 }: Props) {
@@ -179,6 +207,17 @@ export default function MapboxAddressAutocomplete({
   const [sessionToken] = useState(() => generateSessionToken());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accessToken = config.mapboxAccessToken;
+
+  const refCoords = useMemo(() => {
+    if (proximityCoords?.latitude != null && proximityCoords?.longitude != null) {
+      return proximityCoords;
+    }
+    const [lng, lat] = proximity.split(',').map(Number);
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      return { latitude: lat, longitude: lng };
+    }
+    return null;
+  }, [proximityCoords, proximity]);
 
   useEffect(() => {
     setQuery(initialValue);
@@ -490,6 +529,51 @@ export default function MapboxAddressAutocomplete({
 
   const showSuggestions = suggestions.length > 0;
 
+  const getDistanceForSuggestion = useCallback(
+    (s: MapboxSuggestion): string | null => {
+      if (!refCoords) return null;
+      const coords = s.coordinates;
+      if (!coords?.lat || !coords?.lng) return null;
+      const km = haversineKm(
+        refCoords.latitude,
+        refCoords.longitude,
+        coords.lat,
+        coords.lng
+      );
+      return formatDistance(km);
+    },
+    [refCoords]
+  );
+
+  const renderSuggestion = useCallback(
+    (s: MapboxSuggestion, i: number) => {
+      const subtext = formatPlaceFormatted(s);
+      const distance = getDistanceForSuggestion(s);
+      return (
+        <TouchableOpacity
+          key={`${s.mapbox_id}-${i}`}
+          style={styles.suggestionItem}
+          onPress={() => handleSelectSuggestion(s)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.suggestionIcon}>
+            <Ionicons name="location" size={20} color="#8B5CF6" />
+          </View>
+          <View style={styles.suggestionContent}>
+            <Text style={styles.suggestionText} numberOfLines={1}>{s.name}</Text>
+            {subtext ? (
+              <Text style={styles.suggestionSubtext} numberOfLines={1}>{subtext}</Text>
+            ) : null}
+          </View>
+          {distance ? (
+            <Text style={styles.suggestionDistance}>{distance}</Text>
+          ) : null}
+        </TouchableOpacity>
+      );
+    },
+    [handleSelectSuggestion, getDistanceForSuggestion]
+  );
+
   if (!accessToken) {
     return (
       <View style={styles.container}>
@@ -509,7 +593,7 @@ export default function MapboxAddressAutocomplete({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, showSuggestions && styles.containerSuggestionsOpen]}>
       <View style={[styles.inputBox, embedded && styles.inputBoxEmbedded]}>
         <TextInput
           placeholder={placeholder}
@@ -521,32 +605,42 @@ export default function MapboxAddressAutocomplete({
         {loading && <ActivityIndicator size="small" color="#8B5CF6" />}
       </View>
 
-      {showSuggestions && (
-        <View style={styles.suggestionList}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled
-            style={styles.suggestionScroll}
+      {showSuggestions &&
+        (embedded ? (
+          <Modal
+            visible
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSuggestions([])}
           >
-            {suggestions.map((s, i) => {
-              const subtext = formatPlaceFormatted(s);
-              return (
-                <TouchableOpacity
-                  key={`${s.mapbox_id}-${i}`}
-                  style={styles.suggestionItem}
-                  onPress={() => handleSelectSuggestion(s)}
-                  activeOpacity={0.7}
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={() => setSuggestions([])}
+            >
+              <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  style={styles.modalScroll}
+                  contentContainerStyle={styles.modalScrollContent}
                 >
-                  <Text style={styles.suggestionText}>{s.name}</Text>
-                  {subtext ? (
-                    <Text style={styles.suggestionSubtext}>{subtext}</Text>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
+                  {suggestions.map((s, i) => renderSuggestion(s, i))}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        ) : (
+          <View style={styles.suggestionList} collapsable={false}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+              style={styles.suggestionScroll}
+              contentContainerStyle={styles.suggestionScrollContent}
+              removeClippedSubviews={false}
+            >
+              {suggestions.map((s, i) => renderSuggestion(s, i))}
+            </ScrollView>
+          </View>
+        ))}
     </View>
   );
 }
@@ -557,6 +651,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1000,
     overflow: 'visible',
+  },
+  containerSuggestionsOpen: {
+    zIndex: 10000,
   },
   inputBox: {
     backgroundColor: '#f8f8f8',
@@ -596,15 +693,32 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
+    overflow: 'hidden',
   },
   suggestionScroll: {
     maxHeight: 200,
   },
+  suggestionScrollContent: {
+    paddingTop: 4,
+  },
   suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  suggestionIcon: {
+    marginRight: 12,
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestionContent: {
+    flex: 1,
+    minWidth: 0,
   },
   suggestionText: {
     fontSize: 15,
@@ -614,5 +728,34 @@ const styles = StyleSheet.create({
   suggestionSubtext: {
     fontSize: 12,
     color: '#6B7280',
+    marginTop: 2,
+  },
+  suggestionDistance: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-start',
+    paddingTop: 120,
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    maxHeight: 280,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  modalScroll: {
+    maxHeight: 280,
+  },
+  modalScrollContent: {
+    paddingVertical: 4,
   },
 });

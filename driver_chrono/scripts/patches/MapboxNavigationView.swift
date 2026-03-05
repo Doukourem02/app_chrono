@@ -158,7 +158,7 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
           (strongSelf.destination[1] as? CLLocationDegrees) ?? 0
         )
 
-        // Masquer les boutons natifs (boussole, recentrer) et "Tun pada" (Reprendre)
+        // Masquer les boutons natifs (boussole, recentrer) et traduire Tun pada/Atunjade en français
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
           strongSelf.hideNativeFloatingButtons(in: vc.view)
           strongSelf.hideResumeButton(in: vc.view)
@@ -212,7 +212,7 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     mapView.ornaments.options = opts
   }
 
-  /// Masque le bouton Resume (Tun pada, Atunjade, etc.) - tout en français pour Côte d'Ivoire
+  /// Traduit en français les termes Yoruba/Vietnamien (Atunjade, Tun pada, etc.) - Côte d'Ivoire
   private func hideResumeButton(in view: UIView) {
     let typeName = String(describing: type(of: view))
     if typeName.contains("ResumeButton") {
@@ -221,18 +221,39 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     }
     if let btn = view as? UIButton {
       let title = (btn.title(for: .normal) ?? btn.title(for: .selected) ?? "").lowercased()
-      let resumeTerms = ["tun pada", "atunjade", "resume", "reprendre", "continue", "retry", "réessayer"]
+      // Tun pada = recentrer (bouton cible), Atunjade = destination, autres = reprendre
+      if title.contains("tun pada") {
+        btn.setTitle("Recentrer", for: .normal)
+        btn.setTitle("Recentrer", for: .selected)
+        return
+      }
+      if title.contains("atunjade") {
+        btn.setTitle("Destination", for: .normal)
+        btn.setTitle("Destination", for: .selected)
+        return
+      }
+      let resumeTerms = ["resume", "continue", "retry", "đang tính"]
       if resumeTerms.contains(where: { title.contains($0) }) {
-        view.isHidden = true
+        btn.setTitle("Reprendre", for: .normal)
+        btn.setTitle("Reprendre", for: .selected)
         return
       }
     }
     if let label = view as? UILabel {
-      let text = (label.text ?? "").lowercased()
-      if !text.isEmpty {
-        let resumeTerms = ["tun pada", "atunjade", "resume", "reprendre", "continue", "retry", "réessayer"]
-        if resumeTerms.contains(where: { text.contains($0) }) {
-          view.superview?.isHidden = true
+      let original = label.text ?? ""
+      if !original.isEmpty {
+        var updated = original
+        for (term, french) in [
+          ("Atunjade", "Destination"),
+          ("Tun pada", "Recentrer"),
+          ("Đang tính tuyến", "Calcul de l'itinéraire")
+        ] {
+          if updated.range(of: term, options: .caseInsensitive) != nil {
+            updated = updated.replacingOccurrences(of: term, with: french, options: .caseInsensitive)
+          }
+        }
+        if updated != original {
+          label.text = updated
           return
         }
       }

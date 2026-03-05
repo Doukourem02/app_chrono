@@ -150,10 +150,10 @@ npm run dev -- --hostname 0.0.0.0 --port 3000
 # http://localhost:3000/dashboard
 
 # App client
-cd app_chrono && npm start
+cd app_chrono && npm start   # ou npx expo start
 
 # App chauffeur
-cd driver_chrono && npm start
+cd driver_chrono && npm start   # ou npx expo start
 ```
 
 Expo propose ensuite `i` (iOS), `a` (Android), ou QR code via Expo Go.
@@ -437,7 +437,7 @@ npm run create-admin     # Créer un admin
 npm run create-avatars-bucket # Créer bucket avatars
 
 # Apps mobiles
-npm start                # Démarrer Expo
+npm start                # Démarrer Expo (ou npx expo start)
 npm run android          # Build Android
 npm run ios              # Build iOS
 npm run lint             # Linter

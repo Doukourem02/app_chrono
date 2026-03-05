@@ -268,6 +268,7 @@ export default function OrderTrackingPage() {
             status: orderStatus,
             driverId: order.driver_id,
             createdAt: order.created_at,
+            trackingToken: order.tracking_token || order.trackingToken,
           };
           
           const store = useOrderStore.getState();

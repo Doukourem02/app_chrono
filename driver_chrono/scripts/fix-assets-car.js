@@ -7,7 +7,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const iosDir = path.join(__dirname, '..', 'ios');
+// Accept ios dir as first arg (quand appelé depuis Podfile post_install)
+const iosDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..', 'ios');
 const pbxPath = path.join(iosDir, 'ChronoPro.xcodeproj', 'project.pbxproj');
 
 if (!fs.existsSync(pbxPath)) {
@@ -18,8 +19,8 @@ if (!fs.existsSync(pbxPath)) {
 let content = fs.readFileSync(pbxPath, 'utf8');
 
 // Supprimer la ligne Assets.car des outputPaths dans [CP] Copy Pods Resources
-// Match: "..../Assets.car", (avec ou sans virgule, variable paths)
-const assetsCarLine = /^\s*"[^"]*Assets\.car",?\s*\r?\n/gm;
+// Match: ".../Assets.car" (évite conflit avec Compile Asset Catalogs du target principal)
+const assetsCarLine = /^\s*"[^"]*?\/Assets\.car",?\s*\r?\n/gm;
 const newContent = content.replace(assetsCarLine, '');
 if (newContent !== content) {
   fs.writeFileSync(pbxPath, newContent);

@@ -1,6 +1,24 @@
+import crypto from 'crypto';
 import pool from './db.js';
 import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
-import logger from '../utils/logger.js'; const DEFAULT_ASSIGNMENT_SOURCE = 'socket'; interface Order { id: string; user?: {
+import logger from '../utils/logger.js';
+
+/** Génère et enregistre un token de suivi public pour une commande */
+export async function generateAndSaveTrackingToken(orderId: string): Promise<string | null> {
+  try {
+    const token = crypto.randomBytes(16).toString('hex');
+    const colCheck = await (pool as any).query(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'tracking_token'`
+    );
+    if (!colCheck.rows?.length) return null;
+    await (pool as any).query(`UPDATE orders SET tracking_token = $1 WHERE id = $2`, [token, orderId]);
+    logger.info(`Token de suivi généré pour commande ${maskOrderId(orderId)}`);
+    return token;
+  } catch (err: any) {
+    logger.warn(`Échec génération tracking_token pour ${maskOrderId(orderId)}:`, err?.message);
+    return null;
+  }
+} const DEFAULT_ASSIGNMENT_SOURCE = 'socket'; interface Order { id: string; user?: {
     id: string;
     name?: string;
     avatar?: string;

@@ -28,9 +28,9 @@ const requiredEnvVars = [
 
 const optionalEnvVars = [
   {
-    name: 'NEXT_PUBLIC_GOOGLE_API_KEY',
+    name: 'NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN',
     required: false,
-    description: 'Clé API Google Maps (requis pour les cartes)',
+    description: 'Token Mapbox pour les cartes (https://account.mapbox.com/access-tokens/)',
   },
 ] as const;
 
