@@ -259,8 +259,7 @@ export default function Index() {
   const userClosedBottomSheetRef = useRef(false);
   const lastOrderStatusRef = useRef<string | null>(null);
   const [showRecalcOverlay, setShowRecalcOverlay] = useState(false);
-  /** Force unmount/remount Mapbox lors du passage pickup→dropoff (évite navigation figée) */
-  const [mapboxMountedForDropoff, setMapboxMountedForDropoff] = useState(true);
+  /** Phase 2 (dropoff) : Mapbox reste monté, le natif gère le rerouting via reEmbedWithNewDestination */
   /** Délai avant montage Mapbox phase 1 (évite figement au démarrage) */
   const [phase1MountReady, setPhase1MountReady] = useState(false);
   const hasValidatedViaMapboxRef = useRef<Set<string>>(new Set());
@@ -352,22 +351,16 @@ export default function Index() {
       }
     }
     // Phase 2 : transition vers picked_up (colis récupéré → navigation vers livraison)
-    // Unmount Mapbox 450ms puis remount avec dropoff (délai suffisant pour reset natif)
+    // Ne PAS unmount/remount : le natif reEmbedWithNewDestination gère le changement pickup→dropoff
+    // L'unmount/remount causait un figement obligeant à quitter l'app
     if ((status === 'picked_up' || status === 'delivering') && (prevStatus === 'enroute' || prevStatus === 'in_progress')) {
       logger.info('Auto-démarrage navigation phase 2 (adresse de livraison)', 'driver-index');
-      setPhase1MountReady(false);
       setShowRecalcOverlay(true);
-      setMapboxMountedForDropoff(false); // Unmount Mapbox pour reset état interne
       setIsNavigationMinimized(false);
       if (!isNavigationActive) {
         speakWithMapboxMuted('Colis pris en charge. Nous pouvons entamer la course.');
       }
       setIsNavigationActive(true);
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => {
-          setMapboxMountedForDropoff(true); // Remount avec destination = dropoff
-        }, 450);
-      });
       if (status === 'picked_up' && location) {
         setTimeout(() => {
           orderSocketService.updateDeliveryStatus(currentOrder.id, 'delivering', location);
@@ -389,7 +382,6 @@ export default function Index() {
   // Réinitialiser la transition quand la commande change
   useEffect(() => {
     if (!currentOrder?.id) {
-      setMapboxMountedForDropoff(true);
       setPhase1MountReady(false);
     }
   }, [currentOrder?.id]);
@@ -1093,6 +1085,9 @@ export default function Index() {
               ? () => setIsNavigationActive(true)
               : undefined
           }
+          isNavigationMinimized={isNavigationMinimized}
+          onResumeNavigation={() => setIsNavigationMinimized(false)}
+          lastEtaMinutes={lastEtaMinutes}
           onCancelOrder={() => {
             setIsNavigationActive(false);
             orderSocketService.updateDeliveryStatus(currentOrder.id, 'cancelled', location);
@@ -1126,10 +1121,10 @@ export default function Index() {
               },
             ]}
           >
-            {/* Phase 1 : délai 400ms avant montage. Phase 2 : unmount/remount pickup→dropoff */}
-            {(((currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress') && phase1MountReady) || mapboxMountedForDropoff) && (
+            {/* Phase 1 : délai 400ms avant montage. Phase 2 : clé stable, le natif reEmbedWithNewDestination gère le rerouting */}
+            {(((currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress') && phase1MountReady) || (currentOrder?.status === 'picked_up' || currentOrder?.status === 'delivering')) && (
             <MapboxNavigationScreen
-              key={`nav-${currentOrder?.id}-${effectiveNavDestination === currentDropoffCoord ? 'dropoff' : 'pickup'}-${effectiveNavDestination.latitude}-${effectiveNavDestination.longitude}`}
+              key={`nav-${currentOrder?.id}`}
               origin={navOrigin || location!}
               destination={effectiveNavDestination}
               mute={mapboxVoiceMuted}
@@ -1205,12 +1200,12 @@ export default function Index() {
           )}
         </View>
 
-        {/* Barre "Reprendre la navigation" + boutons Colis/Livraison quand minimisé */}
+        {/* Boutons Colis récupéré / Livraison effectuée quand minimisé (le bouton Navigation est dans le bottom sheet) */}
         {isNavigationMinimized && (
           <>
             {showColisRecupereButton && (
               <TouchableOpacity
-                style={[styles.reprendreNavBar, { bottom: 180 }]}
+                style={[styles.reprendreNavBar, { bottom: 100 }]}
                 onPress={handleColisRecupere}
                 activeOpacity={0.8}
               >
@@ -1220,7 +1215,7 @@ export default function Index() {
             )}
             {showLivraisonEffectueeButton && (
               <TouchableOpacity
-                style={[styles.reprendreNavBar, { bottom: 180, backgroundColor: '#16A34A' }]}
+                style={[styles.reprendreNavBar, { bottom: 100, backgroundColor: '#16A34A' }]}
                 onPress={handleLivraisonEffectuee}
                 activeOpacity={0.8}
               >
@@ -1228,17 +1223,6 @@ export default function Index() {
                 <Text style={styles.reprendreNavText}>Livraison effectuée</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={styles.reprendreNavBar}
-              onPress={() => setIsNavigationMinimized(false)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="navigate" size={24} color="#fff" />
-              <Text style={styles.reprendreNavText}>Reprendre la navigation</Text>
-              {lastEtaMinutes != null && (
-                <Text style={styles.reprendreNavEta}>{lastEtaMinutes} min</Text>
-              )}
-            </TouchableOpacity>
           </>
         )}
         </>

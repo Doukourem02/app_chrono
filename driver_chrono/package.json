@@ -10,7 +10,7 @@
     "start": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo run:android",
-    "ios": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo run:ios",
+    "ios": "node scripts/fix-assets-car.js ./ios; BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo run:ios",
     "web": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo start --web",
     "lint": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo lint"
   },

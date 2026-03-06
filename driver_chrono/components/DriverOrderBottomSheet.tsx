@@ -30,6 +30,11 @@ interface DriverOrderBottomSheetProps {
   onMessage?: () => void;
   /** Ouvre la navigation intégrée (Mapbox) vers pickup ou dropoff selon le statut */
   onStartNavigation?: () => void;
+  /** Reprend la navigation si minimisée (un seul bouton pour démarrer ET reprendre) */
+  isNavigationMinimized?: boolean;
+  onResumeNavigation?: () => void;
+  /** ETA en minutes pour afficher sur le bouton navigation quand minimisé */
+  lastEtaMinutes?: number | null;
   /** Annule la course en cours (avec confirmation) */
   onCancelOrder?: () => void;
 }
@@ -60,6 +65,9 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   location,
   onMessage,
   onStartNavigation,
+  isNavigationMinimized = false,
+  onResumeNavigation,
+  lastEtaMinutes = null,
   onCancelOrder,
 }) => {
   const insets = useSafeAreaInsets();
@@ -164,6 +172,12 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
 
   const handleNavigate = () => {
     if (!currentOrder) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Un seul bouton : reprendre si minimisé, sinon démarrer
+    if (isNavigationMinimized && onResumeNavigation) {
+      onResumeNavigation();
+      return;
+    }
     const status = String(currentOrder.status);
     const pickupCoord = resolveCoords(currentOrder.pickup);
     const dropoffCoord = resolveCoords(currentOrder.dropoff);
@@ -172,7 +186,6 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
       Alert.alert('Information', 'Coordonnées non disponibles');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (onStartNavigation) {
       onStartNavigation();
     } else {
@@ -257,6 +270,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                 <TouchableOpacity
                   style={[styles.collapsedActionButton, { backgroundColor: '#7C3AED' }]}
                   onPress={handleNavigate}
+                  accessibilityLabel={isNavigationMinimized ? 'Reprendre la navigation' : 'Navigation'}
                 >
                   <Ionicons name="navigate" size={18} color="#fff" />
                 </TouchableOpacity>
@@ -423,7 +437,13 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                           style={styles.navigateButtonGradient}
                         >
                           <Ionicons name="navigate" size={20} color="#fff" />
-                          <Text style={styles.navigateButtonText}>{onStartNavigation ? 'Démarrer la navigation' : 'Ouvrir la navigation'}</Text>
+                          <Text style={styles.navigateButtonText}>
+                            {isNavigationMinimized
+                              ? `Reprendre la navigation${lastEtaMinutes != null ? ` • ${lastEtaMinutes} min` : ''}`
+                              : onStartNavigation
+                                ? 'Démarrer la navigation'
+                                : 'Ouvrir la navigation'}
+                          </Text>
                         </LinearGradient>
                       </TouchableOpacity>
                     ) : null}
@@ -448,7 +468,13 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                         style={styles.navigateButtonGradient}
                       >
                         <Ionicons name="navigate" size={20} color="#fff" />
-                        <Text style={styles.navigateButtonText}>{onStartNavigation ? 'Démarrer la navigation' : 'Ouvrir la navigation'}</Text>
+                        <Text style={styles.navigateButtonText}>
+                            {isNavigationMinimized
+                              ? `Reprendre la navigation${lastEtaMinutes != null ? ` • ${lastEtaMinutes} min` : ''}`
+                              : onStartNavigation
+                                ? 'Démarrer la navigation'
+                                : 'Ouvrir la navigation'}
+                          </Text>
                       </LinearGradient>
                     </TouchableOpacity>
                   ) : isPhoneOrder ? (

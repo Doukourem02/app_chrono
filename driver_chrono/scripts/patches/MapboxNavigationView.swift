@@ -159,11 +159,14 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
         )
 
         // Masquer les boutons natifs (boussole, recentrer) et traduire Tun pada/Atunjade en français
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        strongSelf.applyFrenchTranslations(in: vc.view, vc: vc)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
           strongSelf.hideNativeFloatingButtons(in: vc.view)
           strongSelf.hideResumeButton(in: vc.view)
           strongSelf.hideMapOrnaments(in: vc)
         }
+        // Réappliquer les traductions périodiquement (Mapbox met à jour le bandeau de façon asynchrone)
+        strongSelf.scheduleFrenchTranslationRefresh(vc: vc)
       }
 
       strongSelf.embedding = false
@@ -212,6 +215,27 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     mapView.ornaments.options = opts
   }
 
+  /// Applique les traductions françaises (Atunjade → Destination, etc.) sur toute la hiérarchie
+  private func applyFrenchTranslations(in view: UIView, vc: NavigationViewController) {
+    hideResumeButton(in: view)
+  }
+
+  /// Planifie des mises à jour périodiques des traductions (Mapbox met à jour le bandeau async)
+  private func scheduleFrenchTranslationRefresh(vc: NavigationViewController) {
+    var count = 0
+    let maxAttempts = 8
+    func scheduleNext() {
+      guard count < maxAttempts else { return }
+      count += 1
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5 + Double(count) * 0.4) { [weak self] in
+        guard let self = self, self.navViewController === vc else { return }
+        self.hideResumeButton(in: vc.view)
+        scheduleNext()
+      }
+    }
+    scheduleNext()
+  }
+
   /// Traduit en français les termes Yoruba/Vietnamien (Atunjade, Tun pada, etc.) - Côte d'Ivoire
   private func hideResumeButton(in view: UIView) {
     let typeName = String(describing: type(of: view))
@@ -245,8 +269,11 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
         var updated = original
         for (term, french) in [
           ("Atunjade", "Destination"),
+          ("atunjade", "Destination"),
           ("Tun pada", "Recentrer"),
-          ("Đang tính tuyến", "Calcul de l'itinéraire")
+          ("tun pada", "Recentrer"),
+          ("Đang tính tuyến", "Calcul de l'itinéraire"),
+          ("đang tính", "Calcul")
         ] {
           if updated.range(of: term, options: .caseInsensitive) != nil {
             updated = updated.replacingOccurrences(of: term, with: french, options: .caseInsensitive)
