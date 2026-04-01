@@ -48,7 +48,7 @@ export default function VerificationScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: email,
+          ...(email?.trim() ? { email: email.trim() } : {}),
           phone: phoneNumber,
           otp: fullCode,
           method: otpMethod,
@@ -141,7 +141,8 @@ export default function VerificationScreen() {
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Code de vérification</Text>
         <Text style={styles.subtitle}>
-          Nous avons envoyé le code de vérification à votre {otpMethod === 'email' ? 'adresse email' : 'numéro de téléphone'}
+          Nous avons envoyé le code à votre numéro
+          {otpMethod === 'whatsapp' ? ' (WhatsApp)' : ' (SMS)'}
         </Text>
 
         <View style={styles.codeContainer}>

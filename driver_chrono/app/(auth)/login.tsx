@@ -6,22 +6,23 @@ import { useTempDriverStore } from '../../store/useTempDriverStore';
 import { config } from '../../config/index';
 import { logger } from '../../utils/logger';
 import { showUserFriendlyError } from '../../utils/errorFormatter';
+import { toE164CI } from '../../utils/e164Phone';
+import { getPhoneValidationError } from '../../utils/phoneValidation';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const setTempData = useTempDriverStore((state) => state.setTempData);
 
   const handleSendOTP = async () => {
-    if (!email || !phone) {
-      Alert.alert('Erreur', 'Veuillez entrer votre email et téléphone');
+    const phoneError = getPhoneValidationError(phone);
+    if (phoneError) {
+      Alert.alert('Numéro invalide', phoneError);
       return;
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Erreur', 'Veuillez entrer un email valide');
+    const phoneE164 = toE164CI(phone);
+    if (!phoneE164) {
+      Alert.alert('Numéro invalide', 'Format attendu : +2250504343424');
       return;
     }
 
@@ -34,9 +35,8 @@ export default function Login() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: email,
-          phone: phone,
-          otpMethod: 'email',
+          phone: phoneE164,
+          otpMethod: 'sms',
           role: 'driver',
         }),
       });
@@ -53,7 +53,7 @@ export default function Login() {
         throw new Error(data.error || data.message || 'Erreur lors de l\'envoi de l\'OTP');
       }
 
-      setTempData(email, phone, 'email');
+      setTempData('', phoneE164, 'sms');
       router.push('/(auth)/verification' as any);
       
     } catch (error) {
@@ -79,28 +79,15 @@ export default function Login() {
           <Ionicons name="car-sport" size={40} color="#8B5CF6" />
         </View>
         <Text style={styles.title}>Connexion Chauffeur</Text>
-        <Text style={styles.subtitle}>Entrez vos informations pour recevoir un code</Text>
+        <Text style={styles.subtitle}>Entrez votre numéro pour recevoir un code par SMS</Text>
       </View>
 
       <View style={styles.form}>
         <View style={styles.inputContainer}>
-          <Ionicons name="mail" size={20} color="#666" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
           <Ionicons name="call" size={20} color="#666" style={styles.inputIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Téléphone (+33...)"
+            placeholder="+2250504343424"
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"

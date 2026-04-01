@@ -3,17 +3,24 @@ import { create } from 'zustand';
 interface TempAuthData {
   email: string;
   phoneNumber: string;
-  otpMethod: 'email' | 'sms';
+  otpMethod: 'sms' | 'whatsapp';
   role: 'client' | 'driver' | 'partner';
-  setTempData: (email: string, phoneNumber: string, otpMethod?: 'email' | 'sms', role?: 'client' | 'driver' | 'partner') => void;
+  setTempData: (
+    email: string,
+    phoneNumber: string,
+    otpMethod?: 'sms' | 'whatsapp',
+    role?: 'client' | 'driver' | 'partner'
+  ) => void;
   clearTempData: () => void;
 }
 
 export const useTempAuthStore = create<TempAuthData>((set) => ({
   email: '',
   phoneNumber: '',
-  otpMethod: 'email',
+  otpMethod: 'sms',
   role: 'client',
-  setTempData: (email, phoneNumber, otpMethod = 'email', role = 'client') => set({ email, phoneNumber, otpMethod, role }),
-  clearTempData: () => set({ email: '', phoneNumber: '', otpMethod: 'email', role: 'client' }),
+  setTempData: (email, phoneNumber, otpMethod = 'sms', role = 'client') =>
+    set({ email, phoneNumber, otpMethod, role }),
+  clearTempData: () =>
+    set({ email: '', phoneNumber: '', otpMethod: 'sms', role: 'client' }),
 }));

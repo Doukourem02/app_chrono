@@ -12,6 +12,24 @@ const normalizeEmail = (email: string = ''): string => email.trim().toLowerCase(
 
 const normalizePhone = (phone: string = ''): string => phone.replace(/[\s().-]/g, '');
 
+/** E-mail technique pour stockage OTP / Supabase quand l'utilisateur ne fournit pas d'e-mail réel. */
+export function syntheticEmailFromPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  return `p${digits}@otp.chrono.local`;
+}
+
+/** E-mail utilisé comme clé dans otp_codes : réel si fourni, sinon dérivé du téléphone. */
+export function resolveOtpEmailForStorage(
+  email: string | undefined | null,
+  phone: string
+): string {
+  const t = email?.trim();
+  if (t && t.includes('@')) {
+    return normalizeEmail(t);
+  }
+  return syntheticEmailFromPhone(phone);
+}
+
 const createKey = (email: string, phone: string, role: string): string =>
   `${normalizeEmail(email)}|${normalizePhone(phone)}|${role}`;
 

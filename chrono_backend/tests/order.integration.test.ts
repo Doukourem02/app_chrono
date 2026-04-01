@@ -16,23 +16,24 @@ describe('Order Flow Integration Tests', () => {
   beforeAll(async () => {
     // Setup: Créer un utilisateur de test
     const testEmail = `test-order-${Date.now()}@example.com`;
-    
-    // Envoyer OTP
+    const testPhone = `+2250500${String(Date.now()).slice(-6)}`;
+
     await request(app)
       .post('/api/auth-simple/send-otp')
       .send({
         email: testEmail,
-        method: 'email',
+        phone: testPhone,
+        otpMethod: 'sms',
         role: 'client'
       });
 
-    // Vérifier OTP
     const verifyResponse = await request(app)
       .post('/api/auth-simple/verify-otp')
       .send({
         email: testEmail,
+        phone: testPhone,
         otp: process.env.TEST_OTP_CODE || '123456',
-        method: 'email',
+        method: 'sms',
         role: 'client'
       });
 

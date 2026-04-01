@@ -71,6 +71,21 @@ export function validateEnvironment(): void {
     if (!process.env.ALLOWED_ORIGINS) {
       errors.push('ALLOWED_ORIGINS est requis en production (CORS strict).');
     }
+
+    const twilioSmsReady = Boolean(
+      process.env.TWILIO_ACCOUNT_SID?.trim() &&
+        process.env.TWILIO_AUTH_TOKEN?.trim() &&
+        (process.env.TWILIO_SMS_FROM?.trim() ||
+          process.env.TWILIO_SMS_MESSAGING_SERVICE_SID?.trim())
+    );
+    const vonageReady = Boolean(
+      process.env.VONAGE_API_KEY?.trim() && process.env.VONAGE_API_SECRET?.trim()
+    );
+    if (!twilioSmsReady && !vonageReady) {
+      warnings.push(
+        'OTP par SMS : aucun fournisseur configuré (Twilio SMS : TWILIO_SMS_FROM ou TWILIO_SMS_MESSAGING_SERVICE_SID + SID/token, ou Vonage VONAGE_*). Les envois send-otp (sms) échoueront.'
+      );
+    }
   }
 
   if (errors.length > 0) {

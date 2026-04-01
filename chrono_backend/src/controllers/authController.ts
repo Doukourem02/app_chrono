@@ -1,11 +1,12 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
-import { sendOTPEmail, sendOTPSMS } from '../services/emailService.js';
-import { storeOTP, verifyOTP } from '../config/otpStorage.js';
+import { sendOTPSMS } from '../services/emailService.js';
+import { sendOTPWhatsApp } from '../services/twilioWhatsAppService.js';
+import {storeOTP,verifyOTP,resolveOtpEmailForStorage,syntheticEmailFromPhone,} from '../config/otpStorage.js';
 import { generateTokens, refreshAccessToken } from '../utils/jwt.js';
 import logger from '../utils/logger.js';
-import { maskEmail, maskUserId } from '../utils/maskSensitiveData.js';
+import { maskEmail, maskPhone, maskUserId } from '../utils/maskSensitiveData.js';
 import { createDefaultPaymentMethods } from '../utils/createDefaultPaymentMethods.js';
 
 interface RequestWithBruteForce<B = any> extends Request<{}, {}, B> {
@@ -28,14 +29,14 @@ interface LoginBody {
 }
 
 interface SendOTPBody {
-  email: string;
+  email?: string;
   phone?: string;
   otpMethod?: string;
   role?: string;
 }
 
 interface VerifyOTPBody {
-  email: string;
+  email?: string;
   phone?: string;
   otp: string;
   method?: string;
@@ -498,42 +499,35 @@ const sendOTPCode = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { email, phone, otpMethod = 'email', role = 'client' } = req.body;
-    logger.info(`Envoi OTP pour ${maskEmail(email)} via ${otpMethod} avec rôle ${role}`);
+    const { email, phone, otpMethod = 'sms', role = 'client' } = req.body;
+    const phoneStr = phone || '';
+    const otpEmail = resolveOtpEmailForStorage(email, phoneStr);
+    logger.info(`Envoi OTP pour ${maskPhone(phoneStr)} via ${otpMethod} avec rôle ${role}`);
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await storeOTP(email, phone || '', role, otpCode);
+    await storeOTP(otpEmail, phoneStr, role, otpCode);
 
-    if (otpMethod === 'email') {
-      logger.info(`Code OTP envoyé par email à ${maskEmail(email)}`);
-      const emailResult = await sendOTPEmail(email, otpCode, role);
-      if (!emailResult.success) {
-        logger.error('Échec envoi email:', emailResult.error);
-        // SÉCURITÉ: ne jamais logguer un OTP en production (risque de fuite via logs).
-        if (process.env.NODE_ENV !== 'production') {
-          logger.info(
-            ` ======================================== FALLBACK EMAIL OTP pour ${role.toUpperCase()} ======================================== À: ${email} Sujet: Code de vérification ${role}
-            
-            Votre code de vérification est: ${otpCode}
-            
-            Ce code expire dans 5 minutes.
-            ========================================
-          `
-          );
-        } else {
-          logger.warn(`Fallback OTP email déclenché pour ${maskEmail(email)} (envoi email KO)`);
-        }
-      } else {
-        logger.info('Email OTP envoyé avec succès !');
-      }
-    } else if (otpMethod === 'sms') {
-      logger.info(`Code OTP ${otpCode} envoyé par SMS au ${phone}`);
-      const smsResult = await sendOTPSMS(phone || '', otpCode, role);
+    if (otpMethod === 'sms') {
+      logger.info(`Code OTP ${otpCode} envoyé par SMS au ${maskPhone(phoneStr)}`);
+      const smsResult = await sendOTPSMS(phoneStr, otpCode, role);
       if (!smsResult.success) {
         logger.error('Échec envoi SMS:', smsResult.error);
       } else {
         logger.info('SMS OTP envoyé avec succès !');
       }
+    } else if (otpMethod === 'whatsapp') {
+      logger.info(`Code OTP envoyé par WhatsApp au ${phone}`);
+      const waResult = await sendOTPWhatsApp(phoneStr, otpCode, role);
+      if (!waResult.success) {
+        logger.error('Échec envoi WhatsApp:', waResult.error);
+        res.status(503).json({
+          success: false,
+          message: "Impossible d'envoyer le code par WhatsApp",
+          error: process.env.NODE_ENV === 'development' ? waResult.error : undefined,
+        });
+        return;
+      }
+      logger.info('WhatsApp OTP envoyé avec succès !');
     }
 
     res.json({
@@ -541,8 +535,8 @@ const sendOTPCode = async (
       message: `Code OTP envoyé par ${otpMethod}`,
       data: {
         method: otpMethod,
-        email,
-        phone,
+        email: email?.trim() || undefined,
+        phone: phoneStr,
         role,
         debug_code: process.env.NODE_ENV === 'development' ? otpCode : undefined,
       },
@@ -557,15 +551,22 @@ const sendOTPCode = async (
   }
 };
 
+const phoneDigitsKey = (p: string): string => p.replace(/[\s().-]/g, '');
+
 const verifyOTPCode = async (
   req: RequestWithBruteForce<VerifyOTPBody>,
   res: Response
 ): Promise<void> => {
   try {
     const { email, phone, otp, method, role = 'client' } = req.body;
-    logger.info(`Vérification OTP pour ${maskEmail(email)}`);
+    const phoneStr = phone || '';
+    const otpEmail = resolveOtpEmailForStorage(email, phoneStr);
+    const contactEmail = email?.trim() || '';
+    const phoneKey = phoneDigitsKey(phoneStr);
 
-    const isValid = await verifyOTP(email, phone || '', role, otp);
+    logger.info(`Vérification OTP pour ${maskPhone(phoneStr)}`);
+
+    const isValid = await verifyOTP(otpEmail, phoneStr, role, otp);
     if (!isValid) {
       if (req.recordFailedAttempt) {
         req.recordFailedAttempt();
@@ -584,6 +585,8 @@ const verifyOTPCode = async (
 
     logger.info('Code OTP valide !');
 
+    const authEmailForProvision = contactEmail || syntheticEmailFromPhone(phoneStr);
+
     // ÉTAPE 1 : Vérifier d'abord si l'utilisateur existe dans Supabase Auth
     logger.info('Vérification dans Supabase Auth...');
     let existingAuthUser: any = null;
@@ -596,7 +599,19 @@ const verifyOTPCode = async (
           authListError.message
         );
       } else if (authUsers?.users) {
-        existingAuthUser = authUsers.users.find((user: any) => user.email === email);
+        existingAuthUser = authUsers.users.find((user: any) => {
+          if (contactEmail && user.email?.toLowerCase() === contactEmail.toLowerCase()) {
+            return true;
+          }
+          const uPhone = user.phone ? phoneDigitsKey(user.phone) : '';
+          const metaPhone = user.user_metadata?.phone
+            ? phoneDigitsKey(String(user.user_metadata.phone))
+            : '';
+          if (phoneKey.length >= 8 && (uPhone === phoneKey || metaPhone === phoneKey)) {
+            return true;
+          }
+          return false;
+        });
       }
     } else {
       logger.warn(
@@ -604,12 +619,26 @@ const verifyOTPCode = async (
       );
     }
 
-    // ÉTAPE 2 : Vérifier si l'utilisateur existe dans PostgreSQL
-    const { data: existingUsers, error: checkError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .limit(1);
+    // ÉTAPE 2 : Vérifier si l'utilisateur existe dans PostgreSQL (e-mail réel ou téléphone)
+    let existingUsers: any[] | null = null;
+    let checkError: any = null;
+
+    if (contactEmail) {
+      const r = await supabase.from('users').select('*').eq('email', contactEmail).limit(1);
+      checkError = r.error;
+      if (r.data?.length) {
+        existingUsers = r.data;
+      }
+    }
+    if ((!existingUsers || existingUsers.length === 0) && phoneStr.trim()) {
+      const r2 = await supabase.from('users').select('*').eq('phone', phoneStr.trim()).limit(1);
+      if (r2.error && !checkError) {
+        checkError = r2.error;
+      }
+      if (r2.data?.length) {
+        existingUsers = r2.data;
+      }
+    }
 
     if (checkError) {
       logger.error('Erreur vérification utilisateur:', checkError);
@@ -617,11 +646,11 @@ const verifyOTPCode = async (
 
     // ÉTAPE 3 : Si l'utilisateur existe dans PostgreSQL mais PAS dans Supabase Auth, nettoyer les données orphelines
     if (existingUsers && existingUsers.length > 0 && !existingAuthUser) {
-      logger.warn(
-        `Utilisateur trouvé dans PostgreSQL mais absent de Supabase Auth. Nettoyage des données orphelines pour ${maskEmail(email)}`
-      );
       const orphanedUser = existingUsers[0];
-      await cleanupOrphanedUser(orphanedUser.id, email);
+      logger.warn(
+        `Utilisateur trouvé dans PostgreSQL mais absent de Supabase Auth. Nettoyage des données orphelines pour ${maskEmail(orphanedUser.email)}`
+      );
+      await cleanupOrphanedUser(orphanedUser.id, orphanedUser.email);
       // Réinitialiser pour traiter comme un nouvel utilisateur
       existingUsers.length = 0;
     }
@@ -661,13 +690,15 @@ const verifyOTPCode = async (
         );
       }
 
+      const syncEmail = existingAuthUser.email || authEmailForProvision;
+
       const { data: newUser, error: insertError } = await clientForInsert
         .from('users')
         .insert([
           {
             id: existingAuthUser.id,
-            email: email,
-            phone: phone,
+            email: syncEmail,
+            phone: phoneStr,
             role: role,
             created_at: existingAuthUser.created_at || new Date().toISOString(),
           },
@@ -683,8 +714,8 @@ const verifyOTPCode = async (
           );
           userData = {
             id: existingAuthUser.id,
-            email: email,
-            phone: phone,
+            email: syncEmail,
+            phone: phoneStr,
             role: role,
             created_at: existingAuthUser.created_at || new Date().toISOString(),
           };
@@ -702,7 +733,13 @@ const verifyOTPCode = async (
 
       if (role === 'driver' && userData && userData.id) {
         logger.info('Création automatique du profil driver pour utilisateur synchronisé...');
-        driverProfile = await createDriverProfile(userData.id, email, phone, null, null);
+        driverProfile = await createDriverProfile(
+          userData.id,
+          userData.email || syncEmail,
+          phoneStr,
+          null,
+          null
+        );
         if (driverProfile) {
           logger.info('Profil driver créé avec succès !');
         } else {
@@ -720,12 +757,13 @@ const verifyOTPCode = async (
 
       if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
         const result = await supabase.auth.admin.createUser({
-          email: email,
+          email: authEmailForProvision,
           password: tempPassword,
           email_confirm: true,
+          phone: phoneStr || undefined,
           user_metadata: {
             role: role,
-            phone: phone,
+            phone: phoneStr,
           },
         });
         authUser = result.data;
@@ -735,12 +773,12 @@ const verifyOTPCode = async (
           'SUPABASE_SERVICE_ROLE_KEY non défini, utilisation de signUp() (nécessite confirmation email)'
         );
         const result = await supabase.auth.signUp({
-          email: email,
+          email: authEmailForProvision,
           password: tempPassword,
           options: {
             data: {
               role: role,
-              phone: phone,
+              phone: phoneStr,
             },
           },
         });
@@ -755,7 +793,7 @@ const verifyOTPCode = async (
           errorMessage =
             'Création de compte non autorisée. Vérifiez la configuration Supabase (inscriptions activées et service role key configurée).';
         } else if (authError.message.includes('already registered')) {
-          errorMessage = 'Cet email est déjà utilisé.';
+          errorMessage = 'Ce compte existe déjà (e-mail ou téléphone).';
         }
         res.status(400).json({
           success: false,
@@ -790,8 +828,8 @@ const verifyOTPCode = async (
         .insert([
           {
             id: userId,
-            email: email,
-            phone: phone,
+            email: authEmailForProvision,
+            phone: phoneStr,
             role: role,
             created_at: new Date().toISOString(),
           },
@@ -810,8 +848,8 @@ const verifyOTPCode = async (
           );
           userData = {
             id: userId,
-            email: email,
-            phone: phone,
+            email: authEmailForProvision,
+            phone: phoneStr,
             role: role,
             created_at: new Date().toISOString(),
           };
@@ -829,7 +867,13 @@ const verifyOTPCode = async (
 
       if (role === 'driver' && userData && userData.id) {
         logger.info('Création automatique du profil driver...');
-        driverProfile = await createDriverProfile(userData.id, email, phone, null, null);
+        driverProfile = await createDriverProfile(
+          userData.id,
+          userData.email || authEmailForProvision,
+          phoneStr,
+          null,
+          null
+        );
         if (driverProfile) {
           logger.info('Profil driver créé avec succès !');
         } else {

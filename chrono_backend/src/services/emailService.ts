@@ -1,5 +1,10 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import { Vonage } from '@vonage/server-sdk';
 import logger from '../utils/logger.js';
+import {
+  isTwilioSmsConfigured,
+  sendOTPSMSTwilio,
+} from './twilioSmsService.js';
 
 let transporter: Transporter | null = null;
 
@@ -146,6 +151,48 @@ Ce code expire dans 5 minutes. Si vous n'avez pas demandé ce code, ignorez cet 
   }
 };
 
+function isVonageSmsConfigured(): boolean {
+  return Boolean(
+    process.env.VONAGE_API_KEY?.trim() && process.env.VONAGE_API_SECRET?.trim()
+  );
+}
+
+async function sendOTPSMSVonage(
+  phone: string,
+  otpCode: string,
+  role: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const apiKey = process.env.VONAGE_API_KEY!.trim();
+  const apiSecret = process.env.VONAGE_API_SECRET!.trim();
+  const from = (process.env.VONAGE_FROM || 'Chrono').trim();
+  const vonage = new Vonage({ apiKey, apiSecret });
+  const message = `Votre code ${role} Chrono: ${otpCode}. Valide 5 min. Ne partagez pas ce code.`;
+
+  try {
+    const response = await vonage.sms.send({
+      to: phone,
+      from,
+      text: message,
+    });
+    const first = response.messages[0];
+    if (first?.status === '0') {
+      logger.info(`SMS OTP Vonage envoyé au ${phone}`);
+      return { success: true, messageId: first['message-id'] };
+    }
+    const errText = first?.['error-text'] || 'Erreur Vonage SMS';
+    logger.error('Vonage SMS:', errText);
+    return { success: false, error: errText };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('Erreur envoi SMS Vonage:', error);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Envoie l’OTP par SMS : Twilio (recommandé, voir TWILIO_SMS_*), sinon Vonage, sinon
+ * simulation en dev/test uniquement. En production sans fournisseur → échec explicite.
+ */
 export const sendOTPSMS = async (
   phone: string,
   otpCode: string,
@@ -154,21 +201,42 @@ export const sendOTPSMS = async (
   try {
     logger.info(`Envoi SMS OTP au ${phone} pour rôle ${role}`);
 
+    if (isTwilioSmsConfigured()) {
+      return await sendOTPSMSTwilio(phone, otpCode, role);
+    }
+
+    if (isVonageSmsConfigured()) {
+      return await sendOTPSMSVonage(phone, otpCode, role);
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      logger.error(
+        'Aucun fournisseur SMS configuré. Définissez Twilio (TWILIO_SMS_FROM ou TWILIO_SMS_MESSAGING_SERVICE_SID + SID/token) ou Vonage (VONAGE_*).'
+      );
+      return {
+        success: false,
+        error:
+          'SMS non configuré sur le serveur (Twilio SMS ou Vonage requis en production)',
+      };
+    }
+
+    logger.warn(
+      'SMS OTP simulé : aucune config Twilio SMS ni Vonage. Le code apparaît dans les logs / debug_code en dev.'
+    );
     logger.debug(`
 ========================================
-SMS OTP pour ${role.toUpperCase()}
+SMS OTP SIMULÉ (${role.toUpperCase()})
 ========================================
 Au: ${phone}
-
-ChronoDelivery ${role}
 Code: ${otpCode}
 Expire dans 5 min.
 ========================================
     `);
 
     return { success: true, messageId: 'sim-' + Date.now() };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     logger.error('Erreur envoi SMS:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: msg };
   }
 };

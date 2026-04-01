@@ -4,30 +4,23 @@ import { router } from 'expo-router';
 import { useTempAuthStore } from '../../store/useTempAuthStore';
 import { AnimatedButton, ScreenTransition } from '../../components/animations';
 import { logger } from '../../utils/logger';
+import { toE164CI } from '../../utils/e164Phone';
 import { getPhoneValidationError } from '../../utils/phoneValidation';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const setTempData = useTempAuthStore((state) => state.setTempData);
 
   const handleSendOTP = async () => {
-    if (!email || !phone) {
-      Alert.alert('Erreur', 'Veuillez entrer votre email et téléphone');
-      return;
-    }
-
-    // Validation email basique
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Erreur', 'Veuillez entrer un email valide');
-      return;
-    }
-
     const phoneError = getPhoneValidationError(phone);
     if (phoneError) {
       Alert.alert('Numéro invalide', phoneError);
+      return;
+    }
+    const phoneE164 = toE164CI(phone);
+    if (!phoneE164) {
+      Alert.alert('Numéro invalide', 'Format attendu : +2250504343424');
       return;
     }
 
@@ -47,9 +40,9 @@ export default function LoginScreen() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            email: email,
-            phone: phone,
-            otpMethod: 'email',
+            phone: phoneE164,
+            otpMethod: 'sms',
+            role: 'client',
           }),
           signal: controller.signal,
         });
@@ -63,7 +56,7 @@ export default function LoginScreen() {
         }
 
         // Sauvegarder temporairement pour la vérification
-        setTempData(email, phone, 'email', 'client');
+        setTempData('', phoneE164, 'sms', 'client');
         
         // Naviguer vers la vérification
         router.push('/(auth)/verification' as any);
@@ -112,29 +105,14 @@ export default function LoginScreen() {
         <View style={styles.contentContainer}>
           <Text style={styles.title}>Bon retour !</Text>
           <Text style={styles.subtitle}>
-            Entrez votre email pour recevoir un code de vérification
+            Entrez votre numéro pour recevoir un code par SMS
           </Text>
 
-          {/* Email Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="votre@email.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-
-          {/* Phone Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Téléphone</Text>
             <TextInput
               style={styles.input}
-              placeholder="+225 XX XX XX XX XX"
+              placeholder="+2250504343424"
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"

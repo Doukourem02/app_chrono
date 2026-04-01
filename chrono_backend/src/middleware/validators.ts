@@ -161,29 +161,39 @@ export const validateLogin = (req: Request, res: Response, next: NextFunction): 
   next();
 };
 
-const phoneSchema = Joi.string()
-  .trim()
-  .pattern(/^\+?[0-9][0-9\s().-]{6,}$/)
+/** Compacte espaces / tirets ; le corps doit être en E.164 (+indicatif…, 8–15 chiffres après +). */
+function compactE164PhoneBody(req: Request): void {
+  if (req.body && typeof req.body.phone === 'string') {
+    req.body.phone = req.body.phone.trim().replace(/[\s().-]/g, '');
+  }
+}
+
+const e164PhoneSchema = Joi.string()
+  .pattern(/^\+[1-9]\d{6,14}$/)
+  .required()
   .messages({
-    'string.pattern.base': 'Le numéro de téléphone doit contenir uniquement des chiffres et peut inclure "+", espaces ou tirets',
+    'string.pattern.base':
+      'Numéro au format E.164 : + puis chiffres uniquement, ex. +2250504343424',
+    'any.required': 'Le numéro de téléphone est requis',
+    'string.empty': 'Le numéro de téléphone est requis',
   });
 
 export const validateSendOTP = (req: Request, res: Response, next: NextFunction): void => {
+  compactE164PhoneBody(req);
   const schema = Joi.object({
-    email: Joi.string().email().required().messages({
+    email: Joi.string().email().optional().allow('').messages({
       'string.email': 'L\'email doit être valide',
-      'any.required': 'L\'email est requis'
     }),
-    phone: phoneSchema.optional(),
-    otpMethod: Joi.string().valid('email', 'sms').default('email').messages({
-      'any.only': 'La méthode OTP doit être email ou sms'
+    phone: e164PhoneSchema,
+    otpMethod: Joi.string().valid('sms', 'whatsapp').default('sms').messages({
+      'any.only': 'La méthode OTP doit être sms ou whatsapp',
     }),
     role: Joi.string().valid('client', 'driver', 'admin').default('client').messages({
       'any.only': 'Le rôle doit être client, driver ou admin'
     })
   });
 
-  const { error } = schema.validate(req.body);
+  const { error, value } = schema.validate(req.body, { allowUnknown: true });
   if (error) {
     res.status(400).json({
       success: false,
@@ -192,28 +202,29 @@ export const validateSendOTP = (req: Request, res: Response, next: NextFunction)
     });
     return;
   }
+  Object.assign(req.body, value);
   next();
 };
 
 export const validateVerifyOTP = (req: Request, res: Response, next: NextFunction): void => {
+  compactE164PhoneBody(req);
   const schema = Joi.object({
-    email: Joi.string().email().required().messages({
+    email: Joi.string().email().optional().allow('').messages({
       'string.email': 'L\'email doit être valide',
-      'any.required': 'L\'email est requis'
     }),
-    phone: phoneSchema.optional(),
+    phone: e164PhoneSchema,
     otp: Joi.string().length(6).pattern(/^\d+$/).required().messages({
       'string.length': 'Le code OTP doit contenir 6 chiffres',
       'string.pattern.base': 'Le code OTP doit contenir uniquement des chiffres',
       'any.required': 'Le code OTP est requis'
     }),
-    method: Joi.string().valid('email', 'sms').optional(),
+    method: Joi.string().valid('sms', 'whatsapp').optional(),
     role: Joi.string().valid('client', 'driver', 'admin').default('client').messages({
       'any.only': 'Le rôle doit être client, driver ou admin'
     })
   });
 
-  const { error } = schema.validate(req.body);
+  const { error, value } = schema.validate(req.body, { allowUnknown: true });
   if (error) {
     res.status(400).json({
       success: false,
@@ -222,6 +233,7 @@ export const validateVerifyOTP = (req: Request, res: Response, next: NextFunctio
     });
     return;
   }
+  Object.assign(req.body, value);
   next();
 };
 

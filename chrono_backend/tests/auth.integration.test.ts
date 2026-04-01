@@ -11,6 +11,7 @@ import app from '../src/app.js';
 
 describe('Authentication Integration Tests', () => {
   const testEmail = `test-${Date.now()}@example.com`;
+  const testPhone = '+2250500000001';
   const testPassword = 'TestPassword123!';
   let otpCode: string;
 
@@ -20,7 +21,8 @@ describe('Authentication Integration Tests', () => {
         .post('/api/auth/send-otp')
         .send({
           email: testEmail,
-          otpMethod: 'email',
+          phone: testPhone,
+          otpMethod: 'sms',
           role: 'client'
         })
         .expect(200);
@@ -28,8 +30,8 @@ describe('Authentication Integration Tests', () => {
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('message');
       expect(response.body).toHaveProperty('data');
-      expect(response.body.data).toHaveProperty('method', 'email');
-      expect(response.body.data).toHaveProperty('email', testEmail);
+      expect(response.body.data).toHaveProperty('method', 'sms');
+      expect(response.body.data).toHaveProperty('phone', testPhone);
 
       // En développement, le code OTP est retourné pour les tests
       if (process.env.NODE_ENV === 'development' && response.body.data.debug_code) {
@@ -37,12 +39,13 @@ describe('Authentication Integration Tests', () => {
       }
     });
 
-    it('should return 400 for invalid email', async () => {
+    it('should return 400 for invalid email when provided', async () => {
       const response = await request(app)
         .post('/api/auth/send-otp')
         .send({
           email: 'invalid-email',
-          otpMethod: 'email',
+          phone: testPhone,
+          otpMethod: 'sms',
           role: 'client'
         })
         .expect(400);
@@ -50,11 +53,12 @@ describe('Authentication Integration Tests', () => {
       expect(response.body).toHaveProperty('success', false);
     });
 
-    it('should return 400 for missing email', async () => {
+    it('should return 400 for missing phone', async () => {
       const response = await request(app)
         .post('/api/auth/send-otp')
         .send({
-          otpMethod: 'email',
+          email: testEmail,
+          otpMethod: 'sms',
           role: 'client'
         })
         .expect(400);
@@ -70,7 +74,8 @@ describe('Authentication Integration Tests', () => {
         .post('/api/auth/send-otp')
         .send({
           email: testEmail,
-          otpMethod: 'email',
+          phone: testPhone,
+          otpMethod: 'sms',
           role: 'client'
         })
         .expect(200);
@@ -84,7 +89,9 @@ describe('Authentication Integration Tests', () => {
         .post('/api/auth/verify-otp')
         .send({
           email: testEmail,
+          phone: testPhone,
           otp: code,
+          method: 'sms',
           role: 'client'
         });
 
@@ -106,7 +113,9 @@ describe('Authentication Integration Tests', () => {
         .post('/api/auth/verify-otp')
         .send({
           email: testEmail,
+          phone: testPhone,
           otp: '000000',
+          method: 'sms',
           role: 'client'
         })
         .expect(400);

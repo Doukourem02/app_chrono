@@ -1,44 +1,80 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {View,Text,StyleSheet,TextInput,TouchableOpacity,Alert,KeyboardAvoidingView,Platform,} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTempDriverStore } from '../../store/useTempDriverStore';
+import { toE164CI } from '../../utils/e164Phone';
 import { getPhoneValidationError } from '../../utils/phoneValidation';
+import { config } from '../../config/index';
+import { logger } from '../../utils/logger';
 
 export default function Register() {
-  const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const setTempData = useTempDriverStore((state) => state.setTempData);
 
   const handleContinue = async () => {
-    if (!email || !phoneNumber) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Erreur', 'Veuillez entrer un email valide');
-      return;
-    }
-
     const phoneError = getPhoneValidationError(phoneNumber);
     if (phoneError) {
       Alert.alert('Numéro invalide', phoneError);
       return;
     }
+    const phoneE164 = toE164CI(phoneNumber);
+    if (!phoneE164) {
+      Alert.alert('Numéro invalide', 'Format attendu : +2250504343424');
+      return;
+    }
 
     setIsLoading(true);
+    const TIMEOUT_MS = 15000;
 
-    setTempData(email, phoneNumber);
-    router.push('./otpMethod' as any);
-    setIsLoading(false);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      try {
+        const response = await fetch(`${config.apiUrl}/api/auth-simple/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: phoneE164,
+            otpMethod: 'sms',
+            role: 'driver',
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            (data.errors && data.errors[0]) || data.message || data.error || 'Erreur envoi OTP'
+          );
+        }
+
+        setTempData('', phoneE164, 'sms');
+        router.push('/(auth)/verification' as any);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError' || controller.signal.aborted) {
+          throw new Error(
+            'La requête a pris trop de temps. Vérifiez votre connexion internet et réessayez.'
+          );
+        }
+        throw fetchError;
+      }
+    } catch (error: any) {
+      logger.error('Erreur envoi OTP inscription driver:', undefined, error);
+      Alert.alert('Erreur', error?.message || 'Impossible d’envoyer le code SMS.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.illustrationContainer}>
@@ -50,28 +86,14 @@ export default function Register() {
       <View style={styles.contentContainer}>
         <Text style={styles.title}>Connexion Chauffeur</Text>
         <Text style={styles.subtitle}>
-          Entrez votre email et numéro de téléphone. Nous vous enverrons un code de vérification.
+          Numéro mobile CI (01, 05 ou 07), au format +2250504343424 ou 0504343424.
         </Text>
 
         <View style={styles.formContainer}>
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Ionicons name="mail-outline" size={20} color="#8B5CF6" style={styles.inputIcon} />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Numéro de téléphone (ex: 07 12 34 56 78)"
+              placeholder="+2250504343424"
               placeholderTextColor="#9CA3AF"
               value={phoneNumber}
               onChangeText={setPhoneNumber}
@@ -80,13 +102,13 @@ export default function Register() {
             <Ionicons name="call-outline" size={20} color="#8B5CF6" style={styles.inputIcon} />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.continueButton, (!email || !phoneNumber || isLoading) && styles.buttonDisabled]}
+          <TouchableOpacity
+            style={[styles.continueButton, (!phoneNumber || isLoading) && styles.buttonDisabled]}
             onPress={handleContinue}
-            disabled={!email || !phoneNumber || isLoading}
+            disabled={!phoneNumber || isLoading}
           >
             <Text style={styles.continueButtonText}>
-              Continuer
+              {isLoading ? 'Envoi...' : 'Recevoir le code'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -162,10 +184,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     shadowColor: '#8B5CF6',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
@@ -176,21 +195,6 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  loginLinkContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  loginLinkText: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  loginLink: {
-    fontSize: 14,
-    color: '#8B5CF6',
     fontWeight: '600',
   },
 });

@@ -17,24 +17,24 @@ describe('Payment Integration Tests', () => {
     // Setup: Créer un utilisateur de test et obtenir un token
     // Note: En production, utilisez un utilisateur de test dédié
     const testEmail = `test-payment-${Date.now()}@example.com`;
-    
-    // Envoyer OTP
+    const testPhone = `+2250501${String(Date.now()).slice(-6)}`;
+
     await request(app)
       .post('/api/auth-simple/send-otp')
       .send({
         email: testEmail,
-        method: 'email',
+        phone: testPhone,
+        otpMethod: 'sms',
         role: 'client'
       });
 
-    // Vérifier OTP (en développement, utilisez le code debug)
-    // Pour les tests, on peut mocker ou utiliser un code de test
     const verifyResponse = await request(app)
       .post('/api/auth-simple/verify-otp')
       .send({
         email: testEmail,
+        phone: testPhone,
         otp: process.env.TEST_OTP_CODE || '123456',
-        method: 'email',
+        method: 'sms',
         role: 'client'
       });
 
