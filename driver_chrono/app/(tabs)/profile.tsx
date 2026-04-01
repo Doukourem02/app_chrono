@@ -215,7 +215,7 @@ export default function ProfilePage() {
           style: 'destructive',
           onPress: () => {
             logout();
-            router.replace('/(auth)/register' as any);
+            router.replace('/(auth)' as any);
           },
         },
       ]

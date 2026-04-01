@@ -16,21 +16,18 @@ export default function PersonalInfoPage() {
     phone: user?.phone || '',
   });
 
+  // Ne pas dépendre de `user` (référence) : l’onglet Profil appelle souvent setUser après
+  // getUserProfile, ce qui réinitialisait le formulaire à chaque frappe.
   useEffect(() => {
-    // Charger les données utilisateur
-    if (user) {
-      // Utiliser first_name et last_name depuis le store si disponibles
-      const firstName = user.first_name || '';
-      const lastName = user.last_name || '';
-      
-      setFormData({
-        firstName,
-        lastName,
-        email: user.email || '',
-        phone: user.phone || '',
-      });
-    }
-  }, [user]);
+    if (!user?.id) return;
+    setFormData({
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      email: user.email || '',
+      phone: user.phone || '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydratation au changement de compte uniquement (évite reset si setUser depuis l’onglet Profil)
+  }, [user?.id]);
 
   const handleSave = async () => {
     if (!formData.firstName.trim() || !formData.lastName.trim()) {
@@ -91,7 +88,9 @@ export default function PersonalInfoPage() {
             <TextInput
               style={styles.input}
               value={formData.firstName}
-              onChangeText={(text) => setFormData({ ...formData, firstName: text })}
+              onChangeText={(text) =>
+                setFormData((prev) => ({ ...prev, firstName: text }))
+              }
               placeholder="Votre prénom"
               placeholderTextColor="#9CA3AF"
             />
@@ -102,7 +101,9 @@ export default function PersonalInfoPage() {
             <TextInput
               style={styles.input}
               value={formData.lastName}
-              onChangeText={(text) => setFormData({ ...formData, lastName: text })}
+              onChangeText={(text) =>
+                setFormData((prev) => ({ ...prev, lastName: text }))
+              }
               placeholder="Votre nom"
               placeholderTextColor="#9CA3AF"
             />
@@ -124,7 +125,9 @@ export default function PersonalInfoPage() {
             <TextInput
               style={styles.input}
               value={formData.phone}
-              onChangeText={(text) => setFormData({ ...formData, phone: text })}
+              onChangeText={(text) =>
+                setFormData((prev) => ({ ...prev, phone: text }))
+              }
               placeholder="Votre numéro de téléphone"
               placeholderTextColor="#9CA3AF"
               keyboardType="phone-pad"

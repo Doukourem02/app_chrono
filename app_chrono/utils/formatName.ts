@@ -1,3 +1,12 @@
+/** Email technique généré pour les comptes OTP (ne pas l’afficher comme identité). */
+export function isSyntheticAuthEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return (
+    email.endsWith('@otp.chrono.local') ||
+    email.endsWith('@otp.krono.local')
+  );
+}
+
 /**
  * Formate le nom d'un utilisateur à partir de first_name, last_name ou email
  * @param user - Objet avec first_name, last_name, email (optionnels)
@@ -9,6 +18,7 @@ export function formatUserName(user?: {
   last_name?: string | null;
   email?: string | null;
   name?: string | null;
+  phone?: string | null;
 }, fallback?: string): string {
   if (!user) {
     return fallback || 'Utilisateur';
@@ -29,12 +39,21 @@ export function formatUserName(user?: {
     return user.name;
   }
 
-  // Priorité 3: email
+  // Priorité 3: email réel (pas l’email technique OTP)
+  if (user.email && !isSyntheticAuthEmail(user.email)) {
+    return user.email;
+  }
+
+  // Priorité 4: téléphone
+  const phone = user.phone?.trim();
+  if (phone) {
+    return phone;
+  }
+
   if (user.email) {
     return user.email;
   }
 
-  // Fallback final
   return fallback || 'Utilisateur';
 }
 

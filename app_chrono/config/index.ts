@@ -11,7 +11,7 @@ export const config = {
   
   // App Configuration
   app: {
-    name: 'Chrono Livraison',
+    name: 'Krono',
     version: Constants.expoConfig?.version || '1.0.0',
     environment: __DEV__ ? 'development' : 'production',
   },

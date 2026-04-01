@@ -8,7 +8,7 @@ export const useRequireAuth = () => {
     if (isAuthenticated) {
       action();
     } else {
-      router.push('/(auth)/register' as any);
+      router.push('/(auth)' as any);
     }
   };
 

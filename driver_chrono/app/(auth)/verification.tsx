@@ -111,16 +111,10 @@ export default function VerificationScreen() {
       // (les informations véhicule sont optionnelles et peuvent être complétées plus tard)
       router.push('./success' as any);
     } catch (error) {
-      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
-      logger.error('Erreur lors de la vérification:', undefined, error);
-      
-      // Afficher un message user-friendly (jamais les détails techniques)
       showUserFriendlyError(error, 'vérification du code', () => {
         handleConfirm();
       });
-      
-      setCode(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
+      // Ne pas vider les 6 cases : en cas de code incorrect / expiré, l’utilisateur peut corriger sans tout ressaisir.
     } finally {
       setIsLoading(false);
     }

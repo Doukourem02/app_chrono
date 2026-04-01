@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { AppState, AppStateStatus, Platform } from "react-native";
+import { AppState, AppStateStatus, LogBox, Platform } from "react-native";
 import Constants from "expo-constants";
 import { useDriverStore } from "../store/useDriverStore";
 import { initSentry } from "../utils/sentry";
@@ -31,6 +31,16 @@ initSentry();
 
 export default function RootLayout() {
   const { isAuthenticated, user, logout, hydrateTokens } = useDriverStore();
+
+  useEffect(() => {
+    if (__DEV__) {
+      LogBox.ignoreLogs([
+        "[ErrorFormatter]",
+        "Erreur technique",
+        "[driver_chrono] Erreur lors de la vérification",
+      ]);
+    }
+  }, []);
 
   // Charger le refresh token depuis SecureStore avant tout check de session (comme app_chrono)
   useEffect(() => {

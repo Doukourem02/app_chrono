@@ -42,7 +42,7 @@ export class UserFriendlyError {
    */
   static showSessionExpired() {
     const errorData = ErrorTypes.SESSION_EXPIRED(() => {
-      router.replace('/(auth)/login');
+      router.replace('/(auth)');
     });
     errorData.onClose = () => {
       useErrorModalStore.getState().hideError();
@@ -134,7 +134,7 @@ export class UserFriendlyError {
       if (onReconnect) {
         onReconnect();
       } else {
-        router.replace('/(auth)/login');
+        router.replace('/(auth)');
       }
     });
     errorData.onClose = () => {
@@ -149,7 +149,7 @@ export class UserFriendlyError {
   static showLoginRequired() {
     const errorData = ErrorTypes.LOGIN_REQUIRED();
     errorData.onAction = () => {
-      router.replace('/(auth)/login');
+      router.replace('/(auth)');
       useErrorModalStore.getState().hideError();
     };
     errorData.onClose = () => {

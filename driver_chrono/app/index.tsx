@@ -29,7 +29,7 @@ export default function RootIndex() {
 
         if (!tokenResult.token) {
           logout();
-          router.replace("/(auth)/register" as any);
+          router.replace("/(auth)" as any);
           return;
         }
 
@@ -74,10 +74,10 @@ export default function RootIndex() {
         } else {
           // validationResult === false : suppression explicite côté backend
           logout();
-          router.replace("/(auth)/register" as any);
+          router.replace("/(auth)" as any);
         }
       } else {
-        router.replace("/(auth)/register" as any);
+        router.replace("/(auth)" as any);
       }
     };
 

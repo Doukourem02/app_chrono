@@ -20,11 +20,11 @@ export default function AboutPage() {
             <Ionicons name="cube" size={64} color="#8B5CF6" />
           </View>
           
-          <Text style={styles.appName}>Chrono</Text>
+          <Text style={styles.appName}>Krono</Text>
           <Text style={styles.version}>Version 1.0.0</Text>
 
           <Text style={styles.description}>
-            Chrono est une plateforme de livraison rapide qui connecte les clients avec des livreurs professionnels pour des livraisons efficaces et sécurisées.
+            Krono est une plateforme de livraison rapide qui connecte les clients avec des livreurs professionnels pour des livraisons efficaces et sécurisées.
           </Text>
 
           <View style={styles.infoSection}>

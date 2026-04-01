@@ -422,8 +422,8 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                       // Ne pas utiliser `url` séparément : sur iOS, message+url génère du bplist corrompu.
                       // Le message contient déjà l'URL en texte brut → lien cliquable et partage propre.
                       await Share.share({
-                        message: `Suivez votre livraison Chrono en temps réel : ${trackUrl}`,
-                        title: 'Lien de suivi Chrono',
+                        message: `Suivez votre livraison Krono en temps réel : ${trackUrl}`,
+                        title: 'Lien de suivi Krono',
                       });
                     } catch (err) {
                       logger.error('Erreur partage lien', undefined, err);

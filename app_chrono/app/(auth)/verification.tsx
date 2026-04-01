@@ -89,8 +89,17 @@ export default function VerificationScreen() {
         });
         
         clearTempData();
-        
-        router.push('./success' as any);
+
+        const u = data.data.user;
+        const hasFullName =
+          !!(u.first_name && String(u.first_name).trim()) &&
+          !!(u.last_name && String(u.last_name).trim());
+
+        if (!hasFullName) {
+          router.replace('/(auth)/complete-profile' as any);
+        } else {
+          router.push('./success' as any);
+        }
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
         

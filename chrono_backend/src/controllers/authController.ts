@@ -551,7 +551,178 @@ const sendOTPCode = async (
   }
 };
 
-const phoneDigitsKey = (p: string): string => p.replace(/[\s().-]/g, '');
+/** Clé de comparaison téléphone : uniquement des chiffres (E.164 +225… vs 225… dans Auth). */
+const phoneDigitsKey = (p: string): string => p.replace(/\D/g, '');
+
+/**
+ * Retrouve un utilisateur Supabase Auth par e-mail réel, e-mail OTP synthétique (p…@otp.chrono.local) ou téléphone.
+ * Important : listUsers() sans pagination ne renvoie qu’une page — d’où des faux « utilisateur absent » puis createUser → « already registered ».
+ */
+async function findAuthUserInSupabase(
+  contactEmail: string,
+  authEmailForProvision: string,
+  phoneKey: string
+): Promise<any | null> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+
+  const provisionLower = (authEmailForProvision || '').toLowerCase();
+  const contactLower = (contactEmail || '').toLowerCase();
+
+  const matchesUser = (user: any): boolean => {
+    if (contactLower && user.email?.toLowerCase() === contactLower) {
+      return true;
+    }
+    if (provisionLower && user.email?.toLowerCase() === provisionLower) {
+      return true;
+    }
+    const uPhone = user.phone ? phoneDigitsKey(user.phone) : '';
+    const metaPhone = user.user_metadata?.phone
+      ? phoneDigitsKey(String(user.user_metadata.phone))
+      : '';
+    if (phoneKey.length >= 8 && (uPhone === phoneKey || metaPhone === phoneKey)) {
+      return true;
+    }
+    return false;
+  };
+
+  const perPage = 1000;
+  const maxPages = 50;
+  let page = 1;
+
+  const adminClient = supabaseAdmin || supabase;
+
+  while (page <= maxPages) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      logger.warn('findAuthUserInSupabase listUsers:', error.message);
+      return null;
+    }
+    const users = data?.users ?? [];
+    const found = users.find(matchesUser);
+    if (found) {
+      return found;
+    }
+    if (users.length < perPage) {
+      break;
+    }
+    page += 1;
+  }
+
+  return null;
+}
+
+type SyncAuthToPostgresResult =
+  | { ok: true; userData: any; driverProfile: any }
+  | { ok: false; responseSent: true };
+
+/** Utilisateur présent dans Supabase Auth mais pas (encore) dans public.users → insertion + profil driver si besoin */
+async function syncAuthUserToPostgresFromVerify(
+  existingAuthUser: any,
+  authEmailForProvision: string,
+  phoneStr: string,
+  role: string,
+  res: Response
+): Promise<SyncAuthToPostgresResult> {
+  logger.info('Utilisateur trouvé dans Supabase Auth, synchronisation vers PostgreSQL...');
+  const clientForInsert = supabaseAdmin || supabase;
+  if (!supabaseAdmin) {
+    logger.warn(
+      'supabaseAdmin non disponible (SUPABASE_SERVICE_ROLE_KEY manquant), insertion dans users peut échouer à cause de RLS'
+    );
+  }
+
+  const syncEmail = existingAuthUser.email || authEmailForProvision;
+
+  const { data: newUser, error: insertError } = await clientForInsert
+    .from('users')
+    .insert([
+      {
+        id: existingAuthUser.id,
+        email: syncEmail,
+        phone: phoneStr,
+        role: role,
+        created_at: existingAuthUser.created_at || new Date().toISOString(),
+      },
+    ])
+    .select()
+    .single();
+
+  let userData: any;
+  if (insertError) {
+    const isUniqueConflict =
+      insertError.code === '23505' ||
+      /duplicate key|unique constraint/i.test(String(insertError.message || ''));
+
+    if (isUniqueConflict) {
+      const { data: byId } = await clientForInsert
+        .from('users')
+        .select('*')
+        .eq('id', existingAuthUser.id)
+        .maybeSingle();
+      if (byId) {
+        logger.info('Ligne users déjà présente (même id Auth), poursuite du flux verify-otp.');
+        userData = byId;
+      } else if (phoneStr?.trim()) {
+        const { data: byPhone } = await clientForInsert
+          .from('users')
+          .select('*')
+          .eq('phone', phoneStr.trim())
+          .maybeSingle();
+        if (byPhone) {
+          logger.info('Ligne users déjà présente (même téléphone), poursuite du flux verify-otp.');
+          userData = byPhone;
+        }
+      }
+    }
+
+    if (!userData) {
+      logger.error('Erreur synchronisation PostgreSQL:', insertError);
+      if (insertError.code === '2501' && !supabaseAdmin) {
+        logger.warn(
+          'Synchronisation users échouée à cause de RLS (SUPABASE_SERVICE_ROLE_KEY manquant), utilisation des données Auth'
+        );
+        userData = {
+          id: existingAuthUser.id,
+          email: syncEmail,
+          phone: phoneStr,
+          role: role,
+          created_at: existingAuthUser.created_at || new Date().toISOString(),
+        };
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Erreur lors de la synchronisation du profil utilisateur',
+          error: insertError.message,
+        });
+        return { ok: false, responseSent: true };
+      }
+    }
+  } else {
+    userData = newUser;
+  }
+
+  let driverProfile: any = null;
+  if (role === 'driver' && userData && userData.id) {
+    logger.info('Création automatique du profil driver pour utilisateur synchronisé...');
+    driverProfile = await createDriverProfile(
+      userData.id,
+      userData.email || syncEmail,
+      phoneStr,
+      null,
+      null
+    );
+    if (driverProfile) {
+      logger.info('Profil driver créé avec succès !');
+    } else {
+      logger.warn('Échec création profil driver (non bloquant)');
+    }
+  }
+
+  logger.info('Utilisateur synchronisé avec succès !');
+  return { ok: true, userData, driverProfile };
+}
 
 const verifyOTPCode = async (
   req: RequestWithBruteForce<VerifyOTPBody>,
@@ -587,32 +758,16 @@ const verifyOTPCode = async (
 
     const authEmailForProvision = contactEmail || syntheticEmailFromPhone(phoneStr);
 
-    // ÉTAPE 1 : Vérifier d'abord si l'utilisateur existe dans Supabase Auth
+    // ÉTAPE 1 : Vérifier si l'utilisateur existe dans Supabase Auth (pagination + e-mail OTP synthétique)
     logger.info('Vérification dans Supabase Auth...');
     let existingAuthUser: any = null;
 
     if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const { data: authUsers, error: authListError } = await supabase.auth.admin.listUsers();
-      if (authListError) {
-        logger.warn(
-          'Impossible de lister les utilisateurs Auth (nécessite service role key):',
-          authListError.message
-        );
-      } else if (authUsers?.users) {
-        existingAuthUser = authUsers.users.find((user: any) => {
-          if (contactEmail && user.email?.toLowerCase() === contactEmail.toLowerCase()) {
-            return true;
-          }
-          const uPhone = user.phone ? phoneDigitsKey(user.phone) : '';
-          const metaPhone = user.user_metadata?.phone
-            ? phoneDigitsKey(String(user.user_metadata.phone))
-            : '';
-          if (phoneKey.length >= 8 && (uPhone === phoneKey || metaPhone === phoneKey)) {
-            return true;
-          }
-          return false;
-        });
-      }
+      existingAuthUser = await findAuthUserInSupabase(
+        contactEmail,
+        authEmailForProvision,
+        phoneKey
+      );
     } else {
       logger.warn(
         "SUPABASE_SERVICE_ROLE_KEY non défini, impossible de vérifier si l'utilisateur existe dans Supabase Auth"
@@ -644,15 +799,26 @@ const verifyOTPCode = async (
       logger.error('Erreur vérification utilisateur:', checkError);
     }
 
-    // ÉTAPE 3 : Si l'utilisateur existe dans PostgreSQL mais PAS dans Supabase Auth, nettoyer les données orphelines
+    // ÉTAPE 3 : PostgreSQL sans Auth résolu — nettoyage orphelin sauf comptes OTP (sinon createUser échoue en doublon Auth)
+    let trustPostgresOtpRow = false;
     if (existingUsers && existingUsers.length > 0 && !existingAuthUser) {
       const orphanedUser = existingUsers[0];
-      logger.warn(
-        `Utilisateur trouvé dans PostgreSQL mais absent de Supabase Auth. Nettoyage des données orphelines pour ${maskEmail(orphanedUser.email)}`
-      );
-      await cleanupOrphanedUser(orphanedUser.id, orphanedUser.email);
-      // Réinitialiser pour traiter comme un nouvel utilisateur
-      existingUsers.length = 0;
+      const otpSynthetic =
+        typeof orphanedUser.email === 'string' &&
+        orphanedUser.email.toLowerCase().includes('@otp.chrono.local');
+
+      if (otpSynthetic) {
+        logger.warn(
+          `Ligne users OTP sans correspondance listUsers Auth — compte conservé (${maskEmail(orphanedUser.email)}).`
+        );
+        trustPostgresOtpRow = true;
+      } else {
+        logger.warn(
+          `Utilisateur trouvé dans PostgreSQL mais absent de Supabase Auth. Nettoyage des données orphelines pour ${maskEmail(orphanedUser.email)}`
+        );
+        await cleanupOrphanedUser(orphanedUser.id, orphanedUser.email);
+        existingUsers.length = 0;
+      }
     }
 
     let userData: any;
@@ -680,74 +846,43 @@ const verifyOTPCode = async (
           logger.warn('Impossible de récupérer le profil driver existant:', error);
         }
       }
+    } else if (
+      existingUsers &&
+      existingUsers.length > 0 &&
+      !existingAuthUser &&
+      trustPostgresOtpRow
+    ) {
+      logger.info('Connexion via ligne PostgreSQL (OTP / Auth non listé).');
+      userData = existingUsers[0];
+      isNewUser = false;
+      if (role === 'driver' && userData.id) {
+        try {
+          const clientForSelect = supabaseAdmin || supabase;
+          const { data: existingProfile } = await clientForSelect
+            .from('driver_profiles')
+            .select('*')
+            .eq('user_id', userData.id)
+            .single();
+          if (existingProfile) {
+            driverProfile = existingProfile;
+          }
+        } catch (error) {
+          logger.warn('Impossible de récupérer le profil driver existant:', error);
+        }
+      }
     } else if (existingAuthUser && (!existingUsers || existingUsers.length === 0)) {
-      // Utilisateur existe dans Supabase Auth mais pas dans PostgreSQL → Synchronisation
-      logger.info('Utilisateur trouvé dans Supabase Auth, synchronisation vers PostgreSQL...');
-      const clientForInsert = supabaseAdmin || supabase;
-      if (!supabaseAdmin) {
-        logger.warn(
-          'supabaseAdmin non disponible (SUPABASE_SERVICE_ROLE_KEY manquant), insertion dans users peut échouer à cause de RLS'
-        );
+      const syncResult = await syncAuthUserToPostgresFromVerify(
+        existingAuthUser,
+        authEmailForProvision,
+        phoneStr,
+        role,
+        res
+      );
+      if (!syncResult.ok) {
+        return;
       }
-
-      const syncEmail = existingAuthUser.email || authEmailForProvision;
-
-      const { data: newUser, error: insertError } = await clientForInsert
-        .from('users')
-        .insert([
-          {
-            id: existingAuthUser.id,
-            email: syncEmail,
-            phone: phoneStr,
-            role: role,
-            created_at: existingAuthUser.created_at || new Date().toISOString(),
-          },
-        ])
-        .select()
-        .single();
-
-      if (insertError) {
-        logger.error('Erreur synchronisation PostgreSQL:', insertError);
-        if (insertError.code === '2501' && !supabaseAdmin) {
-          logger.warn(
-            'Synchronisation users échouée à cause de RLS (SUPABASE_SERVICE_ROLE_KEY manquant), utilisation des données Auth'
-          );
-          userData = {
-            id: existingAuthUser.id,
-            email: syncEmail,
-            phone: phoneStr,
-            role: role,
-            created_at: existingAuthUser.created_at || new Date().toISOString(),
-          };
-        } else {
-          res.status(500).json({
-            success: false,
-            message: 'Erreur lors de la synchronisation du profil utilisateur',
-            error: insertError.message,
-          });
-          return;
-        }
-      } else {
-        userData = newUser;
-      }
-
-      if (role === 'driver' && userData && userData.id) {
-        logger.info('Création automatique du profil driver pour utilisateur synchronisé...');
-        driverProfile = await createDriverProfile(
-          userData.id,
-          userData.email || syncEmail,
-          phoneStr,
-          null,
-          null
-        );
-        if (driverProfile) {
-          logger.info('Profil driver créé avec succès !');
-        } else {
-          logger.warn('Échec création profil driver (non bloquant)');
-        }
-      }
-
-      logger.info('Utilisateur synchronisé avec succès !');
+      userData = syncResult.userData;
+      driverProfile = syncResult.driverProfile;
     } else if (!existingAuthUser && (!existingUsers || existingUsers.length === 0)) {
       // Utilisateur n'existe ni dans Supabase Auth ni dans PostgreSQL → Nouvel utilisateur
       logger.info('Création nouvel utilisateur complet...');
@@ -786,23 +921,69 @@ const verifyOTPCode = async (
         authError = result.error;
       }
 
+      let provisionedViaExistingAuth = false;
+
       if (authError) {
-        logger.error('Erreur création Supabase Auth:', authError);
-        let errorMessage = authError.message;
-        if (authError.message.includes('not allowed') || authError.code === 'not_admin') {
-          errorMessage =
-            'Création de compte non autorisée. Vérifiez la configuration Supabase (inscriptions activées et service role key configurée).';
-        } else if (authError.message.includes('already registered')) {
-          errorMessage = 'Ce compte existe déjà (e-mail ou téléphone).';
+        const errRaw = String(authError.message || '');
+        const errLower = errRaw.toLowerCase();
+        const looksLikeDuplicate =
+          errLower.includes('already registered') ||
+          errLower.includes('already been registered') ||
+          errLower.includes('duplicate') ||
+          errLower.includes('user already exists') ||
+          errLower.includes('email address is already') ||
+          errLower.includes('email already') ||
+          errLower.includes('phone already') ||
+          errLower.includes('unique') ||
+          errLower.includes('existe déjà') ||
+          (authError as any).code === 'email_exists';
+
+        let recovered: any = null;
+        if (looksLikeDuplicate && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          recovered = await findAuthUserInSupabase(
+            contactEmail,
+            authEmailForProvision,
+            phoneKey
+          );
         }
-        res.status(400).json({
-          success: false,
-          message: 'Erreur lors de la création du compte',
-          error: errorMessage,
-        });
-        return;
+
+        if (recovered) {
+          logger.info(
+            'Compte déjà présent dans Supabase Auth : récupération et synchronisation PostgreSQL (verify-otp).'
+          );
+          isNewUser = false;
+          const syncResult = await syncAuthUserToPostgresFromVerify(
+            recovered,
+            authEmailForProvision,
+            phoneStr,
+            role,
+            res
+          );
+          if (!syncResult.ok) {
+            return;
+          }
+          userData = syncResult.userData;
+          driverProfile = syncResult.driverProfile;
+          provisionedViaExistingAuth = true;
+        } else {
+          logger.error('Erreur création Supabase Auth:', authError);
+          let errorMessage = errRaw;
+          if (errRaw.includes('not allowed') || authError.code === 'not_admin') {
+            errorMessage =
+              'Création de compte non autorisée. Vérifiez la configuration Supabase (inscriptions activées et service role key configurée).';
+          } else if (looksLikeDuplicate) {
+            errorMessage = 'Ce compte existe déjà (e-mail ou téléphone).';
+          }
+          res.status(400).json({
+            success: false,
+            message: 'Erreur lors de la création du compte',
+            error: errorMessage,
+          });
+          return;
+        }
       }
 
+      if (!provisionedViaExistingAuth) {
       const userId = authUser?.user?.id || authUser?.id;
       if (!userId) {
         logger.error('Erreur: utilisateur créé mais ID introuvable');
@@ -894,6 +1075,7 @@ const verifyOTPCode = async (
       }
 
       logger.info('Nouvel utilisateur créé avec succès !');
+      }
     }
 
     if (!userData || !userData.id) {

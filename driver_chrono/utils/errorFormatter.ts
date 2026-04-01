@@ -1,4 +1,5 @@
 import { UserFriendlyError } from './userFriendlyError';
+import { logger } from './logger';
 
 /**
  * Convertit une erreur brute en message user-friendly
@@ -9,9 +10,15 @@ export function formatErrorForUser(error: unknown, context?: string): {
   message: string;
   onRetry?: () => void;
 } {
-  // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
+  // Jamais console.error ici : sous RN/Expo ça affiche la bannière LogBox (toast) à l’utilisateur.
   if (__DEV__) {
-    console.error('[ErrorFormatter] Erreur technique:', error);
+    const detail =
+      error instanceof Error ? error.message : typeof error === 'string' ? error : String(error);
+    logger.debug(
+      `Erreur brute${context ? ` (${context})` : ''}`,
+      'ErrorFormatter',
+      detail
+    );
   }
 
   // Erreur réseau
@@ -30,6 +37,21 @@ export function formatErrorForUser(error: unknown, context?: string): {
   if (error instanceof Error) {
     const errorMessage = error.message.toLowerCase();
 
+    // Compte déjà enregistré (API / Auth)
+    if (
+      errorMessage.includes('compte existe déjà') ||
+      errorMessage.includes('already registered') ||
+      errorMessage.includes('already exists') ||
+      errorMessage.includes('duplicate') ||
+      errorMessage.includes('email address is already')
+    ) {
+      return {
+        title: 'Numéro déjà utilisé',
+        message:
+          'Ce numéro est déjà associé à un compte. Connectez-vous avec ce numéro ou contactez le support si vous ne retrouvez pas l’accès.',
+      };
+    }
+
     // Erreurs OTP
     if (errorMessage.includes('otp') || errorMessage.includes('code de vérification')) {
       if (errorMessage.includes('expiré') || errorMessage.includes('expired')) {
@@ -38,10 +60,14 @@ export function formatErrorForUser(error: unknown, context?: string): {
           message: 'Le code de vérification a expiré. Veuillez en demander un nouveau.',
         };
       }
-      if (errorMessage.includes('incorrect') || errorMessage.includes('invalid')) {
+      if (
+        errorMessage.includes('incorrect') ||
+        errorMessage.includes('invalid') ||
+        errorMessage.includes('incorrect ou expiré')
+      ) {
         return {
           title: 'Code incorrect',
-          message: 'Le code de vérification est incorrect. Veuillez réessayer.',
+          message: 'Le code de vérification est incorrect ou a expiré. Demandez un nouveau code et réessayez.',
         };
       }
       if (errorMessage.includes('trop de demandes') || errorMessage.includes('too many')) {

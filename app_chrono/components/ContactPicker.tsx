@@ -54,7 +54,7 @@ export function ContactPicker({ visible, onClose, onSelect }: ContactPickerProps
         const Contacts = await import('expo-contacts');
         const { status } = await Contacts.requestPermissionsAsync();
         if (status !== 'granted') {
-          setError('Accès aux contacts refusé. Autorisez Chrono dans les paramètres.');
+          setError('Accès aux contacts refusé. Autorisez Krono dans les paramètres.');
           setContacts([]);
           return;
         }

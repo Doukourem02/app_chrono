@@ -29,7 +29,7 @@ export default function RootIndex() {
         // Session incomplète (user en persist mais pas de token) → déconnecter et aller à l'auth
         if (!token) {
           logout();
-          router.replace('/(auth)/register' as any);
+          router.replace('/(auth)' as any);
           return;
         }
 

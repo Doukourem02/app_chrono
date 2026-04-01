@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Chrono",
+    "name": "Krono",
     "slug": "app_chrono",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.app-chrono",
       "infoPlist": {
-        "NSContactsUsageDescription": "Chrono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire."
+        "NSContactsUsageDescription": "Krono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire."
       }
     },
     "android": {
@@ -47,7 +47,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Chrono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire."
+          "contactsPermission": "Krono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire."
         }
       ]
     ],

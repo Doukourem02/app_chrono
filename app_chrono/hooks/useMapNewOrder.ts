@@ -95,7 +95,7 @@ export function useMapNewOrder({
             {
               text: 'Se connecter',
               onPress: () => {
-                router.push('/(auth)/register' as any);
+                router.push('/(auth)' as any);
               },
             },
           ]

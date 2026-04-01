@@ -63,7 +63,7 @@ export const ErrorTypes = {
         explanation: 'Nous avons besoin de votre localisation pour vous proposer des services personnalisés comme la recherche d\'adresses proches, le calcul d\'itinéraires, et le suivi de livraison en temps réel.',
         suggestions: [
           'Allez dans les paramètres de votre appareil',
-          'Trouvez l\'application Chrono',
+          'Trouvez l\'application Krono Pro',
           'Activez l\'autorisation de localisation',
           'Revenez dans l\'application',
         ],
@@ -74,7 +74,7 @@ export const ErrorTypes = {
         explanation: 'Nous avons besoin d\'accéder à vos photos pour vous permettre de télécharger des images, par exemple pour compléter votre profil ou partager des documents.',
         suggestions: [
           'Allez dans les paramètres de votre appareil',
-          'Trouvez l\'application Chrono',
+          'Trouvez l\'application Krono Pro',
           'Activez l\'autorisation d\'accès aux photos',
           'Revenez dans l\'application',
         ],
@@ -85,7 +85,7 @@ export const ErrorTypes = {
         explanation: 'Nous avons besoin d\'accéder à votre caméra pour vous permettre de prendre des photos, scanner des codes QR, ou utiliser des fonctionnalités de réalité augmentée.',
         suggestions: [
           'Allez dans les paramètres de votre appareil',
-          'Trouvez l\'application Chrono',
+          'Trouvez l\'application Krono Pro',
           'Activez l\'autorisation d\'accès à la caméra',
           'Revenez dans l\'application',
         ],

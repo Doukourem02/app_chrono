@@ -16,12 +16,16 @@ export const logger = {
   warn: (message: string, _component?: string, extra?: any) => {
     console.warn(format(message), extra ?? '');
   },
+  /** Ne pas utiliser console.error : Expo/RN affiche une bannière « toast » à l’utilisateur. */
   error: (message: string, _component?: string, extra?: any) => {
-    console.error(format(message), extra ?? '');
+    if (__DEV__) {
+      console.log(format(`[ERROR] ${message}`), extra ?? '');
+    }
   },
   userError: (message: string, title = 'Erreur') => {
-    // Logger l'erreur (dans les logs, pas visible à l'utilisateur en production)
-    console.error(format(message));
+    if (__DEV__) {
+      console.log(format(`[userError] ${message}`));
+    }
     // En production, ne jamais afficher les détails techniques à l'utilisateur
     // Utiliser un message générique
     if (!__DEV__) {

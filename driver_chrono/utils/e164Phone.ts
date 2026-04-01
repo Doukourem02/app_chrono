@@ -1,7 +1,4 @@
-/**
- * Mobiles Côte d’Ivoire : 01 / 05 / 07 + 8 chiffres.
- * Sortie canonique : +2250Xxxxxxxxx (ex. +2250504343424).
- */
+/** Normalise les mobiles CI (01 / 05 / 07) vers l’E.164 +225… */
 const MOBILE_PREFIXES = ['01', '05', '07'] as const;
 
 function digitsOnly(phone: string): string {

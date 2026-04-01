@@ -6,7 +6,7 @@ import React, { useEffect, useState } from "react";
 import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
 import { userApiService } from "../../services/userApiService";
 import { useAuthStore } from "../../store/useAuthStore";
-import { formatUserName } from "../../utils/formatName";
+import { formatUserName, isSyntheticAuthEmail } from "../../utils/formatName";
 import { logger } from "../../utils/logger";
 
 interface UserStatistics {
@@ -43,19 +43,21 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadUserProfile = async () => {
-      if (!user?.id) return;
-
-      if (user.first_name || user.last_name) return;
+      const current = useAuthStore.getState().user;
+      if (!current?.id) return;
+      if (current.first_name || current.last_name) return;
 
       try {
-        const result = await userApiService.getUserProfile(user.id);
+        const result = await userApiService.getUserProfile(current.id);
         if (result.success && result.data) {
+          const latest = useAuthStore.getState().user;
+          if (!latest?.id) return;
           setUser({
-            ...user,
+            ...latest,
             first_name: result.data.first_name,
             last_name: result.data.last_name,
-            phone: result.data.phone || user.phone,
-            avatar_url: result.data.avatar_url || (user as any)?.avatar_url,
+            phone: result.data.phone || latest.phone,
+            avatar_url: result.data.avatar_url || (latest as any)?.avatar_url,
           } as any);
         }
       } catch (error) {
@@ -66,7 +68,7 @@ export default function ProfilePage() {
     if (user?.id) {
       loadUserProfile();
     }
-  }, [user, setUser]);
+  }, [user?.id, setUser]);
 
   useEffect(() => {
     const loadStatistics = async () => {
@@ -93,7 +95,7 @@ export default function ProfilePage() {
   // Rediriger vers l'authentification si l'utilisateur n'est pas connecté
   useEffect(() => {
     if (!user) {
-      router.replace("/(auth)/register" as any);
+      router.replace("/(auth)" as any);
     }
   }, [user]);
 
@@ -215,7 +217,7 @@ export default function ProfilePage() {
         style: "destructive",
         onPress: () => {
           logout();
-          router.replace("/(auth)/register" as any);
+          router.replace("/(auth)" as any);
         },
       },
     ]);
@@ -310,7 +312,9 @@ export default function ProfilePage() {
 
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{formatUserName(user as any)}</Text>
-              <Text style={styles.userEmail}>{user?.email}</Text>
+              {user?.email && !isSyntheticAuthEmail(user.email) ? (
+                <Text style={styles.userEmail}>{user.email}</Text>
+              ) : null}
               <Text style={styles.userPhone}>{user?.phone}</Text>
             </View>
           </View>
