@@ -32,6 +32,8 @@ interface OrderLocation {
 interface OrderUser {
   id: string;
   name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
   avatar?: string;
   rating?: number;
   phone?: string;
@@ -102,6 +104,9 @@ const connectedUsers = new Map<string, string>(); // userId -> socketId // Limit
 const MAX_ACTIVE_ORDERS_PER_CLIENT = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_CLIENT || '5');
 const MAX_ACTIVE_ORDERS_PER_DRIVER = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_DRIVER || '3');
 
+/** Fenêtre pour accepter/décliner une offre (à garder alignée avec `autoDeclineTimer` sur OrderRequestPopup, driver_chrono). */
+const DRIVER_OFFER_RESPONSE_MS = 30_000;
+
 // Fonction pour compter les commandes actives d'un client
 function getActiveOrdersCountByUser(userId: string): number {
   let count = 0; for (const [, order] of activeOrders.entries()) {
@@ -119,6 +124,40 @@ function getActiveOrdersCountByDriver(driverId: string): number {
   return count;
 }
 
+/** Profil client depuis `users` (source de vérité pour le nom affiché aux livreurs). */
+async function loadClientProfileForOrder(userId: string): Promise<{
+  name: string;
+  first_name: string | null;
+  last_name: string | null;
+  avatar?: string;
+  phone?: string;
+}> {
+  try {
+    const userResult = await (pool as any).query(
+      'SELECT first_name, last_name, avatar_url, phone, email FROM users WHERE id = $1',
+      [userId]
+    );
+    const row = userResult.rows?.[0];
+    if (!row) {
+      return { name: 'Client', first_name: null, last_name: null };
+    }
+    const full = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
+    const name =
+      full ||
+      (row.email ? String(row.email).split('@')[0] : '') ||
+      'Client';
+    return {
+      name,
+      first_name: row.first_name ?? null,
+      last_name: row.last_name ?? null,
+      avatar: row.avatar_url || undefined,
+      phone: row.phone || undefined,
+    };
+  } catch (e: any) {
+    logger.warn(`loadClientProfileForOrder échoué pour ${maskUserId(userId)}:`, e?.message || e);
+    return { name: 'Client', first_name: null, last_name: null };
+  }
+}
 
 // Extended Socket interface for custom properties
 interface ExtendedSocket extends Socket {
@@ -449,7 +488,7 @@ async function notifyDriversForOrder(
     logger.debug(`[notifyDriversForOrder] Événement 'new-order-request' émis vers socket ${driverSocketId}`);
         }
 
-        // Timeout de 20 secondes pour la réponse du livreur
+        // Timeout aligné sur le popup livreur (OrderRequestPopup)
         setTimeout(async () => {
           const currentOrder = activeOrders.get(order.id);
           if (currentOrder && currentOrder.status === 'pending') {
@@ -460,7 +499,7 @@ async function notifyDriversForOrder(
             driverIndex++;
             tryNextDriver().catch(() => {});
           }
-        }, 20000);
+        }, DRIVER_OFFER_RESPONSE_MS);
       } else {
   if (DEBUG) {
     logger.debug(`[notifyDriversForOrder] Chauffeur ${maskUserId(driver.driverId)} trouvé mais socket non connecté`);
@@ -602,11 +641,17 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           }
         }
 
+        const clientProfile = await loadClientProfileForOrder(userId);
         let initialPaymentStatus: 'pending' | 'delayed' = 'pending'; if (paymentMethodType === 'deferred') { initialPaymentStatus = 'delayed'; } const order: Order = {
           id: providedOrderId || uuidv4(),
           user: {
             id: userId,
-            name: userInfo?.name || 'Client', avatar: userInfo?.avatar, rating: userInfo?.rating || 4.5, phone: userInfo?.phone
+            name: clientProfile.name,
+            first_name: clientProfile.first_name,
+            last_name: clientProfile.last_name,
+            avatar: clientProfile.avatar ?? userInfo?.avatar,
+            rating: userInfo?.rating || 4.5,
+            phone: clientProfile.phone ?? userInfo?.phone,
           },
           pickup,
           dropoff,
@@ -774,7 +819,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           const driverSocketId = connectedDrivers.get(driver.driverId);
 
           logger.debug(`[DIAGNOSTIC] Tentative envoi à livreur ${maskUserId(driver.driverId)}:`); logger.debug(` - Socket ID: ${driverSocketId || 'NON CONNECTÉ'}`); logger.debug(` - Distance: ${driver.distance.toFixed(2)}km`); if (driverSocketId) {
-            const assignedAt = new Date(); order.assignedAt = assignedAt; logger.debug(`Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`); await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => { }); io.to(driverSocketId).emit('new-order-request', order); logger.debug(`Événement 'new-order-request' émis vers socket ${driverSocketId}`); setTimeout(async () => { const currentOrder = activeOrders.get(order.id); if (currentOrder && currentOrder.status === 'pending') { if (DEBUG) logger.debug(`Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`); await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => { }); driverIndex++; tryNextDriver().catch(() => { }); } }, 20000);
+            const assignedAt = new Date(); order.assignedAt = assignedAt; logger.debug(`Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`); await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => { }); io.to(driverSocketId).emit('new-order-request', order); logger.debug(`Événement 'new-order-request' émis vers socket ${driverSocketId}`); setTimeout(async () => { const currentOrder = activeOrders.get(order.id); if (currentOrder && currentOrder.status === 'pending') { if (DEBUG) logger.debug(`Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`); await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => { }); driverIndex++; tryNextDriver().catch(() => { }); } }, DRIVER_OFFER_RESPONSE_MS);
           } else {
             if (DEBUG) logger.debug(`Chauffeur ${driver.driverId} trouvé mais socket non connecté.`); driverIndex++; tryNextDriver().catch(() => { });
           }

@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { realDriverStatuses } from '../controllers/driverController.js';
 import { maskUserId } from '../utils/maskSensitiveData.js';
 import logger from '../utils/logger.js';
+import { persistAdminFeedNotification } from '../services/adminNotificationPersistService.js';
 
 const connectedAdmins = new Map<string, string>();
 
@@ -260,6 +261,8 @@ export const broadcastOrderUpdateToAdmins = (
   event: string,
   data: any
 ): void => {
+  void persistAdminFeedNotification(event, data);
+
   if (connectedAdmins.size === 0) return;
 
   io.to(Array.from(connectedAdmins.values())).emit(event, data);

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useOrderStore, OrderRequest } from '../store/useOrderStore';
+import { formatUserName } from '../utils/formatName';
 
 interface ActiveOrdersListProps {
   onOrderSelect?: (orderId: string) => void;
@@ -238,10 +239,19 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onPress }) => 
             </Text>
           </View>
         )}
-        {order.user?.name && (
+        {order.user && (
           <View style={styles.metaItem}>
             <Ionicons name="person-outline" size={14} color="#6B7280" />
-            <Text style={styles.metaText}>{order.user.name}</Text>
+            <Text style={styles.metaText}>
+              {formatUserName(
+                {
+                  first_name: order.user.first_name,
+                  last_name: order.user.last_name,
+                  name: order.user.name,
+                },
+                'Client'
+              )}
+            </Text>
           </View>
         )}
       </View>

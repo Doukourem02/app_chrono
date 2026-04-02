@@ -129,9 +129,10 @@ export default function DashboardPage() {
       })
       return result
     },
-    refetchInterval: 15000,
-    staleTime: 5000,
-    refetchOnWindowFocus: true,
+    // Filet de sécurité : le socket invalide déjà la query sur order:status:update
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   })
 

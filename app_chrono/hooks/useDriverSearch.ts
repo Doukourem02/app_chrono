@@ -18,7 +18,6 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
   const [driverCoords, setDriverCoords] = useState<Coordinates | null>(null);
   
   const searchIntervalRef = useRef<number | null>(null);
-  const searchTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     let socket: any;
@@ -62,14 +61,6 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
     searchIntervalRef.current = (setInterval(() => {
       setSearchSeconds((s) => s + 1);
     }, 1000) as unknown) as number;
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current as any);
-      searchTimeoutRef.current = null;
-    }
-    searchTimeoutRef.current = (setTimeout(() => {
-      stopDriverSearch();
-    }, 25000) as unknown) as number;
   };
 
   const stopDriverSearch = () => {
@@ -77,10 +68,6 @@ export const useDriverSearch = (onSearchComplete?: () => void) => {
     if (searchIntervalRef.current) {
       clearInterval(searchIntervalRef.current as any);
       searchIntervalRef.current = null;
-    }
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current as any);
-      searchTimeoutRef.current = null;
     }
     setSearchSeconds(0);
  

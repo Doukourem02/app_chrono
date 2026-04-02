@@ -5,7 +5,7 @@
   "scripts": {
     "update-ip": "node ../scripts/set-local-ip.js",
     "predev": "npm run update-ip",
-    "dev": "next dev --webpack",
+    "dev": "node scripts/run-dev.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

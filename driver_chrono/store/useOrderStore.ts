@@ -7,6 +7,8 @@ export interface OrderRequest {
   user: {
     id: string;
     name: string;
+    first_name?: string | null;
+    last_name?: string | null;
     avatar?: string;
     rating: number;
     phone?: string;

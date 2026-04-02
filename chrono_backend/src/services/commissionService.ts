@@ -3,7 +3,12 @@ import logger from '../utils/logger.js';
 import { maskUserId, maskAmount } from '../utils/maskSensitiveData.js';
 
 /**
- * Service de gestion de la commission prépayée pour les livreurs partenaires
+ * Service de gestion de la commission prépayée pour les livreurs partenaires.
+ *
+ * Les lignes dans `commission_transactions` sont créées par les fonctions SQL
+ * `recharge_commission_balance` et `deduct_commission` (migration 016) : recharge
+ * livreur/admin, ou livraison **completed** pour un livreur **partner**.
+ * Les livreurs **internal** ne génèrent pas de transaction (aucune commission prélevée).
  */
 
 export interface CommissionAccount {

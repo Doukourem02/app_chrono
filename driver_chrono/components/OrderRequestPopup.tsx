@@ -4,11 +4,14 @@ import * as Haptics from 'expo-haptics';
 import { useAudioPlayer } from 'expo-audio';
 import { AdminOrderInfo } from './AdminOrderInfo';
 import { logger } from '../utils/logger';
+import { formatUserName } from '../utils/formatName';
 
 interface OrderRequest {
   id: string;
   user: {
     name: string;
+    first_name?: string | null;
+    last_name?: string | null;
     avatar?: string;
     rating?: number; // Rating optionnel car peut ne pas être présent pour les commandes admin
   };
@@ -35,7 +38,7 @@ interface OrderRequestPopupProps {
   visible: boolean;
   onAccept: (orderId: string) => void;
   onDecline: (orderId: string) => void;
-  autoDeclineTimer?: number; // en secondes, défaut 30s
+  autoDeclineTimer?: number; // secondes — aligné avec DRIVER_OFFER_RESPONSE_MS (backend) et la barre client (app_chrono)
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -46,7 +49,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   visible,
   onAccept,
   onDecline,
-  autoDeclineTimer = 25,
+  autoDeclineTimer = 30,
 }) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -195,6 +198,17 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
 
   if (!visible || !order) return null;
 
+  const clientDisplayName = formatUserName(
+    {
+      first_name: order.user.first_name,
+      last_name: order.user.last_name,
+      name: order.user.name,
+    },
+    'Client'
+  );
+  const clientInitial =
+    clientDisplayName.trim().charAt(0).toUpperCase() || '?';
+
   const getVehicleIcon = (method: string) => {
     switch (method) {
       case 'moto': return require('../assets/images/motoo.png');
@@ -274,13 +288,13 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
                 ) : (
                   <View style={styles.avatarPlaceholder}>
                     <Text style={styles.avatarText}>
-                      {order.user.name.charAt(0).toUpperCase()}
+                      {clientInitial}
                     </Text>
                   </View>
                 )}
               </View>
               <View style={styles.userDetails}>
-                <Text style={styles.userName}>{order.user.name}</Text>
+                <Text style={styles.userName}>{clientDisplayName}</Text>
                 <View style={styles.ratingContainer}>
                   <Text style={styles.starIcon}>⭐</Text>
                   <Text style={styles.rating}>

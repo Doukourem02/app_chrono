@@ -4,6 +4,7 @@ import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { maskUserId, maskAmount, maskOrderId, maskFinancialStats } from '../utils/maskSensitiveData.js';
 import { calculateDriverRating } from '../utils/calculateDriverRating.js';
+import { recordDriverLocationThrottled } from '../services/driverLocationAuditService.js';
 
 interface DriverStatus {
   user_id: string;
@@ -128,6 +129,18 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
          WHERE user_id = $5`,
         [is_online, is_available, current_latitude, current_longitude, userId]
       );
+      if (
+        current_latitude != null &&
+        current_longitude != null &&
+        updatedDriver.current_latitude != null &&
+        updatedDriver.current_longitude != null
+      ) {
+        void recordDriverLocationThrottled(
+          userId,
+          updatedDriver.current_latitude,
+          updatedDriver.current_longitude
+        );
+      }
     } catch (dbError: any) {
       logger.warn(`Échec mise à jour DB pour chauffeur ${maskUserId(userId)}:`, dbError.message);
     }

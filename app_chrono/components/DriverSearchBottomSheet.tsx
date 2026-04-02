@@ -61,26 +61,26 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
   const progressAnim = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const [avatarError, setAvatarError] = useState(false);
-  const maxSearchTime = 25; // 25 secondes max
+  /** Durée d’un cycle de barre (alignée sur la fenêtre d’acceptation livreur côté serveur / driver_chrono). */
+  const progressCycleSeconds = 30;
 
-  // Animation fluide et continue de la barre de progression
+  // Barre en boucle tant que la recherche est active (pas de « fin » artificielle toutes les 25 s)
   useEffect(() => {
     if (isSearching) {
-      // Réinitialiser la valeur à 0
       progressAnim.setValue(0);
-      
-      // Arrêter toute animation en cours
+
       if (animationRef.current) {
         animationRef.current.stop();
       }
-      
-      // Démarrer une animation continue de 25 secondes
-      animationRef.current = Animated.timing(progressAnim, {
-        toValue: 1,
-        duration: maxSearchTime * 1000, // 25000ms = 25 secondes
-        useNativeDriver: false,
-      });
-      
+
+      animationRef.current = Animated.loop(
+        Animated.timing(progressAnim, {
+          toValue: 1,
+          duration: progressCycleSeconds * 1000,
+          useNativeDriver: false,
+        })
+      );
+
       animationRef.current.start();
     } else {
       // Arrêter l'animation et réinitialiser
@@ -97,7 +97,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
         animationRef.current.stop();
       }
     };
-  }, [isSearching, maxSearchTime, progressAnim]);
+  }, [isSearching, progressCycleSeconds, progressAnim]);
 
   // Réinitialiser l'erreur d'avatar quand le driver change
   useEffect(() => {

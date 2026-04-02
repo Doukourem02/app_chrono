@@ -131,7 +131,10 @@ export function useMapNewOrder({
           },
           deliveryMethod: selectedMethod as 'moto' | 'vehicule' | 'cargo',
           userInfo: {
-            name: user.email?.split('@')[0] || 'Client',
+            name:
+              [user.first_name, user.last_name].filter(Boolean).join(' ').trim() ||
+              user.email?.split('@')[0] ||
+              'Client',
             rating: 4.5,
             phone: user.phone,
           },

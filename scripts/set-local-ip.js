@@ -127,6 +127,10 @@ function main() {
   if (updateEnvFile(adminEnv, {
     NEXT_PUBLIC_API_URL: apiUrl,
     NEXT_PUBLIC_SOCKET_URL: apiUrl,
+    // Origine du navigateur pour Next.js (allowedDevOrigins + CSP ws:// en dev)
+    NEXT_PUBLIC_DEV_ORIGIN: adminUrl,
+    // IP seule : affichée par npm run dev (Next indique souvent 0.0.0.0 car -H 0.0.0.0)
+    LAN_DEV_HOST: ip === 'localhost' ? '127.0.0.1' : ip,
   })) {
     updated.push('admin_chrono/.env.local');
   }
@@ -135,7 +139,7 @@ function main() {
     console.log('✅ Fichiers mis à jour:');
     updated.forEach((f) => console.log(`   - ${f}`));
     console.log(`\n🔗 API/Socket: ${apiUrl}`);
-    console.log(`🔗 Admin: ${adminUrl}`);
+    console.log(`🔗 Admin (navigateur / téléphone): ${adminUrl}`);
     console.log('\n💡 Redémarrez les apps pour appliquer les changements.');
   } else {
     console.log('ℹ️  Aucun fichier .env trouvé à mettre à jour.');

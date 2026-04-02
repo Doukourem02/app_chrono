@@ -1,4 +1,34 @@
 import type { NextConfig } from "next";
+import path from "path";
+import { loadEnvConfig } from "@next/env";
+
+// Charger .env.local avant de lire NEXT_PUBLIC_DEV_ORIGIN (origine LAN pour HMR / allowedDevOrigins)
+loadEnvConfig(path.resolve(__dirname));
+
+/**
+ * Next.js compare allowedDevOrigins au **hostname** seul (voir block-cross-site + isCsrfOriginAllowed),
+ * pas à une URL complète. `http://192.168.1.66:3000` ne matche jamais → 403 sur /_next → HMR « cannot parse response ».
+ */
+function hostnamesForAllowedDevOrigins(): string[] {
+  const set = new Set<string>(["localhost", "127.0.0.1"]);
+  const fromEnv = process.env.NEXT_PUBLIC_DEV_ORIGIN?.trim();
+  if (fromEnv) {
+    const normalized = fromEnv.replace(/\/$/, "");
+    const withProto = /^https?:\/\//i.test(normalized)
+      ? normalized
+      : `http://${normalized}`;
+    try {
+      const h = new URL(withProto).hostname.toLowerCase();
+      // 0.0.0.0 = adresse de bind uniquement ; le navigateur envoie Origin avec la vraie IP (ex. 192.168.x.x)
+      if (h && h !== "0.0.0.0") {
+        set.add(h);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return [...set];
+}
 
 const nextConfig: NextConfig = {
   // Configuration des images pour autoriser les domaines externes
@@ -12,9 +42,9 @@ const nextConfig: NextConfig = {
     ],
   },
   
-  // Configuration pour permettre les requêtes cross-origin en développement
+  // Développement sur LAN : aligner avec scripts/set-local-ip.js → NEXT_PUBLIC_DEV_ORIGIN
   ...(process.env.NODE_ENV === 'development' && {
-    allowedDevOrigins: ['http://192.168.1.85:3000', 'http://localhost:3000', 'http://192.168.1.91:3000'],
+    allowedDevOrigins: hostnamesForAllowedDevOrigins(),
   }),
   
   // Configuration pour réduire les problèmes de HMR (Hot Module Replacement)
@@ -94,13 +124,27 @@ const nextConfig: NextConfig = {
       "https://nominatim.openstreetmap.org",
     ]
 
-    // En dev uniquement: autoriser localhost / réseau local pour API & sockets
+    // En dev : localhost + origine LAN (HMR WebSocket sur ws://192.168.x.x:3000)
     if (isDevelopment) {
       connectSrcDirectives.push(
         "http://localhost:*",
         "ws://localhost:*",
         "wss://localhost:*"
       )
+      const devOrigin = process.env.NEXT_PUBLIC_DEV_ORIGIN?.trim()
+      if (devOrigin) {
+        try {
+          const u = new URL(devOrigin)
+          const host = u.host
+          connectSrcDirectives.push(
+            `http://${host}`,
+            `ws://${host}`,
+            `wss://${host}`
+          )
+        } catch {
+          /* ignore */
+        }
+      }
     }
     
     // Ajouter l'URL de l'API backend si elle n'est pas localhost
@@ -116,7 +160,7 @@ const nextConfig: NextConfig = {
         } else if (apiUrlObj.protocol === 'https:') {
           connectSrcDirectives.push(apiHost.replace('https://', 'wss://'))
         }
-      } catch (e) {
+      } catch {
         // Si l'URL n'est pas valide, on continue sans l'ajouter
         console.warn('Invalid API URL in CSP configuration:', apiUrl)
       }
@@ -146,10 +190,13 @@ const nextConfig: NextConfig = {
       cspDirectives.push("upgrade-insecure-requests")
     }
 
-    securityHeaders.push({
-      key: 'Content-Security-Policy',
-      value: cspDirectives.join('; ')
-    })
+    // CSP en dev casse souvent le HMR (ws://LAN) et les outils type Mapbox telemetry ; on la réserve à la prod.
+    if (!isDevelopment) {
+      securityHeaders.push({
+        key: 'Content-Security-Policy',
+        value: cspDirectives.join('; '),
+      })
+    }
 
     return [
       {
