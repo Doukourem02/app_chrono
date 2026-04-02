@@ -1,4 +1,5 @@
 import pool from './db.js';
+import { OTP_TTL_MS } from './otpTtl.js';
 import logger from '../utils/logger.js';
 
 interface OTPEntry {
@@ -8,9 +9,20 @@ interface OTPEntry {
 
 const memoryOTPStore = new Map<string, OTPEntry>();
 
+/** Évite de retaper la DB si la table otp_codes n'existe pas (42P01). */
+let otpTableMissingInDb = false;
+
+function markOtpTableMissing(error: unknown): void {
+  const code = (error as { code?: string })?.code;
+  if (code === '42P01') {
+    otpTableMissingInDb = true;
+  }
+}
+
 const normalizeEmail = (email: string = ''): string => email.trim().toLowerCase();
 
-const normalizePhone = (phone: string = ''): string => phone.replace(/[\s().-]/g, '');
+/** Chiffres uniquement — aligné sur syntheticEmailFromPhone (+225… vs 225… même clé OTP). */
+const normalizePhoneForOtp = (phone: string = ''): string => phone.replace(/\D/g, '');
 
 /** E-mail technique pour stockage OTP / Supabase quand l'utilisateur ne fournit pas d'e-mail réel. */
 export function syntheticEmailFromPhone(phone: string): string {
@@ -31,7 +43,7 @@ export function resolveOtpEmailForStorage(
 }
 
 const createKey = (email: string, phone: string, role: string): string =>
-  `${normalizeEmail(email)}|${normalizePhone(phone)}|${role}`;
+  `${normalizeEmail(email)}|${normalizePhoneForOtp(phone)}|${role}`;
 
 const setMemoryOTP = (
   email: string,
@@ -125,8 +137,9 @@ export async function storeOTP(
   role: string,
   code: string
 ): Promise<{ storage: string; fallback: boolean }> {
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-  const poolAvailable = DATABASE_AVAILABLE && pool !== null;
+  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+  const poolAvailable =
+    DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb;
 
   if (!poolAvailable) {
     logger.warn('Base de données non disponible, utilisation du stockage mémoire');
@@ -147,7 +160,7 @@ export async function storeOTP(
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (email, phone, role) 
        DO UPDATE SET code = $4, expires_at = $5, created_at = NOW()`,
-      [normalizeEmail(email), normalizePhone(phone), role, code, expiresAt]
+      [normalizeEmail(email), normalizePhoneForOtp(phone), role, code, expiresAt]
     ) as any;
 
     if (result && result.rowCount !== undefined && result.rowCount > 0) {
@@ -166,6 +179,7 @@ export async function storeOTP(
       );
     }
   } catch (error: any) {
+    markOtpTableMissing(error);
     const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
     logger.error('Erreur lors du stockage OTP:', { error: errorMessage, code: error?.code });
     return fallbackToMemory(
@@ -186,7 +200,8 @@ export async function verifyOTP(
   role: string,
   code: string
 ): Promise<boolean> {
-  const poolAvailable = DATABASE_AVAILABLE && pool !== null;
+  const poolAvailable =
+    DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb;
 
   if (poolAvailable) {
     try {
@@ -195,7 +210,7 @@ export async function verifyOTP(
          WHERE email = $1 AND phone = $2 AND role = $3 
          AND code = $4 AND expires_at > NOW() 
          RETURNING *`,
-        [normalizeEmail(email), normalizePhone(phone), role, code]
+        [normalizeEmail(email), normalizePhoneForOtp(phone), role, code]
       ) as any;
 
       if (result.rows && result.rows.length > 0) {
@@ -203,8 +218,18 @@ export async function verifyOTP(
         return true;
       }
     } catch (error: any) {
+      markOtpTableMissing(error);
       const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
-      logger.error('Erreur lors de la vérification OTP:', { error: errorMessage, code: error?.code });
+      if (error?.code === '42P01') {
+        logger.warn(
+          'Table otp_codes absente — vérification OTP en mémoire. Lancez : npm run migrate:otp'
+        );
+      } else {
+        logger.error('Erreur lors de la vérification OTP:', {
+          error: errorMessage,
+          code: error?.code,
+        });
+      }
     }
   }
 
@@ -216,7 +241,7 @@ export async function getOTP(
   phone: string,
   role: string
 ): Promise<OTPEntry | null> {
-  if (DATABASE_AVAILABLE && pool !== null) {
+  if (DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb) {
     try {
       const result = await (pool as any).query(
         `SELECT * FROM otp_codes 
@@ -224,13 +249,14 @@ export async function getOTP(
          AND expires_at > NOW() 
          ORDER BY created_at DESC 
          LIMIT 1`,
-        [normalizeEmail(email), normalizePhone(phone), role]
+        [normalizeEmail(email), normalizePhoneForOtp(phone), role]
       ) as any;
 
       if (result.rows && result.rows[0]) {
         return result.rows[0];
       }
     } catch (error: any) {
+      markOtpTableMissing(error);
       const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
       logger.error('Erreur lors de la récupération OTP:', { error: errorMessage, code: error?.code });
     }

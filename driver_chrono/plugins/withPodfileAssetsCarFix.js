@@ -3,11 +3,6 @@ const fs = require('fs');
 const path = require('path');
 
 const POST_INSTALL_FIX = `
-    # Fix duplicate Assets.car (Multiple commands produce)
-    fix_script = File.join(__dir__, '..', 'scripts', 'fix-assets-car.js')
-    if File.exist?(fix_script)
-      system('node', fix_script)
-    end
     # Réduire la latence du rerouting Mapbox (recalcul plus réactif)
     reroute_script = File.join(__dir__, '..', 'scripts', 'fix-mapbox-reroute-latency.js')
     if File.exist?(reroute_script)
@@ -48,6 +43,18 @@ const POST_INSTALL_FIX = `
       end
     end`;
 
+const POST_INTEGRATE_FIX = `
+# Après « Integrating client project » — sinon CocoaPods réécrit Assets.car après post_install
+post_integrate do |_installer|
+  fix_assets_script = File.expand_path('../scripts/fix-assets-car.js', __dir__)
+  if File.exist?(fix_assets_script)
+    unless system('node', fix_assets_script, __dir__)
+      raise StandardError, "[fix-assets-car] échec — lancez : node scripts/fix-assets-car.js"
+    end
+    puts '[fix-assets-car] post_integrate OK'
+  end
+end`;
+
 /**
  * Corrige l'erreur "Multiple commands produce Assets.car" :
  * 1. install! 'cocoapods', :disable_input_output_paths => true
@@ -69,53 +76,17 @@ function withPodfileAssetsCarFix(config) {
           : contents.replace(/(\nprepare_react_native_project!)/, `\n\n${fixLine}\n$1`);
       }
 
-      // 2. Ajouter le fix post_install si absent
-      if (!contents.includes('Fix duplicate Assets.car')) {
+      // 2. Ajouter le bloc post_install (Mapbox) si absent
+      if (!contents.includes('ViewAnnotationManager.swift')) {
         contents = contents.replace(
           /(:ccache_enabled => ccache_enabled\?\(podfile_properties\),\s*\n\s+\)\s*\n)(\s+end\s*\n)(end)/m,
           `$1${POST_INSTALL_FIX}\n$2$3`
         );
-      } else if (!contents.includes('ViewAnnotationManager.swift')) {
-        // Podfile a déjà le fix Assets.car, ajouter le fix Mapbox Xcode 16
-        const MAPBOX_FIX = `
-    # Fix MapboxMaps ViewAnnotationManager.swift for Xcode 16 (compactMapValues type inference)
-    mapbox_swift = File.join(installer.sandbox.root, 'MapboxMaps/Sources/MapboxMaps/Annotations/ViewAnnotationManager.swift')
-    system('chmod', '-R', 'u+w', File.join(installer.sandbox.root, 'MapboxMaps')) rescue nil
-    if File.exist?(mapbox_swift)
-      content = File.read(mapbox_swift)
-      old = '        idsByView.compactMapValues { [mapboxMap] id in
-            try? mapboxMap.options(forViewAnnotationWithId: id)
-        }'
-      new = '        var result: [UIView: ViewAnnotationOptions] = [:]
-        for (view, id) in idsByView {
-            if let options = try? mapboxMap.options(forViewAnnotationWithId: id) {
-                result[view] = options
-            }
-        }
-        return result'
-      if content.include?(old)
-        content = content.sub(old, new)
-        File.write(mapbox_swift, content)
-        puts '[Fix] Patched ViewAnnotationManager.swift for Xcode 16'
-      end
-    end
-    # Fix MapboxNavigation Expression ambiguous for type lookup (MapboxMaps vs MapboxCoreMaps)
-    expr_swift = File.join(installer.sandbox.root, 'MapboxNavigation/Sources/MapboxNavigation/Expression.swift')
-    system('chmod', '-R', 'u+w', File.join(installer.sandbox.root, 'MapboxNavigation')) rescue nil
-    if File.exist?(expr_swift)
-      content = File.read(expr_swift)
-      if content.include?('extension Expression {') && !content.include?('extension MapboxMaps.Expression')
-        content = content.gsub('extension Expression {', 'extension MapboxMaps.Expression {')
-        content = content.gsub('-> Expression ', '-> MapboxMaps.Expression ')
-        content = content.gsub('-> Expression)', '-> MapboxMaps.Expression)')
-        File.write(expr_swift, content)
-        puts '[Fix] Patched Expression.swift for type disambiguation'
-      end
-    end`;
-        contents = contents.replace(
-          /(fix_script = File\.join\(__dir__, '\.\.', 'scripts', 'fix-assets-car\.js'\)\s+if File\.exist\?\(fix_script\)\s+system\('node', fix_script\)\s+end)/m,
-          `$1${MAPBOX_FIX}`
-        );
+      }
+
+      // 3. post_integrate : fix-assets-car après intégration du projet (obligatoire)
+      if (!contents.includes('post_integrate do |_installer|')) {
+        contents = contents.trimEnd() + `\n${POST_INTEGRATE_FIX}\n`;
       }
 
       await fs.promises.writeFile(podfilePath, contents);

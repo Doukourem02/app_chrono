@@ -1,3 +1,4 @@
+import { OTP_TTL_MINUTES } from '../config/otpTtl.js';
 import logger from '../utils/logger.js';
 
 /** True when Twilio can send standard SMS (distinct from WhatsApp From). */
@@ -59,10 +60,11 @@ export async function sendOTPSMSTwilio(
   }
 
   body.set('To', to);
-  const brand = process.env.TWILIO_SMS_BODY_BRAND?.trim() || 'Chrono';
+  const brand = process.env.TWILIO_SMS_BODY_BRAND?.trim() || 'Krono';
+  const minLabel = OTP_TTL_MINUTES === 1 ? '1 minute' : `${OTP_TTL_MINUTES} minutes`;
   body.set(
     'Body',
-    `${brand} — code ${role}: ${otpCode}. Valide 5 minutes. Ne partagez pas ce code.`
+    `${brand} — code ${role}: ${otpCode}. Valide ${minLabel}. Ne partagez pas ce code.`
   );
 
   const auth = Buffer.from(`${accountSid}:${authToken}`, 'utf8').toString('base64');

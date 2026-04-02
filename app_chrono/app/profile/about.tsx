@@ -16,11 +16,6 @@ export default function AboutPage() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.contentContainer}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="cube" size={64} color="#8B5CF6" />
-          </View>
-          
-          <Text style={styles.appName}>Krono</Text>
           <Text style={styles.version}>Version 1.0.0</Text>
 
           <Text style={styles.description}>
@@ -81,21 +76,6 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 12,
     alignItems: 'center',
-  },
-  logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F3F0FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  appName: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
   },
   version: {
     fontSize: 14,

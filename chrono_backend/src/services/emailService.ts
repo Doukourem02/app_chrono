@@ -1,5 +1,6 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { Vonage } from '@vonage/server-sdk';
+import { OTP_TTL_MINUTES } from '../config/otpTtl.js';
 import logger from '../utils/logger.js';
 import {
   isTwilioSmsConfigured,
@@ -31,6 +32,8 @@ export const sendOTPEmail = async (
   try {
     logger.info(`Envoi email OTP Gmail à ${email} pour rôle ${role}`);
 
+    const minLabelHtml =
+      OTP_TTL_MINUTES === 1 ? '1 minute' : `${OTP_TTL_MINUTES} minutes`;
     const htmlTemplate = `
       <!DOCTYPE html>
       <html>
@@ -102,7 +105,7 @@ export const sendOTPEmail = async (
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">ChronoDelivery</div>
+              <div class="logo">Krono</div>
               <h1 class="title">Code de vérification ${role}</h1>
             </div>
             <p class="instructions">
@@ -114,11 +117,11 @@ export const sendOTPEmail = async (
               Saisissez ce code dans l'application pour compléter votre authentification.
             </p>
             <div class="warning">
-              Ce code expire dans <strong>5 minutes</strong> et ne peut être utilisé qu'une seule fois.
+              Ce code expire dans <strong>${minLabelHtml}</strong> et ne peut être utilisé qu'une seule fois.
             </div>
             <div class="footer">
               Si vous n'avez pas demandé ce code, ignorez cet email.<br>
-              © 2025 ChronoDelivery - Service de livraison
+              © 2025 Krono — Service de livraison
             </div>
           </div>
         </body>
@@ -126,11 +129,11 @@ export const sendOTPEmail = async (
     `;
 
     const textTemplate = `
-Code de vérification ChronoDelivery ${role}
+Code de vérification Krono ${role}
 
 Votre code de vérification est: ${otpCode}
 
-Ce code expire dans 5 minutes. Si vous n'avez pas demandé ce code, ignorez cet email.
+Ce code expire dans ${minLabelHtml}. Si vous n'avez pas demandé ce code, ignorez cet email.
     `;
 
     const mailOptions = {
@@ -164,9 +167,10 @@ async function sendOTPSMSVonage(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   const apiKey = process.env.VONAGE_API_KEY!.trim();
   const apiSecret = process.env.VONAGE_API_SECRET!.trim();
-  const from = (process.env.VONAGE_FROM || 'Chrono').trim();
+  const from = (process.env.VONAGE_FROM || 'Krono').trim();
   const vonage = new Vonage({ apiKey, apiSecret });
-  const message = `Votre code ${role} Chrono: ${otpCode}. Valide 5 min. Ne partagez pas ce code.`;
+  const minShort = OTP_TTL_MINUTES === 1 ? '1 min' : `${OTP_TTL_MINUTES} min`;
+  const message = `Votre code ${role} Krono : ${otpCode}. Valide ${minShort}. Ne partagez pas ce code.`;
 
   try {
     const response = await vonage.sms.send({
@@ -229,7 +233,7 @@ SMS OTP SIMULÉ (${role.toUpperCase()})
 ========================================
 Au: ${phone}
 Code: ${otpCode}
-Expire dans 5 min.
+Expire dans ${OTP_TTL_MINUTES} min.
 ========================================
     `);
 

@@ -25,7 +25,7 @@ describe('EmailService', () => {
     process.env.EMAIL_PORT = '587';
     process.env.EMAIL_USER = 'test@example.com';
     process.env.EMAIL_PASS = 'test-password';
-    process.env.EMAIL_FROM_NAME = 'ChronoDelivery';
+    process.env.EMAIL_FROM_NAME = 'Krono';
     process.env.EMAIL_FROM_ADDRESS = 'noreply@chronodelivery.com';
 
     // Créer le mockTransporter une seule fois

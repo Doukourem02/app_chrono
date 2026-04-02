@@ -1,4 +1,5 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import { OTP_TTL_MINUTES } from '../config/otpTtl.js';
 import logger from './logger.js';
 
 let transporter: Transporter | null = null;
@@ -22,6 +23,7 @@ const generateOTPEmailTemplate = (
   otpCode: string,
   brandName: string = 'CHRONO'
 ): string => {
+  const minLabel = OTP_TTL_MINUTES === 1 ? '1 minute' : `${OTP_TTL_MINUTES} minutes`;
   return `
     <!DOCTYPE html>
     <html>
@@ -108,7 +110,7 @@ const generateOTPEmailTemplate = (
           </div>
           <p class="description">
             Saisissez ce code dans l'application pour confirmer votre adresse email.
-            Ce code est valide pendant <strong>5 minutes</strong>.
+            Ce code est valide pendant <strong>${minLabel}</strong>.
           </p>
           <div class="warning">
             <strong>Important :</strong> Ne partagez jamais ce code avec personne.
@@ -147,7 +149,7 @@ export async function sendOTPEmail(
       to: to,
       subject: `Code de vérification ${brandName}: ${otpCode}`,
       html: generateOTPEmailTemplate(otpCode, brandName),
-      text: `Votre code de vérification ${brandName} est: ${otpCode}. Ce code est valide pendant 5 minutes. Ne le partagez avec personne.`,
+      text: `Votre code de vérification ${brandName} est: ${otpCode}. Ce code est valide pendant ${OTP_TTL_MINUTES === 1 ? '1 minute' : `${OTP_TTL_MINUTES} minutes`}. Ne le partagez avec personne.`,
     };
 
     const result = await transporter.sendMail(mailOptions);

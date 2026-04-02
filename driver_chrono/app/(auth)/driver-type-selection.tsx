@@ -161,7 +161,7 @@ export default function DriverTypeSelectionScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Option 2 : Livreur interne Krono */}
+        {/* Option 2 : Livreur interne Krono pro */}
         <TouchableOpacity
           style={[
             styles.optionCard,
@@ -191,10 +191,10 @@ export default function DriverTypeSelectionScreen() {
                   selectedType === 'internal' && styles.optionTitleSelected,
                 ]}
               >
-                Livreur interne Krono
+                Livreur interne Krono pro
               </Text>
               <Text style={styles.optionSubtitle}>
-                Livreur affilié à Krono
+                Livreur affilié à Krono pro
               </Text>
             </View>
             {selectedType === 'internal' && (

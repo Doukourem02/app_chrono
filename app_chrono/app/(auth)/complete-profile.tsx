@@ -83,7 +83,6 @@ export default function CompleteProfileScreen() {
     >
       <View style={[styles.inner, { paddingTop: insets.top + 24 }]}>
         <Text style={styles.wordmark}>Krono</Text>
-
         <Text style={styles.headline}>Comment vous appeler ?</Text>
         <Text style={styles.subline}>
           Renseignez votre prénom et votre nom pour personnaliser votre profil.
@@ -144,9 +143,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     fontStyle: 'italic',
-    color: '#8B7CF6',
+    color: '#8B5CF6',
     textAlign: 'center',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     marginBottom: 32,
   },
   headline: {

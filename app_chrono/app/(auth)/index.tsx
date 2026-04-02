@@ -190,9 +190,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     fontStyle: 'italic',
-    color: '#8B7CF6',
+    color: '#8B5CF6',
     textAlign: 'center',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     marginBottom: 40,
   },
   headline: {

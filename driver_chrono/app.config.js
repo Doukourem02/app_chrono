@@ -3,11 +3,11 @@ require('dotenv').config({ path: '.env' });
 module.exports = {
   expo: {
     owner: "doukourem02",
-    name: "Chrono Pro",
+    name: "Krono pro",
     slug: "driver_chrono",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/images/icon.png",
+    icon: "./assets/images/logo/LOGO_APP1.png",
     scheme: "driverchrono",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
@@ -15,23 +15,21 @@ module.exports = {
       bundleIdentifier: "com.anonymous.driver-chrono",
       supportsTablet: true,
       infoPlist: {
-        CFBundleDisplayName: "Chrono Pro",
+        CFBundleDisplayName: "Krono pro",
       },
     },
     android: {
       package: "com.anonymous.driver_chrono",
       adaptiveIcon: {
-        backgroundColor: "#E6F4FE",
-        foregroundImage: "./assets/images/android-icon-foreground.png",
-        backgroundImage: "./assets/images/android-icon-background.png",
-        monochromeImage: "./assets/images/android-icon-monochrome.png"
+        backgroundColor: "#FFFFFF",
+        foregroundImage: "./assets/images/logo/LOGO_APP1.png",
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
     },
     web: {
       output: "static",
-      favicon: "./assets/images/favicon.png"
+      favicon: "./assets/images/logo/LOGO_APP1.png"
     },
     plugins: [
       "expo-audio",
@@ -65,9 +63,8 @@ module.exports = {
       [
         "expo-splash-screen",
         {
-          image: "./assets/images/splash-icon.png",
+          image: "./assets/images/logo/LOGO_APP1.png",
           imageWidth: 200,
-          imageHeight: 200,
           resizeMode: "contain",
           backgroundColor: "#ffffff",
           dark: {

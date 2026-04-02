@@ -4,6 +4,7 @@ import pool from '../config/db.js';
 import { sendOTPSMS } from '../services/emailService.js';
 import { sendOTPWhatsApp } from '../services/twilioWhatsAppService.js';
 import {storeOTP,verifyOTP,resolveOtpEmailForStorage,syntheticEmailFromPhone,} from '../config/otpStorage.js';
+import { OTP_TTL_MINUTES } from '../config/otpTtl.js';
 import { generateTokens, refreshAccessToken } from '../utils/jwt.js';
 import logger from '../utils/logger.js';
 import { maskEmail, maskPhone, maskUserId } from '../utils/maskSensitiveData.js';
@@ -508,13 +509,19 @@ const sendOTPCode = async (
     await storeOTP(otpEmail, phoneStr, role, otpCode);
 
     if (otpMethod === 'sms') {
-      logger.info(`Code OTP ${otpCode} envoyé par SMS au ${maskPhone(phoneStr)}`);
+      logger.info(`Code OTP ${otpCode} pour SMS au ${maskPhone(phoneStr)} (Twilio/Vonage)`);
+      // Attendre l’API SMS : évite un 200 alors que Twilio/Vonage a refusé ; la livraison opérateur peut encore prendre du retard.
       const smsResult = await sendOTPSMS(phoneStr, otpCode, role);
       if (!smsResult.success) {
         logger.error('Échec envoi SMS:', smsResult.error);
-      } else {
-        logger.info('SMS OTP envoyé avec succès !');
+        res.status(503).json({
+          success: false,
+          message: "Impossible d'envoyer le code par SMS pour le moment. Réessayez dans un instant.",
+          error: process.env.NODE_ENV === 'development' ? smsResult.error : undefined,
+        });
+        return;
       }
+      logger.info('SMS OTP envoyé avec succès !');
     } else if (otpMethod === 'whatsapp') {
       logger.info(`Code OTP envoyé par WhatsApp au ${phone}`);
       const waResult = await sendOTPWhatsApp(phoneStr, otpCode, role);
@@ -538,6 +545,7 @@ const sendOTPCode = async (
         email: email?.trim() || undefined,
         phone: phoneStr,
         role,
+        otpExpiresInMinutes: OTP_TTL_MINUTES,
         debug_code: process.env.NODE_ENV === 'development' ? otpCode : undefined,
       },
     });

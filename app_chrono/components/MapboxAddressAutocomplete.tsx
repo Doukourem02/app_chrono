@@ -27,7 +27,7 @@ const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 
 const PROXIMITY = '-4.0083,5.36';
 const NOMINATIM_HEADERS: HeadersInit = {
-  'User-Agent': 'ChronoLivraison/1.0 (app-mobile-address-search)',
+  'User-Agent': 'Krono/1.0 (app-mobile-address-search)',
 };
 
 interface MapboxSuggestion {

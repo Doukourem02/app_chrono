@@ -67,7 +67,9 @@ export default function VerificationScreen() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || 'Code de vérification incorrect');
+          throw new Error(
+            data.message || data.error || 'Code de vérification incorrect'
+          );
         }
 
         logger.debug(`${otpMethod} OTP vérifié avec succès:`, data);

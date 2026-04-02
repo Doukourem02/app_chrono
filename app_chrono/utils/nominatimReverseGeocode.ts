@@ -6,7 +6,7 @@
 const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 const NOMINATIM_HEADERS: HeadersInit = {
-  'User-Agent': 'ChronoLivraison/1.0 (app-mobile-reverse-geocode)',
+  'User-Agent': 'Krono/1.0 (app-mobile-reverse-geocode)',
 };
 
 interface NominatimAddress {

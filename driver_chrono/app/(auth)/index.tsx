@@ -102,7 +102,7 @@ export default function PhoneAuthScreen() {
     >
       <View style={[styles.inner, { paddingTop: insets.top + 24 }]}>
         <Text style={styles.wordmark}>
-          Krono <Text style={styles.wordmarkPro}>Pro</Text>
+          Krono <Text style={styles.wordmarkPro}>pro</Text>
         </Text>
 
         <Text

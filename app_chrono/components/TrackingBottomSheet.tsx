@@ -410,7 +410,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                 </View>
               )}
 
-              {/* Partager le lien au destinataire (sans compte Chrono) */}
+              {/* Partager le lien au destinataire (sans compte Krono) */}
               {(currentOrder?.trackingToken || currentOrder?.tracking_token) && (
                 <TouchableOpacity
                   style={styles.shareLinkButton}

@@ -21,7 +21,8 @@
     "backup:test": "tsx scripts/backup-enhanced.ts test",
     "recovery:list": "tsx scripts/recovery.ts list",
     "recovery:test": "tsx scripts/recovery.ts test",
-    "recovery:restore": "tsx scripts/recovery.ts restore"
+    "recovery:restore": "tsx scripts/recovery.ts restore",
+    "migrate:otp": "tsx scripts/apply-otp-migration.ts"
   },
   "keywords": [],
   "author": "",

@@ -1,3 +1,4 @@
+import { OTP_TTL_MINUTES } from '../config/otpTtl.js';
 import logger from '../utils/logger.js';
 
 function normalizeE164Digits(phone: string): string {
@@ -74,9 +75,10 @@ export async function sendOTPWhatsApp(
     body.set('ContentVariables', JSON.stringify(variables));
   } else {
     const brand = process.env.TWILIO_WHATSAPP_BODY_BRAND || 'Krono';
+    const minLabel = OTP_TTL_MINUTES === 1 ? '1 minute' : `${OTP_TTL_MINUTES} minutes`;
     body.set(
       'Body',
-      `${brand} — code ${role}: ${otpCode}. Valide 5 minutes. Ne partagez ce code avec personne.`
+      `${brand} — code ${role}: ${otpCode}. Valide ${minLabel}. Ne partagez ce code avec personne.`
     );
   }
 
