@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { View } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 import { apiService } from "../services/apiService";
 import { logger } from "../utils/logger";
@@ -102,20 +102,6 @@ export default function RootIndex() {
     };
   }, [validateUserExists, logout, hydrateTokens]);
 
-  return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-      }}
-    >
-      <ActivityIndicator size="large" color="#8B5CF6" />
-      <Text style={{ marginTop: 20, color: "#6B7280", textAlign: "center" }}>
-        Vérification de la session...
-      </Text>
-    </View>
-  );
+  // Pas d’écran de vérification : fond neutre puis redirection (même logique qu’avant)
+  return <View style={{ flex: 1, backgroundColor: "#FFFFFF" }} />;
 }

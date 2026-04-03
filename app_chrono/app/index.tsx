@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { router } from 'expo-router';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { userApiService } from '../services/userApiService';
 import { logger } from '../utils/logger';
@@ -69,18 +69,6 @@ export default function RootIndex() {
     };
   }, [validateUser, logout, hydrateTokens]);
 
-  return (
-    <View style={{ 
-      flex: 1, 
-      backgroundColor: '#FFFFFF',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-    }}>
-      <ActivityIndicator size="large" color="#8B7CF6" />
-      <Text style={{ marginTop: 20, color: '#6B7280', textAlign: 'center' }}>
-        Chargement...
-      </Text>
-    </View>
-  );
+  // Pas d’écran « Chargement » : fond neutre le temps que la session soit résolue puis router.replace
+  return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
 }
