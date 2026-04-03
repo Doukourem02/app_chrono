@@ -1,6 +1,9 @@
 # Guide : mettre PROJET_CHRONO en ligne (App Store, Play Store, backend sécurisé)
 
-Ce document est pensé pour un **développeur qui maîtrise le code** mais découvre le **déploiement** et le vocabulaire « production ». Il couvre **tout le chemin** : ce qui se passe **avant**, **pendant** et **après** la mise en ligne, avec des **outils possibles** et des **suggestions** pour Chrono.
+Ce document est pensé pour un **développeur qui maîtrise le code** mais découvre le **déploiement** et le vocabulaire « production ». Il couvre **tout le chemin** : ce qui se passe **avant**, **pendant** et **après** la mise en ligne, les **outils** possibles, et — dans le **même fichier** — la **feuille de route technique des apps mobiles** (temps réel, cache, push, qualité) alignée sur l’état actuel du repo **Chrono**.
+
+**Sommaire (ligne directrice)**  
+**§0** — Carte mentale prod · **§1** — Outils · **§2** — Avant prod · **§3** — Pendant · **§4** — Après prod · **§5** — **Apps mobile** (temps réel, offline, qualité — état repo vs bonnes pratiques) · **§6** — Roadmap produit (nav / tarif) · **§7** — Synthèse beta vs sérieux · **§8** — Variables backend.
 
 **Important** : « Mettre l’app sur les stores » n’est **qu’une partie** du travail. Les utilisateurs ont besoin d’un **backend** (API + WebSockets), d’une **base de données** (Supabase), et souvent d’un **site admin** (`admin_chrono`). Les binaires App Store / Play Store sont des **clients** qui parlent à cette infrastructure. Sans backend et URL stables, les apps en prod ne fonctionneront pas correctement.
 
@@ -14,7 +17,7 @@ Tu as eu raison de comparer deux sources : **plusieurs avis, c’est prudent**. 
 - **Outils obsolètes** : par exemple **Freshping** a été arrêté ; pour l’uptime, préfère **UptimeRobot**, **Better Stack**, ou l’équivalent de ton hébergeur.
 - **Cases cochées trop vite** : des ✅ sur « Sentry backend » alors que le code n’initialise pas encore Sentry = **faux sentiment de sécurité**. Ici on dit : vérifier dans le code ou considérer que c’est une **étape à faire**.
 
-**Ce qui a été repris de l’autre checklist** (sans doublon inutile) : branche / release Git, **release channels** Expo, **TestFlight** et **test interne Play**, tableau d’outils élargi (Neon, Bitrise, agrégateurs de logs), boucle **feedback** après prod, **tags git** — voir les sections concernées ci-dessous.
+**Ce qui a été repris de l’autre checklist** (sans doublon inutile) : branche / release Git, **release channels** Expo, **TestFlight** et **test interne Play**, tableau d’outils élargi (Neon, Bitrise, agrégateurs de logs), boucle **feedback** après prod, **tags git** — voir **§2**, **§3** et **§4**.
 
 ---
 
@@ -263,7 +266,99 @@ Ce ne sont pas des « comportements vagues » : ce sont des **habitudes** et des
 
 ---
 
-## 5. Roadmap produit (optionnel, souvent en dernier)
+## 5. Applications mobiles (`app_chrono`, `driver_chrono`) : état réel vs bonnes pratiques
+
+Cette partie complète les sections **§2–§4** (infra, stores, monitoring) avec ce qu’il faut **côté code mobile** pour une app « sérieuse » : rafraîchissement des données, hors-ligne, cycle de vie, etc. **Une seule ligne directrice** : prioriser selon la colonne **Quand** (avant / pendant / après prod).
+
+### 5.0 Légende
+
+| Statut | Signification |
+|--------|----------------|
+| **Fait** | Présent dans le code ou les dépendances. |
+| **Partiel** | Partiellement couvert ou sans stratégie globale. |
+| **Non fait** | Absent pour l’instant. |
+
+| Timing | Signification |
+|--------|----------------|
+| **Avant prod** | Avant la première version store / utilisateurs réels (ou fortement conseillé). |
+| **Pendant** | Pendant le développement ou chaque release majeure. |
+| **Après prod** | Une fois en ligne ; amélioration continue. |
+
+### 5.1 Rafraîchissement des données & temps réel
+
+| Thème | État dans Chrono | Recommandation | Quand |
+|--------|------------------|----------------|-------|
+| **Widgets écran d’accueil (système)** | **Non fait** (pas de WidgetKit / App Widget ; le « widget » météo dans `MapboxNavigationScreen` est un bloc **dans** l’app). | N’ajouter des widgets iOS/Android **que** si le produit le demande ; respecter les intervalles batterie. | **Après prod** (souvent) |
+| **Push (FCM / APNs)** | **Non fait** (pas d’`expo-notifications` dans les apps). | `expo-notifications` + Firebase (Android) + APNs (iOS) ; backend qui pousse sur événement métier ; stocker le token côté serveur. | **Avant prod** si alertes hors app ; sinon **après prod** |
+| **WebSockets** | **Fait** : `socket.io-client`, services commandes / messagerie, auth JWT, reconnexion. | Tester long **arrière-plan** ; au retour **active** : reconnect + refetch commande active si besoin. | **Pendant** ; tests **avant prod** |
+| **Polling** | **Partiel** (ex. refresh token 10 min si app active dans `_layout` ; compteurs UI). | Éviter polling REST agressif ; **socket + refetch au focus** pour listes critiques. | **Pendant** |
+| **UI à jour sans fermer l’app** | **Partiel** (sockets + `ensureAccessToken` au retour actif). | Revoir écrans liste / suivi : rechargement au **focus** navigation. | **Avant prod** (commande / livreur) |
+
+### 5.2 Cache, hors-ligne, connectivité
+
+| Thème | État dans Chrono | Recommandation | Quand |
+|--------|------------------|----------------|-------|
+| **Cache / dernière donnée** | **Partiel** (AsyncStorage, Zustand persist, pas de politique « stale + horodatage » partout). | Écrans critiques : dernier état connu + « hors ligne » / horodatage ; envisager **TanStack Query** ou équivalent. | **Pendant** ; **avant prod** pour suivi commande |
+| **NetInfo** | **Non fait** (peu ou pas d’usage repéré). | Bannière pas de réseau ; aligner client sur la logique livreur (**timeout**, pas de logout brutal). | **Avant prod** (recommandé) |
+| **Sync après retour réseau** | **Partiel** (refresh token ; pas de file globale « actions en attente »). | File locale + retry pour messages si besoin. | **Pendant** / **après prod** |
+| **SQLite** | **Non fait**. | Si gros historique ou offline avancé. | **Après prod** |
+
+### 5.3 État global & cycle de vie
+
+| Thème | État dans Chrono | Recommandation | Quand |
+|--------|------------------|----------------|-------|
+| **State management** | **Fait** : **Zustand** + persistance partielle. | Documenter source de vérité (API vs socket vs cache). | **Pendant** |
+| **AppState / arrière-plan** | **Partiel** : `_layout` client + livreur, refresh token si **active**. | Politique explicite sockets en arrière-plan ; **reconnect + fetch** au retour. | **Avant prod** (livreur) |
+| **App tuée / cold start** | **Non géré finement**. | Tester commande en cours après kill app. | **Avant prod** (manuel) |
+| **Interruptions (appel, etc.)** | Gestion RN par défaut. | Tester Mapbox + appel sur device réel. | **Pendant** |
+
+### 5.4 Performance, sécurité mobile, accessibilité
+
+| Thème | État dans Chrono | Recommandation | Quand |
+|--------|------------------|----------------|-------|
+| **GPS / Mapbox / batterie** | **Partiel** (hooks livreur). | Limiter fréquence envoi position ; auditer hors course. | **Pendant** / **après prod** |
+| **Taille du binaire** | À mesurer (EAS). | Assets, bundle analyzer avant store. | **Avant prod** (1er build release) |
+| **Tokens** | **Partiel** : **SecureStore** refresh (`secureTokenStorage`). | Jamais de secrets en `EXPO_PUBLIC_*` ; pas de tokens en logs. | **Avant prod** |
+| **Permissions** | **Partiel** (contacts, etc. dans `app.json`). | Textes **localisation arrière-plan** si applicable — croiser avec **§2.5** (stores / légal). | **Avant prod** |
+| **Accessibilité / i18n** | Peu audité ; français dominant. | VoiceOver/TalkBack, contrastes ; i18n si multi-pays. | **Après prod** (ou **avant** si exigence) |
+
+### 5.5 Monitoring, erreurs, déploiement app
+
+| Thème | État dans Chrono | Recommandation | Quand |
+|--------|------------------|----------------|-------|
+| **Sentry / ErrorBoundary** | **Partiel** : présent si **DSN** configuré. | `EXPO_PUBLIC_SENTRY_DSN` sur builds prod ; test crash. | **Avant prod** |
+| **Analytics** | **Non fait**. | Posthog, Amplitude, etc. + mention dans la politique de confidentialité. | **Après prod** (souvent) |
+| **Timeouts / JSON invalide** | **Partiel** (livreur `apiService` solide ; harmoniser client). | Même politique + pas de crash sur données inattendues. | **Pendant** |
+| **Stores / conformité** | Lié **§2.5** · **§3**. | CGU, suppression compte si requis, etc. | **Avant prod** |
+| **Version minimale forcée** | **Non fait** côté app. | Endpoint `minAppVersion` + modal. | **Après prod** (API qui évolue) |
+
+### 5.6 Webhooks, fond, tests, dette
+
+| Thème | État dans Chrono | Recommandation | Quand |
+|--------|------------------|----------------|-------|
+| **Webhooks** | **Backend** (`chrono_backend`) — pas l’app. | Idempotence, HTTPS : **§2.4**. | **Avant prod** si paiements |
+| **Background fetch / workers** | **Non fait** comme module dédié. | Souvent **focus** + push plus tard ; `expo-background-fetch` si besoin. | **Après prod** |
+| **Tests auto mobile** | **Non fait** (tests dans le repo surtout **backend**). | Jest + RNTL, ou Maestro/Detox ciblé + **§2.8** manuel. | **Pendant** puis **après prod** |
+| **Charge** | Surtout **API**. | Load test backend. | **Après prod** |
+| **Dette technique** | Projet riche (carte, sockets). | Sprints refacto après stabilisation. | **Après prod** |
+
+### 5.7 Synthèse mobile & priorités
+
+| Forces | Lacunes principales |
+|--------|---------------------|
+| WebSockets commandes / messagerie | Pas de **push** ni widgets **système** |
+| SecureStore + garde-fous réseau (livreur) | **NetInfo**, cache unifié, tests auto apps |
+| Sentry + ErrorBoundary (si DSN) | Resync socket après long arrière-plan (valider **livreur**) |
+
+1. **Avant prod** : DSN Sentry, NetInfo / UX offline minimale, E2E (**§2.8**), CGU (**§2.5**), tests retour **active** + sockets livreur.  
+2. **Pendant** : cache ciblé, timeouts harmonisés, tests auto légers.  
+3. **Après prod** : push, widgets si besoin, analytics, `minAppVersion`, i18n.
+
+*État du dépôt : avril 2026 — à réviser après refactors majeurs.*
+
+---
+
+## 6. Roadmap produit (optionnel, souvent en dernier)
 
 Ces sujets **n’empêchent pas** une première mise en ligne si le produit actuel te suffit :
 
@@ -272,7 +367,7 @@ Ces sujets **n’empêchent pas** une première mise en ligne si le produit actu
 
 ---
 
-## 6. Synthèse « minimum vital » vs « sérieux »
+## 7. Synthèse « minimum vital » vs « sérieux »
 
 | Niveau | Inclut |
 |--------|--------|
@@ -281,7 +376,7 @@ Ces sujets **n’empêchent pas** une première mise en ligne si le produit actu
 
 ---
 
-## 7. Rappel des variables critiques (backend)
+## 8. Rappel des variables critiques (backend)
 
 À recopier depuis `chrono_backend/.env.example` vers l’interface de ton hébergeur, en adaptant :
 
