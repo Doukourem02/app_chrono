@@ -94,7 +94,20 @@ class QRCodeService {
         };
       }
 
-      return result;
+      // L’API renvoie { success, message, data } — normaliser pour l’UI (success + isValid + data)
+      if (result.success && result.data) {
+        return {
+          success: true,
+          isValid: true,
+          data: result.data,
+        };
+      }
+
+      return {
+        success: false,
+        isValid: false,
+        error: result.message || 'Réponse scan invalide',
+      };
     } catch (error: any) {
       logger.error('Erreur lors du scan du QR code:', undefined, error);
       return {

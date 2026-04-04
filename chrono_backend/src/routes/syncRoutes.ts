@@ -1,8 +1,12 @@
 import express, { Router } from 'express';
-import { syncUsersFromAuth, checkSyncStatus } from '../controllers/syncController.js'; const router: Router = express.Router(); router.post('/sync-users', syncUsersFromAuth);
+import { syncUsersFromAuth, checkSyncStatus } from '../controllers/syncController.js';
+import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 
+const router: Router = express.Router();
 
-router.get('/sync-status', checkSyncStatus);
+// SÉCURITÉ go-live : ces endpoints exposaient données / actions sans auth (§2.7 ckprod.md).
+router.post('/sync-users', verifyAdminSupabase, syncUsersFromAuth);
+router.get('/sync-status', verifyAdminSupabase, checkSyncStatus);
 
 export default router;
 

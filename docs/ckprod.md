@@ -127,6 +127,8 @@ Tu peux **choisir** selon budget, confort et pays. Ci-dessous : rôle + exemples
 
 Objectif : quand tu appuies sur « déployer » ou « build store », tu n’as plus à improviser les secrets ni la base.
 
+**Vocabulaire équipe** : quand on dit **« tout est OK avant production »**, on entend par là **cette première phase (§2) terminée** — secrets, réseau, base, légal, observabilité, revue auth, tests manuels de préparation, etc. **Ce n’est pas encore** la mise en ligne : l’exécution concrète (Supabase prod déployée, API publique, admin, builds store) est la **phase suivante**, **§3 — Pendant la production**.
+
 ### 2.0 Git et organisation (optionnel mais propre)
 
 - **Repo propre** : pas de secrets dans l’historique ; `.env` ignorés (déjà dans `.gitignore`).
@@ -171,30 +173,62 @@ Objectif : quand tu appuies sur « déployer » ou « build store », tu n’as 
 
 ### 2.5 Stores et légal (préparation contenu)
 
+**Par quoi commencer** : (1) rédiger / héberger les documents, (2) renseigner les URLs dans les apps.
+
 1. Rédiger ou faire rédiger **CGU** et **politique de confidentialité** ; les héberger sur une URL stable (`https://tondomaine.com/legal/...` ou page Notion publique en dernier recours).
-2. Prévoir de remplacer dans le code les `Alert` « Lien à configurer » dans `app_chrono` et `driver_chrono` `(auth)/index.tsx` par `Linking.openURL('https://...')`.
-3. Aligner le texte avec `app_chrono/app/profile/privacy.tsx` (une seule vérité, pas deux politiques contradictoires).
+2. **Dans les apps** : définir `EXPO_PUBLIC_LEGAL_CGU_URL` et `EXPO_PUBLIC_LEGAL_PRIVACY_URL` (voir `app_chrono/.env.example` et `driver_chrono/.env.example`). Les écrans d’auth ouvrent ces liens via `utils/openLegalUrl.ts` et `config.legal.*`.
+3. **`app_chrono/app/profile/privacy.tsx`** : bannière « document officiel en ligne » si `EXPO_PUBLIC_LEGAL_PRIVACY_URL` est défini — le texte à l’écran reste un **résumé** ; la version **faisant foi** est la page web (à tenir alignée).
 4. Noter pour les questionnaires App Store / Play : **localisation** (dont arrière-plan si utilisé), **Mapbox** (clé publique seulement côté app), mentions données personnelles.
 
 ### 2.6 Observabilité (préparation)
 
-1. Créer un compte **Sentry**, un projet par plateforme ou un seul projet avec tags.
-2. Prévoir où coller le DSN côté Expo (`EXPO_PUBLIC_SENTRY_DSN` ou `app.config` → `extra`).
-3. Backend : vérifier si `chrono_backend` initialise Sentry au démarrage (dépendance `@sentry/node` dans `package.json`) ; sinon c’est une amélioration post-MVP — au minimum les logs du PaaS.
-4. Healthcheck : le backend expose déjà **`GET /health`** (et variantes sous `/health` — voir `chrono_backend/src/routes/healthRoutes.ts`). Tu pourras l’utiliser si un load balancer ou un uptime monitor le demande.
+**État dans le dépôt (déjà câblé)**  
+- **Backend** : `@sentry/node` dans `package.json` ; **`Sentry.init`** dans `chrono_backend/src/server.ts` si `SENTRY_DSN` est défini ; erreurs **5xx** remontées depuis `middleware/errorHandler.ts`.  
+- **Client / livreur** : `@sentry/react-native` ; **`initSentry()`** au démarrage (`app/_layout.tsx`) ; DSN lu depuis **`EXPO_PUBLIC_SENTRY_DSN`** ou **`app.config.js` → `extra.sentryDsn`** (les deux apps). En dev, `beforeSend` filtre pour ne pas envoyer (voir `utils/sentry.ts`).  
+- **Healthcheck** : `GET /health`, `/health/live`, `/health/ready`, `/health/advanced` — `chrono_backend/src/routes/healthRoutes.ts`.
+
+**À faire de ton côté**
+
+1. Créer un compte **Sentry** et un **projet** (un seul projet avec tags `app: client` / `app: driver` / `server` est possible).
+2. Renseigner **`SENTRY_DSN`** dans `chrono_backend/.env` (production).  
+3. Renseigner **`EXPO_PUBLIC_SENTRY_DSN`** dans les `.env` / secrets **EAS** pour **app_chrono** et **driver_chrono** (même DSN ou projets séparés selon ton choix). Redémarrer / rebuild après changement.  
+4. **Test** : provoquer une erreur contrôlée en **build release** (pas Expo Go si besoin) et vérifier l’événement dans Sentry ; côté API, un **500** de test sur staging si acceptable.  
+5. **Uptime** : pointer un monitor externe vers **`GET https://ton-api/health`** (ou `/health/ready` si tu veux vérifier la dispo DB — selon ce que fait `readinessCheck`).
 
 ### 2.7 Auth (revue code — avant go-live)
 
-1. Passer en revue les routes **admin**, **commandes**, **sockets** : middleware JWT, `verifyAdminSupabase`, usage de la clé service uniquement côté serveur.
-2. S’assurer qu’aucune route sensible n’est exposée sans garde par erreur.
+**À faire manuellement** : relire après chaque grosse PR touchant `routes/` ou `sockets/`.
+
+1. **Admin** (`/api/admin/*`, `/api/analytics/*`, `/api/fleet/*` sauf exception) : toutes les routes vues passent par **`verifyAdminSupabase`** — JWT Supabase + rôle `admin` / `super_admin` en base ; **`SUPABASE_SERVICE_ROLE_KEY`** uniquement côté serveur (jamais dans une app mobile).
+2. **JWT utilisateur** : `verifyJWT` sur paiements, commission, QR (génération / scan), météo, support, etc. Vérifier les contrôleurs qui comparent `req.user.id` au paramètre d’URL (pas d’IDOR).
+3. **Sockets** (`server.ts`) : en prod, token **obligatoire** sauf `ALLOW_UNAUTHENTICATED_SOCKETS=true` (déconseillé). JWT backend ou Supabase **admin** ; `create-order` / `accept-order` liés à l’identité socket.
+4. **Clé service** : uniquement dans `chrono_backend/.env` et scripts serveur — pas d’`EXPO_PUBLIC_*` sensible.
+
+**Revue effectuée sur le dépôt (synthèse)**
+
+| Zone | Verdict |
+|------|---------|
+| `adminRoutes.ts` | OK — `verifyAdminSupabase` sur chaque route. |
+| `syncRoutes.ts` | **Corrigé** : `POST /sync-users` et `GET /sync-status` étaient **sans auth** (fuite liste utilisateurs + action de sync) ; désormais **`verifyAdminSupabase`**. |
+| `mapboxRoutes.ts` | **Sans JWT** — proxy Mapbox avec token serveur : risque **abus / coût** ; à mitiger (rate limit global, ou `verifyJWT` si seuls les apps authentifiés doivent géocoder). |
+| `paymentRoutes` `calculatePrice` | Sans JWT — souvent voulu pour devis ; surveiller l’abus. |
+| `fleetRoutes` `POST /delivery-mileage` | **Sans auth** — insertion kilométrage : à durcir plus tard (**JWT livreur** + commande assignée). |
+| `driverRoutes` | Plusieurs `GET` **sans** `verifyJWT` (`online`, `details`, `revenues`, `statistics`) — vérifier **besoin métier** (carte publique vs **IDOR** / données perso). |
+| `trackRoutes` `/:token` | Public **volontaire** (suivi par token). |
+
+**Suite recommandée post-MVP** : durcir Mapbox + `delivery-mileage` + revue des `GET` driver exposés.
 
 ### 2.8 Tests manuels (checklist avant « jour J »)
 
-- **Client** : inscription → commande → paiement → suivi.
-- **Livreur** : en ligne → offre → acceptation → navigation → statuts jusqu’à la fin.
-- **Admin** : login → commandes / livreurs.
-- **Annulation / litige** : au moins un scénario.
-- **Sockets** : couper le réseau ~10 s, rétablir : reconnexion correcte ?
+Cocher sur **build proche prod** (API prod ou staging + binaires TestFlight / Play interne).
+
+- [ ] **Client** : téléphone → OTP → session → **commande** → **paiement** (ou différé / cash selon config) → **suivi** → **QR** si applicable → livraison terminée.
+- [ ] **Livreur** : en ligne → **offre** → acceptation → **navigation** → statuts jusqu’à **fin** (dont scan QR si politique active).
+- [ ] **Admin** : login Supabase → **commandes** / **livreurs** / une action sensible (ex. annulation ou commission).
+- [ ] **Annulation** : client ou livreur / admin — au moins **un** scénario bout en bout.
+- [ ] **Litige / support** : ouverture ticket ou dispute si le flux existe.
+- [ ] **Sockets** : couper le réseau **~10 s**, rétablir — **reconnexion**, pas de double commande fantôme.
+- [ ] **CORS** : admin web sur l’URL prod ne doit pas être bloqué (`ALLOWED_ORIGINS`).
 
 ---
 

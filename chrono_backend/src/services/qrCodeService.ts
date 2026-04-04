@@ -60,10 +60,14 @@ export class QRCodeService {
   private verifySignature(data: QRCodeData): boolean {
     const { signature, ...dataWithoutSignature } = data;
     const expectedSignature = this.generateSignature(dataWithoutSignature);
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    try {
+      const sigBuf = Buffer.from(String(signature), 'hex');
+      const expBuf = Buffer.from(expectedSignature, 'hex');
+      if (sigBuf.length !== expBuf.length || sigBuf.length === 0) return false;
+      return crypto.timingSafeEqual(sigBuf, expBuf);
+    } catch {
+      return false;
+    }
   }
 
   /**

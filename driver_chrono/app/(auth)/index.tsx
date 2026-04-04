@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from 'react-native';
+import {View,Text,TextInput,TouchableOpacity,StyleSheet,KeyboardAvoidingView,Platform,Alert,} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +9,7 @@ import { getPhoneValidationError } from '../../utils/phoneValidation';
 import { formatNationalIvorian, parseNationalIvorianInput } from '../../utils/formatNationalPhone';
 import { config } from '../../config/index';
 import { logger } from '../../utils/logger';
+import { openLegalUrl } from '../../utils/openLegalUrl';
 
 /** Une seule entrée téléphone + OTP — nouveau ou existant, traité après le code. */
 export default function PhoneAuthScreen() {
@@ -156,14 +148,24 @@ export default function PhoneAuthScreen() {
           En continuant, vous acceptez les{' '}
           <Text
             style={styles.legalLink}
-            onPress={() => Alert.alert('Conditions', 'Lien à configurer (URL des CGU).')}
+            onPress={() =>
+              openLegalUrl(
+                config.legal.cguUrl,
+                'URL des conditions d’utilisation non configurée. Ajoutez EXPO_PUBLIC_LEGAL_CGU_URL dans .env (voir .env.example).'
+              )
+            }
           >
             conditions d&apos;utilisation
           </Text>{' '}
           et la{' '}
           <Text
             style={styles.legalLink}
-            onPress={() => Alert.alert('Confidentialité', 'Lien à configurer (politique de confidentialité).')}
+            onPress={() =>
+              openLegalUrl(
+                config.legal.privacyUrl,
+                'URL de la politique de confidentialité non configurée. Ajoutez EXPO_PUBLIC_LEGAL_PRIVACY_URL dans .env (voir .env.example).'
+              )
+            }
           >
             politique de confidentialité
           </Text>

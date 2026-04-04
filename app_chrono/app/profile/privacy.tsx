@@ -1,7 +1,9 @@
 import React from 'react';
-import {View,Text,StyleSheet,ScrollView,TouchableOpacity} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { config } from '../../config';
+import { openLegalUrl } from '../../utils/openLegalUrl';
 
 export default function PrivacyPage() {
   return (
@@ -17,6 +19,32 @@ export default function PrivacyPage() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.contentContainer}>
           <Text style={styles.lastUpdated}>Dernière mise à jour : {new Date().toLocaleDateString('fr-FR')}</Text>
+
+          {config.legal.privacyUrl?.trim() ? (
+            <TouchableOpacity
+              style={styles.officialDocBanner}
+              onPress={() =>
+                openLegalUrl(
+                  config.legal.privacyUrl,
+                  'URL de la politique complète non configurée.'
+                )
+              }
+              accessibilityRole="link"
+              accessibilityLabel="Ouvrir la politique de confidentialité officielle en ligne"
+            >
+              <Ionicons name="open-outline" size={20} color="#7C3AED" />
+              <Text style={styles.officialDocBannerText}>
+                Document officiel en ligne (même politique que pour les stores)
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+          ) : null}
+
+          <Text style={styles.summaryHint}>
+            {config.legal.privacyUrl?.trim()
+              ? 'Résumé dans l’app — la version faisant foi est le document officiel en ligne (lien ci-dessus).'
+              : 'Résumé dans l’app — pour la soumission stores, publiez la politique complète sur une URL stable et renseignez EXPO_PUBLIC_LEGAL_PRIVACY_URL.'}
+          </Text>
           
           <Text style={styles.sectionTitle}>1. Collecte des données</Text>
           <Text style={styles.text}>
@@ -83,6 +111,29 @@ const styles = StyleSheet.create({
     margin: 20,
     padding: 20,
     borderRadius: 12,
+  },
+  officialDocBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F5F3FF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  officialDocBannerText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5B21B6',
+  },
+  summaryHint: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 18,
   },
   lastUpdated: {
     fontSize: 12,

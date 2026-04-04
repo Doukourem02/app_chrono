@@ -92,6 +92,9 @@ module.exports = {
       EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
       EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL,
       EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
+      legalCguUrl: process.env.EXPO_PUBLIC_LEGAL_CGU_URL || '',
+      legalPrivacyUrl: process.env.EXPO_PUBLIC_LEGAL_PRIVACY_URL || '',
+      sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN || '',
     }
   }
 };

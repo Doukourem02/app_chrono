@@ -76,6 +76,9 @@ module.exports = {
       socketUrl: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      legalCguUrl: process.env.EXPO_PUBLIC_LEGAL_CGU_URL || '',
+      legalPrivacyUrl: process.env.EXPO_PUBLIC_LEGAL_PRIVACY_URL || '',
+      sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN || '',
     }
   }
 };

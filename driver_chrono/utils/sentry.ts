@@ -36,11 +36,17 @@ export function initSentry() {
   }
 }
 
+function hasSentryDsn(): boolean {
+  return Boolean(
+    Constants.expoConfig?.extra?.sentryDsn || process.env.EXPO_PUBLIC_SENTRY_DSN
+  );
+}
+
 /**
  * Capture une erreur manuellement
  */
 export function captureError(error: Error, context?: Record<string, any>) {
-  if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  if (hasSentryDsn()) {
     Sentry.captureException(error, {
       extra: context,
     });
@@ -51,7 +57,7 @@ export function captureError(error: Error, context?: Record<string, any>) {
  * Capture un message
  */
 export function captureMessage(message: string, level: Sentry.SeverityLevel = 'info') {
-  if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  if (hasSentryDsn()) {
     Sentry.captureMessage(message, level);
   }
 }

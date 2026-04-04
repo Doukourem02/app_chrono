@@ -8,6 +8,18 @@ export const config = {
   socketUrl: Constants.expoConfig?.extra?.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
   trackBaseUrl: Constants.expoConfig?.extra?.trackBaseUrl || process.env.EXPO_PUBLIC_TRACK_BASE_URL || 'http://localhost:3000',
   sentryDsn: Constants.expoConfig?.extra?.sentryDsn || process.env.EXPO_PUBLIC_SENTRY_DSN,
+
+  /** URLs des documents légaux (§2.5 ckprod.md) — même contenu que la politique en ligne. */
+  legal: {
+    cguUrl:
+      Constants.expoConfig?.extra?.legalCguUrl ||
+      process.env.EXPO_PUBLIC_LEGAL_CGU_URL ||
+      '',
+    privacyUrl:
+      Constants.expoConfig?.extra?.legalPrivacyUrl ||
+      process.env.EXPO_PUBLIC_LEGAL_PRIVACY_URL ||
+      '',
+  },
   
   // App Configuration
   app: {

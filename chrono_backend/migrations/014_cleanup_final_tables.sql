@@ -12,7 +12,8 @@
 --
 -- 🔴 SUPPRIMER :
 --   drivers, reviews, driver_vehicles, loyalty_transactions,
---   driver_status_logs, delivery_proofs, addresses, otp_codes
+--   driver_status_logs, delivery_proofs, addresses
+--   (otp_codes CONSERVÉE : utilisée par otpStorage / otpService — ne pas supprimer)
 -- ============================================================
 
 DO $$
@@ -25,8 +26,7 @@ DECLARE
         'loyalty_transactions', -- Non utilisée
         'driver_status_logs',   -- Non utilisée
         'delivery_proofs',      -- À supprimer (remplacée par autre système)
-        'addresses',            -- Non utilisée (adresses en JSONB dans orders)
-        'otp_codes'             -- Non nécessaire (fallback mémoire fonctionne)
+        'addresses'             -- Non utilisée (adresses en JSONB dans orders)
     ];
     table_exists BOOLEAN;
     row_count INTEGER := 0;
@@ -43,7 +43,8 @@ BEGIN
     RAISE NOTICE '              notifications, driver_locations';
     RAISE NOTICE '  🔴 SUPPRIMER : drivers, reviews, driver_vehicles,';
     RAISE NOTICE '                 loyalty_transactions, driver_status_logs,';
-    RAISE NOTICE '                 delivery_proofs, addresses, otp_codes';
+    RAISE NOTICE '                 delivery_proofs, addresses';
+    RAISE NOTICE '  📌 otp_codes CONSERVÉE (OTP en base)';
     RAISE NOTICE '';
     RAISE NOTICE '============================================================';
     RAISE NOTICE '';
@@ -149,6 +150,6 @@ BEGIN
     RAISE NOTICE '    - delivery_proofs a été supprimée alors qu''elle';
     RAISE NOTICE '      est actuellement utilisée dans orderStorage.js (ligne 586).';
     RAISE NOTICE '      Il faudra adapter le code pour utiliser un autre système.';
-    RAISE NOTICE '    - otp_codes a été supprimée : le fallback mémoire fonctionne automatiquement.';
+    RAISE NOTICE '    - otp_codes est conservée (voir migration 006).';
     RAISE NOTICE '';
 END $$;

@@ -102,7 +102,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     }
   };
 
-  // Handler pour confirmer la livraison après scan
+  // Après scan réussi, le backend met déjà la commande en `completed` ; on resynchronise l’UI locale.
   const handleConfirmDelivery = () => {
     if (scanResult) {
       setScanResult(null);
