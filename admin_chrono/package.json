@@ -14,6 +14,7 @@
     "add-avatar-column": "node scripts/add-avatar-url-column.js"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.47.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.81.1",
     "@tanstack/react-query": "^5.90.8",
