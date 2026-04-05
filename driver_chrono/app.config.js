@@ -16,6 +16,7 @@ module.exports = {
       supportsTablet: true,
       infoPlist: {
         CFBundleDisplayName: "Krono pro",
+        ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {
@@ -48,8 +49,9 @@ module.exports = {
         "@rnmapbox/maps",
         {
           RNMapboxMapsImpl: "mapbox",
-          // MapboxMaps v10 requis pour @fleetbase/react-native-mapbox-navigation
-          RNMapboxMapsVersion: "10.12.1",
+          // Aligné sur @rnmapbox/maps package.json (mapbox.ios). Forcer 10.x casse le build :
+          // ModelLayer, PuckBearing, addStyleModel = API MapboxMaps v11.
+          RNMapboxMapsVersion: "11.16.2",
         },
       ],
       [
