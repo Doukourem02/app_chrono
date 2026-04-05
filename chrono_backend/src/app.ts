@@ -35,6 +35,11 @@ if (
   process.env.FORCE_HTTPS !== 'false'
 ) {
   app.use((req, res, next) => {
+    // Sondes Render (HTTP interne :10000) — pas de redirect, sinon health check timeout
+    if (req.path.startsWith('/health')) {
+      return next();
+    }
+
     const forwardedProto = req.headers['x-forwarded-proto'];
     const isHttps = req.secure || forwardedProto === 'https';
 
@@ -66,6 +71,9 @@ app.use(
   })
 );
 
+// Avant CORS : les health checks Render n’envoient pas de header Origin (voir doc dépannage Render)
+app.use('/health', healthRoutes);
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -94,7 +102,6 @@ if (
   setupSwagger(app);
 }
 
-app.use('/health', healthRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/auth-simple', authRoutes);

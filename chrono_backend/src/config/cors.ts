@@ -37,8 +37,9 @@ export function getAllowedOrigins(): string[] {
 
 export function isOriginAllowed(origin: string | undefined): boolean {
   if (!origin) {
-    // Autoriser les requêtes sans origin (ex: Postman, curl)
-    return process.env.NODE_ENV !== 'production';
+    // Sans Origin : outils type curl/Postman, et sondes qui ne sont pas des navigateurs.
+    // Les routes /health sont montées avant CORS ; le reste reste protégé par auth.
+    return true;
   }
 
   const allowedOrigins = getAllowedOrigins();
