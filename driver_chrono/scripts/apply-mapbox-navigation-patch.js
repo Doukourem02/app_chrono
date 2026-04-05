@@ -31,3 +31,25 @@ if (!fs.existsSync(path.dirname(targetPath))) {
 
 fs.copyFileSync(patchPath, targetPath);
 console.log('[apply-mapbox-navigation-patch] Applied MapboxNavigationView turn-by-turn patch');
+
+// Fleetbase pinne MapboxNavigation ~> 2.12.0 → MapboxMaps ~> 10.12.x uniquement, en conflit avec @rnmapbox/maps.
+// MapboxNavigation 2.20.x dépend de MapboxMaps ~> 10.19 (toujours < 11), compatible avec rnmapbox en 10.19.x.
+const podspecPath = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  '@fleetbase',
+  'react-native-mapbox-navigation',
+  'react-native-mapbox-navigation.podspec'
+);
+if (fs.existsSync(podspecPath)) {
+  let pod = fs.readFileSync(podspecPath, 'utf8');
+  const next = pod.replace(
+    /s\.dependency 'MapboxNavigation', '~> 2\.12\.0'/,
+    "s.dependency 'MapboxNavigation', '~> 2.20'"
+  );
+  if (pod !== next) {
+    fs.writeFileSync(podspecPath, next);
+    console.log('[apply-mapbox-navigation-patch] Bumped Fleetbase MapboxNavigation pod to ~> 2.20 (Maps ~> 10.19)');
+  }
+}

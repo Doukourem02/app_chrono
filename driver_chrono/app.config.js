@@ -49,9 +49,8 @@ module.exports = {
         "@rnmapbox/maps",
         {
           RNMapboxMapsImpl: "mapbox",
-          // Aligné sur @rnmapbox/maps package.json (mapbox.ios). Forcer 10.x casse le build :
-          // ModelLayer, PuckBearing, addStyleModel = API MapboxMaps v11.
-          RNMapboxMapsVersion: "11.16.2",
+          // Aligné sur MapboxNavigation 2.20 (Fleetbase patché) : MapboxMaps ~> 10.19. 11.x entre en conflit CocoaPods avec Navigation.
+          RNMapboxMapsVersion: "10.19.4",
         },
       ],
       [
