@@ -63,7 +63,7 @@ Tu peux **choisir** selon budget, confort et pays. Ci-dessous : rôle + exemples
 **Suggestion** : commence par **Railway** ou **Render** (ou **Fly.io**) pour `chrono_backend` : moins de friction que VPS + Docker pour un premier déploiement.
 
 ### 1.2 Base de données et Auth
-
+––––
 | Option | Rôle |
 |--------|------|
 | **Supabase** (déjà dans le projet) | Postgres managé, Auth, parfois stockage. Tu crées un projet **prod** séparé du dev si possible. |
