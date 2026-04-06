@@ -30,6 +30,7 @@ Ce dossier décrit le **schéma Postgres** attendu par l’API Node. Les fichier
 | 20 | `020_driver_locations_and_admin_notifications.sql` | `driver_locations`, `admin_notification_feed` |
 | 21 | `021_payment_messaging_history_profiles.sql` | `profiles` (minimal), `payment_methods`, `transactions`, `invoices`, `order_status_history`, `conversations`, `messages` |
 | 22 | `022_qr_code_scans_unique_order_scanner.sql` | Index unique `(order_id, scanned_by)` sur `qr_code_scans` (requis pour les `ON CONFLICT` du service QR) |
+| 23 | `023_create_push_tokens.sql` | `push_tokens` — Expo push (client / driver), voir `docs/notifications-expo-token.md` |
 
 **Important — doublons `016_` et `017_`** : deux fichiers partagent le même préfixe. L’ordre **lexicographique** des noms de fichier est :
 
@@ -51,7 +52,7 @@ Certaines tables peuvent exister chez toi (dashboard Supabase, anciens scripts) 
 - `driver_wallets`, `driver_wallet_transactions`, `driver_payouts`
 - tout ce qui vient d’extensions Supabase / SQL manuel
 
-Pour une **nouvelle** base vide : enchaîne **001 → 022** comme ci-dessus, puis **admin_chrono** + **RLS** si besoin.
+Pour une **nouvelle** base vide : enchaîne **001 → 023** comme ci-dessus, puis **admin_chrono** + **RLS** si besoin.
 
 ## Règles
 

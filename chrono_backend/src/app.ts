@@ -23,6 +23,7 @@ import multiDeliveryRoutes from './routes/multiDeliveryRoutes.js';
 import demandForecastRoutes from './routes/demandForecastRoutes.js';
 import fleetRoutes from './routes/fleetRoutes.js';
 import mapboxRoutes from './routes/mapboxRoutes.js';
+import pushRoutes from './routes/pushRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupSwagger } from './config/swagger.js';
 import { isOriginAllowed } from './config/cors.js';
@@ -122,6 +123,7 @@ app.use('/api/multi-delivery', multiDeliveryRoutes);
 app.use('/api/forecast', demandForecastRoutes);
 app.use('/api/fleet', fleetRoutes);
 app.use('/api/mapbox', mapboxRoutes);
+app.use('/api/push', pushRoutes);
 
 app.use(errorHandler);
 
