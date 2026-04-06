@@ -106,6 +106,12 @@ export const registerPushToken = async (
     );
 
     const row = result.rows[0];
+    if (!row) {
+      logger.error('registerPushToken: INSERT sans ligne RETURNING');
+      res.status(500).json({ success: false, message: 'Erreur serveur' });
+      return;
+    }
+
     logger.info('push_tokens enregistré', {
       userId: user.id,
       app_role: app,
@@ -121,16 +127,47 @@ export const registerPushToken = async (
       },
     });
   } catch (error: unknown) {
-    const err = error as { code?: string; message?: string };
+    const err = error as {
+      code?: string;
+      message?: string;
+      detail?: string;
+      constraint?: string;
+    };
+    logger.error('registerPushToken failed', {
+      code: err.code,
+      message: err.message,
+      detail: err.detail,
+      constraint: err.constraint,
+    });
+
     if (err.code === '42P01') {
-      logger.error('push_tokens: table absente — exécuter migration 023');
       res.status(503).json({
         success: false,
-        message: 'Table push_tokens introuvable. Appliquer la migration 023.',
+        message: 'Table push_tokens introuvable. Appliquer la migration 023 sur la même base que DATABASE_URL (Render).',
       });
       return;
     }
-    logger.error('registerPushToken', error);
+    if (err.code === '23503') {
+      res.status(400).json({
+        success: false,
+        message: 'Utilisateur introuvable pour ce token (clé étrangère).',
+      });
+      return;
+    }
+    if (err.code === '42501') {
+      res.status(503).json({
+        success: false,
+        message: 'Permission PostgreSQL refusée sur push_tokens (rôle DB / RLS).',
+      });
+      return;
+    }
+    if (err.code === '42703') {
+      res.status(503).json({
+        success: false,
+        message: 'Schéma push_tokens incohérent — revérifier la migration 023.',
+      });
+      return;
+    }
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };

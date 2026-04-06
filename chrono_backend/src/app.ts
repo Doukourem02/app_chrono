@@ -31,6 +31,11 @@ import logger from './utils/logger.js';
 
 const app: Express = express();
 
+// Render / reverse proxy : X-Forwarded-For présent — requis pour express-rate-limit et req.ip
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 if (
   process.env.NODE_ENV === 'production' &&
   process.env.FORCE_HTTPS !== 'false'
