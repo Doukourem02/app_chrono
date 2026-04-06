@@ -15,6 +15,7 @@ module.exports = {
       bundleIdentifier: "com.anonymous.app-chrono",
       supportsTablet: true,
       infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
         CFBundleDisplayName: "Krono",
         NSContactsUsageDescription:
           "Krono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire.",

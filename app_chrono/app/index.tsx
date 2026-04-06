@@ -26,8 +26,14 @@ export default function RootIndex() {
 
         if (cancelled) return;
 
-        // Session incomplète (user en persist mais pas de token) → déconnecter et aller à l'auth
+        // Pas d'access token : ne pas déconnecter si un refresh existe encore (réseau lent / API
+        // temporairement injoignable — ensureAccessToken évite déjà le logout dans ce cas).
         if (!token) {
+          const { refreshToken: rt } = useAuthStore.getState();
+          if (rt) {
+            router.replace('/(tabs)' as any);
+            return;
+          }
           logout();
           router.replace('/(auth)' as any);
           return;

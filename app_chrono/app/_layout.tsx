@@ -11,12 +11,15 @@ import { userApiService } from "../services/userApiService";
 import { logger } from "../utils/logger";
 import "../config/envCheck";
 
-// Mapbox : initialiser le token au démarrage (iOS/Android uniquement, pas web)
-if (Platform.OS !== "web") {
+// Mapbox : ne charger le module natif que si un token est présent (sinon certains builds iOS plantent au lancement).
+const mapboxPublicToken =
+  Constants.expoConfig?.extra?.mapboxAccessToken ||
+  process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
+
+if (Platform.OS !== "web" && mapboxPublicToken) {
   import("@rnmapbox/maps")
     .then(({ default: Mapbox }) => {
-      const token = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN ?? Constants.expoConfig?.extra?.mapboxAccessToken;
-      if (token) Mapbox.setAccessToken(token);
+      Mapbox.setAccessToken(mapboxPublicToken);
     })
     .catch(() => {
       // @rnmapbox/maps non disponible (ex: Expo Go)

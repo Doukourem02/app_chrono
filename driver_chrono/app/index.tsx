@@ -28,6 +28,11 @@ export default function RootIndex() {
         if (cancelled) return;
 
         if (!tokenResult.token) {
+          const { refreshToken: rt } = useDriverStore.getState();
+          if (rt) {
+            router.replace("/(tabs)" as any);
+            return;
+          }
           logout();
           router.replace("/(auth)" as any);
           return;
