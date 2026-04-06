@@ -1,6 +1,7 @@
 // Service API pour l'application utilisateur
 import { config } from '../config';
 import { useAuthStore } from '../store/useAuthStore';
+import { apiFetch, getApiFetchUserMessage, transportOrErrorMessage } from '../utils/apiFetch';
 import { logger } from '../utils/logger';
 
 /** Erreurs réseau/serveur : JAMAIS de logout, retry possible */
@@ -58,25 +59,18 @@ class UserApiService {
 
       let response: Response;
       try {
-        response = await fetch(url);
+        response = await apiFetch(url);
       } catch (fetchError: unknown) {
-        if (
-          fetchError instanceof TypeError &&
-          fetchError.message.includes('Network request failed')
-        ) {
-          logger.warn(
-            'Backend inaccessible (getOnlineDrivers) — démarrer chrono_backend et vérifier EXPO_PUBLIC_API_URL (localhost = simulateur Mac uniquement)',
-            'userApiService',
-            config.apiUrl
-          );
-          return {
-            success: false,
-            message:
-              'Impossible de joindre le serveur. Vérifiez la connexion et l’URL API (réseau local / VPN).',
-            data: [],
-          };
-        }
-        throw fetchError;
+        logger.warn(
+          'Backend inaccessible (getOnlineDrivers)',
+          'userApiService',
+          config.apiUrl
+        );
+        return {
+          success: false,
+          message: getApiFetchUserMessage(fetchError),
+          data: [],
+        };
       }
 
       let result: any;
@@ -116,7 +110,7 @@ class UserApiService {
     data?: any;
   }> {
     try {
-      const response = await fetch(`${config.apiUrl}/api/drivers/${driverId}/details`);
+      const response = await apiFetch(`${config.apiUrl}/api/drivers/${driverId}/details`);
 
       // Vérifier d'abord le status avant de parser le JSON
       if (response.status === 404) {
@@ -139,8 +133,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      // Ne logger que les vraies erreurs (réseau, serveur, etc.), pas les 404
-      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      const errorMessage = transportOrErrorMessage(error, 'Erreur de connexion');
       if (!errorMessage.includes('Chauffeur non trouvé') && !errorMessage.includes('404')) {
         logger.error('Erreur getDriverDetails:', 'userApiService', error);
       }
@@ -196,23 +189,19 @@ class UserApiService {
 
       let response: Response;
       try {
-        response = await fetch(url, {
+        response = await apiFetch(url, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
-      } catch (fetchError: any) {
-        // Erreur réseau (backend inaccessible, timeout, etc.)
-        if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
-          logger.warn('Backend inaccessible - vérifiez que le serveur est démarré sur', 'userApiService', config.apiUrl);
-          return {
-            success: false,
-            message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
-            data: []
-          };
-        }
-        throw fetchError;
+      } catch (fetchError: unknown) {
+        logger.warn('getUserDeliveries — transport', 'userApiService', config.apiUrl);
+        return {
+          success: false,
+          message: getApiFetchUserMessage(fetchError),
+          data: []
+        };
       }
 
       let result: any;
@@ -247,19 +236,9 @@ class UserApiService {
       return result;
     } catch (error) {
       logger.error('Erreur getUserDeliveries:', 'userApiService', error);
-
-      // Gérer spécifiquement les erreurs réseau
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        return {
-          success: false,
-          message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
-          data: []
-        };
-      }
-
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion',
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
         data: []
       };
     }
@@ -292,7 +271,7 @@ class UserApiService {
       if (!token) {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
-      const response = await fetch(`${config.apiUrl}/api/deliveries/${orderId}/cancel`, {
+      const response = await apiFetch(`${config.apiUrl}/api/deliveries/${orderId}/cancel`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -326,9 +305,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      // Ne logger comme erreur que les vraies erreurs (réseau, serveur, etc.)
-      // Pas les messages d'information attendus (statut invalide, etc.)
-      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      const errorMessage = transportOrErrorMessage(error, 'Erreur de connexion');
       const isExpectedError = errorMessage.includes('Impossible d\'annuler') ||
         errorMessage.includes('déjà été') ||
         errorMessage.includes('Session expirée');
@@ -478,21 +455,18 @@ class UserApiService {
   }
 
   private async refreshAccessToken(refreshToken: string): Promise<{ token: string | null; revoked?: boolean }> {
-    const TIMEOUT_MS = 15000;
     try {
       logger.debug('🔄 Tentative de rafraîchissement du token...', 'userApiService');
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-      const response = await fetch(`${config.apiUrl}/api/auth-simple/refresh-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
+      const response = await apiFetch(
+        `${config.apiUrl}/api/auth-simple/refresh-token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        },
+        { maxRetries: 0, timeoutMs: 22_000 }
+      );
       const result = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
 
       if (!response.ok) {
@@ -514,14 +488,12 @@ class UserApiService {
 
       logger.debug('Token rafraîchi avec succès', 'userApiService');
       return { token: result.data.accessToken as string };
-    } catch (error: any) {
-      const msg = error?.message || '';
-      const isTimeout = msg.includes('abort') || msg.includes('timeout') || msg.includes('Network request failed');
-      if (isTimeout) {
-        logger.warn('Timeout lors du refresh (pas de logout):', 'userApiService', config.apiUrl);
-      } else {
-        logger.warn('Erreur lors du rafraîchissement du token:', 'userApiService', error);
-      }
+    } catch (error: unknown) {
+      logger.warn(
+        'Refresh token — transport ou erreur (pas de logout):',
+        'userApiService',
+        error
+      );
       return { token: null, revoked: false };
     }
   }
@@ -545,7 +517,7 @@ class UserApiService {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
 
-      const response = await fetch(`${config.apiUrl}/api/deliveries/${userId}/statistics`, {
+      const response = await apiFetch(`${config.apiUrl}/api/deliveries/${userId}/statistics`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -563,7 +535,7 @@ class UserApiService {
       logger.error('Erreur getUserStatistics:', 'userApiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion',
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
         data: {
           completedOrders: 0,
           loyaltyPoints: 0,
@@ -593,7 +565,7 @@ class UserApiService {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
 
-      const response = await fetch(`${config.apiUrl}/api/ratings`, {
+      const response = await apiFetch(`${config.apiUrl}/api/ratings`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -617,7 +589,7 @@ class UserApiService {
       logger.error('Erreur submitRating:', 'userApiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion')
       };
     }
   }
@@ -627,6 +599,7 @@ class UserApiService {
    */
   async getOrderRating(orderId: string): Promise<{
     success: boolean;
+    message?: string;
     data?: {
       id: string;
       rating: number;
@@ -641,7 +614,7 @@ class UserApiService {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
 
-      const response = await fetch(`${config.apiUrl}/api/ratings/order/${orderId}`, {
+      const response = await apiFetch(`${config.apiUrl}/api/ratings/order/${orderId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -659,6 +632,7 @@ class UserApiService {
       logger.error('Erreur getOrderRating:', 'userApiService', error);
       return {
         success: false,
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
         data: null
       };
     }
@@ -694,7 +668,7 @@ class UserApiService {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
 
-      const response = await fetch(`${config.apiUrl}/api/auth-simple/users/${userId}/profile`, {
+      const response = await apiFetch(`${config.apiUrl}/api/auth-simple/users/${userId}/profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -714,7 +688,7 @@ class UserApiService {
       logger.error('Erreur updateProfile:', 'userApiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion')
       };
     }
   }
@@ -743,7 +717,7 @@ class UserApiService {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
 
-      const response = await fetch(`${config.apiUrl}/api/auth-simple/users/${userId}/profile`, {
+      const response = await apiFetch(`${config.apiUrl}/api/auth-simple/users/${userId}/profile`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -769,7 +743,7 @@ class UserApiService {
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erreur de connexion';
+      const errorMessage = transportOrErrorMessage(error, 'Erreur de connexion');
       if (!errorMessage.includes('Utilisateur non trouvé') && !errorMessage.includes('404')) {
         logger.error('Erreur getUserProfile:', 'userApiService', error);
       }
@@ -811,7 +785,7 @@ class UserApiService {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
 
-      const response = await fetch(`${config.apiUrl}/api/auth-simple/users/${userId}/avatar`, {
+      const response = await apiFetch(`${config.apiUrl}/api/auth-simple/users/${userId}/avatar`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -834,7 +808,7 @@ class UserApiService {
       logger.error('Erreur uploadAvatar:', 'userApiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion')
       };
     }
   }

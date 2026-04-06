@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
 import { useOrderStore } from '../store/useOrderStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { logger } from '../utils/logger';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
@@ -61,6 +62,11 @@ class UserOrderSocketService {
       auth: {
         token,
       },
+    });
+
+    this.socket.io.on('reconnect_failed', () => {
+      logger.warn('Socket commandes: reconnexions épuisées', 'userOrderSocketService');
+      useRealtimeDegradedStore.getState().setSocketDegraded(true);
     });
 
     // CRITIQUE : Installer TOUS les listeners AVANT la connexion
@@ -495,6 +501,7 @@ class UserOrderSocketService {
     this.socket.removeAllListeners('resync-order-state');
 
     this.socket.on('connect', () => {
+      useRealtimeDegradedStore.getState().setSocketDegraded(false);
       logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
       this.isConnected = true;
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
@@ -553,6 +560,7 @@ class UserOrderSocketService {
   }
 
   disconnect() {
+    useRealtimeDegradedStore.getState().setSocketDegraded(false);
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;

@@ -2,6 +2,7 @@
 import { useDriverStore } from '../store/useDriverStore';
 import { config } from '../config/index';
 import { logger } from '../utils/logger';
+import {apiFetch,isApiTimeoutError,getApiFetchUserMessage,transportOrErrorMessage,} from '../utils/apiFetch';
 
 const API_BASE_URL = config.apiUrl;
 
@@ -158,19 +159,16 @@ class ApiService {
   }
 
   private async refreshAccessToken(refreshToken: string): Promise<{ token: string | null; revoked?: boolean }> {
-    const TIMEOUT_MS = 15000;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-      const response = await fetch(`${API_BASE_URL}/api/auth-simple/refresh-token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
+      const response = await apiFetch(
+        `${API_BASE_URL}/api/auth-simple/refresh-token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        },
+        { maxRetries: 0, timeoutMs: 22_000 }
+      );
       const result = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
 
       if (!response.ok) {
@@ -190,10 +188,8 @@ class ApiService {
       }
 
       return { token: result.data.accessToken as string };
-    } catch (error: any) {
-      const msg = error?.message || '';
-      const isTimeout = msg.includes('abort') || msg.includes('timeout') || msg.includes('Network request failed');
-      if (isTimeout) {
+    } catch (error: unknown) {
+      if (isApiTimeoutError(error)) {
         logger.warn('Timeout lors du refresh (pas de logout):', 'apiService', API_BASE_URL);
       } else {
         logger.warn('Erreur lors du rafraîchissement du token:', 'apiService', error);
@@ -231,20 +227,24 @@ class ApiService {
       
       let response: Response;
       try {
-        response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/status`, {
+        response = await apiFetch(`${API_BASE_URL}/api/drivers/${userId}/status`, {
           method: 'PUT',
           headers,
           body: JSON.stringify(statusData),
         });
-      } catch (fetchError: any) {
-        // Erreur réseau (backend inaccessible, timeout, etc.)
-        if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
+      } catch (fetchError: unknown) {
+        if (
+          isApiTimeoutError(fetchError) ||
+          (fetchError instanceof TypeError &&
+            typeof fetchError.message === 'string' &&
+            fetchError.message.includes('Network request failed'))
+        ) {
           if (__DEV__) {
             logger.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
-            message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+            message: getApiFetchUserMessage(fetchError),
           };
         }
         throw fetchError;
@@ -283,18 +283,22 @@ class ApiService {
       if (__DEV__) {
         logger.error('Erreur updateDriverStatus:', 'apiService', error);
       }
-      
-      // Gérer spécifiquement les erreurs réseau
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+
+      if (
+        isApiTimeoutError(error) ||
+        (error instanceof TypeError &&
+          typeof error.message === 'string' &&
+          error.message.includes('Network request failed'))
+      ) {
         return {
           success: false,
-          message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+          message: getApiFetchUserMessage(error),
         };
       }
-      
+
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -396,7 +400,7 @@ class ApiService {
       if (__DEV__) {
         logger.debug('🔍 [apiService.getDriverRevenues] Appel API:', 'apiService', url);
       }
-      response = await fetch(url, {
+      response = await apiFetch(url, {
         method: 'GET',
         headers,
       });
@@ -404,15 +408,19 @@ class ApiService {
       if (__DEV__) {
         logger.debug('[apiService.getDriverRevenues] Status:', 'apiService', { status: response.status, statusText: response.statusText });
       }
-      } catch (fetchError: any) {
-        // Erreur réseau (backend inaccessible, timeout, etc.)
-        if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
+      } catch (fetchError: unknown) {
+        if (
+          isApiTimeoutError(fetchError) ||
+          (fetchError instanceof TypeError &&
+            typeof fetchError.message === 'string' &&
+            fetchError.message.includes('Network request failed'))
+        ) {
           if (__DEV__) {
             logger.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
-            message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+            message: getApiFetchUserMessage(fetchError),
             data: {
               period,
               totalEarnings: 0,
@@ -519,14 +527,18 @@ class ApiService {
       
       return result;
     } catch (error) {
-      // Gérer spécifiquement les erreurs réseau
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+      if (
+        isApiTimeoutError(error) ||
+        (error instanceof TypeError &&
+          typeof error.message === 'string' &&
+          error.message.includes('Network request failed'))
+      ) {
         if (__DEV__) {
           logger.debug('[apiService.getDriverRevenues] Erreur réseau (backend inaccessible)', 'apiService');
         }
         return {
           success: false,
-          message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+          message: getApiFetchUserMessage(error),
           data: {
             period: options?.period || 'today',
             totalEarnings: 0,
@@ -541,15 +553,14 @@ class ApiService {
           },
         };
       }
-      
-      // Pour les autres erreurs, logger en debug pour éviter le spam
+
       if (__DEV__) {
         logger.debug('[apiService.getDriverRevenues] Erreur:', 'apiService', error instanceof Error ? error.message : 'Erreur inconnue');
       }
-      
+
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion',
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
         data: {
           period: options?.period || 'today',
           totalEarnings: 0,
@@ -638,21 +649,26 @@ class ApiService {
         if (__DEV__) {
           logger.debug('[apiService.getDriverStatistics] Appel API:', 'apiService', `${API_BASE_URL}/api/drivers/${userId}/statistics`);
         }
-        response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/statistics`, {
+        response = await apiFetch(`${API_BASE_URL}/api/drivers/${userId}/statistics`, {
           method: 'GET',
           headers,
         });
         if (__DEV__) {
           logger.debug('[apiService.getDriverStatistics] Status:', 'apiService', { status: response.status, statusText: response.statusText });
         }
-      } catch (fetchError: any) {
-        if (fetchError instanceof TypeError && fetchError.message.includes('Network request failed')) {
+      } catch (fetchError: unknown) {
+        if (
+          isApiTimeoutError(fetchError) ||
+          (fetchError instanceof TypeError &&
+            typeof fetchError.message === 'string' &&
+            fetchError.message.includes('Network request failed'))
+        ) {
           if (__DEV__) {
             logger.warn(' Backend inaccessible - vérifiez que le serveur est démarré sur', API_BASE_URL);
           }
           return {
             success: false,
-            message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.',
+            message: getApiFetchUserMessage(fetchError),
             data: {
               completedDeliveries: 0,
               averageRating: 5.0,
@@ -722,7 +738,7 @@ class ApiService {
       logger.error('Erreur getDriverStatistics:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion',
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
         data: {
           completedDeliveries: 0,
           averageRating: 5.0,
@@ -761,7 +777,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -780,7 +796,7 @@ class ApiService {
       logger.error('Erreur getUserProfile:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -820,7 +836,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -840,7 +856,7 @@ class ApiService {
       logger.error('Erreur updateProfile:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -881,7 +897,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/avatar`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/auth-simple/users/${userId}/avatar`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -904,7 +920,7 @@ class ApiService {
       logger.error('Erreur uploadAvatar:', undefined, error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -945,7 +961,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/vehicle`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/drivers/${userId}/vehicle`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -965,7 +981,7 @@ class ApiService {
       logger.error('Erreur updateDriverVehicle:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -1001,7 +1017,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/fleet/vehicles/${encodeURIComponent(vehiclePlate)}/documents`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/fleet/vehicles/${encodeURIComponent(vehiclePlate)}/documents`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -1020,7 +1036,7 @@ class ApiService {
       logger.error('Erreur getVehicleDocuments:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -1068,7 +1084,7 @@ class ApiService {
       }
 
       // Enregistrer ou mettre à jour le document (l'upload de l'image est géré côté backend)
-      const response = await fetch(`${API_BASE_URL}/api/fleet/vehicles/${encodeURIComponent(vehiclePlate)}/documents`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/fleet/vehicles/${encodeURIComponent(vehiclePlate)}/documents`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -1097,7 +1113,7 @@ class ApiService {
       logger.error('Erreur uploadVehicleDocument:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -1126,7 +1142,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/driver-type`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/drivers/${userId}/driver-type`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -1146,7 +1162,7 @@ class ApiService {
       logger.error('Erreur updateDriverType:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -1170,7 +1186,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/drivers/${userId}/details`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/drivers/${userId}/details`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -1189,7 +1205,7 @@ class ApiService {
       logger.error('Erreur getDriverProfile:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -1219,7 +1235,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/commission/${userId}/balance`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/commission/${userId}/balance`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -1255,12 +1271,12 @@ class ApiService {
       return result;
     } catch (error) {
       logger.error('Erreur getCommissionBalance:', 'apiService', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Erreur de connexion au serveur. Veuillez réessayer.';
       return {
         success: false,
-        message: errorMessage
+        message: transportOrErrorMessage(
+          error,
+          'Erreur de connexion au serveur. Veuillez réessayer.'
+        ),
       };
     }
   }
@@ -1294,7 +1310,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/commission/${userId}/transactions?limit=${limit}`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/commission/${userId}/transactions?limit=${limit}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -1326,7 +1342,7 @@ class ApiService {
       logger.error('Erreur getCommissionTransactions:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }
@@ -1357,7 +1373,7 @@ class ApiService {
         };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/commission/${userId}/recharge`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/commission/${userId}/recharge`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,
@@ -1390,7 +1406,7 @@ class ApiService {
       logger.error('Erreur rechargeCommission:', 'apiService', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion'
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
       };
     }
   }

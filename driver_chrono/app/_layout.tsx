@@ -7,6 +7,7 @@ import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { RealtimeDegradedBanner } from "../components/RealtimeDegradedBanner";
 import { soundService } from "../services/soundService";
 import { apiService } from "../services/apiService";
 import { orderSocketService } from "../services/orderSocketService";
@@ -107,6 +108,7 @@ export default function RootLayout() {
       <ErrorModalsProvider>
         <View style={{ flex: 1 }}>
           <OfflineBanner />
+          <RealtimeDegradedBanner />
           <View style={{ flex: 1 }}>
             <Stack
               screenOptions={{

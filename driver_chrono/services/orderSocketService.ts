@@ -4,6 +4,7 @@ import { config } from '../config/index';
 import { OrderRequest, useOrderStore } from '../store/useOrderStore';
 import { useDriverStore } from '../store/useDriverStore';
 import { logger } from '../utils/logger';
+import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { soundService } from './soundService';
 import { apiService } from './apiService';
 
@@ -50,12 +51,18 @@ class OrderSocketService {
       },
     });
 
+    this.socket.io.on('reconnect_failed', () => {
+      logger.warn('Socket commandes: reconnexions épuisées', 'orderSocketService');
+      useRealtimeDegradedStore.getState().setOrdersSocketDegraded(true);
+    });
+
     // CRITIQUE : Installer TOUS les listeners AVANT le connect
     // Cela garantit que les événements sont capturés dès la connexion
     this.setupAllListeners(driverId);
     this.setupConnectionErrorHandler();
 
     this.socket.on('connect', () => {
+      useRealtimeDegradedStore.getState().setOrdersSocketDegraded(false);
       logger.info('Socket connecté pour commandes');
       this.isConnected = true;
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
@@ -348,6 +355,7 @@ class OrderSocketService {
   }
 
   disconnect() {
+    useRealtimeDegradedStore.getState().setOrdersSocketDegraded(false);
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;

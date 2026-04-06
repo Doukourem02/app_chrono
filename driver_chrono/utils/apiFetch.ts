@@ -1,0 +1,130 @@
+import { logger } from "./logger";
+
+export const API_DEFAULT_TIMEOUT_MS = 28_000;
+/** Nombre de tentatives supplémentaires après le premier essai (2 = 3 essais au total). */
+export const API_DEFAULT_MAX_RETRIES = 2;
+
+const RETRYABLE_HTTP = new Set([408, 429, 502, 503, 504]);
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+function linkAbort(parent: AbortSignal | null | undefined, child: AbortController) {
+  if (!parent) return;
+  if (parent.aborted) {
+    child.abort();
+    return;
+  }
+  parent.addEventListener("abort", () => child.abort(), { once: true });
+}
+
+export class ApiTimeoutError extends Error {
+  override name = "ApiTimeoutError";
+  constructor() {
+    super("API_REQUEST_TIMEOUT");
+  }
+}
+
+export function isApiTimeoutError(e: unknown): boolean {
+  return e instanceof ApiTimeoutError;
+}
+
+/** Message utilisateur pour échec transport (hors message métier JSON). */
+export function getApiFetchUserMessage(e: unknown): string {
+  if (isApiTimeoutError(e)) {
+    return "Le serveur met trop longtemps à répondre. Réessayez dans un instant.";
+  }
+  if (
+    e instanceof TypeError &&
+    typeof e.message === "string" &&
+    e.message.includes("Network request failed")
+  ) {
+    return "Impossible de joindre le serveur. Vérifiez votre connexion Internet.";
+  }
+  if (e instanceof Error && e.name === "AbortError") {
+    return "La requête a été interrompue.";
+  }
+  return "Impossible de joindre le serveur. Vérifiez votre connexion.";
+}
+
+/** Message à afficher : transport (timeout / réseau) ou message métier `Error`. */
+export function transportOrErrorMessage(error: unknown, fallback: string): string {
+  if (isApiTimeoutError(error)) return getApiFetchUserMessage(error);
+  if (
+    error instanceof TypeError &&
+    typeof error.message === "string" &&
+    error.message.includes("Network request failed")
+  ) {
+    return getApiFetchUserMessage(error);
+  }
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
+/**
+ * fetch avec timeout et retries sur erreurs réseau / timeout / HTTP transitoires.
+ * Ne pas utiliser avec un body non rejouable (ex. POST idempotent seulement avec prudence).
+ */
+export async function apiFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options?: { timeoutMs?: number; maxRetries?: number }
+): Promise<Response> {
+  const timeoutMs = options?.timeoutMs ?? API_DEFAULT_TIMEOUT_MS;
+  const maxRetries = options?.maxRetries ?? API_DEFAULT_MAX_RETRIES;
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const ctrl = new AbortController();
+    let timedOut = false;
+    const tid = setTimeout(() => {
+      timedOut = true;
+      ctrl.abort();
+    }, timeoutMs);
+
+    try {
+      linkAbort(init?.signal, ctrl);
+      const response = await fetch(input, { ...init, signal: ctrl.signal });
+      clearTimeout(tid);
+
+      if (RETRYABLE_HTTP.has(response.status) && attempt < maxRetries) {
+        logger.debug(
+          `apiFetch: HTTP ${response.status}, nouvel essai ${attempt + 2}/${maxRetries + 1}`,
+          "apiFetch"
+        );
+        await sleep(Math.min(8000, 1000 * 2 ** attempt));
+        continue;
+      }
+      return response;
+    } catch (err: unknown) {
+      clearTimeout(tid);
+      const isAbort = err instanceof Error && err.name === "AbortError";
+      const isNet =
+        err instanceof TypeError &&
+        typeof err.message === "string" &&
+        err.message.includes("Network request failed");
+
+      if (isAbort && !timedOut) {
+        throw err;
+      }
+
+      if ((isAbort && timedOut) || isNet) {
+        lastErr = isAbort && timedOut ? new ApiTimeoutError() : err;
+        if (attempt < maxRetries) {
+          logger.debug(
+            `apiFetch: retry après ${isNet ? "réseau" : "timeout"} (${attempt + 2}/${maxRetries + 1})`,
+            "apiFetch"
+          );
+          await sleep(Math.min(8000, 1000 * 2 ** attempt));
+          continue;
+        }
+        throw lastErr;
+      }
+
+      throw err;
+    }
+  }
+
+  throw lastErr ?? new Error("apiFetch: épuisé");
+}

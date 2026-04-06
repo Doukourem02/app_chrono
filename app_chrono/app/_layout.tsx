@@ -6,6 +6,7 @@ import Constants from "expo-constants";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
 import { OfflineBanner } from "../components/OfflineBanner";
+import { RealtimeDegradedBanner } from "../components/RealtimeDegradedBanner";
 import { soundService } from "../services/soundService";
 import { useAuthStore } from "../store/useAuthStore";
 import { userApiService } from "../services/userApiService";
@@ -93,6 +94,7 @@ export default function RootLayout() {
       <ErrorModalsProvider>
         <View style={{ flex: 1 }}>
           <OfflineBanner />
+          <RealtimeDegradedBanner />
           <View style={{ flex: 1 }}>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />

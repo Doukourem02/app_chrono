@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 import { Message, Conversation } from './driverMessageService';
 import { config } from '../config/index';
 import { useDriverStore } from '../store/useDriverStore';
+import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 
 const SOCKET_URL = config.socketUrl || 'http://localhost:4000';
 
@@ -50,7 +51,13 @@ class DriverMessageSocketService {
       },
     });
 
+    this.socket.io.on('reconnect_failed', () => {
+      logger.warn('Socket messagerie: reconnexions épuisées', 'driverMessageSocketService');
+      useRealtimeDegradedStore.getState().setMessagesSocketDegraded(true);
+    });
+
     this.socket.on('connect', () => {
+      useRealtimeDegradedStore.getState().setMessagesSocketDegraded(false);
       logger.info('🔌 Socket connecté pour messagerie', 'driverMessageSocketService');
       this.isConnected = true;
       // S'identifier comme driver
@@ -108,6 +115,7 @@ class DriverMessageSocketService {
   }
 
   disconnect() {
+    useRealtimeDegradedStore.getState().setMessagesSocketDegraded(false);
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
