@@ -33,6 +33,7 @@ module.exports = {
       favicon: "./assets/images/logo/LOGO_APP1.png"
     },
     plugins: [
+      "expo-asset",
       "expo-audio",
       "@driveapp/expo-plugin-pod-disable-paths",
       "./plugins/withMapboxToken.js",
@@ -72,7 +73,14 @@ module.exports = {
             backgroundColor: "#000000"
           }
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          /** iOS : push en arrière-plan (nouvelles courses, messages, etc.). */
+          enableBackgroundRemoteNotifications: true,
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,

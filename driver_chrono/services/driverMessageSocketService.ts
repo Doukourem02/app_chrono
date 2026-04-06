@@ -124,6 +124,16 @@ class DriverMessageSocketService {
     this.lastSocketAuthToken = null;
   }
 
+  /** Ré-émet la présence driver (ex. après retour réseau) pour que le serveur renvoie les rooms actives. */
+  reassertDriverPresence(driverId: string) {
+    if (!driverId || !this.socket?.connected) return;
+    try {
+      this.socket.emit("driver-connect", driverId);
+    } catch (err) {
+      logger.warn("reassertDriverPresence failed", "driverMessageSocketService", err);
+    }
+  }
+
   /** Après refresh JWT : reconnecter si le token handshake a changé ou le lien est mort. */
   syncAfterAccessTokenRefresh(driverId: string | undefined) {
     if (!driverId) return;

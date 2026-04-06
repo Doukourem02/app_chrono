@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
-import { useEffect } from "react";
+import { getNetworkStateAsync, useNetworkState } from "expo-network";
+import { useEffect, useRef } from "react";
 import { AppState, AppStateStatus, Platform, View } from "react-native";
 import { initSentry } from "../utils/sentry";
 import Constants from "expo-constants";
@@ -11,6 +12,8 @@ import { soundService } from "../services/soundService";
 import { useAuthStore } from "../store/useAuthStore";
 import { userApiService } from "../services/userApiService";
 import { userOrderSocketService } from "../services/userOrderSocketService";
+import { runUserAppResync } from "../services/userAppResync";
+import { isNetworkOffline } from "../utils/isNetworkOffline";
 import { logger } from "../utils/logger";
 import "../config/envCheck";
 
@@ -32,7 +35,9 @@ if (Platform.OS !== "web" && mapboxPublicToken) {
 initSentry();
 
 export default function RootLayout() {
-  const { isAuthenticated, user, logout, hydrateTokens } = useAuthStore();
+  const { isAuthenticated, user, hydrateTokens } = useAuthStore();
+  const network = useNetworkState();
+  const prevNetworkOfflineRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     // Initialiser le service de son au démarrage
@@ -46,26 +51,39 @@ export default function RootLayout() {
     hydrateTokens().catch(() => {});
   }, [hydrateTokens]);
 
-  // Rafraîchir la session quand l'app revient au premier plan
+  // Re-sync (commandes, liste, profil, socket) au retour réseau hors ligne → en ligne
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      prevNetworkOfflineRef.current = null;
+      return;
+    }
+    const offline = isNetworkOffline(network);
+    if (prevNetworkOfflineRef.current === null) {
+      prevNetworkOfflineRef.current = offline;
+      return;
+    }
+    if (prevNetworkOfflineRef.current && !offline) {
+      void runUserAppResync(user.id);
+    }
+    prevNetworkOfflineRef.current = offline;
+  }, [network, isAuthenticated, user?.id]);
+
+  // Rafraîchir la session + resync ciblé quand l'app revient au premier plan
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active' && isAuthenticated && user) {
-        try {
-          const token = await userApiService.ensureAccessToken();
-          if (!token) {
-            logger.warn('[RootLayout] Impossible de rafraîchir le token (réseau?) - on garde la session');
-          } else {
-            userOrderSocketService.syncAfterAccessTokenRefresh(user.id);
-          }
-        } catch (error) {
-          logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', undefined, error);
-        }
+      if (nextAppState !== "active" || !isAuthenticated || !user?.id) return;
+      try {
+        const net = await getNetworkStateAsync();
+        if (isNetworkOffline(net)) return;
+        await runUserAppResync(user.id);
+      } catch (error) {
+        logger.warn("[RootLayout] Resync au retour premier plan:", undefined, error);
       }
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
-  }, [isAuthenticated, user, logout]);
+  }, [isAuthenticated, user?.id]);
 
   // Rafraîchissement proactif du token toutes les 10 min quand l'app est active
   // Évite les déconnexions après inactivité prolongée (écran allumé sans interaction)

@@ -393,6 +393,16 @@ class OrderSocketService {
     this.connect(driverId);
   }
 
+  /** Redemande l’état des commandes au serveur après retour réseau / premier plan. */
+  requestServerOrdersResync(driverId: string) {
+    if (!driverId || !this.socket?.connected) return;
+    try {
+      this.socket.emit("driver-reconnect", { driverId });
+    } catch (err) {
+      logger.warn("requestServerOrdersResync failed", "orderSocketService", err);
+    }
+  }
+
   // Accepter une commande
   async acceptOrder(orderId: string) {
     if (!this.socket || !this.driverId) {

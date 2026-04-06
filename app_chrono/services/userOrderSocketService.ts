@@ -599,6 +599,26 @@ class UserOrderSocketService {
     this.connect(userId);
   }
 
+  /**
+   * Redemande l’état des commandes au serveur (HTTP vient d’aligner le store, ou retour réseau).
+   */
+  requestServerOrdersResync(userId: string) {
+    if (!userId || !this.socket?.connected) return;
+    try {
+      this.socket.emit("user-connect", userId);
+      setTimeout(() => {
+        try {
+          this.socket?.emit("user-reconnect", { userId });
+          logger.debug("user-reconnect (resync demandé)", "userOrderSocketService", { userId });
+        } catch (err) {
+          logger.warn("user-reconnect emit failed", "userOrderSocketService", err);
+        }
+      }, 100);
+    } catch (err) {
+      logger.warn("requestServerOrdersResync failed", "userOrderSocketService", err);
+    }
+  }
+
   // 📦 Créer une nouvelle commande
   createOrder(orderData: {
     pickup: {

@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
-import { useEffect } from "react";
+import { getNetworkStateAsync, useNetworkState } from "expo-network";
+import { useEffect, useRef } from "react";
 import { AppState, AppStateStatus, LogBox, Platform, View } from "react-native";
 import Constants from "expo-constants";
 import { useDriverStore } from "../store/useDriverStore";
@@ -12,7 +13,9 @@ import { soundService } from "../services/soundService";
 import { apiService } from "../services/apiService";
 import { orderSocketService } from "../services/orderSocketService";
 import { driverMessageSocketService } from "../services/driverMessageSocketService";
+import { runDriverAppResync } from "../services/driverAppResync";
 import "../config/envCheck";
+import { isNetworkOffline } from "../utils/isNetworkOffline";
 import { logger } from "../utils/logger";
 
 // Mapbox : initialiser le token au démarrage (iOS/Android uniquement, pas web)
@@ -34,7 +37,9 @@ if (Platform.OS !== "web") {
 initSentry();
 
 export default function RootLayout() {
-  const { isAuthenticated, user, logout, hydrateTokens } = useDriverStore();
+  const { isAuthenticated, user, hydrateTokens } = useDriverStore();
+  const network = useNetworkState();
+  const prevNetworkOfflineRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     if (__DEV__) {
@@ -51,28 +56,38 @@ export default function RootLayout() {
     hydrateTokens().catch(() => {});
   }, [hydrateTokens]);
 
-  // Rafraîchir la session quand l'app revient au premier plan
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      prevNetworkOfflineRef.current = null;
+      return;
+    }
+    const offline = isNetworkOffline(network);
+    if (prevNetworkOfflineRef.current === null) {
+      prevNetworkOfflineRef.current = offline;
+      return;
+    }
+    if (prevNetworkOfflineRef.current && !offline) {
+      void runDriverAppResync(user.id);
+    }
+    prevNetworkOfflineRef.current = offline;
+  }, [network, isAuthenticated, user?.id]);
+
+  // Rafraîchir la session + resync profil / commandes quand l'app revient au premier plan
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active' && isAuthenticated && user) {
-        try {
-          const tokenResult = await apiService.ensureAccessToken();
-          if (!tokenResult.token) {
-            logger.warn('[RootLayout] Impossible de rafraîchir le token (réseau?) - on garde la session');
-          } else {
-            const online = useDriverStore.getState().isOnline;
-            orderSocketService.syncAfterAccessTokenRefresh(user.id, online);
-            driverMessageSocketService.syncAfterAccessTokenRefresh(user.id);
-          }
-        } catch (error) {
-          logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', undefined, error);
-        }
+      if (nextAppState !== "active" || !isAuthenticated || !user?.id) return;
+      try {
+        const net = await getNetworkStateAsync();
+        if (isNetworkOffline(net)) return;
+        await runDriverAppResync(user.id);
+      } catch (error) {
+        logger.warn("[RootLayout] Resync au retour premier plan:", undefined, error);
       }
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
-  }, [isAuthenticated, user, logout]);
+  }, [isAuthenticated, user?.id]);
 
   // Rafraîchissement proactif du token toutes les 10 min quand l'app est active
   useEffect(() => {

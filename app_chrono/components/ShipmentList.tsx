@@ -4,6 +4,7 @@ import {estimateDurationMinutes,formatDurationLabel,} from "../services/orderApi
 import { userApiService } from "../services/userApiService";
 import { useAuthStore } from "../store/useAuthStore";
 import {OrderRequest,OrderStatus,useOrderStore,} from "../store/useOrderStore";
+import { useUserDataResyncStore } from "../store/useUserDataResyncStore";
 import { formatUserName } from "../utils/formatName";
 import { AnimatedCard, SkeletonLoader } from "./animations";
 import ShipmentCard from "./ShipmentCard";
@@ -571,6 +572,15 @@ export default function ShipmentList() {
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
+
+  const deliveriesListBump = useUserDataResyncStore((s) => s.deliveriesListBump);
+  const lastDeliveriesBumpRef = React.useRef(0);
+
+  useEffect(() => {
+    if (deliveriesListBump <= lastDeliveriesBumpRef.current) return;
+    lastDeliveriesBumpRef.current = deliveriesListBump;
+    loadOrders();
+  }, [deliveriesListBump, loadOrders]);
 
   const lastActiveOrdersHashRef = React.useRef<string>("");
 

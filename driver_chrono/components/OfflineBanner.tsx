@@ -1,17 +1,7 @@
-import {
-  type NetworkState,
-  NetworkStateType,
-  useNetworkState,
-} from "expo-network";
+import { useNetworkState } from "expo-network";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-function isOffline(state: NetworkState): boolean {
-  if (state.isConnected === false) return true;
-  if (state.type === NetworkStateType.NONE) return true;
-  if (state.isInternetReachable === false) return true;
-  return false;
-}
+import { isNetworkOffline } from "../utils/isNetworkOffline";
 
 /**
  * Bandeau discret en tête : l’écran en dessous reste celui de l’app (pas d’écran blanc plein page).
@@ -21,7 +11,7 @@ export function OfflineBanner() {
   const network = useNetworkState();
 
   if (Platform.OS === "web") return null;
-  if (!isOffline(network)) return null;
+  if (!isNetworkOffline(network)) return null;
 
   return (
     <View

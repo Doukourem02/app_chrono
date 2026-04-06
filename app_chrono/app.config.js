@@ -35,6 +35,7 @@ module.exports = {
       favicon: "./assets/images/logo/LOGO_APP2.png"
     },
     plugins: [
+      "expo-asset",
       "expo-router",
       [
         "@rnmapbox/maps",
@@ -51,6 +52,13 @@ module.exports = {
         }
       ],
       [
+        "expo-contacts",
+        {
+          contactsPermission:
+            "Krono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire.",
+        },
+      ],
+      [
         "expo-splash-screen",
         {
           image: "./assets/images/logo/LOGO_APP2.png",
@@ -61,7 +69,14 @@ module.exports = {
             backgroundColor: "#000000"
           }
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          /** iOS : mode distant en arrière-plan (utile pour événements type « en route »). */
+          enableBackgroundRemoteNotifications: true,
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,
