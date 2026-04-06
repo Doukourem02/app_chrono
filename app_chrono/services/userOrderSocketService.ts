@@ -12,6 +12,8 @@ class UserOrderSocketService {
   private socket: Socket | null = null;
   private userId: string | null = null;
   private isConnected = false;
+  /** Dernier JWT passé au handshake ; si le store a changé après refresh, il faut reconnecter. */
+  private lastSocketAuthToken: string | null = null;
   private retryCount: number = 0;
   private isCreatingOrder = false; // Protection contre les appels multiples
   private listenersSetup = false; // Flag pour éviter les listeners multiples
@@ -44,6 +46,7 @@ class UserOrderSocketService {
       logger.warn('Impossible de connecter le socket: accessToken manquant', 'userOrderSocketService');
       return;
     }
+    this.lastSocketAuthToken = token;
     logger.info('🔌 Connexion au socket...', 'userOrderSocketService', { socketUrl });
     this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
@@ -556,6 +559,36 @@ class UserOrderSocketService {
       this.isConnected = false;
       this.userId = null;
     }
+    this.lastSocketAuthToken = null;
+  }
+
+  /**
+   * Après `ensureAccessToken()` (ex. retour premier plan) : si le JWT a changé ou le lien est mort,
+   * reconnecter pour que le handshake envoie le bon token.
+   */
+  syncAfterAccessTokenRefresh(userId: string | undefined) {
+    if (!userId) return;
+    const token = useAuthStore.getState().accessToken;
+    if (!token) return;
+    const socketOk =
+      this.socket?.connected &&
+      token === this.lastSocketAuthToken &&
+      this.userId === userId;
+    if (socketOk) return;
+
+    logger.info('🔄 Reconnexion socket commandes (JWT ou état lien)', 'userOrderSocketService');
+    if (this.socket) {
+      try {
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch (err) {
+        logger.warn('Teardown socket avant resync', 'userOrderSocketService', err);
+      }
+      this.socket = null;
+    }
+    this.listenersSetup = false;
+    this.isConnected = false;
+    this.connect(userId);
   }
 
   // 📦 Créer une nouvelle commande

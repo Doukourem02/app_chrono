@@ -1,13 +1,15 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { AppState, AppStateStatus, Platform } from "react-native";
+import { AppState, AppStateStatus, Platform, View } from "react-native";
 import { initSentry } from "../utils/sentry";
 import Constants from "expo-constants";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
+import { OfflineBanner } from "../components/OfflineBanner";
 import { soundService } from "../services/soundService";
 import { useAuthStore } from "../store/useAuthStore";
 import { userApiService } from "../services/userApiService";
+import { userOrderSocketService } from "../services/userOrderSocketService";
 import { logger } from "../utils/logger";
 import "../config/envCheck";
 
@@ -51,6 +53,8 @@ export default function RootLayout() {
           const token = await userApiService.ensureAccessToken();
           if (!token) {
             logger.warn('[RootLayout] Impossible de rafraîchir le token (réseau?) - on garde la session');
+          } else {
+            userOrderSocketService.syncAfterAccessTokenRefresh(user.id);
           }
         } catch (error) {
           logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', undefined, error);
@@ -72,7 +76,10 @@ export default function RootLayout() {
       const appState = AppState.currentState;
       if (appState !== 'active') return; // Ne pas rafraîchir en arrière-plan
       try {
-        await userApiService.ensureAccessToken();
+        const token = await userApiService.ensureAccessToken();
+        if (token && user?.id) {
+          userOrderSocketService.syncAfterAccessTokenRefresh(user.id);
+        }
       } catch {
         // Silencieux - la prochaine action déclenchera un refresh
       }
@@ -84,12 +91,17 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <ErrorModalsProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="summary" />
-        </Stack>
+        <View style={{ flex: 1 }}>
+          <OfflineBanner />
+          <View style={{ flex: 1 }}>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="summary" />
+            </Stack>
+          </View>
+        </View>
       </ErrorModalsProvider>
     </ErrorBoundary>
   );

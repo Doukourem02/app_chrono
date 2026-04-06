@@ -1,9 +1,5 @@
 # Prod Chrono — checklist (`ckprod`)
 
-**§2 Avant prod : terminé pour ce projet.**
-
----
-
 ## 3. Phase PENDANT la production (premier déploiement et publication)
 
 Objectif : sécurité et comptes → données → validation réelle → **légal** → bêta stores → **soumission** → confort (monitoring).
@@ -14,15 +10,13 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 
 ### 3.1 Checklist *(ordre recommandé)*
 
-**A — Urgent (avant tout le reste si concerné)**
+*Validations **session / OTP / arrière‑plan / sockets** (détail + Twilio) : **`docs/mobile-auth-and-lifecycle.md`**.*
 
-- [ ] Révoquer l’ancien token Mapbox **sk** s’il a pu fuiter.
-- [ ] Retirer / ignorer la zone Cloudflare **kronodelivery.com** si elle est inutile (évite confusion DNS).
-- [ ] Vérifier la **facturation Vercel** si tu as reçu une alerte (évite coupure admin plus tard).
+*Vigilance **A** (Mapbox **sk**, zone Cloudflare **kronodelivery.com**, facturation **Vercel**) : **OK pour l’instant** — ne revérifier qu’en cas d’alerte ou de changement.*
 
-**B — Données prod** *(skip si §2 déjà validé de bout en bout)*
+**B — Données prod** *(projet Supabase branché sur l’API prod — pas une « 2ᵉ BDD » obligatoire ; à valider avant de considérer la prod « figée »)*
 
-- [ ] **Supabase prod** : migrations à jour, **RLS** cohérente, **backups** actifs.
+- [ ] **Supabase** (même projet que le backend prod) : migrations à jour, **RLS** cohérente, **backups** actifs *(dashboard)*.
 
 **C — Smoke web** *(rapide, navigateur)*
 
@@ -74,6 +68,8 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 
 ## 4. Phase APRÈS la production (exploitation continue)
 
+À **entretenir** tant que le service vit : habitudes, pas une liste à « finir une fois » comme le **§3**. La **première mise en place** Sentry / uptime reste le **§3.I**.
+
 ### 4.1 Habitudes de sécurité
 
 - Ne pas committer de secrets ; faire tourner les clés si fuite suspectée.
@@ -82,13 +78,13 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 
 ### 4.2 Monitoring
 
-- Consulter **Sentry** (pics d’erreurs après une release).
-- Lire les **logs** du PaaS en cas d’incident.
-- Optionnel : **uptime** (UptimeRobot, Better Stack, etc.) sur `https://api.kro-no-delivery.com/health/live` — vérifier que le service est encore maintenu avant de t’y fier.
+- **Sentry** : surveiller les pics après une release *(config initiale + premier test d’erreur : **§3.I**)*.
+- **Logs** du PaaS en cas d’incident.
+- **Uptime** optionnel sur `https://api.kro-no-delivery.com/health/live` *(outil externe + **§3.I** ; vérifier périodiquement que l’outil est encore actif)*.
 
 ### 4.3 Données
 
-- Vérifier périodiquement que les **backups** Supabase sont actifs.
+- **Backups** Supabase : contrôle périodique *(aligné **§3.B** au moment du go prod)*.
 - Avant migrations **destructives** en prod : **export** ou snapshot si possible.
 
 ### 4.4 Stores
@@ -108,13 +104,32 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 - **Plusieurs instances** backend : Socket.IO peut exiger **sticky sessions** ou **adapter Redis** — avancé, pas nécessaire au début.
 - **CI** : faire échouer le build sur vulnérabilités critiques (`npm audit`) si tu veux durcir.
 
+### 4.7 Backlog qualité app *(hors déploiement pur)*
+
+Amélioration **continue** dans le code ou sur device. **Smoke minimal** : **§3.D** ; session / OTP / arrière‑plan : **`docs/mobile-auth-and-lifecycle.md`**.
+
+- [ ] **Réseau** : messages clairs hors ligne / timeout (pas d’écran muet).
+- [ ] **Robustesse API** : pas de crash sur réponses inattendues.
+- [ ] **Perf / batterie** : GPS / carte raisonnables quand l’écran carte n’est pas actif.
+- [ ] **Push** : APNs / Expo + backend ; tests sur device.
+- [ ] **Sentry mobile** : `EXPO_PUBLIC_SENTRY_DSN` sur EAS, rebuild, erreur de test reçue — *première fois **§3.I**, suivi **§4.2***.
+- [ ] **Dette** : tests auto ciblés (auth / refresh) ; politique « app trop vieille » vs API si tu casses des contrats.
+
+**Tests dynamiques** *(complètent **§3.D** ; auth / OTP : `mobile-auth-and-lifecycle.md`)* :
+
+1. Auth : inscription / OTP / session stable  
+2. Commande : création → statuts → temps réel des deux côtés  
+3. Carte : pickup / livraison, Mapbox OK  
+4. Paiement (si activé en prod) : nominal + annulation si applicable  
+5. Edge : mode avion ~10 s puis retour réseau — l’app recolle sans tout casser  
+
 ---
 
 ## Fichiers utiles dans le repo
 
 | Sujet | Fichier |
 |--------|---------|
-| Qualité app (session, push, robustesse) | `docs/app-quality-checklist.md` |
+| Session, OTP, cycle de vie, validations device liées | `docs/mobile-auth-and-lifecycle.md` |
 | Variables backend | `chrono_backend/.env.example` |
 | Contrôles prod backend | `chrono_backend/src/config/envCheck.ts` |
 | Apps Expo | `app_chrono/.env.example`, `driver_chrono/.env.example` |

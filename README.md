@@ -3,7 +3,7 @@
 Plateforme de livraison en temps réel connectant clients, chauffeurs **et administrateurs**. Ce dépôt rassemble :
 
 - `chrono_backend/` → API REST + Socket.IO
-- `admin_chrono/` → Dashboard web (Next.js 16 / React 18)
+- `admin_chrono/` → Dashboard web (Next.js 16 / React 19)
 - `app_chrono/` → App mobile client (Expo / React Native)
 - `driver_chrono/` → App mobile chauffeur (Expo / React Native)
 
@@ -13,6 +13,9 @@ PROJET_CHRONO/
 ├── admin_chrono/
 ├── app_chrono/
 ├── driver_chrono/
+├── docs/                 # ckprod, mobile auth, paiements, etc.
+├── supabase/             # SQL / RLS (selon usage)
+├── scripts/              # IP locale, utilitaires repo
 └── README.md
 ```
 
@@ -50,8 +53,9 @@ PROJET_CHRONO/
 - PostgreSQL 14+ ou Supabase
 - Redis (optionnel, recommandé pour production - scaling Socket.IO)
 - Expo CLI (pour les apps mobiles)
-- Google Maps API key (avec APIs activées : Maps JavaScript API, Places API, Geocoding API)
-- Compte Supabase (recommandé)
+- **Mapbox** : token **pk.** pour admin (`NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`) et apps (`EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN`) — voir section [Mapbox](#mapbox-configuration)
+- Compte **Supabase** (recommandé)
+- **OTP SMS** : compte **Twilio** (principal dans le backend) ou **Vonage** (alternative) — variables dans `chrono_backend/.env.example`
 
 ---
 
@@ -100,13 +104,15 @@ Variables clés :
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` - Configuration Supabase
 - `JWT_SECRET` - Secret pour les tokens JWT
 - `REDIS_URL` - (Optionnel) URL Redis pour scaling Socket.IO
-- `EMAIL_*`, `VONAGE_*` - (Optionnel) Configuration email/SMS
+- `EMAIL_*` — (Optionnel) envoi mail
+- `TWILIO_*` — SMS / WhatsApp OTP (principal)
+- `VONAGE_*` — (Optionnel) SMS alternatif si pas Twilio
 - `SENTRY_DSN` - (Optionnel) Monitoring d'erreurs Sentry
 
 #### Dashboard admin (`admin_chrono/.env.local`)
 
 ```bash
-cp admin_chrono/.env.example admin_chrono/.env.local
+cp admin_chrono/.env.local.example admin_chrono/.env.local
 ```
 
 Variables clés :
@@ -114,7 +120,7 @@ Variables clés :
 - `NEXT_PUBLIC_API_URL` (ex: `http://localhost:4000` ou `http://192.168.1.96:4000` pour réseau local)
 - `NEXT_PUBLIC_SOCKET_URL` (même URL que API_URL)
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_GOOGLE_API_KEY` (pour Google Maps)
+- `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` (cartes **Mapbox**, token **pk.**)
 
 **Important :** Le CSP (Content Security Policy) est configuré automatiquement dans `next.config.ts` pour autoriser l'URL définie dans `NEXT_PUBLIC_API_URL`. Redémarrez le serveur après modification.
 
@@ -130,7 +136,7 @@ Variables clés :
 - `EXPO_PUBLIC_API_URL` (ex: `http://localhost:4000` ou `http://192.168.1.96:4000` pour réseau local)
 - `EXPO_PUBLIC_SOCKET_URL` (même URL que API_URL)
 - `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- `EXPO_PUBLIC_GOOGLE_API_KEY` (pour les cartes)
+- `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` (cartes **Mapbox** ; builds **EAS prod** : aussi sur `eas env`, pas seulement le `.env` local)
 
 **Note pour iOS Simulator :** Utilisez `localhost` au lieu de l'IP locale.
 
@@ -187,7 +193,7 @@ admin_chrono/
 ├── components/          # KPI cards, tables, tracker, etc.
 ├── hooks/               # useRealTimeTracking, useSocketConnection…
 ├── lib/                 # Services API, adminSocketService
-├── contexts/            # DateFilter, GoogleMaps
+├── contexts/            # DateFilter, Mapbox
 ├── stores/              # Zustand stores (auth…)
 └── utils/               # formatDeliveryId, debug helpers
 ```
@@ -212,8 +218,6 @@ app_chrono/
 ## 🔌 Documentation API
 
 > **Note :** Le backend expose une documentation Swagger interactive. Une fois le backend démarré, accédez à `/api-docs` pour explorer toutes les routes disponibles avec leurs paramètres et réponses.
-
-### Auth (`/api/auth-simple/*`)
 
 ### Auth (`/api/auth-simple/*`)
 
@@ -376,7 +380,7 @@ app_chrono/
 - **Validation:** Joi
 - **Logging:** Winston
 - **Email:** Nodemailer, Resend
-- **SMS:** Vonage
+- **SMS / WhatsApp OTP:** Twilio (principal), Vonage (alternative)
 - **Monitoring:** Sentry
 - **Documentation API:** Swagger
 - **QR Codes:** qrcode
@@ -388,7 +392,7 @@ app_chrono/
 - **Framework:** Next.js 16 (App Router)
 - **State Management:** React Query (TanStack Query) + Zustand
 - **WebSocket:** Socket.IO client
-- **Cartes:** Google Maps JS API
+- **Cartes:** Mapbox GL JS (`mapbox-gl`)
 - **Graphiques:** Recharts
 - **Export:** jsPDF, xlsx
 - **Animations:** Framer Motion
@@ -402,7 +406,7 @@ app_chrono/
 - **Routing:** Expo Router 6
 - **State Management:** Zustand
 - **WebSocket:** Socket.IO client
-- **Cartes:** React Native Maps
+- **Cartes:** `@rnmapbox/maps` (Mapbox)
 - **Scanner:** Expo Barcode Scanner (nécessite développement build pour `driver_chrono`)
 - **Localisation:** Expo Location
 - **Monitoring:** Sentry React Native
@@ -451,7 +455,7 @@ npm run update-ip        # Mettre à jour l'IP dans .env
 ### Dashboard Admin (`admin_chrono`)
 
 - 📊 **Tableau de bord** avec statistiques en temps réel (KPIs, revenus, livraisons)
-- 🗺️ **Suivi des livraisons** en direct sur carte Google Maps
+- 🗺️ **Suivi des livraisons** en direct sur carte **Mapbox**
 - 👥 **Gestion des utilisateurs** :
   - `/users` - Vue globale de tous les utilisateurs (clients, livreurs, admins)
     - Gestion administrative (création, modification, suppression)
@@ -531,7 +535,7 @@ npm run update-ip        # Mettre à jour l'IP dans .env
 ### Corrections importantes
 
 1. **Content Security Policy (CSP)** - Configuration dynamique pour autoriser le backend
-2. **Gestion des erreurs Google Maps** - Détection et messages d'erreur améliorés
+2. **Gestion des erreurs cartes (Mapbox)** - Détection et messages d'erreur améliorés
 3. **Protection contre les crashes** - Gestion améliorée des appels multiples à `createOrder()`
 4. **Nettoyage des sockets** - Prévention des listeners dupliqués
 5. **Scanner QR code** - Gestion gracieuse de l'absence du module natif
@@ -601,11 +605,10 @@ npx expo run:android
 
 ### Guides de configuration
 
-- **Variables d'environnement** : `docs/ENV_VARIABLES_GUIDE.md`
-
-  - Où configurer Redis et PostgreSQL Pool
-  - Configuration par projet (backend, admin, apps)
-  - Checklist de configuration
+- **Prod / TestFlight / EAS** : `docs/ckprod.md`
+- **Session mobile, OTP, cycle de vie** : `docs/mobile-auth-and-lifecycle.md`
+- **Paiements** : `docs/paiements-krono.md`, `docs/integrations-psp.md`
+- **Variables** : fichiers `.env.example` à la racine de chaque package (`chrono_backend`, `admin_chrono`, `app_chrono`, `driver_chrono`)
 
 - **Scaling et production** : `chrono_backend/docs/SCALING_SETUP.md`
   - Configuration Redis Adapter pour Socket.IO
@@ -624,7 +627,10 @@ npx expo run:android
 ```
 PROJET_CHRONO/
 ├── docs/
-│   └── ENV_VARIABLES_GUIDE.md          # Guide des variables d'environnement
+│   ├── ckprod.md                       # Déploiement, checklist prod, backlog qualité
+│   ├── mobile-auth-and-lifecycle.md    # Auth / OTP / tests device liés
+│   ├── paiements-krono.md
+│   └── integrations-psp.md
 ├── admin_chrono/docs/
 │   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers
 │   ├── NOTIFICATIONS_BEHAVIOR.md       # Comportement des notifications

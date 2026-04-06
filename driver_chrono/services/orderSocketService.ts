@@ -11,6 +11,7 @@ class OrderSocketService {
   private socket: Socket | null = null;
   private driverId: string | null = null;
   private isConnected = false;
+  private lastSocketAuthToken: string | null = null;
   private retryCount = 0;
 
   connect(driverId: string) {
@@ -33,6 +34,7 @@ class OrderSocketService {
       logger.warn('Impossible de connecter le socket: accessToken manquant', undefined);
       return;
     }
+    this.lastSocketAuthToken = token;
     this.socket = io(config.socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -352,6 +354,35 @@ class OrderSocketService {
       this.isConnected = false;
       this.driverId = null;
     }
+    this.lastSocketAuthToken = null;
+  }
+
+  /**
+   * Après refresh JWT : reconnecter le socket commandes si le livreur est en ligne,
+   * pour envoyer le bon token au handshake.
+   */
+  syncAfterAccessTokenRefresh(driverId: string | undefined, isDriverOnline: boolean) {
+    if (!isDriverOnline || !driverId) return;
+    const token = useDriverStore.getState().accessToken;
+    if (!token) return;
+    const socketOk =
+      this.socket?.connected &&
+      token === this.lastSocketAuthToken &&
+      this.driverId === driverId;
+    if (socketOk) return;
+
+    logger.info('Reconnexion socket commandes (JWT ou lien)', 'orderSocketService');
+    if (this.socket) {
+      try {
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch (err) {
+        logger.warn('Teardown socket commandes', undefined, err);
+      }
+      this.socket = null;
+    }
+    this.isConnected = false;
+    this.connect(driverId);
   }
 
   // Accepter une commande

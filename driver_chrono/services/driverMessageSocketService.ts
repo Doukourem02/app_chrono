@@ -10,6 +10,7 @@ class DriverMessageSocketService {
   private socket: Socket | null = null;
   private driverId: string | null = null;
   private isConnected = false;
+  private lastSocketAuthToken: string | null = null;
   private messageCallbacks: ((message: Message, conversation: Conversation) => void)[] = [];
   private typingCallbacks: ((data: { userId: string; isTyping: boolean }) => void)[] = [];
 
@@ -33,6 +34,7 @@ class DriverMessageSocketService {
       logger.warn('Impossible de connecter le socket de messagerie: accessToken manquant', 'driverMessageSocketService');
       return;
     }
+    this.lastSocketAuthToken = token;
     this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -111,6 +113,32 @@ class DriverMessageSocketService {
       this.socket = null;
       this.isConnected = false;
     }
+    this.lastSocketAuthToken = null;
+  }
+
+  /** Après refresh JWT : reconnecter si le token handshake a changé ou le lien est mort. */
+  syncAfterAccessTokenRefresh(driverId: string | undefined) {
+    if (!driverId) return;
+    const token = useDriverStore.getState().accessToken;
+    if (!token) return;
+    const socketOk =
+      this.socket?.connected &&
+      token === this.lastSocketAuthToken &&
+      this.driverId === driverId;
+    if (socketOk) return;
+
+    logger.info('Reconnexion socket messagerie (JWT ou lien)', 'driverMessageSocketService');
+    if (this.socket) {
+      try {
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch (err) {
+        logger.warn('Teardown socket messagerie', 'driverMessageSocketService', err);
+      }
+      this.socket = null;
+    }
+    this.isConnected = false;
+    this.connect(driverId);
   }
 
   /**

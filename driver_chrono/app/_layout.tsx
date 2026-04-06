@@ -1,13 +1,16 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { AppState, AppStateStatus, LogBox, Platform } from "react-native";
+import { AppState, AppStateStatus, LogBox, Platform, View } from "react-native";
 import Constants from "expo-constants";
 import { useDriverStore } from "../store/useDriverStore";
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
+import { OfflineBanner } from "../components/OfflineBanner";
 import { soundService } from "../services/soundService";
 import { apiService } from "../services/apiService";
+import { orderSocketService } from "../services/orderSocketService";
+import { driverMessageSocketService } from "../services/driverMessageSocketService";
 import "../config/envCheck";
 import { logger } from "../utils/logger";
 
@@ -55,6 +58,10 @@ export default function RootLayout() {
           const tokenResult = await apiService.ensureAccessToken();
           if (!tokenResult.token) {
             logger.warn('[RootLayout] Impossible de rafraîchir le token (réseau?) - on garde la session');
+          } else {
+            const online = useDriverStore.getState().isOnline;
+            orderSocketService.syncAfterAccessTokenRefresh(user.id, online);
+            driverMessageSocketService.syncAfterAccessTokenRefresh(user.id);
           }
         } catch (error) {
           logger.warn('[RootLayout] Erreur lors de la vérification du token au retour:', undefined, error);
@@ -74,7 +81,12 @@ export default function RootLayout() {
     const intervalId = setInterval(async () => {
       if (AppState.currentState !== 'active') return;
       try {
-        await apiService.ensureAccessToken();
+        const tokenResult = await apiService.ensureAccessToken();
+        if (tokenResult.token && user?.id) {
+          const online = useDriverStore.getState().isOnline;
+          orderSocketService.syncAfterAccessTokenRefresh(user.id, online);
+          driverMessageSocketService.syncAfterAccessTokenRefresh(user.id);
+        }
       } catch {
         // Silencieux - la prochaine action déclenchera un refresh
       }
@@ -93,11 +105,16 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <ErrorModalsProvider>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-          }}
-        />
+        <View style={{ flex: 1 }}>
+          <OfflineBanner />
+          <View style={{ flex: 1 }}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+              }}
+            />
+          </View>
+        </View>
       </ErrorModalsProvider>
     </ErrorBoundary>
   );
