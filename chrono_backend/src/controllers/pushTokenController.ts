@@ -219,11 +219,11 @@ export const registerPushToken = async (
       return;
     }
 
-    const exposeCode = process.env.EXPOSE_PUSH_REGISTER_PG_CODE === 'true' && err.code;
+    // Code court (PostgreSQL 23503, etc. ou Node ECONNREFUSED) — pas un secret, aide au debug sans ouvrir les logs
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',
-      ...(exposeCode ? { pgCode: err.code } : {}),
+      ...(err.code ? { errCode: err.code } : {}),
     });
   }
 };
