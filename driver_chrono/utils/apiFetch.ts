@@ -62,7 +62,18 @@ export function transportOrErrorMessage(error: unknown, fallback: string): strin
   return fallback;
 }
 
-/** Message métier depuis le corps JSON d’une erreur HTTP (`message` ou `error`). */
+/** Réponses API où `message` est un enveloppe générique et le détail utile est dans `error`. */
+const GENERIC_API_MESSAGE_SNIPPETS = [
+  "erreur lors de la mise à jour du profil",
+  "erreur lors de la récupération du profil",
+];
+
+function isGenericApiMessage(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return GENERIC_API_MESSAGE_SNIPPETS.some((s) => lower.includes(s));
+}
+
+/** Message métier depuis le corps JSON d’une erreur HTTP (`message` et/ou `error`). */
 export function parseApiErrorBody(
   body: unknown,
   httpStatus: number,
@@ -70,10 +81,11 @@ export function parseApiErrorBody(
 ): string {
   if (body && typeof body === "object") {
     const r = body as Record<string, unknown>;
-    const m = r.message;
-    const e = r.error;
-    if (typeof m === "string" && m.trim()) return m.trim();
-    if (typeof e === "string" && e.trim()) return e.trim();
+    const m = typeof r.message === "string" ? r.message.trim() : "";
+    const e = typeof r.error === "string" ? r.error.trim() : "";
+    if (e && (!m || isGenericApiMessage(m))) return e;
+    if (m) return m;
+    if (e) return e;
   }
   return fallback || `Erreur serveur (${httpStatus})`;
 }

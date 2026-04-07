@@ -9,6 +9,7 @@ import { generateTokens, refreshAccessToken } from '../utils/jwt.js';
 import logger from '../utils/logger.js';
 import { maskEmail, maskPhone, maskUserId } from '../utils/maskSensitiveData.js';
 import { createDefaultPaymentMethods } from '../utils/createDefaultPaymentMethods.js';
+import { ensureUsersProfileColumns } from '../utils/ensureUsersProfileColumns.js';
 
 interface RequestWithBruteForce<B = any> extends Request<{}, {}, B> {
   recordFailedAttempt?: () => void;
@@ -1289,6 +1290,8 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    await ensureUsersProfileColumns(pool);
+
     // Construire la requête de mise à jour dynamiquement
     const updates: string[] = [];
     const values: any[] = [];
@@ -1426,6 +1429,8 @@ export const getUserProfile = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    await ensureUsersProfileColumns(pool);
+
     const result = await (pool as any).query(
       'SELECT id, email, phone, first_name, last_name, avatar_url, role, created_at, updated_at FROM users WHERE id = $1',
       [userId]
@@ -1505,6 +1510,8 @@ export const uploadAvatar = async (req: Request, res: Response): Promise<void> =
       });
       return;
     }
+
+    await ensureUsersProfileColumns(pool);
 
     if (!supabaseAdmin) {
       res.status(500).json({
