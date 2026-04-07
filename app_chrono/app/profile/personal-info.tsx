@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
 import { logger } from '../../utils/logger';
+import { captureError } from '../../utils/sentry';
 
 export default function PersonalInfoPage() {
   const { user } = useAuthStore();
@@ -61,11 +62,23 @@ export default function PersonalInfoPage() {
           { text: 'OK', onPress: () => router.back() },
         ]);
       } else {
-        Alert.alert('Erreur', result.message || 'Impossible de mettre à jour vos informations');
+        const msg = result.message || 'Impossible de mettre à jour vos informations';
+        console.warn('[app_chrono/personal-info] updateProfile success:false', { userId: user.id, message: msg });
+        logger.warn('updateProfile success:false', 'personal-info', { userId: user.id, message: msg });
+        captureError(new Error(msg), { screen: 'personal-info', userId: user.id, source: 'updateProfile_result' });
+        Alert.alert('Erreur', msg);
       }
     } catch (error) {
+      console.warn('[app_chrono/personal-info] updateProfile exception', error);
       logger.error('Erreur mise à jour profil:', undefined, error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour vos informations');
+      captureError(
+        error instanceof Error ? error : new Error(String(error)),
+        { screen: 'personal-info', userId: user?.id, source: 'updateProfile_catch' }
+      );
+      Alert.alert(
+        'Erreur',
+        error instanceof Error ? error.message : 'Impossible de mettre à jour vos informations'
+      );
     } finally {
       setIsLoading(false);
     }

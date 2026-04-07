@@ -382,6 +382,64 @@ const checkUserInPostgreSQL = async (
   }
 };
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Même contrat que check / email, mais par id (connexion téléphone sans e-mail exploitable côté app). */
+const checkUserByIdInPostgreSQL = async (
+  req: Request<{ userId: string }>,
+  res: Response
+): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    if (!userId || !UUID_RE.test(userId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Identifiant utilisateur invalide',
+        user: null,
+      });
+      return;
+    }
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .limit(1);
+
+    if (error) {
+      logger.error('Erreur Supabase (check-by-id):', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur lors de la vérification',
+        error: error.message,
+      });
+      return;
+    }
+
+    if (users && users.length > 0) {
+      res.json({
+        success: true,
+        message: 'Utilisateur trouvé dans PostgreSQL',
+        user: users[0],
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Utilisateur non trouvé dans PostgreSQL',
+        user: null,
+      });
+    }
+  } catch (error: any) {
+    logger.error('Erreur vérification par id:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la vérification',
+      error: error.message,
+    });
+  }
+};
+
 const getAllUsersFromPostgreSQL = async (
   _req: Request,
   res: Response
@@ -1525,6 +1583,7 @@ export {
   registerUserWithPostgreSQL,
   loginUserWithPostgreSQL,
   checkUserInPostgreSQL,
+  checkUserByIdInPostgreSQL,
   getAllUsersFromPostgreSQL,
   sendOTPCode,
   verifyOTPCode,

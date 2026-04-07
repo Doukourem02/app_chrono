@@ -330,7 +330,7 @@ class UserApiService {
       let {
         accessToken,
         refreshToken,
-        setTokens,
+        setTokensAndWait,
         logout,
         hydrateTokens,
       } = useAuthStore.getState();
@@ -373,8 +373,8 @@ class UserApiService {
       const { token: newAccessToken, revoked } = await this.refreshPromise;
       this.refreshPromise = null;
 
-      if (newAccessToken) {
-        setTokens({ accessToken: newAccessToken, refreshToken });
+      if (newAccessToken && refreshToken) {
+        await setTokensAndWait({ accessToken: newAccessToken, refreshToken });
         logger.debug('Token rafraîchi et sauvegardé avec succès', 'userApiService');
         return newAccessToken;
       }

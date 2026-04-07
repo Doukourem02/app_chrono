@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userApiService } from '../../services/userApiService';
 import { logger } from '../../utils/logger';
+import { captureError } from '../../utils/sentry';
 
 export default function CompleteProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -40,7 +41,10 @@ export default function CompleteProfileScreen() {
       });
 
       if (!result.success || !result.data) {
-        throw new Error(result.message || 'Impossible d’enregistrer le profil');
+        const msg = result.message || 'Impossible d’enregistrer le profil';
+        console.warn('[app_chrono/complete-profile] updateProfile success:false', { userId: user.id, message: msg });
+        logger.warn('updateProfile success:false', 'complete-profile', { userId: user.id, message: msg });
+        throw new Error(msg);
       }
 
       setUser({
@@ -52,7 +56,12 @@ export default function CompleteProfileScreen() {
 
       router.replace('/(auth)/success' as any);
     } catch (error: any) {
+      console.warn('[app_chrono/complete-profile] exception', error);
       logger.error('Erreur complete-profile', 'CompleteProfile', error);
+      captureError(
+        error instanceof Error ? error : new Error(String(error)),
+        { screen: 'complete-profile', userId: user?.id, source: 'complete-profile_catch' }
+      );
       Alert.alert(
         'Erreur',
         error?.message || 'Une erreur est survenue. Réessayez.'

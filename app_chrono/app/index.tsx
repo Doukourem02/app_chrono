@@ -56,10 +56,15 @@ export default function RootIndex() {
           router.replace('/(tabs)' as any);
         } else {
           logout();
-          router.replace('/(tabs)' as any);
+          router.replace('/(auth)' as any);
         }
       } else {
-        router.replace('/(tabs)' as any);
+        const rt = useAuthStore.getState().refreshToken;
+        if (rt) {
+          router.replace('/(tabs)' as any);
+        } else {
+          router.replace('/(auth)' as any);
+        }
       }
     };
 

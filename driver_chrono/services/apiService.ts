@@ -79,7 +79,8 @@ class ApiService {
    */
   async ensureAccessToken(): Promise<{ token: string | null; reason?: 'missing' | 'refresh_failed' }> {
     try {
-      let { accessToken, refreshToken, setTokens, logout, hydrateTokens } = useDriverStore.getState();
+      let { accessToken, refreshToken, setTokensAndWait, logout, hydrateTokens } =
+        useDriverStore.getState();
 
       if (accessToken && this.isTokenValid(accessToken)) {
         return { token: accessToken };
@@ -118,8 +119,8 @@ class ApiService {
       const { token: newAccessToken, revoked } = await this.refreshPromise;
       this.refreshPromise = null;
 
-      if (newAccessToken) {
-        setTokens({ accessToken: newAccessToken, refreshToken });
+      if (newAccessToken && refreshToken) {
+        await setTokensAndWait({ accessToken: newAccessToken, refreshToken });
         logger.debug('Token rafraîchi et sauvegardé avec succès', 'apiService');
         return { token: newAccessToken };
       }

@@ -89,12 +89,17 @@ export const useAuthStore = create<AuthState>()(
 
       validateUser: async () => {
         const { user } = get();
-        if (!user?.email) {
-          return false;
+        if (!user?.id && !user?.email?.trim()) {
+          return null;
         }
 
+        const base = process.env.EXPO_PUBLIC_API_URL;
+        const url = user?.id
+          ? `${base}/api/auth-simple/check-by-id/${encodeURIComponent(user.id)}`
+          : `${base}/api/auth-simple/check/${encodeURIComponent(user.email!.trim())}`;
+
         try {
-          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth-simple/check/${encodeURIComponent(user.email)}`);
+          const response = await fetch(url);
           const data = await response.json();
 
           if (!response.ok) {

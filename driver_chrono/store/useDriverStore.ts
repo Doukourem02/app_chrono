@@ -151,12 +151,16 @@ export const useDriverStore = create<DriverStore>()(
 
       validateUserExists: async () => {
         const { user } = get();
-        if (!user?.email) {
-          return false;
+        if (!user?.id && !user?.email?.trim()) {
+          return null;
         }
 
+        const url = user?.id
+          ? `${config.apiUrl}/api/auth-simple/check-by-id/${encodeURIComponent(user.id)}`
+          : `${config.apiUrl}/api/auth-simple/check/${encodeURIComponent(user.email!.trim())}`;
+
         try {
-          const response = await fetch(`${config.apiUrl}/api/auth-simple/check/${encodeURIComponent(user.email)}`);
+          const response = await fetch(url);
           const data = await response.json();
 
           if (!response.ok) {
