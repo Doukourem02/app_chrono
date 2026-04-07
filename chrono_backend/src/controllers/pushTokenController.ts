@@ -19,6 +19,40 @@ function isValidExpoPushToken(token: string): boolean {
   return t.startsWith('ExponentPushToken[') || t.startsWith('ExpoPushToken[');
 }
 
+/** Code / détails pg même si l'erreur est enveloppée (cause, AggregateError). */
+function pickPgError(error: unknown): {
+  code?: string;
+  message?: string;
+  detail?: string;
+  constraint?: string;
+} {
+  const seen = new Set<unknown>();
+  const walk = (e: unknown): { code?: string; message?: string; detail?: string; constraint?: string } => {
+    if (!e || typeof e !== 'object' || seen.has(e)) return {};
+    seen.add(e);
+    const o = e as Record<string, unknown>;
+    const code = typeof o.code === 'string' ? o.code : undefined;
+    const message = typeof o.message === 'string' ? o.message : undefined;
+    const detail = typeof o.detail === 'string' ? o.detail : undefined;
+    const constraint = typeof o.constraint === 'string' ? o.constraint : undefined;
+    if (code && /^[0-9A-Z]{5}$/.test(code)) {
+      return { code, message, detail, constraint };
+    }
+    if (typeof o.cause !== 'undefined') {
+      const inner = walk(o.cause);
+      if (inner.code) return { ...inner, message: inner.message || message, detail: inner.detail || detail };
+    }
+    if (e instanceof AggregateError && Array.isArray(e.errors)) {
+      for (const sub of e.errors) {
+        const inner = walk(sub);
+        if (inner.code) return { ...inner, message: inner.message || message };
+      }
+    }
+    return { message, detail, constraint, code };
+  };
+  return walk(error);
+}
+
 /**
  * POST /api/push/register — enregistre ou met à jour un token Expo Push (JWT requis).
  * Body: { expoPushToken, platform: "ios"|"android", app: "client"|"driver", deviceId? }
@@ -107,8 +141,15 @@ export const registerPushToken = async (
 
     const row = result.rows[0];
     if (!row) {
-      logger.error('registerPushToken: INSERT sans ligne RETURNING');
-      res.status(500).json({ success: false, message: 'Erreur serveur' });
+      logger.error('registerPushToken: INSERT sans ligne RETURNING', {
+        userId: user.id,
+        rowCount: result.rowCount,
+      });
+      res.status(503).json({
+        success: false,
+        message:
+          'Insertion push_tokens sans ligne renvoyée. Souvent causé par RLS (Supabase) : autoriser SELECT/INSERT pour le rôle de DATABASE_URL, ou désactiver RLS sur push_tokens pour le backend.',
+      });
       return;
     }
 
@@ -127,12 +168,7 @@ export const registerPushToken = async (
       },
     });
   } catch (error: unknown) {
-    const err = error as {
-      code?: string;
-      message?: string;
-      detail?: string;
-      constraint?: string;
-    };
+    const err = pickPgError(error);
     logger.error('registerPushToken failed', {
       code: err.code,
       message: err.message,
@@ -168,6 +204,26 @@ export const registerPushToken = async (
       });
       return;
     }
-    res.status(500).json({ success: false, message: 'Erreur serveur' });
+    if (err.code === '23514') {
+      res.status(400).json({
+        success: false,
+        message: 'Données incohérentes avec les contraintes push_tokens (CHECK).',
+      });
+      return;
+    }
+    if (err.code === '22P02') {
+      res.status(400).json({
+        success: false,
+        message: 'Identifiant utilisateur invalide (UUID).',
+      });
+      return;
+    }
+
+    const exposeCode = process.env.EXPOSE_PUSH_REGISTER_PG_CODE === 'true' && err.code;
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      ...(exposeCode ? { pgCode: err.code } : {}),
+    });
   }
 };

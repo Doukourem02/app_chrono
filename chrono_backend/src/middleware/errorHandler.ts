@@ -22,6 +22,7 @@ interface JoiError extends Error {
 interface ErrorWithStatus extends Error {
   status?: number;
   statusCode?: number;
+  type?: string;
 }
 
 export const errorHandler = (
@@ -118,7 +119,24 @@ export const errorHandler = (
     });
     return;
   }
-  
+
+  // body-parser / express.json : JSON invalide — sinon en prod le client ne voit que « Erreur serveur » + 400
+  const errType = (err as ErrorWithStatus).type;
+  if (
+    err.name === 'SyntaxError' ||
+    errType === 'entity.parse.failed' ||
+    errType === 'charset.unsupported'
+  ) {
+    res.status(400).json({
+      success: false,
+      message:
+        errType === 'charset.unsupported'
+          ? 'Charset du corps de requête non supporté (utilisez UTF-8)'
+          : 'Corps JSON invalide ou mal formé',
+    });
+    return;
+  }
+
   statusCode = (err as AppError).statusCode || (err as ErrorWithStatus).status || 500;
   res.status(statusCode).json({
     success: false,

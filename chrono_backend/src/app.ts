@@ -31,13 +31,10 @@ import logger from './utils/logger.js';
 
 const app: Express = express();
 
-// Reverse proxy (Render, etc.) : X-Forwarded-For — requis pour express-rate-limit et req.ip.
-// Render ne met pas toujours NODE_ENV=production ; la variable RENDER=true est définie sur Render.
-const behindProxy =
-  process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
-if (behindProxy) {
-  app.set('trust proxy', 1);
-}
+// Toujours activer : Render / nginx envoient X-Forwarded-For ; sans ça express-rate-limit lève
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR. Les variables NODE_ENV/RENDER ne sont pas fiables sur tous les hébergeurs.
+app.set('trust proxy', 1);
+logger.info(`Express trust proxy = ${String(app.get('trust proxy'))}`);
 
 if (
   process.env.NODE_ENV === 'production' &&
