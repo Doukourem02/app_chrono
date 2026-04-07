@@ -338,7 +338,8 @@ class UserApiService {
    * Vérifie et rafraîchit le token d'accès si nécessaire.
    * Règle d'or : timeout / erreur réseau → JAMAIS de logout, on garde la session.
    */
-  async ensureAccessToken(): Promise<string | null> {
+  async ensureAccessToken(options?: { forceRefresh?: boolean }): Promise<string | null> {
+    const forceRefresh = options?.forceRefresh === true;
     try {
       let {
         accessToken,
@@ -349,6 +350,7 @@ class UserApiService {
       } = useAuthStore.getState();
 
       if (
+        !forceRefresh &&
         accessToken &&
         this.isTokenValid(accessToken) &&
         !this.isAccessTokenNearExpiry(accessToken)
@@ -680,47 +682,90 @@ class UserApiService {
     };
   }> {
     try {
-      const token = await this.ensureAccessToken();
+      let token = await this.ensureAccessToken();
       if (!token) {
         throw new Error('Session expirée. Veuillez vous reconnecter.');
       }
 
-      const response = await apiFetch(`${config.apiUrl}/api/auth-simple/users/${userId}/profile`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(profileData),
-      });
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await apiFetch(`${config.apiUrl}/api/auth-simple/users/${userId}/profile`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(profileData),
+        });
 
-      const result = await response.json().catch(() => null);
+        const result = await response.json().catch(() => null);
 
-      if (!response.ok) {
-        throw new Error(
-          parseApiErrorBody(
-            result,
-            response.status,
-            'Erreur lors de la mise à jour du profil'
-          )
-        );
+        if (!response.ok) {
+          const code =
+            result && typeof result === 'object'
+              ? (result as { code?: string }).code
+              : undefined;
+          if (response.status === 401 && code === 'TOKEN_EXPIRED' && attempt === 0) {
+            token = await this.ensureAccessToken({ forceRefresh: true });
+            if (!token) {
+              throw new Error('Session expirée. Veuillez vous reconnecter.');
+            }
+            continue;
+          }
+          throw new Error(
+            parseApiErrorBody(
+              result,
+              response.status,
+              'Erreur lors de la mise à jour du profil'
+            )
+          );
+        }
+
+        if (
+          result &&
+          typeof result === 'object' &&
+          (result as { success?: boolean }).success === false
+        ) {
+          throw new Error(
+            parseApiErrorBody(
+              result,
+              response.status,
+              'Impossible de mettre à jour le profil'
+            )
+          );
+        }
+
+        const ok =
+          result &&
+          typeof result === 'object' &&
+          (result as { success?: boolean }).success === true &&
+          (result as { data?: unknown }).data != null;
+        if (!ok) {
+          return {
+            success: false,
+            message: 'Réponse serveur inattendue. Réessayez dans un instant.',
+          };
+        }
+
+        return result as {
+          success: boolean;
+          message?: string;
+          data: {
+            id: string;
+            email: string;
+            phone: string | null;
+            first_name: string | null;
+            last_name: string | null;
+            role: string;
+            created_at: string;
+            updated_at: string;
+          };
+        };
       }
 
-      if (
-        result &&
-        typeof result === 'object' &&
-        (result as { success?: boolean }).success === false
-      ) {
-        throw new Error(
-          parseApiErrorBody(
-            result,
-            response.status,
-            'Impossible de mettre à jour le profil'
-          )
-        );
-      }
-
-      return result;
+      return {
+        success: false,
+        message: 'Impossible de mettre à jour le profil. Réessayez.',
+      };
     } catch (error) {
       logger.error('Erreur updateProfile:', 'userApiService', error);
       return {

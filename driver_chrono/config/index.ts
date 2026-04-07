@@ -43,6 +43,11 @@ export const config = {
   },
 };
 
+if (__DEV__) {
+  // À regarder dans le terminal Metro au lancement : doit être https://api.kro-no-delivery.com en prod réseau.
+  console.warn('[Krono dev] API =', config.apiUrl, '| Socket =', config.socketUrl);
+}
+
 // Validation des variables critiques
 if (!config.mapboxAccessToken) {
   logger.warn('⚠️ Mapbox access token not configured. Mapbox maps may not work in dev build.');

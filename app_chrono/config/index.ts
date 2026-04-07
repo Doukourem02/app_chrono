@@ -50,6 +50,10 @@ export const config = {
   },
 };
 
+if (__DEV__) {
+  console.warn('[Krono dev] API =', config.apiUrl, '| Socket =', config.socketUrl);
+}
+
 // Validation des variables critiques
 if (!config.mapboxAccessToken) {
   logger.warn('⚠️ Mapbox access token not configured. Mapbox maps may not work in dev build.');
