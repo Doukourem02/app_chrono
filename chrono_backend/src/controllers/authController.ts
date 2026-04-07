@@ -1291,13 +1291,56 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
       avatar_url: avatar_url !== undefined,
     });
 
+    const updatedUser = result.rows[0];
+
+    // Livreur : garder driver_profiles aligné (écran détail / carte utilise souvent cette table)
+    if (updatedUser && String(updatedUser.role) === 'driver') {
+      try {
+        const dpSets: string[] = [];
+        const dpVals: unknown[] = [];
+        let n = 1;
+        if (first_name !== undefined) {
+          dpSets.push(`first_name = $${n++}`);
+          dpVals.push(first_name || null);
+        }
+        if (last_name !== undefined) {
+          dpSets.push(`last_name = $${n++}`);
+          dpVals.push(last_name || null);
+        }
+        if (phone !== undefined) {
+          dpSets.push(`phone = $${n++}`);
+          dpVals.push(phone || null);
+        }
+        if (dpSets.length > 0) {
+          dpSets.push('updated_at = NOW()');
+          dpVals.push(userId);
+          await (pool as any).query(
+            `UPDATE driver_profiles SET ${dpSets.join(', ')} WHERE user_id = $${n}`,
+            dpVals
+          );
+        }
+      } catch (syncErr: any) {
+        logger.warn('Sync driver_profiles après mise à jour users (non bloquant):', syncErr?.message || syncErr);
+      }
+    }
+
     res.json({
       success: true,
       message: 'Profil mis à jour avec succès',
-      data: result.rows[0],
+      data: updatedUser,
     });
   } catch (error: any) {
     logger.error('Erreur mise à jour profil utilisateur:', error);
+    const code = error?.code as string | undefined;
+    if (code === '42703') {
+      res.status(503).json({
+        success: false,
+        message:
+          'Colonnes profil manquantes sur la table users. Exécuter la migration 024_users_name_avatar_columns.sql sur cette base.',
+        error: error.message,
+      });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la mise à jour du profil',

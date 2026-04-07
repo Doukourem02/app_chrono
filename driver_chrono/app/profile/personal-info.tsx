@@ -6,6 +6,7 @@ import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
 import { showUserFriendlyError } from '../../utils/errorFormatter';
+import { captureError } from '../../utils/sentry';
 
 export default function PersonalInfoPage() {
   const { user, profile } = useDriverStore();
@@ -75,13 +76,18 @@ export default function PersonalInfoPage() {
           { text: 'Fermer', onPress: () => router.back() },
         ]);
       } else {
-        // Afficher un message user-friendly (jamais les détails techniques)
-        showUserFriendlyError(new Error(result.message || 'Impossible de mettre à jour vos informations'), 'mise à jour de vos informations');
+        const msg = result.message || 'Impossible de mettre à jour vos informations';
+        // warn : visible sur l’appareil (Console Xcode / macOS) même en prod — error est désactivé en prod dans logger
+        logger.warn('[personal-info] updateProfile API success:false', undefined, { userId: user.id, message: msg });
+        captureError(new Error(msg), { screen: 'personal-info', userId: user.id, source: 'updateProfile_result' });
+        showUserFriendlyError(new Error(msg), 'mise à jour de vos informations');
       }
     } catch (error) {
-      // Logger l'erreur technique (pour les développeurs, pas visible à l'utilisateur)
-      logger.error('Erreur mise à jour profil:', undefined, error);
-      // Afficher un message user-friendly (jamais les détails techniques)
+      logger.warn('[personal-info] updateProfile exception', undefined, error);
+      captureError(
+        error instanceof Error ? error : new Error(String(error)),
+        { screen: 'personal-info', userId: user?.id, source: 'updateProfile_catch' }
+      );
       showUserFriendlyError(error, 'mise à jour de vos informations');
     } finally {
       setIsLoading(false);

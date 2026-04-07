@@ -121,6 +121,20 @@ export function formatErrorForUser(error: unknown, context?: string): {
         message: 'La ressource demandée n\'a pas été trouvée. Veuillez réessayer.',
       };
     }
+
+    // Schéma DB : colonnes users manquantes (migration 024)
+    if (
+      errorMessage.includes('migration 024') ||
+      errorMessage.includes('colonnes profil manquantes')
+    ) {
+      return {
+        title: 'Mise à jour serveur requise',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'La base de données doit être mise à jour. Réessayez après le déploiement ou contactez le support.',
+      };
+    }
   }
 
   // Erreur inconnue - message générique
