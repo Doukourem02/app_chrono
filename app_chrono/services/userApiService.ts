@@ -321,6 +321,19 @@ class UserApiService {
     }
   }
 
+  /** Rafraîchir avant expiration si moins de marginSeconds restantes (JWT court côté API). */
+  private isAccessTokenNearExpiry(token: string, marginSeconds = 180): boolean {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return true;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.exp) return false;
+      return Date.now() > payload.exp * 1000 - marginSeconds * 1000;
+    } catch {
+      return true;
+    }
+  }
+
   /**
    * Vérifie et rafraîchit le token d'accès si nécessaire.
    * Règle d'or : timeout / erreur réseau → JAMAIS de logout, on garde la session.
@@ -335,7 +348,11 @@ class UserApiService {
         hydrateTokens,
       } = useAuthStore.getState();
 
-      if (accessToken && this.isTokenValid(accessToken)) {
+      if (
+        accessToken &&
+        this.isTokenValid(accessToken) &&
+        !this.isAccessTokenNearExpiry(accessToken)
+      ) {
         return accessToken;
       }
 

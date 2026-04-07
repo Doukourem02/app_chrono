@@ -4,6 +4,7 @@ import { Message, Conversation } from './driverMessageService';
 import { config } from '../config/index';
 import { useDriverStore } from '../store/useDriverStore';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
+import { apiService } from './apiService';
 
 const SOCKET_URL = config.socketUrl || 'http://localhost:4000';
 
@@ -12,36 +13,58 @@ class DriverMessageSocketService {
   private driverId: string | null = null;
   private isConnected = false;
   private lastSocketAuthToken: string | null = null;
+  private connectGeneration = 0;
   private messageCallbacks: ((message: Message, conversation: Conversation) => void)[] = [];
   private typingCallbacks: ((data: { userId: string; isTyping: boolean }) => void)[] = [];
 
   connect(driverId: string) {
-    // Si le socket est déjà connecté avec le même driverId, ne rien faire
     if (this.socket && this.isConnected && this.socket.connected && this.driverId === driverId) {
       return;
     }
+    this.connectGeneration += 1;
+    const gen = this.connectGeneration;
+    void this.establishSocket(driverId, gen);
+  }
 
-    // Nettoyer l'ancien socket s'il existe
+  private async establishSocket(driverId: string, gen: number) {
+    const tokenResult = await apiService.ensureAccessToken();
+    if (gen !== this.connectGeneration) {
+      return;
+    }
+    const token = tokenResult.token;
+    if (!token) {
+      logger.warn(
+        'Socket messagerie: pas de jeton après ensureAccessToken',
+        'driverMessageSocketService'
+      );
+      return;
+    }
+
     if (this.socket) {
-      logger.info('Nettoyage de l\'ancien socket', 'driverMessageSocketService');
-      this.socket.removeAllListeners();
-      this.socket.disconnect();
+      try {
+        logger.info("Nettoyage de l'ancien socket", 'driverMessageSocketService');
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch {
+        /* ignore */
+      }
       this.socket = null;
     }
 
-    this.driverId = driverId;
-    const token = useDriverStore.getState().accessToken;
-    if (!token) {
-      logger.warn('Impossible de connecter le socket de messagerie: accessToken manquant', 'driverMessageSocketService');
+    if (gen !== this.connectGeneration) {
       return;
     }
+
+    this.driverId = driverId;
     this.lastSocketAuthToken = token;
+    this.isConnected = false;
+
     this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 24,
       timeout: 20000,
       forceNew: false,
       upgrade: true,
@@ -60,7 +83,6 @@ class DriverMessageSocketService {
       useRealtimeDegradedStore.getState().setMessagesSocketDegraded(false);
       logger.info('🔌 Socket connecté pour messagerie', 'driverMessageSocketService');
       this.isConnected = true;
-      // S'identifier comme driver
       this.socket?.emit('driver-connect', driverId);
     });
 
@@ -71,23 +93,22 @@ class DriverMessageSocketService {
 
     this.socket.on('connect_error', (error) => {
       this.isConnected = false;
-      // Ignorer les erreurs de polling temporaires et WebSocket
-      const isTemporaryPollError = error.message?.includes('xhr poll error') || 
-                                   error.message?.includes('poll error') ||
-                                   error.message?.includes('transport unknown') ||
-                                   error.message?.includes('websocket error') ||
-                                   (error as any).type === 'TransportError';
-      
-      // Ne logger que les erreurs non-temporaires (après plusieurs tentatives)
-      // Ignorer les erreurs si le backend est simplement inaccessible
-      if (!isTemporaryPollError) {
-        // Logger seulement en mode debug ou après plusieurs tentatives
-        if (__DEV__) {
-          logger.debug('Erreur connexion socket messagerie (tentative de reconnexion en cours)', 'driverMessageSocketService', {
+      const isTemporaryPollError =
+        error.message?.includes('xhr poll error') ||
+        error.message?.includes('poll error') ||
+        error.message?.includes('transport unknown') ||
+        error.message?.includes('websocket error') ||
+        (error as any).type === 'TransportError';
+
+      if (!isTemporaryPollError && __DEV__) {
+        logger.debug(
+          'Erreur connexion socket messagerie (tentative de reconnexion en cours)',
+          'driverMessageSocketService',
+          {
             message: error.message,
             type: (error as any).type,
-          });
-        }
+          }
+        );
       }
     });
 
@@ -115,6 +136,7 @@ class DriverMessageSocketService {
   }
 
   disconnect() {
+    this.connectGeneration += 1;
     useRealtimeDegradedStore.getState().setMessagesSocketDegraded(false);
     if (this.socket) {
       this.socket.disconnect();

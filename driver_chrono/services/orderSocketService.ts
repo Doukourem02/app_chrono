@@ -14,34 +14,67 @@ class OrderSocketService {
   private isConnected = false;
   private lastSocketAuthToken: string | null = null;
   private retryCount = 0;
+  /** Incrémenté à chaque nouveau connect/disconnect pour ignorer les establishSocket obsolètes. */
+  private connectGeneration = 0;
 
   connect(driverId: string) {
-    // Si le socket est déjà connecté avec le même driverId, ne rien faire
-    if (this.socket && this.isConnected && this.socket.connected && this.driverId === driverId) {
+    if (
+      this.socket &&
+      this.isConnected &&
+      this.socket.connected &&
+      this.driverId === driverId
+    ) {
+      return;
+    }
+    this.connectGeneration += 1;
+    const gen = this.connectGeneration;
+    void this.establishSocket(driverId, gen);
+  }
+
+  /**
+   * Rafraîchit le JWT puis ouvre le socket (évite handshake avec accessToken expiré
+   * et reconnexions Socket.IO qui réutilisent un auth périmé).
+   */
+  private async establishSocket(driverId: string, gen: number) {
+    const tokenResult = await apiService.ensureAccessToken();
+    if (gen !== this.connectGeneration) {
+      return;
+    }
+    const token = tokenResult.token;
+    if (!token) {
+      logger.warn(
+        'Socket commandes: pas de jeton après ensureAccessToken (réseau ou session)',
+        'orderSocketService'
+      );
       return;
     }
 
-    // Nettoyer l'ancien socket s'il existe
     if (this.socket) {
-      logger.info('Nettoyage de l\'ancien socket', undefined);
-      this.socket.removeAllListeners();
-      this.socket.disconnect();
+      try {
+        logger.info("Nettoyage de l'ancien socket", undefined);
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch {
+        /* ignore */
+      }
       this.socket = null;
     }
 
-    this.driverId = driverId;
-    const token = useDriverStore.getState().accessToken;
-    if (!token) {
-      logger.warn('Impossible de connecter le socket: accessToken manquant', undefined);
+    if (gen !== this.connectGeneration) {
       return;
     }
+
+    this.driverId = driverId;
     this.lastSocketAuthToken = token;
+    this.retryCount = 0;
+    this.isConnected = false;
+
     this.socket = io(config.socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 24,
       timeout: 20000,
       forceNew: false,
       upgrade: true,
@@ -56,8 +89,6 @@ class OrderSocketService {
       useRealtimeDegradedStore.getState().setOrdersSocketDegraded(true);
     });
 
-    // CRITIQUE : Installer TOUS les listeners AVANT le connect
-    // Cela garantit que les événements sont capturés dès la connexion
     this.setupAllListeners(driverId);
     this.setupConnectionErrorHandler();
 
@@ -65,15 +96,12 @@ class OrderSocketService {
       useRealtimeDegradedStore.getState().setOrdersSocketDegraded(false);
       logger.info('Socket connecté pour commandes');
       this.isConnected = true;
-      this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
+      this.retryCount = 0;
 
-      // Réinstaller les listeners après reconnexion pour garantir qu'ils sont actifs
       this.setupAllListeners(driverId);
 
-      // S'identifier comme driver
       logger.info('Identification comme driver', undefined, { driverId });
       this.socket?.emit('driver-connect', driverId);
-      // Demander au serveur de resynchroniser les commandes en attente pour ce driver
       try {
         this.socket?.emit('driver-reconnect', { driverId });
       } catch (err) {
@@ -85,8 +113,6 @@ class OrderSocketService {
       logger.info('Socket déconnecté', undefined, { reason });
       this.isConnected = false;
 
-      // Laisser Socket.IO gérer la reconnexion automatique
-      // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
       if (reason === 'io server disconnect') {
         logger.info('Le serveur a forcé la déconnexion, reconnexion automatique...', undefined);
       }
@@ -355,6 +381,7 @@ class OrderSocketService {
   }
 
   disconnect() {
+    this.connectGeneration += 1;
     useRealtimeDegradedStore.getState().setOrdersSocketDegraded(false);
     if (this.socket) {
       this.socket.disconnect();

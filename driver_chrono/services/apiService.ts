@@ -47,14 +47,14 @@ class ApiService {
         const expirationTime = payload.exp * 1000; // Convertir en millisecondes
         const now = Date.now();
         const isExpired = now >= expirationTime;
-        
+
         if (isExpired) {
           if (__DEV__) {
             logger.debug('Token expiré, expiration:', 'apiService', new Date(expirationTime).toISOString());
           }
           return false;
         }
-        
+
         // Token valide si pas expiré
         return true;
       }
@@ -74,6 +74,23 @@ class ApiService {
   }
 
   /**
+   * Moins de `marginSeconds` avant expiration : forcer un refresh pour Socket.IO / API
+   * (le client Socket garde le même objet `auth` aux reconnexions — JWT court = échecs en chaîne).
+   */
+  private isAccessTokenNearExpiry(token: string, marginSeconds = 180): boolean {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return true;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.exp) return false;
+      const expMs = payload.exp * 1000;
+      return Date.now() > expMs - marginSeconds * 1000;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
    * Vérifie et rafraîchit le token d'accès si nécessaire.
    * Règle d'or : timeout / erreur réseau → JAMAIS de logout.
    */
@@ -82,7 +99,11 @@ class ApiService {
       let { accessToken, refreshToken, setTokensAndWait, logout, hydrateTokens } =
         useDriverStore.getState();
 
-      if (accessToken && this.isTokenValid(accessToken)) {
+      if (
+        accessToken &&
+        this.isTokenValid(accessToken) &&
+        !this.isAccessTokenNearExpiry(accessToken)
+      ) {
         return { token: accessToken };
       }
 
