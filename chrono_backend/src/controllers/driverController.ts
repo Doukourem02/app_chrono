@@ -267,7 +267,25 @@ export const getDriverRevenues = async (req: Request, res: Response): Promise<vo
     logger.debug('Colonne de prix trouvée:', priceColumn);
 
     if (!priceColumn) {
-      throw new Error("La colonne 'price' (ou 'price_cfa') est absente de la table orders. Exécutez les migrations.");
+      logger.warn(
+        "getDriverRevenues: colonne price / price_cfa absente sur orders — retour zéros (exécuter les migrations)."
+      );
+      res.json({
+        success: true,
+        data: {
+          period,
+          totalEarnings: 0,
+          totalDeliveries: 0,
+          totalDistance: 0,
+          averageEarningPerDelivery: 0,
+          averageDistance: 0,
+          earningsByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+          deliveriesByMethod: { moto: 0, vehicule: 0, cargo: 0 },
+          earningsByDay: {},
+          orders: [],
+        },
+      });
+      return;
     }
 
     const distanceColumn = columnSet.has('distance_km') ? 'distance_km' : columnSet.has('distance') ? 'distance' : null;
