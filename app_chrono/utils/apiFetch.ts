@@ -45,7 +45,28 @@ export function getApiFetchUserMessage(e: unknown): string {
   if (e instanceof Error && e.name === "AbortError") {
     return "La requête a été interrompue.";
   }
+  if (
+    e instanceof Error &&
+    typeof e.message === "string" &&
+    isSystemNetworkErrorMessage(e.message)
+  ) {
+    return "Impossible de joindre le serveur (réseau injoignable). Essayez le Wi‑Fi ou réessayez plus tard.";
+  }
   return "Impossible de joindre le serveur. Vérifiez votre connexion.";
+}
+
+/** Erreurs bas niveau (Node / iOS) : pas un message métier API. */
+function isSystemNetworkErrorMessage(msg: string): boolean {
+  const m = msg.toUpperCase();
+  return (
+    m.includes("ENETUNREACH") ||
+    m.includes("EHOSTUNREACH") ||
+    m.includes("ECONNREFUSED") ||
+    m.includes("ECONNRESET") ||
+    m.includes("ETIMEDOUT") ||
+    m.includes("ENOTFOUND") ||
+    m.includes("NETWORK IS UNREACHABLE")
+  );
 }
 
 /** Message à afficher : transport (timeout / réseau) ou message métier `Error`. */
@@ -58,7 +79,12 @@ export function transportOrErrorMessage(error: unknown, fallback: string): strin
   ) {
     return getApiFetchUserMessage(error);
   }
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error && typeof error.message === "string") {
+    if (isSystemNetworkErrorMessage(error.message)) {
+      return "Impossible de joindre le serveur (réseau injoignable). Essayez le Wi‑Fi ou réessayez plus tard.";
+    }
+    return error.message;
+  }
   return fallback;
 }
 
