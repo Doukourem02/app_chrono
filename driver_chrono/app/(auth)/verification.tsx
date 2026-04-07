@@ -12,7 +12,7 @@ export default function VerificationScreen() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
-  const { setUser, setProfile, setTokens } = useDriverStore();
+  const { setUser, setProfile, setTokensAndWait } = useDriverStore();
   const { email, phoneNumber, otpMethod, setIsNewUser } = useTempDriverStore();
 
   const handleCodeChange = (text: string, index: number) => {
@@ -85,7 +85,7 @@ export default function VerificationScreen() {
       }
 
       if (data.data.tokens && data.data.tokens.accessToken && data.data.tokens.refreshToken) {
-        setTokens({
+        await setTokensAndWait({
           accessToken: data.data.tokens.accessToken,
           refreshToken: data.data.tokens.refreshToken
         });

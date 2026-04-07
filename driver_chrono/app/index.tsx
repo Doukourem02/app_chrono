@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
 import { apiService } from "../services/apiService";
 import { logger } from "../utils/logger";
+import { tryRestoreDriverSessionFromRefresh } from "../utils/restoreDriverSession";
 
 export default function RootIndex() {
   const { validateUserExists, logout, hydrateTokens } = useDriverStore();
@@ -14,8 +15,16 @@ export default function RootIndex() {
     const checkSession = async () => {
       // Charger le refresh token depuis SecureStore AVANT tout check (comme app_chrono)
       await hydrateTokens();
-      const state = useDriverStore.getState();
-      const { isAuthenticated: auth, user: u, profile: p } = state;
+      let state = useDriverStore.getState();
+      let { isAuthenticated: auth, user: u, profile: p } = state;
+
+      if ((!auth || !u) && state.refreshToken) {
+        await tryRestoreDriverSessionFromRefresh();
+        state = useDriverStore.getState();
+        auth = state.isAuthenticated;
+        u = state.user;
+        p = state.profile;
+      }
 
       if (auth && u) {
         let tokenResult: { token: string | null } = { token: null };
@@ -82,7 +91,12 @@ export default function RootIndex() {
           router.replace("/(auth)" as any);
         }
       } else {
-        router.replace("/(auth)" as any);
+        const rt = useDriverStore.getState().refreshToken;
+        if (rt) {
+          router.replace("/(tabs)" as any);
+        } else {
+          router.replace("/(auth)" as any);
+        }
       }
     };
 

@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { userApiService } from '../services/userApiService';
 import { logger } from '../utils/logger';
+import { tryRestoreAuthSessionFromRefresh } from '../utils/restoreAuthSession';
 
 export default function RootIndex() {
   const { validateUser, logout, hydrateTokens } = useAuthStore();
@@ -13,8 +14,16 @@ export default function RootIndex() {
 
     const checkSession = async () => {
       await hydrateTokens();
-      const state = useAuthStore.getState();
-      const { isAuthenticated: auth, user: u } = state;
+      let state = useAuthStore.getState();
+      let { isAuthenticated: auth, user: u } = state;
+
+      // Refresh en SecureStore mais user pas encore/chargé depuis AsyncStorage → restaurer via API
+      if ((!auth || !u) && state.refreshToken) {
+        await tryRestoreAuthSessionFromRefresh();
+        state = useAuthStore.getState();
+        auth = state.isAuthenticated;
+        u = state.user;
+      }
 
       if (auth && u) {
         let token: string | null = null;

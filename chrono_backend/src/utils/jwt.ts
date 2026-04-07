@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import pool from '../config/db.js';
 import logger from './logger.js';
 import { JWTPayload, User } from '../types/index.js';
@@ -21,8 +21,14 @@ if (JWT_SECRET_ENV.length < 32) {
 
 
 const JWT_SECRET: string = JWT_SECRET_ENV;
-const JWT_EXPIRES_IN = '15m'; // 15 minutes - évite les déconnexions après courte inactivité
-const REFRESH_EXPIRES_IN = '7d'; // 7 jours
+const JWT_EXPIRES_IN = '15m'; // 15 minutes — court volontairement si le jeton fuit
+
+/**
+ * Refresh token : longue durée pour coller au comportement « rester connecté tant que je ne me déconnecte pas ».
+ * La déconnexion dans l'app efface les tokens en local ; une révocation serveur fine = évolution future (blacklist / table sessions).
+ * Surcharge optionnelle : variable d'environnement JWT_REFRESH_EXPIRES_IN (syntaxe jsonwebtoken, ex. 365d, 2y).
+ */
+const REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '3650d') as SignOptions['expiresIn'];
 
 
 export function generateTokens(

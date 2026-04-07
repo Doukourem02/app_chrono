@@ -15,8 +15,8 @@
 
 **Session (client Krono)**  
 - Login → **Home** (app en arrière‑plan) → rouvrir → **toujours connecté**.  
-- Login → **tuer l’app** → relancer → **toujours connecté** si le refresh est encore valide.  
-- Si déconnexion : **volontaire** (refresh expiré, compte révoqué) ou **bug** — noter la date du build.
+- Login → **tuer l’app** → relancer → **toujours connecté** tant que le refresh JWT est valide (défaut backend ~10 ans sans variable d’env).  
+- Si déconnexion : **volontaire** (bouton déconnexion, réinstall, effacement données), **refresh expiré** (rare : durée longue côté `jwt.ts` / `JWT_REFRESH_EXPIRES_IN`), ou **bug** — noter la date du build.
 
 **Session (livreur Krono pro)**  
 - **Mêmes scénarios** que le client.

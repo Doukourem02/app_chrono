@@ -54,6 +54,8 @@ interface DriverStore {
   setUser: (user: DriverUser) => void;
   setProfile: (profile: DriverProfile) => void;
   setTokens: (tokens: { accessToken: string; refreshToken: string }) => void;
+  /** Comme app_chrono : attendre SecureStore avant navigation (évite session perdue si l’app se ferme tout de suite). */
+  setTokensAndWait: (tokens: { accessToken: string; refreshToken: string }) => Promise<void>;
   logout: () => void;
   validateUserExists: () => Promise<boolean | 'not_found' | null>;
   hydrateTokens: () => Promise<void>;
@@ -108,6 +110,14 @@ export const useDriverStore = create<DriverStore>()(
 
       setTokens: (tokens) => {
         setRefreshToken(tokens.refreshToken).catch(() => {});
+        set({
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken
+        });
+      },
+
+      setTokensAndWait: async (tokens) => {
+        await setRefreshToken(tokens.refreshToken);
         set({
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken

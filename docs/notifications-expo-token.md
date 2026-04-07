@@ -14,6 +14,27 @@
 
 ---
 
+## État — pause et priorité n°1 à la reprise
+
+**Dernière mise à jour de cette section** : avril 2026.
+
+**Où on s’est arrêté** : travail mis en **pause** après mise en place côté **chrono_backend** de la table `push_tokens` (migration **023**), de la route **`POST /api/push/register`** (JWT, upsert par `expo_push_token`), et de correctifs **Render** (`trust proxy` pour `express-rate-limit`, messages d’erreur plus clairs dont **`errCode`** sur certains 500). La doc et les apps **n’ont pas encore** l’enregistrement automatique du token après login (`app_chrono` / `driver_chrono`).
+
+**Priorité n°1 si on revient sur ce sujet** : faire **fonctionner de bout en bout** l’enregistrement du token en **production** (avant d’enchaîner sur l’envoi Expo côté backend ou le branchement complet des apps).
+
+À ce stade, **`POST /api/push/register`** vers l’API déployée pouvait encore répondre **500** (« Erreur serveur ») **alors que** le JWT et le JSON étaient corrects (notamment : token Bearer **sans retour à la ligne** dans le shell). Ce blocage est la **première chose à lever** :
+
+| À vérifier (même base que `DATABASE_URL` sur Render) | Pourquoi |
+|-----------------------------------------------------|----------|
+| `SELECT id, role FROM users WHERE id = '<uuid du JWT>'` retourne **une ligne** | Sinon **clé étrangère** vers `push_tokens` → échec insert (**23503**) |
+| Migration **023** appliquée, table **`push_tokens`** existe | Sinon table absente (**42P01**) |
+| **RLS** (Supabase) sur `push_tokens` : le rôle du pool peut **INSERT** et les lignes sont visibles pour **`RETURNING`**, ou politiques adaptées | Sinon insert « réussi » mais **0 ligne** renvoyée à l’API |
+| Backend **dernier commit** déployé (logs : `registerPushToken failed`, champ **`errCode`** dans le JSON si présent) | Pour identifier la cause exacte sans deviner |
+
+**Note** : `SELECT COUNT(*) FROM push_tokens` à **0** est **normal** tant qu’aucun enregistrement n’a réussi ; ce qui bloque est souvent **l’absence de l’utilisateur dans `users`** ou **RLS / droits**, pas une table « vide ».
+
+---
+
 ## 1. Pourquoi Expo Push (et pas APNs/FCM « à la main » dans l’app)
 
 - L’app obtient un **`ExpoPushToken`** via `expo-notifications`.
