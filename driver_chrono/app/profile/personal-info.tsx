@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
-import { showUserFriendlyError } from '../../utils/errorFormatter';
 import { captureError } from '../../utils/sentry';
 
 export default function PersonalInfoPage() {
@@ -77,10 +76,9 @@ export default function PersonalInfoPage() {
         ]);
       } else {
         const msg = result.message || 'Impossible de mettre à jour vos informations';
-        // warn : visible sur l’appareil (Console Xcode / macOS) même en prod — error est désactivé en prod dans logger
         logger.warn('[personal-info] updateProfile API success:false', undefined, { userId: user.id, message: msg });
         captureError(new Error(msg), { screen: 'personal-info', userId: user.id, source: 'updateProfile_result' });
-        showUserFriendlyError(new Error(msg), 'mise à jour de vos informations');
+        Alert.alert('Impossible d’enregistrer', msg);
       }
     } catch (error) {
       logger.warn('[personal-info] updateProfile exception', undefined, error);
@@ -88,7 +86,9 @@ export default function PersonalInfoPage() {
         error instanceof Error ? error : new Error(String(error)),
         { screen: 'personal-info', userId: user?.id, source: 'updateProfile_catch' }
       );
-      showUserFriendlyError(error, 'mise à jour de vos informations');
+      const errMsg =
+        error instanceof Error ? error.message : 'Impossible de mettre à jour vos informations';
+      Alert.alert('Impossible d’enregistrer', errMsg);
     } finally {
       setIsLoading(false);
     }

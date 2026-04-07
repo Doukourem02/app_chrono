@@ -1,7 +1,7 @@
 // Service API pour l'application utilisateur
 import { config } from '../config';
 import { useAuthStore } from '../store/useAuthStore';
-import { apiFetch, getApiFetchUserMessage, transportOrErrorMessage } from '../utils/apiFetch';
+import { apiFetch, getApiFetchUserMessage, transportOrErrorMessage, parseApiErrorBody } from '../utils/apiFetch';
 import { logger } from '../utils/logger';
 
 /** Erreurs réseau/serveur : JAMAIS de logout, retry possible */
@@ -677,10 +677,30 @@ class UserApiService {
         body: JSON.stringify(profileData),
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(result.message || 'Erreur lors de la mise à jour du profil');
+        throw new Error(
+          parseApiErrorBody(
+            result,
+            response.status,
+            'Erreur lors de la mise à jour du profil'
+          )
+        );
+      }
+
+      if (
+        result &&
+        typeof result === 'object' &&
+        (result as { success?: boolean }).success === false
+      ) {
+        throw new Error(
+          parseApiErrorBody(
+            result,
+            response.status,
+            'Impossible de mettre à jour le profil'
+          )
+        );
       }
 
       return result;

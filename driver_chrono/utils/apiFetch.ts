@@ -62,6 +62,22 @@ export function transportOrErrorMessage(error: unknown, fallback: string): strin
   return fallback;
 }
 
+/** Message métier depuis le corps JSON d’une erreur HTTP (`message` ou `error`). */
+export function parseApiErrorBody(
+  body: unknown,
+  httpStatus: number,
+  fallback: string
+): string {
+  if (body && typeof body === "object") {
+    const r = body as Record<string, unknown>;
+    const m = r.message;
+    const e = r.error;
+    if (typeof m === "string" && m.trim()) return m.trim();
+    if (typeof e === "string" && e.trim()) return e.trim();
+  }
+  return fallback || `Erreur serveur (${httpStatus})`;
+}
+
 /**
  * fetch avec timeout et retries sur erreurs réseau / timeout / HTTP transitoires.
  * Ne pas utiliser avec un body non rejouable (ex. POST idempotent seulement avec prudence).

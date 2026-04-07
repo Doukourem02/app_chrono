@@ -1446,6 +1446,16 @@ export const getUserProfile = async (req: Request, res: Response): Promise<void>
     });
   } catch (error: any) {
     logger.error('Erreur récupération profil utilisateur:', error);
+    const code = error?.code as string | undefined;
+    if (code === '42703') {
+      res.status(503).json({
+        success: false,
+        message:
+          'Colonnes profil manquantes sur la table users. Exécuter la migration 024_users_name_avatar_columns.sql sur cette base.',
+        error: error.message,
+      });
+      return;
+    }
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération du profil',

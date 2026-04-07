@@ -125,7 +125,9 @@ export function formatErrorForUser(error: unknown, context?: string): {
     // Schéma DB : colonnes users manquantes (migration 024)
     if (
       errorMessage.includes('migration 024') ||
-      errorMessage.includes('colonnes profil manquantes')
+      errorMessage.includes('colonnes profil manquantes') ||
+      errorMessage.includes('table users') ||
+      errorMessage.includes('42703')
     ) {
       return {
         title: 'Mise à jour serveur requise',

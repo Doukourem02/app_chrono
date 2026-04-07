@@ -2,7 +2,7 @@
 import { useDriverStore } from '../store/useDriverStore';
 import { config } from '../config/index';
 import { logger } from '../utils/logger';
-import {apiFetch,isApiTimeoutError,getApiFetchUserMessage,transportOrErrorMessage,} from '../utils/apiFetch';
+import {apiFetch,isApiTimeoutError,getApiFetchUserMessage,transportOrErrorMessage,parseApiErrorBody,} from '../utils/apiFetch';
 
 const API_BASE_URL = config.apiUrl;
 
@@ -846,10 +846,30 @@ class ApiService {
         body: JSON.stringify(profileData),
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(result.message || 'Erreur lors de la mise à jour du profil');
+        throw new Error(
+          parseApiErrorBody(
+            result,
+            response.status,
+            'Erreur lors de la mise à jour du profil'
+          )
+        );
+      }
+
+      if (
+        result &&
+        typeof result === 'object' &&
+        (result as { success?: boolean }).success === false
+      ) {
+        throw new Error(
+          parseApiErrorBody(
+            result,
+            response.status,
+            'Impossible de mettre à jour le profil'
+          )
+        );
       }
 
       return result;
