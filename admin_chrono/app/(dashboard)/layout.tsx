@@ -109,6 +109,7 @@ export default function DashboardLayout({
           alignItems: "center",
           justifyContent: "center",
           gap: "16px",
+          backgroundColor: "var(--background)",
         }}
       >
         <SkeletonLoader width={200} height={40} borderRadius={8} />
@@ -117,7 +118,24 @@ export default function DashboardLayout({
     );
   }
 
-  if (!user) return null;
+  // Ne jamais retourner null : pendant router.push("/login") l’écran restait blanc (WebView / Safari).
+  if (!user) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "var(--background)",
+        }}
+      >
+        <span style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+          Redirection vers la connexion…
+        </span>
+      </div>
+    );
+  }
 
   const containerStyle: React.CSSProperties = {
     display: "flex",
