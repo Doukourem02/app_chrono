@@ -14,9 +14,29 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://admin.kro-no-delivery.com");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Krono Admin Console",
   description: "Console d'administration Krono Livraison",
+  manifest: "/site.webmanifest",
+  themeColor: "#0F172A",
+  appleWebApp: {
+    capable: true,
+    title: "Krono Admin Console",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.png", type: "image/png", sizes: "512x512" },
+      { url: "/assets/chrono.png", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
   openGraph: {
     title: "Krono Admin Console",
     description: "Console d'administration Krono Livraison",

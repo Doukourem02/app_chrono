@@ -41,6 +41,17 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
+  // Les navigateurs demandent souvent /favicon.ico en premier ; on sert le logo Krono
+  async redirects() {
+    return [
+      {
+        source: "/favicon.ico",
+        destination: "/assets/chrono.png",
+        permanent: false,
+      },
+    ];
+  },
   
   // Développement sur LAN : aligner avec scripts/set-local-ip.js → NEXT_PUBLIC_DEV_ORIGIN
   ...(process.env.NODE_ENV === 'development' && {

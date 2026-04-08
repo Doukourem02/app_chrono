@@ -1,0 +1,23 @@
+{
+  "name": "Krono Admin Console",
+  "short_name": "Krono Admin",
+  "description": "Console d'administration Krono Livraison",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#8B5CF6",
+  "icons": [
+    {
+      "src": "/assets/chrono.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
