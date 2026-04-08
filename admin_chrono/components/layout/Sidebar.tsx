@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,CarFront,Wrench,Shield,Sliders,} from "lucide-react";
 import Image from "next/image";
-import logoImage from "@/assets/logo.png";
+import logoImage from "@/assets/chrono.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuthStore } from "@/stores/authStore";

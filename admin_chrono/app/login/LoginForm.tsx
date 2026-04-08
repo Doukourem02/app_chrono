@@ -238,7 +238,7 @@ export default function LoginForm() {
         <div style={headerStyle}>
           <div style={logoContainerStyle}>
             <Image
-              src="/assets/logo.png"
+              src="/assets/chrono.png"
               alt="Chrono Admin Logo"
               width={120}
               height={120}

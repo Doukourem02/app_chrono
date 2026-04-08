@@ -107,14 +107,14 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
   }
 
   const hasErrors = healthStatus.checks.database.status === 'error' && healthStatus.checks.supabase.status === 'error';
-  
+
   if (hasErrors) {
     healthStatus.status = 'unhealthy';
   } else if (
     healthStatus.checks.database.status === 'error' ||
-    healthStatus.checks.supabase.status === 'error' ||
-    healthStatus.checks.memory.status === 'warning'
+    healthStatus.checks.supabase.status === 'error'
   ) {
+    // Dégradé seulement si un service critique échoue — pas à cause du heap Node (souvent volatil).
     healthStatus.status = 'degraded';
   }
 
