@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chrono Admin Console",
-  description: "Console d'administration Chrono Livraison",
+  title: "Krono Admin Console",
+  description: "Console d'administration Krono Livraison",
 };
 
 export default function RootLayout({

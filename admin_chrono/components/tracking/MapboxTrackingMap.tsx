@@ -20,7 +20,7 @@ const MAPBOX_GEOCODE_URL = 'https://api.mapbox.com/search/geocode/v6/forward'
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 
 const NOMINATIM_HEADERS: HeadersInit = {
-  'User-Agent': 'ChronoLivraison/1.0 (admin-map-search)',
+  'User-Agent': 'KronoLivraison/1.0 (admin-map-search)',
 }
 
 /** Parse coordonnées GPS : "5.36, -4.0083" | "5.36 -4" | "-4.0083, 5.36" */

@@ -80,7 +80,7 @@ export default function TrackPage() {
     return (
       <div style={styles.container}>
         <div style={styles.card}>
-          <h1 style={styles.title}>Suivi Chrono</h1>
+          <h1 style={styles.title}>Suivi Krono</h1>
           <p style={styles.errorText}>{error || 'Commande introuvable'}</p>
         </div>
       </div>

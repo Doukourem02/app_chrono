@@ -85,16 +85,18 @@ export default function LoginForm() {
 
   const headerStyle: React.CSSProperties = {
     textAlign: 'center',
-    marginBottom: '32px',
+    marginBottom: '24px',
   }
+
+  const logoSize = 72
 
   const logoContainerStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    margin: '0 auto 16px',
-    width: '120px',
-    height: '120px',
+    margin: '0 auto 12px',
+    width: logoSize,
+    height: logoSize,
     position: 'relative',
   }
 
@@ -239,16 +241,19 @@ export default function LoginForm() {
           <div style={logoContainerStyle}>
             <Image
               src="/assets/chrono.png"
-              alt="Chrono Admin Logo"
-              width={120}
-              height={120}
+              alt="Krono Admin"
+              width={logoSize}
+              height={logoSize}
               style={{
+                width: logoSize,
+                height: logoSize,
+                maxWidth: '100%',
                 objectFit: 'contain',
               }}
               priority
             />
           </div>
-          <h1 style={titleStyle}>Chrono Admin</h1>
+          <h1 style={titleStyle}>Krono Admin</h1>
           <p style={subtitleStyle}>Connectez-vous à votre compte</p>
         </div>
 
@@ -269,7 +274,7 @@ export default function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="admin@chrono.com"
+              placeholder="admin@krono.com"
               style={{
                 ...inputStyle,
               }}

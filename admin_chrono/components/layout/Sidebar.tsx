@@ -442,8 +442,8 @@ export default function Sidebar() {
     alignItems: 'center',
     gap: '12px',
     width: '100%',
-    paddingTop: 28,
-    paddingBottom: 20,
+    paddingTop: 20,
+    paddingBottom: 14,
     marginBottom: 0,
     transition: 'transform 0.2s ease',
     position: 'sticky',
@@ -454,11 +454,14 @@ export default function Sidebar() {
   }
 
   const logoImageContainerStyle: React.CSSProperties = {
-    width: 60,
-    height: 60,
+    width: iconSlotSize,
+    height: iconSlotSize,
+    maxWidth: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+    overflow: 'hidden',
   }
 
   const logoTextStyle: React.CSSProperties = {
@@ -744,10 +747,14 @@ export default function Sidebar() {
         <div style={logoImageContainerStyle}>
           <Image
             src={logoImage}
-            alt="Chrono Logo"
-            width={60}
-            height={60}
+            alt="Krono"
+            width={iconSlotSize}
+            height={iconSlotSize}
             style={{ 
+              width: iconSlotSize,
+              height: iconSlotSize,
+              maxWidth: '100%',
+              maxHeight: '100%',
               objectFit: 'contain',
               mixBlendMode: isDarkMode ? 'lighten' : 'normal',
               filter: isDarkMode ? 'brightness(1.1)' : 'none',

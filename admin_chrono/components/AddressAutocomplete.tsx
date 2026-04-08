@@ -11,7 +11,7 @@ const MAPBOX_GEOCODE_URL = 'https://api.mapbox.com/search/geocode/v6/forward'
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 
 const NOMINATIM_HEADERS: HeadersInit = {
-  'User-Agent': 'ChronoLivraison/1.0 (admin-address-autocomplete)',
+  'User-Agent': 'KronoLivraison/1.0 (admin-address-autocomplete)',
 }
 
 interface MapboxSuggestion {

@@ -8,7 +8,7 @@ export const config = {
   
   // App Configuration
   app: {
-    name: 'Chrono Admin Console',
+    name: 'Krono Admin Console',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
   },
