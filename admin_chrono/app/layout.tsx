@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { FaviconClient } from "@/components/FaviconClient";
 import "../lib/envCheck"; //validation des variables d'environnement au démarrage
 
 const geistSans = Geist({
@@ -59,6 +60,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <FaviconClient />
         <Providers>{children}</Providers>
       </body>
     </html>

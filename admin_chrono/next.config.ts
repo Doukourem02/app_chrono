@@ -42,13 +42,12 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Les navigateurs demandent souvent /favicon.ico en premier ; on sert le logo Krono
-  async redirects() {
+  // Réécriture (pas redirection) : le navigateur garde /favicon.ico en URL interne mais reçoit le PNG — évite les allers-retours cache / icône par défaut après hydratation
+  async rewrites() {
     return [
       {
         source: "/favicon.ico",
-        destination: "/assets/chrono.png",
-        permanent: false,
+        destination: "/favicon.png",
       },
     ];
   },
