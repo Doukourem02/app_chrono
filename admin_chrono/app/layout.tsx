@@ -6,7 +6,7 @@ import { FaviconClient } from "@/components/FaviconClient";
 import config from "@/lib/config";
 import "../lib/envCheck"; //validation des variables d'environnement au démarrage
 
-const logoUrl = config.app.logoUrl;
+const iconUrl = config.app.iconUrl;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,19 +34,19 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   icons: {
-    icon: [{ url: logoUrl, type: "image/png", sizes: "512x512" }],
-    shortcut: logoUrl,
-    apple: logoUrl,
+    icon: [{ url: iconUrl, type: "image/png", sizes: "512x512" }],
+    shortcut: iconUrl,
+    apple: iconUrl,
   },
   openGraph: {
     title: "Krono Admin Console",
     description: "Console d'administration Krono Livraison",
-    images: [{ url: logoUrl, alt: "Krono" }],
+    images: [{ url: iconUrl, alt: "Krono" }],
   },
   twitter: {
     card: "summary",
     title: "Krono Admin Console",
-    images: [logoUrl],
+    images: [iconUrl],
   },
 };
 

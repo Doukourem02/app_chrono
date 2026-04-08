@@ -47,7 +47,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/favicon.ico",
-        destination: "/assets/chrono.png",
+        destination: "/assets/chrono-icon.png",
       },
     ];
   },

@@ -4,8 +4,8 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import config from '@/lib/config'
 
-/** Même URL que `metadata.icons` + `config.app.logoUrl` — évite l’icône Vercel / défaut après hydratation */
-const iconHref = `${config.app.logoUrl}?v=krono`
+/** Carré 512×512 — même URL que `metadata.icons` (pas le PNG portrait) */
+const iconHref = `${config.app.iconUrl}?v=krono`
 
 export function FaviconClient() {
   const pathname = usePathname()

@@ -11,7 +11,8 @@
     "lint": "eslint",
     "create-admin": "node scripts/create-admin.js",
     "create-avatars-bucket": "node scripts/create-avatars-bucket.js",
-    "add-avatar-column": "node scripts/add-avatar-url-column.js"
+    "add-avatar-column": "node scripts/add-avatar-url-column.js",
+    "generate-chrono-icon": "bash scripts/generate-chrono-icon.sh"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.47.0",
