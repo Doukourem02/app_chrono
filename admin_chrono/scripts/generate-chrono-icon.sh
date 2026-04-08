@@ -15,7 +15,5 @@ OFF_X=$(( (W - SIDE) / 2 ))
 sips -c "$SIDE" "$SIDE" --cropOffset "$OFF_Y" "$OFF_X" "$SRC" -o "$TMP"
 sips -z 512 512 "$TMP" -o "$OUT"
 rm -f "$TMP"
-cp "$OUT" "$ROOT/app/icon.png"
-cp "$OUT" "$ROOT/app/apple-icon.png"
 cp "$OUT" "$ROOT/public/favicon.png"
-echo "OK: $OUT (+ app/icon.png, apple-icon.png, public/favicon.png)"
+echo "OK: $OUT (+ public/favicon.png). Pas d’app/icon.png : évite le doublon Next.js /favicon.ico."

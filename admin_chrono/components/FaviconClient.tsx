@@ -33,7 +33,13 @@ export function FaviconClient() {
       selectors.forEach((sel) => {
         document.querySelectorAll<HTMLLinkElement>(sel).forEach((link) => {
           const href = link.getAttribute('href') || ''
+          const rel = link.getAttribute('rel') || ''
           if (href.includes('vercel.com') || href.includes('vercel.app')) {
+            link.remove()
+            return
+          }
+          // Next.js peut injecter rel="icon" + /favicon.ico?... (ICO) : souvent choisi avant le PNG
+          if (rel === 'icon' && href.includes('favicon.ico')) {
             link.remove()
             return
           }
