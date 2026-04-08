@@ -7,6 +7,8 @@ import config from "@/lib/config";
 import "../lib/envCheck"; //validation des variables d'environnement au démarrage
 
 const iconUrl = config.app.iconUrl;
+const appName = config.app.name;
+const appDescription = config.app.description;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,13 +26,16 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Krono Admin Console",
-  description: "Console d'administration Krono Livraison",
+  title: {
+    default: appName,
+    template: "%s | Krono Admin",
+  },
+  description: appDescription,
   manifest: "/site.webmanifest",
   themeColor: "#0F172A",
   appleWebApp: {
     capable: true,
-    title: "Krono Admin Console",
+    title: appName,
     statusBarStyle: "default",
   },
   icons: {
@@ -39,13 +44,14 @@ export const metadata: Metadata = {
     apple: iconUrl,
   },
   openGraph: {
-    title: "Krono Admin Console",
-    description: "Console d'administration Krono Livraison",
-    images: [{ url: iconUrl, alt: "Krono" }],
+    title: appName,
+    description: appDescription,
+    images: [{ url: iconUrl, alt: appName }],
   },
   twitter: {
     card: "summary",
-    title: "Krono Admin Console",
+    title: appName,
+    description: appDescription,
     images: [iconUrl],
   },
 };

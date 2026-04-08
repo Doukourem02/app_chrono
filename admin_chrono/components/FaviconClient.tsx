@@ -4,13 +4,25 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import config from '@/lib/config'
 
-/** Carré 512×512 — même URL que `metadata.icons` (pas le PNG portrait) */
-const iconHref = `${config.app.iconUrl}?v=krono`
+/** Carré 512×512 — même URL que `metadata.icons` (pas le PNG portrait). Incrémente le query après changement d’icône pour casser le cache. */
+const iconHref = `${config.app.iconUrl}?v=krono2`
 
 export function FaviconClient() {
   const pathname = usePathname()
 
   useEffect(() => {
+    const fixTitle = () => {
+      const t = document.title?.trim() || ''
+      if (
+        t === '' ||
+        t === 'Sans titre' ||
+        t.toLowerCase() === 'untitled' ||
+        t === 'Krono Admin Console'
+      ) {
+        document.title = config.app.name
+      }
+    }
+
     const fixIcons = () => {
       const selectors = [
         'link[rel="icon"]',
@@ -32,6 +44,7 @@ export function FaviconClient() {
     }
 
     const run = () => {
+      fixTitle()
       fixIcons()
     }
 

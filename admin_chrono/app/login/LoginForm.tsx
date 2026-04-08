@@ -254,7 +254,7 @@ export default function LoginForm() {
               priority
             />
           </div>
-          <h1 style={titleStyle}>Krono Admin</h1>
+          <h1 style={titleStyle}>{config.app.name}</h1>
           <p style={subtitleStyle}>Connectez-vous à votre compte</p>
         </div>
 

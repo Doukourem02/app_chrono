@@ -1,7 +1,7 @@
 {
-  "name": "Krono Admin Console",
-  "short_name": "Krono Admin",
-  "description": "Console d'administration Krono Livraison",
+  "name": "Dashboard Krono Admin",
+  "short_name": "Dashboard Krono",
+  "description": "Dashboard et administration Krono Livraison",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0F172A",
