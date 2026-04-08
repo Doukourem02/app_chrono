@@ -267,6 +267,8 @@ export default function Sidebar() {
   const collapsedWidth = 72
   const expandedWidth = 340
   const iconSlotSize = 44
+  /** Logo au-dessus du menu (légèrement plus grand que les icônes de navigation) */
+  const logoSize = 47
   const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
 
   useEffect(() => {
@@ -454,8 +456,8 @@ export default function Sidebar() {
   }
 
   const logoImageContainerStyle: React.CSSProperties = {
-    width: iconSlotSize,
-    height: iconSlotSize,
+    width: logoSize,
+    height: logoSize,
     maxWidth: '100%',
     display: 'flex',
     alignItems: 'center',
@@ -748,11 +750,11 @@ export default function Sidebar() {
           <Image
             src={logoImage}
             alt="Krono"
-            width={iconSlotSize}
-            height={iconSlotSize}
+            width={logoSize}
+            height={logoSize}
             style={{ 
-              width: iconSlotSize,
-              height: iconSlotSize,
+              width: logoSize,
+              height: logoSize,
               maxWidth: '100%',
               maxHeight: '100%',
               objectFit: 'contain',

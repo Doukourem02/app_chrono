@@ -8,6 +8,7 @@ import { ScreenTransition } from '@/components/animations'
 import { AnimatedButton } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { logger } from '@/utils/logger'
+import { themeColors } from '@/utils/theme'
 
 export default function SettingsPage() {
   const { user } = useAuthStore()
@@ -563,20 +564,20 @@ export default function SettingsPage() {
   const titleStyle: React.CSSProperties = {
     fontSize: '24px',
     fontWeight: 700,
-    color: '#111827',
+    color: themeColors.textPrimary,
   }
 
   const subtitleStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#6B7280',
+    color: themeColors.textSecondary,
   }
 
   const cardStyle: React.CSSProperties = {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
     padding: '24px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '1px solid #F3F4F6',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+    border: `1px solid ${themeColors.cardBorder}`,
   }
 
   const avatarSectionStyle: React.CSSProperties = {
@@ -585,7 +586,7 @@ export default function SettingsPage() {
     alignItems: 'center',
     gap: '16px',
     paddingBottom: '24px',
-    borderBottom: '1px solid #E5E7EB',
+    borderBottom: `1px solid ${themeColors.cardBorder}`,
   }
 
   const avatarContainerStyle: React.CSSProperties = {
@@ -597,14 +598,14 @@ export default function SettingsPage() {
     width: '120px',
     height: '120px',
     borderRadius: '50%',
-    backgroundColor: avatarUrl ? 'transparent' : '#8B5CF6',
+    backgroundColor: avatarUrl ? 'transparent' : themeColors.purplePrimary,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '48px',
     fontWeight: 600,
     color: '#FFFFFF',
-    border: '4px solid #FFFFFF',
+    border: `4px solid ${themeColors.cardBg}`,
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     overflow: 'hidden',
     backgroundSize: 'cover',
@@ -620,8 +621,8 @@ export default function SettingsPage() {
     width: '36px',
     height: '36px',
     borderRadius: '50%',
-    backgroundColor: '#8B5CF6',
-    border: '3px solid #FFFFFF',
+    backgroundColor: themeColors.purplePrimary,
+    border: `3px solid ${themeColors.cardBg}`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -644,7 +645,7 @@ export default function SettingsPage() {
   const labelStyle: React.CSSProperties = {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#374151',
+    color: themeColors.textPrimary,
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
@@ -655,12 +656,13 @@ export default function SettingsPage() {
     paddingRight: '16px',
     paddingTop: '12px',
     paddingBottom: '12px',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: themeColors.grayLight,
     borderRadius: '12px',
-    border: '1px solid #E5E7EB',
+    border: `1px solid ${themeColors.cardBorder}`,
     fontSize: '14px',
     outline: 'none',
     transition: 'all 0.2s',
+    color: themeColors.textPrimary,
   }
 
   const buttonStyle: React.CSSProperties = {
@@ -668,7 +670,7 @@ export default function SettingsPage() {
     paddingRight: '24px',
     paddingTop: '12px',
     paddingBottom: '12px',
-    backgroundColor: '#8B5CF6',
+    backgroundColor: themeColors.purplePrimary,
     color: '#FFFFFF',
     borderRadius: '12px',
     border: 'none',
@@ -734,7 +736,7 @@ export default function SettingsPage() {
             onChange={handleFileChange}
             style={{ display: 'none' }}
           />
-          <p style={{ fontSize: '14px', color: '#6B7280', textAlign: 'center' }}>
+          <p style={{ fontSize: '14px', color: themeColors.textSecondary, textAlign: 'center' }}>
             Cliquez sur l&apos;avatar pour changer votre photo
           </p>
         </div>
@@ -742,7 +744,7 @@ export default function SettingsPage() {
         <div style={formStyle}>
           <div style={inputGroupStyle}>
             <label style={labelStyle}>
-              <User size={16} style={{ color: '#6B7280' }} />
+              <User size={16} style={{ color: themeColors.textSecondary }} />
               Prénom
             </label>
             <input
@@ -752,19 +754,19 @@ export default function SettingsPage() {
               placeholder="Votre prénom"
               style={inputStyle}
               onFocus={(e) => {
-                e.target.style.borderColor = '#8B5CF6'
-                e.target.style.backgroundColor = '#FFFFFF'
+                e.target.style.borderColor = themeColors.purplePrimary
+                e.target.style.backgroundColor = themeColors.cardBg
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#E5E7EB'
-                e.target.style.backgroundColor = '#F9FAFB'
+                e.target.style.borderColor = themeColors.cardBorder
+                e.target.style.backgroundColor = themeColors.grayLight
               }}
             />
           </div>
 
           <div style={inputGroupStyle}>
             <label style={labelStyle}>
-              <User size={16} style={{ color: '#6B7280' }} />
+              <User size={16} style={{ color: themeColors.textSecondary }} />
               Nom
             </label>
             <input
@@ -774,19 +776,19 @@ export default function SettingsPage() {
               placeholder="Votre nom"
               style={inputStyle}
               onFocus={(e) => {
-                e.target.style.borderColor = '#8B5CF6'
-                e.target.style.backgroundColor = '#FFFFFF'
+                e.target.style.borderColor = themeColors.purplePrimary
+                e.target.style.backgroundColor = themeColors.cardBg
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#E5E7EB'
-                e.target.style.backgroundColor = '#F9FAFB'
+                e.target.style.borderColor = themeColors.cardBorder
+                e.target.style.backgroundColor = themeColors.grayLight
               }}
             />
           </div>
 
           <div style={inputGroupStyle}>
             <label style={labelStyle}>
-              <Mail size={16} style={{ color: '#6B7280' }} />
+              <Mail size={16} style={{ color: themeColors.textSecondary }} />
               Email
             </label>
             <input
@@ -795,16 +797,17 @@ export default function SettingsPage() {
               disabled
               style={{
                 ...inputStyle,
-                backgroundColor: '#F3F4F6',
-                color: '#6B7280',
+                backgroundColor: themeColors.grayLight,
+                color: themeColors.textSecondary,
                 cursor: 'not-allowed',
+                opacity: 0.95,
               }}
             />
           </div>
 
           <div style={inputGroupStyle}>
             <label style={labelStyle}>
-              <Phone size={16} style={{ color: '#6B7280' }} />
+              <Phone size={16} style={{ color: themeColors.textSecondary }} />
               Téléphone
             </label>
             <input
@@ -814,12 +817,12 @@ export default function SettingsPage() {
               placeholder="+225 XX XX XX XX XX"
               style={inputStyle}
               onFocus={(e) => {
-                e.target.style.borderColor = '#8B5CF6'
-                e.target.style.backgroundColor = '#FFFFFF'
+                e.target.style.borderColor = themeColors.purplePrimary
+                e.target.style.backgroundColor = themeColors.cardBg
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#E5E7EB'
-                e.target.style.backgroundColor = '#F9FAFB'
+                e.target.style.borderColor = themeColors.cardBorder
+                e.target.style.backgroundColor = themeColors.grayLight
               }}
             />
           </div>

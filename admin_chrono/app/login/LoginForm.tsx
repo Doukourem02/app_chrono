@@ -88,7 +88,7 @@ export default function LoginForm() {
     marginBottom: '24px',
   }
 
-  const logoSize = 72
+  const logoSize = 75
 
   const logoContainerStyle: React.CSSProperties = {
     display: 'flex',
