@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
+import config from '@/lib/config'
 import { useAuthStore } from '@/stores/authStore'
 
 export default function LoginForm() {
@@ -240,8 +241,8 @@ export default function LoginForm() {
         <div style={headerStyle}>
           <div style={logoContainerStyle}>
             <Image
-              src="/assets/chrono.png"
-              alt="Krono Admin"
+              src={config.app.logoUrl}
+              alt={config.app.name}
               width={logoSize}
               height={logoSize}
               style={{

@@ -3,7 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { FaviconClient } from "@/components/FaviconClient";
+import config from "@/lib/config";
 import "../lib/envCheck"; //validation des variables d'environnement au démarrage
+
+const logoUrl = config.app.logoUrl;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,22 +34,19 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   icons: {
-    icon: [
-      { url: "/favicon.png", type: "image/png", sizes: "512x512" },
-      { url: "/assets/chrono.png", type: "image/png", sizes: "512x512" },
-    ],
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    icon: [{ url: logoUrl, type: "image/png", sizes: "512x512" }],
+    shortcut: logoUrl,
+    apple: logoUrl,
   },
   openGraph: {
     title: "Krono Admin Console",
     description: "Console d'administration Krono Livraison",
-    images: [{ url: "/assets/chrono.png", alt: "Krono" }],
+    images: [{ url: logoUrl, alt: "Krono" }],
   },
   twitter: {
     card: "summary",
     title: "Krono Admin Console",
-    images: ["/assets/chrono.png"],
+    images: [logoUrl],
   },
 };
 

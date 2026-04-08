@@ -13,6 +13,7 @@ import { logger } from "@/utils/logger";
 import { themeColors } from "@/utils/theme";
 import { useThemeStore } from "@/stores/themeStore";
 import { useTranslation } from "@/hooks/useTranslation";
+import config from "@/lib/config";
 
 interface NavItem {
   href: string;
@@ -749,7 +750,7 @@ export default function Sidebar() {
         <div style={logoImageContainerStyle}>
           <Image
             src={logoImage}
-            alt="Krono"
+            alt={config.app.name}
             width={logoSize}
             height={logoSize}
             style={{ 

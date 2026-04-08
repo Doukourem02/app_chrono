@@ -2,14 +2,16 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import config from '@/lib/config'
 
-const ICON_HREF = '/favicon.png?v=krono'
+/** Même URL que `metadata.icons` + `config.app.logoUrl` — évite l’icône Vercel / défaut après hydratation */
+const iconHref = `${config.app.logoUrl}?v=krono`
 
 export function FaviconClient() {
   const pathname = usePathname()
 
   useEffect(() => {
-    const apply = () => {
+    const fixIcons = () => {
       const selectors = [
         'link[rel="icon"]',
         'link[rel="shortcut icon"]',
@@ -18,15 +20,41 @@ export function FaviconClient() {
 
       selectors.forEach((sel) => {
         document.querySelectorAll<HTMLLinkElement>(sel).forEach((link) => {
-          link.href = ICON_HREF
+          const href = link.getAttribute('href') || ''
+          if (href.includes('vercel.com') || href.includes('vercel.app')) {
+            link.remove()
+            return
+          }
+          link.href = iconHref
           link.type = 'image/png'
         })
       })
     }
 
-    apply()
-    const t = window.setTimeout(apply, 0)
-    return () => window.clearTimeout(t)
+    const run = () => {
+      fixIcons()
+    }
+
+    run()
+    const t0 = requestAnimationFrame(run)
+    const t1 = window.setTimeout(run, 0)
+    const t2 = window.setTimeout(run, 50)
+    const t3 = window.setTimeout(run, 300)
+    const t4 = window.setTimeout(run, 1500)
+
+    const observer = new MutationObserver(run)
+    observer.observe(document.head, { childList: true, subtree: true })
+    const stopObserver = window.setTimeout(() => observer.disconnect(), 8000)
+
+    return () => {
+      cancelAnimationFrame(t0)
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+      window.clearTimeout(t3)
+      window.clearTimeout(t4)
+      observer.disconnect()
+      window.clearTimeout(stopObserver)
+    }
   }, [pathname])
 
   return null

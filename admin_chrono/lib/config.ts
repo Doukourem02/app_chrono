@@ -9,6 +9,11 @@ export const config = {
   // App Configuration
   app: {
     name: 'Krono Admin Console',
+    /**
+     * Logo unique (onglet, favicon.ico, PWA, Open Graph, sidebar, connexion).
+     * Fichier sous `public/assets/` — ne pas dupliquer d’autres visuels pour le même usage.
+     */
+    logoUrl: '/assets/chrono.png',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
   },
