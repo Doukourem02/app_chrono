@@ -17,6 +17,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Krono Admin Console",
   description: "Console d'administration Krono Livraison",
+  openGraph: {
+    title: "Krono Admin Console",
+    description: "Console d'administration Krono Livraison",
+    images: [{ url: "/assets/chrono.png", alt: "Krono" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Krono Admin Console",
+    images: ["/assets/chrono.png"],
+  },
 };
 
 export default function RootLayout({
