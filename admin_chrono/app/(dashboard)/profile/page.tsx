@@ -267,26 +267,22 @@ export default function SettingsPage() {
     }
 
     try {
-      // Compresser l'image si elle dépasse 2MB
+      // Compresser les images un peu lourdes (évite aussi la limite ~4,5 Mo du corps HTTP sur Vercel si on passe par l’API)
       let fileToUpload = file
-      if (file.size > 2 * 1024 * 1024) {
+      if (file.size > 400 * 1024) {
         try {
-          fileToUpload = await compressImage(file, 1920, 1920, 0.85)
-          const originalSize = (file.size / 1024 / 1024).toFixed(2)
-          const compressedSize = (fileToUpload.size / 1024 / 1024).toFixed(2)
-          logger.debug(`Image compressée: ${originalSize}MB → ${compressedSize}MB`)
+          fileToUpload = await compressImage(file, 1280, 1280, 0.85)
+          logger.debug(
+            `Image compressée: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`
+          )
         } catch (error) {
           logger.warn('Erreur lors de la compression, utilisation du fichier original:', error)
-          // Continuer avec le fichier original si la compression échoue
         }
       }
 
-      // Créer un nom de fichier unique
       const fileExt = fileToUpload.name.split('.').pop() || 'jpg'
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      const storagePath = `${user.id}-${Date.now()}.${fileExt}`
 
-      // Vérifier à nouveau la session avant l'upload
       const { data: { session: currentSession } } = await supabase.auth.getSession()
       if (!currentSession) {
         alert('Votre session a expiré. Veuillez vous reconnecter.')
@@ -294,44 +290,70 @@ export default function SettingsPage() {
       }
 
       logger.debug('Upload attempt:', {
-        filePath,
+        storagePath,
         fileSize: fileToUpload.size,
         userId: user.id,
         sessionExists: !!currentSession,
       })
 
-      // Utiliser l'API route pour uploader (bypass RLS avec service role key)
-      const formData = new FormData()
-      formData.append('file', fileToUpload)
-
-      const token = currentSession.access_token
-      const response = await fetch('/api/upload-avatar', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
+      // 1) Upload direct vers Supabase Storage (pas de limite Vercel sur la taille du corps — évite « Load failed » en prod)
+      const { error: storageError } = await supabase.storage.from('avatars').upload(storagePath, fileToUpload, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: fileToUpload.type || 'image/jpeg',
       })
 
-      const result = await response.json()
+      let publicUrl: string
 
-      if (!response.ok) {
-        logger.error('Upload error:', result)
-        if (result.error.includes('Bucket not found') || result.error.includes('not found')) {
-          alert(
-            'Le bucket "avatars" n\'existe pas.\n\n' +
-            'Pour le créer, exécutez dans le terminal:\n' +
-            'npm run create-avatars-bucket\n\n' +
-            'Ou créez-le manuellement dans Supabase Dashboard → Storage → New bucket\n' +
-            'Nom: avatars | Public: Oui | Taille max: 50MB'
+      if (!storageError) {
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(storagePath)
+        publicUrl = urlData.publicUrl
+      } else {
+        logger.warn('[Settings] Upload direct Storage échoué, tentative via API route:', storageError)
+        // 2) Repli : route API (service role). Peut échouer si fichier > ~4,5 Mo sur Vercel.
+        const formData = new FormData()
+        formData.append('file', fileToUpload)
+
+        const response = await fetch('/api/upload-avatar', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${currentSession.access_token}`,
+          },
+          body: formData,
+        })
+
+        let result: { error?: string; url?: string } = {}
+        const rawText = await response.text()
+        try {
+          if (rawText) result = JSON.parse(rawText) as { error?: string; url?: string }
+        } catch {
+          throw new Error(
+            response.status === 413
+              ? 'Fichier trop volumineux pour le serveur (essayez une image plus petite).'
+              : 'Réponse serveur invalide lors de l’upload.'
           )
-        } else {
-          alert('Erreur lors de l\'upload: ' + (result.error || 'Erreur inconnue'))
         }
-        return
-      }
 
-      const publicUrl = result.url
+        if (!response.ok) {
+          logger.error('Upload error (API):', result)
+          const err = result.error || 'Erreur inconnue'
+          if (err.includes('Bucket not found') || err.toLowerCase().includes('not found')) {
+            alert(
+              'Le bucket "avatars" n\'existe pas.\n\n' +
+                'Créez-le dans Supabase → Storage (nom: avatars, public) ou : npm run create-avatars-bucket'
+            )
+          } else {
+            alert('Erreur lors de l\'upload: ' + err)
+          }
+          return
+        }
+
+        if (!result.url) {
+          alert("Erreur lors de l'upload: URL manquante dans la réponse serveur.")
+          return
+        }
+        publicUrl = result.url
+      }
 
       // Mettre à jour le profil dans la table users via l'API route (bypass RLS)
       logger.debug('Calling update-avatar-url API...')
@@ -417,7 +439,11 @@ export default function SettingsPage() {
       alert('Photo de profil mise à jour avec succès!')
     } catch (error) {
       logger.error('Error uploading avatar:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue'
+      let errorMessage = error instanceof Error ? error.message : 'Erreur inconnue'
+      if (/load failed|failed to fetch|networkerror/i.test(errorMessage)) {
+        errorMessage =
+          'Connexion interrompue (réseau ou limite de taille côté hébergeur). Réessayez avec une image plus légère (JPEG/PNG), ou vérifiez votre connexion.'
+      }
       alert('Erreur lors de l\'upload de l\'image: ' + errorMessage)
     } finally {
       setUploading(false)

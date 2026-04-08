@@ -268,7 +268,7 @@ export default function Sidebar() {
   const expandedWidth = 340
   const iconSlotSize = 44
   /** Logo au-dessus du menu (légèrement plus grand que les icônes de navigation) */
-  const logoSize = 47
+  const logoSize = 50
   const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
 
   useEffect(() => {
