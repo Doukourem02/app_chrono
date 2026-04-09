@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import Constants from 'expo-constants';
 import { config } from '../config';
 import { useOrderStore } from '../store/useOrderStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -195,6 +196,12 @@ class UserOrderSocketService {
       });
     });
 
+    const socketDiag = () => ({
+      clientTransportMode: __DEV__ ? 'dev_ws_then_polling' : 'prod_polling_only',
+      transportsConfigured: this.buildSocketTransports().join(','),
+      iosBuild: Constants.nativeBuildVersion ?? 'unknown',
+    });
+
     this.socket.io.on('reconnect_error', (error: Error & { type?: string; description?: unknown }) => {
       reportSocketIssue('client_orders_reconnect_error', {
         socketUrl,
@@ -202,6 +209,7 @@ class UserOrderSocketService {
         type: String(error.type ?? ''),
         description: String(error.description ?? ''),
         transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+        ...socketDiag(),
       });
     });
 
@@ -212,6 +220,7 @@ class UserOrderSocketService {
         type: String(error.type ?? ''),
         description: String(error.description ?? ''),
         transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+        ...socketDiag(),
       });
     });
 
@@ -222,6 +231,7 @@ class UserOrderSocketService {
         transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
         retries: this.retryCount,
         recoveryAttempt: this.reconnectRecoveryCount,
+        ...socketDiag(),
       });
       void this.recoverSocketAfterReconnectFailed();
     });
@@ -240,6 +250,10 @@ class UserOrderSocketService {
         type: String((error as { type?: string }).type ?? ''),
         retries: this.retryCount,
         transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+        /** Permet de vérifier dans Sentry si le build est bien celui avec polling en prod */
+        clientTransportMode: __DEV__ ? 'dev_ws_then_polling' : 'prod_polling_only',
+        transportsConfigured: this.buildSocketTransports().join(','),
+        iosBuild: Constants.nativeBuildVersion ?? 'unknown',
       };
       logger.warn('Socket connect_error', 'userOrderSocketService', errorPayload);
       if (!isTemporaryPollError || this.retryCount >= 3) {
