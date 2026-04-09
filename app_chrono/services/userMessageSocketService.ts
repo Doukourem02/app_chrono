@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { logger } from '../utils/logger';
+import { reportSocketIssue } from '../utils/sentry';
 import { Conversation, Message } from './userMessageService';
 import { config } from '../config';
 import { useAuthStore } from '../store/useAuthStore';
@@ -49,6 +50,11 @@ class UserMessageSocketService {
       },
     });
 
+    this.socket.io.on('reconnect_failed', () => {
+      logger.warn('Socket messagerie: reconnexions épuisées', 'userMessageSocketService');
+      reportSocketIssue('client_messages_reconnect_failed', { socketUrl });
+    });
+
     this.socket.on('connect', () => {
       logger.info('🔌 Socket connecté pour messagerie', 'userMessageSocketService');
       this.isConnected = true;
@@ -72,6 +78,11 @@ class UserMessageSocketService {
         logger.error('Erreur connexion socket messagerie:', 'userMessageSocketService', {
           message: error.message,
           type: (error as any).type,
+        });
+        reportSocketIssue('client_messages_connect_error', {
+          socketUrl,
+          message: error.message,
+          type: String((error as { type?: string }).type ?? ''),
         });
       }
     });

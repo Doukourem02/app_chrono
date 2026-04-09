@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, Platform } from 'react-native';
 import { MapView, Camera, PointAnnotation, ShapeSource, LineLayer } from '@rnmapbox/maps';
 import type { MapRefHandle } from '../hooks/useMapCamera';
 import { COTE_IVOIRE_MAX_BOUNDS } from '../utils/mapBounds';
+import { ensureMapboxAccessToken } from '../mapboxInit';
 
 type Coordinates = {
   latitude: number;
@@ -87,6 +88,7 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
   setSelectedOrder,
   isOnline,
 }) => {
+  ensureMapboxAccessToken();
   const cameraRef = useRef<Camera>(null);
 
   useEffect(() => {

@@ -45,8 +45,13 @@ export function validateEnvironment(): {
   const warnings: string[] = [];
 
   // Récupérer les variables d'environnement depuis Expo Constants
+  // app.config.js expose aussi apiUrl / socketUrl (sans préfixe EXPO_PUBLIC_* dans extra)
   const getEnvVar = (name: string): string | undefined => {
-    return Constants.expoConfig?.extra?.[name] || process.env[name];
+    const extra = Constants.expoConfig?.extra as Record<string, string | undefined> | undefined;
+    if (extra?.[name]) return extra[name];
+    if (name === 'EXPO_PUBLIC_API_URL' && extra?.apiUrl) return extra.apiUrl;
+    if (name === 'EXPO_PUBLIC_SOCKET_URL' && extra?.socketUrl) return extra.socketUrl;
+    return process.env[name];
   };
 
   // Vérifier les variables requises

@@ -62,8 +62,10 @@ const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
       if (!origin) {
-        // En prod: refuser les origins manquantes (évite certains contournements). En dev: ok.
-        return isDevelopment ? callback(null, true) : callback(new Error('Not allowed by CORS'));
+        // React Native / apps natives n'envoient souvent pas de header Origin sur le handshake
+        // WebSocket (contrairement au navigateur). L'API HTTP autorise déjà !origin via isOriginAllowed.
+        // La sécurité repose sur io.use (JWT obligatoire en prod), pas sur Origin ici.
+        return callback(null, true);
       }
 
       // En développement (ou si NODE_ENV n'est pas défini), accepter toutes les origines localhost et 192.168.*

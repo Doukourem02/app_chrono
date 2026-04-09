@@ -4,6 +4,7 @@ import { useOrderStore } from '../store/useOrderStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { logger } from '../utils/logger';
+import { reportSocketIssue } from '../utils/sentry';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
 import { soundService } from './soundService';
@@ -67,6 +68,23 @@ class UserOrderSocketService {
     this.socket.io.on('reconnect_failed', () => {
       logger.warn('Socket commandes: reconnexions épuisées', 'userOrderSocketService');
       useRealtimeDegradedStore.getState().setSocketDegraded(true);
+      reportSocketIssue('client_orders_reconnect_failed', { socketUrl });
+    });
+
+    this.socket.on('connect_error', (error: Error & { type?: string }) => {
+      const isTemporaryPollError =
+        error.message?.includes('xhr poll error') ||
+        error.message?.includes('poll error') ||
+        error.message?.includes('transport unknown') ||
+        error.message?.includes('websocket error') ||
+        (error as { type?: string }).type === 'TransportError';
+      if (!isTemporaryPollError) {
+        reportSocketIssue('client_orders_connect_error', {
+          socketUrl,
+          message: error.message,
+          type: String((error as { type?: string }).type ?? ''),
+        });
+      }
     });
 
     // CRITIQUE : Installer TOUS les listeners AVANT la connexion

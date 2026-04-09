@@ -14,7 +14,7 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
-      buildNumber: "20",
+      buildNumber: "22",
       supportsTablet: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -92,11 +92,15 @@ module.exports = {
       mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
       socketUrl: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
+      // Même noms que sur EAS (aligné driver_chrono + envCheck)
+      EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+      EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL,
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       legalCguUrl: process.env.EXPO_PUBLIC_LEGAL_CGU_URL || '',
       legalPrivacyUrl: process.env.EXPO_PUBLIC_LEGAL_PRIVACY_URL || '',
       sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN || '',
+      EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN || '',
     }
   }
 };

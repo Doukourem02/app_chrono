@@ -1,3 +1,4 @@
+import "../../mapboxInit";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator, InteractionManager } from "react-native";
 import type { MapRefHandle } from "../../hooks/useMapCamera";

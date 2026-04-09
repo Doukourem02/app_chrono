@@ -4,6 +4,7 @@ import { config } from '../config/index';
 import { OrderRequest, useOrderStore } from '../store/useOrderStore';
 import { useDriverStore } from '../store/useDriverStore';
 import { logger } from '../utils/logger';
+import { reportSocketIssue } from '../utils/sentry';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { soundService } from './soundService';
 import { apiService } from './apiService';
@@ -87,6 +88,9 @@ class OrderSocketService {
     this.socket.io.on('reconnect_failed', () => {
       logger.warn('Socket commandes: reconnexions épuisées', 'orderSocketService');
       useRealtimeDegradedStore.getState().setOrdersSocketDegraded(true);
+      reportSocketIssue('driver_orders_reconnect_failed', {
+        socketUrl: config.socketUrl,
+      });
     });
 
     this.setupAllListeners(driverId);
@@ -370,6 +374,12 @@ class OrderSocketService {
         logger.warn('Erreur connexion socket persistante:', undefined, {
           message: error.message,
           type: (error as any).type,
+          retryCount: this.retryCount,
+        });
+        reportSocketIssue('driver_orders_connect_error', {
+          socketUrl: config.socketUrl,
+          message: error.message,
+          type: String((error as { type?: string }).type ?? ''),
           retryCount: this.retryCount,
         });
       }

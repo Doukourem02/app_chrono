@@ -13,6 +13,7 @@ import { useAnimatedDriverPositions } from '../hooks/useAnimatedDriverPositions'
 import { useWeather } from '../hooks/useWeather';
 import { ETABadge } from './ETABadge';
 import { OnlineDriverMarker } from './OnlineDriverMarker';
+import { ensureMapboxAccessToken } from '../mapboxInit';
 
 type Coordinates = {
   latitude: number;
@@ -103,6 +104,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   radarCoords,
   mapStyle = 'light',
 }) => {
+  ensureMapboxAccessToken();
   const cameraRef = useRef<Camera>(null);
   const pickup = toCoords(pickupCoords);
   const dropoff = toCoords(dropoffCoords);

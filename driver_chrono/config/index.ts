@@ -1,11 +1,15 @@
 import Constants from 'expo-constants';
 import { logger } from '../utils/logger';
+import { normalizeExpoUrl } from '../utils/normalizeExpoUrl';
+
+const rawApi = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL;
+const rawSocket = Constants.expoConfig?.extra?.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL;
 
 export const config = {
   // API Configuration
   mapboxAccessToken: Constants.expoConfig?.extra?.mapboxAccessToken || process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
-  apiUrl: Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
-  socketUrl: Constants.expoConfig?.extra?.socketUrl || process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
+  apiUrl: normalizeExpoUrl(rawApi as string | undefined, 'http://localhost:4000'),
+  socketUrl: normalizeExpoUrl(rawSocket as string | undefined, 'http://localhost:4000'),
   sentryDsn: Constants.expoConfig?.extra?.sentryDsn || process.env.EXPO_PUBLIC_SENTRY_DSN,
 
   legal: {
@@ -48,9 +52,19 @@ if (__DEV__) {
   console.warn('[Krono dev] API =', config.apiUrl, '| Socket =', config.socketUrl);
 }
 
+if (!__DEV__ && (config.apiUrl.includes('localhost') || config.apiUrl.includes('127.0.0.1'))) {
+  logger.warn(
+    'EXPO_PUBLIC_API_URL pointe vers localhost — l’API ne sera pas joignable depuis un téléphone. Vérifie les variables EAS (production) pour driver_chrono.',
+    'config'
+  );
+}
+
 // Validation des variables critiques
 if (!config.mapboxAccessToken) {
-  logger.warn('⚠️ Mapbox access token not configured. Mapbox maps may not work in dev build.');
+  logger.warn(
+    'Mapbox access token manquant — carte inactive. Vérifie EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN dans EAS (production).',
+    'config'
+  );
 }
 
 export default config;

@@ -4,11 +4,13 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { FaviconClient } from "@/components/FaviconClient";
 import config from "@/lib/config";
+import { getSiteUrl } from "@/lib/siteUrl";
 import "../lib/envCheck"; //validation des variables d'environnement au démarrage
 
 const iconUrl = config.app.iconUrl;
 const appName = config.app.name;
 const appDescription = config.app.description;
+const siteUrl = getSiteUrl();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,10 +21,6 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://admin.kro-no-delivery.com");
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

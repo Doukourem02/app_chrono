@@ -3,6 +3,17 @@ import Constants from 'expo-constants';
 import { config } from '../config/index';
 import { logger } from './logger';
 
+function buildSentryRelease(): string | undefined {
+  const slug = Constants.expoConfig?.slug ?? 'driver_chrono';
+  const appVer =
+    Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? '0';
+  const build = Constants.nativeBuildVersion;
+  if (build) {
+    return `${slug}@${appVer}+${build}`;
+  }
+  return `${slug}@${appVer}`;
+}
+
 /**
  * Initialise Sentry pour le monitoring d'erreurs
  * Ne capture les erreurs qu'en production
@@ -20,10 +31,11 @@ export function initSentry() {
 
   Sentry.init({
     dsn: sentryDsn,
+    release: buildSentryRelease(),
     environment: config.app.environment,
-    tracesSampleRate: config.app.environment === 'production' ? 0.1 : 1.0, // 10% en prod, 100% en dev
-    beforeSend(event, hint) {
-      // Filtrer les erreurs de développement
+    tracesSampleRate: config.app.environment === 'production' ? 0.1 : 1.0,
+    enableAutoSessionTracking: true,
+    beforeSend(event) {
       if (__DEV__) {
         return null;
       }
@@ -62,3 +74,34 @@ export function captureMessage(message: string, level: Sentry.SeverityLevel = 'i
   }
 }
 
+const socketReportLastAt: Record<string, number> = {};
+const SOCKET_REPORT_COOLDOWN_MS = 90_000;
+
+export function reportSocketIssue(
+  eventKey: string,
+  data: Record<string, unknown>
+): void {
+  if (__DEV__ || !hasSentryDsn()) {
+    return;
+  }
+
+  Sentry.addBreadcrumb({
+    category: 'socket.io',
+    level: 'error',
+    message: eventKey,
+    data,
+  });
+
+  const now = Date.now();
+  const last = socketReportLastAt[eventKey] ?? 0;
+  if (now - last < SOCKET_REPORT_COOLDOWN_MS) {
+    return;
+  }
+  socketReportLastAt[eventKey] = now;
+
+  Sentry.captureMessage(`Socket: ${eventKey}`, {
+    level: 'warning',
+    tags: { socket_event: eventKey },
+    extra: data,
+  });
+}

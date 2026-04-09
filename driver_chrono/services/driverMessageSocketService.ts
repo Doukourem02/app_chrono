@@ -5,6 +5,7 @@ import { config } from '../config/index';
 import { useDriverStore } from '../store/useDriverStore';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { apiService } from './apiService';
+import { reportSocketIssue } from '../utils/sentry';
 
 const SOCKET_URL = config.socketUrl || 'http://localhost:4000';
 
@@ -77,6 +78,9 @@ class DriverMessageSocketService {
     this.socket.io.on('reconnect_failed', () => {
       logger.warn('Socket messagerie: reconnexions épuisées', 'driverMessageSocketService');
       useRealtimeDegradedStore.getState().setMessagesSocketDegraded(true);
+      reportSocketIssue('driver_messages_reconnect_failed', {
+        socketUrl: SOCKET_URL,
+      });
     });
 
     this.socket.on('connect', () => {
@@ -100,15 +104,22 @@ class DriverMessageSocketService {
         error.message?.includes('websocket error') ||
         (error as any).type === 'TransportError';
 
-      if (!isTemporaryPollError && __DEV__) {
-        logger.debug(
-          'Erreur connexion socket messagerie (tentative de reconnexion en cours)',
-          'driverMessageSocketService',
-          {
-            message: error.message,
-            type: (error as any).type,
-          }
-        );
+      if (!isTemporaryPollError) {
+        if (__DEV__) {
+          logger.debug(
+            'Erreur connexion socket messagerie (tentative de reconnexion en cours)',
+            'driverMessageSocketService',
+            {
+              message: error.message,
+              type: (error as any).type,
+            }
+          );
+        }
+        reportSocketIssue('driver_messages_connect_error', {
+          socketUrl: SOCKET_URL,
+          message: error.message,
+          type: String((error as { type?: string }).type ?? ''),
+        });
       }
     });
 
