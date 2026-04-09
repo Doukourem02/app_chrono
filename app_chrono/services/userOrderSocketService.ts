@@ -10,6 +10,20 @@ import { userApiService } from './userApiService';
 import { soundService } from './soundService';
 import { UserFriendlyError } from '../utils/userFriendlyError';
 
+function readJwtExpEpochSeconds(token: string): number | null {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const json = JSON.parse(atob(padded));
+    const exp = (json as { exp?: unknown }).exp;
+    return typeof exp === 'number' ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
 class UserOrderSocketService {
   private socket: Socket | null = null;
   private userId: string | null = null;
@@ -19,6 +33,40 @@ class UserOrderSocketService {
   private retryCount: number = 0;
   private isCreatingOrder = false; // Protection contre les appels multiples
   private listenersSetup = false; // Flag pour éviter les listeners multiples
+  private isRefreshingSocketAuth = false;
+
+  private isAuthRelatedSocketError(message: string | undefined): boolean {
+    const m = (message || '').toLowerCase();
+    return (
+      m.includes('jwt') ||
+      m.includes('token') ||
+      m.includes('unauthorized') ||
+      m.includes('unauthenticated') ||
+      m.includes('authentication') ||
+      m.includes('invalid credentials') ||
+      m.includes('forbidden')
+    );
+  }
+
+  private async tryRefreshAuthAndReconnect(source: string): Promise<void> {
+    if (!this.socket || !this.userId || this.isRefreshingSocketAuth) return;
+    this.isRefreshingSocketAuth = true;
+    try {
+      logger.warn('Refresh JWT avant reconnexion socket', 'userOrderSocketService', { source });
+      const newToken = await userApiService.ensureAccessToken({ forceRefresh: true });
+      if (!newToken || !this.socket || !this.userId) return;
+
+      this.lastSocketAuthToken = newToken;
+      this.socket.auth = { token: newToken };
+      this.socket.disconnect();
+      this.socket.connect();
+      logger.info('Reconnexion socket relancée avec JWT rafraîchi', 'userOrderSocketService');
+    } catch (err) {
+      logger.warn('Échec refresh JWT pour socket', 'userOrderSocketService', err);
+    } finally {
+      this.isRefreshingSocketAuth = false;
+    }
+  }
 
   connect(userId: string) {
     // Si le socket est déjà connecté avec le même userId, ne rien faire
@@ -49,13 +97,22 @@ class UserOrderSocketService {
       return;
     }
     this.lastSocketAuthToken = token;
+    const tokenExp = readJwtExpEpochSeconds(token);
+    const tokenTtlSec =
+      typeof tokenExp === 'number' ? tokenExp - Math.floor(Date.now() / 1000) : null;
     logger.info('🔌 Connexion au socket...', 'userOrderSocketService', { socketUrl });
+    logger.info('Socket auth diagnostic', 'userOrderSocketService', {
+      hasToken: Boolean(token),
+      tokenExp,
+      tokenTtlSec,
+      userId,
+    });
     this.socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 24,
       timeout: 20000,
       forceNew: false,
       upgrade: true,
@@ -65,25 +122,73 @@ class UserOrderSocketService {
       },
     });
 
+    this.socket.io.on('reconnect_attempt', (attempt) => {
+      const latestToken = useAuthStore.getState().accessToken;
+      if (latestToken && latestToken !== this.lastSocketAuthToken && this.socket) {
+        this.lastSocketAuthToken = latestToken;
+        this.socket.auth = { token: latestToken };
+      }
+      logger.warn('Socket commandes: tentative de reconnexion', 'userOrderSocketService', {
+        attempt,
+        connected: this.socket?.connected,
+        transport: this.socket?.io?.engine?.transport?.name,
+      });
+    });
+
+    this.socket.io.on('reconnect_error', (error: Error & { type?: string; description?: unknown }) => {
+      reportSocketIssue('client_orders_reconnect_error', {
+        socketUrl,
+        message: error.message,
+        type: String(error.type ?? ''),
+        description: String(error.description ?? ''),
+        transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+      });
+    });
+
+    this.socket.io.on('error', (error: Error & { type?: string; description?: unknown }) => {
+      reportSocketIssue('client_orders_manager_error', {
+        socketUrl,
+        message: error.message,
+        type: String(error.type ?? ''),
+        description: String(error.description ?? ''),
+        transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+      });
+    });
+
     this.socket.io.on('reconnect_failed', () => {
       logger.warn('Socket commandes: reconnexions épuisées', 'userOrderSocketService');
       useRealtimeDegradedStore.getState().setSocketDegraded(true);
-      reportSocketIssue('client_orders_reconnect_failed', { socketUrl });
+      reportSocketIssue('client_orders_reconnect_failed', {
+        socketUrl,
+        transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+        retries: this.retryCount,
+      });
     });
 
     this.socket.on('connect_error', (error: Error & { type?: string }) => {
+      this.retryCount = (this.retryCount || 0) + 1;
       const isTemporaryPollError =
         error.message?.includes('xhr poll error') ||
         error.message?.includes('poll error') ||
         error.message?.includes('transport unknown') ||
         error.message?.includes('websocket error') ||
         (error as { type?: string }).type === 'TransportError';
-      if (!isTemporaryPollError) {
+      const errorPayload = {
+        socketUrl,
+        message: error.message,
+        type: String((error as { type?: string }).type ?? ''),
+        retries: this.retryCount,
+        transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+      };
+      logger.warn('Socket connect_error', 'userOrderSocketService', errorPayload);
+      if (!isTemporaryPollError || this.retryCount >= 3) {
         reportSocketIssue('client_orders_connect_error', {
-          socketUrl,
-          message: error.message,
-          type: String((error as { type?: string }).type ?? ''),
+          ...errorPayload,
+          temporaryPollError: isTemporaryPollError,
         });
+      }
+      if (this.isAuthRelatedSocketError(error.message)) {
+        void this.tryRefreshAuthAndReconnect('connect_error');
       }
     });
 
@@ -523,6 +628,10 @@ class UserOrderSocketService {
       logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
       this.isConnected = true;
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
+      reportSocketIssue('client_orders_connected', {
+        socketUrl: config.socketUrl,
+        transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+      });
 
       // CRITIQUE : Installer les listeners AVANT d'émettre user-connect
       // Cela garantit que si le serveur envoie un événement immédiatement après user-connect,
