@@ -8,7 +8,7 @@ export const config = {
   
   // App Configuration
   app: {
-    name: 'Dashboard Krono Admin',
+    name: 'Dashboard Krono',
     description: 'Dashboard et administration Krono Livraison',
     /**
      * Logo pleine image (portrait) — connexion, sidebar (`@/assets/chrono.png`).

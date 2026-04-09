@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: appName,
-    template: "%s | Krono Admin",
+    template: "%s | Krono",
   },
   description: appDescription,
   manifest: "/site.webmanifest",
