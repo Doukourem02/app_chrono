@@ -104,8 +104,16 @@ io.use(async (socket, next) => {
       ? socket.handshake.headers.authorization
       : undefined);
 
+  // Debug prod : handshake sans données sensibles (pas de JWT)
+  logger.info('Socket handshake', {
+    hasToken: Boolean(authToken),
+    hasOrigin: Boolean(socket.handshake.headers?.origin),
+    transport: (socket.handshake as { query?: { transport?: string } }).query?.transport ?? 'default',
+  });
+
   if (!authToken) {
     if (allowUnauthenticated) return next();
+    logger.warn('Socket handshake rejected: no token');
     return next(new Error('Unauthorized'));
   }
 
@@ -117,6 +125,7 @@ io.use(async (socket, next) => {
     (socket.data as any).user = decoded;
     (socket as any).userId = decoded.id;
     (socket as any).userRole = decoded.role;
+    logger.info('Socket auth OK (backend JWT)', { role: decoded.role, socketId: socket.id });
     return next();
   } catch {
     // 2) Fallback: JWT Supabase (admin_chrono)
@@ -151,6 +160,7 @@ io.use(async (socket, next) => {
             (socket.data as any).user = { id: dbUser.id, role: dbUser.role };
             (socket as any).userId = dbUser.id;
             (socket as any).userRole = dbUser.role;
+            logger.info('Socket auth OK (Supabase admin)', { socketId: socket.id });
             return next();
           }
         }
@@ -161,6 +171,7 @@ io.use(async (socket, next) => {
   }
 
   if (allowUnauthenticated) return next();
+  logger.warn('Socket handshake rejected: invalid or non-admin token');
   return next(new Error('Unauthorized'));
 });
 
