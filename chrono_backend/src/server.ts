@@ -59,6 +59,9 @@ const allowedOrigins = getAllowedOrigins();
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 const io = new Server(server, {
+  // Réduit les déconnexions « fantômes » derrière proxy / idle timeout (ex. Render).
+  pingInterval: 25_000,
+  pingTimeout: 60_000,
   cors: {
     origin: (origin, callback) => {
       if (!origin) {
