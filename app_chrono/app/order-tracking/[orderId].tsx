@@ -69,14 +69,8 @@ export default function OrderTrackingPage() {
     requireAuth(() => {});
   }, [requireAuth]);
 
-  useEffect(() => {
-    if (user?.id) {
-      userOrderSocketService.connect(user.id);
-    }
-    return () => {
-      userOrderSocketService.disconnect();
-    };
-  }, [user?.id]);
+  // Socket commandes : connecté dans (tabs)/_layout uniquement. Ne pas disconnect ici :
+  // au retour depuis le suivi, ça coupait le socket global et provoquait polls 400 / erreurs enregistrement.
 
   useEffect(() => {
     if (user?.id) {

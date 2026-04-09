@@ -5,7 +5,7 @@ import { useOrderStore } from '../store/useOrderStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { logger } from '../utils/logger';
-import { reportSocketIssue } from '../utils/sentry';
+import { addSocketSuccessBreadcrumb, reportSocketIssue } from '../utils/sentry';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
 import { soundService } from './soundService';
@@ -130,9 +130,14 @@ class UserOrderSocketService {
   }
 
   connect(userId: string) {
-    // Si le socket est déjà connecté avec le même userId, ne rien faire
+    // Déjà connecté
     if (this.socket && this.isConnected && this.socket.connected && this.userId === userId && this.listenersSetup) {
       logger.debug('🔌 Socket déjà connecté avec le même userId, ignoré', 'userOrderSocketService');
+      return;
+    }
+    // Même user, socket en cours de connexion (handshake) : ne pas recréer (sinon 400 sur l’ancien sid)
+    if (this.socket && this.userId === userId && this.listenersSetup && this.socket.active) {
+      logger.debug('🔌 Socket commandes déjà actif pour ce userId (handshake ou reconnect), ignoré', 'userOrderSocketService');
       return;
     }
 
@@ -735,7 +740,7 @@ class UserOrderSocketService {
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
       this.reconnectRecoveryCount = 0;
       // Si on a réussi à se reconnecter en polling-only, on reste stable dans ce mode.
-      reportSocketIssue('client_orders_connected', {
+      addSocketSuccessBreadcrumb('client_orders_connected', {
         socketUrl: config.socketUrl,
         transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
       });
@@ -801,6 +806,7 @@ class UserOrderSocketService {
       this.isConnected = false;
       this.userId = null;
     }
+    this.listenersSetup = false;
     this.lastSocketAuthToken = null;
   }
 

@@ -18,6 +18,12 @@ class UserMessageSocketService {
       return;
     }
 
+    // Même user, handshake ou reconnexion en cours : ne pas recréer (évite sid invalide → 400 / xhr poll error)
+    if (this.socket && this.userId === userId && this.socket.active) {
+      logger.debug('🔌 Socket messagerie déjà actif pour ce userId (handshake ou reconnect), ignoré', 'userMessageSocketService');
+      return;
+    }
+
     // Nettoyer l'ancien socket s'il existe
     if (this.socket) {
       logger.info('🔄 Nettoyage de l\'ancien socket', 'userMessageSocketService');

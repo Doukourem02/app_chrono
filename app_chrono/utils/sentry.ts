@@ -109,3 +109,19 @@ export function reportSocketIssue(
     extra: data,
   });
 }
+
+/** Breadcrumb info uniquement (pas de captureMessage) — ex. connexion Socket.IO réussie. */
+export function addSocketSuccessBreadcrumb(
+  eventKey: string,
+  data: Record<string, unknown>
+): void {
+  if (__DEV__ || !hasSentryDsn()) {
+    return;
+  }
+  Sentry.addBreadcrumb({
+    category: 'socket.io',
+    level: 'info',
+    message: eventKey,
+    data,
+  });
+}
