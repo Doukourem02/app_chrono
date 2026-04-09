@@ -36,14 +36,14 @@ class UserMessageSocketService {
     }
     logger.info('🔌 Connexion au socket de messagerie...', 'userMessageSocketService', { socketUrl });
     this.socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: __DEV__ ? ['websocket', 'polling'] : ['polling'],
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
       reconnectionAttempts: 5,
       timeout: 20000,
       forceNew: false,
-      upgrade: true,
+      upgrade: __DEV__,
       autoConnect: true,
       auth: {
         token,

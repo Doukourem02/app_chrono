@@ -34,6 +34,10 @@ class UserOrderSocketService {
   private isCreatingOrder = false; // Protection contre les appels multiples
   private listenersSetup = false; // Flag pour éviter les listeners multiples
   private isRefreshingSocketAuth = false;
+  /** Après reconnect_failed : combien de fois on a déjà tout recréé avec JWT forcé. */
+  private reconnectRecoveryCount = 0;
+  /** Fallback transport: si WS échoue en boucle, forcer polling-only. */
+  private forcedPollingMode = false;
 
   private isAuthRelatedSocketError(message: string | undefined): boolean {
     const m = (message || '').toLowerCase();
@@ -44,8 +48,57 @@ class UserOrderSocketService {
       m.includes('unauthenticated') ||
       m.includes('authentication') ||
       m.includes('invalid credentials') ||
-      m.includes('forbidden')
+      m.includes('forbidden') ||
+      m.includes('expired') ||
+      m.includes('handshake')
     );
+  }
+
+  /**
+   * reconnect_failed : Socket.IO a abandonné — souvent JWT périmé ou transport bloqué.
+   * On force un refresh HTTP puis on recrée un socket neuf (pas seulement disconnect/connect).
+   */
+  private async recoverSocketAfterReconnectFailed(): Promise<void> {
+    const uid = this.userId;
+    if (!uid || this.isRefreshingSocketAuth) return;
+    if (this.reconnectRecoveryCount >= 2) {
+      useRealtimeDegradedStore.getState().setSocketDegraded(true);
+      return;
+    }
+    this.reconnectRecoveryCount += 1;
+    this.isRefreshingSocketAuth = true;
+    try {
+      logger.warn('Recovery socket après reconnect_failed (JWT forcé + nouveau client)', 'userOrderSocketService', {
+        attempt: this.reconnectRecoveryCount,
+      });
+      const newToken = await userApiService.ensureAccessToken({ forceRefresh: true });
+      if (!newToken) {
+        useRealtimeDegradedStore.getState().setSocketDegraded(true);
+        reportSocketIssue('client_orders_reconnect_failed_no_token', {
+          socketUrl: config.socketUrl,
+        });
+        return;
+      }
+      if (this.socket) {
+        try {
+          this.socket.removeAllListeners();
+          this.socket.io.removeAllListeners();
+          this.socket.disconnect();
+        } catch {
+          /* ignore */
+        }
+        this.socket = null;
+      }
+      this.listenersSetup = false;
+      this.isConnected = false;
+      this.lastSocketAuthToken = newToken;
+      this.connect(uid);
+    } catch (err) {
+      logger.warn('Recovery socket échouée', 'userOrderSocketService', err);
+      useRealtimeDegradedStore.getState().setSocketDegraded(true);
+    } finally {
+      this.isRefreshingSocketAuth = false;
+    }
   }
 
   private async tryRefreshAuthAndReconnect(source: string): Promise<void> {
@@ -66,6 +119,13 @@ class UserOrderSocketService {
     } finally {
       this.isRefreshingSocketAuth = false;
     }
+  }
+
+  private buildSocketTransports(): ('websocket' | 'polling')[] {
+    if (this.forcedPollingMode) return ['polling'];
+    // Prod : WebSocket upgrade souvent cassé sur mobile/4G alors que HTTPS REST marche → polling seul (fiable).
+    if (!__DEV__) return ['polling'];
+    return ['websocket', 'polling'];
   }
 
   connect(userId: string) {
@@ -108,14 +168,14 @@ class UserOrderSocketService {
       userId,
     });
     this.socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: this.buildSocketTransports(),
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
       reconnectionAttempts: 24,
       timeout: 20000,
       forceNew: false,
-      upgrade: true,
+      upgrade: __DEV__,
       autoConnect: true,
       auth: {
         token,
@@ -156,13 +216,14 @@ class UserOrderSocketService {
     });
 
     this.socket.io.on('reconnect_failed', () => {
-      logger.warn('Socket commandes: reconnexions épuisées', 'userOrderSocketService');
-      useRealtimeDegradedStore.getState().setSocketDegraded(true);
+      logger.warn('Socket commandes: reconnexions épuisées — tentative recovery JWT + nouveau socket', 'userOrderSocketService');
       reportSocketIssue('client_orders_reconnect_failed', {
         socketUrl,
         transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
         retries: this.retryCount,
+        recoveryAttempt: this.reconnectRecoveryCount,
       });
+      void this.recoverSocketAfterReconnectFailed();
     });
 
     this.socket.on('connect_error', (error: Error & { type?: string }) => {
@@ -187,8 +248,38 @@ class UserOrderSocketService {
           temporaryPollError: isTemporaryPollError,
         });
       }
-      if (this.isAuthRelatedSocketError(error.message)) {
+      // iOS renvoie souvent seulement « websocket error » alors que le handshake JWT est refusé.
+      const persistentAuthGuess = this.retryCount >= 8 && this.retryCount % 8 === 0;
+      if (this.isAuthRelatedSocketError(error.message) || persistentAuthGuess) {
         void this.tryRefreshAuthAndReconnect('connect_error');
+      }
+
+      // Si WS échoue en boucle avec TransportError, basculer en polling-only.
+      const isWebsocketTransportError =
+        isTemporaryPollError &&
+        ((error as { type?: string }).type === 'TransportError' ||
+          (error.message || '').toLowerCase().includes('websocket error'));
+      if (isWebsocketTransportError && !this.forcedPollingMode && this.retryCount >= 4 && this.userId) {
+        const currentSocket = this.socket;
+        if (!currentSocket) return;
+        this.forcedPollingMode = true;
+        reportSocketIssue('client_orders_force_polling_fallback', {
+          socketUrl,
+          retries: this.retryCount,
+          previousTransport: currentSocket.io?.engine?.transport?.name ?? 'websocket',
+        });
+        logger.warn('Fallback socket: passage en polling-only après erreurs websocket', 'userOrderSocketService', {
+          retries: this.retryCount,
+        });
+        const uid = this.userId;
+        currentSocket.removeAllListeners();
+        currentSocket.io.removeAllListeners();
+        currentSocket.disconnect();
+        this.socket = null;
+        this.listenersSetup = false;
+        this.isConnected = false;
+        this.connect(uid);
+        return;
       }
     });
 
@@ -628,6 +719,8 @@ class UserOrderSocketService {
       logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
       this.isConnected = true;
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
+      this.reconnectRecoveryCount = 0;
+      // Si on a réussi à se reconnecter en polling-only, on reste stable dans ce mode.
       reportSocketIssue('client_orders_connected', {
         socketUrl: config.socketUrl,
         transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',

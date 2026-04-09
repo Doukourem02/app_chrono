@@ -4,6 +4,7 @@ import { MapView, Camera, PointAnnotation, ShapeSource, LineLayer } from '@rnmap
 import type { MapRefHandle } from '../hooks/useMapCamera';
 import { COTE_IVOIRE_MAX_BOUNDS } from '../utils/mapBounds';
 import { ensureMapboxAccessToken } from '../mapboxInit';
+import { config } from '../config';
 
 type Coordinates = {
   latitude: number;
@@ -91,6 +92,10 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
   ensureMapboxAccessToken();
   const cameraRef = useRef<Camera>(null);
 
+  const mapboxToken = config.mapboxAccessToken?.trim();
+  const hasMapboxToken =
+    Boolean(mapboxToken && mapboxToken.length >= 10 && !mapboxToken.startsWith('<'));
+
   useEffect(() => {
     if (!cameraRef.current || !mapRef) return;
     mapRef.current = {
@@ -126,6 +131,18 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
     return (
       <View style={styles.map}>
         <Text>Mapbox n&apos;est pas disponible sur web. Utilisez un dev build iOS/Android.</Text>
+      </View>
+    );
+  }
+
+  if (!hasMapboxToken) {
+    return (
+      <View style={[styles.map, styles.mapPlaceholder]}>
+        <Text style={styles.mapPlaceholderTitle}>Carte indisponible</Text>
+        <Text style={styles.mapPlaceholderText}>
+          Token Mapbox manquant ou invalide dans le build. Définissez EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN sur
+          EAS (profil production), avec le même token pk. que sur Mapbox, puis refaites un build.
+        </Text>
       </View>
     );
   }
@@ -223,6 +240,25 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
 
 const styles = StyleSheet.create({
   map: { flex: 1 },
+  mapPlaceholder: {
+    backgroundColor: '#f5f5f4',
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapPlaceholderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#44403c',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  mapPlaceholderText: {
+    fontSize: 13,
+    color: '#57534e',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
   pickupMarker: {
     alignItems: 'center',
     justifyContent: 'center',

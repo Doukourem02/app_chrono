@@ -61,14 +61,14 @@ class DriverMessageSocketService {
     this.isConnected = false;
 
     this.socket = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
+      transports: __DEV__ ? ['websocket', 'polling'] : ['polling'],
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
       reconnectionAttempts: 24,
       timeout: 20000,
       forceNew: false,
-      upgrade: true,
+      upgrade: __DEV__,
       autoConnect: true,
       auth: {
         token,
