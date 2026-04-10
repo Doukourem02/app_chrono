@@ -47,6 +47,8 @@ export interface OrderRequest {
   estimatedDuration: string;
   status: OrderStatus;
   driverId?: string;
+  /** Cible de l’offre en cours (socket) avant acceptation — resync / popup */
+  offeredDriverId?: string;
   createdAt: Date;
   acceptedAt?: Date;
   completedAt?: Date;

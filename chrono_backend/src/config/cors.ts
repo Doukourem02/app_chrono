@@ -3,6 +3,31 @@
  * Gère les origines autorisées selon l'environnement
  */
 
+/**
+ * URL publique du backend (sans chemin), ex. https://api.kro-no-delivery.com
+ * Certaines stacks (iOS / RN) envoient Origin = cette URL sur les requêtes Socket.IO polling.
+ */
+export function getBackendPublicOrigin(): string | null {
+  const raw = [
+    process.env.API_PUBLIC_URL,
+    process.env.BACKEND_PUBLIC_URL,
+    process.env.PUBLIC_API_URL,
+    process.env.RENDER_EXTERNAL_URL,
+  ].find((s) => typeof s === 'string' && s.trim().length > 0);
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const normalized = /^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`;
+    const u = new URL(normalized);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return null;
+  }
+}
+
 export function getAllowedOrigins(): string[] {
   // En production, utiliser uniquement les origines configurées
   if (process.env.NODE_ENV === 'production') {
@@ -53,6 +78,11 @@ export function isOriginAllowed(origin: string | undefined): boolean {
     ) {
       return true;
     }
+  }
+
+  const selfOrigin = getBackendPublicOrigin();
+  if (selfOrigin && origin === selfOrigin) {
+    return true;
   }
 
   return allowedOrigins.includes(origin);

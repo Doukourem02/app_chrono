@@ -14,7 +14,7 @@ import { initializeRedis, closeRedis, pubClient, subClient } from './config/redi
 import { createClient } from '@supabase/supabase-js';
 import pool from './config/db.js';
 import { verifyAccessToken } from './utils/jwt.js';
-import { getAllowedOrigins } from './config/cors.js';
+import { isOriginAllowed } from './config/cors.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -52,9 +52,6 @@ try {
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const server = http.createServer(app);
 
-// SÉCURITÉ: en prod, ALLOWED_ORIGINS doit être défini (pas de fallback permissif)
-const allowedOrigins = getAllowedOrigins();
-
 // En développement, accepter toutes les origines localhost et 192.168.*
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
@@ -78,11 +75,11 @@ const io = new Server(server, {
         }
       }
 
-      if (allowedOrigins.includes(origin)) {
+      // Aligné sur CORS HTTP : inclut ALLOWED_ORIGINS + origine publique du backend (API_PUBLIC_URL, etc.)
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
         logger.warn(`Socket.io CORS bloqué pour origin: ${origin}`, {
-          allowedOrigins,
           nodeEnv: process.env.NODE_ENV,
           isDevelopment,
         });

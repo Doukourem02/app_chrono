@@ -1,7 +1,7 @@
 import { Socket, Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/db.js';
-import {recordOrderAssignment,saveDeliveryProofRecord,saveOrder, generateAndSaveTrackingToken, updateOrderStatus as updateOrderStatusDB,getActiveOrdersByDriver,} from '../config/orderStorage.js';
+import {recordOrderAssignment,saveDeliveryProofRecord,saveOrder, generateAndSaveTrackingToken, updateOrderStatus as updateOrderStatusDB,getActiveOrdersByDriver,getPendingOfferOrdersForDriver,} from '../config/orderStorage.js';
 import qrCodeService from '../services/qrCodeService.js';
 import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionForOrder.js';
 import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
@@ -658,10 +658,11 @@ async function notifyDriversForOrder(
       if (driverSocketId) {
         const assignedAt = new Date();
         order.assignedAt = assignedAt;
-        
+        (order as any).offeredDriverId = driver.driverId;
+
         // Enregistrer l'assignation
         await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => {});
-        
+
         // Envoyer la commande au livreur
         io.to(driverSocketId).emit('new-order-request', order);
         
@@ -1002,7 +1003,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           const driverSocketId = connectedDrivers.get(driver.driverId);
 
           logger.debug(`[DIAGNOSTIC] Tentative envoi à livreur ${maskUserId(driver.driverId)}:`); logger.debug(` - Socket ID: ${driverSocketId || 'NON CONNECTÉ'}`); logger.debug(` - Distance: ${driver.distance.toFixed(2)}km`); if (driverSocketId) {
-            const assignedAt = new Date(); order.assignedAt = assignedAt; logger.debug(`Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`); await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => { }); io.to(driverSocketId).emit('new-order-request', order); logger.debug(`Événement 'new-order-request' émis vers socket ${driverSocketId}`); setTimeout(async () => { const currentOrder = activeOrders.get(order.id); if (currentOrder && currentOrder.status === 'pending') { if (DEBUG) logger.debug(`Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`); await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => { }); driverIndex++; tryNextDriver().catch(() => { }); } }, DRIVER_OFFER_RESPONSE_MS);
+            const assignedAt = new Date(); order.assignedAt = assignedAt; (order as any).offeredDriverId = driver.driverId; logger.debug(`Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`); await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => { }); io.to(driverSocketId).emit('new-order-request', order); logger.debug(`Événement 'new-order-request' émis vers socket ${driverSocketId}`); setTimeout(async () => { const currentOrder = activeOrders.get(order.id); if (currentOrder && currentOrder.status === 'pending') { if (DEBUG) logger.debug(`Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`); await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => { }); driverIndex++; tryNextDriver().catch(() => { }); } }, DRIVER_OFFER_RESPONSE_MS);
           } else {
             if (DEBUG) logger.debug(`Chauffeur ${driver.driverId} trouvé mais socket non connecté.`); driverIndex++; tryNextDriver().catch(() => { });
           }
@@ -1836,11 +1837,26 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 
         // Charger depuis la base de données pour avoir les statuts à jour
         try {
-          const dbOrders = await getActiveOrdersByDriver(driverId);
+          const acceptedRows = await getActiveOrdersByDriver(driverId);
+          const pendingOffers = await getPendingOfferOrdersForDriver(driverId);
+          const seenIds = new Set<string>();
+          const dbOrders: any[] = [];
+          for (const row of [...acceptedRows, ...pendingOffers]) {
+            if (row?.id && !seenIds.has(row.id)) {
+              seenIds.add(row.id);
+              dbOrders.push(row);
+            }
+          }
           logger.info(
             `[driver-reconnect] Commandes récupérées depuis DB pour driver ${maskUserId(driverId)}:`,
             undefined,
-            { count: dbOrders.length, orderIds: dbOrders.map(o => maskOrderId(o.id)), statuses: dbOrders.map(o => o.status) }
+            {
+              count: dbOrders.length,
+              acceptedCount: acceptedRows.length,
+              pendingOfferCount: pendingOffers.length,
+              orderIds: dbOrders.map((o) => maskOrderId(o.id)),
+              statuses: dbOrders.map((o) => o.status),
+            }
           );
           
           for (const dbOrder of dbOrders) {
@@ -1975,7 +1991,10 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             continue; // Ignorer complètement les commandes complétées/annulées
           }
           
-          if (memOrder.driverId === driverId && !allOrders.has(orderId)) {
+          const offeredToThisDriver =
+            (memOrder as any).offeredDriverId === driverId ||
+            memOrder.driverId === driverId;
+          if (offeredToThisDriver && !allOrders.has(orderId)) {
             // Triple vérification avant d'ajouter (par sécurité)
             const finalCheck = String(memOrder.status || '').toLowerCase();
             if (finalCheck !== 'completed' && finalCheck !== 'cancelled' && finalCheck !== 'declined') {

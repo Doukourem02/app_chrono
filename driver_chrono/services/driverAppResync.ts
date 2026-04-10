@@ -52,5 +52,9 @@ export async function runDriverAppResync(userId: string): Promise<void> {
   }
 
   orderSocketService.requestServerOrdersResync(userId);
+  /** iOS peut reconnecter le socket quelques ms après le retour premier plan : re-tenter le resync offres pending. */
+  setTimeout(() => orderSocketService.requestServerOrdersResync(userId), 500);
+  setTimeout(() => orderSocketService.requestServerOrdersResync(userId), 1800);
+
   driverMessageSocketService.reassertDriverPresence(userId);
 }

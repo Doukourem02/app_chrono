@@ -702,6 +702,52 @@ export async function getOrderById(orderId: string): Promise<any | null> {
         distance: order.distance_km != null ? Number(order.distance_km) : null,
       estimatedDuration: etaMinutes != null ? `${etaMinutes} min` : null, }; }); } catch (error: any) {
   logger.error('Erreur lors de la récupération des commandes du chauffeur:', error); throw error; }
+}
+
+/**
+ * Offres en cours (statut pending) où ce livreur est la cible active (order_assignments),
+ * sans driver_id encore sur orders — indispensable pour resync après retour premier plan / socket.
+ */
+export async function getPendingOfferOrdersForDriver(driverId: string): Promise<any[]> {
+  try {
+    const tableCheck = await (pool as any).query(
+      `SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'order_assignments'
+      ) AS exists`
+    );
+    if (!tableCheck.rows?.[0]?.exists) {
+      return [];
+    }
+
+    const result = await (pool as any).query(
+      `SELECT o.*
+       FROM orders o
+       INNER JOIN order_assignments oa ON oa.order_id = o.id AND oa.driver_id = $1
+       WHERE o.status = 'pending'
+         AND oa.accepted_at IS NULL
+         AND oa.declined_at IS NULL
+         AND oa.assigned_at IS NOT NULL
+       ORDER BY oa.assigned_at DESC`,
+      [driverId]
+    );
+
+    return (result.rows || []).map((order: any) => {
+      const etaMinutes = order.eta_minutes != null ? Number(order.eta_minutes) : null;
+      return {
+        ...order,
+        pickup: parseJsonField(order.pickup_address),
+        dropoff: parseJsonField(order.dropoff_address),
+        price: order.price_cfa != null ? Number(order.price_cfa) : null,
+        deliveryMethod: order.delivery_method,
+        distance: order.distance_km != null ? Number(order.distance_km) : null,
+        estimatedDuration: etaMinutes != null ? `${etaMinutes} min` : null,
+      };
+    });
+  } catch (error: any) {
+    logger.warn('getPendingOfferOrdersForDriver:', error?.message || error);
+    return [];
+  }
 } export async function completeOrder(orderId: string): Promise<boolean> {
   try {
   await updateOrderStatus(orderId, 'completed', { completed_at: new Date() }); return true;
