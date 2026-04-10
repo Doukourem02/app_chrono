@@ -21,21 +21,20 @@ const PAYMENT_METHODS: {
   color: string;
   useImage?: boolean; 
 }[] = [
-  { 
-    type: 'orange_money', 
-    name: 'Orange Money', 
-    icon: 'phone-portrait', 
-    image: require('../assets/images/images.png'), 
+  {
+    type: 'orange_money',
+    name: 'Orange Money',
+    icon: 'phone-portrait',
     color: '#FF6600',
-    useImage: true 
+    useImage: false,
   },
-  { 
-    type: 'wave', 
-    name: 'Wave', 
-    icon: 'wallet', 
-    image: require('../assets/images/WAVE-recrute-pour-ce-poste-12-Decembre-2024.png'),
+  {
+    type: 'wave',
+    name: 'Wave',
+    icon: 'wallet',
+    image: require('../assets/images/wave.png'),
     color: '#00A8E8',
-    useImage: true 
+    useImage: true,
   },
   { type: 'cash', name: 'Espèces', icon: 'cash', color: '#28A745', useImage: false },
   { type: 'deferred', name: 'Paiement différé', icon: 'time', color: '#FFC107', useImage: false },
