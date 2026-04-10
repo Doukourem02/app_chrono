@@ -14,7 +14,6 @@ export default function PersonalInfoPage() {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    email: user?.email || '',
     phone: user?.phone || '',
   });
 
@@ -24,7 +23,6 @@ export default function PersonalInfoPage() {
       setFormData({
         firstName: profile?.first_name || user?.first_name || '',
         lastName: profile?.last_name || user?.last_name || '',
-        email: user?.email || '',
         phone: user?.phone || '',
       });
       setIsInitialized(true);
@@ -129,17 +127,6 @@ export default function PersonalInfoPage() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={[styles.input, styles.inputDisabled]}
-              value={formData.email}
-              editable={false}
-              placeholderTextColor="#9CA3AF"
-            />
-            <Text style={styles.helperText}>L&apos;email ne peut pas être modifié</Text>
-          </View>
-
-          <View style={styles.inputGroup}>
             <Text style={styles.label}>Téléphone</Text>
             <TextInput
               style={styles.input}
@@ -226,15 +213,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#1F2937',
-  },
-  inputDisabled: {
-    backgroundColor: '#F3F4F6',
-    color: '#6B7280',
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
   },
   saveButton: {
     backgroundColor: '#8B5CF6',

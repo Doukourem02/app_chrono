@@ -51,7 +51,15 @@ export async function canReceiveOrders(driverId: string): Promise<{
     }
 
     const driverType = driverCheck.rows[0].driver_type;
-    
+
+    if (driverType == null || driverType === '') {
+      return {
+        canReceive: false,
+        reason:
+          'Type de livreur non défini. Ouvrez l’app et choisissez « interne » ou « partenaire » dans votre profil.',
+      };
+    }
+
     // Les livreurs internes peuvent toujours recevoir des commandes
     if (driverType === 'internal') {
       return { canReceive: true };
@@ -123,6 +131,10 @@ export async function deductCommissionAfterDelivery(
     }
 
     const driverType = driverCheck.rows[0].driver_type;
+
+    if (driverType == null || driverType === '') {
+      return { success: false, error: 'Type de livreur non défini' };
+    }
 
     // Les livreurs internes ne paient pas de commission
     if (driverType === 'internal') {

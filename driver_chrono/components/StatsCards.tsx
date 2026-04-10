@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useDriverStore } from '../store/useDriverStore';
 import { CommissionBalanceCard } from './CommissionBalanceCard';
 
@@ -20,7 +21,9 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
   todayDeliveries = 0
 }) => {
   const { profile } = useDriverStore();
-  const isPartner = profile?.driver_type === 'partner';
+  const driverType = profile?.driver_type;
+  const needsTypeChoice = profile != null && (driverType == null || driverType === undefined);
+  const isPartner = driverType === 'partner';
 
   const formatCurrency = (amount: number) => {
     const formatted = new Intl.NumberFormat('fr-FR', {
@@ -50,8 +53,23 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
         </View>
       </View>
 
-      {/* Carte conditionnelle : Revenus total (interne) ou Solde Commission (partenaire) */}
-      {isPartner ? (
+      {/* Carte conditionnelle : choix type / commission partenaire / revenus interne */}
+      {needsTypeChoice ? (
+        <TouchableOpacity
+          style={[styles.card, styles.cardAction]}
+          onPress={() => router.push('/(auth)/driver-type-selection' as any)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="person-outline" size={24} color="#8B5CF6" />
+          <View style={{ marginLeft: 8, flex: 1 }}>
+            <Text style={styles.cardTitle}>Type de livreur</Text>
+            <Text style={styles.cardSubtitleAction}>
+              Appuyez pour choisir interne ou partenaire
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#8B5CF6" />
+        </TouchableOpacity>
+      ) : isPartner ? (
         <CommissionBalanceCard isOnline={isOnline} />
       ) : (
         <View style={[styles.card, !isOnline && styles.cardDisabled]}>
@@ -111,5 +129,15 @@ const styles = StyleSheet.create({
   },
   textDisabled: {
     color: '#9CA3AF',
+  },
+  cardAction: {
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    backgroundColor: '#FAF5FF',
+  },
+  cardSubtitleAction: {
+    fontSize: 12,
+    color: '#7C3AED',
+    marginTop: 2,
   },
 });

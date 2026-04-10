@@ -108,17 +108,21 @@ const createDriverProfile = async (
   try {
     const clientForInsert = supabaseAdmin || supabase;
 
-    const { data: existingProfile, error: checkError } = await clientForInsert
+    const { data: existingProfile } = await clientForInsert
       .from('driver_profiles')
-      .select('id')
+      .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (existingProfile) {
       logger.info(`Profil driver déjà existant pour user ${maskUserId(userId)}`);
       return existingProfile;
     }
 
+    // Ne pas envoyer driver_type : l’app livreur doit proposer le choix interne / partenaire.
+    // Si l’insert échoue (colonne NOT NULL sans défaut NULL), exécuter en SQL :
+    //   ALTER TABLE driver_profiles ALTER COLUMN driver_type DROP NOT NULL;
+    //   ALTER TABLE driver_profiles ALTER COLUMN driver_type DROP DEFAULT;
     const { data: driverProfile, error: insertError } = await clientForInsert
       .from('driver_profiles')
       .insert([
@@ -129,7 +133,6 @@ const createDriverProfile = async (
           first_name: firstName || null,
           last_name: lastName || null,
           vehicle_type: 'moto',
-          driver_type: 'partner', // Par défaut, tous les livreurs s'inscrivant sont des partenaires
           is_online: false,
           is_available: true,
           rating: 5.0,

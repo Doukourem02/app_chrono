@@ -229,6 +229,17 @@ export default function ProfilePage() {
       onPress: () => router.push('/profile/personal-info'),
     },
     {
+      icon: 'briefcase-outline',
+      title: 'Type de livreur (interne / partenaire)',
+      subtitle:
+        profile?.driver_type === 'internal'
+          ? 'Livreur interne Krono pro'
+          : profile?.driver_type === 'partner'
+            ? 'Livreur partenaire'
+            : 'À définir',
+      onPress: () => router.push('/(auth)/driver-type-selection' as any),
+    },
+    {
       icon: 'car-outline',
       title: 'Mon véhicule',
       onPress: () => router.push('/profile/vehicle'),
@@ -307,7 +318,6 @@ export default function ProfilePage() {
                 ? formatUserName(user as any) || formatUserName(profile as any) || 'Utilisateur'
                 : 'Compléter votre profil'}
             </Text>
-            <Text style={styles.userEmail}>{user?.email}</Text>
             <Text style={styles.userPhone}>{user?.phone}</Text>
             {!(user?.first_name || user?.last_name || profile?.first_name || profile?.last_name) && (
               <TouchableOpacity 
@@ -415,7 +425,12 @@ export default function ProfilePage() {
               <View style={styles.menuIcon}>
                 <Ionicons name={item.icon as any} size={24} color="#8B5CF6" />
               </View>
-              <Text style={styles.menuItemTitle}>{item.title}</Text>
+              <View style={styles.menuItemTextCol}>
+                <Text style={styles.menuItemTitle}>{item.title}</Text>
+                {'subtitle' in item && item.subtitle ? (
+                  <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                ) : null}
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
@@ -512,11 +527,6 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 4,
   },
-  userEmail: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
   userPhone: {
     fontSize: 14,
     color: '#6B7280',
@@ -605,6 +615,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 8,
+  },
+  menuItemTextCol: {
+    flex: 1,
   },
   menuIcon: {
     width: 40,
@@ -619,6 +633,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  menuItemSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
   },
   logoutButton: {
     backgroundColor: '#FEF2F2',

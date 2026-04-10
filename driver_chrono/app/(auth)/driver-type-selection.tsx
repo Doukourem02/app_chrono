@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,15 @@ export default function DriverTypeSelectionScreen() {
   const [selectedType, setSelectedType] = useState<'partner' | 'internal' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { setDriverType } = useTempDriverStore();
-  const { user, setProfile } = useDriverStore();
+  const { user, profile, setProfile } = useDriverStore();
+  /** Déjà un type en base : l’utilisateur change depuis le profil (pas le flux première connexion). */
+  const isChangingExistingType = Boolean(profile?.driver_type);
+
+  useEffect(() => {
+    if (profile?.driver_type === 'internal' || profile?.driver_type === 'partner') {
+      setSelectedType(profile.driver_type);
+    }
+  }, [profile?.driver_type]);
 
   const handleContinue = async () => {
     if (!selectedType) {
@@ -51,11 +59,9 @@ export default function DriverTypeSelectionScreen() {
         
         }
 
-        if (selectedType === 'partner') {
-      
+        if (selectedType === 'partner' && !isChangingExistingType) {
           router.replace('/(auth)/partner-onboarding' as any);
         } else {
-        
           router.replace('/(tabs)' as any);
         }
       } else {
