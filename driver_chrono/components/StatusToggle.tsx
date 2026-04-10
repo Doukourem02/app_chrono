@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Switch, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Switch, Dimensions, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
@@ -8,12 +8,15 @@ interface StatusToggleProps {
   isOnline: boolean;
   onToggle: (value: boolean) => void;
   hasLocationError?: boolean;
+  /** Ouvre les réglages app (localisation) — affiché si hasLocationError */
+  onOpenLocationSettings?: () => void;
 }
 
 export const StatusToggle: React.FC<StatusToggleProps> = ({ 
   isOnline, 
   onToggle, 
-  hasLocationError = false 
+  hasLocationError = false,
+  onOpenLocationSettings,
 }) => {
   const getStatusText = () => {
     if (hasLocationError) return 'Localisation indisponible';
@@ -31,7 +34,22 @@ export const StatusToggle: React.FC<StatusToggleProps> = ({
         <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]} />
         <Text style={styles.statusText}>{getStatusText()}</Text>
         {hasLocationError && (
-          <Ionicons name="warning" size={16} color="#FF6B6B" style={{ marginLeft: 5 }} />
+          onOpenLocationSettings ? (
+            <TouchableOpacity
+              onPress={onOpenLocationSettings}
+              accessibilityRole="button"
+              accessibilityLabel={
+                Platform.OS === 'ios'
+                  ? 'Ouvrir les réglages de localisation'
+                  : 'Ouvrir les paramètres de l’application'
+              }
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="warning" size={16} color="#FF6B6B" style={{ marginLeft: 5 }} />
+            </TouchableOpacity>
+          ) : (
+            <Ionicons name="warning" size={16} color="#FF6B6B" style={{ marginLeft: 5 }} />
+          )
         )}
       </View>
       

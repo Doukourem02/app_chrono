@@ -11,6 +11,7 @@ export function useDriversTracking(isSocketConnected: boolean) {
   const driversRef = useRef<Map<string, OnlineDriver>>(new Map())
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const positionResyncDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
   // Mettre à jour la ref quand l'état change
   useEffect(() => {
@@ -177,14 +178,17 @@ export function useDriversTracking(isSocketConnected: boolean) {
           updated_at: typedData.updated_at,
         })
       } else {
-        updateDriver({
-          userId: typedData.userId,
-          is_online: true,
-          is_available: true,
-          current_latitude: typedData.current_latitude,
-          current_longitude: typedData.current_longitude,
-          updated_at: typedData.updated_at ?? new Date().toISOString(),
-        })
+        // Ne pas inventer un livreur « en ligne » uniquement à partir d’une position :
+        // si driver:online / admin:initial-drivers a été manqué ou si le livreur est hors ligne côté serveur,
+        // ça affichait un marqueur actif à tort. On resynchronise via l’API (vérité is_online).
+        if (positionResyncDebounceRef.current) {
+          clearTimeout(positionResyncDebounceRef.current)
+        }
+        positionResyncDebounceRef.current = setTimeout(() => {
+          positionResyncDebounceRef.current = null
+          debug('[useDriversTracking] position:update sans entrée — resync API (debounced)')
+          void loadDriversFromAPI()
+        }, 600)
       }
     })
 
@@ -200,6 +204,10 @@ export function useDriversTracking(isSocketConnected: boolean) {
       }
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
+      }
+      if (positionResyncDebounceRef.current) {
+        clearTimeout(positionResyncDebounceRef.current)
+        positionResyncDebounceRef.current = null
       }
       unsubscribeInitialDrivers()
       unsubscribeDriverOnline()

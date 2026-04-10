@@ -1,6 +1,6 @@
 import "../../mapboxInit";
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator, InteractionManager } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator, InteractionManager, Linking } from "react-native";
 import type { MapRefHandle } from "../../hooks/useMapCamera";
 import { DriverMapView } from "../../components/DriverMapView";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +18,7 @@ import { useOrderStore } from "../../store/useOrderStore";
 import { useUIStore } from "../../store/useUIStore";
 import { apiService } from "../../services/apiService";
 import { orderSocketService } from "../../services/orderSocketService";
+import { requestBackgroundLocationPermissionForDuty } from "../../services/driverBackgroundLocation";
 import { driverMessageSocketService } from "../../services/driverMessageSocketService";
 import { logger } from '../../utils/logger';
 import { useMapCamera } from '../../hooks/useMapCamera';
@@ -60,6 +61,10 @@ export default function Index() {
   const isOnline = storeIsOnline;
   
   const { location, error } = useDriverLocation(isOnline);
+
+  const openAppLocationSettings = useCallback(() => {
+    void Linking.openSettings();
+  }, []);
   const mapRef = useRef<MapRefHandle | null>(null);
 
   const resolveCoords = (candidate?: any) => {
@@ -697,6 +702,9 @@ export default function Index() {
           }
         } else {
           sessionExpiredRef.current = false;
+          if (value) {
+            void requestBackgroundLocationPermissionForDuty();
+          }
         }
       }).catch((error) => {
         isTogglingRef.current = false;
@@ -992,6 +1000,7 @@ export default function Index() {
         isOnline={isOnline} 
         onToggle={handleToggleOnline}
         hasLocationError={!!error}
+        onOpenLocationSettings={error ? openAppLocationSettings : undefined}
       />
 
       <StatsCards 

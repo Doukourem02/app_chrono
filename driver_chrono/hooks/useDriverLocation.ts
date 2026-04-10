@@ -12,6 +12,8 @@ export const useDriverLocation = (isOnline: boolean) => {
   const [location, setLocation] = useState<DriverLocation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** iOS/Android : refus explicite — le système ne redemandera pas ; il faut ouvrir Réglages. */
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
@@ -24,16 +26,19 @@ export const useDriverLocation = (isOnline: boolean) => {
           subscription = null;
         }
         setLocation(null);
+        setPermissionDenied(false);
         return;
       }
 
       setLoading(true);
       setError(null);
+      setPermissionDenied(false);
 
       try {
-        // Demander les permissions
+        // Demander les permissions (dialog système la 1ère fois ; si déjà refusé, status === denied sans nouvelle popup)
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
+          setPermissionDenied(status === 'denied');
           setError('Permission de localisation refusée');
           setLoading(false);
           return;
@@ -83,5 +88,5 @@ export const useDriverLocation = (isOnline: boolean) => {
     };
   }, [isOnline]);
 
-  return { location, error, loading };
+  return { location, error, loading, permissionDenied };
 };

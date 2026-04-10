@@ -6,7 +6,8 @@ import qrCodeService from '../services/qrCodeService.js';
 import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionForOrder.js';
 import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
 import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
-import { broadcastOrderUpdateToAdmins } from './adminSocket.js';
+import { broadcastDriverStatusToAdmins, broadcastOrderUpdateToAdmins } from './adminSocket.js';
+import { realDriverStatuses } from '../controllers/driverController.js';
 import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
 import { autoLogDeliveryMileage } from '../controllers/fleetController.js';
@@ -103,6 +104,70 @@ const connectedDrivers = new Map<string, string>(); // driverId -> socketId
 const connectedUsers = new Map<string, string>(); // userId -> socketId // Limites configurable pour les commandes multiples
 const MAX_ACTIVE_ORDERS_PER_CLIENT = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_CLIENT || '5');
 const MAX_ACTIVE_ORDERS_PER_DRIVER = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_DRIVER || '3');
+
+/** Après déconnexion du socket livreur, délai avant passage hors ligne (évite faux positifs réseau / switch d’app). */
+const DRIVER_OFFLINE_GRACE_MS = parseInt(process.env.DRIVER_SOCKET_OFFLINE_GRACE_MS || '90000', 10);
+const driverDisconnectTimers = new Map<string, NodeJS.Timeout>();
+
+function clearDriverSocketOfflineTimer(driverId: string): void {
+  const t = driverDisconnectTimers.get(driverId);
+  if (t) {
+    clearTimeout(t);
+    driverDisconnectTimers.delete(driverId);
+  }
+}
+
+async function markDriverOfflineAfterSocketGrace(io: SocketIOServer, driverId: string): Promise<void> {
+  driverDisconnectTimers.delete(driverId);
+  if (connectedDrivers.has(driverId)) {
+    return;
+  }
+  const existing = realDriverStatuses.get(driverId);
+  if (!existing || existing.is_online !== true) {
+    return;
+  }
+
+  const updated_at = new Date().toISOString();
+  const updated = {
+    ...existing,
+    user_id: driverId,
+    is_online: false as const,
+    is_available: false,
+    updated_at,
+  };
+  realDriverStatuses.set(driverId, updated);
+
+  try {
+    await pool.query(
+      `UPDATE driver_profiles SET is_online = false, is_available = false, updated_at = NOW() WHERE user_id = $1`,
+      [driverId]
+    );
+  } catch (e: any) {
+    logger.warn(`[socket-disconnect] Échec MAJ DB is_online pour ${maskUserId(driverId)}:`, e?.message || e);
+  }
+
+  broadcastDriverStatusToAdmins(io, 'driver:offline', {
+    userId: driverId,
+    is_online: false,
+  });
+
+  logger.info(`[socket-disconnect] Livreur passé hors ligne (socket absent après ${DRIVER_OFFLINE_GRACE_MS}ms): ${maskUserId(driverId)}`);
+
+  setTimeout(() => {
+    const d = realDriverStatuses.get(driverId);
+    if (d && d.is_online === false) {
+      realDriverStatuses.delete(driverId);
+    }
+  }, 5000);
+}
+
+function scheduleDriverOfflineOnSocketDisconnect(io: SocketIOServer, driverId: string): void {
+  clearDriverSocketOfflineTimer(driverId);
+  const t = setTimeout(() => {
+    void markDriverOfflineAfterSocketGrace(io, driverId);
+  }, DRIVER_OFFLINE_GRACE_MS);
+  driverDisconnectTimers.set(driverId, t);
+}
 
 /** Fenêtre pour accepter/décliner une offre (à garder alignée avec `autoDeclineTimer` sur OrderRequestPopup, driver_chrono). */
 const DRIVER_OFFER_RESPONSE_MS = 30_000;
@@ -524,6 +589,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
     const authRole = (socket as any).userRole as string | undefined;
 
     if (authUserId && authRole === 'driver') {
+      clearDriverSocketOfflineTimer(authUserId);
       connectedDrivers.set(authUserId, socket.id);
       socket.driverId = authUserId;
       if (DEBUG) logger.debug(`[DIAGNOSTIC] Driver auto-auth: ${maskUserId(authUserId)} (socket: ${socket.id})`);
@@ -542,6 +608,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       if (driverId && driverId !== authUserId) {
         logger.warn(`[DIAGNOSTIC] driver-connect mismatch (ignored): provided=${maskUserId(driverId)} auth=${maskUserId(authUserId)}`);
       }
+      clearDriverSocketOfflineTimer(authUserId);
       connectedDrivers.set(authUserId, socket.id);
       socket.driverId = authUserId;
       logger.debug(`[DIAGNOSTIC] Driver connecté: ${maskUserId(authUserId)} (socket: ${socket.id})`);
@@ -1854,6 +1921,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       if (socket.driverId) {
         connectedDrivers.delete(socket.driverId);
         if (DEBUG) logger.debug(`Driver déconnecté: ${socket.driverId}`);
+        scheduleDriverOfflineOnSocketDisconnect(io, socket.driverId);
       }
 
       if (socket.userId) {

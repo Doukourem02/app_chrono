@@ -3,6 +3,11 @@ import { getNetworkStateAsync, useNetworkState } from "expo-network";
 import { useEffect, useRef } from "react";
 import { AppState, AppStateStatus, LogBox, View } from "react-native";
 import { useDriverStore } from "../store/useDriverStore";
+import { useOrderStore } from "../store/useOrderStore";
+import {
+  startDriverBackgroundLocation,
+  stopDriverBackgroundLocation,
+} from "../services/driverBackgroundLocation"; // side-effect: enregistre TaskManager.defineTask
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
@@ -60,6 +65,24 @@ export default function RootLayout() {
   // Rafraîchir la session + resync profil / commandes quand l'app revient au premier plan
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (nextAppState === "background") {
+        const uid = useDriverStore.getState().user?.id;
+        if (!uid || !isAuthenticated) return;
+        const online = useDriverStore.getState().isOnline;
+        const hasActiveDelivery = useOrderStore.getState().activeOrders.some((o) => {
+          const s = String(o.status || "").toLowerCase();
+          return s !== "completed" && s !== "cancelled" && s !== "declined";
+        });
+        if (online || hasActiveDelivery) {
+          void startDriverBackgroundLocation(uid);
+        }
+        return;
+      }
+
+      if (nextAppState === "active") {
+        void stopDriverBackgroundLocation();
+      }
+
       if (nextAppState !== "active" || !isAuthenticated || !user?.id) return;
       try {
         const net = await getNetworkStateAsync();
@@ -73,6 +96,12 @@ export default function RootLayout() {
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
   }, [isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      void stopDriverBackgroundLocation();
+    }
+  }, [isAuthenticated]);
 
   // Rafraîchissement proactif du token toutes les 10 min quand l'app est active
   useEffect(() => {
