@@ -810,7 +810,12 @@ export default function ShipmentList() {
   if (orders.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={[styles.emptyText, { color: isDark ? '#D1D5DB' : '#666' }]}>Aucune commande pour le moment</Text>
+        <Text style={[styles.emptyText, { color: isDark ? '#D1D5DB' : '#374151' }]}>
+          Aucune expédition en cours
+        </Text>
+        <Text style={[styles.emptyHint, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+          Créez une livraison depuis la carte pour la voir ici.
+        </Text>
       </View>
     );
   }
@@ -850,12 +855,21 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   emptyContainer: {
-    padding: 40,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
     alignItems: "center",
     justifyContent: "center",
   },
   emptyText: {
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  emptyHint: {
     fontSize: 14,
-    color: "#666",
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+    maxWidth: 280,
   },
 });

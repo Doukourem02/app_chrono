@@ -38,7 +38,7 @@ sectionTitle: {
 },
 viewMore: {
     fontSize: 14,
-    color: "#c1c1c1ff",
+    color: "#7C3AED",
     fontWeight: "600",
 },
 });

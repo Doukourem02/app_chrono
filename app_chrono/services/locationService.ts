@@ -200,25 +200,36 @@ class LocationService {
     const cacheKey = `${coords.latitude.toFixed(6)},${coords.longitude.toFixed(6)}`;
     const now = Date.now();
 
+    const persistAddressToStore = (address: string) => {
+      this.lastKnownAddress = address;
+      const store = useLocationStore.getState();
+      const prev = store.currentLocation;
+      if (prev) {
+        store.setCurrentLocation({ ...prev, address });
+      } else {
+        store.setCurrentLocation({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          address,
+        });
+      }
+    };
+
     const cached = this.reverseGeocodeCache.get(cacheKey);
     const isVagueNeighborhood = (addr: string) =>
       !/(\d+|rue|avenue|boulevard|route|street|av\.|bd|impasse|allée)/i.test(addr);
     if (cached && now - cached.timestamp < this.REVERSE_GEOCODE_CACHE_EXPIRY) {
       // Ne pas réutiliser un cache de quartier vague (ex: "Cité Colombe")
       if (!isVagueNeighborhood(cached.address)) {
-        this.lastKnownAddress = cached.address;
+        persistAddressToStore(cached.address);
         return cached.address;
       }
       this.reverseGeocodeCache.delete(cacheKey);
     }
 
     const saveAndReturn = (address: string): string => {
-      this.lastKnownAddress = address;
       this.reverseGeocodeCache.set(cacheKey, { address, timestamp: now });
-      const store = useLocationStore.getState();
-      if (store.currentLocation) {
-        store.setCurrentLocation({ ...store.currentLocation, address });
-      }
+      persistAddressToStore(address);
       return address;
     };
 
