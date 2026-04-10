@@ -229,6 +229,13 @@ class AdminSocketService {
         this.emit('order:created', data)
       })
 
+      this.socket.on('order:assigned', (data: OrderStatusUpdateData) => {
+        if (process.env.NODE_ENV === 'development') {
+          logger.debug('[adminSocketService] order:assigned:', data.order?.id)
+        }
+        this.emit('order:assigned', data)
+      })
+
       // Écouter les erreurs
       this.socket.on('admin:error', (data) => {
         logger.error('[adminSocketService] Erreur serveur:', data)

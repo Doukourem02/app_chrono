@@ -54,8 +54,21 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 
   if (!visible) return null;
 
+  /** Hors du bottom sheet (~120px), sinon le scanner est rogné et invisible. */
+  const wrapFullScreen = (children: React.ReactNode) => (
+    <Modal
+      visible
+      animationType="slide"
+      presentationStyle={Platform.OS === 'ios' ? 'fullScreen' : undefined}
+      onRequestClose={onClose}
+      statusBarTranslucent={Platform.OS === 'android'}
+    >
+      <View style={styles.modalRoot}>{children}</View>
+    </Modal>
+  );
+
   if (!permission) {
-    return (
+    return wrapFullScreen(
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <ActivityIndicator size="large" color="#6366F1" />
@@ -69,7 +82,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   }
 
   if (!permission.granted) {
-    return (
+    return wrapFullScreen(
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
           <Ionicons name="camera-outline" size={64} color="#EF4444" />
@@ -140,7 +153,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     );
   }
 
-  return (
+  return wrapFullScreen(
     <View style={styles.container}>
       <CameraView
         style={StyleSheet.absoluteFillObject}
@@ -243,6 +256,10 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 };
 
 const styles = StyleSheet.create({
+  modalRoot: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
   container: {
     flex: 1,
     backgroundColor: '#000',

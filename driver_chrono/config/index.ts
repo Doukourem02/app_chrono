@@ -11,6 +11,14 @@ export const config = {
   apiUrl: normalizeExpoUrl(rawApi as string | undefined, 'http://localhost:4000'),
   socketUrl: normalizeExpoUrl(rawSocket as string | undefined, 'http://localhost:4000'),
   sentryDsn: Constants.expoConfig?.extra?.sentryDsn || process.env.EXPO_PUBLIC_SENTRY_DSN,
+  /** Better Stack / Logtail — même type de token que le backend (source dédiée mobile recommandée) */
+  betterStackSourceToken:
+    Constants.expoConfig?.extra?.betterStackSourceToken ||
+    process.env.EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN ||
+    process.env.EXPO_PUBLIC_LOGTAIL_SOURCE_TOKEN,
+  /** Surcharge rare (région EU, etc.) ; défaut in.logs.betterstack.com */
+  betterStackIngestUrl:
+    Constants.expoConfig?.extra?.betterStackIngestUrl || process.env.EXPO_PUBLIC_BETTER_STACK_INGEST_URL,
 
   legal: {
     cguUrl:

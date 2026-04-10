@@ -294,9 +294,13 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     _ navigationViewController: NavigationViewController, didUpdate progress: RouteProgress,
     with location: CLLocation, rawLocation: CLLocation
   ) {
-    onLocationChange?([
-      "longitude": location.coordinate.longitude, "latitude": location.coordinate.latitude,
-    ])
+    var locPayload: [String: Any] = [
+      "longitude": location.coordinate.longitude,
+      "latitude": location.coordinate.latitude,
+    ]
+    // m/s pour le widget vitesse côté RN (CLLocation.speed < 0 = invalide)
+    locPayload["speed"] = location.speed >= 0 ? location.speed : 0
+    onLocationChange?(locPayload)
     onRouteProgressChange?([
       "distanceTraveled": progress.distanceTraveled,
       "durationRemaining": progress.durationRemaining,

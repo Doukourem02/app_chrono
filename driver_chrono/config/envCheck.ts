@@ -34,6 +34,11 @@ const optionalEnvVars = [
     required: false,
     description: 'Token Mapbox pour les cartes et itinéraires',
   },
+  {
+    name: 'EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN',
+    required: false,
+    description: 'Better Stack / Logtail — télémétrie navigation (source dédiée recommandée)',
+  },
 ] as const;
 
 export function validateEnvironment(): {
@@ -71,6 +76,11 @@ export function validateEnvironment(): {
       value =
         Constants.expoConfig?.extra?.mapboxAccessToken ||
         process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    }
+    if (!value && envVar.name === 'EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN') {
+      value =
+        Constants.expoConfig?.extra?.betterStackSourceToken ||
+        process.env.EXPO_PUBLIC_LOGTAIL_SOURCE_TOKEN;
     }
     if (!value) {
       warnings.push(

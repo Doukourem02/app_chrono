@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef } from "react";
-import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Easing, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { OrderRequest } from "../store/useOrderStore";
 import { formatDurationLabel } from "../services/orderApi";
 import { formatDeliveryId } from "../utils/formatDeliveryId";
@@ -108,6 +108,16 @@ export default function ShipmentCard({
     : formatDeliveryId(order.id, order.createdAt);
   
   const status = String(order.status || 'pending');
+  /** Aligné sur ShipmentList.getBackgroundColor : fond #E5D5FF → photo + imgcard1 (camion). */
+  const isVioletCardStyle =
+    status === "pending" ||
+    status === "accepted" ||
+    status === "enroute" ||
+    status === "picked_up" ||
+    status === "delivering";
+  /** Commande terminée : fond #E8F0F4 → même photo + imgcard2 (livreur / scooter). */
+  const isCompletedCardStyle = status === "completed" || status === "delivered";
+  const showProductThumbnail = isVioletCardStyle || isCompletedCardStyle;
   const activeStageIndex = useMemo(() => getDisplayStageIndex(status), [status]);
 
   /** Pour chaque étape : isCompleted = statut >= étape, isActive = étape courante (animée) */
@@ -204,14 +214,37 @@ export default function ShipmentCard({
     >
       {/* HEADER */}
       <View style={styles.header}>
-        <View style={styles.productInfo}>
-          <View style={styles.productImageContainer}>
-            <Ionicons name="cube" size={24} color="#8B5CF6" />
+        <View style={styles.headerRow}>
+          <View style={styles.productInfo}>
+            <View style={styles.productImageContainer}>
+              {showProductThumbnail ? (
+                <Image
+                  source={require("../assets/images/Apple-iPhone-Air-Sky-Blue-1.webp")}
+                  style={styles.productThumbnailImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="cube" size={24} color="#8B5CF6" />
+              )}
+            </View>
+            <View style={styles.productDetails}>
+              <Text style={styles.productName} numberOfLines={1}>{productName}</Text>
+              <Text style={styles.productId}>ID: {formatDeliveryId(order.id, order.createdAt)}</Text>
+            </View>
           </View>
-          <View style={styles.productDetails}>
-            <Text style={styles.productName} numberOfLines={1}>{productName}</Text>
-            <Text style={styles.productId}>ID: {formatDeliveryId(order.id, order.createdAt)}</Text>
-          </View>
+          {isVioletCardStyle ? (
+            <Image
+              source={require("../assets/images/imgcard1.png")}
+              style={styles.headerTruckIllustration}
+              resizeMode="contain"
+            />
+          ) : isCompletedCardStyle ? (
+            <Image
+              source={require("../assets/images/imgcard2.png")}
+              style={styles.headerTruckIllustration}
+              resizeMode="contain"
+            />
+          ) : null}
         </View>
       </View>
 
@@ -321,15 +354,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     marginBottom: 20,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
   },
   productInfo: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+    minWidth: 0,
   },
   productImageContainer: {
     width: 56,
@@ -339,10 +376,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    overflow: "hidden",
   },
-  productIconImage: {
-    width: 40,
-    height: 40,
+  productThumbnailImage: {
+    width: 56,
+    height: 56,
+  },
+  headerTruckIllustration: {
+    width: 108,
+    height: 72,
+    marginLeft: 4,
   },
   productDetails: {
     flex: 1,

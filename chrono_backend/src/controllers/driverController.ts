@@ -24,6 +24,48 @@ interface RequestWithUser extends Request {
 
 export const realDriverStatuses = new Map<string, DriverStatus>();
 
+/**
+ * Réaligne la carte mémoire avec `driver_profiles` après reconnexion socket.
+ * Évite qu’un livreur reste absent du matching après une coupure réseau / app en arrière-plan
+ * alors que la DB indique encore en ligne (le passage hors ligne ne doit pas reposer uniquement sur le socket).
+ */
+export async function rehydrateDriverStatusFromDb(driverId: string): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    const { rows } = await pool.query<{
+      user_id: string;
+      current_latitude: string | number | null;
+      current_longitude: string | number | null;
+      is_online: boolean;
+      is_available: boolean;
+      updated_at: Date;
+    }>(
+      `SELECT user_id, current_latitude, current_longitude, is_online, is_available, updated_at
+       FROM driver_profiles WHERE user_id = $1`,
+      [driverId]
+    );
+    if (!rows.length) return;
+    const row = rows[0];
+    const lat =
+      row.current_latitude != null ? Number(row.current_latitude) : undefined;
+    const lng =
+      row.current_longitude != null ? Number(row.current_longitude) : undefined;
+    const existing = realDriverStatuses.get(driverId) || ({} as DriverStatus);
+    realDriverStatuses.set(driverId, {
+      ...existing,
+      user_id: driverId,
+      is_online: row.is_online,
+      is_available: row.is_available,
+      current_latitude: Number.isFinite(lat) ? lat : existing.current_latitude,
+      current_longitude: Number.isFinite(lng) ? lng : existing.current_longitude,
+      updated_at: row.updated_at?.toISOString?.() ?? new Date().toISOString(),
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logger.warn(`[rehydrateDriverStatusFromDb] ${maskUserId(driverId)}:`, msg);
+  }
+}
+
 const mockDrivers: any[] = [];
 
 export const updateDriverStatus = async (req: RequestWithUser, res: Response): Promise<void> => {

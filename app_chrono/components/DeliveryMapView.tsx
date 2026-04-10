@@ -121,10 +121,11 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       : null;
   }, [orderStatus, pickup, dropoff]);
 
+  // Aligné sur l’émission livreur (~3 s) : 5 s d’interpolation ajoutait une latence perçue forte.
   const animatedDriverPosition = useAnimatedPosition({
     currentPosition: orderDriverCoords || null,
     previousPosition: previousDriverCoordsRef.current || null,
-    animationDuration: 5000,
+    animationDuration: 1800,
   });
 
   useEffect(() => {

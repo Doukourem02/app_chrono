@@ -7,7 +7,7 @@ import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionF
 import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
 import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
 import { broadcastDriverStatusToAdmins, broadcastOrderUpdateToAdmins } from './adminSocket.js';
-import { realDriverStatuses } from '../controllers/driverController.js';
+import { realDriverStatuses, rehydrateDriverStatusFromDb } from '../controllers/driverController.js';
 import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
 import { autoLogDeliveryMileage } from '../controllers/fleetController.js';
@@ -143,21 +143,17 @@ async function markDriverOfflineAfterSocketGrace(io: SocketIOServer, driverId: s
   };
   realDriverStatuses.set(driverId, updated);
 
-  try {
-    await pool.query(
-      `UPDATE driver_profiles SET is_online = false, is_available = false, updated_at = NOW() WHERE user_id = $1`,
-      [driverId]
-    );
-  } catch (e: any) {
-    logger.warn(`[socket-disconnect] Échec MAJ DB is_online pour ${maskUserId(driverId)}:`, e?.message || e);
-  }
+  // Ne pas écrire is_online=false en PostgreSQL ici : une coupure socket (app mobile en arrière-plan,
+  // bascule entre deux apps sur le même téléphone) n’est pas équivalente à une mise hors ligne explicite.
+  // Sinon la fusion DB de findNearbyDrivers exclut le livreur alors que l’app livreur affiche encore « en ligne »
+  // jusqu’au prochain updateDriverStatus / rafraîchissement — d’où « aucun chauffeur » à la commande suivante.
 
   broadcastDriverStatusToAdmins(io, 'driver:offline', {
     userId: driverId,
     is_online: false,
   });
 
-  logger.info(`[socket-disconnect] Livreur passé hors ligne (socket absent après ${DRIVER_OFFLINE_GRACE_MS}ms): ${maskUserId(driverId)}`);
+  logger.info(`[socket-disconnect] Livreur retiré du cache mémoire (socket absent après ${DRIVER_OFFLINE_GRACE_MS}ms), DB inchangée: ${maskUserId(driverId)}`);
 
   setTimeout(() => {
     const d = realDriverStatuses.get(driverId);
@@ -709,6 +705,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       clearDriverSocketOfflineTimer(authUserId);
       connectedDrivers.set(authUserId, socket.id);
       socket.driverId = authUserId;
+      void rehydrateDriverStatusFromDb(authUserId);
       if (DEBUG) logger.debug(`[DIAGNOSTIC] Driver auto-auth: ${maskUserId(authUserId)} (socket: ${socket.id})`);
     } else if (authUserId && authRole === 'client') {
       connectedUsers.set(authUserId, socket.id);
@@ -728,6 +725,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       clearDriverSocketOfflineTimer(authUserId);
       connectedDrivers.set(authUserId, socket.id);
       socket.driverId = authUserId;
+      void rehydrateDriverStatusFromDb(authUserId);
       logger.debug(`[DIAGNOSTIC] Driver connecté: ${maskUserId(authUserId)} (socket: ${socket.id})`);
       logger.debug(` - Total drivers connectés: ${connectedDrivers.size}`);
     });
@@ -942,6 +940,23 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           logger.debug(` - ${maskUserId(driverId)}: online=${driverData.is_online}, available=${driverData.is_available}, connected=${isConnected}, has_position=${hasPosition}${distance !== null ? `, distance=${distance.toFixed(2)}km` : ''}`);
         } if (nearbyDrivers.length === 0) {
           logger.warn(`Aucun chauffeur disponible dans la zone pour la commande ${maskOrderId(order.id)}`);
+          try {
+            order.status = 'cancelled';
+            order.cancelledAt = new Date();
+            await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt });
+            logger.debug(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB (aucun livreur dans la zone)`);
+          } catch (dbError: any) {
+            logger.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message);
+          }
+          activeOrders.delete(order.id);
+          const userSocketIdEarly = connectedUsers.get(order.user.id);
+          if (userSocketIdEarly) {
+            io.to(userSocketIdEarly).emit('order-cancelled', {
+              orderId: order.id,
+              reason: 'no_drivers_available',
+              message: 'Aucun chauffeur disponible dans votre zone',
+            });
+          }
           io.to(socket.id).emit('no-drivers-available', { orderId: order.id, message: 'Aucun chauffeur disponible dans votre zone' });
           return;
         }
@@ -1304,6 +1319,21 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         order.status = status;
         if (status === 'completed') {
           order.completedAt = new Date();
+        }
+
+        const navigationLifecycleStatuses = ['enroute', 'picked_up', 'delivering', 'completed'];
+        if (navigationLifecycleStatuses.includes(status)) {
+          const loc = location;
+          logger.info('navigation_delivery_status_transition', {
+            context: 'navigation',
+            orderId: maskOrderId(orderId),
+            previousStatus: current,
+            newStatus: status,
+            driverLocation:
+              loc && typeof loc.latitude === 'number' && typeof loc.longitude === 'number'
+                ? { lat: Math.round(loc.latitude * 1e4) / 1e4, lng: Math.round(loc.longitude * 1e4) / 1e4 }
+                : undefined,
+          });
         }
 
         let dbSavedStatus = false;

@@ -186,6 +186,12 @@ EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=your-mapbox-access-token
 # ============================================
 # DSN Sentry pour le monitoring d'erreurs
 EXPO_PUBLIC_SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+
+# ============================================
+# BETTER STACK / LOGTAIL (Optionnel — logs navigation app livreur)
+# ============================================
+# Créer une source dédiée dans Better Stack ; le token est public (embarqué dans l'app).
+# EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN=...
 EOF
 
 echo "✅ Fichiers .env.example créés avec succès!"

@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { logger } from '../utils/logger';
 import { useWeather } from '../hooks/useWeather';
+import { logNavigationEvent, logNavigationProgressThrottled } from '../utils/navigationTelemetry';
 
 type Coords = { latitude: number; longitude: number };
 
@@ -92,6 +93,11 @@ export function MapboxNavigationScreen({
   });
 
   const handleError = useCallback((event: { nativeEvent: { message: string } }) => {
+    logNavigationEvent(
+      'nav_mapbox_error',
+      { detail: event.nativeEvent.message?.slice(0, 500) },
+      'error'
+    );
     Alert.alert('Erreur navigation', event.nativeEvent.message);
   }, []);
 
@@ -112,9 +118,39 @@ export function MapboxNavigationScreen({
     }
   }, []);
 
+  const handleRouteProgressWrapped = useCallback(
+    (event: RouteProgressEvent) => {
+      onRouteProgressChange?.(event);
+      const ne = event?.nativeEvent;
+      if (
+        ne &&
+        (ne.durationRemaining != null ||
+          ne.distanceRemaining != null ||
+          ne.fractionTraveled != null)
+      ) {
+        logNavigationProgressThrottled({
+          durationRemainingSec: ne.durationRemaining,
+          distanceRemainingM: ne.distanceRemaining,
+          fractionTraveled: ne.fractionTraveled,
+          distanceTraveledM: ne.distanceTraveled,
+        });
+      }
+    },
+    [onRouteProgressChange]
+  );
+
   useEffect(() => {
     setNavLocation(origin);
   }, [origin]);
+
+  useEffect(() => {
+    logNavigationEvent('nav_mapbox_mount_or_target', {
+      originLat: Math.round(origin.latitude * 1e4) / 1e4,
+      originLng: Math.round(origin.longitude * 1e4) / 1e4,
+      destLat: Math.round(destination.latitude * 1e4) / 1e4,
+      destLng: Math.round(destination.longitude * 1e4) / 1e4,
+    });
+  }, [origin.latitude, origin.longitude, destination.latitude, destination.longitude]);
 
   const originArr: [number, number] = [origin.longitude, origin.latitude];
   const destArr: [number, number] = [destination.longitude, destination.latitude];
@@ -199,7 +235,7 @@ export function MapboxNavigationScreen({
         showsEndOfRouteFeedback={false}
         hideStatusView={true}
         onLocationChange={handleLocationChange}
-        onRouteProgressChange={onRouteProgressChange}
+        onRouteProgressChange={handleRouteProgressWrapped}
         onError={handleError}
         onCancelNavigation={onCancel}
         onArrive={onArrive}

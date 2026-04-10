@@ -30,6 +30,7 @@ import MessageBottomSheet from "../../components/MessageBottomSheet";
 import { MapboxNavigationScreen } from "../../components/MapboxNavigationScreen";
 import { formatUserName } from '../../utils/formatName';
 import { speakAnnouncement } from '../../utils/speechAnnouncement';
+import { logNavigationEvent } from '../../utils/navigationTelemetry';
 
 export default function Index() {
   const { setHideTabBar } = useUIStore();
@@ -344,6 +345,10 @@ export default function Index() {
     let phase1FallbackId: ReturnType<typeof setTimeout> | null = null;
     if (status === 'accepted' && prevStatus !== 'accepted') {
       logger.info('Auto-démarrage navigation phase 1 (point de collecte)', 'driver-index');
+      logNavigationEvent('nav_phase_pickup_start', {
+        orderId: currentOrder.id,
+        status,
+      });
       setPhase1MountReady(false);
       setIsNavigationActive(true);
       InteractionManager.runAfterInteractions(() => {
@@ -362,6 +367,11 @@ export default function Index() {
     // L'unmount/remount causait un figement obligeant à quitter l'app
     if ((status === 'picked_up' || status === 'delivering') && (prevStatus === 'enroute' || prevStatus === 'in_progress')) {
       logger.info('Auto-démarrage navigation phase 2 (adresse de livraison)', 'driver-index');
+      logNavigationEvent('nav_phase_dropoff_reroute', {
+        orderId: currentOrder.id,
+        status,
+        previousStatus: prevStatus,
+      });
       setShowRecalcOverlay(true);
       setIsNavigationMinimized(false);
       if (!isNavigationActive) {
@@ -782,9 +792,13 @@ export default function Index() {
     const syncLocation = async () => {
       if (isOnline && location && user?.id && isAuthenticated && !sessionExpiredRef.current) {
         try {
+          // Réaffirmer is_online / is_available à chaque battement : le toggle ne s’exécute qu’une fois ;
+          // sans ça, la base peut diverger (ex. ancienne logique socket, autre instance, admin) alors que l’UI reste « en ligne ».
           const result = await apiService.updateDriverStatus(user.id, {
+            is_online: true,
+            is_available: true,
             current_latitude: location.latitude,
-            current_longitude: location.longitude
+            current_longitude: location.longitude,
           });
 
           if (!result.success && result.message?.includes('Session expirée')) {

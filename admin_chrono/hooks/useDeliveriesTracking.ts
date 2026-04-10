@@ -20,6 +20,7 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
   const [ongoingDeliveries, setOngoingDeliveries] = useState<Delivery[]>([])
   const deliveriesRef = useRef<Delivery[]>([])
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const wasSocketConnectedRef = useRef(false)
 
   // Mettre à jour la ref quand l'état change
   useEffect(() => {
@@ -72,6 +73,22 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
     }
   }, [])
 
+  // À chaque connexion (ou reconnexion) socket : synchroniser avec l’API.
+  // Sinon la liste « suivi » reste vide tant qu’aucun order:status:update n’est reçu
+  // (order:created / order:assigned n’étaient pas intégrés au hook).
+  useEffect(() => {
+    if (isSocketConnected && !wasSocketConnectedRef.current) {
+      wasSocketConnectedRef.current = true
+      // Defer so setState runs outside this effect’s synchronous body (react-hooks/set-state-in-effect).
+      queueMicrotask(() => {
+        void loadDeliveriesFromAPI()
+      })
+    }
+    if (!isSocketConnected) {
+      wasSocketConnectedRef.current = false
+    }
+  }, [isSocketConnected, loadDeliveriesFromAPI])
+
   useEffect(() => {
     if (!isSocketConnected) {
       // Fallback automatique après 3.5 secondes si le socket n'est pas connecté
@@ -90,19 +107,24 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
     }
 
     // Écouter les mises à jour de commandes
-    const unsubscribeOrderUpdate = adminSocketService.on('order:status:update', (data: unknown) => {
+    const applyOrderPayload = (data: unknown) => {
       const typedData = data as OrderUpdateData
       if (typedData.order) {
         const delivery = mapOrderToDelivery(typedData.order)
 
-        // Si la commande est terminée ou annulée, la retirer immédiatement
         if (['completed', 'cancelled'].includes(delivery.status)) {
           removeDelivery(delivery.id)
         } else {
           updateDelivery(delivery)
         }
       }
-    })
+    }
+
+    const unsubscribeOrderUpdate = adminSocketService.on('order:status:update', applyOrderPayload)
+
+    const unsubscribeOrderCreated = adminSocketService.on('order:created', applyOrderPayload)
+
+    const unsubscribeOrderAssigned = adminSocketService.on('order:assigned', applyOrderPayload)
 
     // Écouter les échecs de connexion pour déclencher le fallback
     const unsubscribeConnectionFailed = adminSocketService.on('admin:connection-failed', () => {
@@ -114,6 +136,8 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
         clearTimeout(fallbackTimeoutRef.current)
       }
       unsubscribeOrderUpdate()
+      unsubscribeOrderCreated()
+      unsubscribeOrderAssigned()
       unsubscribeConnectionFailed()
     }
   }, [isSocketConnected, loadDeliveriesFromAPI, updateDelivery, removeDelivery])

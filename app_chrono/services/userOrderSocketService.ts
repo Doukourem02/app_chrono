@@ -693,7 +693,13 @@ class UserOrderSocketService {
     this.socket.on('driver:location:update', (data) => {
       try {
         const { orderId, latitude, longitude } = data || {};
-        if (orderId && latitude && longitude) {
+        if (
+          orderId &&
+          typeof latitude === 'number' &&
+          typeof longitude === 'number' &&
+          Number.isFinite(latitude) &&
+          Number.isFinite(longitude)
+        ) {
           const store = useOrderStore.getState();
           store.setDriverCoordsForOrder(orderId, { latitude, longitude });
         }
