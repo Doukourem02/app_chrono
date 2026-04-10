@@ -1,4 +1,6 @@
-import { supabase } from '../utils/supabase';
+import { config } from '../config';
+import { apiFetch, parseApiErrorBody } from '../utils/apiFetch';
+import { userApiService } from './userApiService';
 
 type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
 
@@ -68,20 +70,54 @@ export async function createOrderInDatabase(params: {
   priceCfa: number;
   distanceKm: number;
 }) {
-  const { data, error } = await supabase.rpc('fn_create_order', {
-    p_user_id: params.userId,
-    p_pickup: params.pickup,
-    p_dropoff: params.dropoff,
-    p_method: params.method,
-    p_price: params.priceCfa,
-    p_distance: params.distanceKm,
-  });
-
-  if (error) {
-    throw error;
+  const token = await userApiService.ensureAccessToken();
+  if (!token) {
+    const err = new Error('Session expirée. Veuillez vous reconnecter.');
+    (err as any).code = 'AUTH_REQUIRED';
+    throw err;
   }
 
-  return data as string; // order_id
+  const response = await apiFetch(`${config.apiUrl}/api/orders/record`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      userId: params.userId,
+      pickup: params.pickup,
+      dropoff: params.dropoff,
+      method: params.method,
+      priceCfa: params.priceCfa,
+      distanceKm: params.distanceKm,
+    }),
+  });
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  if (!response.ok) {
+    const msg = parseApiErrorBody(body, response.status, 'Impossible d’enregistrer la commande');
+    const err = new Error(msg);
+    const code = body && typeof body === 'object' && 'code' in body ? (body as { code?: string }).code : undefined;
+    if (code) (err as any).code = code;
+    throw err;
+  }
+
+  const orderId =
+    body &&
+    typeof body === 'object' &&
+    'data' in body &&
+    (body as { data?: { orderId?: string } }).data?.orderId;
+  if (typeof orderId !== 'string' || !orderId) {
+    throw new Error('Réponse serveur invalide (orderId manquant)');
+  }
+
+  return orderId;
 }
 
 export async function createOrderRecord(options: {

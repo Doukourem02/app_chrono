@@ -219,6 +219,21 @@ class UserOrderSocketService {
     });
 
     this.socket.io.on('error', (error: Error & { type?: string; description?: unknown }) => {
+      // Même famille que connect_error : ne pas envoyer une « exception » Sentry pour une coupure polling (background iOS, réseau).
+      const transient =
+        error.message?.includes('xhr poll error') ||
+        error.message?.includes('poll error') ||
+        error.message?.includes('transport unknown') ||
+        (error as { type?: string }).type === 'TransportError';
+      if (transient) {
+        logger.warn('Socket manager error (transient, non reporté Sentry)', 'userOrderSocketService', {
+          message: error.message,
+          type: String(error.type ?? ''),
+          transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+          ...socketDiag(),
+        });
+        return;
+      }
       reportSocketIssue('client_orders_manager_error', {
         socketUrl,
         message: error.message,
