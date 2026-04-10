@@ -105,7 +105,8 @@ function formatApiDeliveryRow(order: any): OrderRequest {
   } as OrderRequest;
 }
 
-async function syncOrdersFromApi(userId: string): Promise<void> {
+/** Exporté pour la tâche de localisation en arrière-plan (alignement commandes via API). */
+export async function syncClientOrdersFromApi(userId: string): Promise<void> {
   const result = await userApiService.getUserDeliveries(userId, { limit: 100 });
   const store = useOrderStore.getState();
   const localIds = new Set(store.activeOrders.map((o) => o.id));
@@ -153,7 +154,7 @@ export async function runUserAppResync(userId: string): Promise<void> {
   userOrderSocketService.syncAfterAccessTokenRefresh(userId);
 
   try {
-    await Promise.all([syncOrdersFromApi(userId), syncUserProfile(userId)]);
+    await Promise.all([syncClientOrdersFromApi(userId), syncUserProfile(userId)]);
   } catch (e) {
     logger.warn("userAppResync: erreur partielle", "userAppResync", e);
   }

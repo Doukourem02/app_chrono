@@ -79,6 +79,7 @@ module.exports = {
           enableBackgroundRemoteNotifications: true,
         },
       ],
+      "./plugins/withMergeBackgroundModes.js",
     ],
     experiments: {
       typedRoutes: true,
