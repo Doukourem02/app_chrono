@@ -14,7 +14,7 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
-      buildNumber: "31",
+      buildNumber: "32",
       supportsTablet: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
