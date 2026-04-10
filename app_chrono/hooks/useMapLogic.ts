@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Dimensions } from 'react-native';
 import * as Location from 'expo-location';
 import { useShipmentStore } from '../store/useShipmentStore';
+import { useLocationStore } from '../store/useLocationStore';
 import { logger } from '../utils/logger';
 import { useErrorHandler } from '../utils/errorHandler';
 import { config } from '../config';
@@ -371,9 +372,53 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     }
   };
 
-  // Initialiser la position
+  // Initialiser la position (cache disque immédiat + GPS + sync retour premier plan)
   useEffect(() => {
     let isMounted = true;
+
+    const primeFromPersistedStore = () => {
+      const cl = useLocationStore.getState().currentLocation;
+      if (cl?.latitude == null || cl.longitude == null) return;
+      locationService.applyPersistedSnapshot(cl);
+      setRegion((r) =>
+        r ?? {
+          latitude: cl.latitude,
+          longitude: cl.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        }
+      );
+      setPickupCoords((p) => p ?? { latitude: cl.latitude, longitude: cl.longitude });
+      const addr = cl.address?.trim();
+      if (addr) {
+        const ship = useShipmentStore.getState();
+        if (!ship.pickupLocation?.trim()) {
+          ship.setPickupLocation(addr);
+        }
+      }
+    };
+
+    primeFromPersistedStore();
+
+    const unsubStore = useLocationStore.subscribe(() => {
+      if (!isMounted) return;
+      primeFromPersistedStore();
+    });
+
+    const unsubForeground = locationService.onForegroundRefreshComplete((coords) => {
+      if (!isMounted) return;
+      setRegion({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      });
+      setPickupCoords({ latitude: coords.latitude, longitude: coords.longitude });
+      const addr = useLocationStore.getState().currentLocation?.address?.trim();
+      if (addr) {
+        useShipmentStore.getState().setPickupLocation(addr);
+      }
+    });
 
     (async () => {
       try {
@@ -436,6 +481,8 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
 
     return () => {
       isMounted = false;
+      unsubStore();
+      unsubForeground();
     };
   }, []);
 

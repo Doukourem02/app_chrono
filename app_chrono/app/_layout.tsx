@@ -23,6 +23,7 @@ import {
 } from "../services/clientPushService";
 import { isNetworkOffline } from "../utils/isNetworkOffline";
 import { logger } from "../utils/logger";
+import { locationService } from "../services/locationService";
 import "../config/envCheck";
 import "../mapboxInit";
 
@@ -97,6 +98,7 @@ export default function RootLayout() {
 
       if (nextAppState === "active") {
         void stopClientBackgroundAlignment();
+        void locationService.refreshOnForeground();
       }
 
       if (nextAppState !== "active" || !isAuthenticated || !user?.id) return;

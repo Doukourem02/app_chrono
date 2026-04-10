@@ -1,6 +1,7 @@
 import "../../mapboxInit";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator, InteractionManager, Linking } from "react-native";
+import * as Location from "expo-location";
 import type { MapRefHandle } from "../../hooks/useMapCamera";
 import { DriverMapView } from "../../components/DriverMapView";
 import { Ionicons } from "@expo/vector-icons";
@@ -660,6 +661,42 @@ export default function Index() {
     }
     
     isTogglingRef.current = true;
+
+    /** GPS serveur : obligatoire pour le matching client ; on ne passe pas en ligne sans coords API. */
+    let coordsForApi: { latitude: number; longitude: number } | null = location;
+
+    if (value && user?.id) {
+      if (!coordsForApi) {
+        try {
+          const perm = await Location.requestForegroundPermissionsAsync();
+          if (perm.status !== Location.PermissionStatus.GRANTED) {
+            isTogglingRef.current = false;
+            Alert.alert(
+              'Localisation',
+              'Autorisez la localisation pour que les clients puissent vous trouver.',
+              [{ text: 'Fermer' }]
+            );
+            return;
+          }
+          const pos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Highest,
+          });
+          coordsForApi = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          };
+          setLocation(coordsForApi);
+        } catch {
+          isTogglingRef.current = false;
+          Alert.alert(
+            'Localisation',
+            'Impossible d’obtenir votre position. Réessayez.',
+            [{ text: 'Fermer' }]
+          );
+          return;
+        }
+      }
+    }
     
     setOnlineStatus(value);
     
@@ -669,10 +706,9 @@ export default function Index() {
         is_available: value
       };
 
-      if (value && location) {
-        statusData.current_latitude = location.latitude;
-        statusData.current_longitude = location.longitude;
-        setLocation(location);
+      if (value && coordsForApi) {
+        statusData.current_latitude = coordsForApi.latitude;
+        statusData.current_longitude = coordsForApi.longitude;
       }
 
       apiService.updateDriverStatus(user.id, statusData).then((result) => {
@@ -770,8 +806,8 @@ export default function Index() {
       }
     };
 
-    const timeoutId = setTimeout(syncLocation, 5000);
-    const heartbeatInterval = setInterval(syncLocation, 2 * 60 * 1000); // Heartbeat toutes les 2 min pour rester dans la liste
+    const timeoutId = setTimeout(syncLocation, 1500);
+    const heartbeatInterval = setInterval(syncLocation, 10 * 1000); // 10 s : matching client utilise la position serveur
     return () => {
       clearTimeout(timeoutId);
       clearInterval(heartbeatInterval);

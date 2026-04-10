@@ -58,8 +58,8 @@ export const useDriverLocation = (isOnline: boolean) => {
         subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
-            timeInterval: 10000, 
-            distanceInterval: 50, 
+            timeInterval: 5000,
+            distanceInterval: 30,
           },
           (newLocation) => {
             setLocation({

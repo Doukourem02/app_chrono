@@ -77,12 +77,25 @@ export const useLocationStore = create<LocationState>()(
     }),
     {
       name: 'location-storage',
-      version: 1,
+      version: 2,
+      migrate: (persistedState: unknown, fromVersion: number) => {
+        const parsed = persistedState as Record<string, unknown> & { _version?: number };
+        if (fromVersion < 2) {
+          const { _version: _ignored, ...rest } = parsed;
+          return {
+            ...rest,
+            currentLocation: (rest.currentLocation as Location | null | undefined) ?? null,
+          };
+        }
+        return parsed;
+      },
       partialize: (state) => ({
         recentPickupLocations: state.recentPickupLocations,
         recentDeliveryLocations: state.recentDeliveryLocations,
         favoriteLocations: state.favoriteLocations,
         locationPermission: state.locationPermission,
+        /** Dernière position + adresse : affichage instantané au cold start / retour app */
+        currentLocation: state.currentLocation,
       }),
     }
   )

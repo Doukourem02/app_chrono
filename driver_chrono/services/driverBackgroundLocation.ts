@@ -128,10 +128,10 @@ export async function startDriverBackgroundLocation(userId: string): Promise<boo
 
     await Location.startLocationUpdatesAsync(DRIVER_BACKGROUND_LOCATION_TASK, {
       accuracy: Location.Accuracy.Balanced,
-      distanceInterval: 50,
-      timeInterval: 20000,
-      deferredUpdatesDistance: 80,
-      deferredUpdatesInterval: 45000,
+      distanceInterval: 40,
+      timeInterval: 10000,
+      deferredUpdatesDistance: 60,
+      deferredUpdatesInterval: 30000,
       showsBackgroundLocationIndicator: true,
       activityType: Location.ActivityType.AutomotiveNavigation,
       pausesUpdatesAutomatically: true,

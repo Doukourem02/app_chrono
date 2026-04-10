@@ -29,6 +29,7 @@ class LocationService {
   private lastKnownAddress: string | null = null;
   private reverseGeocodeCache: Map<string, { address: string; timestamp: number }> = new Map();
   private listeners: Set<(location: LocationCoords) => void> = new Set();
+  private foregroundRefreshListeners: Set<(location: LocationCoords) => void> = new Set();
   private isWatching = false;
   private readonly CACHE_EXPIRY = 30 * 1000; // 30 secondes
   private readonly REVERSE_GEOCODE_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
@@ -94,7 +95,7 @@ class LocationService {
 
       // Haute précision pour obtenir l'adresse exacte (rue, numéro)
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: forceRefresh ? Location.Accuracy.Highest : Location.Accuracy.High,
       });
 
       const coords: LocationCoords = {
@@ -469,6 +470,57 @@ class LocationService {
   }
 
   /**
+   * Hydrate le cache mémoire depuis le store persisté (AsyncStorage) pour un affichage immédiat
+   * tout en forçant un nouveau fix GPS au prochain getCurrentPosition (timestamp volontairement vieux).
+   */
+  applyPersistedSnapshot(loc: { latitude: number; longitude: number; address?: string }): void {
+    if (loc.latitude == null || loc.longitude == null) return;
+    if (!Number.isFinite(loc.latitude) || !Number.isFinite(loc.longitude)) return;
+    this.lastKnownLocation = {
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      timestamp: Date.now() - this.CACHE_EXPIRY - 1,
+    };
+    if (loc.address?.trim()) {
+      this.lastKnownAddress = loc.address.trim();
+    }
+  }
+
+  /**
+   * Au retour premier plan : fix GPS frais + géocodage, puis notifie la carte (listeners dédiés).
+   */
+  async refreshOnForeground(): Promise<void> {
+    try {
+      const permitted = await this.checkPermissions();
+      if (!permitted) {
+        return;
+      }
+      const coords = await this.getCurrentPosition(true);
+      if (!coords) {
+        return;
+      }
+      await this.reverseGeocode(coords);
+      this.foregroundRefreshListeners.forEach((cb) => {
+        try {
+          cb(coords);
+        } catch (error) {
+          logger.error('Error in foregroundRefresh listener', 'locationService', error);
+        }
+      });
+    } catch (error) {
+      logger.warn('refreshOnForeground failed', 'locationService', error);
+    }
+  }
+
+  /** S’abonner aux rafraîchissements « retour app » (carte + prise en charge alignées sur le header). */
+  onForegroundRefreshComplete(cb: (location: LocationCoords) => void): () => void {
+    this.foregroundRefreshListeners.add(cb);
+    return () => {
+      this.foregroundRefreshListeners.delete(cb);
+    };
+  }
+
+  /**
    * Obtient la dernière position connue
    */
   getLastKnownLocation(): LocationCoords | null {
@@ -511,6 +563,7 @@ class LocationService {
   cleanup(): void {
     this.stopWatching();
     this.listeners.clear();
+    this.foregroundRefreshListeners.clear();
     this.reverseGeocodeCache.clear();
     this.lastKnownLocation = null;
     this.lastKnownAddress = null;
