@@ -19,10 +19,12 @@ export default function Error({
       digest: error.digest,
     });
 
-    // En production, envoyer à un service de monitoring si nécessaire
     if (process.env.NODE_ENV === "production") {
-      // TODO: Intégrer Sentry ou autre service de monitoring
-      // Sentry.captureException(error, { tags: { type: 'page_error' } })
+      import("@sentry/nextjs")
+        .then((Sentry) => {
+          Sentry.captureException(error, { tags: { type: "page_error" } });
+        })
+        .catch(() => {});
     }
   }, [error]);
 

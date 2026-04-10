@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as Sentry from '@sentry/node';
 import logger from '../utils/logger.js';
+import { getRequestId } from '../utils/requestContext.js';
 import { AppError } from '../types/index.js';
 import { sendErrorAlert, sendCriticalAlert } from '../utils/slackNotifier.js';
 
@@ -31,12 +32,14 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ): void => {
+  const requestId = getRequestId();
   logger.error('Error:', {
     message: err.message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
     path: req.path,
     method: req.method,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    ...(requestId && { request_id: requestId }),
   });
 
   let statusCode = (err as AppError).statusCode || (err as ErrorWithStatus).status || 500;
@@ -47,6 +50,7 @@ export const errorHandler = (
         path: req.path,
         method: req.method,
         statusCode,
+        ...(requestId && { request_id: requestId }),
       },
       extra: {
         body: req.body,
@@ -65,6 +69,7 @@ export const errorHandler = (
         Method: req.method,
         StatusCode: statusCode.toString(),
         Timestamp: new Date().toISOString(),
+        ...(requestId && { 'Request ID': requestId }),
         ...(err.stack && { Stack: err.stack.substring(0, 500) })
       }
     ).catch(() => {

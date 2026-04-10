@@ -1,15 +1,30 @@
 import winston from 'winston';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Logtail } from '@logtail/node';
+import { LogtailTransport } from '@logtail/winston';
+import { requestContext } from './requestContext.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const requestIdFormat = winston.format((info) => {
+  const requestId = requestContext.getStore()?.requestId;
+  if (requestId) {
+    info.request_id = requestId;
+  }
+  return info;
+});
+
+const betterStackToken =
+  process.env.BETTER_STACK_SOURCE_TOKEN || process.env.LOGTAIL_SOURCE_TOKEN;
 
 const logger = winston.createLogger({
   level:
     process.env.LOG_LEVEL ||
     (process.env.NODE_ENV === 'production' ? 'info' : 'info'),
   format: winston.format.combine(
+    requestIdFormat(),
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.errors({ stack: true }),
     winston.format.splat(),
@@ -40,6 +55,11 @@ const logger = winston.createLogger({
     }),
   ],
 });
+
+if (process.env.NODE_ENV === 'production' && betterStackToken) {
+  const logtail = new Logtail(betterStackToken);
+  logger.add(new LogtailTransport(logtail));
+}
 
 if (process.env.NODE_ENV !== 'production') {
   logger.add(

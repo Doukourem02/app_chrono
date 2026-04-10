@@ -10,6 +10,20 @@ function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
 
+/** Permet de corréler les logs backend (Better Stack) avec une requête API. */
+function mergeRequestIdHeader(init?: RequestInit): RequestInit {
+  const headers = new Headers(init?.headers as HeadersInit | undefined);
+  if (!headers.has("X-Request-Id")) {
+    const id =
+      typeof globalThis.crypto !== "undefined" &&
+      typeof globalThis.crypto.randomUUID === "function"
+        ? globalThis.crypto.randomUUID()
+        : `req-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    headers.set("X-Request-Id", id);
+  }
+  return { ...init, headers };
+}
+
 function linkAbort(parent: AbortSignal | null | undefined, child: AbortController) {
   if (!parent) return;
   if (parent.aborted) {
@@ -139,7 +153,10 @@ export async function apiFetch(
 
     try {
       linkAbort(init?.signal, ctrl);
-      const response = await fetch(input, { ...init, signal: ctrl.signal });
+      const response = await fetch(input, {
+        ...mergeRequestIdHeader(init),
+        signal: ctrl.signal,
+      });
       clearTimeout(tid);
 
       if (RETRYABLE_HTTP.has(response.status) && attempt < maxRetries) {

@@ -26,6 +26,7 @@ import mapboxRoutes from './routes/mapboxRoutes.js';
 import pushRoutes from './routes/pushRoutes.js';
 import orderRecordRoutes from './routes/orderRecordRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { requestIdMiddleware } from './middleware/requestId.js';
 import { setupSwagger } from './config/swagger.js';
 import { isOriginAllowed } from './config/cors.js';
 import logger from './utils/logger.js';
@@ -36,6 +37,8 @@ const app: Express = express();
 // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR. Les variables NODE_ENV/RENDER ne sont pas fiables sur tous les hébergeurs.
 app.set('trust proxy', 1);
 logger.info(`Express trust proxy = ${String(app.get('trust proxy'))}`);
+
+app.use(requestIdMiddleware);
 
 if (
   process.env.NODE_ENV === 'production' &&
@@ -92,6 +95,7 @@ app.use(
       }
     },
     credentials: true,
+    exposedHeaders: ['X-Request-Id'],
   })
 );
 

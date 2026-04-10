@@ -19,10 +19,15 @@ export default function GlobalError({
       digest: error.digest,
     })
 
-    // En production, envoyer à un service de monitoring
     if (process.env.NODE_ENV === 'production') {
-      // TODO: Intégrer Sentry ou autre service de monitoring
-      // Sentry.captureException(error, { tags: { type: 'global_error' }, level: 'fatal' })
+      import('@sentry/nextjs')
+        .then((Sentry) => {
+          Sentry.captureException(error, {
+            tags: { type: 'global_error' },
+            level: 'fatal',
+          })
+        })
+        .catch(() => {})
     }
   }, [error])
 

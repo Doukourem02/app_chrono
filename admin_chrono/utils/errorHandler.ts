@@ -50,13 +50,17 @@ export class ErrorHandler {
       stack: error instanceof Error ? error.stack : undefined,
     })
 
-    // En production, envoyer à un service de monitoring si nécessaire
     if (!isDevelopment) {
-      // TODO: Intégrer Sentry ou autre service de monitoring
-      // Sentry.captureException(error, {
-      //   tags: { context },
-      //   extra: appError.context,
-      // })
+      import('@sentry/nextjs')
+        .then((Sentry) => {
+          const err =
+            error instanceof Error ? error : new Error(String(error))
+          Sentry.captureException(err, {
+            tags: { context: context ?? 'unknown' },
+            extra: appError.context as Record<string, unknown> | undefined,
+          })
+        })
+        .catch(() => {})
     }
 
     return appError
