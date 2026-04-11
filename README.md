@@ -605,9 +605,8 @@ npx expo run:android
 
 ### Guides de configuration
 
-- **Prod / TestFlight / EAS** : `docs/ckprod.md`
-- **Session mobile, OTP, cycle de vie** : `docs/mobile-auth-and-lifecycle.md`
-- **Krono (tarifs, trafic, météo, paiements, QR)** : `docs/krono-reference-unique.md` ; PSP : `docs/integrations-psp.md`
+- **Prod / TestFlight / EAS + tâches manuelles** (OTP, session, sockets, Sentry, logs) : `docs/ckprod.md` — **§3.1 bis** (ordre prioritaire + carte du code §7)
+- **Krono (calibration, B2B/B2C, paiements / QR, PSP, pointeurs tarif)** : `docs/krono-reference-unique.md`
 - **Variables** : fichiers `.env.example` à la racine de chaque package (`chrono_backend`, `admin_chrono`, `app_chrono`, `driver_chrono`)
 
 - **Scaling et production** : `chrono_backend/docs/SCALING_SETUP.md`
@@ -627,10 +626,8 @@ npx expo run:android
 ```
 PROJET_CHRONO/
 ├── docs/
-│   ├── ckprod.md                       # Déploiement, checklist prod, backlog qualité
-│   ├── mobile-auth-and-lifecycle.md    # Auth / OTP / tests device liés
-│   ├── krono-reference-unique.md      # Référence unique produit / tarifs / paiements
-│   └── integrations-psp.md
+│   ├── ckprod.md                       # Déploiement + §3.1 bis (OTP → session → observabilité + carte code §7)
+│   └── krono-reference-unique.md      # Produit : calibration, B2B/B2C, paiements/QR, roadmap PSP (§5)
 ├── admin_chrono/docs/
 │   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers
 │   ├── NOTIFICATIONS_BEHAVIOR.md       # Comportement des notifications

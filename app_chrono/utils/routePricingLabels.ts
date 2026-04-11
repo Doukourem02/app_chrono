@@ -1,5 +1,5 @@
 /**
- * Libellés transparence (étape D — doc krono-reference-unique.md).
+ * Libellés transparence distance route — doc krono-reference-unique.md §1.
  */
 
 export type RouteMetricsSource = 'mapbox_route' | 'straight_line';

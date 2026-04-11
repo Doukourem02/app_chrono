@@ -1,5 +1,9 @@
 # Prod Chrono — checklist (`ckprod`)
 
+**Où sont les tâches encore ouvertes (manuel / vérif) ?** **§3.1** (déploiement A–I) et **§3.1 bis** (ordre **du plus bloquant au plus optionnel** : OTP → session apps → temps réel → observabilité → carte du code).
+
+---
+
 ## 3. Phase PENDANT la production (premier déploiement et publication)
 
 Objectif : sécurité et comptes → données → validation réelle → **légal** → bêta stores → **soumission** → confort (monitoring).
@@ -10,7 +14,7 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 
 ### 3.1 Checklist *(ordre recommandé)*
 
-*Validations **session / OTP / arrière‑plan / sockets** (détail + Twilio) : **`docs/mobile-auth-and-lifecycle.md`**.*
+*Auth, session, sockets, Sentry : tout le détail et l’ordre de priorité sont en **§3.1 bis**.*
 
 *Vigilance **A** (Mapbox **sk**, zone Cloudflare **kronodelivery.com**, facturation **Vercel**) : **OK pour l’instant** — ne revérifier qu’en cas d’alerte ou de changement.*
 
@@ -51,8 +55,79 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 
 **I — Optionnel (confort)**
 
-- [ ] **Sentry** : erreur de test reçue après une release.
-- [ ] **Uptime** (UptimeRobot, Better Stack, …) sur `https://api.kro-no-delivery.com/health/live`.
+- [ ] Détail et cases supplémentaires : **§3.1 bis** (Sentry, uptime, Better Stack, traces).
+
+### 3.1 bis — Validations manuelles *(du plus bloquant au plus optionnel)*
+
+*Backend : `request_id`, Winston → Better Stack, `X-Request-Id` dans `apiFetch` (app + driver) sont déjà en place. Ci‑dessous : prérequis, puis session / temps réel, puis secrets & preuves monitoring.*
+
+---
+
+**1 — Prérequis OTP** *(sans ça, pas de parcours login bout en bout sur device)*
+
+- [ ] **Twilio / SMS** : compte actif, crédit suffisant ; OTP reçu en conditions réelles.
+- [ ] **Build** type **TestFlight prod** (ou équivalent) + **API prod** (`https://api.kro-no-delivery.com`) pour des tests crédibles.
+
+---
+
+**2 — Session — app client** (`app_chrono`)
+
+- [ ] Après **login** : mise en **arrière-plan** → rouvrir → **toujours connecté**.
+- [ ] **Tuer l’app** → relancer → session **OK** tant que le refresh JWT est valide (défaut backend long ; voir `jwt` / env si tu changes la durée).
+
+---
+
+**3 — Session — app chauffeur** (`driver_chrono`)
+
+- [ ] Mêmes scénarios que **§2** (arrière-plan puis kill / relance).
+
+---
+
+**4 — Temps réel après retour au premier plan**
+
+- [ ] **Commandes** et **messagerie** : pas d’état figé ; événements socket cohérents après passage par l’arrière-plan (refresh token + resync déjà prévus dans `_layout`).
+
+---
+
+**5 — Observabilité — secrets & builds**
+
+- [ ] **`SENTRY_DSN`** sur le backend **prod** (Render ou équivalent).
+- [ ] **`EXPO_PUBLIC_SENTRY_DSN`** en **EAS / production** pour **app_chrono** et **driver_chrono** (rebuild après ajout).
+- [ ] **Admin Next** : variables Sentry en **prod** (Vercel / autre).
+
+---
+
+**6 — Observabilité — preuves de bout en bout**
+
+- [ ] **Sentry** : erreur **volontaire** (ex. 500 staging) → événement visible après release.
+- [ ] **Better Stack** : log présent ; requête avec **`X-Request-Id`** fixe → **même** id sur toutes les lignes liées.
+- [ ] **Slack** (si branché) : niveau d’alerte acceptable.
+- [ ] **Uptime** sur `https://api.kro-no-delivery.com/health/live` → **alerte** si panne simulée.
+
+---
+
+**7 — Carte du code** *(référence debug / onboarding — décisions déjà en code)*
+
+*Pas d’écran « chargement » dédié à l’hydratation : splash natif ; une erreur **réseau** sur le refresh **ne déclenche pas** de logout si un refresh token existe encore en SecureStore.*
+
+**Client** (`app_chrono`)
+
+| Élément | Fichier |
+|--------|---------|
+| Auth Zustand + persist | `store/useAuthStore.ts` — clé `auth-storage` |
+| Refresh SecureStore | `utils/secureTokenStorage.ts` — `chrono:refreshToken` |
+| Cold start | `app/index.tsx` — `hydrateTokens`, `ensureAccessToken`, `(tabs)` / `(auth)` |
+| Retour actif + refresh | `app/_layout.tsx` — `AppState`, `ensureAccessToken`, sync socket |
+| Socket commandes | `services/userOrderSocketService.ts` ; `app/(tabs)/_layout.tsx` |
+
+**Chauffeur** (`driver_chrono`)
+
+| Élément | Fichier |
+|--------|---------|
+| Auth | `store/useDriverStore.ts` + SecureStore équivalent |
+| Cold start | `app/index.tsx` |
+| Retour actif + refresh | `app/_layout.tsx` |
+| Sockets | `services/orderSocketService.ts`, `services/driverMessageSocketService.ts` — `app/(tabs)/index.tsx` |
 
 ### 3.2 Docker et Kubernetes à cette phase
 
@@ -68,7 +143,7 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 
 ## 4. Phase APRÈS la production (exploitation continue)
 
-À **entretenir** tant que le service vit : habitudes, pas une liste à « finir une fois » comme le **§3**. La **première mise en place** Sentry / uptime reste le **§3.I**.
+À **entretenir** tant que le service vit : habitudes, pas une liste à « finir une fois » comme le **§3**. La **première mise en place** Sentry / logs / uptime : **§3.1 bis**.
 
 ### 4.1 Habitudes de sécurité
 
@@ -78,9 +153,9 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 
 ### 4.2 Monitoring
 
-- **Sentry** : surveiller les pics après une release *(config initiale + premier test d’erreur : **§3.I**)*.
+- **Sentry** : surveiller les pics après une release *(config initiale + premier test d’erreur : **§3.1 bis**)*.
 - **Logs** du PaaS en cas d’incident.
-- **Uptime** optionnel sur `https://api.kro-no-delivery.com/health/live` *(outil externe + **§3.I** ; vérifier périodiquement que l’outil est encore actif)*.
+- **Uptime** optionnel sur `https://api.kro-no-delivery.com/health/live` *(outil externe + **§3.1 bis** ; vérifier périodiquement que l’outil est encore actif)*.
 
 ### 4.3 Données
 
@@ -106,16 +181,16 @@ Objectif : sécurité et comptes → données → validation réelle → **léga
 
 ### 4.7 Backlog qualité app *(hors déploiement pur)*
 
-Amélioration **continue** dans le code ou sur device. **Smoke minimal** : **§3.D** ; session / OTP / arrière‑plan : **`docs/mobile-auth-and-lifecycle.md`**.
+Amélioration **continue** dans le code ou sur device. **Smoke minimal** : **§3.D** ; auth / session / sockets : **§3.1 bis** (points **1–4** + **7** pour les fichiers).
 
 - [ ] **Réseau** : messages clairs hors ligne / timeout (pas d’écran muet).
 - [ ] **Robustesse API** : pas de crash sur réponses inattendues.
 - [ ] **Perf / batterie** : GPS / carte raisonnables quand l’écran carte n’est pas actif.
 - [ ] **Push** : APNs / Expo + backend ; tests sur device.
-- [ ] **Sentry mobile** : `EXPO_PUBLIC_SENTRY_DSN` sur EAS, rebuild, erreur de test reçue — *première fois **§3.I**, suivi **§4.2***.
+- [ ] **Sentry mobile** : `EXPO_PUBLIC_SENTRY_DSN` sur EAS, rebuild, erreur de test reçue — *première fois **§3.1 bis**, suivi **§4.2***.
 - [ ] **Dette** : tests auto ciblés (auth / refresh) ; politique « app trop vieille » vs API si tu casses des contrats.
 
-**Tests dynamiques** *(complètent **§3.D** ; auth / OTP : `mobile-auth-and-lifecycle.md`)* :
+**Tests dynamiques** *(complètent **§3.D** ; priorité session / OTP : **§3.1 bis** §§**1–4**)* :
 
 1. Auth : inscription / OTP / session stable  
 2. Commande : création → statuts → temps réel des deux côtés  
@@ -129,7 +204,8 @@ Amélioration **continue** dans le code ou sur device. **Smoke minimal** : **§3
 
 | Sujet | Fichier |
 |--------|---------|
-| Session, OTP, cycle de vie, validations device liées | `docs/mobile-auth-and-lifecycle.md` |
+| **Checklist manuelle** (OTP → session → temps réel → Sentry / logs / uptime) | **Ce fichier — §3.1 bis** |
+| **Carte du code** auth / sockets (client + chauffeur) | **Ce fichier — §3.1 bis §7** |
 | Variables backend | `chrono_backend/.env.example` |
 | Contrôles prod backend | `chrono_backend/src/config/envCheck.ts` |
 | Apps Expo | `app_chrono/.env.example`, `driver_chrono/.env.example` |

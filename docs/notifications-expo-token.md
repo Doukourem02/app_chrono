@@ -158,7 +158,7 @@ Point d’accroche code : là où tu émets déjà les événements Socket / met
 
 ## 10. Croisement avec le reste de la doc
 
-- **Auth / cycle de vie** : `docs/mobile-auth-and-lifecycle.md` (session, premier plan, sockets). Les push sont **complémentaires** : quand l’app est fermée, le socket ne tourne pas — le push sert de **réveil** ; la vérité reste **API** + resync à l’ouverture.
+- **Auth / cycle de vie** : `docs/ckprod.md` **§3.1 bis** (priorités **1–4** + carte fichiers **§7**). Les push sont **complémentaires** : app fermée → pas de socket ; le push **réveille** ; vérité **API** + resync à l’ouverture.
 - **Prod / qualité** : `docs/ckprod.md` pour le contexte déploiement.
 
 ---

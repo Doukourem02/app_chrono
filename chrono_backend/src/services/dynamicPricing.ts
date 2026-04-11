@@ -1,5 +1,5 @@
 /**
- * Tarification dynamique (niveau C) — doc krono-reference-unique §4.5
+ * Tarification dynamique (niveau C) — doc krono-reference-unique.md §1
  * (coût base + prime temps trafic) × facteurs contextuels plafonnés.
  */
 
