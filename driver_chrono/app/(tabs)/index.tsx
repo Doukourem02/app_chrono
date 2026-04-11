@@ -1,6 +1,7 @@
 import "../../mapboxInit";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator, InteractionManager, Linking } from "react-native";
+import { router } from "expo-router";
 import * as Location from "expo-location";
 import type { MapRefHandle } from "../../hooks/useMapCamera";
 import { DriverMapView } from "../../components/DriverMapView";
@@ -279,6 +280,8 @@ export default function Index() {
   const [showLivraisonEffectueeButton, setShowLivraisonEffectueeButton] = useState(false);
   const atPickupZoneAnnouncedRef = useRef(false);
   const atDropoffZoneAnnouncedRef = useRef(false);
+  /** Annonce « arrivée à destination » une seule fois (géofence et/ou Mapbox peuvent arriver dans n’importe quel ordre). */
+  const spokenDropoffArrivalRef = useRef(false);
 
   /** Annonce vocale en mutant Mapbox pour éviter les doublons (ex: "tournez à droite" + notre annonce) */
   const speakWithMapboxMuted = useCallback((text: string, onDone?: () => void) => {
@@ -372,11 +375,9 @@ export default function Index() {
         status,
         previousStatus: prevStatus,
       });
+      lastEtaAnnouncedMinRef.current = 99;
       setShowRecalcOverlay(true);
       setIsNavigationMinimized(false);
-      if (!isNavigationActive) {
-        speakWithMapboxMuted('Colis pris en charge. Nous pouvons entamer la course.');
-      }
       setIsNavigationActive(true);
       if (status === 'picked_up' && location) {
         setTimeout(() => {
@@ -387,7 +388,7 @@ export default function Index() {
     return () => {
       if (phase1FallbackId) clearTimeout(phase1FallbackId);
     };
-  }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination, isNavigationActive, speakWithMapboxMuted]);
+  }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination, isNavigationActive]);
 
   // Masquer l'overlay "Recalcul..." après 5 s (fallback si transition lente)
   useEffect(() => {
@@ -426,26 +427,15 @@ export default function Index() {
       if (atPickupZoneAnnouncedRef.current) return;
       atPickupZoneAnnouncedRef.current = true;
       setShowColisRecupereButton(true);
-      speakWithMapboxMuted('Vous êtes arrivés au point de collecte de colis.');
     },
     onEnteredDropoffZone: () => {
-      if (atDropoffZoneAnnouncedRef.current) return;
-      atDropoffZoneAnnouncedRef.current = true;
-      setShowLivraisonEffectueeButton(true);
-      speakWithMapboxMuted('Vous êtes arrivés à destination.');
-    },
-    onValidated: (newStatus) => {
-      if (newStatus !== 'completed') return;
-      logger.info('Validation automatique géofencing (destination)', 'geofencing');
-      const orderId = currentOrder?.id;
-      if (!orderId) return;
-      if (hasValidatedViaMapboxRef.current.has(orderId)) return;
-      hasValidatedViaMapboxRef.current.add(orderId);
-      setShowLivraisonEffectueeButton(false);
-      atDropoffZoneAnnouncedRef.current = true;
-      speakWithMapboxMuted('Vous êtes arrivés à destination.');
-      if (currentOrder && isNavigationActive) {
-        setNavigationCompletedOrder(currentOrder);
+      if (!atDropoffZoneAnnouncedRef.current) {
+        atDropoffZoneAnnouncedRef.current = true;
+        setShowLivraisonEffectueeButton(true);
+      }
+      if (!spokenDropoffArrivalRef.current) {
+        spokenDropoffArrivalRef.current = true;
+        speakWithMapboxMuted('Vous êtes arrivés à destination.');
       }
     },
   });
@@ -462,6 +452,7 @@ export default function Index() {
   useEffect(() => {
     if (!isInZone && (currentOrder?.status === 'picked_up' || currentOrder?.status === 'delivering')) {
       atDropoffZoneAnnouncedRef.current = false;
+      spokenDropoffArrivalRef.current = false;
       setShowLivraisonEffectueeButton(false);
     }
   }, [isInZone, currentOrder?.status]);
@@ -472,6 +463,7 @@ export default function Index() {
       lastEtaAnnouncedMinRef.current = 99;
       atPickupZoneAnnouncedRef.current = false;
       atDropoffZoneAnnouncedRef.current = false;
+      spokenDropoffArrivalRef.current = false;
       setShowColisRecupereButton(false);
       setShowLivraisonEffectueeButton(false);
       setLastEtaMinutes(null);
@@ -492,36 +484,42 @@ export default function Index() {
     atDropoffZoneAnnouncedRef.current = true;
     hasValidatedViaMapboxRef.current.add(currentOrder.id);
     orderSocketService.updateDeliveryStatus(currentOrder.id, 'completed', location);
-    speakWithMapboxMuted('Vous êtes arrivés à destination.');
     setNavigationCompletedOrder(currentOrder);
-  }, [currentOrder, location, speakWithMapboxMuted]);
+  }, [currentOrder, location]);
 
-  // Annonces pré-arrivée : "Arrivée à destination dans X minutes" (3, 2, 1 min)
+  // Annonces pré-arrivée livraison : ~2 min et ~1 min (Mapbox)
   // Stocke aussi lastEtaMinutes pour la barre "Reprendre la navigation"
-  const handleRouteProgressChange = useCallback((event: { nativeEvent?: { durationRemaining?: number }; durationRemaining?: number }) => {
-    const durationRemaining = event?.nativeEvent?.durationRemaining ?? event?.durationRemaining;
+  const handleRouteProgressChange = useCallback(
+    (event: {
+      nativeEvent?: { durationRemaining?: number; distanceRemaining?: number };
+      durationRemaining?: number;
+      distanceRemaining?: number;
+    }) => {
+    const durationRemaining =
+      event?.nativeEvent?.durationRemaining ?? event?.durationRemaining;
+
     if (durationRemaining != null && durationRemaining > 0) {
       setLastEtaMinutes(Math.ceil(durationRemaining / 60));
     }
 
     const status = String(currentOrder?.status || '');
     if (status !== 'picked_up' && status !== 'delivering') return;
+
     if (durationRemaining == null || durationRemaining <= 0) return;
 
     const minsRemaining = Math.ceil(durationRemaining / 60);
     const last = lastEtaAnnouncedMinRef.current;
 
-    if (minsRemaining <= 3 && last > 3) {
-      lastEtaAnnouncedMinRef.current = 3;
-      speakWithMapboxMuted('Arrivée à destination dans 3 minutes.');
-    } else if (minsRemaining <= 2 && last > 2) {
+    if (minsRemaining <= 2 && last > 2) {
       lastEtaAnnouncedMinRef.current = 2;
-      speakWithMapboxMuted('Arrivée à destination dans 2 minutes.');
+      speakWithMapboxMuted('Arrivée à destination dans environ deux minutes.');
     } else if (minsRemaining <= 1 && last > 1) {
       lastEtaAnnouncedMinRef.current = 1;
-      speakWithMapboxMuted('Arrivée à destination dans 1 minute.');
+      speakWithMapboxMuted('Arrivée à destination dans environ une minute.');
     }
-  }, [currentOrder?.status, speakWithMapboxMuted]);
+  },
+  [currentOrder?.status, speakWithMapboxMuted]
+  );
 
   // Route animée vers la destination
   const animatedRoute = useAnimatedRoute({
@@ -631,8 +629,18 @@ export default function Index() {
     // Mise à jour optimiste : afficher la commande et ouvrir la navigation immédiatement
     useOrderStore.getState().acceptOrder(orderId, user?.id || '');
     orderSocketService.acceptOrder(orderId);
-    // Annonce vocale dès l'acceptation
-    speakWithMapboxMuted('Course acceptée, en route pour récupérer le colis.');
+    const accepted = useOrderStore.getState().getOrderById(orderId);
+    const profileVt = useDriverStore.getState().profile?.vehicle_type;
+    const method = String(profileVt || accepted?.deliveryMethod || 'vehicule')
+      .trim()
+      .toLowerCase();
+    let safety = ' Attachez votre ceinture de sécurité.';
+    if (method === 'moto') {
+      safety = ' Privilégiez le casque homologué et la visibilité.';
+    } else if (method === 'cargo') {
+      safety = ' Vérifiez la fixation de la cargaison avant de rouler.';
+    }
+    speakWithMapboxMuted(`Course acceptée, en route pour récupérer le colis.${safety}`);
     setIsNavigationActive(true);
     // Émettre immédiatement la position pour que le client voie la route dès l'acceptation
     if (location) {
@@ -705,6 +713,30 @@ export default function Index() {
           );
           return;
         }
+      }
+    }
+
+    if (value && user?.id) {
+      const prof = useDriverStore.getState().profile;
+      const hasEngin =
+        prof?.vehicle_type &&
+        String(prof.vehicle_type).trim() !== "" &&
+        prof?.vehicle_plate &&
+        String(prof.vehicle_plate).trim() !== "";
+      if (!hasEngin) {
+        isTogglingRef.current = false;
+        Alert.alert(
+          "Mon véhicule",
+          "Renseignez le type d’engin (moto, véhicule ou cargo) et la plaque dans Profil → Mon véhicule. Sans cela, le serveur n’associe pas les bonnes courses.",
+          [
+            { text: "Plus tard", style: "cancel" },
+            {
+              text: "Ouvrir",
+              onPress: () => router.push("/profile/vehicle" as const),
+            },
+          ]
+        );
+        return;
       }
     }
     
@@ -1122,9 +1154,6 @@ export default function Index() {
           isExpanded={orderBottomSheetIsExpanded}
           onToggle={toggleOrderBottomSheet}
           onUpdateStatus={async (status: string) => {
-            if (status === 'completed') {
-              speakAnnouncement('Vous êtes arrivés à destination.');
-            }
             if (status === 'picked_up') {
               const dropoffCoord = resolveCoords(currentOrder.dropoff);
               await orderSocketService.updateDeliveryStatus(currentOrder.id, status, location);
@@ -1201,6 +1230,7 @@ export default function Index() {
                       setLastEtaMinutes(null);
                       atPickupZoneAnnouncedRef.current = false;
                       atDropoffZoneAnnouncedRef.current = false;
+                      spokenDropoffArrivalRef.current = false;
                     }
                   : () => setIsNavigationMinimized(true)
               }
@@ -1213,15 +1243,16 @@ export default function Index() {
               if (atPickupZoneAnnouncedRef.current) return;
               atPickupZoneAnnouncedRef.current = true;
               setShowColisRecupereButton(true);
-              speakWithMapboxMuted('Vous êtes arrivés au point de collecte de colis.');
             }
-            // Phase 2 : arrivée à la destination de livraison → afficher bouton "Livraison effectuée"
-            // Le livreur clique pour confirmer (comme "Colis récupéré" au pickup)
             else if (status === 'picked_up' || status === 'delivering') {
-              if (atDropoffZoneAnnouncedRef.current) return;
-              atDropoffZoneAnnouncedRef.current = true;
-              setShowLivraisonEffectueeButton(true);
-              speakWithMapboxMuted('Vous êtes arrivés à destination.');
+              if (!atDropoffZoneAnnouncedRef.current) {
+                atDropoffZoneAnnouncedRef.current = true;
+                setShowLivraisonEffectueeButton(true);
+              }
+              if (!spokenDropoffArrivalRef.current) {
+                spokenDropoffArrivalRef.current = true;
+                speakWithMapboxMuted('Vous êtes arrivés à destination.');
+              }
             }
           }}
           showColisRecupereButton={showColisRecupereButton}
@@ -1239,6 +1270,7 @@ export default function Index() {
             setLastEtaMinutes(null);
             atPickupZoneAnnouncedRef.current = false;
             atDropoffZoneAnnouncedRef.current = false;
+            spokenDropoffArrivalRef.current = false;
           }}
           onRouteProgressChange={handleRouteProgressChange}
           onMessagePress={() => setShowMessageBottomSheet(true)}

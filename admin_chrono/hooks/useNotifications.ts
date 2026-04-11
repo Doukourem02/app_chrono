@@ -10,25 +10,9 @@ import { logger } from '@/utils/logger'
 /**
  * Hook pour gérer les notifications en temps réel
  * Écoute les événements Socket.IO et crée des notifications.
- * Son uniquement pour les événements prioritaires (Nouvelle commande, Nouveau message).
- * Pas de son pour les mises à jour de statut (livrée, annulée, refusée) pour éviter
- * une avalanche de sons (ex: 100 commandes × 4 types = trop de bruits).
+ * Son prioritaire : livreur assigné (accepted), nouveau message.
+ * Pas de son pour les autres mises à jour de statut (livrée, annulée, refusée).
  */
-// Type for order:created event (similar structure to order:status:update)
-type OrderCreatedData = {
-  order?: {
-    id?: string
-    is_phone_order?: boolean
-    is_b2b_order?: boolean
-    shipmentNumber?: string
-    shipment_number?: string
-    deliveryId?: string
-    delivery_id?: string
-    [key: string]: unknown
-  }
-  [key: string]: unknown
-}
-
 // Extended type for order:status:update that includes additional properties
 type OrderStatusUpdateData = SocketEventData['order:status:update'] & {
   order?: SocketEventData['order:status:update']['order'] & {
@@ -43,36 +27,7 @@ export function useNotifications() {
   const { unreadCount: messageUnreadCount } = useAdminMessageStore()
 
   useEffect(() => {
-    // Écouter les nouvelles commandes
-    const unsubscribeOrderCreated = adminSocketService.on('order:created', (data: unknown) => {
-      const orderData = data as OrderCreatedData
-      const order = orderData?.order
-      if (!order || !order.id) return
-
-      // Ne pas créer de notification pour les commandes téléphoniques normales (hors-ligne)
-      // Mais permettre les notifications pour les commandes B2B
-      const isB2BOrder = order.is_b2b_order === true
-      if (order.is_phone_order && !isB2BOrder) return
-
-      const shipmentNumber = order.shipmentNumber || order.shipment_number || order.deliveryId || order.delivery_id
-      
-      // Créer la notification + son (prioritaire : action requise)
-      addNotification({
-        type: 'order',
-        title: 'Nouvelle commande',
-        message: `Une nouvelle commande a été créée${shipmentNumber ? ` (${shipmentNumber})` : ''}`,
-        link: `/orders?orderId=${order.id}`,
-        metadata: {
-          orderId: order.id,
-          shipmentNumber: shipmentNumber,
-        },
-      })
-      soundService.playNewOrder().catch((err) => {
-        if (process.env.NODE_ENV === 'development') {
-          logger.warn('[useNotifications] Erreur lecture son nouvelle commande:', err)
-        }
-      })
-    })
+    // order:created : aucune alerte — notification + son seulement quand un livreur accepte (accepted).
 
     // Écouter les mises à jour de statut de commande
     const unsubscribeOrderStatus = adminSocketService.on('order:status:update', (data: unknown) => {
@@ -80,9 +35,27 @@ export function useNotifications() {
       const order = orderData?.order
       if (!order || !order.id) return
 
-      // Ne créer une notification que pour les changements importants
+      const st = order.status?.toLowerCase() || ''
+
+      // Son prioritaire : un livreur a accepté la course (aligné produit : pas de son à la simple création côté client)
+      if (st === 'accepted') {
+        addNotification({
+          type: 'order',
+          title: 'Livreur assigné',
+          message: `Un livreur a accepté la commande${order.shipmentNumber || order.shipment_number ? ` (${order.shipmentNumber || order.shipment_number})` : ''}`,
+          link: `/orders?orderId=${order.id}`,
+          metadata: { orderId: order.id, status: order.status },
+        })
+        soundService.playNewOrder().catch((err) => {
+          if (process.env.NODE_ENV === 'development') {
+            logger.warn('[useNotifications] Erreur lecture son commande acceptée:', err)
+          }
+        })
+        return
+      }
+
       const importantStatuses = ['completed', 'cancelled', 'declined', 'canceled']
-      if (!importantStatuses.includes(order.status?.toLowerCase())) return
+      if (!importantStatuses.includes(st)) return
 
       const statusConfig: Record<string, { title: string; messageSuffix: string }> = {
         completed: { title: 'Commande livrée', messageSuffix: 'livrée' },
@@ -91,13 +64,12 @@ export function useNotifications() {
         declined: { title: 'Commande refusée', messageSuffix: 'refusée' },
       }
 
-      const config = statusConfig[order.status?.toLowerCase()] || {
+      const config = statusConfig[st] || {
         title: 'Statut de commande mis à jour',
         messageSuffix: 'mise à jour',
       }
       const shipmentNumber = order.shipmentNumber || order.shipment_number || order.deliveryId || order.delivery_id
 
-      // Notification uniquement (pas de son pour livrée/annulée/refusée - trop fréquent)
       addNotification({
         type: 'order',
         title: config.title,
@@ -142,7 +114,6 @@ export function useNotifications() {
     })
 
     return () => {
-      unsubscribeOrderCreated()
       unsubscribeOrderStatus()
       unsubscribeNewMessage()
     }

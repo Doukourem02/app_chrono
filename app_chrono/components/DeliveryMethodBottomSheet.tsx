@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {StyleSheet,View,Text,TouchableOpacity,ScrollView,Image,Animated,Switch,Dimensions,PanResponder} from 'react-native';
+import {StyleSheet,View,Text,TouchableOpacity,ScrollView,Image,Animated,Switch,Dimensions,PanResponder,Alert} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
 import { calculatePrice, getDistanceInKm, estimateDurationMinutes, formatDurationLabel, BASE_PRICES } from '../services/orderApi';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -128,42 +129,45 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
   onConfirm,
   onBack,
 }) => {
-  const [selectedSpeed, setSelectedSpeed] = useState<string>(
-    selectedMethod === 'vehicule' ? 'pickup_service' : 'express'
-  );
+  const effectiveMethod = (
+    isDeliveryMethodEnabledForClient(selectedMethod) ? selectedMethod : 'moto'
+  ) as 'moto' | 'vehicule' | 'cargo';
+
+  const [selectedSpeed, setSelectedSpeed] = useState<string>('express');
   const [isThermalBag, setIsThermalBag] = useState(false);
   const dragHandleRef = useRef<View>(null);
 
-  const selectedMethodData = deliveryMethods.find(m => m.id === selectedMethod) || deliveryMethods[0];
+  const selectedMethodData =
+    deliveryMethods.find((m) => m.id === effectiveMethod) || deliveryMethods[0];
   
-  const selectedSpeedOption = getDeliveryOptions(selectedMethod).find(opt => opt.id === selectedSpeed);
+  const selectedSpeedOption = getDeliveryOptions(effectiveMethod).find(opt => opt.id === selectedSpeed);
 
   const calculatedPrice = useMemo(() => {
     if (pickupCoords && dropoffCoords) {
       const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
       
       if (selectedSpeedOption && selectedSpeedOption.price) {
-        const pricing = BASE_PRICES[selectedMethod as 'moto' | 'vehicule' | 'cargo'] ?? BASE_PRICES.vehicule;
+        const pricing = BASE_PRICES[effectiveMethod as 'moto' | 'vehicule' | 'cargo'] ?? BASE_PRICES.vehicule;
         const realPrice = Math.max(0, Math.round(selectedSpeedOption.price + distanceKm * pricing.perKm));
         return realPrice;
       }
 
-      const realPrice = calculatePrice(distanceKm, selectedMethod as 'moto' | 'vehicule' | 'cargo');
+      const realPrice = calculatePrice(distanceKm, effectiveMethod as 'moto' | 'vehicule' | 'cargo');
       return realPrice;
     }
   
     return price || selectedMethodData?.price || 0;
-  }, [pickupCoords, dropoffCoords, selectedMethod, selectedSpeedOption, price, selectedMethodData]);
+  }, [pickupCoords, dropoffCoords, effectiveMethod, selectedSpeedOption, price, selectedMethodData]);
 
 
   const calculatedTime = useMemo(() => {
     if (pickupCoords && dropoffCoords) {
       const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
-      const durationMinutes = estimateDurationMinutes(distanceKm, selectedMethod as 'moto' | 'vehicule' | 'cargo');
+      const durationMinutes = estimateDurationMinutes(distanceKm, effectiveMethod as 'moto' | 'vehicule' | 'cargo');
       return formatDurationLabel(durationMinutes) || estimatedTime || selectedMethodData?.avgTime || '';
     }
     return estimatedTime || selectedMethodData?.avgTime || '';
-  }, [pickupCoords, dropoffCoords, selectedMethod, estimatedTime, selectedMethodData]);
+  }, [pickupCoords, dropoffCoords, effectiveMethod, estimatedTime, selectedMethodData]);
 
 
   const basePrice = selectedMethodData?.price || 0;
@@ -175,11 +179,11 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
 
 
   useEffect(() => {
-    const options = getDeliveryOptions(selectedMethod);
+    const options = getDeliveryOptions(effectiveMethod);
     if (options.length > 0) {
       setSelectedSpeed(options[0].id);
     }
-  }, [selectedMethod]);
+  }, [effectiveMethod]);
 
  
   useEffect(() => {
@@ -195,7 +199,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
         useNativeDriver: true,
       }),
     ]).start();
-  }, [calculatedPrice, selectedMethod, scaleAnimation]);
+  }, [calculatedPrice, effectiveMethod, scaleAnimation]);
 
 const customPanResponder = useRef(
     PanResponder.create({
@@ -316,70 +320,107 @@ useEffect(() => {
 
   
           <View style={styles.methodOptionsContainer}>
-            {deliveryMethods.map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                style={[
-                  styles.methodCard,
-                  selectedMethod === method.id && styles.methodCardSelected,
-                  method.popular && styles.methodCardPopular,
-                ]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  onMethodSelected(method.id as 'moto' | 'vehicule' | 'cargo');
-                }}
-                activeOpacity={0.7}
-              >
-                {method.popular && (
-                  <View style={styles.popularBadge}>
-                    <Text style={styles.popularBadgeText}>⭐</Text>
+            {deliveryMethods.map((method) => {
+              const enabled = isDeliveryMethodEnabledForClient(method.id);
+              const isSelected = effectiveMethod === method.id;
+              return (
+                <TouchableOpacity
+                  key={method.id}
+                  style={[
+                    styles.methodCard,
+                    isSelected && enabled && styles.methodCardSelected,
+                    method.popular && enabled && styles.methodCardPopular,
+                    !enabled && styles.methodCardDisabled,
+                  ]}
+                  onPress={() => {
+                    if (!enabled) {
+                      Alert.alert(
+                        'Bientôt disponible',
+                        'Pour l’instant, Krono propose uniquement la livraison à moto.',
+                      );
+                      return;
+                    }
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onMethodSelected(method.id as 'moto' | 'vehicule' | 'cargo');
+                  }}
+                  activeOpacity={enabled ? 0.7 : 1}
+                >
+                  {method.popular && enabled && (
+                    <View style={styles.popularBadge}>
+                      <Text style={styles.popularBadgeText}>⭐</Text>
+                    </View>
+                  )}
+                  <View
+                    style={[
+                      styles.methodCardIconContainer,
+                      isSelected && enabled && styles.methodCardIconContainerSelected,
+                      !enabled && styles.methodCardIconContainerDisabled,
+                    ]}
+                  >
+                    <Image
+                      source={method.icon}
+                      style={[styles.methodCardIcon, !enabled && styles.methodCardIconDimmed]}
+                    />
                   </View>
-                )}
-                <View style={[
-                  styles.methodCardIconContainer,
-                  selectedMethod === method.id && styles.methodCardIconContainerSelected,
-                ]}>
-                  <Image source={method.icon} style={styles.methodCardIcon} />
-                </View>
-                <Text style={[
-                  styles.methodCardName,
-                  selectedMethod === method.id && styles.methodCardNameSelected,
-                ]} numberOfLines={1}>{method.name}</Text>
-                <Text style={[
-                  styles.methodCardPrice,
-                  selectedMethod === method.id && styles.methodCardPriceSelected,
-                ]} numberOfLines={1}>à partir de {method.price} F</Text>
-                {selectedMethod === method.id && pickupCoords && dropoffCoords && (
-                  <Text style={styles.methodCardPriceCalculated}>
-                    {(() => {
-                      const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
-                      const options = getDeliveryOptions(method.id);
-                      const selectedOption = options.find(opt => opt.id === selectedSpeed);
-                      if (selectedOption && selectedOption.price) {
-                        const pricing = BASE_PRICES[method.id as 'moto' | 'vehicule' | 'cargo'] ?? BASE_PRICES.vehicule;
-                        const realPrice = Math.max(0, Math.round(selectedOption.price + distanceKm * pricing.perKm));
-                        return `${realPrice} F`;
-                      }
-                      const realPrice = calculatePrice(distanceKm, method.id as 'moto' | 'vehicule' | 'cargo');
-                      return `${realPrice} F`;
-                    })()}
+                  <Text
+                    style={[
+                      styles.methodCardName,
+                      isSelected && enabled && styles.methodCardNameSelected,
+                      !enabled && styles.methodCardNameDisabled,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {method.name}
                   </Text>
-                )}
-                {selectedMethod === method.id && (
-                  <View style={styles.selectedIndicator}>
-                    <Ionicons name="checkmark-circle" size={16} color="#8B5CF6" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.methodCardPrice,
+                      isSelected && enabled && styles.methodCardPriceSelected,
+                      !enabled && styles.methodCardPriceDisabled,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    à partir de {method.price} F
+                  </Text>
+                  {isSelected && enabled && pickupCoords && dropoffCoords && (
+                    <Text style={styles.methodCardPriceCalculated}>
+                      {(() => {
+                        const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
+                        const options = getDeliveryOptions(method.id);
+                        const selectedOption = options.find((opt) => opt.id === selectedSpeed);
+                        if (selectedOption && selectedOption.price) {
+                          const pricing =
+                            BASE_PRICES[method.id as 'moto' | 'vehicule' | 'cargo'] ?? BASE_PRICES.vehicule;
+                          const realPrice = Math.max(
+                            0,
+                            Math.round(selectedOption.price + distanceKm * pricing.perKm)
+                          );
+                          return `${realPrice} F`;
+                        }
+                        const realPrice = calculatePrice(
+                          distanceKm,
+                          method.id as 'moto' | 'vehicule' | 'cargo'
+                        );
+                        return `${realPrice} F`;
+                      })()}
+                    </Text>
+                  )}
+                  {isSelected && enabled && (
+                    <View style={styles.selectedIndicator}>
+                      <Ionicons name="checkmark-circle" size={16} color="#8B5CF6" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-        {selectedMethod !== 'cargo' && getDeliveryOptions(selectedMethod).length > 0 && (
+        {effectiveMethod !== 'cargo' && getDeliveryOptions(effectiveMethod).length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                {selectedMethod === 'vehicule' ? 'Type de service' : 'Mode de livraison'}
+                {effectiveMethod === 'vehicule' ? 'Type de service' : 'Mode de livraison'}
               </Text>
-              {getDeliveryOptions(selectedMethod).map((option) => (
+              {getDeliveryOptions(effectiveMethod).map((option) => (
                 <TouchableOpacity
                   key={option.id}
                   style={[
@@ -422,7 +463,7 @@ useEffect(() => {
             </View>
           )}
 
-          {selectedMethod === 'cargo' && (
+          {effectiveMethod === 'cargo' && (
             <>
               <TouchableOpacity style={styles.specialSection}>
                 <View style={styles.specialSectionLeft}>
@@ -483,7 +524,7 @@ useEffect(() => {
           )}
 
           {/* Options supplémentaires - UNIQUEMENT pour moto */}
-          {selectedMethod === 'moto' && (
+          {effectiveMethod === 'moto' && (
             <View style={styles.additionalOptions}>
               {/* Sac de livraison isotherme - Uniquement pour moto */}
               <View style={styles.additionalOption}>
@@ -683,6 +724,22 @@ const styles = StyleSheet.create({
   methodCardPopular: {
     borderColor: '#FFD700',
     borderWidth: 2,
+  },
+  methodCardDisabled: {
+    opacity: 0.42,
+    backgroundColor: '#E5E7EB',
+  },
+  methodCardIconContainerDisabled: {
+    backgroundColor: '#F3F4F6',
+  },
+  methodCardIconDimmed: {
+    opacity: 0.55,
+  },
+  methodCardNameDisabled: {
+    color: '#9CA3AF',
+  },
+  methodCardPriceDisabled: {
+    color: '#9CA3AF',
   },
   popularBadge: {
     position: 'absolute',

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
 import { logger } from '../utils/logger';
 
 type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
@@ -42,7 +43,10 @@ export const useShipmentStore = create<ShipmentState>((set, get) => ({
   
   setPickupLocation: (location) => set({ pickupLocation: location }),
   setDeliveryLocation: (location) => set({ deliveryLocation: location }),
-  setSelectedMethod: (method) => set({ selectedMethod: method }),
+  setSelectedMethod: (method) =>
+    set({
+      selectedMethod: isDeliveryMethodEnabledForClient(method) ? method : 'moto',
+    }),
   setUserName: (name) => set({ userName: name }),
   setLoginStatus: (status) => set({ isLoggedIn: status }),
   

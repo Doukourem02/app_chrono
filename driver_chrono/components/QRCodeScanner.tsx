@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Constants from 'expo-constants';
 import { logger } from '../utils/logger';
+import { getQRScanErrorAlert } from '../utils/qrScanUserMessage';
 
 const isSimulator = Platform.OS === 'ios' && !Constants.isDevice;
 
@@ -43,7 +44,8 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       onScan(data);
     } catch (error) {
       logger.error('Erreur lors du scan:', undefined, error);
-      Alert.alert('Erreur', 'Impossible de traiter le QR code scanné');
+      const { title, message } = getQRScanErrorAlert('CAMERA_READ_ERROR');
+      Alert.alert(title, message);
     } finally {
       setIsLoading(false);
       setTimeout(() => {
@@ -95,6 +97,12 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
             onPress={requestPermission}
           >
             <Text style={styles.permissionButtonText}>Réessayer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.permissionButton, { marginTop: 12, backgroundColor: '#374151' }]}
+            onPress={() => Linking.openSettings().catch(() => {})}
+          >
+            <Text style={styles.permissionButtonText}>Ouvrir les réglages</Text>
           </TouchableOpacity>
           {/* Saisie manuelle quand caméra indisponible (simulateur ou permission refusée) */}
           {(isSimulator || __DEV__) && (

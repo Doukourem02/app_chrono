@@ -20,6 +20,18 @@ export interface QRCodeData {
   expiresAt: string; // ISO 8601
 }
 
+/** Codes stables pour l’app livreur (messages utilisateur côté client). */
+export type QRScanErrorCode =
+  | 'QR_INVALID_JSON'
+  | 'QR_MALFORMED'
+  | 'QR_SIGNATURE_INVALID'
+  | 'QR_EXPIRED'
+  | 'ORDER_NOT_FOUND'
+  | 'DRIVER_NOT_ASSIGNED'
+  | 'ORDER_STATUS_INVALID'
+  | 'QR_ALREADY_SCANNED'
+  | 'SCAN_SERVER_ERROR';
+
 export interface QRCodeScanResult {
   success: boolean;
   isValid: boolean;
@@ -31,6 +43,8 @@ export interface QRCodeScanResult {
     orderId: string;
   };
   error?: string;
+  /** Code machine pour affichage précis côté mobile */
+  code?: QRScanErrorCode;
 }
 
 export class QRCodeService {
@@ -146,7 +160,27 @@ export class QRCodeService {
         return {
           success: false,
           isValid: false,
-          error: 'Format de QR code invalide',
+          code: 'QR_INVALID_JSON',
+          error: 'Ce n’est pas un QR Chrono valide (données illisibles). Demandez au client d’afficher à nouveau le QR depuis l’app.',
+        };
+      }
+
+      const requiredKeys: (keyof QRCodeData)[] = [
+        'orderId',
+        'orderNumber',
+        'signature',
+        'expiresAt',
+        'timestamp',
+      ];
+      const missing = requiredKeys.filter(
+        (k) => qrCodeData[k] == null || String(qrCodeData[k]).trim() === ''
+      );
+      if (missing.length > 0) {
+        return {
+          success: false,
+          isValid: false,
+          code: 'QR_MALFORMED',
+          error: 'QR incomplet ou corrompu. Vérifiez que le client affiche le bon code de livraison.',
         };
       }
 
@@ -156,7 +190,8 @@ export class QRCodeService {
         return {
           success: false,
           isValid: false,
-          error: 'QR code invalide ou falsifié',
+          code: 'QR_SIGNATURE_INVALID',
+          error: 'Signature du QR invalide (code falsifié, expiré côté serveur ou mauvaise commande). Utilisez le QR affiché dans l’app client pour cette livraison.',
         };
       }
 
@@ -167,7 +202,8 @@ export class QRCodeService {
         return {
           success: false,
           isValid: false,
-          error: 'QR code expiré',
+          code: 'QR_EXPIRED',
+          error: 'Ce QR a expiré. Le client doit rouvrir « Afficher le QR code » pour en générer un nouveau.',
         };
       }
 
@@ -184,7 +220,8 @@ export class QRCodeService {
         return {
           success: false,
           isValid: false,
-          error: 'Commande introuvable',
+          code: 'ORDER_NOT_FOUND',
+          error: 'Aucune commande ne correspond à ce QR. Vérifiez qu’il s’agit bien de la course en cours.',
         };
       }
 
@@ -196,17 +233,20 @@ export class QRCodeService {
         return {
           success: false,
           isValid: false,
-          error: 'Vous n\'êtes pas assigné à cette commande',
+          code: 'DRIVER_NOT_ASSIGNED',
+          error: 'Ce QR n’est pas pour votre compte : vous n’êtes pas le livreur assigné à cette commande.',
         };
       }
 
       // Vérifier le statut de la commande
-      if (!['picked_up', 'delivering'].includes(order.status)) {
+      const st = String(order.status || '').toLowerCase();
+      if (!['picked_up', 'delivering'].includes(st)) {
         await this.recordInvalidScan(qrCodeData.orderId, scannedBy, `Statut invalide: ${order.status}`, location, deviceInfo);
         return {
           success: false,
           isValid: false,
-          error: `Le statut de la commande (${order.status}) ne permet pas le scan`,
+          code: 'ORDER_STATUS_INVALID',
+          error: `Le scan n’est possible qu’après le ramassage du colis. Statut actuel : ${st || order.status}.`,
         };
       }
 
@@ -221,7 +261,8 @@ export class QRCodeService {
         return {
           success: false,
           isValid: false,
-          error: 'Ce QR code a déjà été scanné',
+          code: 'QR_ALREADY_SCANNED',
+          error: 'Ce QR a déjà été enregistré pour vous. Si la course n’est pas terminée côté app, synchronisez ou contactez le support.',
         };
       }
 
@@ -257,7 +298,8 @@ export class QRCodeService {
       return {
         success: false,
         isValid: false,
-        error: `Erreur lors du scan: ${error.message}`,
+        code: 'SCAN_SERVER_ERROR',
+        error: 'Erreur serveur pendant le scan. Réessayez dans un instant.',
       };
     }
   }

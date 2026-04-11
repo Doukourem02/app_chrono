@@ -40,12 +40,19 @@ export async function rehydrateDriverStatusFromDb(driverId: string): Promise<voi
       is_available: boolean;
       updated_at: Date;
     }>(
-      `SELECT user_id, current_latitude, current_longitude, is_online, is_available, updated_at
+      `SELECT user_id, current_latitude, current_longitude, is_online, is_available, updated_at, vehicle_type
        FROM driver_profiles WHERE user_id = $1`,
       [driverId]
     );
     if (!rows.length) return;
-    const row = rows[0];
+    const row = rows[0] as {
+      current_latitude: string | number | null;
+      current_longitude: string | number | null;
+      is_online: boolean;
+      is_available: boolean;
+      updated_at: Date;
+      vehicle_type?: string | null;
+    };
     const lat =
       row.current_latitude != null ? Number(row.current_latitude) : undefined;
     const lng =
@@ -59,6 +66,9 @@ export async function rehydrateDriverStatusFromDb(driverId: string): Promise<voi
       current_latitude: Number.isFinite(lat) ? lat : existing.current_latitude,
       current_longitude: Number.isFinite(lng) ? lng : existing.current_longitude,
       updated_at: row.updated_at?.toISOString?.() ?? new Date().toISOString(),
+      ...(row.vehicle_type != null && String(row.vehicle_type).trim() !== ''
+        ? { vehicle_type: row.vehicle_type }
+        : {}),
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -133,6 +143,17 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
     }
 
     realDriverStatuses.set(userId, updatedDriver);
+
+    try {
+      const vtr = await pool.query('SELECT vehicle_type FROM driver_profiles WHERE user_id = $1', [userId]);
+      const vt = vtr.rows[0]?.vehicle_type;
+      const cur = realDriverStatuses.get(userId);
+      if (cur != null && vt != null && String(vt).trim() !== '') {
+        realDriverStatuses.set(userId, { ...cur, vehicle_type: vt });
+      }
+    } catch {
+      /* non bloquant */
+    }
 
     // Émettre immédiatement l'événement si le driver repasse en ligne
     if (typeof is_online === 'boolean' && is_online === true && wasOffline) {
@@ -1469,6 +1490,14 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
       vehicle_color: vehicle_color !== undefined,
       license_number: license_number !== undefined,
     });
+
+    const vtRow = result.rows[0]?.vehicle_type;
+    if (vtRow != null && String(vtRow).trim() !== '') {
+      const mem = realDriverStatuses.get(userId);
+      if (mem) {
+        realDriverStatuses.set(userId, { ...mem, vehicle_type: vtRow });
+      }
+    }
 
     res.json({
       success: true,

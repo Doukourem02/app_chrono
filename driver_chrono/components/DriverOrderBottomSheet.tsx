@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { QRCodeScanner } from './QRCodeScanner';
 import { QRCodeScanResult } from './QRCodeScanResult';
 import { qrCodeService } from '../services/qrCodeService';
+import { getQRScanErrorAlert } from '../utils/qrScanUserMessage';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -91,14 +92,17 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
         setScanResult(scanData);
         setShowQRScanner(false);
       } else {
-        Alert.alert(
-          'QR Code invalide',
-          result.error || 'Le QR code scanné n\'est pas valide pour cette commande',
-          [{ text: 'Fermer', onPress: () => setShowQRScanner(false) }]
-        );
+        const { title, message } = getQRScanErrorAlert(result.code, result.error);
+        Alert.alert(title, message, [
+          { text: 'Fermer', onPress: () => setShowQRScanner(false) },
+        ]);
       }
     } catch (error: any) {
-      Alert.alert('Erreur', error.message || 'Erreur lors du scan du QR code');
+      const { title, message } = getQRScanErrorAlert(
+        'SCAN_UNKNOWN',
+        error?.message
+      );
+      Alert.alert(title, message);
     }
   };
 

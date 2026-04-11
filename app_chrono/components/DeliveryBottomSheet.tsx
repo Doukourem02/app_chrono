@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View,Text,TouchableOpacity, Animated,ScrollView,Image,Alert} from 'react-native';
+import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 import { useShipmentStore } from '../store/useShipmentStore';
 
@@ -111,27 +112,44 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
           <View style={styles.deliveryMethodsContainer}>
             <Text style={styles.deliveryMethodsTitle}>Méthode de livraison</Text>
             <View style={styles.deliveryOptions}>
-              {deliveryMethods.map((method) => (
-                <TouchableOpacity
-                  key={method.id}
-                  style={[
-                    styles.deliveryOption,
-                    selectedMethod === method.id && styles.selectedOption,
-                  ]}
-                  onPress={() => onMethodSelected(method.id as 'moto' | 'vehicule' | 'cargo')}
-                  activeOpacity={0.7}
-                >
-                  <Image source={method.icon} style={styles.methodIcon} />
-                  <Text
+              {deliveryMethods.map((method) => {
+                const enabled = isDeliveryMethodEnabledForClient(method.id);
+                return (
+                  <TouchableOpacity
+                    key={method.id}
                     style={[
-                      styles.methodName,
-                      selectedMethod === method.id && styles.methodNameSelected,
+                      styles.deliveryOption,
+                      selectedMethod === method.id && enabled && styles.selectedOption,
+                      !enabled && styles.deliveryOptionDisabled,
                     ]}
+                    onPress={() => {
+                      if (!enabled) {
+                        Alert.alert(
+                          'Bientôt disponible',
+                          'Pour l’instant, Krono propose uniquement la livraison à moto.',
+                        );
+                        return;
+                      }
+                      onMethodSelected(method.id as 'moto' | 'vehicule' | 'cargo');
+                    }}
+                    activeOpacity={enabled ? 0.7 : 1}
                   >
-                    {method.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Image
+                      source={method.icon}
+                      style={[styles.methodIcon, !enabled && styles.methodIconDisabled]}
+                    />
+                    <Text
+                      style={[
+                        styles.methodName,
+                        selectedMethod === method.id && enabled && styles.methodNameSelected,
+                        !enabled && styles.methodNameDisabled,
+                      ]}
+                    >
+                      {method.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -238,6 +256,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F0FF',
     borderColor: '#8B5CF6',
   },
+  deliveryOptionDisabled: {
+    opacity: 0.45,
+    backgroundColor: '#E5E7EB',
+  },
   methodIcon: {
     width: 40,
     height: 40,
@@ -253,6 +275,12 @@ const styles = StyleSheet.create({
   methodNameSelected: {
     color: '#8B5CF6',
     fontWeight: '600',
+  },
+  methodIconDisabled: {
+    opacity: 0.55,
+  },
+  methodNameDisabled: {
+    color: '#9CA3AF',
   },
   chooseButton: {
     backgroundColor: '#8B5CF6',

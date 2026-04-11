@@ -5,9 +5,11 @@ import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
+import { usePeriodicClientOrderSync } from '../../hooks/usePeriodicClientOrderSync';
 
 export default function TabLayout() {
   const { user } = useAuthStore();
+  usePeriodicClientOrderSync();
 
   useEffect(() => {
     if (user?.id) {

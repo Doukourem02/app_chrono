@@ -157,7 +157,11 @@ export const scanQRCode = async (req: AuthenticatedRequest, res: Response): Prom
     const { qrCode, location, deviceInfo } = req.body;
 
     if (!qrCode) {
-      res.status(400).json({ success: false, message: 'QR code requis' });
+      res.status(400).json({
+        success: false,
+        message: 'Aucun contenu QR envoyé. Scannez à nouveau ou utilisez la saisie manuelle (test).',
+        code: 'QR_PAYLOAD_MISSING',
+      });
       return;
     }
 
@@ -173,7 +177,7 @@ export const scanQRCode = async (req: AuthenticatedRequest, res: Response): Prom
       res.status(400).json({
         success: false,
         message: result.error || 'Scan invalide',
-        data: result,
+        code: result.code || 'SCAN_INVALID',
       });
       return;
     }
@@ -213,7 +217,11 @@ export const scanQRCode = async (req: AuthenticatedRequest, res: Response): Prom
     });
   } catch (error: any) {
     logger.error('Erreur lors du scan du QR code:', error);
-    res.status(500).json({ success: false, message: error.message || 'Erreur serveur' });
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur pendant le scan. Réessayez dans un instant.',
+      code: 'SCAN_SERVER_ERROR',
+    });
   }
 };
 

@@ -180,6 +180,54 @@ function delayMs(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Type d’engin : commande (`delivery_method`) ↔ profil livreur (`vehicle_type`). */
+function normalizeEnginType(
+  m: string | undefined | null
+): 'moto' | 'vehicule' | 'cargo' | null {
+  const s = String(m ?? '').trim().toLowerCase();
+  if (s === 'moto') return 'moto';
+  if (s === 'vehicule' || s === 'vehicle' || s === 'voiture' || s === 'car') return 'vehicule';
+  if (s === 'cargo') return 'cargo';
+  return null;
+}
+
+function orderRequiredEngin(orderMethod: string): 'moto' | 'vehicule' | 'cargo' {
+  return normalizeEnginType(orderMethod) ?? 'vehicule';
+}
+
+function driverMatchesOrderEngin(
+  driverVehicleType: string | undefined | null,
+  orderMethod: string
+): boolean {
+  const need = orderRequiredEngin(orderMethod);
+  const got = normalizeEnginType(driverVehicleType);
+  if (got == null) return false;
+  return got === need;
+}
+
+async function enrichCandidateVehicleTypes(candidates: Map<string, Record<string, unknown>>): Promise<void> {
+  const missing: string[] = [];
+  for (const [id, d] of candidates.entries()) {
+    const vt = d.vehicle_type as string | undefined | null;
+    if (vt == null || String(vt).trim() === '') missing.push(id);
+  }
+  if (missing.length === 0 || !process.env.DATABASE_URL) return;
+  try {
+    const { rows } = await pool.query<{ user_id: string; vehicle_type: string | null }>(
+      `SELECT user_id, vehicle_type FROM driver_profiles WHERE user_id = ANY($1::uuid[])`,
+      [missing]
+    );
+    for (const r of rows) {
+      const c = candidates.get(r.user_id);
+      if (c && r.vehicle_type != null && String(r.vehicle_type).trim() !== '') {
+        c.vehicle_type = r.vehicle_type;
+      }
+    }
+  } catch (e: any) {
+    logger.warn('[enrichCandidateVehicleTypes]', e?.message || e);
+  }
+}
+
 // Fonction pour compter les commandes actives d'un client
 function getActiveOrdersCountByUser(userId: string): number {
   let count = 0; for (const [, order] of activeOrders.entries()) {
@@ -342,6 +390,7 @@ async function findNearbyDrivers(
       current_longitude: Number(driverData.current_longitude),
       is_online: true,
       is_available: true,
+      vehicle_type: (driverData as { vehicle_type?: string }).vehicle_type,
     });
   }
 
@@ -353,8 +402,9 @@ async function findNearbyDrivers(
         current_latitude: string | number;
         current_longitude: string | number;
         updated_at: Date;
+        vehicle_type: string | null;
       }>(
-        `SELECT user_id, current_latitude, current_longitude, updated_at
+        `SELECT user_id, current_latitude, current_longitude, updated_at, vehicle_type
          FROM driver_profiles
          WHERE is_online = true
            AND is_available = true
@@ -383,12 +433,15 @@ async function findNearbyDrivers(
           current_latitude: lat,
           current_longitude: lng,
           updated_at: row.updated_at?.toISOString?.() ?? String(row.updated_at),
+          vehicle_type: row.vehicle_type ?? undefined,
         });
       }
     } catch (dbErr: any) {
       logger.warn('[findNearbyDrivers] fusion driver_profiles ignorée:', dbErr?.message || dbErr);
     }
   }
+
+  await enrichCandidateVehicleTypes(candidates as Map<string, Record<string, unknown>>);
 
   const nearbyDrivers: NearbyDriver[] = [];
 
@@ -401,6 +454,15 @@ async function findNearbyDrivers(
     );
 
     if (distance <= maxDistance) {
+      const vt = (driverData as { vehicle_type?: string }).vehicle_type;
+      if (!driverMatchesOrderEngin(vt, deliveryMethod)) {
+        if (DEBUG) {
+          logger.debug(
+            `Livreur ${driverId.slice(0, 8)} ignoré: engin ${vt ?? 'non renseigné'} ≠ commande ${orderRequiredEngin(deliveryMethod)}`
+          );
+        }
+        continue;
+      }
       if (DEBUG) {
         logger.debug(`Livreur ${driverId.slice(0, 8)} trouvé à ${distance.toFixed(2)}km`);
       }
@@ -512,7 +574,37 @@ async function findAllAvailableDrivers(
     );
   }
 
-  return availableDrivers;
+  const ids = [...new Set(availableDrivers.map((d) => d.driverId))];
+  const vtMap = new Map<string, string>();
+  if (ids.length && process.env.DATABASE_URL) {
+    try {
+      const { rows } = await pool.query<{ user_id: string; vehicle_type: string | null }>(
+        `SELECT user_id, vehicle_type FROM driver_profiles WHERE user_id = ANY($1::uuid[])`,
+        [ids]
+      );
+      for (const r of rows) {
+        if (r.vehicle_type != null && String(r.vehicle_type).trim() !== '') {
+          vtMap.set(r.user_id, r.vehicle_type);
+        }
+      }
+    } catch (e: any) {
+      logger.warn('[findAllAvailableDrivers] vehicle_type:', e?.message);
+    }
+  }
+
+  const filtered = availableDrivers.filter((d) => {
+    let vt = (d as { vehicle_type?: string }).vehicle_type;
+    if (vt == null || String(vt).trim() === '') vt = vtMap.get(d.driverId);
+    return driverMatchesOrderEngin(vt, deliveryMethod);
+  });
+
+  if (DEBUG && filtered.length < availableDrivers.length) {
+    logger.debug(
+      `[findAllAvailableDrivers] Filtrage engin: ${availableDrivers.length} → ${filtered.length} (commande=${orderRequiredEngin(deliveryMethod)})`
+    );
+  }
+
+  return filtered;
 }
 
 /**
@@ -1121,6 +1213,24 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       if (order.status !== 'pending') {
         socket.emit('order-already-taken', { orderId });
         return;
+      }
+
+      try {
+        const vtRes = await pool.query('SELECT vehicle_type FROM driver_profiles WHERE user_id = $1', [
+          driverId,
+        ]);
+        const driverVt = vtRes.rows[0]?.vehicle_type;
+        const orderMethod = order.deliveryMethod || 'vehicule';
+        if (!driverMatchesOrderEngin(driverVt, orderMethod)) {
+          socket.emit('order-accept-error', {
+            orderId,
+            message:
+              "Cette course ne correspond pas à votre type d'engin. Ouvrez Profil → Mon véhicule et enregistrez le bon mode.",
+          });
+          return;
+        }
+      } catch (e: any) {
+        logger.warn('[accept-order] vehicle_type check DB error:', e?.message);
       }
 
       const activeOrdersCount = getActiveOrdersCountByDriver(driverId);

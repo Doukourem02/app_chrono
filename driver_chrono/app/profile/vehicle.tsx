@@ -74,10 +74,11 @@ export default function VehiclePage() {
           };
 
           result.data.forEach((doc: any) => {
+            const isCarteGrise = doc.document_type === 'carte_grise';
             docsMap[doc.document_type] = {
               document_number: doc.document_number || '',
               issue_date: doc.issue_date || '',
-              expiry_date: doc.expiry_date || '',
+              expiry_date: isCarteGrise ? '' : doc.expiry_date || '',
               document_url: doc.document_url,
             };
           });
@@ -93,6 +94,28 @@ export default function VehiclePage() {
 
     loadDocuments();
   }, [profile?.vehicle_plate]);
+
+  /** Payload API : carte grise sans expiration (CI) ; permis aligné sur le numéro du profil. */
+  const buildDocumentApiPayload = (
+    documentType: 'carte_grise' | 'assurance' | 'controle_technique' | 'permis_conduire',
+    doc: DocumentData
+  ) => {
+    const base = {
+      document_number: doc.document_number,
+      issue_date: doc.issue_date,
+      expiry_date: doc.expiry_date,
+    };
+    if (documentType === 'carte_grise') {
+      return { ...base, expiry_date: undefined };
+    }
+    if (documentType === 'permis_conduire') {
+      return {
+        ...base,
+        document_number: formData.licenseNumber.trim() || doc.document_number,
+      };
+    }
+    return base;
+  };
 
   const handleSave = async () => {
     if (!formData.vehicleType.trim() || !formData.vehiclePlate.trim()) {
@@ -197,18 +220,12 @@ export default function VehiclePage() {
       });
       const base64DataUri = `data:${mimeType};base64,${base64}`;
 
-      // Uploader le document
-      const result = await apiService.uploadVehicleDocument(
-        profile.vehicle_plate,
-        documentType,
-        {
-          document_number: documents[documentType].document_number,
-          issue_date: documents[documentType].issue_date,
-          expiry_date: documents[documentType].expiry_date,
-          imageBase64: base64DataUri,
-          mimeType,
-        }
-      );
+      const payload = buildDocumentApiPayload(documentType, documents[documentType]);
+      const result = await apiService.uploadVehicleDocument(profile.vehicle_plate, documentType, {
+        ...payload,
+        imageBase64: base64DataUri,
+        mimeType,
+      });
 
       if (result.success && result.data) {
         setDocuments((prev) => ({
@@ -242,11 +259,11 @@ export default function VehiclePage() {
     }
 
     try {
-      const result = await apiService.uploadVehicleDocument(profile.vehicle_plate, documentType, {
-        document_number: documents[documentType].document_number,
-        issue_date: documents[documentType].issue_date,
-        expiry_date: documents[documentType].expiry_date,
-      });
+      const result = await apiService.uploadVehicleDocument(
+        profile.vehicle_plate,
+        documentType,
+        buildDocumentApiPayload(documentType, documents[documentType])
+      );
 
       if (result.success) {
         Alert.alert('Succès', 'Document enregistré avec succès');
@@ -365,6 +382,10 @@ export default function VehiclePage() {
             {/* Carte grise */}
             <View style={styles.documentCard}>
               <Text style={styles.documentTitle}>Carte grise</Text>
+              <Text style={styles.documentHint}>
+                En Côte d&apos;Ivoire, la carte grise ne comporte généralement pas de date
+                d&apos;expiration à suivre comme une assurance.
+              </Text>
               <TextInput
                 style={styles.input}
                 value={documents.carte_grise.document_number || ''}
@@ -377,37 +398,20 @@ export default function VehiclePage() {
                 placeholder="Numéro de carte grise"
                 placeholderTextColor="#9CA3AF"
               />
-              <View style={styles.dateRow}>
-                <View style={styles.dateInput}>
-                  <Text style={styles.dateLabel}>Date d&apos;émission</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={documents.carte_grise.issue_date || ''}
-                    onChangeText={(text) =>
-                      setDocuments((prev) => ({
-                        ...prev,
-                        carte_grise: { ...prev.carte_grise, issue_date: text },
-                      }))
-                    }
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-                <View style={styles.dateInput}>
-                  <Text style={styles.dateLabel}>Date d&apos;expiration</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={documents.carte_grise.expiry_date || ''}
-                    onChangeText={(text) =>
-                      setDocuments((prev) => ({
-                        ...prev,
-                        carte_grise: { ...prev.carte_grise, expiry_date: text },
-                      }))
-                    }
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
+              <View style={styles.dateInputFull}>
+                <Text style={styles.dateLabel}>Date d&apos;émission</Text>
+                <TextInput
+                  style={styles.input}
+                  value={documents.carte_grise.issue_date || ''}
+                  onChangeText={(text) =>
+                    setDocuments((prev) => ({
+                      ...prev,
+                      carte_grise: { ...prev.carte_grise, issue_date: text },
+                    }))
+                  }
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#9CA3AF"
+                />
               </View>
               <TouchableOpacity
                 style={styles.uploadButton}
@@ -526,62 +530,67 @@ export default function VehiclePage() {
               </TouchableOpacity>
             </View>
 
-            {/* Contrôle technique */}
-            <View style={styles.documentCard}>
-              <Text style={styles.documentTitle}>Contrôle technique</Text>
-              <View style={styles.dateInput}>
-                <Text style={styles.dateLabel}>Date d&apos;expiration</Text>
-                <TextInput
-                  style={styles.input}
-                  value={documents.controle_technique.expiry_date || ''}
-                  onChangeText={(text) =>
-                    setDocuments((prev) => ({
-                      ...prev,
-                      controle_technique: { ...prev.controle_technique, expiry_date: text },
-                    }))
-                  }
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={() => handlePickDocumentImage('controle_technique')}
-                disabled={documents.controle_technique.is_uploading}
-              >
-                {documents.controle_technique.is_uploading ? (
-                  <ActivityIndicator color="#8B5CF6" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name={documents.controle_technique.document_url ? 'checkmark-circle' : 'camera-outline'}
-                      size={20}
-                      color={documents.controle_technique.document_url ? '#10B981' : '#8B5CF6'}
-                    />
-                    <Text style={styles.uploadButtonText}>
-                      {documents.controle_technique.document_url ? 'Photo enregistrée' : 'Prendre/Choisir une photo'}
-                    </Text>
-                  </>
+            {/* Contrôle technique — obligatoire pour véhicule / cargo, pas pour moto */}
+            {(formData.vehicleType === 'vehicule' || formData.vehicleType === 'cargo') && (
+              <View style={styles.documentCard}>
+                <Text style={styles.documentTitle}>Contrôle technique</Text>
+                <View style={styles.dateInput}>
+                  <Text style={styles.dateLabel}>Date d&apos;expiration</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={documents.controle_technique.expiry_date || ''}
+                    onChangeText={(text) =>
+                      setDocuments((prev) => ({
+                        ...prev,
+                        controle_technique: { ...prev.controle_technique, expiry_date: text },
+                      }))
+                    }
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                </View>
+                <TouchableOpacity
+                  style={styles.uploadButton}
+                  onPress={() => handlePickDocumentImage('controle_technique')}
+                  disabled={documents.controle_technique.is_uploading}
+                >
+                  {documents.controle_technique.is_uploading ? (
+                    <ActivityIndicator color="#8B5CF6" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name={documents.controle_technique.document_url ? 'checkmark-circle' : 'camera-outline'}
+                        size={20}
+                        color={documents.controle_technique.document_url ? '#10B981' : '#8B5CF6'}
+                      />
+                      <Text style={styles.uploadButtonText}>
+                        {documents.controle_technique.document_url ? 'Photo enregistrée' : 'Prendre/Choisir une photo'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                {documents.controle_technique.document_url && (
+                  <Image
+                    source={{ uri: documents.controle_technique.document_url }}
+                    style={styles.documentPreview}
+                    resizeMode="cover"
+                  />
                 )}
-              </TouchableOpacity>
-              {documents.controle_technique.document_url && (
-                <Image
-                  source={{ uri: documents.controle_technique.document_url }}
-                  style={styles.documentPreview}
-                  resizeMode="cover"
-                />
-              )}
-              <TouchableOpacity
-                style={styles.saveDocumentButton}
-                onPress={() => handleSaveDocument('controle_technique')}
-              >
-                <Text style={styles.saveDocumentButtonText}>Enregistrer</Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={styles.saveDocumentButton}
+                  onPress={() => handleSaveDocument('controle_technique')}
+                >
+                  <Text style={styles.saveDocumentButtonText}>Enregistrer</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Permis de conduire */}
             <View style={styles.documentCard}>
               <Text style={styles.documentTitle}>Permis de conduire</Text>
+              <Text style={styles.documentHint}>
+                Le numéro de permis est celui renseigné plus haut (« Numéro de permis »).
+              </Text>
               <View style={styles.dateInput}>
                 <Text style={styles.dateLabel}>Date d&apos;expiration</Text>
                 <TextInput
@@ -782,6 +791,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
+    marginBottom: 12,
+  },
+  documentHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  dateInputFull: {
     marginBottom: 12,
   },
   dateRow: {

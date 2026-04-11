@@ -104,9 +104,18 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       return state;
     }
     const newOrders = [...state.activeOrders, order];
-    // Ne pas changer selectedOrderId automatiquement si l'utilisateur suit déjà une commande
-    // Seulement si aucune commande n'est sélectionnée
-    const newSelectedId = state.selectedOrderId || order.id;
+    const sel = state.selectedOrderId
+      ? state.activeOrders.find((o) => o.id === state.selectedOrderId)
+      : null;
+    const selFinal =
+      sel &&
+      (sel.status === 'completed' ||
+        sel.status === 'cancelled' ||
+        sel.status === 'declined');
+    const newSelectedId =
+      order.status === 'pending' && (!sel || selFinal)
+        ? order.id
+        : state.selectedOrderId || order.id;
     return {
       activeOrders: newOrders,
       selectedOrderId: newSelectedId,
@@ -168,19 +177,19 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       order.id === orderId ? { ...order, status } : order
     );
     
-    // Si la commande est dans un état final, la retirer immédiatement
-    if (status === 'completed' || status === 'cancelled' || status === 'declined') {
-      const filteredOrders = updatedOrders.filter(o => o.id !== orderId);
+    // Garder les commandes completed dans le store (notation / suivi) jusqu’à removeOrder / clear.
+    if (status === 'cancelled' || status === 'declined') {
+      const filteredOrders = updatedOrders.filter((o) => o.id !== orderId);
       let newSelectedId = state.selectedOrderId;
       if (state.selectedOrderId === orderId) {
         newSelectedId = filteredOrders.length > 0 ? filteredOrders[0].id : null;
       }
-      return { 
+      return {
         activeOrders: filteredOrders,
         selectedOrderId: newSelectedId,
       };
     }
-    
+
     return { activeOrders: updatedOrders };
   }),
 
@@ -266,20 +275,19 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
                 });
               }
               
-              // Si la commande est dans un état final, la retirer immédiatement AVANT de retourner
-              if (status === 'completed' || status === 'cancelled' || status === 'declined') {
-                const filteredOrders = updatedOrders.filter(o => o.id !== order.id);
+              // completed : reste en liste pour UI client (QR, notation) jusqu’à nettoyage explicite.
+              if (status === 'cancelled' || status === 'declined') {
+                const filteredOrders = updatedOrders.filter((o) => o.id !== order.id);
                 let newSelectedId = currentState.selectedOrderId;
                 if (currentState.selectedOrderId === order.id) {
                   newSelectedId = filteredOrders.length > 0 ? filteredOrders[0].id : null;
                 }
-                return { 
+                return {
                   activeOrders: filteredOrders,
                   selectedOrderId: newSelectedId,
                 };
               }
-              
-              // Créer un nouveau tableau pour forcer le re-render
+
               return { activeOrders: [...updatedOrders] };
             });
           }
@@ -343,9 +351,23 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   getCurrentOrder: () => {
     const state = get();
     if (state.selectedOrderId) {
-      return state.activeOrders.find(o => o.id === state.selectedOrderId) || null;
+      const found = state.activeOrders.find((o) => o.id === state.selectedOrderId);
+      if (found) return found;
     }
-    return state.activeOrders.find(o => o.status !== 'pending') || state.activeOrders[0] || null;
+    const priority: OrderStatus[] = [
+      'delivering',
+      'picked_up',
+      'enroute',
+      'accepted',
+      'in_progress',
+      'pending',
+      'completed',
+    ];
+    for (const st of priority) {
+      const o = state.activeOrders.find((x) => x.status === st);
+      if (o) return o;
+    }
+    return state.activeOrders[0] || null;
   },
 
   getPendingOrder: () => {

@@ -33,6 +33,7 @@ import { usePaymentStore } from "../../store/usePaymentStore";
 import { useRatingStore } from "../../store/useRatingStore";
 import { useShipmentStore } from "../../store/useShipmentStore";
 import { logger } from "../../utils/logger";
+import { isDeliveryMethodEnabledForClient } from "../../constants/clientDeliveryMethods";
 import { forwardGeocodeAddress } from "../../utils/forwardGeocodeAddress";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -769,6 +770,13 @@ export default function MapPage() {
   };
 
   const handleMethodSelected = (method: "moto" | "vehicule" | "cargo") => {
+    if (!isDeliveryMethodEnabledForClient(method)) {
+      Alert.alert(
+        "Bientôt disponible",
+        "Pour l’instant, Krono propose uniquement la livraison à moto.",
+      );
+      return;
+    }
     Haptics.selectionAsync();
     setSelectedMethod(method);
     startMethodSelection();

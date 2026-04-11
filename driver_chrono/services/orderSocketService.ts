@@ -210,10 +210,14 @@ class OrderSocketService {
       }
     });
 
-    // Erreur acceptation (limite atteinte)
+    // Erreur acceptation (limite, engin incompatible, etc.)
     this.socket.on('order-accept-error', (data) => {
       logger.warn('Erreur acceptation commande', undefined, data);
-      // La commande reste dans pendingOrders pour que le livreur puisse la voir
+      const msg =
+        typeof (data as { message?: string })?.message === 'string'
+          ? (data as { message: string }).message
+          : 'Vous ne pouvez pas accepter cette course.';
+      Alert.alert('Acceptation impossible', msg);
     });
 
     // Resync order state after reconnect

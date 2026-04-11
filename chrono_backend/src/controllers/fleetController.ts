@@ -765,6 +765,10 @@ export const upsertVehicleDocument = async (req: RequestWithUser, res: Response)
       return;
     }
 
+    // En CI la carte grise ne suit pas une date d'expiration comme l'assurance
+    const effectiveExpiryDate =
+      document_type === 'carte_grise' ? null : expiry_date || null;
+
     let finalDocumentUrl = document_url;
 
     // Si une image base64 est fournie, l'uploader d'abord
@@ -845,7 +849,7 @@ export const upsertVehicleDocument = async (req: RequestWithUser, res: Response)
       document_type,
       document_number || null,
       issue_date || null,
-      expiry_date || null,
+      effectiveExpiryDate,
       finalDocumentUrl || null,
       is_valid !== undefined ? is_valid : true,
       notes || null,

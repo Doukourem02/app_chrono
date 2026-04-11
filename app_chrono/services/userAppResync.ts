@@ -114,7 +114,8 @@ export async function syncClientOrdersFromApi(userId: string): Promise<void> {
   if (result.success && result.data?.length) {
     for (const row of result.data) {
       const st = String(row.status || "");
-      if (!localIds.has(row.id) && !isInProgressStatus(st)) continue;
+      // Toujours fusionner les livraisons en cours même absentes du store (socket raté, 2e commande…).
+      if (!isInProgressStatus(st) && !localIds.has(row.id)) continue;
       try {
         const formatted = formatApiDeliveryRow(row);
         useOrderStore.getState().updateFromSocket({ order: formatted as any });

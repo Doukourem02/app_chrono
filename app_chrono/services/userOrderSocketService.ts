@@ -546,15 +546,11 @@ class UserOrderSocketService {
         const { pendingOrders, activeOrders, pendingOrder, currentOrder, driverCoords } = data || {};
         const store = useOrderStore.getState();
 
-        // Nettoyer d'abord les commandes complétées/annulées existantes
-        const completedOrCancelled = store.activeOrders.filter(o => 
-          o.status === 'completed' || o.status === 'cancelled' || o.status === 'declined'
+        // Ne pas retirer les commandes completed : le client en a besoin pour notation / QR jusqu’au nettoyage local.
+        const cancelledOrDeclined = store.activeOrders.filter(
+          (o) => o.status === 'cancelled' || o.status === 'declined'
         );
-        if (completedOrCancelled.length > 0) {
-          completedOrCancelled.forEach(order => {
-            store.removeOrder(order.id);
-          });
-        }
+        cancelledOrDeclined.forEach((order) => store.removeOrder(order.id));
 
         // Ajouter toutes les commandes actives (filtrer les complétées/annulées)
         if (Array.isArray(activeOrders)) {

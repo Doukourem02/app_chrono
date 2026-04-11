@@ -17,6 +17,8 @@ export interface QRCodeScanResult {
     orderId: string;
   };
   error?: string;
+  /** Aligné sur chrono_backend POST /api/qr-codes/scan */
+  code?: string;
 }
 
 class QRCodeService {
@@ -40,7 +42,8 @@ class QRCodeService {
         return {
           success: false,
           isValid: false,
-          error: 'Non authentifié',
+          code: 'AUTH_REQUIRED',
+          error: 'Session expirée ou déconnecté. Reconnectez-vous pour scanner.',
         };
       }
 
@@ -84,12 +87,33 @@ class QRCodeService {
         }),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
+      const raw = await response.text();
+      let result: {
+        success?: boolean;
+        message?: string;
+        error?: string;
+        code?: string;
+        data?: QRCodeScanResult['data'];
+      } = {};
+      try {
+        result = raw ? JSON.parse(raw) : {};
+      } catch {
         return {
           success: false,
           isValid: false,
+          code: 'SCAN_BAD_RESPONSE',
+          error: 'Réponse serveur illisible. Vérifiez la connexion.',
+        };
+      }
+
+      if (!response.ok) {
+        const code =
+          result.code ||
+          (response.status === 401 ? 'AUTH_REQUIRED' : 'SCAN_INVALID');
+        return {
+          success: false,
+          isValid: false,
+          code,
           error: result.message || result.error || 'Erreur lors du scan',
         };
       }
@@ -106,14 +130,23 @@ class QRCodeService {
       return {
         success: false,
         isValid: false,
+        code: result.code || 'SCAN_INVALID',
         error: result.message || 'Réponse scan invalide',
       };
     } catch (error: any) {
       logger.error('Erreur lors du scan du QR code:', undefined, error);
+      const msg = String(error?.message || '');
+      const isNetwork =
+        msg.includes('Network request failed') ||
+        msg.includes('Failed to fetch') ||
+        msg.includes('internet');
       return {
         success: false,
         isValid: false,
-        error: error.message || 'Erreur de connexion',
+        code: isNetwork ? 'SCAN_NETWORK' : 'SCAN_UNKNOWN',
+        error: isNetwork
+          ? 'Pas de connexion réseau. Réessayez quand le signal est meilleur.'
+          : msg || 'Erreur de connexion',
       };
     }
   }

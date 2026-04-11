@@ -5,10 +5,12 @@ import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useUIStore } from '../../store/useUIStore';
 import { useDriverStore } from '../../store/useDriverStore';
+import { usePeriodicDriverOrderResync } from '../../hooks/usePeriodicDriverOrderResync';
 
 export default function TabLayout() {
   const hideTabBar = useUIStore((state) => state.hideTabBar);
   const { needsDriverTypeSelection } = useDriverStore();
+  usePeriodicDriverOrderResync();
   
   // Vérifier au montage si le profil est complet
   useEffect(() => {
