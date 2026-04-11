@@ -14,7 +14,7 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.driver-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
-      buildNumber: "35",
+      buildNumber: "37",
       supportsTablet: true,
       infoPlist: {
         CFBundleDisplayName: "Krono pro",
