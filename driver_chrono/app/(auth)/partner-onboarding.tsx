@@ -6,6 +6,7 @@ import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
 import { showUserFriendlyError } from '../../utils/errorFormatter';
+import { isDriverVehicleTypeSelectableOnKrono } from '../../constants/driverVehicle';
 
 
 export default function PartnerOnboardingScreen() {
@@ -166,30 +167,52 @@ export default function PartnerOnboardingScreen() {
           {/* Type de véhicule */}
           <Text style={styles.label}>Type de véhicule</Text>
           <View style={styles.vehicleTypeContainer}>
-            {(['moto', 'vehicule', 'cargo'] as const).map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.vehicleTypeButton,
-                  vehicleType === type && styles.vehicleTypeButtonActive,
-                ]}
-                onPress={() => setVehicleType(type)}
-              >
-                <Ionicons
-                  name={type === 'moto' ? 'bicycle' : type === 'vehicule' ? 'car' : 'cube'}
-                  size={24}
-                  color={vehicleType === type ? '#FFFFFF' : '#6B7280'}
-                />
-                <Text
+            {(['moto', 'vehicule', 'cargo'] as const).map((type) => {
+              const enabled = isDriverVehicleTypeSelectableOnKrono(type);
+              const selected = vehicleType === type;
+              return (
+                <TouchableOpacity
+                  key={type}
                   style={[
-                    styles.vehicleTypeText,
-                    vehicleType === type && styles.vehicleTypeTextActive,
+                    styles.vehicleTypeButton,
+                    selected && enabled && styles.vehicleTypeButtonActive,
+                    !enabled && styles.vehicleTypeButtonDisabled,
                   ]}
+                  onPress={() => {
+                    if (!enabled) {
+                      Alert.alert(
+                        'Bientôt disponible',
+                        'Pour l’instant, Krono ne propose que la livraison à moto.',
+                      );
+                      return;
+                    }
+                    setVehicleType(type);
+                  }}
+                  activeOpacity={enabled ? 0.7 : 1}
                 >
-                  {type === 'moto' ? 'Moto' : type === 'vehicule' ? 'Véhicule' : 'Cargo'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Ionicons
+                    name={type === 'moto' ? 'bicycle' : type === 'vehicule' ? 'car' : 'cube'}
+                    size={24}
+                    color={
+                      selected && enabled
+                        ? '#FFFFFF'
+                        : !enabled
+                          ? '#9CA3AF'
+                          : '#6B7280'
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.vehicleTypeText,
+                      selected && enabled && styles.vehicleTypeTextActive,
+                      !enabled && styles.vehicleTypeTextDisabled,
+                    ]}
+                  >
+                    {type === 'moto' ? 'Moto' : type === 'vehicule' ? 'Véhicule' : 'Cargo'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Numéro de plaque */}
@@ -397,6 +420,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#8B5CF6',
     borderColor: '#8B5CF6',
   },
+  vehicleTypeButtonDisabled: {
+    opacity: 0.45,
+    backgroundColor: '#E5E7EB',
+    borderColor: '#D1D5DB',
+  },
   vehicleTypeText: {
     fontSize: 14,
     fontWeight: '600',
@@ -404,6 +432,9 @@ const styles = StyleSheet.create({
   },
   vehicleTypeTextActive: {
     color: '#FFFFFF',
+  },
+  vehicleTypeTextDisabled: {
+    color: '#9CA3AF',
   },
   input: {
     backgroundColor: '#F9FAFB',

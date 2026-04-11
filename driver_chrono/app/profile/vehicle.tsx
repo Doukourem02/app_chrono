@@ -8,6 +8,7 @@ import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
 import { showUserFriendlyError } from '../../utils/errorFormatter';
+import { isDriverVehicleTypeSelectableOnKrono } from '../../constants/driverVehicle';
 
 interface DocumentData {
   document_number?: string;
@@ -291,25 +292,41 @@ export default function VehiclePage() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Type de véhicule</Text>
             <View style={styles.vehicleTypeContainer}>
-              {['moto', 'vehicule', 'cargo'].map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.vehicleTypeButton,
-                    formData.vehicleType === type && styles.vehicleTypeButtonActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, vehicleType: type })}
-                >
-                  <Text
+              {['moto', 'vehicule', 'cargo'].map((type) => {
+                const enabled = isDriverVehicleTypeSelectableOnKrono(type);
+                const selected = formData.vehicleType === type;
+                return (
+                  <TouchableOpacity
+                    key={type}
                     style={[
-                      styles.vehicleTypeText,
-                      formData.vehicleType === type && styles.vehicleTypeTextActive,
+                      styles.vehicleTypeButton,
+                      selected && enabled && styles.vehicleTypeButtonActive,
+                      !enabled && styles.vehicleTypeButtonDisabled,
                     ]}
+                    onPress={() => {
+                      if (!enabled) {
+                        Alert.alert(
+                          'Bientôt disponible',
+                          'Pour l’instant, Krono ne propose que la livraison à moto.',
+                        );
+                        return;
+                      }
+                      setFormData({ ...formData, vehicleType: type });
+                    }}
+                    activeOpacity={enabled ? 0.7 : 1}
                   >
-                    {type === 'moto' ? 'Moto' : type === 'vehicule' ? 'Véhicule' : 'Cargo'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.vehicleTypeText,
+                        selected && enabled && styles.vehicleTypeTextActive,
+                        !enabled && styles.vehicleTypeTextDisabled,
+                      ]}
+                    >
+                      {type === 'moto' ? 'Moto' : type === 'vehicule' ? 'Véhicule' : 'Cargo'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -732,6 +749,14 @@ const styles = StyleSheet.create({
   },
   vehicleTypeTextActive: {
     color: '#8B5CF6',
+  },
+  vehicleTypeButtonDisabled: {
+    opacity: 0.45,
+    backgroundColor: '#E5E7EB',
+    borderColor: '#D1D5DB',
+  },
+  vehicleTypeTextDisabled: {
+    color: '#9CA3AF',
   },
   input: {
     backgroundColor: '#F9FAFB',

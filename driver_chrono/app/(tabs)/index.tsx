@@ -32,6 +32,7 @@ import { MapboxNavigationScreen } from "../../components/MapboxNavigationScreen"
 import { formatUserName } from '../../utils/formatName';
 import { speakAnnouncement } from '../../utils/speechAnnouncement';
 import { logNavigationEvent } from '../../utils/navigationTelemetry';
+import { getSafetyReminderForVehicleType } from '../../constants/driverVehicle';
 
 export default function Index() {
   const { setHideTabBar } = useUIStore();
@@ -631,16 +632,15 @@ export default function Index() {
     orderSocketService.acceptOrder(orderId);
     const accepted = useOrderStore.getState().getOrderById(orderId);
     const profileVt = useDriverStore.getState().profile?.vehicle_type;
-    const method = String(profileVt || accepted?.deliveryMethod || 'vehicule')
+    const vehicleForSafety = String(
+      profileVt || accepted?.deliveryMethod || ''
+    )
       .trim()
       .toLowerCase();
-    let safety = ' Attachez votre ceinture de sécurité.';
-    if (method === 'moto') {
-      safety = ' Privilégiez le casque homologué et la visibilité.';
-    } else if (method === 'cargo') {
-      safety = ' Vérifiez la fixation de la cargaison avant de rouler.';
-    }
-    speakWithMapboxMuted(`Course acceptée, en route pour récupérer le colis.${safety}`);
+    const safety = getSafetyReminderForVehicleType(vehicleForSafety);
+    speakWithMapboxMuted(
+      `Course acceptée, en route pour récupérer le colis. ${safety}`
+    );
     setIsNavigationActive(true);
     // Émettre immédiatement la position pour que le client voie la route dès l'acceptation
     if (location) {
