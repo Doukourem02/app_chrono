@@ -33,6 +33,7 @@ import { usePaymentStore } from "../../store/usePaymentStore";
 import { useRatingStore } from "../../store/useRatingStore";
 import { useShipmentStore } from "../../store/useShipmentStore";
 import { logger } from "../../utils/logger";
+import { sanitizeGeocodeDisplayString, singleLineAddressInput } from "../../utils/sanitizeGeocodeDisplay";
 import { isDeliveryMethodEnabledForClient } from "../../constants/clientDeliveryMethods";
 import { forwardGeocodeAddress } from "../../utils/forwardGeocodeAddress";
 
@@ -732,10 +733,11 @@ export default function MapPage() {
     coords?: Coordinates;
   }) => {
     isUserTypingRef.current = true;
-    setPickupLocation(description);
+    const clean = sanitizeGeocodeDisplayString(singleLineAddressInput(description));
+    setPickupLocation(clean);
     let resolved = coords;
-    if (!resolved && description.trim().length >= 3) {
-      resolved = (await forwardGeocodeAddress(description.trim())) ?? undefined;
+    if (!resolved && clean.length >= 3) {
+      resolved = (await forwardGeocodeAddress(clean)) ?? undefined;
     }
     if (resolved) {
       markPickupCoordsAsUserChosen();
@@ -755,10 +757,11 @@ export default function MapPage() {
     coords?: Coordinates;
   }) => {
     isUserTypingRef.current = true;
-    setDeliveryLocation(description);
+    const clean = sanitizeGeocodeDisplayString(singleLineAddressInput(description));
+    setDeliveryLocation(clean);
     let resolved = coords;
-    if (!resolved && description.trim().length >= 3) {
-      resolved = (await forwardGeocodeAddress(description.trim())) ?? undefined;
+    if (!resolved && clean.length >= 3) {
+      resolved = (await forwardGeocodeAddress(clean)) ?? undefined;
     }
     if (resolved) {
       setDropoffCoords(resolved);

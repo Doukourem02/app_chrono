@@ -215,16 +215,27 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       });
   }, [onlineDrivers, orderDriverCoords]);
 
+  /** Hors course active : ne pas empiler des pastilles « livreurs » sur l’itinéraire devis (confusion avec l’ETA). */
+  const fleetMarkersForMap = useMemo(() => {
+    const activeOrder =
+      orderStatus &&
+      orderStatus !== 'completed' &&
+      orderStatus !== 'cancelled' &&
+      orderStatus !== 'declined';
+    if (isSearchingDriver || activeOrder) return filteredOnlineDrivers;
+    return [];
+  }, [isSearchingDriver, orderStatus, filteredOnlineDrivers]);
+
   const zoomLevel = region
     ? Math.round(14 - Math.log2((region.latitudeDelta || 0.005) * 100))
     : 14;
 
   const driverOffsets = useMemo(
-    () => calculateDriverOffsets(filteredOnlineDrivers, zoomLevel),
-    [filteredOnlineDrivers, zoomLevel]
+    () => calculateDriverOffsets(fleetMarkersForMap, zoomLevel),
+    [fleetMarkersForMap, zoomLevel]
   );
 
-  const animatedDriverPositions = useAnimatedDriverPositions(filteredOnlineDrivers, driverOffsets);
+  const animatedDriverPositions = useAnimatedDriverPositions(fleetMarkersForMap, driverOffsets);
 
   // Centre : priorité region (GPS) > pickupCoords (adresse sélectionnée) > Abidjan par défaut
   const centerCoords = region
@@ -277,7 +288,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         maxBounds={COTE_IVOIRE_MAX_BOUNDS}
       />
 
-      {filteredOnlineDrivers.map((driver) => {
+      {fleetMarkersForMap.map((driver) => {
         const animPos = animatedDriverPositions.get(driver.user_id);
         const fallback = driverOffsets.get(driver.user_id);
         const pos: [number, number] = animPos

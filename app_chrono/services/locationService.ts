@@ -400,6 +400,8 @@ class LocationService {
         // Nettoyer l'adresse pour la Côte d'Ivoire
         if (bestAddress) {
           bestAddress = bestAddress
+            .replace(/\byyyy\s*Abidjan\b/gi, 'Abidjan')
+            .replace(/,\s*yyyy\s*,/gi, ',')
             .replace(/, Côte d'Ivoire$/, '') // Supprimer le pays à la fin
             .replace(/,\s*Abidjan,\s*Abidjan/g, ', Abidjan') // Supprimer doublons
             .replace(/^Unnamed Road,?\s*/, '') // Supprimer "Unnamed Road"

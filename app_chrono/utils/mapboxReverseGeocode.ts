@@ -78,6 +78,8 @@ function buildAddressFromFeature(feature: MapboxReverseFeature): string | null {
  */
 function cleanAddress(address: string): string {
   return address
+    .replace(/\byyyy\s*Abidjan\b/gi, 'Abidjan')
+    .replace(/,\s*yyyy\s*,/gi, ',')
     .replace(/, Côte d'Ivoire$/, '')
     .replace(/,\s*Abidjan,\s*Abidjan/g, ', Abidjan')
     .replace(/^Unnamed Road,?\s*/, '')

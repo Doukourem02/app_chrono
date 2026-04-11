@@ -1,5 +1,5 @@
 /**
- * Badge ETA style Yango : bulle avec bec, double couche, ombre non coupée
+ * Badge ETA : une seule bulle lisible (évite l’effet « plusieurs calques » sur la carte).
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -16,11 +16,9 @@ export function ETABadge({ value, unit, tailPosition = 'bottom' }: ETABadgeProps
   return (
     <View style={[styles.wrapper, tailPosition === 'top' && styles.wrapperTailTop]}>
       {tailPosition === 'top' && <View style={tailStyle} />}
-      <View style={styles.outerBubble}>
-        <View style={styles.innerBubble}>
-          <Text style={styles.valueText}>{value}</Text>
-          <Text style={styles.unitText}>{unit}</Text>
-        </View>
+      <View style={styles.bubble}>
+        <Text style={styles.valueText}>{value}</Text>
+        <Text style={styles.unitText}>{unit}</Text>
       </View>
       {tailPosition === 'bottom' && <View style={tailStyle} />}
     </View>
@@ -34,31 +32,23 @@ const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     marginBottom: 4,
-    // Pas de overflow: 'hidden' pour ne pas couper l'ombre
   },
-  outerBubble: {
-    backgroundColor: '#FFFFFF',
-    padding: 4,
-    borderRadius: 14,
-    minWidth: BUBBLE_SIZE,
-    minHeight: BUBBLE_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  innerBubble: {
+  bubble: {
     backgroundColor: '#8B5CF6',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: BUBBLE_SIZE - 8,
-    minHeight: BUBBLE_SIZE - 8,
+    minWidth: BUBBLE_SIZE,
+    minHeight: BUBBLE_SIZE - 4,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 6,
   },
   valueText: {
     color: '#FFFFFF',
@@ -80,13 +70,8 @@ const styles = StyleSheet.create({
     borderTopWidth: TAIL_SIZE,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#FFFFFF',
-    marginTop: -2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 4,
+    borderTopColor: '#8B5CF6',
+    marginTop: -1,
   },
   wrapperTailTop: { marginBottom: 0, marginTop: 4 },
   tailTop: {
@@ -97,12 +82,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: TAIL_SIZE,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderBottomColor: '#FFFFFF',
-    marginBottom: -2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 4,
+    borderBottomColor: '#8B5CF6',
+    marginBottom: -1,
   },
 });

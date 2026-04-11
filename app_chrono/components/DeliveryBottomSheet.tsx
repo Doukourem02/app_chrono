@@ -1,5 +1,17 @@
 import React from 'react';
-import { StyleSheet, View,Text,TouchableOpacity, Animated,ScrollView,Image,Alert} from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Animated,
+  ScrollView,
+  Image,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 import { useShipmentStore } from '../store/useShipmentStore';
@@ -49,6 +61,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   onConfirm,
 }) => {
   const { createShipment } = useShipmentStore();
+  const insets = useSafeAreaInsets();
 
 
   const handleConfirm = () => {
@@ -81,35 +94,46 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
       </TouchableOpacity>
 
       {isExpanded ? (
-        <ScrollView 
-          showsVerticalScrollIndicator={false}
-          style={styles.scrollContent}
-          scrollEnabled={isExpanded}
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}
         >
-          <Text style={styles.title}>ENVOYER UN COLIS</Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={styles.scrollContent}
+            scrollEnabled={isExpanded}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={{ paddingBottom: Math.max(16, insets.bottom + 8) }}
+          >
+            <Text style={styles.title}>ENVOYER UN COLIS</Text>
 
-          <View style={styles.inputContainer}>
-            <MapboxAddressAutocomplete
-              placeholder="Où récupérer"
-              country="ci"
-              initialValue={pickupLocation}
-              embedded
-              proximityCoords={userLocationCoords ?? undefined}
-              onPlaceSelected={onPickupSelected}
-            />
-            <View style={styles.inputSeparator} />
-            <MapboxAddressAutocomplete
-              placeholder="Où livrer"
-              country="ci"
-              initialValue={deliveryLocation}
-              embedded
-              proximityCoords={pickupCoords ?? userLocationCoords ?? undefined}
-              onPlaceSelected={onDeliverySelected}
-            />
-          </View>
+            <Text style={styles.fieldLabel}>Départ (une adresse)</Text>
+            <View style={styles.inputCard}>
+              <MapboxAddressAutocomplete
+                placeholder="Où récupérer"
+                country="ci"
+                initialValue={pickupLocation}
+                embedded
+                proximityCoords={userLocationCoords ?? undefined}
+                onPlaceSelected={onPickupSelected}
+              />
+            </View>
 
-          
-          <View style={styles.deliveryMethodsContainer}>
+            <Text style={[styles.fieldLabel, styles.fieldLabelSecond]}>Arrivée (une adresse)</Text>
+            <View style={[styles.inputCard, styles.inputCardLast]}>
+              <MapboxAddressAutocomplete
+                placeholder="Où livrer"
+                country="ci"
+                initialValue={deliveryLocation}
+                embedded
+                proximityCoords={pickupCoords ?? userLocationCoords ?? undefined}
+                onPlaceSelected={onDeliverySelected}
+              />
+            </View>
+
+            <View style={styles.deliveryMethodsContainer}>
             <Text style={styles.deliveryMethodsTitle}>Méthode de livraison</Text>
             <View style={styles.deliveryOptions}>
               {deliveryMethods.map((method) => {
@@ -164,7 +188,8 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
           >
             <Text style={styles.chooseButtonText}>Choix de la méthode de livraison</Text>
           </TouchableOpacity>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       ) : (
         <TouchableOpacity 
           style={styles.peekContainer} 
@@ -208,8 +233,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
     borderRadius: 2,
   },
-  scrollContent: {
+  keyboardAvoid: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  fieldLabelSecond: {
+    marginTop: 14,
   },
   title: {
     fontSize: 20,
@@ -217,6 +254,16 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 25,
     textAlign: 'left',
+  },
+  inputCard: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
+    overflow: 'visible',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  inputCardLast: {
+    marginBottom: 22,
   },
   inputContainer: {
     backgroundColor: '#f8f8f8',

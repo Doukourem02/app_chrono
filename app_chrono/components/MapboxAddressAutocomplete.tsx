@@ -19,6 +19,7 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { searchOverpassPoi, type OverpassPoiResult } from '../utils/overpassPoiSearch';
 import { searchCuratedPoi } from '../utils/poiAbidjan';
+import { sanitizeGeocodeDisplayString, singleLineAddressInput } from '../utils/sanitizeGeocodeDisplay';
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest';
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
@@ -220,7 +221,7 @@ export default function MapboxAddressAutocomplete({
   }, [proximityCoords, proximity]);
 
   useEffect(() => {
-    setQuery(initialValue);
+    setQuery(sanitizeGeocodeDisplayString(singleLineAddressInput(initialValue)));
   }, [initialValue]);
 
   const fetchSuggestions = useCallback(
@@ -463,7 +464,7 @@ export default function MapboxAddressAutocomplete({
 
   const handleInputChange = useCallback(
     (text: string) => {
-      setQuery(text);
+      setQuery(singleLineAddressInput(text));
       setSuggestions([]);
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -477,7 +478,8 @@ export default function MapboxAddressAutocomplete({
 
   const handleSelectSuggestion = useCallback(
     async (suggestion: MapboxSuggestion) => {
-      const address = suggestion.full_address || suggestion.address || suggestion.name;
+      const raw = suggestion.full_address || suggestion.address || suggestion.name;
+      const address = sanitizeGeocodeDisplayString(singleLineAddressInput(raw));
       setQuery(address);
       setSuggestions([]);
 
@@ -585,6 +587,7 @@ export default function MapboxAddressAutocomplete({
             style={styles.input}
             placeholderTextColor="#999"
             editable={false}
+            multiline={false}
           />
           <Text style={styles.hint}>Mapbox non configuré</Text>
         </View>
@@ -601,6 +604,8 @@ export default function MapboxAddressAutocomplete({
           onChangeText={handleInputChange}
           style={styles.input}
           placeholderTextColor="#999"
+          multiline={false}
+          blurOnSubmit={false}
         />
         {loading && <ActivityIndicator size="small" color="#8B5CF6" />}
       </View>
