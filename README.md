@@ -607,7 +607,7 @@ npx expo run:android
 
 - **Prod / TestFlight / EAS** : `docs/ckprod.md`
 - **Session mobile, OTP, cycle de vie** : `docs/mobile-auth-and-lifecycle.md`
-- **Paiements** : `docs/paiements-krono.md`, `docs/integrations-psp.md`
+- **Krono (tarifs, trafic, météo, paiements, QR)** : `docs/krono-reference-unique.md` ; PSP : `docs/integrations-psp.md`
 - **Variables** : fichiers `.env.example` à la racine de chaque package (`chrono_backend`, `admin_chrono`, `app_chrono`, `driver_chrono`)
 
 - **Scaling et production** : `chrono_backend/docs/SCALING_SETUP.md`
@@ -629,7 +629,7 @@ PROJET_CHRONO/
 ├── docs/
 │   ├── ckprod.md                       # Déploiement, checklist prod, backlog qualité
 │   ├── mobile-auth-and-lifecycle.md    # Auth / OTP / tests device liés
-│   ├── paiements-krono.md
+│   ├── krono-reference-unique.md      # Référence unique produit / tarifs / paiements
 │   └── integrations-psp.md
 ├── admin_chrono/docs/
 │   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers

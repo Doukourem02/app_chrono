@@ -71,6 +71,8 @@ interface DeliveryMapViewProps {
   userPulseAnim: Animated.Value;
   durationText: string | null;
   arrivalTimeText?: string | null;
+  /** Sous le badge ETA pickup (création commande) — transparence itinéraire */
+  pickupEtaSubtitle?: string;
   searchSeconds: number;
   selectedMethod: string;
   availableVehicles: unknown[];
@@ -96,6 +98,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   userPulseAnim,
   durationText,
   arrivalTimeText,
+  pickupEtaSubtitle,
   searchSeconds,
   selectedMethod,
   availableVehicles,
@@ -424,6 +427,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             <ETABadge
               value={durationText.replace(/\s*(min|sec).*$/i, '').trim() || durationText}
               unit={durationText.toLowerCase().includes('sec') ? 'sec' : 'min'}
+              subtitle={pickupEtaSubtitle}
             />
             <View style={styles.pickupMarker}>
               <View style={styles.pickupPin} />

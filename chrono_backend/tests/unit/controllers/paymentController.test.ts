@@ -13,6 +13,23 @@ import * as mobileMoneyService from '../../../src/services/mobileMoneyService.js
 jest.mock('../../../src/config/db.js');
 jest.mock('../../../src/services/priceCalculator.js');
 jest.mock('../../../src/services/mobileMoneyService.js');
+jest.mock('../../../src/services/dynamicPricing.js', () => ({
+  computeDynamicDeliveryPrice: jest.fn((): Promise<any> =>
+    Promise.resolve({
+      lineSubtotalCfa: 1000,
+      timePremiumCfa: 0,
+      subtotalBeforeContextCfa: 1000,
+      weatherFactor: 1,
+      surgeFactor: 1,
+      hourFactor: 1,
+      trafficFactor: 1,
+      contextFactorRaw: 1,
+      contextFactorApplied: 1,
+      totalCfa: 1000,
+      labels: [],
+    })
+  ),
+}));
 
 describe('paymentController', () => {
   let mockRequest: Partial<Request>;
@@ -138,7 +155,10 @@ describe('paymentController', () => {
       expect(mockResponse.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          data: mockCalculation,
+          data: expect.objectContaining({
+            basePrice: mockCalculation.basePrice,
+            totalPrice: 1000,
+          }),
         })
       );
     });

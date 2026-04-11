@@ -3,7 +3,11 @@ import {StyleSheet,View,Text,TouchableOpacity,ScrollView,Image,Animated,Switch,D
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
-import { calculatePrice, getDistanceInKm, estimateDurationMinutes, formatDurationLabel, BASE_PRICES } from '../services/orderApi';
+import { calculatePrice, getDistanceInKm, estimateDurationMinutes, formatDurationLabel } from '../services/orderApi';
+import {
+  distanceMetricCaption,
+  durationMetricCaption,
+} from '../utils/routePricingLabels';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DELIVERY_METHOD_MAX_HEIGHT = SCREEN_HEIGHT * 0.85; 
@@ -21,9 +25,17 @@ interface DeliveryMethodBottomSheetProps {
   estimatedTime: string;
   pickupCoords?: { latitude: number; longitude: number };
   dropoffCoords?: { latitude: number; longitude: number };
+  /** Distance itinéraire (km) depuis Mapbox — sinon vol d’oiseau */
+  routeDistanceKm?: number;
+  /** Durée itinéraire (secondes), ex. trafic Mapbox — sinon estimation vitesse moyenne */
+  routeDurationSeconds?: number;
+  /** True si distance/durée viennent d’un itinéraire Mapbox chargé */
+  pricingUsesRoute?: boolean;
   onMethodSelected: (method: 'moto' | 'vehicule' | 'cargo') => void;
   onConfirm: () => void;
   onBack: () => void;
+  /** Remonte l’id d’option (express, pickup_service, …) pour create-order / serveur */
+  onSpeedOptionChange?: (optionId: string | undefined) => void;
 }
 
 const deliveryMethods = [
@@ -125,9 +137,13 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
   estimatedTime,
   pickupCoords,
   dropoffCoords,
+  routeDistanceKm,
+  routeDurationSeconds,
+  pricingUsesRoute = false,
   onMethodSelected,
   onConfirm,
   onBack,
+  onSpeedOptionChange,
 }) => {
   const effectiveMethod = (
     isDeliveryMethodEnabledForClient(selectedMethod) ? selectedMethod : 'moto'
@@ -142,32 +158,51 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
   
   const selectedSpeedOption = getDeliveryOptions(effectiveMethod).find(opt => opt.id === selectedSpeed);
 
-  const calculatedPrice = useMemo(() => {
-    if (pickupCoords && dropoffCoords) {
-      const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
-      
-      if (selectedSpeedOption && selectedSpeedOption.price) {
-        const pricing = BASE_PRICES[effectiveMethod as 'moto' | 'vehicule' | 'cargo'] ?? BASE_PRICES.vehicule;
-        const realPrice = Math.max(0, Math.round(selectedSpeedOption.price + distanceKm * pricing.perKm));
-        return realPrice;
-      }
-
-      const realPrice = calculatePrice(distanceKm, effectiveMethod as 'moto' | 'vehicule' | 'cargo');
-      return realPrice;
+  const legDistanceKm = useMemo(() => {
+    if (!pickupCoords || !dropoffCoords) return null;
+    if (routeDistanceKm != null && routeDistanceKm > 0 && Number.isFinite(routeDistanceKm)) {
+      return routeDistanceKm;
     }
-  
+    return getDistanceInKm(pickupCoords, dropoffCoords);
+  }, [pickupCoords, dropoffCoords, routeDistanceKm]);
+
+  const calculatedPrice = useMemo(() => {
+    if (legDistanceKm != null) {
+      return calculatePrice(
+        legDistanceKm,
+        effectiveMethod as 'moto' | 'vehicule' | 'cargo',
+        selectedSpeedOption?.id
+      );
+    }
+
     return price || selectedMethodData?.price || 0;
-  }, [pickupCoords, dropoffCoords, effectiveMethod, selectedSpeedOption, price, selectedMethodData]);
+  }, [legDistanceKm, effectiveMethod, selectedSpeedOption?.id, price, selectedMethodData]);
 
 
   const calculatedTime = useMemo(() => {
-    if (pickupCoords && dropoffCoords) {
-      const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
-      const durationMinutes = estimateDurationMinutes(distanceKm, effectiveMethod as 'moto' | 'vehicule' | 'cargo');
+    if (
+      routeDurationSeconds != null &&
+      routeDurationSeconds > 0 &&
+      Number.isFinite(routeDurationSeconds)
+    ) {
+      const durationMinutes = Math.max(1, Math.round(routeDurationSeconds / 60));
+      return formatDurationLabel(durationMinutes) || estimatedTime || selectedMethodData?.avgTime || '';
+    }
+    if (legDistanceKm != null) {
+      const durationMinutes = estimateDurationMinutes(
+        legDistanceKm,
+        effectiveMethod as 'moto' | 'vehicule' | 'cargo'
+      );
       return formatDurationLabel(durationMinutes) || estimatedTime || selectedMethodData?.avgTime || '';
     }
     return estimatedTime || selectedMethodData?.avgTime || '';
-  }, [pickupCoords, dropoffCoords, effectiveMethod, estimatedTime, selectedMethodData]);
+  }, [
+    legDistanceKm,
+    routeDurationSeconds,
+    effectiveMethod,
+    estimatedTime,
+    selectedMethodData,
+  ]);
 
 
   const basePrice = selectedMethodData?.price || 0;
@@ -185,7 +220,10 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
     }
   }, [effectiveMethod]);
 
- 
+  useEffect(() => {
+    onSpeedOptionChange?.(selectedSpeedOption?.id);
+  }, [effectiveMethod, selectedSpeedOption?.id, onSpeedOptionChange]);
+
   useEffect(() => {
     Animated.sequence([
       Animated.timing(scaleAnimation, {
@@ -385,21 +423,17 @@ useEffect(() => {
                   {isSelected && enabled && pickupCoords && dropoffCoords && (
                     <Text style={styles.methodCardPriceCalculated}>
                       {(() => {
-                        const distanceKm = getDistanceInKm(pickupCoords, dropoffCoords);
+                        const dKm =
+                          legDistanceKm ??
+                          (pickupCoords && dropoffCoords
+                            ? getDistanceInKm(pickupCoords, dropoffCoords)
+                            : 0);
                         const options = getDeliveryOptions(method.id);
                         const selectedOption = options.find((opt) => opt.id === selectedSpeed);
-                        if (selectedOption && selectedOption.price) {
-                          const pricing =
-                            BASE_PRICES[method.id as 'moto' | 'vehicule' | 'cargo'] ?? BASE_PRICES.vehicule;
-                          const realPrice = Math.max(
-                            0,
-                            Math.round(selectedOption.price + distanceKm * pricing.perKm)
-                          );
-                          return `${realPrice} F`;
-                        }
                         const realPrice = calculatePrice(
-                          distanceKm,
-                          method.id as 'moto' | 'vehicule' | 'cargo'
+                          dKm,
+                          method.id as 'moto' | 'vehicule' | 'cargo',
+                          selectedOption?.id
                         );
                         return `${realPrice} F`;
                       })()}
@@ -572,14 +606,24 @@ useEffect(() => {
               <Text style={styles.totalPreviewValue}>{displayPrice} FCFA</Text>
             </View>
             <View style={styles.totalPreviewRow}>
-              <Text style={styles.totalPreviewLabel}>Temps estimé</Text>
+              <View style={styles.totalPreviewCol}>
+                <Text style={styles.totalPreviewLabel}>Temps estimé</Text>
+                <Text style={styles.totalPreviewHint}>
+                  {durationMetricCaption(pricingUsesRoute ? 'mapbox_route' : 'straight_line')}
+                </Text>
+              </View>
               <Text style={styles.totalPreviewValue}>{calculatedTime}</Text>
             </View>
             {pickupCoords && dropoffCoords && (
               <View style={styles.totalPreviewRow}>
-                <Text style={styles.totalPreviewLabel}>Distance</Text>
+                <View style={styles.totalPreviewCol}>
+                  <Text style={styles.totalPreviewLabel}>Distance</Text>
+                  <Text style={styles.totalPreviewHint}>
+                    {distanceMetricCaption(pricingUsesRoute ? 'mapbox_route' : 'straight_line')}
+                  </Text>
+                </View>
                 <Text style={styles.totalPreviewValue}>
-                  {getDistanceInKm(pickupCoords, dropoffCoords).toFixed(2)} km
+                  {(legDistanceKm ?? getDistanceInKm(pickupCoords, dropoffCoords)).toFixed(2)} km
                 </Text>
               </View>
             )}
@@ -957,18 +1001,30 @@ const styles = StyleSheet.create({
   totalPreviewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
+  },
+  totalPreviewCol: {
+    flex: 1,
+    paddingRight: 10,
   },
   totalPreviewLabel: {
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
   },
+  totalPreviewHint: {
+    fontSize: 11,
+    color: '#7C3AED',
+    marginTop: 3,
+    lineHeight: 14,
+  },
   totalPreviewValue: {
     fontSize: 16,
     color: '#8B5CF6',
     fontWeight: '700',
+    maxWidth: '48%',
+    textAlign: 'right',
   },
   peekContainer: {
     backgroundColor: '#fff',

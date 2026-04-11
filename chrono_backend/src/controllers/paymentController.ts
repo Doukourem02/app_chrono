@@ -1,7 +1,16 @@
 import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
-import { calculateDeliveryPrice, validatePriceParams } from '../services/priceCalculator.js';
+import {
+  calculateDeliveryPrice,
+  validatePriceParams,
+  haversineDistanceKm,
+  estimateDurationMinutes,
+  normalizeDeliveryMethod,
+  URGENCY_FEE_PERCENTAGE,
+  type DeliveryMethod,
+} from '../services/priceCalculator.js';
+import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
 import {initiateMobileMoneyPayment,validateMobileMoneyParams,checkPaymentStatus,} from '../services/mobileMoneyService.js';
 import { maskOrderId, maskUserId, maskPhoneNumber } from '../utils/maskSensitiveData.js';
 import { getDeferredPaymentInfo } from '../utils/deferredPaymentLimits.js';
@@ -124,16 +133,52 @@ export const getPaymentMethods = async (req: RequestWithUser, res: Response): Pr
   }
 };
 
+function isValidLatLon(lat: number, lon: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+}
+
 export const calculatePrice = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { distance, deliveryMethod, isUrgent, customPricePerKm } = req.body;
+    const body = req.body as Record<string, unknown>;
+    const { deliveryMethod, isUrgent, customPricePerKm, speedOptionId } = body;
+
+    let distanceNum =
+      body.distance !== undefined && body.distance !== null && body.distance !== ''
+        ? parseFloat(String(body.distance))
+        : NaN;
+
+    const pickup = body.pickup as { coordinates?: { latitude: number; longitude: number } } | undefined;
+    const dropoff = body.dropoff as { coordinates?: { latitude: number; longitude: number } } | undefined;
+
+    if (!Number.isFinite(distanceNum) || distanceNum <= 0) {
+      const p = pickup?.coordinates;
+      const d = dropoff?.coordinates;
+      if (p && d && isValidLatLon(p.latitude, p.longitude) && isValidLatLon(d.latitude, d.longitude)) {
+        distanceNum = haversineDistanceKm(p, d);
+      }
+    }
+
+    if (!deliveryMethod || typeof deliveryMethod !== 'string') {
+      res.status(400).json({ success: false, message: 'Méthode de livraison requise' });
+      return;
+    }
 
     const params = {
-      distance: parseFloat(distance),
-      deliveryMethod,
+      distance: distanceNum,
+      deliveryMethod: normalizeDeliveryMethod(deliveryMethod) as DeliveryMethod,
       isUrgent: isUrgent === true || isUrgent === 'true',
-      customPricePerKm: customPricePerKm ? parseFloat(customPricePerKm) : undefined,
+      customPricePerKm: customPricePerKm ? parseFloat(String(customPricePerKm)) : undefined,
+      speedOptionId: typeof speedOptionId === 'string' ? speedOptionId : undefined,
     };
+
+    if (pickup?.coordinates && !isValidLatLon(pickup.coordinates.latitude, pickup.coordinates.longitude)) {
+      res.status(400).json({ success: false, message: 'Coordonnées de retrait invalides' });
+      return;
+    }
+    if (dropoff?.coordinates && !isValidLatLon(dropoff.coordinates.latitude, dropoff.coordinates.longitude)) {
+      res.status(400).json({ success: false, message: 'Coordonnées de livraison invalides' });
+      return;
+    }
 
     const validation = validatePriceParams(params);
     if (!validation.valid) {
@@ -141,11 +186,52 @@ export const calculatePrice = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const calculation = calculateDeliveryPrice(params);
+    const calculation = calculateDeliveryPrice({ ...params, isUrgent: false });
+    const pCoords = pickup?.coordinates;
+    const routeDur =
+      body.routeDurationSeconds !== undefined && body.routeDurationSeconds !== null && body.routeDurationSeconds !== ''
+        ? Number(body.routeDurationSeconds)
+        : undefined;
+    const routeTyp =
+      body.routeDurationTypicalSeconds !== undefined &&
+      body.routeDurationTypicalSeconds !== null &&
+      body.routeDurationTypicalSeconds !== ''
+        ? Number(body.routeDurationTypicalSeconds)
+        : undefined;
+
+    const dynamic = await computeDynamicDeliveryPrice({
+      distanceKm: params.distance,
+      method: params.deliveryMethod,
+      speedOptionId: params.speedOptionId,
+      pickupLatitude: pCoords?.latitude,
+      pickupLongitude: pCoords?.longitude,
+      routeDurationSeconds: Number.isFinite(routeDur) && routeDur! > 0 ? routeDur : undefined,
+      routeDurationTypicalSeconds: Number.isFinite(routeTyp) && routeTyp! > 0 ? routeTyp : undefined,
+    });
+
+    const urgencyOnLine = params.isUrgent
+      ? Math.round(dynamic.lineSubtotalCfa * URGENCY_FEE_PERCENTAGE)
+      : 0;
+    const totalPrice = dynamic.totalCfa + urgencyOnLine;
+
+    const etaMin = estimateDurationMinutes(params.distance, params.deliveryMethod);
 
     res.json({
       success: true,
-      data: calculation,
+      data: {
+        ...calculation,
+        totalPrice,
+        urgencyFee: urgencyOnLine,
+        breakdown: {
+          ...calculation.breakdown,
+          urgencyFee: urgencyOnLine,
+          total: totalPrice,
+          dynamicPricing: dynamic,
+        },
+      },
+      price: totalPrice,
+      distance: calculation.breakdown.distance,
+      estimatedDuration: etaMin < 60 ? `${etaMin} min` : `${Math.floor(etaMin / 60)}h ${etaMin % 60}min`,
     });
   } catch (error: any) {
     logger.error('Erreur calcul prix:', error);

@@ -13,6 +13,7 @@ interface PaymentBottomSheetProps {
   distance: number;
   deliveryMethod: 'moto' | 'vehicule' | 'cargo';
   price: number;
+  distanceContextNote?: string;
   isUrgent?: boolean;
   visible: boolean;
   onClose: () => void;
@@ -32,6 +33,7 @@ export default function PaymentBottomSheet({
   distance,
   deliveryMethod,
   price,
+  distanceContextNote,
   isUrgent = false,
   visible,
   onClose,
@@ -208,6 +210,7 @@ export default function PaymentBottomSheet({
             distance={distance}
             deliveryMethod={deliveryMethod}
             isUrgent={isUrgent}
+            distanceContextNote={distanceContextNote}
           />
 
           <PaymentMethodSelector

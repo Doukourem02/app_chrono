@@ -58,6 +58,15 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
   const [displayedRouteCoords, setDisplayedRouteCoords] = useState<Coordinates[]>([]);
   const [durationText, setDurationText] = useState<string | null>(null);
   const [arrivalTimeText, setArrivalTimeText] = useState<string | null>(null);
+  /** Distance route Mapbox (km) + durée — pour prix / commande ; null si pas encore chargé ou échec API */
+  const [routeSnapshot, setRouteSnapshot] = useState<{
+    distanceKm: number;
+    durationSeconds: number;
+    /** Durée avec trafic (Mapbox × engin) — serveur / tarif dynamique */
+    durationTrafficSeconds?: number;
+    /** Durée typique Mapbox × engin — rapport trafic */
+    durationTypicalSeconds?: number;
+  } | null>(null);
   const [driverCoords, setDriverCoords] = useState<Coordinates | null>(null);
   const [showMethodSelection, setShowMethodSelection] = useState(false);
   const [cameraAnimationDuration, setCameraAnimationDuration] = useState(0);
@@ -67,7 +76,8 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
   const userPulseAnim = useRef(new Animated.Value(0)).current;
   const MAPBOX_TOKEN = config.mapboxAccessToken;
 
-  const simplifyRoute = (points: Coordinates[], tolerance = 0.00002): Coordinates[] => {
+  /** Tolérance plus basse = plus de points conservés (tracé plus fidèle à la route). */
+  const simplifyRoute = (points: Coordinates[], tolerance = 0.000007): Coordinates[] => {
     if (!points || points.length <= 2) return points;
 
     const sqTolerance = tolerance * tolerance;
@@ -252,6 +262,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     setDisplayedRouteCoords([]);
     setDurationText(null);
     setArrivalTimeText(null);
+    setRouteSnapshot(null);
     stopDestinationPulse();
   };
 
@@ -275,8 +286,11 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
   const fetchRoute = async (pickup: Coordinates, dropoff: Coordinates) => {
     if (!MAPBOX_TOKEN || MAPBOX_TOKEN.startsWith('<')) {
       logger.warn('Mapbox token not set - cannot fetch directions', 'useMapLogic');
+      setRouteSnapshot(null);
       return;
     }
+
+    setRouteSnapshot(null);
 
     try {
       const result = await fetchMapboxDirections(
@@ -302,8 +316,35 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
 
         const vehicleMultiplier = selectedMethod === 'moto' ? 0.85 : selectedMethod === 'cargo' ? 1.25 : 1.0;
         const chosenSeconds = result.durationTypical ?? result.duration;
-        if (chosenSeconds) {
-          const adjustedSeconds = Math.round(chosenSeconds * vehicleMultiplier);
+        const distanceKm =
+          result.distance > 0 ? Math.round((result.distance / 1000) * 100) / 100 : 0;
+
+        const adjustedSeconds =
+          chosenSeconds > 0
+            ? Math.round(chosenSeconds * vehicleMultiplier)
+            : distanceKm > 0
+              ? Math.max(60, Math.round((distanceKm / 22) * 3600))
+              : 0;
+
+        const durationTrafficSeconds =
+          result.duration > 0 ? Math.round(result.duration * vehicleMultiplier) : undefined;
+        const durationTypicalSeconds =
+          result.durationTypical != null && result.durationTypical > 0
+            ? Math.round(result.durationTypical * vehicleMultiplier)
+            : undefined;
+
+        if (distanceKm > 0 && adjustedSeconds > 0) {
+          setRouteSnapshot({
+            distanceKm,
+            durationSeconds: adjustedSeconds,
+            durationTrafficSeconds,
+            durationTypicalSeconds,
+          });
+        } else {
+          setRouteSnapshot(null);
+        }
+
+        if (adjustedSeconds > 0) {
           setDurationText(adjustedSeconds < 60 ? `${adjustedSeconds} sec` : `${Math.round(adjustedSeconds / 60)} min`);
           const arrivalDate = new Date(Date.now() + adjustedSeconds * 1000);
           const hours = arrivalDate.getHours();
@@ -315,8 +356,11 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         }
 
         fitRoute(points);
+      } else {
+        setRouteSnapshot(null);
       }
     } catch (err) {
+      setRouteSnapshot(null);
       handleError(err, 'useMapLogic', 'Erreur lors de la récupération de l\'itinéraire');
     }
   };
@@ -553,6 +597,17 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     }
   }, [cameraAnimationDuration]);
 
+  const prevMethodForRouteRef = useRef(selectedMethod);
+  const fetchRouteLatestRef = useRef(fetchRoute);
+  fetchRouteLatestRef.current = fetchRoute;
+  useEffect(() => {
+    if (prevMethodForRouteRef.current === selectedMethod) return;
+    prevMethodForRouteRef.current = selectedMethod;
+    if (pickupCoords && dropoffCoords) {
+      void fetchRouteLatestRef.current(pickupCoords, dropoffCoords);
+    }
+  }, [selectedMethod, pickupCoords, dropoffCoords]);
+
   return {
     // États
     region,
@@ -562,6 +617,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     displayedRouteCoords,
     durationText,
     arrivalTimeText,
+    routeSnapshot,
     driverCoords,
     pickupLocation,
     deliveryLocation,

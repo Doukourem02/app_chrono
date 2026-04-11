@@ -10,7 +10,11 @@ import { usePaymentStore } from '../store/usePaymentStore';
 import { logger } from '../utils/logger';
 import { getPhoneValidationError } from '../utils/phoneValidation';
 import { useRecentPhoneNumbers } from '../hooks/useRecentPhoneNumbers';
-
+import type { RouteMetricsSource } from '../utils/routePricingLabels';
+import {
+  distanceMetricCaption,
+  durationMetricCaption,
+} from '../utils/routePricingLabels';
 
 interface AddressDetails {
   phone?: string;
@@ -31,6 +35,12 @@ interface OrderDetailsSheetProps {
   deliveryLocation: string;
   selectedMethod: string;
   price: number;
+  /** Distance / durée affichées pour la transparence (itinéraire vs ligne droite) */
+  orderRouteSummary?: {
+    distanceKm: number;
+    durationLabel: string;
+    source: RouteMetricsSource;
+  } | null;
   onBack: () => void;
   onConfirm: (
     pickupDetails: AddressDetails,
@@ -56,6 +66,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
   deliveryLocation,
   selectedMethod,
   price,
+  orderRouteSummary,
   onBack,
   onConfirm,
 }) => {
@@ -447,6 +458,34 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
             </View>
           </View>
 
+          {orderRouteSummary ? (
+            <View style={styles.routeRecap}>
+              <Text style={styles.routeRecapTitle}>Estimation de course</Text>
+              <View style={styles.routeRecapRow}>
+                <Ionicons name="map-outline" size={22} color="#8B5CF6" />
+                <View style={styles.routeRecapTexts}>
+                  <Text style={styles.routeRecapLabel}>Distance</Text>
+                  <Text style={styles.routeRecapValue}>
+                    {orderRouteSummary.distanceKm.toFixed(2)} km
+                  </Text>
+                  <Text style={styles.routeRecapHint}>
+                    {distanceMetricCaption(orderRouteSummary.source)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.routeRecapRow}>
+                <Ionicons name="time-outline" size={22} color="#8B5CF6" />
+                <View style={styles.routeRecapTexts}>
+                  <Text style={styles.routeRecapLabel}>Durée</Text>
+                  <Text style={styles.routeRecapValue}>{orderRouteSummary.durationLabel}</Text>
+                  <Text style={styles.routeRecapHint}>
+                    {durationMetricCaption(orderRouteSummary.source)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
           {/* Pickup section */}
           {renderAddressSection('Prise en charge', pickupLocation, pickupDetails, updatePickupDetails, 'pickup')}
 
@@ -657,6 +696,46 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+  },
+  routeRecap: {
+    backgroundColor: '#F5F3FF',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  routeRecapTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4C1D95',
+    marginBottom: 12,
+  },
+  routeRecapRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+  },
+  routeRecapTexts: {
+    flex: 1,
+  },
+  routeRecapLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  routeRecapValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 2,
+  },
+  routeRecapHint: {
+    fontSize: 11,
+    color: '#7C3AED',
+    marginTop: 4,
+    lineHeight: 15,
   },
   addressSection: {
     marginBottom: 30,

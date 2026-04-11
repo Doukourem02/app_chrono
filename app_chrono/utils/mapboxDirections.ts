@@ -35,7 +35,8 @@ export async function fetchMapboxDirections(
   if (!accessToken || accessToken.startsWith("<")) return null;
 
   const coords = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
-  const url = `${MAPBOX_DIRECTIONS_URL}/${coords}?geometries=geojson&access_token=${accessToken}`;
+  // overview=full : géométrie plus détaillée (polyline moins « lissée » / factice)
+  const url = `${MAPBOX_DIRECTIONS_URL}/${coords}?geometries=geojson&overview=full&access_token=${accessToken}`;
 
   try {
     const response = await fetch(url);

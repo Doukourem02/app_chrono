@@ -6,7 +6,7 @@ Ce document prépare le travail **hors code** : accords marchands et accès API 
 
 - **Paiement course** : initier un encaissement, recevoir le statut (succès / échec), idempotence, webhooks.
 - **Recharge commission livreur partenaire** : même principe, montants crédités seulement après confirmation PSP.
-- **Pas de duplication** des QR « paiement » des opérateurs dans l’app Chrono — voir `docs/paiements-krono.md`.
+- **Pas de duplication** des QR « paiement » des opérateurs dans l’app Chrono — voir `docs/krono-reference-unique.md` (§6).
 
 ## Étapes typiques côté entreprise
 

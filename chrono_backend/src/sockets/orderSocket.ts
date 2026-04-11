@@ -12,6 +12,9 @@ import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
 import { autoLogDeliveryMileage } from '../controllers/fleetController.js';
 import logger from '../utils/logger.js';
+import { computeOrderPriceCfa } from '../services/priceCalculator.js';
+import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
+import { setSurgeSnapshotGetter } from '../services/surgePricing.js';
 import type { SocketAckCallback, UpdateDeliveryStatusData, SendProofData } from '../types/socketEvents.js';
 interface OrderCoordinates {
   latitude: number; longitude: number;
@@ -90,6 +93,12 @@ interface CreateOrderData {
   partialAmount?: number;
   recipientUserId?: string;
   recipientIsRegistered?: boolean;
+  /** Option vitesse / service (express, pickup_service, …) — aligné app client */
+  speedOptionId?: string;
+  /** Durée route (trafic), secondes — tarif dynamique */
+  routeDurationSeconds?: number;
+  /** Durée typique Mapbox, secondes — facteur trafic */
+  routeDurationTypicalSeconds?: number;
 }
 
 interface NearbyDriver {
@@ -303,16 +312,9 @@ function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
 
-// Fonction pour calculer le prix basé sur la distance et la méthode
-function calculatePrice(distance: number, method: string): number {
-  const basePrices: { [key: string]: { base: number; perKm: number } } = {
-    moto: { base: 500, perKm: 200 },
-    vehicule: { base: 800, perKm: 300 },
-    cargo: { base: 1200, perKm: 450 }
-  };
-
-  const pricing = basePrices[method] || basePrices.vehicule;
-  return Math.round(pricing.base + (distance * pricing.perKm));
+/** Prix serveur (source unique — priceCalculator.ts). Export pour tests / outils. */
+function calculatePrice(distance: number, method: string, speedOptionId?: string): number {
+  return computeOrderPriceCfa(distance, method, { speedOptionId });
 }
 
 // Fonction pour estimer la durée
@@ -796,6 +798,11 @@ async function notifyDriversForOrder(
 }
 
 const setupOrderSocket = (io: SocketIOServer): void => {
+  setSurgeSnapshotGetter(() => ({
+    pendingOrders: Array.from(activeOrders.values()).filter((o) => o.status === 'pending').length,
+    onlineDrivers: connectedDrivers.size,
+  }));
+
   const DEBUG = process.env.DEBUG_SOCKETS === 'true'; io.on('connection', (socket: ExtendedSocket) => {
     if (DEBUG) logger.debug(`Nouvelle connexion Socket: ${socket.id}`);
 
@@ -874,6 +881,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           partialAmount,
           recipientUserId,
           recipientIsRegistered,
+          speedOptionId,
+          routeDurationSeconds: routeDurSec,
+          routeDurationTypicalSeconds: routeTypSec,
         } = orderData;
         // SÉCURITÉ: ne jamais faire confiance au userId fourni par le client
         if (userId && userId !== authUserId) {
@@ -897,7 +907,34 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           ? Math.round(rawDistance * 100) / 100
           : 0;
 
-        const price = providedPrice ?? calculatePrice(distance, deliveryMethod);
+        const rd =
+          routeDurSec != null && Number.isFinite(Number(routeDurSec)) && Number(routeDurSec) > 0
+            ? Number(routeDurSec)
+            : undefined;
+        const rt =
+          routeTypSec != null && Number.isFinite(Number(routeTypSec)) && Number(routeTypSec) > 0
+            ? Number(routeTypSec)
+            : undefined;
+
+        const dynamicBreakdown = await computeDynamicDeliveryPrice({
+          distanceKm: distance,
+          method: deliveryMethod,
+          speedOptionId,
+          pickupLatitude: pickup.coordinates.latitude,
+          pickupLongitude: pickup.coordinates.longitude,
+          routeDurationSeconds: rd,
+          routeDurationTypicalSeconds: rt,
+        });
+        const serverPrice = dynamicBreakdown.totalCfa;
+        if (providedPrice != null && Number.isFinite(Number(providedPrice))) {
+          const diff = Math.abs(Number(providedPrice) - serverPrice);
+          if (diff > 5) {
+            logger.warn(
+              `[create-order] Écart prix client/serveur: client=${providedPrice} serveur=${serverPrice} (distance=${distance} km, méthode=${deliveryMethod}, option=${speedOptionId ?? 'défaut'}, contexte=${dynamicBreakdown.labels.join(',') || '—'})`
+            );
+          }
+        }
+        const price = serverPrice;
         const estimatedDuration = providedEta ?? estimateDuration(distance, deliveryMethod);
 
         // Valider les limites de paiement différé si c'est un paiement différé par le client

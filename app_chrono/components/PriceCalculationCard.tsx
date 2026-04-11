@@ -7,6 +7,8 @@ interface PriceCalculationCardProps {
   distance: number;
   deliveryMethod: 'moto' | 'vehicule' | 'cargo';
   isUrgent?: boolean;
+  /** Ex. « Itinéraire routier » vs ligne droite */
+  distanceContextNote?: string;
   onPriceCalculated?: (price: number) => void;
 }
 
@@ -14,6 +16,7 @@ export default function PriceCalculationCard({
   distance,
   deliveryMethod,
   isUrgent = false,
+  distanceContextNote,
   onPriceCalculated,
 }: PriceCalculationCardProps) {
   const [calculation, setCalculation] = useState<any>(null);
@@ -87,6 +90,9 @@ export default function PriceCalculationCard({
           <Text style={styles.label}>Distance</Text>
           <Text style={styles.value}>{calculation.breakdown.distance} km</Text>
         </View>
+        {distanceContextNote ? (
+          <Text style={styles.contextNote}>{distanceContextNote}</Text>
+        ) : null}
 
         <View style={styles.row}>
           <Text style={styles.label}>Tarif par km</Text>
@@ -159,6 +165,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 4,
+  },
+  contextNote: {
+    fontSize: 11,
+    color: '#7C3AED',
+    marginTop: -6,
+    marginBottom: 8,
+    lineHeight: 15,
   },
   label: {
     fontSize: 14,

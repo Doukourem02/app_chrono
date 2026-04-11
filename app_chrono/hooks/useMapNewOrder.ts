@@ -40,6 +40,15 @@ interface UseMapNewOrderProps {
   setSelectedPaymentMethodType: (type: 'orange_money' | 'wave' | 'cash' | 'deferred' | null) => void;
   setRecipientInfo: (info: { userId?: string; phone?: string; isRegistered?: boolean }) => void;
   setPaymentPartialInfo: (info: { isPartial?: boolean; partialAmount?: number }) => void;
+  /** Option tarifaire (express, pickup_service, …) — alignée serveur */
+  deliverySpeedOptionId?: string | undefined;
+  /** Itinéraire Mapbox (km + durée) — enregistrement commande / prix */
+  routeSnapshot?: {
+    distanceKm: number;
+    durationSeconds: number;
+    durationTrafficSeconds?: number;
+    durationTypicalSeconds?: number;
+  } | null;
 }
 
 export function useMapNewOrder({
@@ -71,6 +80,8 @@ export function useMapNewOrder({
   setSelectedPaymentMethodType,
   setRecipientInfo: setRecipientInfoState,
   setPaymentPartialInfo,
+  deliverySpeedOptionId,
+  routeSnapshot,
 }: UseMapNewOrderProps) {
   const handleOrderDetailsConfirm = useCallback(
     async (
@@ -129,6 +140,11 @@ export function useMapNewOrder({
             coordinates: dropoffCoords,
             details: dropoffDetails,
           },
+          speedOptionId: deliverySpeedOptionId,
+          routeDistanceKm: routeSnapshot?.distanceKm,
+          routeDurationSeconds:
+            routeSnapshot?.durationTrafficSeconds ?? routeSnapshot?.durationSeconds,
+          routeDurationTypicalSeconds: routeSnapshot?.durationTypicalSeconds,
           deliveryMethod: selectedMethod as 'moto' | 'vehicule' | 'cargo',
           userInfo: {
             name:
@@ -287,6 +303,8 @@ export function useMapNewOrder({
       setSelectedPaymentMethodType,
       setRecipientInfoState,
       setPaymentPartialInfo,
+      deliverySpeedOptionId,
+      routeSnapshot,
     ]
   );
 

@@ -76,6 +76,8 @@ export interface PriceCalculation {
   breakdown: {
     distance: number;
     pricePerKm: number;
+    flatFee?: number;
+    distanceCharge?: number;
     urgencyFee: number;
     total: number;
   };
@@ -126,6 +128,7 @@ class PaymentApiService {
     deliveryMethod: 'moto' | 'vehicule' | 'cargo';
     isUrgent?: boolean;
     customPricePerKm?: number;
+    speedOptionId?: string;
   }): Promise<{
     success: boolean;
     data?: PriceCalculation;

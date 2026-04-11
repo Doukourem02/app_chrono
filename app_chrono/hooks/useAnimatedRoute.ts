@@ -33,7 +33,7 @@ export const useAnimatedRoute = ({
 
   const TRAFFIC_RECALC_INTERVAL = 2 * 60 * 1000;
 
-  const simplifyRoute = useCallback((points: Coordinates[], tolerance = 0.00002): Coordinates[] => {
+  const simplifyRoute = useCallback((points: Coordinates[], tolerance = 0.000007): Coordinates[] => {
     if (!points || points.length <= 2) return points;
 
     const sqTolerance = tolerance * tolerance;

@@ -33,6 +33,11 @@ import { usePaymentStore } from "../../store/usePaymentStore";
 import { useRatingStore } from "../../store/useRatingStore";
 import { useShipmentStore } from "../../store/useShipmentStore";
 import { logger } from "../../utils/logger";
+import type { RouteMetricsSource } from "../../utils/routePricingLabels";
+import {
+  distanceMetricCaption,
+  mapEtaSubtitle,
+} from "../../utils/routePricingLabels";
 import { sanitizeGeocodeDisplayString, singleLineAddressInput } from "../../utils/sanitizeGeocodeDisplay";
 import { isDeliveryMethodEnabledForClient } from "../../constants/clientDeliveryMethods";
 import { forwardGeocodeAddress } from "../../utils/forwardGeocodeAddress";
@@ -50,6 +55,9 @@ type MapStyleType = (typeof MAP_STYLES)[number];
 
 export default function MapPage() {
   const [isCreatingNewOrder, setIsCreatingNewOrder] = React.useState(true);
+  const [deliverySpeedOptionId, setDeliverySpeedOptionId] = React.useState<string | undefined>(
+    undefined
+  );
   const [mapStyle, setMapStyle] = React.useState<MapStyleType>('light');
   const { setSelectedMethod } = useShipmentStore();
   const { user } = useAuthStore();
@@ -96,6 +104,7 @@ export default function MapPage() {
     displayedRouteCoords,
     durationText,
     arrivalTimeText,
+    routeSnapshot,
     pickupLocation,
     deliveryLocation,
     selectedMethod,
@@ -816,18 +825,39 @@ export default function MapPage() {
     if (!pickupCoords || !dropoffCoords || !selectedMethod) {
       return { price: 0, estimatedTime: "0 min." };
     }
-    const distance = getDistanceInKm(pickupCoords, dropoffCoords);
+    const airKm = getDistanceInKm(pickupCoords, dropoffCoords);
+    const distance = routeSnapshot?.distanceKm ?? airKm;
     const price = calculatePrice(
       distance,
       selectedMethod as "moto" | "vehicule" | "cargo"
     );
-    const minutes = estimateDurationMinutes(
-      distance,
-      selectedMethod as "moto" | "vehicule" | "cargo"
-    );
+    const minutes = routeSnapshot
+      ? Math.max(0, Math.round(routeSnapshot.durationSeconds / 60))
+      : estimateDurationMinutes(
+          distance,
+          selectedMethod as "moto" | "vehicule" | "cargo"
+        );
     const estimatedTime = formatDurationLabel(minutes) || `${minutes} min.`;
     return { price, estimatedTime };
-  }, [pickupCoords, dropoffCoords, selectedMethod]);
+  }, [pickupCoords, dropoffCoords, selectedMethod, routeSnapshot]);
+
+  const orderRouteSummary = useMemo(() => {
+    if (!pickupCoords || !dropoffCoords || !selectedMethod) return null;
+    const airKm = getDistanceInKm(pickupCoords, dropoffCoords);
+    const distanceKm = routeSnapshot?.distanceKm ?? airKm;
+    const minutes = routeSnapshot
+      ? Math.max(0, Math.round(routeSnapshot.durationSeconds / 60))
+      : estimateDurationMinutes(
+          distanceKm,
+          selectedMethod as "moto" | "vehicule" | "cargo"
+        );
+    const durationLabel = formatDurationLabel(minutes) || `${minutes} min.`;
+    const source: RouteMetricsSource =
+      routeSnapshot != null && routeSnapshot.distanceKm > 0
+        ? "mapbox_route"
+        : "straight_line";
+    return { distanceKm, durationLabel, source };
+  }, [pickupCoords, dropoffCoords, selectedMethod, routeSnapshot]);
 
   const handleConfirm = async () => {
     handleShowDeliveryMethod();
@@ -881,6 +911,8 @@ export default function MapPage() {
     setSelectedPaymentMethodType,
     setRecipientInfo,
     setPaymentPartialInfo,
+    deliverySpeedOptionId,
+    routeSnapshot,
   });
 
   const _handleCancelOrder = useCallback(
@@ -1052,6 +1084,15 @@ export default function MapPage() {
         userPulseAnim={userPulseAnim}
         durationText={durationText}
         arrivalTimeText={arrivalTimeText}
+        pickupEtaSubtitle={
+          isCreatingNewOrder && pickupCoords && dropoffCoords
+            ? mapEtaSubtitle(
+                routeSnapshot != null && routeSnapshot.distanceKm > 0
+                  ? "mapbox_route"
+                  : "straight_line"
+              )
+            : undefined
+        }
         searchSeconds={searchSeconds}
         selectedMethod={selectedMethod}
         availableVehicles={[]}
@@ -1199,9 +1240,15 @@ export default function MapPage() {
                   estimatedTime={estimatedTime}
                   pickupCoords={pickupCoords ?? undefined}
                   dropoffCoords={dropoffCoords ?? undefined}
+                  routeDistanceKm={routeSnapshot?.distanceKm}
+                  routeDurationSeconds={routeSnapshot?.durationSeconds}
+                  pricingUsesRoute={
+                    !!routeSnapshot && routeSnapshot.distanceKm > 0
+                  }
                   onMethodSelected={handleMethodSelected}
                   onConfirm={handleDeliveryMethodConfirm}
                   onBack={handleDeliveryMethodBack}
+                  onSpeedOptionChange={setDeliverySpeedOptionId}
                 />
               );
             })()}
@@ -1219,6 +1266,7 @@ export default function MapPage() {
                   deliveryLocation={deliveryLocation}
                       selectedMethod={selectedMethod || "moto"}
                   price={price}
+                  orderRouteSummary={orderRouteSummary}
                   onBack={() => {
                     collapseOrderDetailsSheet();
                     expandDeliveryMethodSheet();
@@ -1236,8 +1284,9 @@ export default function MapPage() {
               const { price } = getPriceAndTime();
                   const distance =
                     pickupCoords && dropoffCoords
-                ? getDistanceInKm(pickupCoords, dropoffCoords)
-                : 0;
+                      ? routeSnapshot?.distanceKm ??
+                        getDistanceInKm(pickupCoords, dropoffCoords)
+                      : 0;
               
               return (
                 <PaymentBottomSheet
@@ -1245,6 +1294,11 @@ export default function MapPage() {
                   distance={distance}
                       deliveryMethod={selectedMethod || "moto"}
                   price={pendingOrder.price || price}
+                  distanceContextNote={distanceMetricCaption(
+                    routeSnapshot != null && routeSnapshot.distanceKm > 0
+                      ? "mapbox_route"
+                      : "straight_line"
+                  )}
                   isUrgent={false}
                   visible={showPaymentSheet}
                   payerType={paymentPayerType}

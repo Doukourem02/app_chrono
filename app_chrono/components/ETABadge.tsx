@@ -9,9 +9,11 @@ interface ETABadgeProps {
   unit: string;
   /** 'bottom' = bec en bas (pour marqueur en dessous), 'top' = bec en haut (pour marqueur au-dessus) */
   tailPosition?: 'bottom' | 'top';
+  /** Ex. « Itinéraire » vs « Estimation » (transparence client) */
+  subtitle?: string;
 }
 
-export function ETABadge({ value, unit, tailPosition = 'bottom' }: ETABadgeProps) {
+export function ETABadge({ value, unit, tailPosition = 'bottom', subtitle }: ETABadgeProps) {
   const tailStyle = tailPosition === 'top' ? styles.tailTop : styles.tail;
   return (
     <View style={[styles.wrapper, tailPosition === 'top' && styles.wrapperTailTop]}>
@@ -21,6 +23,7 @@ export function ETABadge({ value, unit, tailPosition = 'bottom' }: ETABadgeProps
         <Text style={styles.unitText}>{unit}</Text>
       </View>
       {tailPosition === 'bottom' && <View style={tailStyle} />}
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -84,5 +87,13 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
     borderBottomColor: '#8B5CF6',
     marginBottom: -1,
+  },
+  subtitle: {
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#4B5563',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
 });

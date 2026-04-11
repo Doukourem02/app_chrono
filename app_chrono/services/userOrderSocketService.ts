@@ -902,6 +902,10 @@ class UserOrderSocketService {
       };
     };
     deliveryMethod: 'moto' | 'vehicule' | 'cargo';
+    speedOptionId?: string;
+    routeDistanceKm?: number;
+    routeDurationSeconds?: number;
+    routeDurationTypicalSeconds?: number;
     userInfo: {
       name: string;
       avatar?: string;
@@ -989,6 +993,10 @@ class UserOrderSocketService {
           pickup: orderData.pickup,
           dropoff: orderData.dropoff,
           method: orderData.deliveryMethod,
+          speedOptionId: orderData.speedOptionId,
+          routeDistanceKm: orderData.routeDistanceKm,
+          routeDurationSeconds: orderData.routeDurationSeconds,
+          routeDurationTypicalSeconds: orderData.routeDurationTypicalSeconds,
         });
       } catch (error: any) {
         // Log full error for debugging
