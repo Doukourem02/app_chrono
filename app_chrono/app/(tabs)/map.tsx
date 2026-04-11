@@ -150,7 +150,9 @@ export default function MapPage() {
     toggle: toggleBottomSheet,
     expand: expandBottomSheet,
     collapse: collapseBottomSheet,
-  } = useBottomSheet();
+    expandForAddressInput,
+    restoreAfterAddressInput,
+  } = useBottomSheet({ addressInputHeightFraction: 0.88 });
 
   const hasAutoOpenedRef = useRef(false);
   const userManuallyClosedRef = useRef(false);
@@ -1221,6 +1223,8 @@ export default function MapPage() {
                 onDeliverySelected={handleDeliverySelected}
                 onMethodSelected={handleMethodSelected}
                 onConfirm={handleConfirm}
+                onAddressInputFocus={expandForAddressInput}
+                onAddressInputBlur={restoreAfterAddressInput}
               />
             )}
 

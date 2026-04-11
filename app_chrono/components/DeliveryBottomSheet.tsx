@@ -1,16 +1,5 @@
-import React from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  ScrollView,
-  Image,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import {StyleSheet,View,Text,TouchableOpacity,Animated,ScrollView,Image,Alert,KeyboardAvoidingView,Platform,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
@@ -37,6 +26,10 @@ interface DeliveryBottomSheetProps {
   onDeliverySelected: (data: { description: string; coords?: Coordinates }) => void;
   onMethodSelected: (method: 'moto' | 'vehicule' | 'cargo') => void;
   onConfirm: () => void;
+  /** Monte le sheet au focus des champs adresse (style Yango). */
+  onAddressInputFocus?: () => void;
+  /** Repasse à la hauteur « demi-feuille » quand l’utilisateur quitte le champ. */
+  onAddressInputBlur?: () => void;
 }
 
 const deliveryMethods = [
@@ -59,10 +52,39 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   onDeliverySelected,
   onMethodSelected,
   onConfirm,
+  onAddressInputFocus,
+  onAddressInputBlur,
 }) => {
   const { createShipment } = useShipmentStore();
   const insets = useSafeAreaInsets();
+  const addressBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const handleAddressFocus = useCallback(() => {
+    if (addressBlurTimerRef.current) {
+      clearTimeout(addressBlurTimerRef.current);
+      addressBlurTimerRef.current = null;
+    }
+    onAddressInputFocus?.();
+  }, [onAddressInputFocus]);
+
+  const handleAddressBlur = useCallback(() => {
+    if (!onAddressInputBlur) return;
+    if (addressBlurTimerRef.current) {
+      clearTimeout(addressBlurTimerRef.current);
+    }
+    addressBlurTimerRef.current = setTimeout(() => {
+      onAddressInputBlur();
+      addressBlurTimerRef.current = null;
+    }, 220);
+  }, [onAddressInputBlur]);
+
+  useEffect(() => {
+    return () => {
+      if (addressBlurTimerRef.current) {
+        clearTimeout(addressBlurTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleConfirm = () => {
     if (!pickupLocation || !deliveryLocation) {
@@ -109,8 +131,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
           >
             <Text style={styles.title}>ENVOYER UN COLIS</Text>
 
-            <Text style={styles.fieldLabel}>Départ (une adresse)</Text>
-            <View style={styles.inputCard}>
+            <View style={styles.addressPairCard}>
               <MapboxAddressAutocomplete
                 placeholder="Où récupérer"
                 country="ci"
@@ -118,11 +139,10 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
                 embedded
                 proximityCoords={userLocationCoords ?? undefined}
                 onPlaceSelected={onPickupSelected}
+                onFocus={handleAddressFocus}
+                onBlur={handleAddressBlur}
               />
-            </View>
-
-            <Text style={[styles.fieldLabel, styles.fieldLabelSecond]}>Arrivée (une adresse)</Text>
-            <View style={[styles.inputCard, styles.inputCardLast]}>
+              <View style={styles.addressPairSeparator} />
               <MapboxAddressAutocomplete
                 placeholder="Où livrer"
                 country="ci"
@@ -130,6 +150,8 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
                 embedded
                 proximityCoords={pickupCoords ?? userLocationCoords ?? undefined}
                 onPlaceSelected={onDeliverySelected}
+                onFocus={handleAddressFocus}
+                onBlur={handleAddressBlur}
               />
             </View>
 
@@ -239,15 +261,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  fieldLabelSecond: {
-    marginTop: 14,
-  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -255,25 +268,18 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     textAlign: 'left',
   },
-  inputCard: {
+  addressPairCard: {
     backgroundColor: '#f8f8f8',
     borderRadius: 12,
     overflow: 'visible',
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.06)',
-  },
-  inputCardLast: {
     marginBottom: 22,
   },
-  inputContainer: {
-    backgroundColor: '#f8f8f8',
-    borderRadius: 12,
-    marginBottom: 25,
-    overflow: 'visible',
-  },
-  inputSeparator: {
-    height: 1,
-    backgroundColor: 'rgba(0,0,0,0.06)',
+  addressPairSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    marginHorizontal: 12,
   },
   deliveryMethodsContainer: {
     marginBottom: 25,

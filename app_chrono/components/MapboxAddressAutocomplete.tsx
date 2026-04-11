@@ -3,17 +3,7 @@
  * Combine Search Box + Geocoding + Nominatim pour rues, adresses, POI visibles sur la carte
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {ActivityIndicator,Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { config } from '../config';
 import { logger } from '../utils/logger';
@@ -187,6 +177,8 @@ type Props = {
   proximityCoords?: { latitude: number; longitude: number } | null;
   /** Intégré dans un bloc groupé (ex: pickup + dropoff) — pas de fond ni bordure propres */
   embedded?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
   onPlaceSelected: (data: {
     description: string;
     coords?: { latitude: number; longitude: number };
@@ -200,6 +192,8 @@ export default function MapboxAddressAutocomplete({
   proximity = PROXIMITY,
   proximityCoords = null,
   embedded = false,
+  onFocus,
+  onBlur,
   onPlaceSelected,
 }: Props) {
   const [query, setQuery] = useState(initialValue);
@@ -588,6 +582,8 @@ export default function MapboxAddressAutocomplete({
             placeholderTextColor="#999"
             editable={false}
             multiline={false}
+            onFocus={onFocus}
+            onBlur={onBlur}
           />
           <Text style={styles.hint}>Mapbox non configuré</Text>
         </View>
@@ -606,6 +602,8 @@ export default function MapboxAddressAutocomplete({
           placeholderTextColor="#999"
           multiline={false}
           blurOnSubmit={false}
+          onFocus={onFocus}
+          onBlur={onBlur}
         />
         {loading && <ActivityIndicator size="small" color="#8B5CF6" />}
       </View>
