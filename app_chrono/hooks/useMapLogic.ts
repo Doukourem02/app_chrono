@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { SetStateAction } from 'react';
 import { Alert, Animated, Dimensions } from 'react-native';
 import * as Location from 'expo-location';
 import { useShipmentStore } from '../store/useShipmentStore';
@@ -35,7 +36,24 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
   const { handleError } = useErrorHandler();
   
   const [region, setRegion] = useState<{ latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null>(null);
-  const [pickupCoords, setPickupCoords] = useState<Coordinates | null>(null);
+  const [pickupCoords, setPickupCoordsState] = useState<Coordinates | null>(null);
+  /** Si true : ne pas écraser le point de collecte avec le GPS au retour premier plan (collecte ≠ position client). */
+  const pickupCoordsLockedByUserRef = useRef(false);
+
+  const setPickupCoords = useCallback((coords: SetStateAction<Coordinates | null>) => {
+    setPickupCoordsState((prev) => {
+      const next =
+        typeof coords === 'function'
+          ? (coords as (p: Coordinates | null) => Coordinates | null)(prev)
+          : coords;
+      if (next === null) pickupCoordsLockedByUserRef.current = false;
+      return next;
+    });
+  }, []);
+
+  const markPickupCoordsAsUserChosen = useCallback(() => {
+    pickupCoordsLockedByUserRef.current = true;
+  }, []);
   const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
   const [displayedRouteCoords, setDisplayedRouteCoords] = useState<Coordinates[]>([]);
   const [durationText, setDurationText] = useState<string | null>(null);
@@ -413,10 +431,12 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         latitudeDelta: 0.005,
         longitudeDelta: 0.005,
       });
-      setPickupCoords({ latitude: coords.latitude, longitude: coords.longitude });
-      const addr = useLocationStore.getState().currentLocation?.address?.trim();
-      if (addr) {
-        useShipmentStore.getState().setPickupLocation(addr);
+      if (!pickupCoordsLockedByUserRef.current) {
+        setPickupCoordsState({ latitude: coords.latitude, longitude: coords.longitude });
+        const addr = useLocationStore.getState().currentLocation?.address?.trim();
+        if (addr) {
+          useShipmentStore.getState().setPickupLocation(addr);
+        }
       }
     });
 
@@ -440,7 +460,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         };
 
         setRegion(newRegion);
-        setPickupCoords({ latitude, longitude });
+        setPickupCoordsState({ latitude, longitude });
 
         // Reverse geocoding : Mapbox (priorité) > Nominatim > Expo (via locationService)
         const address = await locationService.reverseGeocode({
@@ -484,7 +504,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
       unsubStore();
       unsubForeground();
     };
-  }, []);
+  }, [setPickupCoords]);
 
   // Générer des véhicules disponibles
   const getAvailableVehicles = () => {
@@ -552,6 +572,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     
     // Actions
     setPickupCoords,
+    markPickupCoordsAsUserChosen,
     setDropoffCoords,
     setDriverCoords,
     setPickupLocation,

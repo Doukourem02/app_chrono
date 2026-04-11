@@ -33,6 +33,7 @@ import { usePaymentStore } from "../../store/usePaymentStore";
 import { useRatingStore } from "../../store/useRatingStore";
 import { useShipmentStore } from "../../store/useShipmentStore";
 import { logger } from "../../utils/logger";
+import { forwardGeocodeAddress } from "../../utils/forwardGeocodeAddress";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PENDING_STATUS: OrderStatus = "pending";
@@ -100,6 +101,7 @@ export default function MapPage() {
     destinationPulseAnim,
     userPulseAnim,
     setPickupCoords,
+    markPickupCoordsAsUserChosen,
     setDropoffCoords,
     clearRoute,
     setPickupLocation,
@@ -721,7 +723,7 @@ export default function MapPage() {
     scheduleBottomSheetOpen,
   ]);
 
-  const handlePickupSelected = ({
+  const handlePickupSelected = async ({
     description,
     coords,
   }: {
@@ -730,16 +732,21 @@ export default function MapPage() {
   }) => {
     isUserTypingRef.current = true;
     setPickupLocation(description);
-    if (coords) {
-      setPickupCoords(coords);
-      if (dropoffCoords) fetchRoute(coords, dropoffCoords);
+    let resolved = coords;
+    if (!resolved && description.trim().length >= 3) {
+      resolved = (await forwardGeocodeAddress(description.trim())) ?? undefined;
+    }
+    if (resolved) {
+      markPickupCoordsAsUserChosen();
+      setPickupCoords(resolved);
+      if (dropoffCoords) fetchRoute(resolved, dropoffCoords);
     }
     setTimeout(() => {
       isUserTypingRef.current = false;
     }, 2000);
   };
 
-  const handleDeliverySelected = ({
+  const handleDeliverySelected = async ({
     description,
     coords,
   }: {
@@ -748,10 +755,14 @@ export default function MapPage() {
   }) => {
     isUserTypingRef.current = true;
     setDeliveryLocation(description);
-    if (coords) {
-      setDropoffCoords(coords);
-      if (pickupCoords) fetchRoute(pickupCoords, coords);
-    } 
+    let resolved = coords;
+    if (!resolved && description.trim().length >= 3) {
+      resolved = (await forwardGeocodeAddress(description.trim())) ?? undefined;
+    }
+    if (resolved) {
+      setDropoffCoords(resolved);
+      if (pickupCoords) fetchRoute(pickupCoords, resolved);
+    }
     setTimeout(() => {
       isUserTypingRef.current = false;
     }, 2000);

@@ -7,6 +7,17 @@
  * URL publique du backend (sans chemin), ex. https://api.kro-no-delivery.com
  * Certaines stacks (iOS / RN) envoient Origin = cette URL sur les requêtes Socket.IO polling.
  */
+function normalizeOriginUrl(raw: string): string | null {
+  try {
+    const normalized = /^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`;
+    const u = new URL(normalized);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Première URL publique du backend (comportement historique). */
 export function getBackendPublicOrigin(): string | null {
   const raw = [
     process.env.API_PUBLIC_URL,
@@ -15,17 +26,33 @@ export function getBackendPublicOrigin(): string | null {
     process.env.RENDER_EXTERNAL_URL,
   ].find((s) => typeof s === 'string' && s.trim().length > 0);
 
-  if (!raw) {
-    return null;
-  }
+  if (!raw) return null;
+  return normalizeOriginUrl(raw);
+}
 
-  try {
-    const normalized = /^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`;
-    const u = new URL(normalized);
-    return `${u.protocol}//${u.host}`;
-  } catch {
-    return null;
+/**
+ * Toutes les origines candidates pour l’API (Socket.IO / CORS).
+ * Les apps ou proxies envoient parfois Origin = URL du backend ; sans ça, handshake refusé.
+ */
+export function getBackendPublicOriginCandidates(): string[] {
+  const keys = [
+    process.env.API_PUBLIC_URL,
+    process.env.BACKEND_PUBLIC_URL,
+    process.env.PUBLIC_API_URL,
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.ALLOWED_ORIGINS,
+  ];
+  const out = new Set<string>();
+  for (const k of keys) {
+    if (!k || typeof k !== 'string') continue;
+    for (const part of k.split(',')) {
+      const t = part.trim();
+      if (!t) continue;
+      const o = normalizeOriginUrl(t);
+      if (o) out.add(o);
+    }
   }
+  return [...out];
 }
 
 export function getAllowedOrigins(): string[] {
@@ -80,9 +107,10 @@ export function isOriginAllowed(origin: string | undefined): boolean {
     }
   }
 
-  const selfOrigin = getBackendPublicOrigin();
-  if (selfOrigin && origin === selfOrigin) {
-    return true;
+  for (const candidate of getBackendPublicOriginCandidates()) {
+    if (origin === candidate) {
+      return true;
+    }
   }
 
   return allowedOrigins.includes(origin);

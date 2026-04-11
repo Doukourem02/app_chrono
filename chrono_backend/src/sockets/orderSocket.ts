@@ -173,6 +173,12 @@ function scheduleDriverOfflineOnSocketDisconnect(io: SocketIOServer, driverId: s
 
 /** Fenêtre pour accepter/décliner une offre (à garder alignée avec `autoDeclineTimer` sur OrderRequestPopup, driver_chrono). */
 const DRIVER_OFFER_RESPONSE_MS = 30_000;
+/** Court délai si le socket livreur n’est pas encore mappé (course client ↔ reconnect driver). */
+const DRIVER_OFFER_SOCKET_RETRY_MS = 500;
+
+function delayMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // Fonction pour compter les commandes actives d'un client
 function getActiveOrdersCountByUser(userId: string): number {
@@ -645,7 +651,11 @@ async function notifyDriversForOrder(
       }
 
       const driver = selectedDrivers[driverIndex];
-      const driverSocketId = connectedDrivers.get(driver.driverId);
+      let driverSocketId = connectedDrivers.get(driver.driverId);
+      if (!driverSocketId) {
+        await delayMs(DRIVER_OFFER_SOCKET_RETRY_MS);
+        driverSocketId = connectedDrivers.get(driver.driverId);
+      }
 
       if (DEBUG) {
         logger.debug(`[notifyDriversForOrder] Tentative envoi à livreur ${maskUserId(driver.driverId)}: socket=${driverSocketId || 'NON CONNECTÉ'}, distance=${driver.distance.toFixed(2)}km`);
@@ -1011,20 +1021,80 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         let driverIndex = 0;
         const tryNextDriver = async (): Promise<void> => {
           if (driverIndex >= selectedDrivers.length) {
-            logger.warn(`Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)} - Annulation automatique`); try { order.status = 'cancelled'; order.cancelledAt = new Date(); await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt }); logger.debug(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB`); } catch (dbError: any) { logger.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message); } const userSocketId = connectedUsers.get(order.user.id); if (userSocketId) { io.to(userSocketId).emit('order-cancelled', { orderId: order.id, reason: 'no_drivers_available', message: 'Aucun chauffeur disponible - Commande annulée' }); } socket.emit('no-drivers-available', { orderId: order.id, message: 'Tous les chauffeurs sont occupés - Commande annulée' }); activeOrders.delete(order.id); return;
+            logger.warn(
+              `Tous les chauffeurs sont occupés pour la commande ${maskOrderId(order.id)} - Annulation automatique`
+            );
+            try {
+              order.status = 'cancelled';
+              order.cancelledAt = new Date();
+              await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt });
+              logger.debug(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB`);
+            } catch (dbError: any) {
+              logger.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message);
+            }
+            const userSocketId = connectedUsers.get(order.user.id);
+            if (userSocketId) {
+              io.to(userSocketId).emit('order-cancelled', {
+                orderId: order.id,
+                reason: 'no_drivers_available',
+                message: 'Aucun chauffeur disponible - Commande annulée',
+              });
+            }
+            socket.emit('no-drivers-available', {
+              orderId: order.id,
+              message: 'Tous les chauffeurs sont occupés - Commande annulée',
+            });
+            activeOrders.delete(order.id);
+            return;
           }
 
           const driver = selectedDrivers[driverIndex];
-          const driverSocketId = connectedDrivers.get(driver.driverId);
+          let driverSocketId = connectedDrivers.get(driver.driverId);
+          if (!driverSocketId) {
+            logger.info(`[create-order] Socket livreur absent, retry ${DRIVER_OFFER_SOCKET_RETRY_MS}ms`, {
+              driverId: maskUserId(driver.driverId),
+              orderId: maskOrderId(order.id),
+            });
+            await delayMs(DRIVER_OFFER_SOCKET_RETRY_MS);
+            driverSocketId = connectedDrivers.get(driver.driverId);
+          }
 
-          logger.debug(`[DIAGNOSTIC] Tentative envoi à livreur ${maskUserId(driver.driverId)}:`); logger.debug(` - Socket ID: ${driverSocketId || 'NON CONNECTÉ'}`); logger.debug(` - Distance: ${driver.distance.toFixed(2)}km`); if (driverSocketId) {
-            const assignedAt = new Date(); order.assignedAt = assignedAt; (order as any).offeredDriverId = driver.driverId; logger.debug(`Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`); await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => { }); io.to(driverSocketId).emit('new-order-request', order); logger.debug(`Événement 'new-order-request' émis vers socket ${driverSocketId}`); setTimeout(async () => { const currentOrder = activeOrders.get(order.id); if (currentOrder && currentOrder.status === 'pending') { if (DEBUG) logger.debug(`Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`); await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(() => { }); driverIndex++; tryNextDriver().catch(() => { }); } }, DRIVER_OFFER_RESPONSE_MS);
+          logger.debug(`[DIAGNOSTIC] Tentative envoi à livreur ${maskUserId(driver.driverId)}:`);
+          logger.debug(` - Socket ID: ${driverSocketId || 'NON CONNECTÉ'}`);
+          logger.debug(` - Distance: ${driver.distance.toFixed(2)}km`);
+          if (driverSocketId) {
+            const assignedAt = new Date();
+            order.assignedAt = assignedAt;
+            (order as any).offeredDriverId = driver.driverId;
+            logger.debug(`Envoi commande à driver ${maskUserId(driver.driverId)} (socket: ${driverSocketId})`);
+            await recordOrderAssignment(order.id, driver.driverId, { assignedAt }).catch(() => {});
+            io.to(driverSocketId).emit('new-order-request', order);
+            logger.debug(`Événement 'new-order-request' émis vers socket ${driverSocketId}`);
+            setTimeout(async () => {
+              const currentOrder = activeOrders.get(order.id);
+              if (currentOrder && currentOrder.status === 'pending') {
+                if (DEBUG)
+                  logger.debug(
+                    `Timeout driver ${maskUserId(driver.driverId)} pour commande ${maskOrderId(order.id)}`
+                  );
+                await recordOrderAssignment(order.id, driver.driverId, { declinedAt: new Date() }).catch(
+                  () => {}
+                );
+                driverIndex++;
+                tryNextDriver().catch(() => {});
+              }
+            }, DRIVER_OFFER_RESPONSE_MS);
           } else {
-            if (DEBUG) logger.debug(`Chauffeur ${driver.driverId} trouvé mais socket non connecté.`); driverIndex++; tryNextDriver().catch(() => { });
+            if (DEBUG)
+              logger.debug(
+                `Chauffeur ${driver.driverId} trouvé mais socket non connecté après retry.`
+              );
+            driverIndex++;
+            tryNextDriver().catch(() => {});
           }
         };
 
-        tryNextDriver().catch(() => { });
+        tryNextDriver().catch(() => {});
 
       } catch (error: any) {
         logger.error('Erreur création commande:', error); socket.emit('order-error', { success: false, message: 'Erreur lors de la création de la commande' });
