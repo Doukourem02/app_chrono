@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { activeOrders, connectedUsers } from '../sockets/orderSocket.js';
 import { deductCommissionAfterDelivery } from '../services/commissionService.js';
+import { notifyClientOrderStatusPush } from '../services/expoPushService.js';
 import { autoLogDeliveryMileage } from './fleetController.js';
 import logger from '../utils/logger.js';
 
@@ -323,6 +324,11 @@ export const updateDeliveryStatus = async (
     if (userSocketId) {
       io.to(userSocketId).emit('order:status:update', { order, location });
     }
+
+    void notifyClientOrderStatusPush(order.user.id, orderId, status).catch((e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.warn('[expo-push] updateDeliveryStatus:', msg);
+    });
 
     try {
       await (pool as any).query('UPDATE deliveries SET status=$1 WHERE id=$2', [

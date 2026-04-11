@@ -1,6 +1,6 @@
 /**
- * Notifications distantes : enregistrement du token Expo sur l’API + écoute pour resynchroniser
- * commandes / socket quand un événement arrive (complément indispensable hors premier plan sur iOS).
+ * Enregistrement du token Expo Push sur l’API (app livreur).
+ * Aligné sur app_chrono/services/clientPushService.ts
  */
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
@@ -8,7 +8,7 @@ import { Platform } from "react-native";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { apiFetch } from "../utils/apiFetch";
-import { userApiService } from "./userApiService";
+import { apiService } from "./apiService";
 
 let handlerConfigured = false;
 
@@ -27,28 +27,24 @@ function ensureNotificationHandler(): void {
 }
 
 async function registerTokenWithBackend(expoPushToken: string): Promise<void> {
-  const token = await userApiService.ensureAccessToken();
+  const { token } = await apiService.ensureAccessToken();
   if (!token) {
-    logger.warn("registerPush: pas de JWT", "clientPush");
+    logger.warn("registerPush: pas de JWT", "driverPush");
     return;
   }
   const platform = Platform.OS === "ios" ? "ios" : "android";
-  const response = await apiFetch(
-    `${config.apiUrl}/api/push/register`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        expoPushToken,
-        platform,
-        app: "client",
-      }),
+  const response = await apiFetch(`${config.apiUrl}/api/push/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
-    { maxRetries: 1 }
-  );
+    body: JSON.stringify({
+      expoPushToken,
+      platform,
+      app: "driver",
+    }),
+  });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     let errCode: string | undefined;
@@ -58,7 +54,7 @@ async function registerTokenWithBackend(expoPushToken: string): Promise<void> {
     } catch {
       /* ignore */
     }
-    logger.warn("registerPush: HTTP non OK", "clientPush", {
+    logger.warn("registerPush: HTTP non OK", "driverPush", {
       status: response.status,
       errCode,
       body: text.slice(0, 300),
@@ -67,17 +63,16 @@ async function registerTokenWithBackend(expoPushToken: string): Promise<void> {
 }
 
 /**
- * Demande la permission + envoie le token Expo à POST /api/push/register.
- * À appeler après connexion (JWT disponible).
+ * Permission + envoi du token à POST /api/push/register (après connexion).
  */
-export async function initializeClientPushNotifications(_userId: string): Promise<void> {
+export async function initializeDriverPushNotifications(_userId: string): Promise<void> {
   if (Platform.OS === "web") return;
 
   ensureNotificationHandler();
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
-      name: "Krono",
+      name: "Krono pro",
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       sound: "default",
@@ -91,7 +86,7 @@ export async function initializeClientPushNotifications(_userId: string): Promis
     finalStatus = status;
   }
   if (finalStatus !== "granted") {
-    logger.warn("Notifications refusées par l’utilisateur", "clientPush");
+    logger.warn("Notifications refusées par l’utilisateur", "driverPush");
     return;
   }
 
@@ -100,23 +95,20 @@ export async function initializeClientPushNotifications(_userId: string): Promis
       ?.projectId ?? Constants.easConfig?.projectId;
 
   if (!projectId || typeof projectId !== "string") {
-    logger.warn("EAS projectId manquant (extra.eas.projectId) — token push impossible", "clientPush");
+    logger.warn("EAS projectId manquant (extra.eas.projectId) — token push impossible", "driverPush");
     return;
   }
 
   try {
     const push = await Notifications.getExpoPushTokenAsync({ projectId });
     await registerTokenWithBackend(push.data);
-    logger.info("Token push client enregistré côté API", "clientPush");
+    logger.info("Token push livreur enregistré côté API", "driverPush");
   } catch (e) {
-    logger.warn("getExpoPushTokenAsync / register échoué", "clientPush", e);
+    logger.warn("getExpoPushTokenAsync / register échoué", "driverPush", e);
   }
 }
 
-/**
- * Resynchroniser l’app quand une notification arrive ou est ouverte (données à jour).
- */
-export function setupClientPushListeners(onRefresh: () => void): () => void {
+export function setupDriverPushListeners(onRefresh: () => void): () => void {
   ensureNotificationHandler();
 
   const sub1 = Notifications.addNotificationReceivedListener(() => {

@@ -18,6 +18,10 @@ import { apiService } from "../services/apiService";
 import { orderSocketService } from "../services/orderSocketService";
 import { driverMessageSocketService } from "../services/driverMessageSocketService";
 import { runDriverAppResync } from "../services/driverAppResync";
+import {
+  initializeDriverPushNotifications,
+  setupDriverPushListeners,
+} from "../services/driverPushService";
 import "../config/envCheck";
 import "../mapboxInit";
 import { isNetworkOffline } from "../utils/isNetworkOffline";
@@ -61,6 +65,16 @@ export default function RootLayout() {
     }
     prevNetworkOfflineRef.current = offline;
   }, [network, isAuthenticated, user?.id]);
+
+  // Push : token Expo → API + resync quand une notification arrive
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    void initializeDriverPushNotifications(user.id);
+    const remove = setupDriverPushListeners(() => {
+      void runDriverAppResync(user.id);
+    });
+    return () => remove();
+  }, [isAuthenticated, user?.id]);
 
   // Rafraîchir la session + resync profil / commandes quand l'app revient au premier plan
   useEffect(() => {

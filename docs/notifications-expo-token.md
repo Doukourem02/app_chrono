@@ -14,13 +14,18 @@
 
 ---
 
-## État — pause et priorité n°1 à la reprise
+## État — reprise (avril 2026)
 
 **Dernière mise à jour de cette section** : avril 2026.
 
-**Où on s’est arrêté** : travail mis en **pause** après mise en place côté **chrono_backend** de la table `push_tokens` (migration **023**), de la route **`POST /api/push/register`** (JWT, upsert par `expo_push_token`), et de correctifs **Render** (`trust proxy` pour `express-rate-limit`, messages d’erreur plus clairs dont **`errCode`** sur certains 500). La doc et les apps **n’ont pas encore** l’enregistrement automatique du token après login (`app_chrono` / `driver_chrono`).
+**Dans le repo** :
 
-**Priorité n°1 si on revient sur ce sujet** : faire **fonctionner de bout en bout** l’enregistrement du token en **production** (avant d’enchaîner sur l’envoi Expo côté backend ou le branchement complet des apps).
+- Migration SQL : **`chrono_backend/migrations/023_create_push_tokens.sql`** — à exécuter sur la base liée à `DATABASE_URL` si la table n’existe pas encore (désactive **RLS** sur `push_tokens` pour éviter un `RETURNING` vide).
+- Backend : **`POST /api/push/register`** (`pushTokenController.ts`) — réponses d’erreur avec **`errCode`** (PostgreSQL) quand c’est pertinent.
+- **app_chrono** : `clientPushService` + appel depuis **`app/_layout.tsx`** après auth (déjà en place) ; logs enrichis (`errCode`) si l’API refuse l’enregistrement.
+- **driver_chrono** : **`services/driverPushService.ts`** + même schéma dans **`app/_layout.tsx`** après auth.
+
+**Priorité n°1 en prod** : appliquer **023** si besoin, puis vérifier que **`POST /api/push/register`** répond **200** depuis les deux apps (voir tableau ci‑dessous). Ensuite seulement : envoi Expo côté backend sur les changements de statut commande.
 
 À ce stade, **`POST /api/push/register`** vers l’API déployée pouvait encore répondre **500** (« Erreur serveur ») **alors que** le JWT et le JSON étaient corrects (notamment : token Bearer **sans retour à la ligne** dans le shell). Ce blocage est la **première chose à lever** :
 
