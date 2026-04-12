@@ -63,8 +63,14 @@ export default function Index() {
   const pendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null;
   
   const isOnline = storeIsOnline;
-  
-  const { location, error } = useDriverLocation(isOnline);
+
+  const { location: rawGpsLocation, error, loading, permissionDenied } = useDriverLocation(isOnline);
+  const storeLocation = useDriverStore((s) => s.currentLocation);
+  /** Position affichée / sync : GPS live ou dernière position enregistrée au passage en ligne. */
+  const location = isOnline ? (rawGpsLocation ?? storeLocation ?? null) : null;
+  const hasLocationBanner =
+    permissionDenied ||
+    (isOnline && !loading && !location && !!error);
 
   const openAppLocationSettings = useCallback(() => {
     void Linking.openSettings();
@@ -669,10 +675,10 @@ export default function Index() {
       return;
     }
     
-    if (value && error) {
+    if (value && permissionDenied) {
       Alert.alert(
-        "Erreur de localisation", 
-        "Impossible de vous mettre en ligne sans accès à votre localisation.",
+        "Erreur de localisation",
+        "Autorisez la localisation dans les réglages du téléphone pour recevoir des courses.",
         [{ text: "Fermer" }]
       );
       return;
@@ -681,7 +687,8 @@ export default function Index() {
     isTogglingRef.current = true;
 
     /** GPS serveur : obligatoire pour le matching client ; on ne passe pas en ligne sans coords API. */
-    let coordsForApi: { latitude: number; longitude: number } | null = location;
+    let coordsForApi: { latitude: number; longitude: number } | null =
+      rawGpsLocation ?? useDriverStore.getState().currentLocation ?? null;
 
     if (value && user?.id) {
       if (!coordsForApi) {
@@ -697,7 +704,7 @@ export default function Index() {
             return;
           }
           const pos = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Highest,
+            accuracy: Location.Accuracy.Balanced,
           });
           coordsForApi = {
             latitude: pos.coords.latitude,
@@ -741,7 +748,7 @@ export default function Index() {
     }
     
     setOnlineStatus(value);
-    
+
     if (user?.id) {
       const statusData: any = {
         is_online: value,
@@ -1078,11 +1085,12 @@ export default function Index() {
         isOnline={!!isOnline}
       />
 
-      <StatusToggle 
-        isOnline={isOnline} 
+      <StatusToggle
+        isOnline={isOnline}
         onToggle={handleToggleOnline}
-        hasLocationError={!!error}
-        onOpenLocationSettings={error ? openAppLocationSettings : undefined}
+        hasLocationError={hasLocationBanner}
+        disableSwitch={false}
+        onOpenLocationSettings={hasLocationBanner ? openAppLocationSettings : undefined}
       />
 
       <StatsCards 

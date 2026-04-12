@@ -3,7 +3,7 @@
  * Bonne couverture pour Abidjan - utilisé quand Mapbox n'a pas d'adresses
  */
 
-import { stripLocalAdminSuffixes } from './sanitizeGeocodeDisplay';
+import { compactAddressForLocalDisplay } from './sanitizeGeocodeDisplay';
 
 const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
 
@@ -34,7 +34,7 @@ function cleanAddress(address: string): string {
     .replace(/^Route sans nom,?\s*/, '')
     .replace(/\s*,\s*$/, '')
     .trim();
-  return stripLocalAdminSuffixes(s);
+  return compactAddressForLocalDisplay(s);
 }
 
 /**

@@ -8,25 +8,31 @@ export interface DriverLocation {
   accuracy?: number;
 }
 
+/**
+ * Suivi GPS livreur. Priorité : ne pas laisser d’erreur « collante » si le flux temps réel reprend
+ * (évite « Localisation indisponible » alors que le livreur est en ligne et reçoit des courses).
+ */
 export const useDriverLocation = (isOnline: boolean) => {
   const [location, setLocation] = useState<DriverLocation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  /** iOS/Android : refus explicite — le système ne redemandera pas ; il faut ouvrir Réglages. */
+  /** Refus explicite — seul cas où l’utilisateur doit ouvrir Réglages. */
   const [permissionDenied, setPermissionDenied] = useState(false);
 
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
+    let cancelled = false;
 
     const startLocationTracking = async () => {
       if (!isOnline) {
-        // Si offline, arrêter le tracking
         if (subscription) {
           subscription.remove();
           subscription = null;
         }
         setLocation(null);
         setPermissionDenied(false);
+        setError(null);
+        setLoading(false);
         return;
       }
 
@@ -35,25 +41,64 @@ export const useDriverLocation = (isOnline: boolean) => {
       setPermissionDenied(false);
 
       try {
-        // Demander les permissions (dialog système la 1ère fois ; si déjà refusé, status === denied sans nouvelle popup)
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          setPermissionDenied(status === 'denied');
-          setError('Permission de localisation refusée');
-          setLoading(false);
+          if (!cancelled) {
+            setPermissionDenied(status === 'denied');
+            setError('Permission de localisation refusée');
+            setLoading(false);
+          }
           return;
         }
 
-        // Obtenir la position actuelle
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
+        const apply = (lat: number, lng: number, accuracy?: number) => {
+          if (cancelled) return;
+          setLocation({
+            latitude: lat,
+            longitude: lng,
+            accuracy: accuracy ?? undefined,
+          });
+          setError(null);
+        };
 
-        setLocation({
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-          accuracy: currentLocation.coords.accuracy || undefined,
-        });
+        // Position cache (instantané, évite trou noir au passage « en ligne »)
+        try {
+          const last = await Location.getLastKnownPositionAsync({});
+          if (last?.coords) {
+            apply(
+              last.coords.latitude,
+              last.coords.longitude,
+              last.coords.accuracy ?? undefined
+            );
+          }
+        } catch {
+          /* optionnel */
+        }
+
+        // Fix initial : Balanced (High time out souvent en intérieur / test)
+        try {
+          const current = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          apply(
+            current.coords.latitude,
+            current.coords.longitude,
+            current.coords.accuracy ?? undefined
+          );
+        } catch {
+          try {
+            const low = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Low,
+            });
+            apply(
+              low.coords.latitude,
+              low.coords.longitude,
+              low.coords.accuracy ?? undefined
+            );
+          } catch {
+            /* le watch peut fournir la 1re position */
+          }
+        }
 
         subscription = await Location.watchPositionAsync(
           {
@@ -62,26 +107,31 @@ export const useDriverLocation = (isOnline: boolean) => {
             distanceInterval: 30,
           },
           (newLocation) => {
-            setLocation({
-              latitude: newLocation.coords.latitude,
-              longitude: newLocation.coords.longitude,
-              accuracy: newLocation.coords.accuracy || undefined,
-            });
+            apply(
+              newLocation.coords.latitude,
+              newLocation.coords.longitude,
+              newLocation.coords.accuracy ?? undefined
+            );
           }
         );
 
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setError(null);
+        }
       } catch (err) {
-        setError('Erreur lors de la récupération de la localisation');
-        setLoading(false);
-        logger.error('Location error:', undefined, err);
+        if (!cancelled) {
+          logger.error('Location error:', undefined, err);
+          setError('Erreur lors de la récupération de la localisation');
+          setLoading(false);
+        }
       }
     };
 
-    startLocationTracking();
+    void startLocationTracking();
 
-    // Cleanup
     return () => {
+      cancelled = true;
       if (subscription) {
         subscription.remove();
       }

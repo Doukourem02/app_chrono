@@ -15,10 +15,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { config } from '../config';
+import type { SavedClientAddress } from '../store/useSavedAddressesStore';
 import { logger } from '../utils/logger';
 import { searchOverpassPoi, type OverpassPoiResult } from '../utils/overpassPoiSearch';
 import { searchCuratedPoi } from '../utils/poiAbidjan';
 import {
+  addressesVisuallyEqual,
+  compactAddressForLocalDisplay,
   formatAutocompleteSelectedAddress,
   sanitizeGeocodeDisplayString,
   singleLineAddressInput,
@@ -167,12 +170,19 @@ function getRelevanceScore(s: MapboxSuggestion, query: string): number {
   return 0;
 }
 
-/** Affiche "à proximité" au lieu de "Category" pour les POI (comme admin_chrono) */
-function formatPlaceFormatted(s: MapboxSuggestion): string {
+/** Sous-titre suggestion : sans commune/Abidjan/pays ; même logique que le champ après choix. */
+function formatSuggestionSecondaryLine(s: MapboxSuggestion): string {
   if (s.feature_type === 'category' || s.place_formatted?.toLowerCase() === 'category') {
     return `${s.name} à proximité`;
   }
-  return s.place_formatted || '';
+  const raw = s.place_formatted || s.full_address || '';
+  return compactAddressForLocalDisplay(raw);
+}
+
+function formatSuggestionTitle(s: MapboxSuggestion): string {
+  const raw = (s.name || '').trim();
+  if (!raw) return compactAddressForLocalDisplay(s.full_address || s.place_formatted || '');
+  return compactAddressForLocalDisplay(raw) || raw;
 }
 
 /** Distance Haversine en km */
@@ -211,7 +221,16 @@ type Props = {
   onPlaceSelected: (data: {
     description: string;
     coords?: { latitude: number; longitude: number };
+    /** Adresse rue complète si `description` est un libellé enregistré (ex. Domicile). */
+    routingAddress?: string | null;
   }) => void;
+  /** Appelé à chaque frappe — pour invalider un libellé enregistré côté commande. */
+  onQueryChange?: (text: string) => void;
+  /**
+   * Si le texte du champ est exactement le nom enregistré (validation clavier ou sortie du champ),
+   * l’adresse est appliquée comme une sélection — sans ligne supplémentaire dans la liste Mapbox.
+   */
+  savedAddresses?: SavedClientAddress[];
 };
 
 export default function MapboxAddressAutocomplete({
@@ -224,11 +243,17 @@ export default function MapboxAddressAutocomplete({
   onFocus,
   onBlur,
   onPlaceSelected,
+  onQueryChange,
+  savedAddresses = [],
 }: Props) {
   const [query, setQuery] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<MapboxSuggestion[]>([]);
+  /** Ferme la liste après tap sur le fond — réouvre au prochain focus / frappe. */
+  const [suppressSuggestionList, setSuppressSuggestionList] = useState(false);
   const [sessionToken] = useState(() => generateSessionToken());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurResolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAppliedSavedFingerprintRef = useRef<string>('');
   const accessToken = config.mapboxAccessToken;
 
   const refCoords = useMemo(() => {
@@ -245,6 +270,55 @@ export default function MapboxAddressAutocomplete({
   useEffect(() => {
     setQuery(sanitizeGeocodeDisplayString(singleLineAddressInput(initialValue)));
   }, [initialValue]);
+
+  useEffect(() => {
+    return () => {
+      if (blurResolveTimerRef.current) {
+        clearTimeout(blurResolveTimerRef.current);
+        blurResolveTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const resolveSavedLabelIfExact = useCallback(
+    (rawQuery: string): boolean => {
+      const q = rawQuery.trim();
+      if (!q || !savedAddresses.length) return false;
+      const qn = q.toLowerCase();
+      const hit = savedAddresses.find((a) => a.label.trim().toLowerCase() === qn);
+      if (!hit) return false;
+
+      const fingerprint = `${hit.id}|${qn}`;
+      if (lastAppliedSavedFingerprintRef.current === fingerprint) {
+        return true;
+      }
+      lastAppliedSavedFingerprintRef.current = fingerprint;
+
+      setSuppressSuggestionList(true);
+      setQuery(hit.label.trim());
+      setSuggestions([]);
+      onPlaceSelected({
+        description: hit.label.trim(),
+        coords: { latitude: hit.latitude, longitude: hit.longitude },
+        routingAddress: hit.addressLine,
+      });
+      return true;
+    },
+    [savedAddresses, onPlaceSelected]
+  );
+
+  const scheduleBlurResolveSaved = useCallback(
+    (rawQueryAtBlur: string) => {
+      if (blurResolveTimerRef.current) {
+        clearTimeout(blurResolveTimerRef.current);
+      }
+      blurResolveTimerRef.current = setTimeout(() => {
+        blurResolveTimerRef.current = null;
+        resolveSavedLabelIfExact(rawQueryAtBlur);
+      }, 180);
+    },
+    [resolveSavedLabelIfExact]
+  );
 
   const fetchSuggestions = useCallback(
     async (searchText: string) => {
@@ -484,7 +558,10 @@ export default function MapboxAddressAutocomplete({
 
   const handleInputChange = useCallback(
     (text: string) => {
+      lastAppliedSavedFingerprintRef.current = '';
+      setSuppressSuggestionList(false);
       setQuery(singleLineAddressInput(text));
+      onQueryChange?.(text);
       setSuggestions([]);
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -493,11 +570,13 @@ export default function MapboxAddressAutocomplete({
         debounceRef.current = setTimeout(() => fetchSuggestions(text), 300);
       }
     },
-    [fetchSuggestions]
+    [fetchSuggestions, onQueryChange]
   );
 
   const handleSelectSuggestion = useCallback(
     async (suggestion: MapboxSuggestion) => {
+      lastAppliedSavedFingerprintRef.current = '';
+      setSuppressSuggestionList(true);
       const raw = suggestion.full_address || suggestion.address || suggestion.name;
       const address = formatAutocompleteSelectedAddress(raw, query);
       setQuery(address);
@@ -549,7 +628,13 @@ export default function MapboxAddressAutocomplete({
     [accessToken, sessionToken, onPlaceSelected, query]
   );
 
-  const showSuggestions = suggestions.length > 0;
+  const showSuggestions =
+    !suppressSuggestionList && suggestions.length > 0;
+
+  const dismissSuggestionUi = useCallback(() => {
+    setSuggestions([]);
+    setSuppressSuggestionList(true);
+  }, []);
 
   const getDistanceForSuggestion = useCallback(
     (s: MapboxSuggestion): string | null => {
@@ -569,7 +654,9 @@ export default function MapboxAddressAutocomplete({
 
   const renderSuggestion = useCallback(
     (s: MapboxSuggestion, i: number) => {
-      const subtext = formatPlaceFormatted(s);
+      const title = formatSuggestionTitle(s);
+      const subtext = formatSuggestionSecondaryLine(s);
+      const showSubtext = subtext.length > 0 && !addressesVisuallyEqual(title, subtext);
       const distance = getDistanceForSuggestion(s);
       return (
         <TouchableOpacity
@@ -582,8 +669,8 @@ export default function MapboxAddressAutocomplete({
             <Ionicons name="location" size={20} color="#8B5CF6" />
           </View>
           <View style={styles.suggestionContent}>
-            <Text style={styles.suggestionText} numberOfLines={1}>{s.name}</Text>
-            {subtext ? (
+            <Text style={styles.suggestionText} numberOfLines={1}>{title}</Text>
+            {showSubtext ? (
               <Text style={styles.suggestionSubtext} numberOfLines={1}>{subtext}</Text>
             ) : null}
           </View>
@@ -595,6 +682,16 @@ export default function MapboxAddressAutocomplete({
     },
     [handleSelectSuggestion, getDistanceForSuggestion]
   );
+
+  const handleTextInputBlur = useCallback(() => {
+    const q = query;
+    scheduleBlurResolveSaved(q);
+    onBlur?.();
+  }, [query, scheduleBlurResolveSaved, onBlur]);
+
+  const handleTextInputSubmit = useCallback(() => {
+    resolveSavedLabelIfExact(query);
+  }, [query, resolveSavedLabelIfExact]);
 
   if (!accessToken) {
     return (
@@ -608,7 +705,10 @@ export default function MapboxAddressAutocomplete({
             placeholderTextColor="#999"
             editable={false}
             multiline={false}
-            onFocus={onFocus}
+            onFocus={() => {
+              setSuppressSuggestionList(false);
+              onFocus?.();
+            }}
             onBlur={onBlur}
           />
           <Text style={styles.hint}>Mapbox non configuré</Text>
@@ -628,8 +728,13 @@ export default function MapboxAddressAutocomplete({
           placeholderTextColor="#999"
           multiline={false}
           blurOnSubmit={false}
-          onFocus={onFocus}
-          onBlur={onBlur}
+          onFocus={() => {
+            setSuppressSuggestionList(false);
+            onFocus?.();
+          }}
+          onBlur={handleTextInputBlur}
+          onSubmitEditing={handleTextInputSubmit}
+          returnKeyType="done"
         />
       </View>
 
@@ -639,11 +744,11 @@ export default function MapboxAddressAutocomplete({
             visible
             transparent
             animationType="fade"
-            onRequestClose={() => setSuggestions([])}
+            onRequestClose={dismissSuggestionUi}
           >
             <Pressable
               style={styles.modalBackdrop}
-              onPress={() => setSuggestions([])}
+              onPress={dismissSuggestionUi}
             >
               <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
                 <ScrollView

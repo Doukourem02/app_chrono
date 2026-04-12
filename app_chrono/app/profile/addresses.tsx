@@ -1,73 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import {View,Text,StyleSheet,TouchableOpacity,ScrollView,Alert,ActivityIndicator} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-
-interface Address {
-  id: string;
-  label: string;
-  address: string;
-  isDefault: boolean;
-}
+import React from 'react';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  useSavedAddressesStore,
+  type SavedClientAddress,
+} from '../../store/useSavedAddressesStore';
 
 export default function AddressesPage() {
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const insets = useSafeAreaInsets();
+  const addresses = useSavedAddressesStore((s) => s.addresses);
+  const defaultAddressId = useSavedAddressesStore((s) => s.defaultAddressId);
+  const removeAddress = useSavedAddressesStore((s) => s.removeAddress);
+  const setDefaultAddress = useSavedAddressesStore((s) => s.setDefaultAddress);
 
-  useEffect(() => {
-    loadAddresses();
-  }, []);
-
-  const loadAddresses = async () => {
-    setIsLoading(true);
-    try {
-    
-      setAddresses([
-        {
-          id: '1',
-          label: 'Domicile',
-          address: '123 Rue Example, Abidjan',
-          isDefault: true,
-        },
-      ]);
-    } catch {
-      Alert.alert('Erreur', 'Impossible de charger les adresses');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSetDefault = (addressId: string) => {
+    setDefaultAddress(addressId);
+    Alert.alert('Succès', 'Adresse utilisée par défaut pour les raccourcis.');
   };
 
-  const handleSetDefault = async (addressId: string) => {
-    try {
-      // TODO: Mettre à jour l'adresse par défaut
-      setAddresses(addresses.map(addr => ({
-        ...addr,
-        isDefault: addr.id === addressId,
-      })));
-      Alert.alert('Succès', 'Adresse par défaut mise à jour');
-    } catch {
-      Alert.alert('Erreur', 'Impossible de mettre à jour l\'adresse');
-    }
-  };
-
-  const handleDelete = (addressId: string) => {
+  const handleDelete = (row: SavedClientAddress) => {
     Alert.alert(
-      'Supprimer l\'adresse',
-      'Êtes-vous sûr de vouloir supprimer cette adresse ?',
+      'Supprimer l’adresse',
+      `Retirer « ${row.label} » ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              // TODO: Supprimer l'adresse via l'API
-              setAddresses(addresses.filter(addr => addr.id !== addressId));
-              Alert.alert('Succès', 'Adresse supprimée');
-            } catch {
-              Alert.alert('Erreur', 'Impossible de supprimer l\'adresse');
-            }
-          },
+          onPress: () => removeAddress(row.id),
         },
       ]
     );
@@ -75,7 +44,7 @@ export default function AddressesPage() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
@@ -89,14 +58,14 @@ export default function AddressesPage() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8B5CF6" />
-          </View>
-        ) : addresses.length === 0 ? (
+        {addresses.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="location-outline" size={64} color="#9CA3AF" />
             <Text style={styles.emptyText}>Aucune adresse enregistrée</Text>
+            <Text style={styles.emptySub}>
+              Enregistrez un nom court (ex. Domicile) lié à une adresse précise : vous la choisirez
+              en un geste sur l’écran d’envoi.
+            </Text>
             <TouchableOpacity
               style={styles.addFirstButton}
               onPress={() => router.push('/profile/add-address' as any)}
@@ -110,36 +79,28 @@ export default function AddressesPage() {
               <View style={styles.addressHeader}>
                 <View style={styles.addressInfo}>
                   <Text style={styles.addressLabel}>{address.label}</Text>
-                  {address.isDefault && (
+                  {defaultAddressId === address.id ? (
                     <View style={styles.defaultBadge}>
                       <Text style={styles.defaultBadgeText}>Par défaut</Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
-                <View style={styles.addressActions}>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/profile/edit-address?id=${address.id}` as any)}
-                    style={styles.actionButton}
-                  >
-                    <Ionicons name="pencil" size={20} color="#8B5CF6" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDelete(address.id)}
-                    style={styles.actionButton}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  onPress={() => handleDelete(address)}
+                  style={styles.actionButton}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                </TouchableOpacity>
               </View>
-              <Text style={styles.addressText}>{address.address}</Text>
-              {!address.isDefault && (
+              <Text style={styles.addressText}>{address.addressLine}</Text>
+              {defaultAddressId !== address.id ? (
                 <TouchableOpacity
                   style={styles.setDefaultButton}
                   onPress={() => handleSetDefault(address.id)}
                 >
                   <Text style={styles.setDefaultButtonText}>Définir par défaut</Text>
                 </TouchableOpacity>
-              )}
+              ) : null}
             </View>
           ))
         )}
@@ -157,9 +118,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -178,24 +138,27 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 48,
     alignItems: 'center',
-    padding: 40,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#4B5563',
     marginTop: 16,
-    marginBottom: 24,
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 10,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   addFirstButton: {
+    marginTop: 24,
     backgroundColor: '#8B5CF6',
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -225,12 +188,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flexWrap: 'wrap',
   },
   addressLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
+    marginRight: 8,
   },
   defaultBadge: {
     backgroundColor: '#10B981',
@@ -243,10 +207,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
-  addressActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
   actionButton: {
     padding: 4,
   },
@@ -254,6 +214,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 12,
+    lineHeight: 20,
   },
   setDefaultButton: {
     alignSelf: 'flex-start',
@@ -268,4 +229,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

@@ -231,6 +231,12 @@ export default function ProfilePage() {
       color: "#8B5CF6",
     },
     {
+      icon: "location-outline",
+      title: "Mes adresses",
+      onPress: () => router.push("/profile/addresses"),
+      color: "#6366F1",
+    },
+    {
       icon: "cube-outline",
       title: "Mes commandes",
       onPress: () => router.push("/profile/order-history"),

@@ -623,7 +623,6 @@ export default function OrderTrackingPage() {
         isSearchingDriver={currentOrder?.status === 'pending'}
         destinationPulseAnim={new Animated.Value(1)}
         userPulseAnim={new Animated.Value(1)}
-        durationText=""
         searchSeconds={0}
         selectedMethod={currentOrder?.deliveryMethod || 'moto'}
         availableVehicles={[]}

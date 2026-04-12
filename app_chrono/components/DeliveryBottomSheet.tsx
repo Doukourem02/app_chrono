@@ -3,7 +3,14 @@ import {StyleSheet,View,Text,TouchableOpacity,Animated,ScrollView,Image,Alert,Ke
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
+import type { SavedClientAddress } from '../store/useSavedAddressesStore';
 import { useShipmentStore } from '../store/useShipmentStore';
+
+type PlaceSelectedPayload = {
+  description: string;
+  coords?: Coordinates;
+  routingAddress?: string | null;
+};
 
 type Coordinates = {
   latitude: number;
@@ -22,8 +29,11 @@ interface DeliveryBottomSheetProps {
   userLocationCoords?: Coordinates | null;
   /** Coordonnées pickup pour calcul des distances (Où livrer) */
   pickupCoords?: Coordinates | null;
-  onPickupSelected: (data: { description: string; coords?: Coordinates }) => void;
-  onDeliverySelected: (data: { description: string; coords?: Coordinates }) => void;
+  onPickupSelected: (data: PlaceSelectedPayload) => void;
+  onDeliverySelected: (data: PlaceSelectedPayload) => void;
+  savedAddresses?: SavedClientAddress[];
+  onPickupQueryChange?: () => void;
+  onDeliveryQueryChange?: () => void;
   onMethodSelected: (method: 'moto' | 'vehicule' | 'cargo') => void;
   onConfirm: () => void;
   /** Monte le sheet au focus des champs adresse (style Yango). */
@@ -50,6 +60,9 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   pickupCoords = null,
   onPickupSelected,
   onDeliverySelected,
+  savedAddresses = [],
+  onPickupQueryChange,
+  onDeliveryQueryChange,
   onMethodSelected,
   onConfirm,
   onAddressInputFocus,
@@ -138,7 +151,9 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
                 initialValue={pickupLocation}
                 embedded
                 proximityCoords={userLocationCoords ?? undefined}
+                savedAddresses={savedAddresses}
                 onPlaceSelected={onPickupSelected}
+                onQueryChange={onPickupQueryChange}
                 onFocus={handleAddressFocus}
                 onBlur={handleAddressBlur}
               />
@@ -149,7 +164,9 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
                 initialValue={deliveryLocation}
                 embedded
                 proximityCoords={pickupCoords ?? userLocationCoords ?? undefined}
+                savedAddresses={savedAddresses}
                 onPlaceSelected={onDeliverySelected}
+                onQueryChange={onDeliveryQueryChange}
                 onFocus={handleAddressFocus}
                 onBlur={handleAddressBlur}
               />

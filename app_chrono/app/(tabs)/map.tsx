@@ -31,16 +31,19 @@ import { useOrderStore } from "../../store/useOrderStore";
 import { usePaymentErrorStore } from "../../store/usePaymentErrorStore";
 import { usePaymentStore } from "../../store/usePaymentStore";
 import { useRatingStore } from "../../store/useRatingStore";
+import { useSavedAddressesStore } from "../../store/useSavedAddressesStore";
 import { useShipmentStore } from "../../store/useShipmentStore";
 import { logger } from "../../utils/logger";
 import type { RouteMetricsSource } from "../../utils/routePricingLabels";
-import {
-  distanceMetricCaption,
-  mapEtaSubtitle,
-} from "../../utils/routePricingLabels";
+import { distanceMetricCaption } from "../../utils/routePricingLabels";
 import { sanitizeGeocodeDisplayString, singleLineAddressInput } from "../../utils/sanitizeGeocodeDisplay";
 import { isDeliveryMethodEnabledForClient } from "../../constants/clientDeliveryMethods";
 import { forwardGeocodeAddress } from "../../utils/forwardGeocodeAddress";
+import {
+  estimateNearestDriverEtaToPickup,
+  formatDriverPickupEtaBadge,
+  type ClientDeliveryMethod,
+} from "../../utils/nearestDriverPickupEta";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PENDING_STATUS: OrderStatus = "pending";
@@ -75,7 +78,25 @@ export default function MapPage() {
   }, [deliverySpeedOptionId]);
 
   const [mapStyle, setMapStyle] = React.useState<MapStyleType>('light');
-  const { setSelectedMethod } = useShipmentStore();
+  const setSelectedMethod = useShipmentStore((s) => s.setSelectedMethod);
+  const clearAddressRoutingOverrides = useShipmentStore(
+    (s) => s.clearAddressRoutingOverrides
+  );
+  const setPickupRoutingAddress = useShipmentStore((s) => s.setPickupRoutingAddress);
+  const setDeliveryRoutingAddress = useShipmentStore(
+    (s) => s.setDeliveryRoutingAddress
+  );
+  const defaultSavedAddressId = useSavedAddressesStore((s) => s.defaultAddressId);
+  const rawSavedAddresses = useSavedAddressesStore((s) => s.addresses);
+  const savedAddresses = useMemo(() => {
+    const list = [...rawSavedAddresses];
+    list.sort((a, b) => {
+      if (a.id === defaultSavedAddressId) return -1;
+      if (b.id === defaultSavedAddressId) return 1;
+      return b.createdAt - a.createdAt;
+    });
+    return list;
+  }, [rawSavedAddresses, defaultSavedAddressId]);
   const { user } = useAuthStore();
   const { loadPaymentMethods } = usePaymentStore();
   // Utiliser des sélecteurs séparés pour éviter les boucles infinies
@@ -118,8 +139,6 @@ export default function MapPage() {
     pickupCoords,
     dropoffCoords,
     displayedRouteCoords,
-    durationText,
-    arrivalTimeText,
     routeSnapshot,
     pickupLocation,
     deliveryLocation,
@@ -207,6 +226,37 @@ export default function MapPage() {
     autoRefresh: true,
     refreshInterval: 5000,
   });
+
+  const selectedVehicleMethod = (selectedMethod || "moto") as ClientDeliveryMethod;
+
+  const nearestDriverPickupEta = useMemo(
+    () =>
+      estimateNearestDriverEtaToPickup(
+        pickupCoords,
+        onlineDrivers,
+        selectedVehicleMethod
+      ),
+    [pickupCoords, onlineDrivers, selectedVehicleMethod]
+  );
+
+  const pickupDriverEtaText = useMemo(
+    () =>
+      nearestDriverPickupEta
+        ? formatDriverPickupEtaBadge(nearestDriverPickupEta.seconds)
+        : null,
+    [nearestDriverPickupEta]
+  );
+
+  /** Fin de course : attente livreur (estim.) + trajet collecte → livraison (Mapbox). */
+  const courseArrivalTimeText = useMemo(() => {
+    const legSec = routeSnapshot?.durationSeconds;
+    if (legSec == null || legSec <= 0) return null;
+    const driverMs = (nearestDriverPickupEta?.seconds ?? 0) * 1000;
+    const arrival = new Date(Date.now() + driverMs + legSec * 1000);
+    const h = arrival.getHours();
+    const m = arrival.getMinutes();
+    return `arrive à ${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  }, [routeSnapshot?.durationSeconds, nearestDriverPickupEta?.seconds]);
 
   const {
     isSearchingDriver,
@@ -372,7 +422,8 @@ export default function MapPage() {
     
     setPickupLocation("");
     setDeliveryLocation("");
-    
+    clearAddressRoutingOverrides();
+
     try {
       const coords = await locationService.getCurrentPosition();
       
@@ -446,6 +497,7 @@ export default function MapPage() {
     setDropoffCoords,
     setPickupLocation,
     setDeliveryLocation,
+    clearAddressRoutingOverrides,
     animateToCoordinate,
     region,
     isSearchingDriver,
@@ -755,16 +807,30 @@ export default function MapPage() {
   const handlePickupSelected = async ({
     description,
     coords,
+    routingAddress,
   }: {
     description: string;
     coords?: Coordinates;
+    /** Si défini : `description` est le libellé court (ex. Domicile), cette chaîne est l’adresse complète pour la commande. */
+    routingAddress?: string | null;
   }) => {
     isUserTypingRef.current = true;
-    const clean = sanitizeGeocodeDisplayString(singleLineAddressInput(description));
-    setPickupLocation(clean);
+    const hasRouting =
+      routingAddress != null && String(routingAddress).trim().length > 0;
+    const displayText = hasRouting
+      ? description.trim()
+      : sanitizeGeocodeDisplayString(singleLineAddressInput(description));
+    const routingClean = hasRouting
+      ? sanitizeGeocodeDisplayString(
+          singleLineAddressInput(String(routingAddress))
+        )
+      : null;
+    setPickupLocation(displayText);
+    setPickupRoutingAddress(routingClean);
     let resolved = coords;
-    if (!resolved && clean.length >= 3) {
-      resolved = (await forwardGeocodeAddress(clean)) ?? undefined;
+    const geocodeQuery = hasRouting ? routingClean ?? "" : displayText;
+    if (!resolved && geocodeQuery.length >= 3) {
+      resolved = (await forwardGeocodeAddress(geocodeQuery)) ?? undefined;
     }
     if (resolved) {
       markPickupCoordsAsUserChosen();
@@ -779,16 +845,29 @@ export default function MapPage() {
   const handleDeliverySelected = async ({
     description,
     coords,
+    routingAddress,
   }: {
     description: string;
     coords?: Coordinates;
+    routingAddress?: string | null;
   }) => {
     isUserTypingRef.current = true;
-    const clean = sanitizeGeocodeDisplayString(singleLineAddressInput(description));
-    setDeliveryLocation(clean);
+    const hasRouting =
+      routingAddress != null && String(routingAddress).trim().length > 0;
+    const displayText = hasRouting
+      ? description.trim()
+      : sanitizeGeocodeDisplayString(singleLineAddressInput(description));
+    const routingClean = hasRouting
+      ? sanitizeGeocodeDisplayString(
+          singleLineAddressInput(String(routingAddress))
+        )
+      : null;
+    setDeliveryLocation(displayText);
+    setDeliveryRoutingAddress(routingClean);
     let resolved = coords;
-    if (!resolved && clean.length >= 3) {
-      resolved = (await forwardGeocodeAddress(clean)) ?? undefined;
+    const geocodeQuery = hasRouting ? routingClean ?? "" : displayText;
+    if (!resolved && geocodeQuery.length >= 3) {
+      resolved = (await forwardGeocodeAddress(geocodeQuery)) ?? undefined;
     }
     if (resolved) {
       setDropoffCoords(resolved);
@@ -992,6 +1071,7 @@ export default function MapPage() {
                 setDropoffCoords(null);
                   setPickupLocation("");
                   setDeliveryLocation("");
+                  clearAddressRoutingOverrides();
                   setSelectedMethod("moto");
 
                   logger.info("Commande annulée avec succès", "map.tsx", {
@@ -1022,6 +1102,7 @@ export default function MapPage() {
       setDropoffCoords,
       setPickupLocation,
       setDeliveryLocation,
+      clearAddressRoutingOverrides,
       setSelectedMethod,
     ]
   );
@@ -1107,17 +1188,9 @@ export default function MapPage() {
         isSearchingDriver={isSearchingDriver}
         destinationPulseAnim={destinationPulseAnim}
         userPulseAnim={userPulseAnim}
-        durationText={durationText}
-        arrivalTimeText={arrivalTimeText}
-        pickupEtaSubtitle={
-          isCreatingNewOrder && pickupCoords && dropoffCoords
-            ? mapEtaSubtitle(
-                routeSnapshot != null && routeSnapshot.distanceKm > 0
-                  ? "mapbox_route"
-                  : "straight_line"
-              )
-            : undefined
-        }
+        pickupDriverEtaText={pickupDriverEtaText}
+        courseArrivalTimeText={courseArrivalTimeText}
+        pickupEtaSubtitle={pickupDriverEtaText ? "Livreur disponible" : undefined}
         searchSeconds={searchSeconds}
         selectedMethod={selectedMethod}
         availableVehicles={[]}
@@ -1157,6 +1230,7 @@ export default function MapPage() {
               // Réinitialiser les champs de localisation pour la nouvelle commande
               setPickupLocation("");
               setDeliveryLocation("");
+              clearAddressRoutingOverrides();
               setPickupCoords(null);
               setDropoffCoords(null);
               clearRoute();
@@ -1244,6 +1318,9 @@ export default function MapPage() {
                 pickupCoords={pickupCoords}
                 onPickupSelected={handlePickupSelected}
                 onDeliverySelected={handleDeliverySelected}
+                savedAddresses={savedAddresses}
+                onPickupQueryChange={() => setPickupRoutingAddress(null)}
+                onDeliveryQueryChange={() => setDeliveryRoutingAddress(null)}
                 onMethodSelected={handleMethodSelected}
                 onConfirm={handleConfirm}
                 onAddressInputFocus={expandForAddressInput}
@@ -1479,6 +1556,7 @@ export default function MapPage() {
                         // Réinitialiser les champs de localisation pour la nouvelle commande
                         setPickupLocation("");
                         setDeliveryLocation("");
+                        clearAddressRoutingOverrides();
                         setPickupCoords(null);
                         setDropoffCoords(null);
                         clearRoute();

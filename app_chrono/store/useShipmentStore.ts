@@ -7,6 +7,9 @@ type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
 interface ShipmentState {
   pickupLocation: string;
   deliveryLocation: string;
+  /** Adresse complète pour la commande / livreur quand l’UI affiche un libellé court (ex. « Domicile »). */
+  pickupRoutingAddress: string | null;
+  deliveryRoutingAddress: string | null;
   selectedMethod: DeliveryMethod;
   
   userName: string;
@@ -20,6 +23,9 @@ interface ShipmentState {
   
   setPickupLocation: (location: string) => void;
   setDeliveryLocation: (location: string) => void;
+  setPickupRoutingAddress: (address: string | null) => void;
+  setDeliveryRoutingAddress: (address: string | null) => void;
+  clearAddressRoutingOverrides: () => void;
   setSelectedMethod: (method: DeliveryMethod) => void;
   setUserName: (name: string) => void;
   setLoginStatus: (status: boolean) => void;
@@ -32,6 +38,8 @@ interface ShipmentState {
 export const useShipmentStore = create<ShipmentState>((set, get) => ({
   pickupLocation: '',
   deliveryLocation: '',
+  pickupRoutingAddress: null,
+  deliveryRoutingAddress: null,
   selectedMethod: 'moto',
   userName: '',
   isLoggedIn: false,
@@ -43,6 +51,10 @@ export const useShipmentStore = create<ShipmentState>((set, get) => ({
   
   setPickupLocation: (location) => set({ pickupLocation: location }),
   setDeliveryLocation: (location) => set({ deliveryLocation: location }),
+  setPickupRoutingAddress: (address) => set({ pickupRoutingAddress: address }),
+  setDeliveryRoutingAddress: (address) => set({ deliveryRoutingAddress: address }),
+  clearAddressRoutingOverrides: () =>
+    set({ pickupRoutingAddress: null, deliveryRoutingAddress: null }),
   setSelectedMethod: (method) =>
     set({
       selectedMethod: isDeliveryMethodEnabledForClient(method) ? method : 'moto',
@@ -85,6 +97,8 @@ export const useShipmentStore = create<ShipmentState>((set, get) => ({
   resetShipment: () => set({
     pickupLocation: '',
     deliveryLocation: '',
+    pickupRoutingAddress: null,
+    deliveryRoutingAddress: null,
     selectedMethod: 'moto',
     currentShipment: {
       id: null,

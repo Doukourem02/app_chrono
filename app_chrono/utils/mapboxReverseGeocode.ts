@@ -3,7 +3,7 @@
  * Aligné avec admin_chrono pour des adresses précises (ex: Rue Panama City, 772)
  */
 
-import { stripLocalAdminSuffixes } from './sanitizeGeocodeDisplay';
+import { compactAddressForLocalDisplay } from './sanitizeGeocodeDisplay';
 
 const MAPBOX_REVERSE_URL = 'https://api.mapbox.com/search/geocode/v6/reverse';
 
@@ -88,7 +88,7 @@ function cleanAddress(address: string): string {
     .replace(/^Route sans nom,?\s*/, '')
     .replace(/\s*,\s*$/, '')
     .trim();
-  return stripLocalAdminSuffixes(s);
+  return compactAddressForLocalDisplay(s);
 }
 
 /**

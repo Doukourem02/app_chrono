@@ -7,15 +7,19 @@ const { width } = Dimensions.get('window');
 interface StatusToggleProps {
   isOnline: boolean;
   onToggle: (value: boolean) => void;
+  /** Vrai si GPS / permission réellement bloquants (pas une erreur transitoire alors qu’une position existe). */
   hasLocationError?: boolean;
+  /** Désactive le switch (ex. permission refusée côté OS) — laisser false pour permettre au moins de repasser hors ligne. */
+  disableSwitch?: boolean;
   /** Ouvre les réglages app (localisation) — affiché si hasLocationError */
   onOpenLocationSettings?: () => void;
 }
 
-export const StatusToggle: React.FC<StatusToggleProps> = ({ 
-  isOnline, 
-  onToggle, 
+export const StatusToggle: React.FC<StatusToggleProps> = ({
+  isOnline,
+  onToggle,
   hasLocationError = false,
+  disableSwitch = false,
   onOpenLocationSettings,
 }) => {
   const getStatusText = () => {
@@ -54,9 +58,9 @@ export const StatusToggle: React.FC<StatusToggleProps> = ({
       </View>
       
       <Switch
-        value={isOnline && !hasLocationError}
+        value={isOnline}
         onValueChange={onToggle}
-        disabled={hasLocationError}
+        disabled={disableSwitch}
         thumbColor={isOnline ? '#8B5CF6' : '#f4f3f4'}
         trackColor={{ false: '#d1d1d1', true: '#C4B5FD' }}
       />

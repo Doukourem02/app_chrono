@@ -56,8 +56,6 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
   }, []);
   const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
   const [displayedRouteCoords, setDisplayedRouteCoords] = useState<Coordinates[]>([]);
-  const [durationText, setDurationText] = useState<string | null>(null);
-  const [arrivalTimeText, setArrivalTimeText] = useState<string | null>(null);
   /** Distance route Mapbox (km) + durée — pour prix / commande ; null si pas encore chargé ou échec API */
   const [routeSnapshot, setRouteSnapshot] = useState<{
     distanceKm: number;
@@ -260,8 +258,6 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     } catch {}
 
     setDisplayedRouteCoords([]);
-    setDurationText(null);
-    setArrivalTimeText(null);
     setRouteSnapshot(null);
     stopDestinationPulse();
   };
@@ -344,16 +340,6 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
           setRouteSnapshot(null);
         }
 
-        if (adjustedSeconds > 0) {
-          setDurationText(adjustedSeconds < 60 ? `${adjustedSeconds} sec` : `${Math.round(adjustedSeconds / 60)} min`);
-          const arrivalDate = new Date(Date.now() + adjustedSeconds * 1000);
-          const hours = arrivalDate.getHours();
-          const minutes = arrivalDate.getMinutes();
-          setArrivalTimeText(`arrive à ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
-        } else {
-          setDurationText(null);
-          setArrivalTimeText(null);
-        }
 
         fitRoute(points);
       } else {
@@ -456,6 +442,7 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         const ship = useShipmentStore.getState();
         if (!ship.pickupLocation?.trim()) {
           ship.setPickupLocation(addr);
+          ship.setPickupRoutingAddress(null);
         }
       }
     };
@@ -479,7 +466,9 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         setPickupCoordsState({ latitude: coords.latitude, longitude: coords.longitude });
         const addr = useLocationStore.getState().currentLocation?.address?.trim();
         if (addr) {
-          useShipmentStore.getState().setPickupLocation(addr);
+          const ship = useShipmentStore.getState();
+          ship.setPickupLocation(addr);
+          ship.setPickupRoutingAddress(null);
         }
       }
     });
@@ -514,7 +503,9 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         });
 
         if (address && isMounted) {
-          useShipmentStore.getState().setPickupLocation(address);
+          const ship = useShipmentStore.getState();
+          ship.setPickupLocation(address);
+          ship.setPickupRoutingAddress(null);
         } else if (isMounted) {
           // Fallback Expo si le service n'a rien retourné
           try {
@@ -523,13 +514,21 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
               const place = geocoded[0];
               const parts = [place.name, place.street, place.district || place.city, place.region];
               const addr = parts.filter(Boolean).join(', ');
-              if (addr) useShipmentStore.getState().setPickupLocation(addr);
+              if (addr) {
+                const ship = useShipmentStore.getState();
+                ship.setPickupLocation(addr);
+                ship.setPickupRoutingAddress(null);
+              }
             } else {
-              useShipmentStore.getState().setPickupLocation(`Position: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              const ship = useShipmentStore.getState();
+              ship.setPickupLocation(`Position: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              ship.setPickupRoutingAddress(null);
             }
           } catch {
             if (isMounted) {
-              useShipmentStore.getState().setPickupLocation(`Position: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              const ship = useShipmentStore.getState();
+              ship.setPickupLocation(`Position: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              ship.setPickupRoutingAddress(null);
             }
           }
         }
@@ -615,8 +614,6 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
     pickupCoords,
     dropoffCoords,
     displayedRouteCoords,
-    durationText,
-    arrivalTimeText,
     routeSnapshot,
     driverCoords,
     pickupLocation,

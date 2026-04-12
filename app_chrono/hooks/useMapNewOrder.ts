@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../store/useAuthStore';
+import { useShipmentStore } from '../store/useShipmentStore';
 import { userOrderSocketService } from '../services/userOrderSocketService';
 import { locationService } from '../services/locationService';
 import { logger } from '../utils/logger';
@@ -92,6 +93,10 @@ export function useMapNewOrder({
   scheduledDeliveryExtras,
   resetScheduledDeliveryExtras,
 }: UseMapNewOrderProps) {
+  const pickupRoutingAddress = useShipmentStore((s) => s.pickupRoutingAddress);
+  const deliveryRoutingAddress = useShipmentStore((s) => s.deliveryRoutingAddress);
+  const clearAddressRoutingOverrides = useShipmentStore((s) => s.clearAddressRoutingOverrides);
+
   const handleOrderDetailsConfirm = useCallback(
     async (
       pickupDetails: any,
@@ -151,14 +156,21 @@ export function useMapNewOrder({
               }
             : {};
 
+        const pickupAddressForOrder = pickupRoutingAddress?.trim()
+          ? pickupRoutingAddress.trim()
+          : pickupLocation;
+        const dropoffAddressForOrder = deliveryRoutingAddress?.trim()
+          ? deliveryRoutingAddress.trim()
+          : deliveryLocation;
+
         const orderData = {
           pickup: {
-            address: pickupLocation,
+            address: pickupAddressForOrder,
             coordinates: pickupCoords,
             details: pickupDetails,
           },
           dropoff: {
-            address: deliveryLocation,
+            address: dropoffAddressForOrder,
             coordinates: dropoffCoords,
             details: { ...dropoffDetails, ...scheduledExtras },
           },
@@ -236,6 +248,7 @@ export function useMapNewOrder({
             setDropoffCoords(null);
             setPickupLocation('');
             setDeliveryLocation('');
+            clearAddressRoutingOverrides();
             setSelectedMethod('moto');
 
             setIsCreatingNewOrder(true);
@@ -302,6 +315,9 @@ export function useMapNewOrder({
       dropoffCoords,
       pickupLocation,
       deliveryLocation,
+      pickupRoutingAddress,
+      deliveryRoutingAddress,
+      clearAddressRoutingOverrides,
       user,
       selectedMethod,
       recipientInfo,

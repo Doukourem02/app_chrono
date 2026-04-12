@@ -69,8 +69,10 @@ interface DeliveryMapViewProps {
   isSearchingDriver: boolean;
   destinationPulseAnim: Animated.Value;
   userPulseAnim: Animated.Value;
-  durationText: string | null;
-  arrivalTimeText?: string | null;
+  /** ETA livreur → collecte (plus proche dispo, mis à jour avec la flotte). */
+  pickupDriverEtaText?: string | null;
+  /** Heure estimée d’arrivée du colis : attente livreur + trajet collecte → livraison. */
+  courseArrivalTimeText?: string | null;
   /** Sous le badge ETA pickup (création commande) — transparence itinéraire */
   pickupEtaSubtitle?: string;
   searchSeconds: number;
@@ -96,8 +98,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   isSearchingDriver,
   destinationPulseAnim,
   userPulseAnim,
-  durationText,
-  arrivalTimeText,
+  pickupDriverEtaText = null,
+  courseArrivalTimeText = null,
   pickupEtaSubtitle,
   searchSeconds,
   selectedMethod,
@@ -312,7 +314,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       })}
 
       {/* Marqueur position utilisateur (temps réel ou pickup par défaut) - masqué si on affiche pickupMarkerWithETA */}
-      {(userLoc || pickup) && !(durationText && pickup && dropoff && !(animatedDriverPosition || orderDriverCoords)) && (
+      {(userLoc || pickup) && !(pickupDriverEtaText && pickup && dropoff && !(animatedDriverPosition || orderDriverCoords)) && (
         <PointAnnotation
           id="user-loc"
           coordinate={toLngLat(userLoc || pickup!)}
@@ -344,9 +346,9 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       {!isSearchingDriver && dropoff && orderStatus !== 'completed' && orderStatus !== 'cancelled' && orderStatus !== 'declined' && (
         <MarkerView coordinate={toLngLat(dropoff)} anchor={{ x: 0.5, y: 1 }} allowOverlap>
           <View style={styles.destinationMarkerWithBadge}>
-            {arrivalTimeText && (() => {
-              const match = arrivalTimeText.match(/arrive à (.+)/i);
-              const time = match ? match[1] : arrivalTimeText;
+            {courseArrivalTimeText && (() => {
+              const match = courseArrivalTimeText.match(/arrive à (.+)/i);
+              const time = match ? match[1] : courseArrivalTimeText;
               return <ETABadge value={time} unit="arrive" tailPosition="bottom" />;
             })()}
             <View style={styles.destinationMarker}>
@@ -421,12 +423,12 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
         </>
       )}
 
-      {!isSearchingDriver && durationText && pickup && dropoff && orderStatus !== 'completed' && orderStatus !== 'cancelled' && orderStatus !== 'declined' && !(animatedDriverPosition || orderDriverCoords) && (
+      {!isSearchingDriver && pickupDriverEtaText && pickup && dropoff && orderStatus !== 'completed' && orderStatus !== 'cancelled' && orderStatus !== 'declined' && !(animatedDriverPosition || orderDriverCoords) && (
         <MarkerView coordinate={toLngLat(pickup)} anchor={{ x: 0.5, y: 1 }} allowOverlap>
           <View style={styles.pickupMarkerWithETA}>
             <ETABadge
-              value={durationText.replace(/\s*(min|sec).*$/i, '').trim() || durationText}
-              unit={durationText.toLowerCase().includes('sec') ? 'sec' : 'min'}
+              value={pickupDriverEtaText.replace(/\s*(min|sec).*$/i, '').trim() || pickupDriverEtaText}
+              unit={pickupDriverEtaText.toLowerCase().includes('sec') ? 'sec' : 'min'}
               subtitle={pickupEtaSubtitle}
             />
             <View style={styles.pickupMarker}>

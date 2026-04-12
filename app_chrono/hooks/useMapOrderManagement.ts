@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useOrderStore } from '../store/useOrderStore';
+import { useShipmentStore } from '../store/useShipmentStore';
 import { useRatingStore } from '../store/useRatingStore';
 import { logger } from '../utils/logger';
 import type { OrderStatus } from '../store/useOrderStore';
@@ -186,6 +187,7 @@ export function useMapOrderManagement({
           setDropoffCoords(null);
           setPickupLocation('');
           setDeliveryLocation('');
+          useShipmentStore.getState().clearAddressRoutingOverrides();
         }
       }
     }
@@ -263,6 +265,7 @@ export function useMapOrderManagement({
       setDropoffCoords(null);
       setPickupLocation('');
       setDeliveryLocation('');
+      useShipmentStore.getState().clearAddressRoutingOverrides();
     } else if (currentOrder && currentOrder.status === 'completed') {
       logger.info(
         '✅ Commande complétée au montage initial - attente du RatingBottomSheet',
@@ -293,6 +296,7 @@ export function useMapOrderManagement({
         setDropoffCoords(null);
         setPickupLocation('');
         setDeliveryLocation('');
+        useShipmentStore.getState().clearAddressRoutingOverrides();
       }
     }
 

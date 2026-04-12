@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useOrderStore } from '../store/useOrderStore';
+import { useShipmentStore } from '../store/useShipmentStore';
 import { locationService } from '../services/locationService';
 import { logger } from '../utils/logger';
 
@@ -123,6 +124,7 @@ export function useMapUI({
       setDropoffCoords(null);
       setPickupLocation('');
       setDeliveryLocation('');
+      useShipmentStore.getState().clearAddressRoutingOverrides();
       setSelectedMethod('moto');
 
       setTimeout(() => {
