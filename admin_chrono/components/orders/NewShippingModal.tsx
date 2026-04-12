@@ -7,6 +7,8 @@ import { adminApiService } from '@/lib/adminApiService'
 import { useRouter } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { logger } from '@/utils/logger'
+import { getPhoneValidationError } from '@/utils/phoneValidation'
+import { ABIDJAN_APPROXIMATE_PICKUP_ZONE_OPTIONS } from '@/lib/abidjanApproximatePickupZones'
 
 interface UserData {
   id: string
@@ -46,6 +48,7 @@ export default function NewShippingModal({
   const [notes, setNotes] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'orange_money' | 'wave' | 'cash' | 'deferred'>('cash')
   const [isPhoneOrder, setIsPhoneOrder] = useState(false)
+  const [approximatePickupZone, setApproximatePickupZone] = useState('')
   const [driverNotes, setDriverNotes] = useState('')
 
   // Calculated values
@@ -150,6 +153,7 @@ export default function NewShippingModal({
     setDeliveryMethod('moto')
     setPaymentMethod('cash')
     setIsPhoneOrder(false)
+    setApproximatePickupZone('')
     setDriverNotes('')
     setDistance(null)
     setPrice(null)
@@ -170,6 +174,30 @@ export default function NewShippingModal({
       return
     }
 
+    const destPhone = recipientPhone.trim()
+    if (!destPhone) {
+      alert(
+        'Le numéro de téléphone du client pour cette course est obligatoire (ex. celui avec lequel il a contacté l’administrateur).'
+      )
+      return
+    }
+    const phoneErr = getPhoneValidationError(destPhone)
+    if (phoneErr) {
+      alert(phoneErr)
+      return
+    }
+
+    const hasPickupGps =
+      !!pickupCoordinates &&
+      typeof pickupCoordinates.latitude === 'number' &&
+      typeof pickupCoordinates.longitude === 'number'
+    if (isPhoneOrder && !hasPickupGps && !approximatePickupZone.trim()) {
+      alert(
+        'Pour une commande téléphonique sans point GPS au retrait, choisissez la commune ou zone du client : les livreurs proches de cette zone recevront la proposition.'
+      )
+      return
+    }
+
     setIsCreating(true)
     try {
       const result = await adminApiService.createOrder({
@@ -181,7 +209,7 @@ export default function NewShippingModal({
         dropoff: {
           address: dropoffAddress,
           coordinates: dropoffCoordinates, // Coordonnées depuis l'autocomplétion
-          details: recipientPhone ? { phone: recipientPhone } : undefined,
+          details: { phone: destPhone },
         },
         deliveryMethod,
         paymentMethodType: paymentMethod,
@@ -191,6 +219,8 @@ export default function NewShippingModal({
         isPhoneOrder: isPhoneOrder || undefined,
         isB2BOrder: false, // Les commandes créées depuis NewShippingModal ne sont pas B2B
         driverNotes: driverNotes || undefined,
+        approximatePickupZone:
+          isPhoneOrder && !hasPickupGps ? approximatePickupZone.trim() || undefined : undefined,
       })
 
         if (result.success && result.data) {
@@ -615,7 +645,11 @@ export default function NewShippingModal({
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Téléphone destinataire (optionnel)</label>
+                <label style={labelStyle}>Téléphone du client pour cette course (obligatoire)</label>
+                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '8px' }}>
+                  Saisissez le numéro avec lequel le client vous a contacté (hors-ligne, appel, etc.). Le livreur pourra
+                  l’utiliser depuis l’app.
+                </div>
                 <input
                   type="tel"
                   placeholder="+225 07 00 00 00 00"
@@ -677,9 +711,34 @@ export default function NewShippingModal({
                     }}>
                       <span style={{ fontSize: '12px', fontWeight: 600, color: '#F59E0B' }}>⚠️</span>
                       <span style={{ fontSize: '12px', color: '#92400E' }}>
-                        Commande hors ligne - Les coordonnées GPS ne sont pas nécessaires. Le livreur appellera le client pour obtenir la position exacte.
+                        Sans GPS au retrait, indiquez au minimum la commune / zone du client : seuls les livreurs à proximité sont sollicités. Le livreur pourra appeler pour le point exact.
                       </span>
                     </div>
+                    {(!pickupCoordinates ||
+                      typeof pickupCoordinates.latitude !== 'number' ||
+                      typeof pickupCoordinates.longitude !== 'number') && (
+                      <div style={{ marginTop: '12px' }}>
+                        <label style={{ ...labelStyle, marginBottom: '4px' }}>
+                          Commune / zone du retrait (obligatoire sans GPS)
+                        </label>
+                        <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '8px' }}>
+                          Demandez au client où il se trouve (ex. Abobo, Yopougon). Utilisé pour le matching livreur, pas comme adresse précise.
+                        </div>
+                        <select
+                          style={inputStyle}
+                          value={approximatePickupZone}
+                          onChange={(e) => setApproximatePickupZone(e.target.value)}
+                          required
+                        >
+                          <option value="">— Choisir une zone —</option>
+                          {ABIDJAN_APPROXIMATE_PICKUP_ZONE_OPTIONS.map((z) => (
+                            <option key={z.value} value={z.value}>
+                              {z.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div style={{ marginTop: '12px' }}>
                       <label style={{ ...labelStyle, marginBottom: '4px' }}>
                         Notes pour le livreur (optionnel)

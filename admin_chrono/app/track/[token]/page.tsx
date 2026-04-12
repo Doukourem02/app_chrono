@@ -6,40 +6,63 @@ import config from '@/lib/config'
 
 const API_URL = config.apiUrl
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'En attente de livreur',
-  accepted: 'Livreur assigné',
-  enroute: 'Livreur en route pour récupérer le colis',
-  picked_up: 'Colis pris en charge',
-  delivering: 'En cours de livraison',
-  completed: 'Livré',
-  cancelled: 'Annulé',
-  declined: 'Refusé',
+/** Aligné sur les textes push / SMS backend (recipientOrderNotifyService). */
+const FLOW_STEPS: { status: string; title: string; body: string }[] = [
+  { status: 'pending', title: 'En attente', body: 'Recherche d’un livreur pour votre course.' },
+  { status: 'accepted', title: 'Course acceptée', body: 'Un livreur a accepté votre commande.' },
+  {
+    status: 'enroute',
+    title: 'En route',
+    body: 'Le livreur est en route vers le point de collecte de colis.',
+  },
+  { status: 'picked_up', title: 'Colis récupéré', body: 'Votre colis a été récupéré.' },
+  { status: 'delivering', title: 'En livraison', body: 'Le livreur est en route vers vous.' },
+  { status: 'completed', title: 'Livraison terminée', body: 'Votre commande est livrée.' },
+]
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const output = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) output[i] = rawData.charCodeAt(i)
+  return output as Uint8Array<ArrayBuffer>
+}
+
+type TrackData = {
+  id: string
+  status: string
+  pickup: { address: string; coordinates: { latitude: number; longitude: number } | null }
+  dropoff: { address: string; coordinates: { latitude: number; longitude: number } | null }
+  driver: { id: string; name: string; latitude: number | null; longitude: number | null } | null
+  price: number | null
+  deliveryMethod: string
+  distance: number | null
+  createdAt: string
+  qrCodeImage: string | null
+  showQRCode: boolean
+  webPushAvailable?: boolean
 }
 
 export default function TrackPage() {
   const params = useParams()
   const token = params?.token as string
-  const [data, setData] = useState<{
-    id: string
-    status: string
-    pickup: { address: string; coordinates: { latitude: number; longitude: number } | null }
-    dropoff: { address: string; coordinates: { latitude: number; longitude: number } | null }
-    driver: { id: string; name: string; latitude: number | null; longitude: number | null } | null
-    price: number | null
-    deliveryMethod: string
-    distance: number | null
-    createdAt: string
-    qrCodeImage: string | null
-    showQRCode: boolean
-  } | null>(null)
+  const [data, setData] = useState<TrackData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushMessage, setPushMessage] = useState<string | null>(null)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   const fetchTrack = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetch(`${API_URL}/api/track/${token}`)
+      const res = await fetch(`${API_URL}/api/track/${encodeURIComponent(token)}`)
       const json = await res.json()
       if (!json.success) {
         setError(json.message || 'Lien invalide')
@@ -66,6 +89,68 @@ export default function TrackPage() {
     return () => clearInterval(interval)
   }, [data, fetchTrack])
 
+  useEffect(() => {
+    if (!token || typeof window === 'undefined') return
+    setPushEnabled(localStorage.getItem(`krono-track-push-${token}`) === '1')
+  }, [token])
+
+  const handleEnablePush = async () => {
+    if (!token || !data?.webPushAvailable) return
+    if (typeof window === 'undefined' || !window.isSecureContext) {
+      setPushMessage('Les notifications navigateur nécessitent HTTPS.')
+      return
+    }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setPushMessage('Navigateur incompatible avec les notifications.')
+      return
+    }
+    setPushBusy(true)
+    setPushMessage(null)
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') {
+        setPushMessage('Permission refusée.')
+        setPushBusy(false)
+        return
+      }
+      const keyRes = await fetch(
+        `${API_URL}/api/track/${encodeURIComponent(token)}/vapid-public-key`
+      )
+      const keyJson = await keyRes.json()
+      if (!keyJson.success || !keyJson.publicKey) {
+        setPushMessage(keyJson.message || 'Service indisponible.')
+        setPushBusy(false)
+        return
+      }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyJson.publicKey),
+      })
+      const subRes = await fetch(
+        `${API_URL}/api/track/${encodeURIComponent(token)}/push-subscribe`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub.toJSON()),
+        }
+      )
+      const subJson = await subRes.json()
+      if (!subRes.ok || !subJson.success) {
+        setPushMessage(subJson.message || 'Inscription impossible.')
+        setPushBusy(false)
+        return
+      }
+      localStorage.setItem(`krono-track-push-${token}`, '1')
+      setPushEnabled(true)
+      setPushMessage('Alertes activées pour cette livraison.')
+    } catch {
+      setPushMessage('Erreur technique. Réessayez plus tard.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
   if (loading) {
     return (
       <div style={styles.container}>
@@ -88,8 +173,22 @@ export default function TrackPage() {
     )
   }
 
-  const statusLabel = STATUS_LABELS[data.status] || data.status
-  const isActive = !['completed', 'cancelled', 'declined'].includes(data.status)
+  const status = data.status
+  const isTerminal = ['completed', 'cancelled', 'declined'].includes(status)
+  const isActive = !isTerminal
+
+  const flowIndex = FLOW_STEPS.findIndex((s) => s.status === status)
+  const currentStepIndex = flowIndex >= 0 ? flowIndex : 0
+  const allStepsDone = status === 'completed'
+
+  const showPushCta =
+    isClient &&
+    Boolean(data.webPushAvailable) &&
+    window.isSecureContext &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    !pushEnabled &&
+    !['cancelled', 'declined'].includes(status)
 
   return (
     <div style={styles.container}>
@@ -97,9 +196,78 @@ export default function TrackPage() {
         <h1 style={styles.title}>Suivi de votre livraison</h1>
         <p style={styles.orderId}>Commande #{data.id.slice(0, 8).toUpperCase()}</p>
 
-        <div style={{ ...styles.statusBadge, ...(isActive ? styles.statusActive : styles.statusDone) }}>
-          {statusLabel}
+        {status === 'cancelled' && (
+          <div style={styles.cancelledBanner}>Commande annulée. Votre commande a été annulée.</div>
+        )}
+
+        {status !== 'cancelled' && status !== 'declined' && (
+          <div style={styles.timeline}>
+            <h3 style={styles.timelineHeading}>Étapes</h3>
+            {FLOW_STEPS.map((step, i) => {
+              const done = allStepsDone || i < currentStepIndex
+              const current =
+                !allStepsDone && !['cancelled', 'declined'].includes(status) && i === currentStepIndex
+              const future = !done && !current
+              return (
+                <div
+                  key={step.status}
+                  style={{
+                    ...styles.timelineRow,
+                    ...(future ? { opacity: 0.45 } : {}),
+                  }}
+                >
+                  <div
+                    style={{
+                      ...styles.timelineDot,
+                      ...(done ? styles.timelineDotDone : {}),
+                      ...(current ? styles.timelineDotCurrent : {}),
+                    }}
+                  />
+                  <div style={styles.timelineTextCol}>
+                    <div style={styles.timelineTitle}>{step.title}</div>
+                    <div style={styles.timelineBody}>{step.body}</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div
+          style={{
+            ...styles.statusBadge,
+            ...(isActive ? styles.statusActive : styles.statusDone),
+            marginTop: 16,
+          }}
+        >
+          {FLOW_STEPS.find((s) => s.status === status)?.title ||
+            (status === 'cancelled'
+              ? 'Annulé'
+              : status === 'declined'
+                ? 'Refusé'
+                : status)}
         </div>
+
+        {showPushCta && (
+          <div style={styles.pushSection}>
+            <p style={styles.pushHint}>
+              Recevez une alerte sur cet appareil quand le statut change (navigateur).
+            </p>
+            <button
+              type="button"
+              style={styles.pushButton}
+              disabled={pushBusy}
+              onClick={() => void handleEnablePush()}
+            >
+              {pushBusy ? 'Activation…' : 'Activer les alertes navigateur'}
+            </button>
+            {pushMessage && <p style={styles.pushFeedback}>{pushMessage}</p>}
+          </div>
+        )}
+
+        {pushEnabled && !showPushCta && (
+          <p style={styles.pushOk}>Alertes navigateur activées pour ce lien.</p>
+        )}
 
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>Prise en charge</h3>
@@ -136,9 +304,7 @@ export default function TrackPage() {
         )}
 
         {data.status === 'completed' && (
-          <div style={styles.completedBanner}>
-            ✓ Votre colis a été livré
-          </div>
+          <div style={styles.completedBanner}>Votre commande est livrée.</div>
         )}
       </div>
     </div>
@@ -173,6 +339,54 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#6B7280',
     marginBottom: 16,
   },
+  timeline: {
+    marginBottom: 8,
+    paddingBottom: 16,
+    borderBottom: '1px solid #E5E7EB',
+  },
+  timelineHeading: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  timelineRow: {
+    display: 'flex',
+    gap: 12,
+    marginBottom: 14,
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+    flexShrink: 0,
+    backgroundColor: '#E5E7EB',
+  },
+  timelineDotCurrent: {
+    backgroundColor: '#8B5CF6',
+    boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.35)',
+  },
+  timelineDotDone: {
+    backgroundColor: '#10B981',
+  },
+  timelineTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#111827',
+  },
+  timelineBody: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 1.45,
+    marginTop: 2,
+  },
   statusBadge: {
     padding: '10px 16px',
     borderRadius: 12,
@@ -187,6 +401,51 @@ const styles: Record<string, React.CSSProperties> = {
   statusDone: {
     backgroundColor: '#D1FAE5',
     color: '#059669',
+  },
+  cancelledBanner: {
+    padding: 14,
+    backgroundColor: '#FEE2E2',
+    color: '#B91C1C',
+    borderRadius: 12,
+    fontWeight: 600,
+    marginBottom: 16,
+    fontSize: 14,
+    lineHeight: 1.4,
+  },
+  pushSection: {
+    marginBottom: 20,
+    padding: 14,
+    backgroundColor: '#F5F3FF',
+    borderRadius: 12,
+    border: '1px solid #DDD6FE',
+  },
+  pushHint: {
+    fontSize: 13,
+    color: '#5B21B6',
+    marginBottom: 10,
+    lineHeight: 1.45,
+  },
+  pushButton: {
+    width: '100%',
+    padding: '12px 16px',
+    borderRadius: 10,
+    border: 'none',
+    backgroundColor: '#7C3AED',
+    color: '#fff',
+    fontWeight: 600,
+    fontSize: 15,
+    cursor: 'pointer',
+  },
+  pushFeedback: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  pushOk: {
+    fontSize: 13,
+    color: '#059669',
+    marginBottom: 16,
+    fontWeight: 500,
   },
   section: {
     marginBottom: 20,

@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 import qrCodeService from '../services/qrCodeService.js';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
-import { notifyClientOrderStatusPush } from '../services/expoPushService.js';
+import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
 
 /**
  * Génère un QR code de livraison pour une commande
@@ -205,12 +205,14 @@ export const scanQRCode = async (req: AuthenticatedRequest, res: Response): Prom
               location: null,
             });
           }
-          void notifyClientOrderStatusPush(orderRow.rows[0].user_id, orderId, 'completed').catch(
-            (e: unknown) => {
-              const msg = e instanceof Error ? e.message : String(e);
-              logger.warn('[expo-push] scanQRCode:', msg);
-            }
-          );
+          void notifyAllForOrderStatus({
+            orderId,
+            status: 'completed',
+            payerUserId: orderRow.rows[0].user_id,
+          }).catch((e: unknown) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            logger.warn('[recipient-notify] scanQRCode:', msg);
+          });
         }
       }
     } catch (socketErr: any) {

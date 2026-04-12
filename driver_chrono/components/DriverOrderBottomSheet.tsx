@@ -167,6 +167,8 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   const dropoffDetails = currentOrder.dropoff?.details;
   const packageImages = currentOrder?.packageImages || currentOrder?.dropoff?.details?.photos || [];
   const isPhoneOrder = currentOrder?.isPhoneOrder || false;
+  const placedByAdmin = currentOrder?.placedByAdmin === true;
+  const isB2BOrder = currentOrder?.isB2BOrder === true;
   const driverNotes = currentOrder?.driverNotes || '';
 
   const handleCall = () => {
@@ -211,6 +213,11 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
 
   const hasPickupCoords = !!resolveCoords(currentOrder?.pickup);
   const hasDropoffCoords = !!resolveCoords(currentOrder?.dropoff);
+  /** Badge type course (admin / téléphone / B2B) — n’altère pas la navigation Mapbox */
+  const showTypeBadge = placedByAdmin || isPhoneOrder || isB2BOrder;
+  /** Aide appel / GPS : téléphone strict (admin) ou point manquant — sinon même écran qu’une course app client */
+  const showOfflineAssistBlock =
+    isPhoneOrder || !hasPickupCoords || !hasDropoffCoords;
   const showNavButton = (status: string) => {
     if (['accepted', 'enroute', 'in_progress'].includes(status)) return hasPickupCoords;
     return hasDropoffCoords;
@@ -317,10 +324,22 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
           <View style={styles.header}>
             <View style={styles.titleContainer}>
               <Text style={styles.title}>Commande en cours</Text>
-              {isPhoneOrder && (
+              {showTypeBadge && (
                 <View style={styles.offlineBadge}>
-                  <Ionicons name="phone-portrait-outline" size={14} color="#F59E0B" />
-                  <Text style={styles.offlineBadgeText}>Hors ligne</Text>
+                  <Ionicons
+                    name={
+                      isB2BOrder
+                        ? 'briefcase-outline'
+                        : placedByAdmin
+                          ? 'headset-outline'
+                          : 'phone-portrait-outline'
+                    }
+                    size={14}
+                    color="#EA580C"
+                  />
+                  <Text style={styles.offlineBadgeText}>
+                    {isB2BOrder ? 'B2B' : placedByAdmin ? 'Saisie admin' : 'Hors ligne'}
+                  </Text>
                 </View>
               )}
             </View>
@@ -373,29 +392,36 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
           >
             {activeTab === 'details' ? (
               <View style={styles.detailsContent}>
-                {/* Badge et bouton pour commandes hors ligne */}
-                {isPhoneOrder && (
+                {showOfflineAssistBlock && (
                   <View style={styles.offlineSection}>
                     <View style={styles.offlineAlert}>
-                      <Ionicons name="warning-outline" size={20} color="#F59E0B" />
+                      <Ionicons name="warning-outline" size={20} color="#EA580C" />
                       <View style={styles.offlineAlertText}>
-                        <Text style={styles.offlineAlertTitle}>Commande hors ligne</Text>
-                        <Text style={styles.offlineAlertSubtitle}>
-                          Cette commande a été créée par téléphone. Les coordonnées GPS peuvent être approximatives.
+                        <Text style={styles.offlineAlertTitle}>
+                          {!hasPickupCoords || !hasDropoffCoords
+                            ? 'Coordonnées GPS incomplètes'
+                            : 'Commande hors ligne (téléphone)'}
                         </Text>
-                        {driverNotes && (
+                        <Text style={styles.offlineAlertSubtitle}>
+                          {!hasPickupCoords || !hasDropoffCoords
+                            ? 'Sans point de retrait ou de livraison précis, la navigation intégrée ne peut pas calculer l’itinéraire. Appelez le client ou l’opérateur pour affiner l’adresse.'
+                            : 'Cette commande a été créée avec la case « téléphone / hors-ligne » : les points sur la carte peuvent être approximatifs. Vérifiez ou appelez le client si besoin.'}
+                        </Text>
+                        {driverNotes ? (
                           <Text style={styles.driverNotesText}>
                             <Text style={styles.driverNotesLabel}>Note: </Text>
                             {driverNotes}
                           </Text>
-                        )}
+                        ) : null}
                       </View>
                     </View>
-                    <TouchableOpacity style={styles.callClientButton} onPress={handleCall}>
+                    <TouchableOpacity
+                      style={styles.callClientButton}
+                      onPress={handleCall}
+                      accessibilityLabel="Appeler le client"
+                    >
                       <Ionicons name="call" size={20} color="#FFFFFF" />
-                      <Text style={styles.callClientButtonText}>
-                        Appeler le client pour position exacte
-                      </Text>
+                      <Text style={styles.callClientButtonText}>Appeler le client</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -469,6 +495,14 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                     </View>
                     <View style={styles.addressCard}>
                       <Text style={styles.addressText}>{currentOrder.pickup.address}</Text>
+                      {currentOrder.pickup.approximate_pickup_zone_label ? (
+                        <Text style={styles.approxZoneHint}>
+                          Zone opérateur : {currentOrder.pickup.approximate_pickup_zone_label}
+                          {currentOrder.pickup.pickup_coordinates_are_approximate
+                            ? ' — navigation vers un point approximatif, confirmer avec le client.'
+                            : ''}
+                        </Text>
+                      ) : null}
                     </View>
                     {hasPickupCoords ? (
                       <TouchableOpacity style={styles.navigateButton} onPress={handleNavigate}>
@@ -519,14 +553,15 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                           </Text>
                       </LinearGradient>
                     </TouchableOpacity>
-                  ) : isPhoneOrder ? (
+                  ) : (
                     <View style={styles.noCoordinatesWarning}>
                       <Ionicons name="information-circle-outline" size={20} color="#F59E0B" />
                       <Text style={styles.noCoordinatesText}>
-                        Coordonnées GPS non disponibles. Appelez le client pour obtenir sa position exacte.
+                        Coordonnées GPS non disponibles pour la livraison. Utilisez « Appeler le client » pour obtenir la
+                        position exacte.
                       </Text>
                     </View>
-                  ) : null}
+                  )}
                 </View>
 
                 {/* Téléphone */}
@@ -882,6 +917,12 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     lineHeight: 22,
     fontWeight: '500',
+  },
+  approxZoneHint: {
+    marginTop: 10,
+    fontSize: 13,
+    color: '#B45309',
+    lineHeight: 18,
   },
   navigateButton: {
     borderRadius: 12,

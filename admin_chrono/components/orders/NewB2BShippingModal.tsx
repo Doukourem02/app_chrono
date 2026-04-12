@@ -201,12 +201,17 @@ export default function NewB2BShippingModal({
       return
     }
 
-    if (recipientPhone.trim()) {
-      const phoneError = getPhoneValidationError(recipientPhone)
-      if (phoneError) {
-        alert(phoneError)
-        return
-      }
+    const destPhone = recipientPhone.trim()
+    if (!destPhone) {
+      alert(
+        'Le numéro de téléphone du client pour cette course est obligatoire (ex. celui avec lequel il a contacté l’administrateur).'
+      )
+      return
+    }
+    const phoneError = getPhoneValidationError(destPhone)
+    if (phoneError) {
+      alert(phoneError)
+      return
     }
 
     setIsCreating(true)
@@ -223,7 +228,7 @@ export default function NewB2BShippingModal({
         dropoff: {
           address: dropoffAddress,
           coordinates: dropoffCoordinates, // Optionnel pour B2B
-          details: recipientPhone ? { phone: recipientPhone } : undefined,
+          details: { phone: destPhone },
         },
         deliveryMethod,
         paymentMethodType: paymentMethod,
@@ -712,7 +717,10 @@ export default function NewB2BShippingModal({
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Téléphone destinataire (optionnel)</label>
+                <label style={labelStyle}>Téléphone du client pour cette course (obligatoire)</label>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '8px' }}>
+                  Saisissez le numéro avec lequel le client vous a contacté. Le livreur pourra l’utiliser depuis l’app.
+                </div>
                 <input
                   type="tel"
                   placeholder="+225 07 00 00 00 00"

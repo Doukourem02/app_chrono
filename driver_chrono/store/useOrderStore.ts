@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { mapAdminOrderFlags } from '../utils/mapAdminOrderFlags';
 
 export type OrderStatus = 'pending' | 'accepted' | 'declined' | 'in_progress' | 'enroute' | 'picked_up' | 'delivering' | 'completed' | 'cancelled';
 
@@ -16,6 +17,10 @@ export interface OrderRequest {
   pickup: {
     address: string;
     coordinates?: { latitude: number; longitude: number };
+    /** Saisie admin : zone commune pour matching sans GPS précis */
+    approximate_pickup_zone?: string;
+    approximate_pickup_zone_label?: string;
+    pickup_coordinates_are_approximate?: boolean;
     details?: {
       entrance?: string;
       apartment?: string;
@@ -57,7 +62,10 @@ export interface OrderRequest {
   acceptedAt?: Date;
   completedAt?: Date;
   notes?: string;
+  /** Case admin « téléphone / hors-ligne » (coords souvent approximatives) — pas toutes les commandes admin */
   isPhoneOrder?: boolean;
+  /** Toute commande créée via l’admin — badge informatif ; navigation = identique au client si GPS OK */
+  placedByAdmin?: boolean;
   isB2BOrder?: boolean;
   driverNotes?: string;
 }
@@ -128,15 +136,14 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     }
 
     const exists = state.activeOrders.some(o => o.id === order.id);
-    
-    // Mapper les champs du backend (snake_case) vers le format frontend (camelCase)
+
+    const flags = mapAdminOrderFlags(order as unknown as Record<string, unknown>);
     const mappedOrder: OrderRequest = {
       ...order,
-      isPhoneOrder: (order as any).is_phone_order ?? (order as any).isPhoneOrder ?? false,
-      isB2BOrder: (order as any).is_b2b_order ?? (order as any).isB2BOrder ?? false,
+      ...flags,
       driverNotes: (order as any).driver_notes ?? (order as any).driverNotes ?? undefined,
     };
-    
+
     if (exists) {
       // Si la commande existe déjà, la mettre à jour plutôt que de la dupliquer
       const updatedActive = state.activeOrders.map(o =>
@@ -167,25 +174,28 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     const exists = state.pendingOrders.some(o => o.id === order.id);
     if (exists) return state;
     
-    // Mapper les champs du backend (snake_case) vers le format frontend (camelCase)
+    const flags = mapAdminOrderFlags(order as unknown as Record<string, unknown>);
     const mappedOrder: OrderRequest = {
       ...order,
-      isPhoneOrder: (order as any).is_phone_order ?? (order as any).isPhoneOrder ?? false,
-      isB2BOrder: (order as any).is_b2b_order ?? (order as any).isB2BOrder ?? false,
+      ...flags,
       driverNotes: (order as any).driver_notes ?? (order as any).driverNotes ?? undefined,
     };
-    
+
     return {
       pendingOrders: [...state.pendingOrders, mappedOrder],
     };
   }),
 
   updateOrder: (orderId, updates) => set((state) => {
-    const updatedActive = state.activeOrders.map(order =>
-      order.id === orderId ? { ...order, ...updates } : order
+    const applyPatch = (o: OrderRequest): OrderRequest => {
+      const merged = { ...o, ...updates } as OrderRequest;
+      return { ...merged, ...mapAdminOrderFlags(merged as unknown as Record<string, unknown>) };
+    };
+    const updatedActive = state.activeOrders.map((order) =>
+      order.id === orderId ? applyPatch(order) : order
     );
-    const updatedPending = state.pendingOrders.map(order =>
-      order.id === orderId ? { ...order, ...updates } : order
+    const updatedPending = state.pendingOrders.map((order) =>
+      order.id === orderId ? applyPatch(order) : order
     );
     return {
       activeOrders: updatedActive,

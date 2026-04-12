@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import qrCodeService from '../services/qrCodeService.js';
+import {
+  getWebPushPublicKey,
+  isTrackWebPushConfigured,
+  saveTrackPushSubscription,
+} from '../services/trackWebPushService.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -107,10 +112,87 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
         createdAt: row.created_at,
         qrCodeImage,
         showQRCode,
+        webPushAvailable: isTrackWebPushConfigured(),
       },
     });
   } catch (error: any) {
     logger.error('Erreur getTrackByToken:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+};
+
+/**
+ * GET /api/track/:token/vapid-public-key — clé publique VAPID (si Web Push configuré).
+ */
+export const getTrackVapidPublicKey = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      res.status(400).json({ success: false, message: 'Token requis' });
+      return;
+    }
+    if (!isTrackWebPushConfigured()) {
+      res.status(503).json({ success: false, message: 'Notifications navigateur non disponibles' });
+      return;
+    }
+    const check = await pool.query(`SELECT 1 FROM orders WHERE tracking_token = $1 LIMIT 1`, [
+      token,
+    ]);
+    if (!check.rows.length) {
+      res.status(404).json({ success: false, message: 'Lien de suivi invalide ou expiré' });
+      return;
+    }
+    const publicKey = getWebPushPublicKey();
+    if (!publicKey) {
+      res.status(503).json({ success: false, message: 'Web Push non configuré' });
+      return;
+    }
+    res.json({ success: true, publicKey });
+  } catch (error: any) {
+    logger.error('Erreur getTrackVapidPublicKey:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+};
+
+function isValidPushSubscription(
+  body: unknown
+): body is { endpoint: string; keys: { p256dh: string; auth: string } } {
+  if (!body || typeof body !== 'object') return false;
+  const b = body as Record<string, unknown>;
+  if (typeof b.endpoint !== 'string' || !b.keys || typeof b.keys !== 'object') return false;
+  const k = b.keys as Record<string, unknown>;
+  return typeof k.p256dh === 'string' && typeof k.auth === 'string';
+}
+
+/**
+ * POST /api/track/:token/push-subscribe — enregistre un abonnement Web Push pour ce lien.
+ */
+export const postTrackPushSubscribe = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      res.status(400).json({ success: false, message: 'Token requis' });
+      return;
+    }
+    if (!isTrackWebPushConfigured()) {
+      res.status(503).json({ success: false, message: 'Web Push non configuré' });
+      return;
+    }
+    const check = await pool.query(`SELECT 1 FROM orders WHERE tracking_token = $1 LIMIT 1`, [
+      token,
+    ]);
+    if (!check.rows.length) {
+      res.status(404).json({ success: false, message: 'Lien de suivi invalide ou expiré' });
+      return;
+    }
+    if (!isValidPushSubscription(req.body)) {
+      res.status(400).json({ success: false, message: 'Subscription push invalide' });
+      return;
+    }
+    await saveTrackPushSubscription(token, req.body);
+    res.status(201).json({ success: true });
+  } catch (error: any) {
+    logger.error('Erreur postTrackPushSubscribe:', error);
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };

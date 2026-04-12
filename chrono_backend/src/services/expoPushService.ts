@@ -3,7 +3,10 @@ import logger from '../utils/logger.js';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
-function copyForStatus(status: string): { title: string; body: string } | null {
+type AppPushRole = 'client' | 'driver';
+
+/** Statuts notifiés au client qui a passé la commande. */
+function copyForPayerStatus(status: string): { title: string; body: string } | null {
   const s = (status || '').toLowerCase();
   switch (s) {
     case 'accepted':
@@ -14,17 +17,7 @@ function copyForStatus(status: string): { title: string; body: string } | null {
     case 'enroute':
       return {
         title: 'En route',
-        body: 'Le livreur est en route vers le point de retrait.',
-      };
-    case 'picked_up':
-      return {
-        title: 'Colis récupéré',
-        body: 'Votre colis a été récupéré.',
-      };
-    case 'delivering':
-      return {
-        title: 'En livraison',
-        body: 'Le livreur est en route vers vous.',
+        body: 'Le livreur est en route vers le point de collecte de colis.',
       };
     case 'completed':
       return {
@@ -41,48 +34,62 @@ function copyForStatus(status: string): { title: string; body: string } | null {
   }
 }
 
-/**
- * Envoie une notification push Expo aux appareils client enregistrés pour cet utilisateur.
- * Ne bloque pas le flux métier : erreurs loguées seulement.
- */
-export async function notifyClientOrderStatusPush(
-  clientUserId: string,
-  orderId: string,
-  status: string
-): Promise<void> {
-  const copy = copyForStatus(status);
-  if (!copy || !clientUserId || !orderId) return;
+/** Statuts notifiés au destinataire inscrit (compte client distinct du payeur). */
+function copyForRecipientStatus(status: string): { title: string; body: string } | null {
+  const s = (status || '').toLowerCase();
+  switch (s) {
+    case 'picked_up':
+      return {
+        title: 'Colis récupéré',
+        body: 'Votre colis a été récupéré.',
+      };
+    case 'delivering':
+      return {
+        title: 'En livraison',
+        body: 'Le livreur est en route vers vous.',
+      };
+    case 'cancelled':
+      return {
+        title: 'Commande annulée',
+        body: 'Votre commande a été annulée.',
+      };
+    default:
+      return null;
+  }
+}
 
-  if (!process.env.DATABASE_URL) return;
+function truncateBody(text: string, max = 140): string {
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
 
-  let tokens: string[];
+async function fetchTokensForUser(userId: string, appRole: AppPushRole): Promise<string[]> {
+  if (!process.env.DATABASE_URL || !userId) return [];
   try {
     const r = await pool.query<{ expo_push_token: string }>(
       `SELECT expo_push_token FROM push_tokens
-       WHERE user_id = $1 AND app_role = 'client' AND invalidated_at IS NULL`,
-      [clientUserId]
+       WHERE user_id = $1 AND app_role = $2 AND invalidated_at IS NULL`,
+      [userId, appRole]
     );
-    tokens = [...new Set(r.rows.map((row) => row.expo_push_token).filter(Boolean))];
+    return [...new Set(r.rows.map((row) => row.expo_push_token).filter(Boolean))];
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     logger.warn('[expo-push] lecture push_tokens:', msg);
-    return;
+    return [];
   }
+}
 
-  if (!tokens.length) return;
-
-  const normalized = status.toLowerCase();
-  const messages = tokens.map((to) => ({
-    to,
-    sound: 'default' as const,
-    title: copy.title,
-    body: copy.body,
-    data: {
-      type: 'order_status',
-      orderId,
-      status: normalized,
-    },
-  }));
+async function postExpoPush(
+  messages: Array<{
+    to: string;
+    sound: 'default';
+    title: string;
+    body: string;
+    data: Record<string, unknown>;
+  }>
+): Promise<void> {
+  if (!messages.length) return;
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -120,4 +127,107 @@ export async function notifyClientOrderStatusPush(
     const msg = e instanceof Error ? e.message : String(e);
     logger.warn('[expo-push] fetch:', msg);
   }
+}
+
+async function sendPushToUser(
+  userId: string,
+  appRole: AppPushRole,
+  title: string,
+  body: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const tokens = await fetchTokensForUser(userId, appRole);
+  if (!tokens.length) return;
+  const messages = tokens.map((to) => ({
+    to,
+    sound: 'default' as const,
+    title,
+    body,
+    data,
+  }));
+  await postExpoPush(messages);
+}
+
+/**
+ * Push statut commande : payeur (toujours app client) + destinataire inscrit si différent.
+ */
+export async function notifyOrderStatusPushes(params: {
+  orderId: string;
+  status: string;
+  payerUserId: string;
+  recipientUserId?: string | null;
+}): Promise<void> {
+  const { orderId, status, payerUserId, recipientUserId } = params;
+  if (!orderId || !payerUserId) return;
+
+  const normalized = status.toLowerCase();
+  const payerCopy = copyForPayerStatus(normalized);
+  const recipientCopy = copyForRecipientStatus(normalized);
+
+  if (payerCopy) {
+    void sendPushToUser(payerUserId, 'client', payerCopy.title, payerCopy.body, {
+      type: 'order_status',
+      orderId,
+      status: normalized,
+    }).catch((e: unknown) => {
+      logger.warn('[expo-push] payer:', e instanceof Error ? e.message : String(e));
+    });
+  }
+
+  const rid = typeof recipientUserId === 'string' ? recipientUserId.trim() : '';
+  if (recipientCopy && rid && rid !== payerUserId) {
+    void sendPushToUser(rid, 'client', recipientCopy.title, recipientCopy.body, {
+      type: 'order_status',
+      orderId,
+      status: normalized,
+    }).catch((e: unknown) => {
+      logger.warn('[expo-push] recipient:', e instanceof Error ? e.message : String(e));
+    });
+  }
+}
+
+/**
+ * Push lors d’un message dans une conversation liée à une commande (client ↔ livreur).
+ */
+export async function notifyOrderChatMessagePush(params: {
+  conversation: {
+    id: string;
+    type: string;
+    order_id?: string | null;
+    participant_1_id: string;
+    participant_2_id: string;
+  };
+  senderId: string;
+  content: string;
+}): Promise<void> {
+  const { conversation, senderId, content } = params;
+  if (conversation.type !== 'order' || !conversation.order_id) return;
+
+  const recipientId =
+    conversation.participant_1_id === senderId
+      ? conversation.participant_2_id
+      : conversation.participant_1_id;
+
+  if (!recipientId || recipientId === senderId) return;
+
+  let senderRole = '';
+  try {
+    const r = await pool.query<{ role: string }>(`SELECT role FROM users WHERE id = $1 LIMIT 1`, [
+      senderId,
+    ]);
+    senderRole = (r.rows[0]?.role || '').toLowerCase();
+  } catch (e: unknown) {
+    logger.warn('[expo-push] rôle expéditeur:', e instanceof Error ? e.message : String(e));
+    return;
+  }
+
+  const title = senderRole === 'driver' ? 'Message du livreur' : 'Message du client';
+  const body = truncateBody(content);
+  const appRole: AppPushRole = senderRole === 'driver' ? 'client' : 'driver';
+
+  await sendPushToUser(recipientId, appRole, title, body, {
+    type: 'order_chat_message',
+    orderId: conversation.order_id,
+    conversationId: conversation.id,
+  });
 }

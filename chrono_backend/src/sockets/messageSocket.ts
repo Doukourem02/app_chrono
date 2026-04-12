@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import messageService from '../services/messageService.js';
+import { notifyOrderChatMessagePush } from '../services/expoPushService.js';
 import logger from '../utils/logger.js';
 
 interface ExtendedSocket extends Socket {
@@ -152,6 +153,19 @@ export const setupMessageSocket = (io: Server): void => {
             message,
             conversation,
           });
+
+          if (conversation) {
+            void notifyOrderChatMessagePush({
+              conversation,
+              senderId: userId,
+              content: content.trim(),
+            }).catch((e: unknown) => {
+              logger.warn(
+                '[expo-push] order chat socket:',
+                e instanceof Error ? e.message : String(e)
+              );
+            });
+          }
 
           // Confirmer l'envoi à l'expéditeur
           socket.emit('message-sent', {

@@ -19,6 +19,8 @@ interface OrderRequest {
   pickup: {
     address: string;
     coordinates?: { latitude: number; longitude: number }; // Optionnel pour les commandes téléphoniques
+    approximate_pickup_zone_label?: string;
+    pickup_coordinates_are_approximate?: boolean;
   };
   dropoff: {
     address: string;
@@ -34,8 +36,9 @@ interface OrderRequest {
   distance: number;
   estimatedDuration: string;
   createdAt: Date;
-  isPhoneOrder?: boolean; // Indique si la commande a été créée par téléphone/admin
-  isB2BOrder?: boolean; // Indique si la commande est une commande B2B
+  isPhoneOrder?: boolean;
+  placedByAdmin?: boolean;
+  isB2BOrder?: boolean;
   driverNotes?: string; // Notes spéciales pour le livreur
 }
 
@@ -319,8 +322,10 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
           {/* Informations spéciales pour les commandes admin/téléphoniques */}
           <AdminOrderInfo
             isPhoneOrder={order.isPhoneOrder || false}
+            placedByAdmin={order.placedByAdmin}
             isB2BOrder={order.isB2BOrder || false}
             driverNotes={order.driverNotes}
+            approximatePickupZoneLabel={order.pickup?.approximate_pickup_zone_label}
           />
 
           {/* Info de livraison */}

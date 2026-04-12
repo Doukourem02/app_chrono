@@ -1533,6 +1533,8 @@ class AdminApiService {
     isPhoneOrder?: boolean
     isB2BOrder?: boolean
     driverNotes?: string
+    /** Commune / zone du retrait si commande téléphonique sans GPS (centroïde côté serveur pour matching livreurs) */
+    approximatePickupZone?: string
   }): Promise<{
     success: boolean
     data?: { id: string }

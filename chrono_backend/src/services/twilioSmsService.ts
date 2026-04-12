@@ -100,3 +100,87 @@ export async function sendOTPSMSTwilio(
     return { success: false, error: msg };
   }
 }
+
+const TRANSACTIONAL_SMS_MAX = 1500;
+
+/**
+ * SMS transactionnel (hors OTP) — suivi commande, alertes. Même config Twilio que l’OTP.
+ */
+export async function sendTransactionalSMSTwilio(
+  phone: string,
+  body: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const fromRaw = process.env.TWILIO_SMS_FROM?.trim();
+  const messagingServiceSid = process.env.TWILIO_SMS_MESSAGING_SERVICE_SID?.trim();
+
+  if (!accountSid || !authToken) {
+    return { success: false, error: 'TWILIO_ACCOUNT_SID ou TWILIO_AUTH_TOKEN manquant' };
+  }
+  if (!fromRaw && !messagingServiceSid) {
+    return {
+      success: false,
+      error:
+        'TWILIO_SMS_FROM (numéro E.164) ou TWILIO_SMS_MESSAGING_SERVICE_SID requis pour les SMS',
+    };
+  }
+
+  const to = normalizeToE164(phone);
+  if (!to) {
+    return { success: false, error: 'Numéro de téléphone invalide pour SMS' };
+  }
+
+  const text = body.replace(/\s+/g, ' ').trim().slice(0, TRANSACTIONAL_SMS_MAX);
+  if (!text) {
+    return { success: false, error: 'Message vide' };
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const bodyParams = new URLSearchParams();
+
+  if (messagingServiceSid) {
+    bodyParams.set('MessagingServiceSid', messagingServiceSid);
+  } else if (fromRaw) {
+    const fromNorm = fromRaw.startsWith('+')
+      ? fromRaw
+      : `+${fromRaw.replace(/\D/g, '')}`;
+    bodyParams.set('From', fromNorm);
+  }
+
+  bodyParams.set('To', to);
+  bodyParams.set('Body', text);
+
+  const auth = Buffer.from(`${accountSid}:${authToken}`, 'utf8').toString('base64');
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: bodyParams.toString(),
+    });
+
+    const data = (await res.json()) as {
+      sid?: string;
+      message?: string;
+      code?: number;
+      more_info?: string;
+    };
+
+    if (!res.ok) {
+      const err = data.message || data.more_info || `Twilio HTTP ${res.status}`;
+      logger.error('Twilio SMS transactionnel error:', err, data);
+      return { success: false, error: err };
+    }
+
+    logger.info(`SMS transactionnel Twilio vers ${to}, sid=${data.sid}`);
+    return { success: true, messageId: data.sid };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Erreur réseau Twilio SMS';
+    logger.error('Twilio SMS transactionnel fetch error:', e);
+    return { success: false, error: msg };
+  }
+}

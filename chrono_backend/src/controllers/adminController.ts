@@ -5,10 +5,11 @@ import pool from '../config/db.js';
 import { saveOrder, generateAndSaveTrackingToken } from '../config/orderStorage.js';
 import qrCodeService from '../services/qrCodeService.js';
 import { broadcastOrderUpdateToAdmins } from '../sockets/adminSocket.js';
-import { notifyDriversForOrder } from '../sockets/orderSocket.js';
+import { activeOrders, connectedUsers, notifyDriversForOrder } from '../sockets/orderSocket.js';
 import { formatDeliveryId } from '../utils/formatDeliveryId.js';
 import { geocodeAddress } from '../utils/geocodeService.js';
 import logger from '../utils/logger.js';
+import { resolveApproximatePickupZone } from '../utils/abidjanApproximatePickupZones.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -3593,7 +3594,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
 
     // Récupérer les informations du client
     const clientResult = await (pool as any).query(
-      'SELECT id, email, phone, first_name, last_name FROM users WHERE id = $1 AND role = $2',
+      'SELECT id, email, phone, first_name, last_name, avatar_url FROM users WHERE id = $1 AND role = $2',
       [userId, 'client']
     );
 
@@ -3609,6 +3610,18 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     const clientName = client.first_name && client.last_name
       ? `${client.first_name} ${client.last_name}`
       : client.email;
+
+    /** Numéro saisi par l’admin (obligatoire) — ex. celui avec lequel le client a joint l’opérateur */
+    const recipientPhoneInput =
+      typeof dropoff?.details?.phone === 'string' ? dropoff.details.phone.trim() : '';
+    if (!recipientPhoneInput) {
+      res.status(400).json({
+        success: false,
+        message:
+          'Le numéro de téléphone de contact est obligatoire : saisissez-le dans le formulaire (numéro du client pour cette course).',
+      });
+      return;
+    }
 
     // Géocoder les adresses si les coordonnées ne sont pas fournies
     let pickupCoords = pickup.coordinates && pickup.coordinates.latitude && pickup.coordinates.longitude
@@ -3643,6 +3656,27 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       }
     }
 
+    /** Rempli si le retrait n’a pas de GPS mais une commune/zone CI (commande téléphonique) */
+    let pickupFromApproximateZone: { id: string; labelFr: string } | null = null;
+    if (isPhoneOrderBool && !pickupCoords) {
+      const rawZone =
+        typeof req.body.approximatePickupZone === 'string' ? req.body.approximatePickupZone : '';
+      const resolved = resolveApproximatePickupZone(rawZone);
+      if (!resolved) {
+        res.status(400).json({
+          success: false,
+          message:
+            'Pour une commande téléphonique sans position GPS au retrait, sélectionnez la commune ou zone du client afin de proposer la course aux livreurs à proximité.',
+        });
+        return;
+      }
+      pickupCoords = { latitude: resolved.latitude, longitude: resolved.longitude };
+      pickupFromApproximateZone = {
+        id: rawZone.trim().toLowerCase(),
+        labelFr: resolved.labelFr,
+      };
+    }
+
     // Calculer la durée estimée
     const avgSpeeds: { [key: string]: number } = {
       moto: 25,
@@ -3658,24 +3692,48 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
 
     // Créer l'objet order
     const orderId = uuidv4();
+    /** Persisté dans pickup/dropoff (JSON) pour que le livreur voie « hors-ligne / opérateur » après resync */
+    const chrono_admin = {
+      placed_by_admin: true,
+      is_phone_order: isPhoneOrderBool,
+      is_b2b_order: isB2BOrder === true,
+    };
+    const dropoffDetailsMerged = {
+      ...(typeof dropoff.details === 'object' && dropoff.details ? dropoff.details : {}),
+      phone: recipientPhoneInput,
+    };
+
     const order = {
       id: orderId,
       user: {
         id: client.id,
         name: clientName,
+        first_name: client.first_name || undefined,
+        last_name: client.last_name || undefined,
         phone: client.phone || undefined,
         email: client.email,
+        avatar: client.avatar_url || undefined,
+        rating: 4.5,
       },
       pickup: {
         address: pickup.address,
         coordinates: pickupCoords || undefined,
+        _chrono_admin: chrono_admin,
+        ...(pickupFromApproximateZone
+          ? {
+              approximate_pickup_zone: pickupFromApproximateZone.id,
+              approximate_pickup_zone_label: pickupFromApproximateZone.labelFr,
+              pickup_coordinates_are_approximate: true,
+            }
+          : {}),
       },
       dropoff: {
         address: dropoff.address,
         coordinates: dropoffCoords || undefined,
-        details: dropoff.details || undefined,
+        details: dropoffDetailsMerged,
+        _chrono_admin: chrono_admin,
       },
-      recipient: dropoff.details?.phone ? { phone: dropoff.details.phone } : null,
+      recipient: { phone: recipientPhoneInput },
       packageImages: [],
       price: Math.round(price),
       deliveryMethod,
@@ -3709,7 +3767,10 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
 
       // Générer le token de suivi public et le QR code de livraison
       try {
-        await generateAndSaveTrackingToken(orderId);
+        const trackingToken = await generateAndSaveTrackingToken(orderId);
+        if (trackingToken) {
+          (order as { trackingToken?: string }).trackingToken = trackingToken;
+        }
         const recipientName = order.recipient?.phone ? `Destinataire (${order.recipient.phone})` : (order.dropoff?.details?.phone ? `Destinataire (${order.dropoff.details.phone})` : 'Destinataire');
         const recipientPhone = order.recipient?.phone || order.dropoff?.details?.phone || '';
         const creatorName = (order.user as any)?.name || 'Client';
@@ -3720,8 +3781,24 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
         logger.warn(`[createAdminOrder] Échec tracking_token/QR pour ${orderId}:`, qrErr?.message);
       }
 
-      // Diffuser la nouvelle commande aux admins via Socket.IO
+      // Aligné sur create-order (socket) : mémoire serveur + événement client pour suivi temps réel
+      activeOrders.set(order.id, order);
       const io = (req.app as any).get('io') as SocketIOServer | undefined;
+      if (io) {
+        const userSocketId = connectedUsers.get(userId);
+        if (userSocketId) {
+          io.to(userSocketId).emit('order-created', {
+            success: true,
+            order,
+            dbSaved: true,
+            dbError: null,
+            message: 'Commande créée, recherche de chauffeur...',
+          });
+          logger.info(`[createAdminOrder] order-created émis au client pour ${orderId}`);
+        }
+      }
+
+      // Diffuser la nouvelle commande aux admins via Socket.IO
       if (io) {
         broadcastOrderUpdateToAdmins(io, 'order:created', { order });
         
@@ -3742,8 +3819,9 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
             logger.warn(`[createAdminOrder] Erreur notification livreurs pour commande B2B ${orderId}:`, error);
           });
         } else if (isPhoneOrderBool) {
-          // Pour les commandes téléphoniques normales (hors-ligne), notifier aussi les livreurs
-          logger.info(`[createAdminOrder] Commande téléphonique ${orderId} - notification de tous les livreurs disponibles`);
+          logger.info(
+            `[createAdminOrder] Commande téléphonique ${orderId} - notification livreurs (proche du retrait: ${finalPickupCoords?.latitude != null ? `${finalPickupCoords.latitude},${finalPickupCoords.longitude}` : 'aucune coord.'})`
+          );
           notifyDriversForOrder(io, order, finalPickupCoords, deliveryMethod).catch((error) => {
             logger.warn(`[createAdminOrder] Erreur notification livreurs pour commande téléphonique ${orderId}:`, error);
           });

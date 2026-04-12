@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../types/index.js';
 import messageService from '../services/messageService.js';
+import { notifyOrderChatMessagePush } from '../services/expoPushService.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -242,6 +243,16 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
       io.to(`conversation:${conversationId}`).emit('new-message', {
         message,
         conversation,
+      });
+    }
+
+    if (conversation) {
+      void notifyOrderChatMessagePush({
+        conversation,
+        senderId: userId,
+        content: content.trim(),
+      }).catch((e: unknown) => {
+        logger.warn('[expo-push] order chat REST:', e instanceof Error ? e.message : String(e));
       });
     }
 

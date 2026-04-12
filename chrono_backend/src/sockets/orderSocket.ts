@@ -10,7 +10,7 @@ import { broadcastDriverStatusToAdmins, broadcastOrderUpdateToAdmins } from './a
 import { realDriverStatuses, rehydrateDriverStatusFromDb } from '../controllers/driverController.js';
 import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
-import { notifyClientOrderStatusPush } from '../services/expoPushService.js';
+import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
 import { autoLogDeliveryMileage } from '../controllers/fleetController.js';
 import logger from '../utils/logger.js';
 import { computeOrderPriceCfa } from '../services/priceCalculator.js';
@@ -1313,9 +1313,13 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 
       if (DEBUG) logger.debug(`Commande ${maskOrderId(orderId)} acceptée par driver ${maskUserId(driverId)}`);
 
-      void notifyClientOrderStatusPush(order.user.id, orderId, 'accepted').catch((e: unknown) => {
+      void notifyAllForOrderStatus({
+        orderId,
+        status: 'accepted',
+        payerUserId: order.user.id,
+      }).catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : String(e);
-        logger.warn('[expo-push] accept-order:', msg);
+        logger.warn('[recipient-notify] accept-order:', msg);
       });
 
       // Créer automatiquement une conversation pour cette commande
@@ -1671,9 +1675,13 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           );
         }
 
-        void notifyClientOrderStatusPush(order.user.id, orderId, status).catch((e: unknown) => {
+        void notifyAllForOrderStatus({
+          orderId,
+          status,
+          payerUserId: order.user.id,
+        }).catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e);
-          logger.warn('[expo-push] update-delivery-status:', msg);
+          logger.warn('[recipient-notify] update-delivery-status:', msg);
         });
 
         // Diffuser aux admins
