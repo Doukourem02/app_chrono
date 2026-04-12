@@ -1,12 +1,10 @@
 import { io, Socket } from 'socket.io-client'
+import config from '@/lib/config'
 import { logger } from '@/utils/logger'
 import { Message, Conversation } from './adminMessageService'
 import { supabase } from '@/lib/supabase'
 
-const SOCKET_URL = 
-  process.env.NEXT_PUBLIC_SOCKET_URL || 
-  process.env.EXPO_PUBLIC_SOCKET_URL ||
-  'http://localhost:4000'
+const SOCKET_URL = config.socketUrl
 
 class AdminMessageSocketService {
   private socket: Socket | null = null

@@ -1,12 +1,9 @@
 import { supabase } from './supabase'
+import config from './config'
 import { logger } from '@/utils/logger'
 import type { Driver } from '@/types'
 
-
-const API_BASE_URL = 
-  process.env.NEXT_PUBLIC_API_URL || 
-  process.env.EXPO_PUBLIC_API_URL ||
-  'http://localhost:4000'
+const API_BASE_URL = config.apiUrl
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {

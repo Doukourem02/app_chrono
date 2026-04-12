@@ -1,6 +1,7 @@
 /**
  * Utilitaires météo pour admin_chrono
  */
+import config from '@/lib/config'
 import { logger } from './logger'
 
 export interface WeatherData {
@@ -28,7 +29,7 @@ export async function fetchWeatherData(
   vehicleType?: 'moto' | 'vehicule' | 'cargo' | null
 ): Promise<{ weather: WeatherData; adjustment: WeatherAdjustment; isDifficult: boolean } | null> {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const apiUrl = config.apiUrl;
     const url = `${apiUrl}/api/weather/${latitude}/${longitude}${vehicleType ? `?vehicleType=${vehicleType}` : ''}`;
     
     const response = await fetch(url);

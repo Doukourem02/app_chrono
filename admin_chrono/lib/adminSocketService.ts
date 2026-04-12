@@ -1,8 +1,9 @@
 import { io, Socket } from 'socket.io-client'
+import config from './config'
 import { supabase } from './supabase'
 import { logger } from '@/utils/logger'
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
+const SOCKET_URL = config.socketUrl
 
 // Interface pour les données de commande reçues via Socket.IO
 interface SocketOrder {

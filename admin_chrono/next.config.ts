@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import path from "path";
 import { loadEnvConfig } from "@next/env";
+import { PRODUCTION_API_BASE_URL } from "./lib/productionApiBase";
 
 // Charger .env.local avant de lire NEXT_PUBLIC_DEV_ORIGIN (origine LAN pour HMR / allowedDevOrigins)
 loadEnvConfig(path.resolve(__dirname));
@@ -120,8 +121,11 @@ const nextConfig: NextConfig = {
       })
     }
 
-    // Extraire l'URL de l'API depuis les variables d'environnement
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+    // Même résolution que `lib/config.ts` (import uniquement de l’URL prod, sans lecture d’env au chargement).
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.EXPO_PUBLIC_API_URL ||
+      PRODUCTION_API_BASE_URL
     
     // Construire les directives connect-src pour l'API backend
     const connectSrcDirectives = [

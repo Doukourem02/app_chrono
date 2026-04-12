@@ -1,9 +1,18 @@
 import { logger } from '@/utils/logger'
+import { PRODUCTION_API_BASE_URL } from './productionApiBase'
+
+export { PRODUCTION_API_BASE_URL }
 
 export const config = {
   // API Configuration
-  apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
-  socketUrl: process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000',
+  apiUrl:
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.EXPO_PUBLIC_API_URL ||
+    PRODUCTION_API_BASE_URL,
+  socketUrl:
+    process.env.NEXT_PUBLIC_SOCKET_URL ||
+    process.env.EXPO_PUBLIC_SOCKET_URL ||
+    PRODUCTION_API_BASE_URL,
   mapboxAccessToken: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '',
   
   // App Configuration

@@ -1,10 +1,8 @@
 import { supabase } from '@/lib/supabase'
+import config from '@/lib/config'
 import { logger } from '@/utils/logger'
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.EXPO_PUBLIC_API_URL ||
-  'http://localhost:4000'
+const API_BASE_URL = config.apiUrl
 
 export interface Conversation {
   id: string

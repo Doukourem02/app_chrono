@@ -40,7 +40,7 @@ Créez un fichier `.env.local` à la racine du projet :
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# API Backend
+# API Backend (en local, pointe vers chrono_backend ; sans ces variables, l’admin utilise l’API prod définie dans `lib/productionApiBase.ts`)
 NEXT_PUBLIC_API_URL=http://localhost:4000
 NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
 

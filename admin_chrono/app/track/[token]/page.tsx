@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import config from '@/lib/config'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+const API_URL = config.apiUrl
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'En attente de livreur',

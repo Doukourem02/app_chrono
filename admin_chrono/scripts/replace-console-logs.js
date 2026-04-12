@@ -4,11 +4,9 @@
  * Usage: node scripts/replace-console-logs.js
  */
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 const filesToProcess = execSync(
   'find . -name "*.ts" -o -name "*.tsx" | grep -v node_modules | grep -v ".next"',
