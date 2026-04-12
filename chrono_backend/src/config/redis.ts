@@ -8,6 +8,19 @@
 import { createClient, RedisClientType } from 'redis';
 import logger from '../utils/logger.js';
 
+/** Trim + retire guillemets souvent collés par copier-coller / Render. */
+function normalizeRedisUrl(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  let u = raw.trim();
+  if (
+    (u.startsWith('"') && u.endsWith('"')) ||
+    (u.startsWith("'") && u.endsWith("'"))
+  ) {
+    u = u.slice(1, -1).trim();
+  }
+  return u || undefined;
+}
+
 let pubClient: RedisClientType | null = null;
 let subClient: RedisClientType | null = null;
 let isRedisAvailable = false;
@@ -21,12 +34,20 @@ export async function initializeRedis(): Promise<{
   subClient: RedisClientType | null;
   isAvailable: boolean;
 }> {
-  const redisUrl = process.env.REDIS_URL;
+  const redisUrl = normalizeRedisUrl(process.env.REDIS_URL);
 
   // Si REDIS_URL n'est pas configuré, fonctionner sans Redis (mode standalone)
   if (!redisUrl) {
     logger.warn('⚠️  REDIS_URL non configuré - Socket.IO fonctionnera en mode standalone (non scalable)');
     logger.info('💡 Pour activer le scaling horizontal, configurez REDIS_URL');
+    return { pubClient: null, subClient: null, isAvailable: false };
+  }
+
+  if (/^https?:\/\//i.test(redisUrl)) {
+    logger.error(
+      'REDIS_URL est une URL HTTP(S) (ex. REST Upstash). Le client Redis attend une URL TCP du type rediss://default:TOKEN@host:6379 (onglet TCP sur Upstash).',
+    );
+    logger.warn('⚠️  Socket.IO fonctionnera en mode standalone (non scalable)');
     return { pubClient: null, subClient: null, isAvailable: false };
   }
 
@@ -89,7 +110,13 @@ export async function initializeRedis(): Promise<{
 
     return { pubClient, subClient, isAvailable: true };
   } catch (error: any) {
-    logger.error('❌ Erreur lors de l\'initialisation Redis:', error.message);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Erreur lors de l\'initialisation Redis', { error: errMsg });
+    if (/invalid url/i.test(errMsg)) {
+      logger.warn(
+        'Astuce Invalid URL : pas de guillemets dans REDIS_URL sur Render, utiliser l’URL TCP rediss:// (Upstash → Connect → TCP), et encoder les caractères spéciaux du mot de passe dans l’URL si besoin.',
+      );
+    }
     logger.warn('⚠️  Socket.IO fonctionnera en mode standalone (non scalable)');
     
     // Nettoyer les clients en cas d'erreur
@@ -122,7 +149,8 @@ export async function closeRedis(): Promise<void> {
       logger.info('Redis Subscriber fermé');
     }
   } catch (error: any) {
-    logger.error('Erreur lors de la fermeture Redis:', error.message);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Erreur lors de la fermeture Redis', { error: errMsg });
   }
 }
 

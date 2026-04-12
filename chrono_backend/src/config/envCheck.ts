@@ -89,7 +89,7 @@ export function validateEnvironment(): void {
 
     if (!process.env.DATABASE_URL?.trim()) {
       warnings.push(
-        'DATABASE_URL absent : PostgreSQL désactivé (pool mock). Voir PRODUCTION_CHECKLIST.md — §1 Base de données.'
+        'DATABASE_URL absent : PostgreSQL désactivé (pool mock). Définir DATABASE_URL (Supabase → Database → connection string).'
       );
     }
     if (
@@ -97,22 +97,22 @@ export function validateEnvironment(): void {
       !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
     ) {
       warnings.push(
-        'Supabase admin incomplet : définir SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY pour le dashboard admin. Voir PRODUCTION_CHECKLIST.md — §4.'
+        'Supabase admin incomplet : définir SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY pour le dashboard admin.'
       );
     }
     if (!process.env.SENTRY_DSN?.trim()) {
       warnings.push(
-        'SENTRY_DSN absent : monitoring d’erreurs désactivé. Voir PRODUCTION_CHECKLIST.md — §3.'
+        'SENTRY_DSN absent : monitoring d’erreurs désactivé.'
       );
     }
     if (!process.env.REDIS_URL?.trim()) {
       warnings.push(
-        'REDIS_URL absent : Socket.IO mono-instance uniquement (pas de scale horizontal). Voir PRODUCTION_CHECKLIST.md — §2.'
+        'REDIS_URL absent : Socket.IO mono-instance uniquement (pas de scale horizontal).'
       );
     }
     if (!process.env.SLACK_WEBHOOK_URL?.trim()) {
       warnings.push(
-        'SLACK_WEBHOOK_URL absent : notifications Slack désactivées. Voir PRODUCTION_CHECKLIST.md — §3.'
+        'SLACK_WEBHOOK_URL absent : notifications Slack désactivées.'
       );
     }
   }
