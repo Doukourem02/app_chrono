@@ -7,6 +7,44 @@ import { verifyAccessToken } from '../utils/jwt.js';
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+function isTransientPgError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const code = typeof (error as { code?: string }).code === 'string' ? (error as { code: string }).code : '';
+  return (
+    /timeout/i.test(msg) ||
+    /Connection terminated/i.test(msg) ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ENOTFOUND'
+  );
+}
+
+async function queryAdminUserFromPool(userId: string, email: string) {
+  const maxAttempts = Math.min(
+    Math.max(1, parseInt(process.env.ADMIN_PG_ROLE_QUERY_ATTEMPTS || '3', 10)),
+    5,
+  );
+  const baseDelayMs = parseInt(process.env.ADMIN_PG_ROLE_QUERY_RETRY_MS || '250', 10);
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await (pool as any).query('SELECT id, role FROM users WHERE id = $1 OR email = $2', [
+        userId,
+        email,
+      ]);
+    } catch (dbError) {
+      lastError = dbError;
+      if (attempt < maxAttempts && isTransientPgError(dbError)) {
+        await new Promise((r) => setTimeout(r, baseDelayMs * attempt));
+        continue;
+      }
+      throw dbError;
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Middleware pour vérifier les tokens Supabase et le rôle admin
  * Utilisé pour l'admin dashboard qui utilise Supabase Auth
@@ -96,10 +134,7 @@ export const verifyAdminSupabase = async (
     let dbUser: any = null;
     
     try {
-      const result = await (pool as any).query(
-        'SELECT id, role FROM users WHERE id = $1 OR email = $2',
-        [user.id, user.email]
-      );
+      const result = await queryAdminUserFromPool(user.id, user.email ?? '');
 
       if (result.rows.length > 0) {
         dbUser = result.rows[0];

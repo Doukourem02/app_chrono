@@ -61,7 +61,11 @@ if (process.env.NODE_ENV === 'production' && betterStackToken) {
   logger.add(new LogtailTransport(logtail));
 }
 
-if (process.env.NODE_ENV !== 'production') {
+// En prod (Render, etc.) seul stdout est visible dans l’UI « Logs » — sans Console, les
+// messages Winston (Redis, Socket.IO, pool PG…) n’y apparaissent pas.
+if (process.env.NODE_ENV === 'production') {
+  logger.add(new winston.transports.Console());
+} else {
   logger.add(
     new winston.transports.Console({
       format: winston.format.combine(

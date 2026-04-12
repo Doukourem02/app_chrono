@@ -23,8 +23,8 @@ if (process.env.DATABASE_URL) {
       // Temps d'inactivité avant fermeture d'une connexion (30 secondes)
       idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT || '30000', 10),
       
-      // Timeout pour obtenir une connexion du pool (10 secondes par défaut)
-      connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT || '10000', 10),
+      // Timeout pour obtenir une connexion du pool (25 s par défaut — cold start Supabase / Render souvent > 10 s)
+      connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT || '25000', 10),
       
       // Temps maximum d'exécution d'une requête (30 secondes)
       query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || '30000', 10),
@@ -56,16 +56,37 @@ if (process.env.DATABASE_URL) {
       logger.debug('Connexion retirée du pool');
     });
 
-    // Test de connexion initial
-    pool.query('SELECT 1', (err) => {
-      if (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        const errorCode = (err as any)?.code || undefined;
-        logger.warn(' Test de connexion PostgreSQL échoué:', { error: errorMessage, code: errorCode });
-      } else {
-        logger.info(`Pool PostgreSQL initialisé (max: ${poolConfig.max}, min: ${poolConfig.min})`);
+    // Test de connexion initial (plusieurs essais : la DB peut être lente au premier contact après déploiement)
+    const verifyAttempts = parseInt(process.env.DB_POOL_VERIFY_ATTEMPTS || '4', 10);
+    const verifyRetryDelayMs = parseInt(process.env.DB_POOL_VERIFY_RETRY_DELAY_MS || '3000', 10);
+    void (async () => {
+      let lastErr: unknown;
+      for (let attempt = 1; attempt <= verifyAttempts; attempt++) {
+        try {
+          await pool!.query('SELECT 1');
+          logger.info(`Pool PostgreSQL initialisé (max: ${poolConfig.max}, min: ${poolConfig.min})`);
+          return;
+        } catch (err) {
+          lastErr = err;
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          const errorCode = (err as { code?: string })?.code;
+          if (attempt < verifyAttempts) {
+            logger.warn(
+              `Test PostgreSQL échoué (essai ${attempt}/${verifyAttempts}), nouvel essai dans ${verifyRetryDelayMs} ms`,
+              { error: errorMessage, code: errorCode },
+            );
+            await new Promise((r) => setTimeout(r, verifyRetryDelayMs));
+          }
+        }
       }
-    });
+      const errorMessage = lastErr instanceof Error ? lastErr.message : String(lastErr);
+      const errorCode = (lastErr as { code?: string })?.code;
+      logger.warn(' Test de connexion PostgreSQL échoué après tous les essais:', {
+        error: errorMessage,
+        code: errorCode,
+        attempts: verifyAttempts,
+      });
+    })();
 
     // Monitoring du pool (optionnel, seulement en développement)
     if (process.env.NODE_ENV === 'development' && process.env.DEBUG_DB_POOL === 'true') {
