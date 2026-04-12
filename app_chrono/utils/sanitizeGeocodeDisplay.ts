@@ -12,9 +12,18 @@ export function sanitizeGeocodeDisplayString(raw: string): string {
   return s;
 }
 
-/** Une seule ligne lisible : pas de collage « deux adresses » dans un champ. */
+/**
+ * Une seule ligne lisible : pas de collage « deux adresses » dans un champ
+ * (flèches → ou motif « … à: … »). Les espaces à l’intérieur d’une adresse
+ * (« Rue Panama City 772 », « Pharmacie Saint Gabriel ») sont conservés.
+ * On ne fait pas trim() en fin de chaîne pendant la saisie, sinon l’espace
+ * après le dernier mot disparaît et on ne peut plus enchaîner le mot suivant.
+ */
 export function singleLineAddressInput(text: string): string {
-  const oneLine = text.replace(/\r\n|\r|\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  const oneLine = text
+    .replace(/\r\n|\r|\n/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^\s+/, '');
   const arrowSplit = oneLine.split(/\s*[→➔>]\s*/);
   if (arrowSplit.length > 1) return arrowSplit[0].trim();
   const deA = oneLine.match(/^(.+?)\s+(?:à|À):\s*(.+)$/);

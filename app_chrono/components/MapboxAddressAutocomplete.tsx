@@ -3,7 +3,16 @@
  * Combine Search Box + Geocoding + Nominatim pour rues, adresses, POI visibles sur la carte
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {ActivityIndicator,Modal,Pressable,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { config } from '../config';
 import { logger } from '../utils/logger';
@@ -198,7 +207,6 @@ export default function MapboxAddressAutocomplete({
 }: Props) {
   const [query, setQuery] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<MapboxSuggestion[]>([]);
-  const [loading, setLoading] = useState(false);
   const [sessionToken] = useState(() => generateSessionToken());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accessToken = config.mapboxAccessToken;
@@ -231,7 +239,6 @@ export default function MapboxAddressAutocomplete({
         return;
       }
 
-      setLoading(true);
       try {
         const baseParams = { country, language: 'fr', proximity };
         const extraTypes = isNumericQuery(trimmed) ? 'postcode,address' : undefined;
@@ -449,8 +456,6 @@ export default function MapboxAddressAutocomplete({
       } catch (err) {
         logger.error('Mapbox suggest error', 'MapboxAddressAutocomplete', err);
         setSuggestions([]);
-      } finally {
-        setLoading(false);
       }
     },
     [accessToken, sessionToken, country, proximity]
@@ -464,7 +469,7 @@ export default function MapboxAddressAutocomplete({
       if (debounceRef.current) clearTimeout(debounceRef.current);
       const minLen = isNumericQuery(text) ? 1 : 2;
       if (text.trim().length >= minLen) {
-        debounceRef.current = setTimeout(() => fetchSuggestions(text), 450);
+        debounceRef.current = setTimeout(() => fetchSuggestions(text), 300);
       }
     },
     [fetchSuggestions]
@@ -605,7 +610,6 @@ export default function MapboxAddressAutocomplete({
           onFocus={onFocus}
           onBlur={onBlur}
         />
-        {loading && <ActivityIndicator size="small" color="#8B5CF6" />}
       </View>
 
       {showSuggestions &&

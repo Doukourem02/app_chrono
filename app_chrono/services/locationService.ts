@@ -71,12 +71,46 @@ class LocationService {
     }
   }
 
+  private applyCoordsToStoreAndNotify(coords: LocationCoords): void {
+    this.lastKnownLocation = coords;
+    this.notifyListeners(coords);
+    const prev = useLocationStore.getState().currentLocation;
+    useLocationStore.getState().setCurrentLocation({
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      address: prev?.address,
+    });
+  }
+
+  /**
+   * Dernière position connue du système (souvent immédiate) + raffinement GPS en arrière-plan.
+   * Réduit le temps avant la première position exploitable (le header n’affiche plus d’état de chargement).
+   */
+  private scheduleGpsRefinement(forceHighestAccuracy: boolean): void {
+    void Location.getCurrentPositionAsync({
+      accuracy: forceHighestAccuracy ? Location.Accuracy.Highest : Location.Accuracy.Balanced,
+    })
+      .then(async (loc) => {
+        const refined: LocationCoords = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          accuracy: loc.coords.accuracy || undefined,
+          timestamp: Date.now(),
+        };
+        this.applyCoordsToStoreAndNotify(refined);
+        await this.reverseGeocode(refined);
+      })
+      .catch((err) => {
+        logger.debug('GPS refinement skipped or failed', 'locationService', { err });
+      });
+  }
+
   /**
    * Obtient la position actuelle (avec cache si récente)
    */
   async getCurrentPosition(forceRefresh = false): Promise<LocationCoords | null> {
     try {
-      // Vérifier le cache si on ne force pas le rafraîchissement
+      // Cache mémoire récent : retour immédiat
       if (!forceRefresh && this.lastKnownLocation) {
         const age = Date.now() - this.lastKnownLocation.timestamp;
         if (age < this.CACHE_EXPIRY) {
@@ -93,9 +127,29 @@ class LocationService {
         }
       }
 
-      // Haute précision pour obtenir l'adresse exacte (rue, numéro)
+      // Pas de raccourci « last known OS » si l’utilisateur force un vrai fix
+      if (!forceRefresh) {
+        try {
+          const lk = await Location.getLastKnownPositionAsync({ maxAge: 10 * 60 * 1000 });
+          if (lk?.coords) {
+            const quick: LocationCoords = {
+              latitude: lk.coords.latitude,
+              longitude: lk.coords.longitude,
+              accuracy: lk.coords.accuracy || undefined,
+              timestamp: Date.now(),
+            };
+            this.applyCoordsToStoreAndNotify(quick);
+            this.scheduleGpsRefinement(false);
+            logger.debug('Returned OS last-known position; GPS refinement scheduled', 'locationService');
+            return quick;
+          }
+        } catch {
+          /* pas de snapshot OS — fix GPS classique */
+        }
+      }
+
       const location = await Location.getCurrentPositionAsync({
-        accuracy: forceRefresh ? Location.Accuracy.Highest : Location.Accuracy.High,
+        accuracy: forceRefresh ? Location.Accuracy.Highest : Location.Accuracy.Balanced,
       });
 
       const coords: LocationCoords = {
@@ -105,14 +159,7 @@ class LocationService {
         timestamp: Date.now(),
       };
 
-      this.lastKnownLocation = coords;
-      this.notifyListeners(coords);
-      
-      // Mettre à jour le store
-      useLocationStore.getState().setCurrentLocation({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
+      this.applyCoordsToStoreAndNotify(coords);
 
       return coords;
     } catch (error) {
