@@ -231,6 +231,7 @@ class ApiService {
     is_available?: boolean;
     current_latitude?: number;
     current_longitude?: number;
+    heading_degrees?: number;
   }): Promise<{
     success: boolean;
     message?: string;
@@ -330,14 +331,25 @@ class ApiService {
   }
 
   // Mettre à jour seulement la position du chauffeur
-  async updateDriverLocation(userId: string, latitude: number, longitude: number): Promise<{
+  async updateDriverLocation(
+    userId: string,
+    latitude: number,
+    longitude: number,
+    headingDegrees?: number
+  ): Promise<{
     success: boolean;
     message?: string;
   }> {
     try {
       return await this.updateDriverStatus(userId, {
         current_latitude: latitude,
-        current_longitude: longitude
+        current_longitude: longitude,
+        ...(headingDegrees != null &&
+        Number.isFinite(headingDegrees) &&
+        headingDegrees >= 0 &&
+        headingDegrees <= 360
+          ? { heading_degrees: headingDegrees }
+          : {}),
       });
     } catch (error) {
       logger.error('Erreur updateDriverLocation:', 'apiService', error);

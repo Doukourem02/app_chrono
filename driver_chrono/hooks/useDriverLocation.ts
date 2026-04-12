@@ -6,6 +6,8 @@ export interface DriverLocation {
   latitude: number;
   longitude: number;
   accuracy?: number;
+  /** Cap en degrés (0–360, horaire depuis le nord), si le GPS le fournit */
+  heading?: number;
 }
 
 /**
@@ -51,12 +53,25 @@ export const useDriverLocation = (isOnline: boolean) => {
           return;
         }
 
-        const apply = (lat: number, lng: number, accuracy?: number) => {
+        const apply = (
+          lat: number,
+          lng: number,
+          accuracy?: number,
+          heading?: number | null
+        ) => {
           if (cancelled) return;
+          const h =
+            heading != null &&
+            Number.isFinite(heading) &&
+            heading >= 0 &&
+            heading <= 360
+              ? heading
+              : undefined;
           setLocation({
             latitude: lat,
             longitude: lng,
             accuracy: accuracy ?? undefined,
+            ...(h !== undefined ? { heading: h } : {}),
           });
           setError(null);
         };
@@ -68,7 +83,8 @@ export const useDriverLocation = (isOnline: boolean) => {
             apply(
               last.coords.latitude,
               last.coords.longitude,
-              last.coords.accuracy ?? undefined
+              last.coords.accuracy ?? undefined,
+              last.coords.heading ?? undefined
             );
           }
         } catch {
@@ -83,7 +99,8 @@ export const useDriverLocation = (isOnline: boolean) => {
           apply(
             current.coords.latitude,
             current.coords.longitude,
-            current.coords.accuracy ?? undefined
+            current.coords.accuracy ?? undefined,
+            current.coords.heading ?? undefined
           );
         } catch {
           try {
@@ -93,7 +110,8 @@ export const useDriverLocation = (isOnline: boolean) => {
             apply(
               low.coords.latitude,
               low.coords.longitude,
-              low.coords.accuracy ?? undefined
+              low.coords.accuracy ?? undefined,
+              low.coords.heading ?? undefined
             );
           } catch {
             /* le watch peut fournir la 1re position */
@@ -110,7 +128,8 @@ export const useDriverLocation = (isOnline: boolean) => {
             apply(
               newLocation.coords.latitude,
               newLocation.coords.longitude,
-              newLocation.coords.accuracy ?? undefined
+              newLocation.coords.accuracy ?? undefined,
+              newLocation.coords.heading ?? undefined
             );
           }
         );

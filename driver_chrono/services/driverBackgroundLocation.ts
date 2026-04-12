@@ -71,10 +71,15 @@ if (Platform.OS !== 'web') {
     const tokenResult = await apiService.ensureAccessToken();
     if (!tokenResult.token) return;
 
+    const h = loc.coords.heading;
+    const headingOk =
+      h != null && Number.isFinite(h) && h >= 0 && h <= 360 ? h : undefined;
+
     const r = await apiService.updateDriverLocation(
       userId,
       loc.coords.latitude,
-      loc.coords.longitude
+      loc.coords.longitude,
+      headingOk
     );
     if (!r.success && __DEV__) {
       logger.debug('[bg-location] updateDriverLocation échoué', 'driverBgLocation', r.message);

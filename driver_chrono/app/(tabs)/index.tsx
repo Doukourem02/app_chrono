@@ -208,7 +208,11 @@ export default function Index() {
         distMeters(location, { latitude: last.lat, longitude: last.lng }) >= 15;
 
       if (shouldEmit) {
-        orderSocketService.emitDriverLocation(currentOrder.id, location);
+        orderSocketService.emitDriverLocation(currentOrder.id, {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          ...(rawGpsLocation?.heading != null ? { heading: rawGpsLocation.heading } : {}),
+        });
         lastEmitRef.current = { lat: location.latitude, lng: location.longitude, ts: now };
       }
     };
@@ -216,7 +220,7 @@ export default function Index() {
     maybeEmit();
     const iv = setInterval(maybeEmit, 3000);
     return () => clearInterval(iv);
-  }, [currentOrder?.id, currentOrder?.status, location]);
+  }, [currentOrder?.id, currentOrder?.status, location, rawGpsLocation?.heading]);
 
   // Bottom sheet pour les détails de la commande (remplace RecipientDetailsSheet)
   const {
@@ -650,7 +654,11 @@ export default function Index() {
     setIsNavigationActive(true);
     // Émettre immédiatement la position pour que le client voie la route dès l'acceptation
     if (location) {
-      orderSocketService.emitDriverLocation(orderId, location);
+      orderSocketService.emitDriverLocation(orderId, {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        ...(rawGpsLocation?.heading != null ? { heading: rawGpsLocation.heading } : {}),
+      });
     }
   };
 
@@ -838,6 +846,9 @@ export default function Index() {
             is_available: true,
             current_latitude: location.latitude,
             current_longitude: location.longitude,
+            ...(rawGpsLocation?.heading != null
+              ? { heading_degrees: rawGpsLocation.heading }
+              : {}),
           });
 
           if (!result.success && result.message?.includes('Session expirée')) {
@@ -865,7 +876,7 @@ export default function Index() {
       clearTimeout(timeoutId);
       clearInterval(heartbeatInterval);
     };
-  }, [location, isOnline, user?.id, isAuthenticated]);
+  }, [location, rawGpsLocation?.heading, isOnline, user?.id, isAuthenticated]);
 
   useEffect(() => {
     if (currentOrder) {

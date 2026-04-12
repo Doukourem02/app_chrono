@@ -94,8 +94,17 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
       is_online, 
       is_available, 
       current_latitude, 
-      current_longitude 
+      current_longitude,
+      heading_degrees: headingDegreesBody,
     } = req.body;
+
+    let headingParam: number | null = null;
+    if (headingDegreesBody != null && headingDegreesBody !== '') {
+      const h = Number(headingDegreesBody);
+      if (Number.isFinite(h) && h >= 0 && h <= 360) {
+        headingParam = h;
+      }
+    }
 
     logger.info(`Mise à jour statut chauffeur ${maskUserId(userId)}:`, {
       is_online,
@@ -188,9 +197,10 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
         `UPDATE driver_profiles 
          SET is_online = $1, is_available = $2, 
            current_latitude = $3, current_longitude = $4,
+           heading_degrees = COALESCE($5::double precision, heading_degrees),
            updated_at = NOW()
-         WHERE user_id = $5`,
-        [is_online, is_available, current_latitude, current_longitude, userId]
+         WHERE user_id = $6`,
+        [is_online, is_available, current_latitude, current_longitude, headingParam, userId]
       );
       if (
         current_latitude != null &&

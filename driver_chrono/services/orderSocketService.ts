@@ -515,11 +515,26 @@ class OrderSocketService {
    * Envoyer la position du livreur pour le suivi temps réel client.
    * À appeler avec throttle (2-5s) et distance filter (10-20m).
    */
-  emitDriverLocation(orderId: string, location: { latitude: number; longitude: number }) {
+  emitDriverLocation(
+    orderId: string,
+    location: { latitude: number; longitude: number; heading?: number }
+  ) {
     if (!this.socket || !this.socket.connected) return;
+    const loc: { lat: number; lng: number; heading?: number } = {
+      lat: location.latitude,
+      lng: location.longitude,
+    };
+    if (
+      location.heading != null &&
+      Number.isFinite(location.heading) &&
+      location.heading >= 0 &&
+      location.heading <= 360
+    ) {
+      loc.heading = location.heading;
+    }
     this.socket.emit('order:driver:location', {
       orderId,
-      location: { lat: location.latitude, lng: location.longitude },
+      location: loc,
       ts: new Date().toISOString(),
     });
   }

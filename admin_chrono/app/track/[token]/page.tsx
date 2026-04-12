@@ -3,10 +3,10 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import config from '@/lib/config'
+import PublicTrackMap from '@/components/track/PublicTrackMap'
 
 const API_URL = config.apiUrl
 
-/** Aligné sur les textes push / SMS backend (recipientOrderNotifyService). */
 const FLOW_STEPS: { status: string; title: string; body: string }[] = [
   { status: 'pending', title: 'En attente', body: 'Recherche d’un livreur pour votre course.' },
   { status: 'accepted', title: 'Course acceptée', body: 'Un livreur a accepté votre commande.' },
@@ -29,12 +29,24 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return output as Uint8Array<ArrayBuffer>
 }
 
+function driverInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return (name.slice(0, 2) || '?').toUpperCase()
+}
+
 type TrackData = {
   id: string
   status: string
   pickup: { address: string; coordinates: { latitude: number; longitude: number } | null }
   dropoff: { address: string; coordinates: { latitude: number; longitude: number } | null }
-  driver: { id: string; name: string; latitude: number | null; longitude: number | null } | null
+  driver: {
+    id: string
+    name: string
+    latitude: number | null
+    longitude: number | null
+    heading?: number | null
+  } | null
   price: number | null
   deliveryMethod: string
   distance: number | null
@@ -153,10 +165,10 @@ export default function TrackPage() {
 
   if (loading) {
     return (
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <div style={styles.spinner} />
-          <p style={styles.loadingText}>Chargement du suivi...</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 p-6">
+        <div className="rounded-2xl bg-white p-10 text-center shadow-xl">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" />
+          <p className="text-gray-600">Chargement du suivi…</p>
         </div>
       </div>
     )
@@ -164,18 +176,17 @@ export default function TrackPage() {
 
   if (error || !data) {
     return (
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>Suivi Krono</h1>
-          <p style={styles.errorText}>{error || 'Commande introuvable'}</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 p-6">
+        <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl">
+          <h1 className="text-xl font-bold text-gray-900">Suivi Krono</h1>
+          <p className="mt-3 text-red-600">{error || 'Commande introuvable'}</p>
         </div>
       </div>
     )
   }
 
   const status = data.status
-  const isTerminal = ['completed', 'cancelled', 'declined'].includes(status)
-  const isActive = !isTerminal
+  const isActive = !['completed', 'cancelled', 'declined'].includes(status)
 
   const flowIndex = FLOW_STEPS.findIndex((s) => s.status === status)
   const currentStepIndex = flowIndex >= 0 ? flowIndex : 0
@@ -191,325 +202,173 @@ export default function TrackPage() {
     !['cancelled', 'declined'].includes(status)
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Suivi de votre livraison</h1>
-        <p style={styles.orderId}>Commande #{data.id.slice(0, 8).toUpperCase()}</p>
+    <div className="min-h-screen bg-gradient-to-br from-violet-500 to-violet-700 p-4 md:p-8">
+      <div className="mx-auto flex max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl lg:min-h-[560px] lg:flex-row">
+        {/* Colonne infos */}
+        <div className="flex min-w-0 flex-1 flex-col border-gray-100 p-6 md:p-8 lg:max-w-[28rem] xl:max-w-md">
+          <h1 className="text-2xl font-bold text-gray-900">Suivi de votre livraison</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Commande #{data.id.slice(0, 8).toUpperCase()}
+          </p>
 
-        {status === 'cancelled' && (
-          <div style={styles.cancelledBanner}>Commande annulée. Votre commande a été annulée.</div>
-        )}
+          {data.driver && (
+            <div className="mt-6 flex items-center gap-4 rounded-xl border border-violet-100 bg-violet-50/80 p-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-violet-200 text-lg font-bold text-violet-800">
+                {driverInitials(data.driver.name)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">
+                  Livreur
+                </p>
+                <p className="truncate text-lg font-semibold text-gray-900">{data.driver.name}</p>
+                <p className="text-xs text-gray-500">Mise à jour de la position sur la carte</p>
+              </div>
+            </div>
+          )}
 
-        {status !== 'cancelled' && status !== 'declined' && (
-          <div style={styles.timeline}>
-            <h3 style={styles.timelineHeading}>Étapes</h3>
-            {FLOW_STEPS.map((step, i) => {
-              const done = allStepsDone || i < currentStepIndex
-              const current =
-                !allStepsDone && !['cancelled', 'declined'].includes(status) && i === currentStepIndex
-              const future = !done && !current
-              return (
-                <div
-                  key={step.status}
-                  style={{
-                    ...styles.timelineRow,
-                    ...(future ? { opacity: 0.45 } : {}),
-                  }}
-                >
-                  <div
-                    style={{
-                      ...styles.timelineDot,
-                      ...(done ? styles.timelineDotDone : {}),
-                      ...(current ? styles.timelineDotCurrent : {}),
-                    }}
-                  />
-                  <div style={styles.timelineTextCol}>
-                    <div style={styles.timelineTitle}>{step.title}</div>
-                    <div style={styles.timelineBody}>{step.body}</div>
-                  </div>
-                </div>
-              )
-            })}
+          {status === 'cancelled' && (
+            <div className="mt-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+              Commande annulée. Votre commande a été annulée.
+            </div>
+          )}
+
+          {status !== 'cancelled' && status !== 'declined' && (
+            <div className="mt-6 border-b border-gray-100 pb-6">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Étapes
+              </h3>
+              <div className="mt-3 space-y-3">
+                {FLOW_STEPS.map((step, i) => {
+                  const done = allStepsDone || i < currentStepIndex
+                  const current =
+                    !allStepsDone &&
+                    !['cancelled', 'declined'].includes(status) &&
+                    i === currentStepIndex
+                  const future = !done && !current
+                  return (
+                    <div
+                      key={step.status}
+                      className={`flex gap-3 ${future ? 'opacity-45' : ''}`}
+                    >
+                      <div
+                        className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ${
+                          done
+                            ? 'bg-emerald-500'
+                            : current
+                              ? 'bg-violet-600 shadow-[0_0_0_3px_rgba(124,58,237,0.35)]'
+                              : 'bg-gray-200'
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">{step.title}</p>
+                        <p className="text-xs leading-snug text-gray-500">{step.body}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <div
+            className={`mt-4 inline-flex w-fit rounded-xl px-4 py-2.5 text-sm font-semibold ${
+              isActive ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800'
+            }`}
+          >
+            {FLOW_STEPS.find((s) => s.status === status)?.title ||
+              (status === 'cancelled' ? 'Annulé' : status === 'declined' ? 'Refusé' : status)}
           </div>
-        )}
 
-        <div
-          style={{
-            ...styles.statusBadge,
-            ...(isActive ? styles.statusActive : styles.statusDone),
-            marginTop: 16,
-          }}
-        >
-          {FLOW_STEPS.find((s) => s.status === status)?.title ||
-            (status === 'cancelled'
-              ? 'Annulé'
-              : status === 'declined'
-                ? 'Refusé'
-                : status)}
-        </div>
+          {showPushCta && (
+            <div className="mt-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
+              <p className="text-sm text-violet-900">
+                Recevez une alerte sur cet appareil quand le statut change (navigateur).
+              </p>
+              <button
+                type="button"
+                className="mt-3 w-full rounded-lg bg-violet-600 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60"
+                disabled={pushBusy}
+                onClick={() => void handleEnablePush()}
+              >
+                {pushBusy ? 'Activation…' : 'Activer les alertes navigateur'}
+              </button>
+              {pushMessage && <p className="mt-2 text-xs text-gray-600">{pushMessage}</p>}
+            </div>
+          )}
 
-        {showPushCta && (
-          <div style={styles.pushSection}>
-            <p style={styles.pushHint}>
-              Recevez une alerte sur cet appareil quand le statut change (navigateur).
+          {pushEnabled && !showPushCta && (
+            <p className="mt-4 text-sm font-medium text-emerald-700">
+              Alertes navigateur activées pour ce lien.
             </p>
-            <button
-              type="button"
-              style={styles.pushButton}
-              disabled={pushBusy}
-              onClick={() => void handleEnablePush()}
-            >
-              {pushBusy ? 'Activation…' : 'Activer les alertes navigateur'}
-            </button>
-            {pushMessage && <p style={styles.pushFeedback}>{pushMessage}</p>}
-          </div>
-        )}
+          )}
 
-        {pushEnabled && !showPushCta && (
-          <p style={styles.pushOk}>Alertes navigateur activées pour ce lien.</p>
-        )}
-
-        <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>Prise en charge</h3>
-          <p style={styles.address}>{data.pickup.address || '—'}</p>
-        </div>
-
-        <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>Livraison</h3>
-          <p style={styles.address}>{data.dropoff.address || '—'}</p>
-        </div>
-
-        {data.driver && (
-          <div style={styles.section}>
-            <h3 style={styles.sectionTitle}>Livreur</h3>
-            <p style={styles.driverName}>{data.driver.name}</p>
-          </div>
-        )}
-
-        {data.showQRCode && data.qrCodeImage && (
-          <div style={styles.qrSection}>
-            <h3 style={styles.sectionTitle}>Montrez ce code au livreur</h3>
-            <p style={styles.qrHint}>Le livreur scannera ce QR code pour confirmer la livraison.</p>
-            <div style={styles.qrWrapper}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={data.qrCodeImage}
-                alt="QR Code de livraison"
-                width={220}
-                height={220}
-                style={{ display: 'block' }}
-              />
+          <div className="mt-6 space-y-5">
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Prise en charge
+              </h3>
+              <p className="mt-1 text-[15px] leading-relaxed text-gray-900">
+                {data.pickup.address || '—'}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Livraison
+              </h3>
+              <p className="mt-1 text-[15px] leading-relaxed text-gray-900">
+                {data.dropoff.address || '—'}
+              </p>
             </div>
           </div>
-        )}
 
-        {data.status === 'completed' && (
-          <div style={styles.completedBanner}>Votre commande est livrée.</div>
-        )}
+          {data.showQRCode && data.qrCodeImage && (
+            <div className="mt-8 border-t border-gray-100 pt-6 text-center">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Montrez ce code au livreur
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Le livreur scannera ce QR code pour confirmer la livraison.
+              </p>
+              <div className="mt-4 inline-flex rounded-xl border-2 border-gray-100 p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={data.qrCodeImage}
+                  alt="QR Code de livraison"
+                  width={220}
+                  height={220}
+                  className="block"
+                />
+              </div>
+            </div>
+          )}
+
+          {data.status === 'completed' && (
+            <div className="mt-8 rounded-xl bg-emerald-100 py-4 text-center text-sm font-semibold text-emerald-800">
+              Votre commande est livrée.
+            </div>
+          )}
+        </div>
+
+        {/* Carte */}
+        <div className="flex min-h-[320px] min-w-0 flex-1 flex-col border-t border-gray-200 lg:min-h-0 lg:border-l lg:border-t-0">
+          <div className="border-b border-gray-100 bg-gray-50 px-4 py-2 lg:hidden">
+            <p className="text-center text-xs font-medium text-gray-600">Itinéraire</p>
+          </div>
+          <PublicTrackMap
+            pickup={data.pickup}
+            dropoff={data.dropoff}
+            driver={
+              data.driver
+                ? {
+                    latitude: data.driver.latitude,
+                    longitude: data.driver.longitude,
+                    heading: data.driver.heading ?? null,
+                  }
+                : null
+            }
+          />
+        </div>
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
-    padding: 24,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    maxWidth: 420,
-    width: '100%',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: '#111827',
-    marginBottom: 4,
-  },
-  orderId: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-  },
-  timeline: {
-    marginBottom: 8,
-    paddingBottom: 16,
-    borderBottom: '1px solid #E5E7EB',
-  },
-  timelineHeading: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  timelineRow: {
-    display: 'flex',
-    gap: 12,
-    marginBottom: 14,
-  },
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 4,
-    flexShrink: 0,
-    backgroundColor: '#E5E7EB',
-  },
-  timelineDotCurrent: {
-    backgroundColor: '#8B5CF6',
-    boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.35)',
-  },
-  timelineDotDone: {
-    backgroundColor: '#10B981',
-  },
-  timelineTextCol: {
-    flex: 1,
-    minWidth: 0,
-  },
-  timelineTitle: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: '#111827',
-  },
-  timelineBody: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 1.45,
-    marginTop: 2,
-  },
-  statusBadge: {
-    padding: '10px 16px',
-    borderRadius: 12,
-    fontSize: 15,
-    fontWeight: 600,
-    marginBottom: 24,
-  },
-  statusActive: {
-    backgroundColor: '#EDE9FE',
-    color: '#7C3AED',
-  },
-  statusDone: {
-    backgroundColor: '#D1FAE5',
-    color: '#059669',
-  },
-  cancelledBanner: {
-    padding: 14,
-    backgroundColor: '#FEE2E2',
-    color: '#B91C1C',
-    borderRadius: 12,
-    fontWeight: 600,
-    marginBottom: 16,
-    fontSize: 14,
-    lineHeight: 1.4,
-  },
-  pushSection: {
-    marginBottom: 20,
-    padding: 14,
-    backgroundColor: '#F5F3FF',
-    borderRadius: 12,
-    border: '1px solid #DDD6FE',
-  },
-  pushHint: {
-    fontSize: 13,
-    color: '#5B21B6',
-    marginBottom: 10,
-    lineHeight: 1.45,
-  },
-  pushButton: {
-    width: '100%',
-    padding: '12px 16px',
-    borderRadius: 10,
-    border: 'none',
-    backgroundColor: '#7C3AED',
-    color: '#fff',
-    fontWeight: 600,
-    fontSize: 15,
-    cursor: 'pointer',
-  },
-  pushFeedback: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  pushOk: {
-    fontSize: 13,
-    color: '#059669',
-    marginBottom: 16,
-    fontWeight: 500,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  address: {
-    fontSize: 15,
-    color: '#111827',
-    lineHeight: 1.5,
-  },
-  driverName: {
-    fontSize: 15,
-    color: '#111827',
-    fontWeight: 500,
-  },
-  qrSection: {
-    marginTop: 24,
-    paddingTop: 24,
-    borderTop: '1px solid #E5E7EB',
-    textAlign: 'center',
-  },
-  qrHint: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-  },
-  qrWrapper: {
-    display: 'inline-flex',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    border: '2px solid #E5E7EB',
-  },
-  completedBanner: {
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: '#D1FAE5',
-    color: '#059669',
-    borderRadius: 12,
-    fontWeight: 600,
-    textAlign: 'center',
-  },
-  spinner: {
-    width: 40,
-    height: 40,
-    border: '3px solid #E5E7EB',
-    borderTopColor: '#8B5CF6',
-    borderRadius: '50%',
-    animation: 'spin 0.8s linear infinite',
-    margin: '0 auto 16px',
-  },
-  loadingText: {
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  errorText: {
-    color: '#DC2626',
-    fontSize: 15,
-  },
 }

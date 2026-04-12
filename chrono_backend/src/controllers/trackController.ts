@@ -36,7 +36,8 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
         d.first_name as driver_first_name,
         d.last_name as driver_last_name,
         dp.current_latitude as driver_lat,
-        dp.current_longitude as driver_lng
+        dp.current_longitude as driver_lng,
+        dp.heading_degrees as driver_heading
       FROM orders o
       LEFT JOIN users d ON o.driver_id = d.id
       LEFT JOIN driver_profiles dp ON dp.user_id = o.driver_id
@@ -104,6 +105,12 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
               name: driverName,
               latitude: row.driver_lat != null ? Number(row.driver_lat) : null,
               longitude: row.driver_lng != null ? Number(row.driver_lng) : null,
+              heading: (() => {
+                const h = row.driver_heading;
+                if (h == null || h === '') return null;
+                const n = Number(h);
+                return Number.isFinite(n) ? n : null;
+              })(),
             }
           : null,
         price: row.price_cfa != null ? Number(row.price_cfa) : null,

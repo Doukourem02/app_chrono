@@ -23,7 +23,8 @@
     "recovery:test": "tsx scripts/recovery.ts test",
     "recovery:restore": "tsx scripts/recovery.ts restore",
     "migrate:otp": "tsx scripts/apply-otp-migration.ts",
-    "migrate:track-web-push": "tsx scripts/apply-track-web-push-migration.ts"
+    "migrate:track-web-push": "tsx scripts/apply-track-web-push-migration.ts",
+    "migrate:driver-heading": "tsx scripts/apply-driver-heading-migration.ts"
   },
   "keywords": [],
   "author": "",
