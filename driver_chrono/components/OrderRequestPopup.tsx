@@ -5,6 +5,7 @@ import { useAudioPlayer } from 'expo-audio';
 import { AdminOrderInfo } from './AdminOrderInfo';
 import { logger } from '../utils/logger';
 import { formatUserName } from '../utils/formatName';
+import { parseClientOrderInstructions } from '../utils/clientOrderInstructions';
 
 interface OrderRequest {
   id: string;
@@ -22,6 +23,11 @@ interface OrderRequest {
   dropoff: {
     address: string;
     coordinates?: { latitude: number; longitude: number }; // Optionnel pour les commandes téléphoniques
+    details?: {
+      thermal_bag?: boolean;
+      courier_note?: string;
+      recipient_message?: string;
+    };
   };
   price: number;
   deliveryMethod: 'moto' | 'vehicule' | 'cargo';
@@ -359,6 +365,36 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
             </View>
           </View>
 
+          {(() => {
+            const instr = parseClientOrderInstructions(
+              order.dropoff?.details as Record<string, unknown> | undefined
+            );
+            if (!instr) return null;
+            return (
+              <View style={styles.clientInstructionsBox}>
+                <Text style={styles.clientInstructionsTitle}>Consignes client</Text>
+                {instr.thermalBag ? (
+                  <View style={styles.clientInstructionRow}>
+                    <Text style={styles.clientInstructionLabel}>Sac isotherme</Text>
+                    <Text style={styles.clientInstructionValue}>Demandé</Text>
+                  </View>
+                ) : null}
+                {instr.courierNote ? (
+                  <View style={styles.clientInstructionBlock}>
+                    <Text style={styles.clientInstructionLabel}>Pour vous (livreur)</Text>
+                    <Text style={styles.clientInstructionMultiline}>{instr.courierNote}</Text>
+                  </View>
+                ) : null}
+                {instr.recipientMessage ? (
+                  <View style={styles.clientInstructionBlock}>
+                    <Text style={styles.clientInstructionLabel}>Message pour le destinataire</Text>
+                    <Text style={styles.clientInstructionMultiline}>{instr.recipientMessage}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })()}
+
           {/* Boutons d'action */}
           <View style={styles.actionsContainer}>
             <TouchableOpacity
@@ -589,6 +625,45 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 14,
     color: '#374151',
+    lineHeight: 20,
+  },
+  clientInstructionsBox: {
+    backgroundColor: '#F5F3FF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  clientInstructionsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#5B21B6',
+    marginBottom: 10,
+  },
+  clientInstructionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  clientInstructionBlock: {
+    marginBottom: 10,
+  },
+  clientInstructionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  clientInstructionValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7C3AED',
+  },
+  clientInstructionMultiline: {
+    fontSize: 14,
+    color: '#1F2937',
     lineHeight: 20,
   },
   actionsContainer: {

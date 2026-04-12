@@ -3,6 +3,8 @@
  * Bonne couverture pour Abidjan - utilisé quand Mapbox n'a pas d'adresses
  */
 
+import { stripLocalAdminSuffixes } from './sanitizeGeocodeDisplay';
+
 const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 const NOMINATIM_HEADERS: HeadersInit = {
@@ -25,13 +27,14 @@ interface NominatimResult {
 }
 
 function cleanAddress(address: string): string {
-  return address
+  const s = address
     .replace(/, Côte d'Ivoire$/, '')
     .replace(/,\s*Abidjan,\s*Abidjan/g, ', Abidjan')
     .replace(/^Unnamed Road,?\s*/, '')
     .replace(/^Route sans nom,?\s*/, '')
     .replace(/\s*,\s*$/, '')
     .trim();
+  return stripLocalAdminSuffixes(s);
 }
 
 /**
@@ -50,8 +53,7 @@ function buildAddress(result: NominatimResult): string | null {
       if (num) {
         return `${street}, ${num}`;
       }
-      const locality = addr.suburb || addr.neighbourhood || addr.city;
-      return locality ? `${street}, ${locality}` : street;
+      return street;
     }
   }
 

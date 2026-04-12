@@ -210,8 +210,9 @@ function driverMatchesOrderEngin(
   orderMethod: string
 ): boolean {
   const need = orderRequiredEngin(orderMethod);
-  const got = normalizeEnginType(driverVehicleType);
-  if (got == null) return false;
+  // Profils sans vehicle_type : ne plus exclure systématiquement (sinon « en ligne » mais aucun match).
+  // On assimile à « moto », le cas le plus courant ; cargo / voiture exigent un type explicite en base.
+  const got = normalizeEnginType(driverVehicleType) ?? 'moto';
   return got === need;
 }
 

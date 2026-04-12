@@ -18,7 +18,11 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { searchOverpassPoi, type OverpassPoiResult } from '../utils/overpassPoiSearch';
 import { searchCuratedPoi } from '../utils/poiAbidjan';
-import { sanitizeGeocodeDisplayString, singleLineAddressInput } from '../utils/sanitizeGeocodeDisplay';
+import {
+  formatAutocompleteSelectedAddress,
+  sanitizeGeocodeDisplayString,
+  singleLineAddressInput,
+} from '../utils/sanitizeGeocodeDisplay';
 
 const MAPBOX_SUGGEST_URL = 'https://api.mapbox.com/search/searchbox/v1/suggest';
 const MAPBOX_RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve';
@@ -86,6 +90,22 @@ function generateSessionToken(): string {
 
 function isNumericQuery(q: string): boolean {
   return /^\d[\d\s]*$/.test(q.trim());
+}
+
+/**
+ * Filtre les suggestions « proches » mais sans mot-clé (ex. « zoo » ne doit pas lister une route sans « zoo »).
+ * Désactivé pour requêtes numériques / type rue : le géocodeur gère déjà la forme.
+ */
+function suggestionMatchesQueryTokens(s: MapboxSuggestion, query: string): boolean {
+  const raw = query.trim().toLowerCase();
+  if (raw.length < 2) return true;
+  if (isNumericQuery(query)) return true;
+  if (isStreetLikeQuery(query)) return true;
+
+  const haystack = `${s.name || ''} ${s.full_address || ''} ${s.place_formatted || ''}`.toLowerCase();
+  const tokens = raw.split(/\s+/).filter((t) => t.length >= 2);
+  if (tokens.length === 0) return true;
+  return tokens.every((t) => haystack.includes(t));
 }
 
 /** Détecte si la requête ressemble à une recherche de rue/adresse (Rue L29, Avenue X, etc.) */
@@ -444,6 +464,7 @@ export default function MapboxAddressAutocomplete({
           : [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim];
         for (const s of sourcesToMerge) {
           if (shouldExcludeSuggestion(s, trimmed)) continue;
+          if (!suggestionMatchesQueryTokens(s, trimmed)) continue;
           const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`;
           if (key && !seen.has(key) && s.name) {
             seen.add(key);
@@ -478,7 +499,7 @@ export default function MapboxAddressAutocomplete({
   const handleSelectSuggestion = useCallback(
     async (suggestion: MapboxSuggestion) => {
       const raw = suggestion.full_address || suggestion.address || suggestion.name;
-      const address = sanitizeGeocodeDisplayString(singleLineAddressInput(raw));
+      const address = formatAutocompleteSelectedAddress(raw, query);
       setQuery(address);
       setSuggestions([]);
 
@@ -525,7 +546,7 @@ export default function MapboxAddressAutocomplete({
         onPlaceSelected({ description: address });
       }
     },
-    [accessToken, sessionToken, onPlaceSelected]
+    [accessToken, sessionToken, onPlaceSelected, query]
   );
 
   const showSuggestions = suggestions.length > 0;

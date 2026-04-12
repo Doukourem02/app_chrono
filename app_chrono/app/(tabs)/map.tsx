@@ -58,6 +58,22 @@ export default function MapPage() {
   const [deliverySpeedOptionId, setDeliverySpeedOptionId] = React.useState<string | undefined>(
     undefined
   );
+  const [scheduledDeliveryExtras, setScheduledDeliveryExtras] = React.useState<{
+    thermalBag: boolean;
+    courierNote: string;
+    recipientMessage: string;
+  }>({ thermalBag: false, courierNote: "", recipientMessage: "" });
+
+  React.useEffect(() => {
+    if (deliverySpeedOptionId !== "scheduled") {
+      setScheduledDeliveryExtras({
+        thermalBag: false,
+        courierNote: "",
+        recipientMessage: "",
+      });
+    }
+  }, [deliverySpeedOptionId]);
+
   const [mapStyle, setMapStyle] = React.useState<MapStyleType>('light');
   const { setSelectedMethod } = useShipmentStore();
   const { user } = useAuthStore();
@@ -915,6 +931,13 @@ export default function MapPage() {
     setPaymentPartialInfo,
     deliverySpeedOptionId,
     routeSnapshot,
+    scheduledDeliveryExtras,
+    resetScheduledDeliveryExtras: () =>
+      setScheduledDeliveryExtras({
+        thermalBag: false,
+        courierNote: "",
+        recipientMessage: "",
+      }),
   });
 
   const _handleCancelOrder = useCallback(
@@ -1253,6 +1276,8 @@ export default function MapPage() {
                   onConfirm={handleDeliveryMethodConfirm}
                   onBack={handleDeliveryMethodBack}
                   onSpeedOptionChange={setDeliverySpeedOptionId}
+                  scheduledDeliveryExtras={scheduledDeliveryExtras}
+                  onScheduledDeliveryExtrasChange={setScheduledDeliveryExtras}
                 />
               );
             })()}

@@ -34,6 +34,10 @@ export interface OrderRequest {
       floor?: string;
       intercom?: string;
       photos?: string[];
+      /** Options client (ex. livraison programmée) — même schéma que la commande en base */
+      thermal_bag?: boolean;
+      courier_note?: string;
+      recipient_message?: string;
     };
   };
   recipient?: {

@@ -3,6 +3,8 @@
  * Aligné avec admin_chrono pour des adresses précises (ex: Rue Panama City, 772)
  */
 
+import { stripLocalAdminSuffixes } from './sanitizeGeocodeDisplay';
+
 const MAPBOX_REVERSE_URL = 'https://api.mapbox.com/search/geocode/v6/reverse';
 
 interface MapboxReverseFeature {
@@ -77,7 +79,7 @@ function buildAddressFromFeature(feature: MapboxReverseFeature): string | null {
  * Nettoie l'adresse pour la Côte d'Ivoire (cohérent avec admin_chrono)
  */
 function cleanAddress(address: string): string {
-  return address
+  const s = address
     .replace(/\byyyy\s*Abidjan\b/gi, 'Abidjan')
     .replace(/,\s*yyyy\s*,/gi, ',')
     .replace(/, Côte d'Ivoire$/, '')
@@ -86,6 +88,7 @@ function cleanAddress(address: string): string {
     .replace(/^Route sans nom,?\s*/, '')
     .replace(/\s*,\s*$/, '')
     .trim();
+  return stripLocalAdminSuffixes(s);
 }
 
 /**

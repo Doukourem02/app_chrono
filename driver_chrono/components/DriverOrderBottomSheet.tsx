@@ -9,6 +9,7 @@ import { QRCodeScanner } from './QRCodeScanner';
 import { QRCodeScanResult } from './QRCodeScanResult';
 import { qrCodeService } from '../services/qrCodeService';
 import { getQRScanErrorAlert } from '../utils/qrScanUserMessage';
+import { parseClientOrderInstructions } from '../utils/clientOrderInstructions';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -152,10 +153,18 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     return actions;
   }, [currentOrder, onUpdateStatus]);
 
+  const clientInstructions = useMemo(
+    () =>
+      parseClientOrderInstructions(
+        (currentOrder?.dropoff?.details ?? {}) as Record<string, unknown>
+      ),
+    [currentOrder]
+  );
+
   if (!currentOrder) return null;
 
   const recipientPhone = currentOrder?.recipient?.phone || currentOrder?.dropoff?.details?.phone || currentOrder?.user?.phone || null;
-  const dropoffDetails = currentOrder?.dropoff?.details || {};
+  const dropoffDetails = currentOrder.dropoff?.details;
   const packageImages = currentOrder?.packageImages || currentOrder?.dropoff?.details?.photos || [];
   const isPhoneOrder = currentOrder?.isPhoneOrder || false;
   const driverNotes = currentOrder?.driverNotes || '';
@@ -391,6 +400,35 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   </View>
                 )}
 
+                {clientInstructions ? (
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <Ionicons name="document-text-outline" size={20} color="#7C3AED" />
+                      <Text style={styles.sectionTitle}>Consignes client</Text>
+                    </View>
+                    <View style={styles.clientInstructionsCard}>
+                      {clientInstructions.thermalBag ? (
+                        <View style={styles.clientInstrRow}>
+                          <Text style={styles.clientInstrLabel}>Sac isotherme</Text>
+                          <Text style={styles.clientInstrEmphasis}>Demandé</Text>
+                        </View>
+                      ) : null}
+                      {clientInstructions.courierNote ? (
+                        <View style={styles.clientInstrBlock}>
+                          <Text style={styles.clientInstrLabel}>Pour vous (livreur)</Text>
+                          <Text style={styles.clientInstrBody}>{clientInstructions.courierNote}</Text>
+                        </View>
+                      ) : null}
+                      {clientInstructions.recipientMessage ? (
+                        <View style={styles.clientInstrBlock}>
+                          <Text style={styles.clientInstrLabel}>Message pour le destinataire</Text>
+                          <Text style={styles.clientInstrBody}>{clientInstructions.recipientMessage}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : null}
+
                 {/* Actions de statut */}
                 {availableActions.length > 0 && (
                   <View style={styles.section}>
@@ -516,32 +554,35 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                 )}
 
                 {/* Détails supplémentaires */}
-                {(dropoffDetails.entrance || dropoffDetails.apartment || dropoffDetails.floor || dropoffDetails.intercom) && (
+                {(dropoffDetails?.entrance ||
+                  dropoffDetails?.apartment ||
+                  dropoffDetails?.floor ||
+                  dropoffDetails?.intercom) && (
                   <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                       <Ionicons name="information-circle-outline" size={20} color="#7C3AED" />
                       <Text style={styles.sectionTitle}>Détails de l&apos;adresse</Text>
                     </View>
                     <View style={styles.detailsCard}>
-                      {dropoffDetails.entrance && (
+                      {dropoffDetails?.entrance && (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Entrée</Text>
                           <Text style={styles.detailValue}>{dropoffDetails.entrance}</Text>
                         </View>
                       )}
-                      {dropoffDetails.apartment && (
+                      {dropoffDetails?.apartment && (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Appartement</Text>
                           <Text style={styles.detailValue}>{dropoffDetails.apartment}</Text>
                         </View>
                       )}
-                      {dropoffDetails.floor && (
+                      {dropoffDetails?.floor && (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Étage</Text>
                           <Text style={styles.detailValue}>{dropoffDetails.floor}</Text>
                         </View>
                       )}
-                      {dropoffDetails.intercom && (
+                      {dropoffDetails?.intercom && (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Interphone</Text>
                           <Text style={styles.detailValue}>{dropoffDetails.intercom}</Text>
@@ -960,6 +1001,38 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  clientInstructionsCard: {
+    backgroundColor: '#F5F3FF',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  clientInstrRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  clientInstrBlock: {
+    marginBottom: 12,
+  },
+  clientInstrLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  clientInstrEmphasis: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#7C3AED',
+  },
+  clientInstrBody: {
+    fontSize: 15,
+    color: '#1F2937',
+    lineHeight: 22,
   },
   detailRow: {
     flexDirection: 'row',

@@ -42,6 +42,13 @@ interface UseMapNewOrderProps {
   setPaymentPartialInfo: (info: { isPartial?: boolean; partialAmount?: number }) => void;
   /** Option tarifaire (express, pickup_service, …) — alignée serveur */
   deliverySpeedOptionId?: string | undefined;
+  /** Extras « programmée » — envoyés dans dropoff.details si option = scheduled */
+  scheduledDeliveryExtras?: {
+    thermalBag: boolean;
+    courierNote: string;
+    recipientMessage: string;
+  };
+  resetScheduledDeliveryExtras?: () => void;
   /** Itinéraire Mapbox (km + durée) — enregistrement commande / prix */
   routeSnapshot?: {
     distanceKm: number;
@@ -82,6 +89,8 @@ export function useMapNewOrder({
   setPaymentPartialInfo,
   deliverySpeedOptionId,
   routeSnapshot,
+  scheduledDeliveryExtras,
+  resetScheduledDeliveryExtras,
 }: UseMapNewOrderProps) {
   const handleOrderDetailsConfirm = useCallback(
     async (
@@ -129,6 +138,19 @@ export function useMapNewOrder({
           resetAfterDriverSearch();
         } catch {}
 
+        const scheduledExtras =
+          deliverySpeedOptionId === 'scheduled' && scheduledDeliveryExtras
+            ? {
+                ...(scheduledDeliveryExtras.thermalBag ? { thermal_bag: true } : {}),
+                ...(scheduledDeliveryExtras.courierNote.trim()
+                  ? { courier_note: scheduledDeliveryExtras.courierNote.trim() }
+                  : {}),
+                ...(scheduledDeliveryExtras.recipientMessage.trim()
+                  ? { recipient_message: scheduledDeliveryExtras.recipientMessage.trim() }
+                  : {}),
+              }
+            : {};
+
         const orderData = {
           pickup: {
             address: pickupLocation,
@@ -138,7 +160,7 @@ export function useMapNewOrder({
           dropoff: {
             address: deliveryLocation,
             coordinates: dropoffCoords,
-            details: dropoffDetails,
+            details: { ...dropoffDetails, ...scheduledExtras },
           },
           speedOptionId: deliverySpeedOptionId,
           routeDistanceKm: routeSnapshot?.distanceKm,
@@ -202,6 +224,7 @@ export function useMapNewOrder({
 
         const success = await userOrderSocketService.createOrder(orderData);
         if (success) {
+          resetScheduledDeliveryExtras?.();
           collapseOrderDetailsSheet();
           collapseDeliveryMethodSheet();
 
@@ -305,6 +328,8 @@ export function useMapNewOrder({
       setPaymentPartialInfo,
       deliverySpeedOptionId,
       routeSnapshot,
+      scheduledDeliveryExtras,
+      resetScheduledDeliveryExtras,
     ]
   );
 

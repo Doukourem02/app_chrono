@@ -6,13 +6,13 @@ export type RouteMetricsSource = 'mapbox_route' | 'straight_line';
 
 export function distanceMetricCaption(source: RouteMetricsSource): string {
   return source === 'mapbox_route'
-    ? 'Itinéraire routier (Mapbox)'
+    ? 'Itinéraire routier'
     : 'Estimation ligne droite — mise à jour après calcul de route';
 }
 
 export function durationMetricCaption(source: RouteMetricsSource): string {
   return source === 'mapbox_route'
-    ? 'Selon trafic (Mapbox)'
+    ? 'Selon trafic en temps réel'
     : 'Selon vitesse moyenne';
 }
 
