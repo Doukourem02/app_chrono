@@ -314,7 +314,7 @@ export default function PublicTrackMap({ pickup, dropoff, driver }: PublicTrackM
 
   if (!isLoaded || loadError || !accessToken) {
     return (
-      <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-2 bg-gray-100 px-4 text-center">
+      <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 bg-slate-100 px-4 text-center">
         <p className="text-sm font-medium text-gray-700">Carte indisponible</p>
         <p className="text-xs text-gray-500">
           Configurez NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN sur l’hébergement (Vercel) pour afficher l’itinéraire.
@@ -325,7 +325,7 @@ export default function PublicTrackMap({ pickup, dropoff, driver }: PublicTrackM
 
   if (!hasAnyPoint) {
     return (
-      <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-2 bg-gray-100 px-4 text-center">
+      <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 bg-slate-100 px-4 text-center">
         <p className="text-sm font-medium text-gray-700">Aucune position GPS pour cette commande</p>
         <p className="text-xs text-gray-500">
           Les adresses s’affichent à gauche. La carte apparaîtra lorsque les coordonnées seront disponibles.
@@ -335,12 +335,9 @@ export default function PublicTrackMap({ pickup, dropoff, driver }: PublicTrackM
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-gray-50">
-      <div
-        ref={containerRef}
-        className="relative min-h-[min(45dvh,320px)] w-full flex-1 lg:min-h-[280px]"
-      />
-      <div className="flex flex-wrap gap-3 border-t border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-slate-100/90">
+      <div ref={containerRef} className="relative min-h-0 w-full flex-1" />
+      <div className="flex shrink-0 flex-wrap gap-2 border-t border-slate-200/90 bg-white/95 px-3 py-2.5 text-[11px] text-gray-600 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] backdrop-blur-sm">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />
           Retrait
