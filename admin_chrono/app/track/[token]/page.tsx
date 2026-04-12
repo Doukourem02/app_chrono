@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { AlertTriangle, MapPin, UserRound } from 'lucide-react'
 import config from '@/lib/config'
 import PublicTrackMap from '@/components/track/PublicTrackMap'
 
@@ -202,45 +203,106 @@ export default function TrackPage() {
     !['cancelled', 'declined'].includes(status)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-br from-violet-500 to-violet-700 p-3 sm:p-4 md:p-6 lg:p-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl lg:min-h-0 lg:flex-row">
-        {/* Colonne infos */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto border-gray-100 p-5 sm:p-6 md:p-8 lg:max-w-md lg:shrink-0 xl:max-w-lg">
-          <h1 className="text-2xl font-bold text-gray-900">Suivi de votre livraison</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Commande #{data.id.slice(0, 8).toUpperCase()}
-          </p>
+    <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-br from-violet-600 via-violet-600 to-violet-900 p-0 sm:p-3 md:p-5 lg:p-6">
+      <div className="flex min-h-dvh w-full flex-1 flex-col overflow-hidden bg-white shadow-2xl sm:min-h-0 sm:rounded-2xl lg:min-h-[calc(100dvh-3rem)] lg:flex-row">
+        {/* Carte en premier dans le DOM : haut sur mobile, droite sur desktop (lg:order-2) */}
+        <div className="order-1 flex min-h-[38dvh] min-w-0 flex-1 flex-col border-b border-gray-200 bg-gray-50/80 sm:min-h-[40dvh] lg:order-2 lg:min-h-0 lg:min-w-0 lg:flex-1 lg:border-b-0 lg:border-l lg:border-gray-200">
+          <div className="flex items-center justify-center gap-2 border-b border-gray-200/80 bg-gradient-to-r from-violet-50/80 to-white px-4 py-2.5 lg:hidden">
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-500" aria-hidden />
+            <p className="text-center text-xs font-semibold uppercase tracking-wide text-violet-900/80">
+              Carte & itinéraire
+            </p>
+          </div>
+          <PublicTrackMap
+            pickup={data.pickup}
+            dropoff={data.dropoff}
+            driver={
+              data.driver
+                ? {
+                    latitude: data.driver.latitude,
+                    longitude: data.driver.longitude,
+                    heading: data.driver.heading ?? null,
+                  }
+                : null
+            }
+          />
+        </div>
+
+        {/* Infos : bas sur mobile, gauche sur desktop (lg:order-1) */}
+        <div className="order-2 flex w-full shrink-0 flex-col border-gray-100 p-4 sm:p-6 md:p-8 lg:order-1 lg:max-h-[calc(100dvh-3.5rem)] lg:max-w-md lg:shrink-0 lg:overflow-y-auto xl:max-w-lg">
+          <header className="border-b border-gray-100 pb-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
+                  Suivi de votre livraison
+                </h1>
+                <p className="mt-1 font-mono text-xs text-gray-500 sm:text-sm">
+                  Commande #{data.id.slice(0, 8).toUpperCase()}
+                </p>
+              </div>
+              <span
+                className={`inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm sm:text-sm ${
+                  status === 'completed'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : status === 'cancelled'
+                      ? 'bg-red-100 text-red-800'
+                      : status === 'declined'
+                        ? 'bg-amber-100 text-amber-900'
+                        : isActive
+                          ? 'bg-violet-100 text-violet-800'
+                          : 'bg-gray-100 text-gray-800'
+                }`}
+              >
+                {FLOW_STEPS.find((s) => s.status === status)?.title ||
+                  (status === 'cancelled' ? 'Annulé' : status === 'declined' ? 'Refusé' : status)}
+              </span>
+            </div>
+          </header>
 
           {data.driver && (
-            <div className="mt-6 flex items-center gap-4 rounded-xl border border-violet-100 bg-violet-50/80 p-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-violet-200 text-lg font-bold text-violet-800">
-                {driverInitials(data.driver.name)}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">
-                  Livreur
-                </p>
-                <p className="truncate text-lg font-semibold text-gray-900">{data.driver.name}</p>
-                <p className="text-xs text-gray-500">Mise à jour de la position sur la carte</p>
+            <div className="relative mt-5 overflow-hidden rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-50 via-white to-violet-50/30 p-4 shadow-md ring-1 ring-violet-100/80 sm:p-5">
+              <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-violet-200/40 blur-2xl" aria-hidden />
+              <div className="relative flex items-center gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 text-lg font-bold text-white shadow-lg ring-4 ring-white/90 sm:h-[4.5rem] sm:w-[4.5rem] sm:text-xl">
+                  {driverInitials(data.driver.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-violet-600">
+                    <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    Livreur
+                  </p>
+                  <p className="mt-0.5 truncate text-lg font-semibold text-gray-900 sm:text-xl">
+                    {data.driver.name}
+                  </p>
+                  <p className="mt-1 text-xs leading-snug text-gray-500">
+                    Position mise à jour sur la carte ci-dessus
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           {status === 'cancelled' && (
-            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-sm">
-              Commande annulée. Votre commande a été annulée.
+            <div className="mt-5 flex gap-3 rounded-2xl border border-red-200 bg-red-50/90 p-4 shadow-sm">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden />
+              <div>
+                <p className="text-sm font-semibold text-red-900">Commande annulée</p>
+                <p className="mt-1 text-sm leading-relaxed text-red-800/90">
+                  Cette livraison ne sera pas effectuée. Les étapes ne sont plus affichées.
+                </p>
+              </div>
             </div>
           )}
 
           {status === 'declined' && (
-            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-sm">
-              Cette commande a été refusée.
-            </div>
-          )}
-
-          {(status === 'cancelled' || status === 'declined') && (
-            <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-              Le détail des étapes de livraison n’est plus affiché pour cette commande.
+            <div className="mt-5 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 shadow-sm">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden />
+              <div>
+                <p className="text-sm font-semibold text-amber-950">Commande refusée</p>
+                <p className="mt-1 text-sm leading-relaxed text-amber-900/90">
+                  Cette commande n’a pas été acceptée. Le détail des étapes n’est plus affiché.
+                </p>
+              </div>
             </div>
           )}
 
@@ -282,23 +344,6 @@ export default function TrackPage() {
             </div>
           )}
 
-          <div
-            className={`mt-4 inline-flex w-fit rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm ${
-              status === 'completed'
-                ? 'bg-emerald-100 text-emerald-800'
-                : status === 'cancelled'
-                  ? 'bg-red-100 text-red-800'
-                  : status === 'declined'
-                    ? 'bg-amber-100 text-amber-900'
-                    : isActive
-                      ? 'bg-violet-100 text-violet-800'
-                      : 'bg-gray-100 text-gray-800'
-            }`}
-          >
-            {FLOW_STEPS.find((s) => s.status === status)?.title ||
-              (status === 'cancelled' ? 'Annulé' : status === 'declined' ? 'Refusé' : status)}
-          </div>
-
           {showPushCta && (
             <div className="mt-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
               <p className="text-sm text-violet-900">
@@ -322,20 +367,26 @@ export default function TrackPage() {
             </p>
           )}
 
-          <div className="mt-6 space-y-4">
-            <div className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 shadow-sm">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <div className="mt-6 space-y-3">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
+              <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-violet-600">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                  <MapPin className="h-4 w-4" aria-hidden />
+                </span>
                 Prise en charge
               </h3>
-              <p className="mt-2 text-[15px] font-medium leading-relaxed text-gray-900">
+              <p className="mt-3 text-[15px] font-medium leading-relaxed text-gray-900">
                 {data.pickup.address || '—'}
               </p>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 shadow-sm">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
+              <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-violet-600">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                  <MapPin className="h-4 w-4" aria-hidden />
+                </span>
                 Livraison
               </h3>
-              <p className="mt-2 text-[15px] font-medium leading-relaxed text-gray-900">
+              <p className="mt-3 text-[15px] font-medium leading-relaxed text-gray-900">
                 {data.dropoff.address || '—'}
               </p>
             </div>
@@ -367,26 +418,6 @@ export default function TrackPage() {
               Votre commande est livrée.
             </div>
           )}
-        </div>
-
-        {/* Carte */}
-        <div className="flex min-h-[min(50dvh,440px)] min-w-0 flex-1 flex-col border-t border-gray-200 lg:min-h-0 lg:min-w-0 lg:border-l lg:border-t-0">
-          <div className="border-b border-gray-100 bg-gray-50 px-4 py-2 lg:hidden">
-            <p className="text-center text-xs font-medium text-gray-600">Itinéraire</p>
-          </div>
-          <PublicTrackMap
-            pickup={data.pickup}
-            dropoff={data.dropoff}
-            driver={
-              data.driver
-                ? {
-                    latitude: data.driver.latitude,
-                    longitude: data.driver.longitude,
-                    heading: data.driver.heading ?? null,
-                  }
-                : null
-            }
-          />
         </div>
       </div>
     </div>
