@@ -165,7 +165,7 @@ export default function TrackPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 p-6">
+      <div className="flex min-h-dvh flex-1 items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 p-6">
         <div className="rounded-2xl bg-white p-10 text-center shadow-xl">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" />
           <p className="text-gray-600">Chargement du suivi…</p>
@@ -176,7 +176,7 @@ export default function TrackPage() {
 
   if (error || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 p-6">
+      <div className="flex min-h-dvh flex-1 items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 p-6">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl">
           <h1 className="text-xl font-bold text-gray-900">Suivi Krono</h1>
           <p className="mt-3 text-red-600">{error || 'Commande introuvable'}</p>
@@ -202,10 +202,10 @@ export default function TrackPage() {
     !['cancelled', 'declined'].includes(status)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-500 to-violet-700 p-4 md:p-8">
-      <div className="mx-auto flex max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl lg:min-h-[560px] lg:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-br from-violet-500 to-violet-700 p-3 sm:p-4 md:p-6 lg:p-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl lg:min-h-0 lg:flex-row">
         {/* Colonne infos */}
-        <div className="flex min-w-0 flex-1 flex-col border-gray-100 p-6 md:p-8 lg:max-w-[28rem] xl:max-w-md">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto border-gray-100 p-5 sm:p-6 md:p-8 lg:max-w-md lg:shrink-0 xl:max-w-lg">
           <h1 className="text-2xl font-bold text-gray-900">Suivi de votre livraison</h1>
           <p className="mt-1 text-sm text-gray-500">
             Commande #{data.id.slice(0, 8).toUpperCase()}
@@ -227,8 +227,20 @@ export default function TrackPage() {
           )}
 
           {status === 'cancelled' && (
-            <div className="mt-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-sm">
               Commande annulée. Votre commande a été annulée.
+            </div>
+          )}
+
+          {status === 'declined' && (
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-sm">
+              Cette commande a été refusée.
+            </div>
+          )}
+
+          {(status === 'cancelled' || status === 'declined') && (
+            <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+              Le détail des étapes de livraison n’est plus affiché pour cette commande.
             </div>
           )}
 
@@ -271,8 +283,16 @@ export default function TrackPage() {
           )}
 
           <div
-            className={`mt-4 inline-flex w-fit rounded-xl px-4 py-2.5 text-sm font-semibold ${
-              isActive ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800'
+            className={`mt-4 inline-flex w-fit rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm ${
+              status === 'completed'
+                ? 'bg-emerald-100 text-emerald-800'
+                : status === 'cancelled'
+                  ? 'bg-red-100 text-red-800'
+                  : status === 'declined'
+                    ? 'bg-amber-100 text-amber-900'
+                    : isActive
+                      ? 'bg-violet-100 text-violet-800'
+                      : 'bg-gray-100 text-gray-800'
             }`}
           >
             {FLOW_STEPS.find((s) => s.status === status)?.title ||
@@ -302,20 +322,20 @@ export default function TrackPage() {
             </p>
           )}
 
-          <div className="mt-6 space-y-5">
-            <div>
+          <div className="mt-6 space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 shadow-sm">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Prise en charge
               </h3>
-              <p className="mt-1 text-[15px] leading-relaxed text-gray-900">
+              <p className="mt-2 text-[15px] font-medium leading-relaxed text-gray-900">
                 {data.pickup.address || '—'}
               </p>
             </div>
-            <div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 shadow-sm">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Livraison
               </h3>
-              <p className="mt-1 text-[15px] leading-relaxed text-gray-900">
+              <p className="mt-2 text-[15px] font-medium leading-relaxed text-gray-900">
                 {data.dropoff.address || '—'}
               </p>
             </div>
@@ -350,7 +370,7 @@ export default function TrackPage() {
         </div>
 
         {/* Carte */}
-        <div className="flex min-h-[320px] min-w-0 flex-1 flex-col border-t border-gray-200 lg:min-h-0 lg:border-l lg:border-t-0">
+        <div className="flex min-h-[min(50dvh,440px)] min-w-0 flex-1 flex-col border-t border-gray-200 lg:min-h-0 lg:min-w-0 lg:border-l lg:border-t-0">
           <div className="border-b border-gray-100 bg-gray-50 px-4 py-2 lg:hidden">
             <p className="text-center text-xs font-medium text-gray-600">Itinéraire</p>
           </div>

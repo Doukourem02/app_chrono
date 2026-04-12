@@ -335,8 +335,11 @@ export default function PublicTrackMap({ pickup, dropoff, driver }: PublicTrackM
   }
 
   return (
-    <div className="flex h-full min-h-[300px] flex-col bg-gray-50 lg:min-h-0">
-      <div ref={containerRef} className="relative min-h-[300px] w-full flex-1 lg:min-h-[420px]" />
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-gray-50">
+      <div
+        ref={containerRef}
+        className="relative min-h-[min(45dvh,320px)] w-full flex-1 lg:min-h-[280px]"
+      />
       <div className="flex flex-wrap gap-3 border-t border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-600">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />
