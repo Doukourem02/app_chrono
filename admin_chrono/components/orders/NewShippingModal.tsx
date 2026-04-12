@@ -102,15 +102,13 @@ export default function NewShippingModal({
     }
   }, [searchQuery, users])
 
-  // Calculate distance and price - utilise une distance estimée par défaut
-  // Le backend pourra géocoder les adresses et calculer la distance exacte
+  // Distance / prix devis (5 km défaut) — recalcul à chaque ouverture du modal car resetForm les remet à null à la fermeture
   useEffect(() => {
-    // Distance estimée par défaut (le backend calculera la distance exacte via géocodage)
-    const estimatedDistance = 5 // 5 km par défaut
+    if (!isOpen) return
+    const estimatedDistance = 5
     setDistance(estimatedDistance)
-    const calculatedPrice = calculatePrice(estimatedDistance, deliveryMethod)
-    setPrice(calculatedPrice)
-  }, [deliveryMethod])
+    setPrice(calculatePrice(estimatedDistance, deliveryMethod))
+  }, [deliveryMethod, isOpen])
 
   const calculatePrice = (distance: number, method: string): number => {
     const basePrices: { [key: string]: { base: number; perKm: number } } = {

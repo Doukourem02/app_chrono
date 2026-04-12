@@ -121,13 +121,13 @@ export default function NewB2BShippingModal({
     }
   }, [searchQuery, users])
 
-  // Calculate distance and price
+  // Recalcul à l’ouverture : resetForm remet distance/prix à null à la fermeture
   useEffect(() => {
-    const estimatedDistance = 5 // 5 km par défaut
+    if (!isOpen) return
+    const estimatedDistance = 5
     setDistance(estimatedDistance)
-    const calculatedPrice = calculatePrice(estimatedDistance, deliveryMethod)
-    setPrice(calculatedPrice)
-  }, [deliveryMethod])
+    setPrice(calculatePrice(estimatedDistance, deliveryMethod))
+  }, [deliveryMethod, isOpen])
 
   const calculatePrice = (distance: number, method: string): number => {
     const basePrices: { [key: string]: { base: number; perKm: number } } = {
