@@ -1,7 +1,7 @@
 /**
- * Avec dependencyResolutionManagement + PREFER_SETTINGS (bloc mapbox-drm-maven / Expo),
- * seul settings.gradle sert à résoudre com.mapbox.maps. Le root build.gradle est ignoré.
- * On réinjecte ici : providers.gradleProperty, gradle.properties en UTF-8, env, .mapbox_downloads_token.
+ * Bloc mapbox-drm-maven (Fleetbase / Expo) : on réinjecte le token (fichier, gradle.properties, env).
+ * Gradle affiche souvent « project declares repositories, ignoring settings » : on force
+ * PREFER_PROJECT pour que les dépôts déclarés dans les build.gradle (credentials Mapbox) priment.
  */
 const { withSettingsGradle } = require('expo/config-plugins');
 
@@ -63,12 +63,21 @@ function patchSettingsGradle(contents) {
   return contents.slice(0, afterUrl) + TOKEN_BLOCK + contents.slice(credStart);
 }
 
+function patchRepositoriesModePreferProject(contents) {
+  return contents.replace(
+    /repositoriesMode\.set\(org\.gradle\.api\.initialization\.resolve\.RepositoriesMode\.PREFER_SETTINGS\)/,
+    'repositoriesMode.set(org.gradle.api.initialization.resolve.RepositoriesMode.PREFER_PROJECT)'
+  );
+}
+
 module.exports = function withMapboxSettingsGradleDownloadsToken(config) {
   return withSettingsGradle(config, (cfg) => {
     if (cfg.modResults.language !== 'groovy') {
       return cfg;
     }
-    cfg.modResults.contents = patchSettingsGradle(cfg.modResults.contents);
+    let next = patchSettingsGradle(cfg.modResults.contents);
+    next = patchRepositoriesModePreferProject(next);
+    cfg.modResults.contents = next;
     return cfg;
   });
 };

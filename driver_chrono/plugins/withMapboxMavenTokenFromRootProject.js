@@ -25,6 +25,47 @@ const BLOCK = `      def token = ''
       }
 `;
 
+const EVERY_SUBPROJECT_HOOK_TAG = '@generated begin mapbox-every-subproject-maven';
+
+const EVERY_SUBPROJECT_HOOK = `
+
+// ${EVERY_SUBPROJECT_HOOK_TAG}
+gradle.beforeProject { proj ->
+  proj.repositories {
+    maven {
+      url 'https://api.mapbox.com/downloads/v2/releases/maven'
+      def token = ''
+      try {
+        def tf = rootProject.file('.mapbox_downloads_token')
+        if (tf.exists()) {
+          token = tf.getText('UTF-8').trim()
+        }
+      } catch (Exception ignored) {
+        token = ''
+      }
+      if (!token) {
+        token = (rootProject.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
+      }
+      if (token) {
+        authentication { basic(BasicAuthentication) }
+        credentials {
+          username = 'mapbox'
+          password = token
+        }
+      }
+    }
+  }
+}
+// @generated end mapbox-every-subproject-maven
+`;
+
+function appendEverySubprojectMapboxHook(contents) {
+  if (contents.includes(EVERY_SUBPROJECT_HOOK_TAG)) {
+    return contents;
+  }
+  return contents + EVERY_SUBPROJECT_HOOK;
+}
+
 function patchMapboxTokenBlock(contents) {
   if (!contents.includes(MAPBOX_MAVEN_MARKER)) {
     return contents;
@@ -49,7 +90,9 @@ module.exports = function withMapboxMavenTokenFromRootProject(config) {
     if (cfg.modResults.language !== 'groovy') {
       return cfg;
     }
-    cfg.modResults.contents = patchMapboxTokenBlock(cfg.modResults.contents);
+    let next = patchMapboxTokenBlock(cfg.modResults.contents);
+    next = appendEverySubprojectMapboxHook(next);
+    cfg.modResults.contents = next;
     return cfg;
   });
 };
