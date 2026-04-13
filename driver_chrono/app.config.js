@@ -94,6 +94,8 @@ module.exports = {
        * env, .mapbox_downloads_token). Les allprojects du root build.gradle ne suffisent pas.
        */
       './plugins/withMapboxSettingsGradleDownloadsToken.js',
+      /** mapbox-init.gradle + apply from: settings (EAS n’applique pas toujours -I sur gradleCommand). */
+      './plugins/withMapboxGradleApplyInitScript.js',
       [
         "expo-location",
         {

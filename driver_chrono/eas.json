@@ -11,8 +11,7 @@
         "simulator": true
       },
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug -I ../mapbox-init.gradle"
+        "buildType": "apk"
       }
     },
     "preview": {
@@ -21,8 +20,7 @@
         "simulator": false
       },
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease -I ../mapbox-init.gradle"
+        "buildType": "apk"
       }
     },
     "production": {
@@ -30,8 +28,7 @@
         "simulator": false
       },
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease -I ../mapbox-init.gradle"
+        "buildType": "apk"
       }
     }
   },
