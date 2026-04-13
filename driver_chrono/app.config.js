@@ -41,6 +41,19 @@ module.exports = {
       favicon: "./assets/images/logo/LOGO_APP1.png"
     },
     plugins: [
+      [
+        'expo-build-properties',
+        {
+          android: {
+            /**
+             * @rnmapbox/maps (10.19.x) : si targetSdk ≥ 35, Gradle demande com.mapbox.maps:android-ndk27:10.19.4,
+             * artefact non publié pour cette version → build EAS cassé. 34 conserve com.mapbox.maps:android:10.19.4.
+             * (Play Store pourra exiger 35+ plus tard : migrer Mapbox / rnmapbox ou token Maven à ce moment-là.)
+             */
+            targetSdkVersion: 34,
+          },
+        },
+      ],
       "expo-asset",
       "expo-audio",
       "@driveapp/expo-plugin-pod-disable-paths",
@@ -60,6 +73,13 @@ module.exports = {
           RNMapboxMapsImpl: "mapbox",
           // Aligné sur MapboxNavigation 2.20 (Fleetbase patché) : MapboxMaps ~> 10.19. 11.x entre en conflit CocoaPods avec Navigation.
           RNMapboxMapsVersion: "10.19.4",
+          ...(process.env.RNMAPBOX_MAPS_DOWNLOAD_TOKEN || process.env.MAPBOX_DOWNLOADS_TOKEN
+            ? {
+                RNMapboxMapsDownloadToken:
+                  process.env.RNMAPBOX_MAPS_DOWNLOAD_TOKEN ||
+                  process.env.MAPBOX_DOWNLOADS_TOKEN,
+              }
+            : {}),
         },
       ],
       [
