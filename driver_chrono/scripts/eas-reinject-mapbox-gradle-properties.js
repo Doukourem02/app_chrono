@@ -24,16 +24,18 @@ function main() {
   if (!fs.existsSync(androidDir)) return;
 
   const gradlePropsPath = path.join(androidDir, 'gradle.properties');
-  if (fs.existsSync(gradlePropsPath)) {
-    const content = fs.readFileSync(gradlePropsPath, 'utf8');
-    const lines = content.split(/\r?\n/);
-    const filtered = lines.filter((line) => !/^\s*MAPBOX_DOWNLOADS_TOKEN\s*=/.test(line));
-    filtered.push(`MAPBOX_DOWNLOADS_TOKEN=${token}`);
-    const out = filtered.join('\n');
-    fs.writeFileSync(gradlePropsPath, out.endsWith('\n') ? out : `${out}\n`);
-  }
+  const content = fs.existsSync(gradlePropsPath) ? fs.readFileSync(gradlePropsPath, 'utf8') : '';
+  const lines = content.split(/\r?\n/);
+  const filtered = lines.filter((line) => !/^\s*MAPBOX_DOWNLOADS_TOKEN\s*=/.test(line));
+  filtered.push(`MAPBOX_DOWNLOADS_TOKEN=${token}`);
+  const out = filtered.join('\n');
+  fs.writeFileSync(gradlePropsPath, out.endsWith('\n') ? out : `${out}\n`);
 
   fs.writeFileSync(path.join(androidDir, '.mapbox_downloads_token'), token, 'utf8');
+
+  console.error(
+    `[eas-reinject-mapbox] android/ prêt : MAPBOX_DOWNLOADS_TOKEN + .mapbox_downloads_token (longueur ${token.length})`
+  );
 }
 
 main();

@@ -69,6 +69,11 @@ module.exports = {
           cameraPermission: "Cette application a besoin de la caméra pour scanner les QR codes.",
         },
       ],
+      /**
+       * Doit être listé *avant* @rnmapbox/maps : pour projectBuildGradle, Expo enregistre le dernier plugin
+       * en « extérieur » (il s’exécute en premier). Ici on veut l’inverse — patcher après l’ajout du bloc Maven.
+       */
+      './plugins/withMapboxMavenTokenFromRootProject.js',
       [
         "@rnmapbox/maps",
         {
@@ -84,8 +89,6 @@ module.exports = {
             : {}),
         },
       ],
-      /** Après @rnmapbox/maps : corrige la lecture du token Maven (Gradle 8 / EAS). */
-      './plugins/withMapboxMavenTokenFromRootProject.js',
       [
         "expo-location",
         {
