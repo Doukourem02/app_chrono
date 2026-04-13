@@ -1,10 +1,10 @@
 /**
- * Expo SDK 54 : useExpoVersionCatalog() ouvre dependencyResolutionManagement. Gradle 8 résout
- * alors les deps via les dépôts « settings » ; le bloc Maven Mapbox dans build.gradle n’est pas
- * (ou mal) utilisé → « Could not find com.mapbox.maps:android ».
+ * Expo SDK 54 : useExpoVersionCatalog() ouvre dependencyResolutionManagement.
+ * Par défaut Gradle 8 utilise repositoriesMode = PREFER_PROJECT : les dépôts déclarés dans les
+ * build.gradle priment et ceux ajoutés ici dans settings sont ignorés (message « ignoring the
+ * repositories you have declared in the settings ») → Mapbox settings ignoré, résolution sans token.
  *
- * On ajoute explicitement le dépôt Mapbox authentifié dans dependencyResolutionManagement.repositories
- * (fusionné avec la config Expo), en lisant le token depuis gradle.properties puis RNMAPBOX_MAPS_DOWNLOAD_TOKEN.
+ * PREFER_SETTINGS force l’usage des dépôts ci‑dessous (google, central, jitpack, Mapbox + token).
  */
 const { withDangerousMod } = require('expo/config-plugins');
 const fs = require('fs');
@@ -19,6 +19,7 @@ const LEGACY_TAG_END = '// @generated end mapbox-repositories-mode';
 const SNIPPET = `
 ${TAG_BEGIN}
 dependencyResolutionManagement {
+  repositoriesMode.set(org.gradle.api.initialization.resolve.RepositoriesMode.PREFER_SETTINGS)
   repositories {
     google()
     mavenCentral()
@@ -38,6 +39,9 @@ dependencyResolutionManagement {
       }
       if (!mapboxToken) {
         mapboxToken = (System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: '').toString().trim()
+      }
+      if (!mapboxToken) {
+        mapboxToken = (System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
       }
       if (mapboxToken) {
         authentication { basic(BasicAuthentication) }
