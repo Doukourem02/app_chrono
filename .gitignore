@@ -1,4 +1,8 @@
 # Secrets - ne jamais commiter
+# Clés privées Google / Firebase (compte de service — EAS les garde côté Expo, pas dans Git)
+*firebase-adminsdk*.json
+*-service-account*.json
+
 .env
 .env.local
 .env.*.local
