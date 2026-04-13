@@ -9,7 +9,7 @@ module.exports = defineConfig([
     ignores: ['dist/*'],
   },
   {
-    files: ['scripts/**/*.js'],
+    files: ['app.config.js', 'scripts/**/*.js'],
     languageOptions: {
       globals: nodeGlobals,
     },

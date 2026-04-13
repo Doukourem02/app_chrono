@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "87606178495",
+    "project_id": "kronopro-e777a",
+    "storage_bucket": "kronopro-e777a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:87606178495:android:7efd5ab45580734bbb4c0a",
+        "android_client_info": {
+          "package_name": "com.anonymous.driver_chrono"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1cc4BKbj4xaEXaK9G4jTb2JtSzYUTQqg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

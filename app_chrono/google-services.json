@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "643437526442",
+    "project_id": "krono-c6207",
+    "storage_bucket": "krono-c6207.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:643437526442:android:0f59e95cbd13e52e917fd3",
+        "android_client_info": {
+          "package_name": "com.anonymous.app_chrono"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2U7H1sAzIE_8IIwABel3lc1Izx3tAyVc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

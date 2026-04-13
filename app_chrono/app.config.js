@@ -1,4 +1,9 @@
 require('dotenv').config({ path: '.env' });
+const fs = require('fs');
+const path = require('path');
+
+const googleServicesPath = path.join(__dirname, 'google-services.json');
+const hasGoogleServices = fs.existsSync(googleServicesPath);
 
 module.exports = {
   expo: {
@@ -14,7 +19,7 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
-      buildNumber: "42",
+      buildNumber: "43",
       supportsTablet: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -31,6 +36,7 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
+      ...(hasGoogleServices ? { googleServicesFile: './google-services.json' } : {}),
     },
     web: {
       output: "static",
