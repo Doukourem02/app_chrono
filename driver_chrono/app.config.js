@@ -56,6 +56,7 @@ module.exports = {
         },
       ],
       './plugins/withGradleWrapperNetworkTimeout.js',
+      './plugins/withMapboxGradleRepositoriesMode.js',
       "expo-asset",
       "expo-audio",
       "@driveapp/expo-plugin-pod-disable-paths",
