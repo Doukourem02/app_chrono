@@ -4,12 +4,15 @@
  *
  * On écrit MAPBOX_DOWNLOADS_TOKEN dans gradle.properties au prebuild : plus fiable que System.getenv()
  * pour le daemon Gradle sur les workers EAS.
+ *
+ * EAS_BUILD_PLATFORM peut être indéfini dans certains contextes (voir eas-cli#2112) : on exige le
+ * secret pour tout build EAS sauf iOS explicite, pour éviter un prebuild Android sans token silencieux.
  */
 const { withGradleProperties } = require('expo/config-plugins');
 
 module.exports = function withRequireMapboxDownloadsTokenAndroid(config) {
-  const isEasAndroid =
-    process.env.EAS_BUILD === 'true' && process.env.EAS_BUILD_PLATFORM === 'android';
+  const isEasNonIos =
+    process.env.EAS_BUILD === 'true' && process.env.EAS_BUILD_PLATFORM !== 'ios';
 
   const token = (
     process.env.RNMAPBOX_MAPS_DOWNLOAD_TOKEN ||
@@ -17,7 +20,7 @@ module.exports = function withRequireMapboxDownloadsTokenAndroid(config) {
     ''
   ).trim();
 
-  if (isEasAndroid) {
+  if (isEasNonIos) {
     if (!token) {
       throw new Error(
         '[driver_chrono] Variable manquante : RNMAPBOX_MAPS_DOWNLOAD_TOKEN (ou MAPBOX_DOWNLOADS_TOKEN). ' +

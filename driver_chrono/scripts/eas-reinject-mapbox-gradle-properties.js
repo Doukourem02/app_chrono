@@ -1,7 +1,10 @@
 /**
- * EAS Android : réinjecte le secret Mapbox avant ./gradlew.
+ * EAS Android : réinjecte le secret Mapbox avant ./gradlew (si `android/` existe déjà).
  * - MAPBOX_DOWNLOADS_TOKEN dans gradle.properties
  * - android/.mapbox_downloads_token (fallback lu par build.gradle, contourne soucis de parsing)
+ *
+ * Sur le cloud EAS, `eas-build-post-install` tourne avant `expo prebuild` : souvent pas de dossier
+ * `android/` → no-op. Le prebuild applique `withMapboxAndroidDownloadsTokenFile` + withGradleProperties.
  */
 const fs = require('fs');
 const https = require('https');

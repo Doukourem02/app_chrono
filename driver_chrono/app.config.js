@@ -123,6 +123,8 @@ module.exports = {
           enableBackgroundRemoteNotifications: true,
         },
       ],
+      /** Après génération android/ : fichier .mapbox_downloads_token (EAS : post-install trop tôt). */
+      './plugins/withMapboxAndroidDownloadsTokenFile.js',
     ],
     experiments: {
       typedRoutes: true,
