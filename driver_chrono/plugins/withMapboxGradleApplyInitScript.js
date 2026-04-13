@@ -16,29 +16,37 @@ const MAPBOX_INIT_GRADLE = `import org.gradle.authentication.http.BasicAuthentic
  */
 gradle.projectsLoaded {
   def root = gradle.rootProject
-  def token = ''
-  try {
-    def tf = new File(root.projectDir, '.mapbox_downloads_token')
-    if (tf.exists()) {
-      token = tf.getText('UTF-8').trim()
-    }
-  } catch (Exception ignored) {
-    token = ''
-  }
-  if (!token) {
-    token = (System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
-  }
-  if (!token) {
+  def token = {
+    def t = (System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: '').trim()
+    if (t) return t
+    t = (System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
+    if (t) return t
+    t = (System.getenv('ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
+    if (t) return t
+    try {
+      def tf = new File(root.projectDir, '.mapbox_downloads_token')
+      if (tf.exists()) {
+        t = tf.getText('UTF-8').trim()
+        if (t) return t
+      }
+    } catch (Exception ignored) {}
     try {
       def gf = new File(root.projectDir, 'gradle.properties')
       if (gf.exists()) {
         def props = new Properties()
         gf.withReader('UTF-8') { reader -> props.load(reader) }
-        token = (props.getProperty('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
+        t = (props.getProperty('MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
+        if (t) return t
       }
-    } catch (Exception ignored) {
-      token = ''
-    }
+    } catch (Exception ignored) {}
+    return ''
+  }.call()
+
+  if (!token || token.length() < 8) {
+    throw new GradleException(
+      '[driver_chrono] Secret Mapbox Maven vide. Définis RNMAPBOX_MAPS_DOWNLOAD_TOKEN (sk., DOWNLOADS:READ) ' +
+      'dans EAS → Environment → production, puis rebuild. Une entrée MAPBOX_DOWNLOADS_TOKEN vide dans gradle.properties ne suffit pas.'
+    )
   }
 
   gradle.rootProject.allprojects { proj ->

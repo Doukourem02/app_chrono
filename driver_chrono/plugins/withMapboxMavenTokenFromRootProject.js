@@ -11,22 +11,30 @@ const { withProjectBuildGradle } = require('expo/config-plugins');
 
 const MAPBOX_MAVEN_MARKER = "url 'https://api.mapbox.com/downloads/v2/releases/maven'";
 
+/** Environnement d’abord : une ligne MAPBOX_DOWNLOADS_TOKEN vide dans gradle.properties ne doit pas masquer EAS. */
+const RESOLVE_TOKEN_ROOT = `      def token = {
+        def t = (System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: '').trim()
+        if (t) return t
+        t = (System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
+        if (t) return t
+        t = (System.getenv('ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
+        if (t) return t
+        try {
+          def tf = rootProject.file('.mapbox_downloads_token')
+          if (tf.exists()) {
+            t = tf.getText('UTF-8').trim()
+            if (t) return t
+          }
+        } catch (Exception ignored) {}
+        return (rootProject.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
+      }.call()
+`;
+
 const BLOCK = `      metadataSources {
         mavenPom()
         artifact()
       }
-      def token = ''
-      try {
-        def tf = rootProject.file('.mapbox_downloads_token')
-        if (tf.exists()) {
-          token = tf.getText('UTF-8').trim()
-        }
-      } catch (Exception ignored) {
-        token = ''
-      }
-      if (!token) {
-        token = (rootProject.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
-      }
+${RESOLVE_TOKEN_ROOT}
 `;
 
 const EVERY_SUBPROJECT_HOOK_TAG = '@generated begin mapbox-every-subproject-maven';
@@ -46,18 +54,22 @@ gradle.beforeProject { proj ->
             mavenPom()
             artifact()
           }
-          def token = ''
-          try {
-            def tf = rootProject.file('.mapbox_downloads_token')
-            if (tf.exists()) {
-              token = tf.getText('UTF-8').trim()
-            }
-          } catch (Exception ignored) {
-            token = ''
-          }
-          if (!token) {
-            token = (rootProject.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
-          }
+          def token = {
+            def t = (System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: '').trim()
+            if (t) return t
+            t = (System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
+            if (t) return t
+            t = (System.getenv('ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
+            if (t) return t
+            try {
+              def tf = rootProject.file('.mapbox_downloads_token')
+              if (tf.exists()) {
+                t = tf.getText('UTF-8').trim()
+                if (t) return t
+              }
+            } catch (Exception ignored) {}
+            return (rootProject.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
+          }.call()
           authentication { basic(BasicAuthentication) }
           credentials {
             username = 'mapbox'
