@@ -8,11 +8,24 @@ const { withSettingsGradle } = require('expo/config-plugins');
 const MAPBOX_MAVEN_MARKER = "url 'https://api.mapbox.com/downloads/v2/releases/maven'";
 
 const TOKEN_BLOCK = `      def mapboxToken = ''
+      // 1) Fichier écrit par eas-build-post-install (fiable sur EAS ; pas besoin de providers dans ce closure).
       try {
-        mapboxToken = providers.gradleProperty('MAPBOX_DOWNLOADS_TOKEN').getOrElse('').toString().trim()
+        def tf = new File(rootDir, '.mapbox_downloads_token')
+        if (tf.exists()) {
+          mapboxToken = tf.getText('UTF-8').trim()
+        }
       } catch (Exception ignored) {
         mapboxToken = ''
       }
+      // 2) Propriété Gradle (gradle.properties, -P, ORG_GRADLE_PROJECT_*)
+      if (!mapboxToken) {
+        try {
+          mapboxToken = settings.providers.gradleProperty('MAPBOX_DOWNLOADS_TOKEN').getOrElse('').toString().trim()
+        } catch (Exception ignored) {
+          mapboxToken = ''
+        }
+      }
+      // 3) gradle.properties brut (UTF-8)
       if (!mapboxToken) {
         try {
           def props = new Properties()
@@ -30,16 +43,6 @@ const TOKEN_BLOCK = `      def mapboxToken = ''
       }
       if (!mapboxToken) {
         mapboxToken = (System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
-      }
-      if (!mapboxToken) {
-        def tf = new File(rootDir, '.mapbox_downloads_token')
-        if (tf.exists()) {
-          try {
-            mapboxToken = tf.getText('UTF-8').trim()
-          } catch (Exception ignored) {
-            mapboxToken = ''
-          }
-        }
       }
 `;
 

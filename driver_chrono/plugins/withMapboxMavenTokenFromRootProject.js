@@ -8,16 +8,17 @@
  */
 const { withProjectBuildGradle } = require('expo/config-plugins');
 
-const BLOCK = `      def token = (rootProject.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
-      if (!token) {
+const BLOCK = `      def token = ''
+      try {
         def tf = rootProject.file('.mapbox_downloads_token')
         if (tf.exists()) {
-          try {
-            token = tf.getText('UTF-8').trim()
-          } catch (Exception ignored) {
-            token = ''
-          }
+          token = tf.getText('UTF-8').trim()
         }
+      } catch (Exception ignored) {
+        token = ''
+      }
+      if (!token) {
+        token = (rootProject.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
       }`;
 
 function patchMapboxTokenBlock(contents) {
