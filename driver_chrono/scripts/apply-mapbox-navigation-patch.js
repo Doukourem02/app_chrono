@@ -64,13 +64,31 @@ const androidGradlePath = path.join(
   'build.gradle'
 );
 if (fs.existsSync(androidGradlePath)) {
-  const gradle = fs.readFileSync(androidGradlePath, 'utf8');
-  const nextGradle = gradle.replace(
+  const original = fs.readFileSync(androidGradlePath, 'utf8');
+  let gradle = original;
+  const navNext = gradle.replace(
     /implementation\s+["']com\.mapbox\.navigation:android:[^"']+["']/,
     'implementation "com.mapbox.navigation:android:2.20.4"'
   );
-  if (gradle !== nextGradle) {
-    fs.writeFileSync(androidGradlePath, nextGradle);
+  if (navNext !== gradle) {
+    gradle = navNext;
     console.log('[apply-mapbox-navigation-patch] Bumped Fleetbase Android MapboxNavigation to 2.20.4');
+  }
+  // RN / Expo 0.81 + AGP : JavaCompile en 17, kotlinOptions encore 1.8 → échec Gradle « Inconsistent JVM Target ».
+  const beforeJvm = gradle;
+  gradle = gradle.replace(
+    /sourceCompatibility\s+JavaVersion\.VERSION_1_8/,
+    'sourceCompatibility JavaVersion.VERSION_17'
+  );
+  gradle = gradle.replace(
+    /targetCompatibility\s+JavaVersion\.VERSION_1_8/,
+    'targetCompatibility JavaVersion.VERSION_17'
+  );
+  gradle = gradle.replace(/jvmTarget\s*=\s*["']1\.8["']/, 'jvmTarget = "17"');
+  if (gradle !== beforeJvm) {
+    console.log('[apply-mapbox-navigation-patch] Fleetbase android: Java/Kotlin JVM target → 17 (aligné AGP/RN)');
+  }
+  if (gradle !== original) {
+    fs.writeFileSync(androidGradlePath, gradle);
   }
 }

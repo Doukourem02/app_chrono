@@ -88,8 +88,6 @@ module.exports = {
             : {}),
         },
       ],
-      /** PREFER_SETTINGS + repos (Mapbox auth via env) pour que Gradle n’ignore plus les dépôts settings. */
-      './plugins/withMapboxSettingsDependencyResolution.js',
       /** Patch token dans le bloc Maven Mapbox du settings (si présent). */
       './plugins/withMapboxSettingsGradleDownloadsToken.js',
       /** mapbox-init.gradle + apply from: settings (EAS n’applique pas toujours -I sur gradleCommand). */

@@ -37,66 +37,20 @@ const BLOCK = `      metadataSources {
 ${RESOLVE_TOKEN_ROOT}
 `;
 
-const EVERY_SUBPROJECT_HOOK_TAG = '@generated begin mapbox-every-subproject-maven';
+const LEGACY_SUBPROJECT_HOOK_START = '// @generated begin mapbox-every-subproject-maven';
+const LEGACY_SUBPROJECT_HOOK_END = '// @generated end mapbox-every-subproject-maven';
 
-const EVERY_SUBPROJECT_HOOK = `
-
-// ${EVERY_SUBPROJECT_HOOK_TAG}
-// exclusiveContent : les artefacts com.mapbox.* ne peuvent être résolus QUE depuis ce dépôt (avec auth).
-// Sinon Gradle peut tenter l’URL Mapbox sans credentials ou mélanger avec d’autres repos → Could not find.
-gradle.beforeProject { proj ->
-  proj.repositories {
-    exclusiveContent {
-      forRepository {
-        maven {
-          url 'https://api.mapbox.com/downloads/v2/releases/maven'
-          metadataSources {
-            mavenPom()
-            artifact()
-          }
-          def token = {
-            def t = (System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: '').trim()
-            if (t) return t
-            t = (System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
-            if (t) return t
-            t = (System.getenv('ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN') ?: '').trim()
-            if (t) return t
-            try {
-              def tf = rootProject.file('.mapbox_downloads_token')
-              if (tf.exists()) {
-                t = tf.getText('UTF-8').trim()
-                if (t) return t
-              }
-            } catch (Exception ignored) {}
-            return (rootProject.findProperty('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
-          }.call()
-          authentication { basic(BasicAuthentication) }
-          credentials {
-            username = 'mapbox'
-            password = token
-          }
-        }
-      }
-      filter {
-        includeGroupByRegex 'com\\\\.mapbox.*'
-      }
-    }
+function stripLegacySubprojectMapboxHook(contents) {
+  if (!contents.includes(LEGACY_SUBPROJECT_HOOK_START)) {
+    return contents;
   }
-}
-// @generated end mapbox-every-subproject-maven
-`;
-
-function appendEverySubprojectMapboxHook(contents) {
-  const endMarker = '// @generated end mapbox-every-subproject-maven';
-  if (contents.includes(EVERY_SUBPROJECT_HOOK_TAG)) {
-    const start = contents.indexOf(`// ${EVERY_SUBPROJECT_HOOK_TAG}`);
-    const end = contents.indexOf(endMarker, start);
-    if (start !== -1 && end !== -1) {
-      const after = contents.slice(end + endMarker.length).replace(/^\r?\n/, '');
-      contents = contents.slice(0, start) + after;
-    }
+  const start = contents.indexOf(LEGACY_SUBPROJECT_HOOK_START);
+  const end = contents.indexOf(LEGACY_SUBPROJECT_HOOK_END, start);
+  if (start === -1 || end === -1) {
+    return contents;
   }
-  return contents + EVERY_SUBPROJECT_HOOK;
+  const after = contents.slice(end + LEGACY_SUBPROJECT_HOOK_END.length).replace(/^\r?\n/, '');
+  return contents.slice(0, start).replace(/\s+$/, '') + (after ? `\n\n${after}` : '');
 }
 
 function patchMapboxTokenBlock(contents) {
@@ -127,8 +81,8 @@ module.exports = function withMapboxMavenTokenFromRootProject(config) {
     if (!next.includes('org.gradle.authentication.http.BasicAuthentication')) {
       next = `import org.gradle.authentication.http.BasicAuthentication\n\n${next}`;
     }
+    next = stripLegacySubprojectMapboxHook(next);
     next = patchMapboxTokenBlock(next);
-    next = appendEverySubprojectMapboxHook(next);
     cfg.modResults.contents = next;
     return cfg;
   });
