@@ -26,7 +26,7 @@ gradle.projectsLoaded {
     token = ''
   }
   if (!token) {
-    token = (System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
+    token = (System.getenv('RNMAPBOX_MAPS_DOWNLOAD_TOKEN') ?: System.getenv('MAPBOX_DOWNLOADS_TOKEN') ?: System.getenv('ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN') ?: '').toString().trim()
   }
   if (!token) {
     try {
@@ -43,14 +43,23 @@ gradle.projectsLoaded {
 
   gradle.rootProject.allprojects { proj ->
     proj.repositories {
-      maven {
-        url 'https://api.mapbox.com/downloads/v2/releases/maven'
-        if (token) {
-          authentication { basic(BasicAuthentication) }
-          credentials {
-            username = 'mapbox'
-            password = token
+      exclusiveContent {
+        forRepository {
+          maven {
+            url 'https://api.mapbox.com/downloads/v2/releases/maven'
+            metadataSources {
+              mavenPom()
+              artifact()
+            }
+            authentication { basic(BasicAuthentication) }
+            credentials {
+              username = 'mapbox'
+              password = token
+            }
           }
+        }
+        filter {
+          includeGroupByRegex 'com\\\\.mapbox.*'
         }
       }
     }

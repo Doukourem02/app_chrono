@@ -41,7 +41,6 @@ module.exports = {
       favicon: "./assets/images/logo/LOGO_APP1.png"
     },
     plugins: [
-      './plugins/withRequireMapboxDownloadsTokenAndroid.js',
       [
         'expo-build-properties',
         {
@@ -89,10 +88,7 @@ module.exports = {
             : {}),
         },
       ],
-      /**
-       * PREFER_SETTINGS : le dépôt Mapbox dans settings.gradle doit avoir le secret (gradle.properties,
-       * env, .mapbox_downloads_token). Les allprojects du root build.gradle ne suffisent pas.
-       */
+      /** Patch token dans le bloc Maven Mapbox du settings (si présent). RN 0.81 n’a souvent pas dependencyResolutionManagement. */
       './plugins/withMapboxSettingsGradleDownloadsToken.js',
       /** mapbox-init.gradle + apply from: settings (EAS n’applique pas toujours -I sur gradleCommand). */
       './plugins/withMapboxGradleApplyInitScript.js',
@@ -125,6 +121,11 @@ module.exports = {
       ],
       /** Après génération android/ : fichier .mapbox_downloads_token (EAS : post-install trop tôt). */
       './plugins/withMapboxAndroidDownloadsTokenFile.js',
+      /**
+       * MAPBOX_DOWNLOADS_TOKEN dans gradle.properties en dernier : sinon Expo / autres plugins
+       * peuvent régénérer gradle.properties et effacer la ligne avant Gradle.
+       */
+      './plugins/withRequireMapboxDownloadsTokenAndroid.js',
     ],
     experiments: {
       typedRoutes: true,

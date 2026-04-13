@@ -26,6 +26,7 @@ module.exports = function withRequireMapboxDownloadsTokenAndroid(config) {
         '[driver_chrono] Variable manquante : RNMAPBOX_MAPS_DOWNLOAD_TOKEN (ou MAPBOX_DOWNLOADS_TOKEN). ' +
           'Crée un token secret Mapbox (sk.…) avec le scope DOWNLOADS:READ, puis expo.dev → projet driver_chrono → ' +
           'Environment variables → environnement production → ajoute RNMAPBOX_MAPS_DOWNLOAD_TOKEN (Sensitive). ' +
+          'Optionnel (même valeur sk.) : MAPBOX_DOWNLOADS_TOKEN ou ORG_GRADLE_PROJECT_MAPBOX_DOWNLOADS_TOKEN si Gradle ne voit pas la variable. ' +
           'Sans cela, Gradle ne peut pas télécharger com.mapbox.maps sur le Maven Mapbox.'
       );
     }
