@@ -1,5 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet,TextInput,ActivityIndicator,Alert} from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  Animated,
+  PanResponderInstance,
+  TouchableOpacity,
+  StyleSheet,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userApiService } from '../services/userApiService';
@@ -14,6 +27,10 @@ interface RatingBottomSheetProps {
   onToggle: () => void;
   onRatingSubmitted?: () => void;
   onClose: () => void;
+  /** Monte le sheet (fraction « clavier » du hook), comme les champs adresse du formulaire colis. */
+  onCommentInputFocus?: () => void;
+  /** Repasse à la hauteur étendue normale après blur (délai aligné sur MapboxAddressAutocomplete). */
+  onCommentInputBlur?: () => void;
 }
 
 const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
@@ -25,8 +42,39 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
   onToggle,
   onRatingSubmitted,
   onClose,
+  onCommentInputFocus,
+  onCommentInputBlur,
 }) => {
   const insets = useSafeAreaInsets();
+  const commentBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCommentFocus = useCallback(() => {
+    if (commentBlurTimerRef.current) {
+      clearTimeout(commentBlurTimerRef.current);
+      commentBlurTimerRef.current = null;
+    }
+    onCommentInputFocus?.();
+  }, [onCommentInputFocus]);
+
+  const handleCommentBlur = useCallback(() => {
+    if (!onCommentInputBlur) return;
+    if (commentBlurTimerRef.current) {
+      clearTimeout(commentBlurTimerRef.current);
+    }
+    commentBlurTimerRef.current = setTimeout(() => {
+      onCommentInputBlur();
+      commentBlurTimerRef.current = null;
+    }, 220);
+  }, [onCommentInputBlur]);
+
+  useEffect(() => {
+    return () => {
+      if (commentBlurTimerRef.current) {
+        clearTimeout(commentBlurTimerRef.current);
+      }
+    };
+  }, []);
+
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -179,83 +227,102 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
         </View>
       )}
 
-      {/* État expandé */}
+      {/* État expandé — même logique que DeliveryBottomSheet (clavier) */}
       {isExpanded && (
-        <View style={styles.expandedCard}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#8B5CF6" />
-              <Text style={styles.loadingText}>Chargement...</Text>
-            </View>
-          ) : (
-            <>
-              <View style={styles.header}>
-                <Text style={styles.title}>
-                  {existingRating ? 'Modifier votre évaluation' : 'Évaluer votre livreur'}
-                </Text>
-                <TouchableOpacity 
-                  onPress={handleClose} 
-                  disabled={isSubmitting} 
-                  style={styles.closeButton}
-                >
-                  <Ionicons name="close" size={24} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
-
-              {driverName && (
-                <Text style={styles.driverName}>Livreur : {driverName}</Text>
-              )}
-
-              <Text style={styles.label}>Note globale</Text>
-              {renderStars()}
-              {rating > 0 && (
-                <Text style={styles.ratingText}>{rating} / 5</Text>
-              )}
-
-              <Text style={styles.label}>Commentaire (optionnel)</Text>
-              <TextInput
-                style={styles.commentInput}
-                placeholder="Donnez votre avis sur le service..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={4}
-                value={comment}
-                onChangeText={setComment}
-                editable={!isSubmitting}
-                maxLength={500}
-              />
-              <Text style={styles.charCount}>{comment.length} / 500</Text>
-
-              {/* Footer */}
-              <View style={styles.footer}>
-                <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={handleClose}
-                  disabled={isSubmitting}
-                >
-                  <Text style={styles.cancelButtonText}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.button,
-                    styles.submitButton,
-                    rating === 0 && styles.submitButtonDisabled,
-                  ]}
-                  onPress={handleSubmit}
-                  disabled={isSubmitting || rating === 0}
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.submitButtonText}>
-                      {existingRating ? 'Modifier' : 'Soumettre'}
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          enabled={Platform.OS === 'ios'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={[
+              styles.scrollContentContainer,
+              { paddingBottom: Math.max(16, insets.bottom + 8) },
+            ]}
+          >
+            <View style={styles.expandedCard}>
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#8B5CF6" />
+                  <Text style={styles.loadingText}>Chargement...</Text>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.header}>
+                    <Text style={styles.title}>
+                      {existingRating ? 'Modifier votre évaluation' : 'Évaluer votre livreur'}
                     </Text>
+                    <TouchableOpacity
+                      onPress={handleClose}
+                      disabled={isSubmitting}
+                      style={styles.closeButton}
+                    >
+                      <Ionicons name="close" size={24} color="#6B7280" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {driverName && (
+                    <Text style={styles.driverName}>Livreur : {driverName}</Text>
                   )}
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
+
+                  <Text style={styles.label}>Note globale</Text>
+                  {renderStars()}
+                  {rating > 0 && (
+                    <Text style={styles.ratingText}>{rating} / 5</Text>
+                  )}
+
+                  <Text style={styles.label}>Commentaire (optionnel)</Text>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Donnez votre avis sur le service..."
+                    placeholderTextColor="#9CA3AF"
+                    multiline
+                    numberOfLines={4}
+                    value={comment}
+                    onChangeText={setComment}
+                    onFocus={handleCommentFocus}
+                    onBlur={handleCommentBlur}
+                    editable={!isSubmitting}
+                    maxLength={500}
+                  />
+                  <Text style={styles.charCount}>{comment.length} / 500</Text>
+
+                  <View style={styles.footer}>
+                    <TouchableOpacity
+                      style={[styles.button, styles.cancelButton]}
+                      onPress={handleClose}
+                      disabled={isSubmitting}
+                    >
+                      <Text style={styles.cancelButtonText}>Annuler</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.button,
+                        styles.submitButton,
+                        rating === 0 && styles.submitButtonDisabled,
+                      ]}
+                      onPress={handleSubmit}
+                      disabled={isSubmitting || rating === 0}
+                    >
+                      {isSubmitting ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.submitButtonText}>
+                          {existingRating ? 'Modifier' : 'Soumettre'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </Animated.View>
   );
@@ -270,6 +337,18 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     backgroundColor: 'transparent',
+  },
+  keyboardAvoid: {
+    flex: 1,
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
   },
   dragIndicator: {
     alignItems: 'center',

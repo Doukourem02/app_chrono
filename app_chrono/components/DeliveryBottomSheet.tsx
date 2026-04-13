@@ -131,7 +131,10 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
       {isExpanded ? (
         <KeyboardAvoidingView
           style={styles.keyboardAvoid}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          /* Android : behavior "height" + animation de hauteur du sheet = conflit → tremblements.
+             On s’appuie sur expandForAddressInput (88 %) + ScrollView ; iOS garde padding. */
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          enabled={Platform.OS === 'ios'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}
         >
           <ScrollView

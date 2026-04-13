@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, PanResponder } from 'react-native';
+import { Animated, Dimensions, Easing, PanResponder, Platform } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BOTTOM_SHEET_MIN_HEIGHT = 100;
@@ -53,6 +53,15 @@ export const useBottomSheet = (options?: UseBottomSheetOptions) => {
   isAddressInputExpandedRef.current = isAddressInputExpanded;
 
   const springTo = useCallback((toValue: number) => {
+    if (Platform.OS === 'android') {
+      Animated.timing(animatedHeight, {
+        toValue,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+      return;
+    }
     Animated.spring(animatedHeight, {
       toValue,
       useNativeDriver: false,

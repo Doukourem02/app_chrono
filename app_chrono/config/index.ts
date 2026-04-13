@@ -56,7 +56,24 @@ export const config = {
 };
 
 if (__DEV__) {
-  console.warn('[Krono dev] API =', config.apiUrl, '| Socket =', config.socketUrl);
+  console.warn(
+    '[Krono dev] API =',
+    config.apiUrl,
+    '| Socket =',
+    config.socketUrl,
+    '| Track =',
+    config.trackBaseUrl
+  );
+}
+
+if (
+  !__DEV__ &&
+  (config.trackBaseUrl.includes('localhost') || config.trackBaseUrl.includes('127.0.0.1'))
+) {
+  logger.error(
+    '[Krono prod] EXPO_PUBLIC_TRACK_BASE_URL pointe vers localhost — le lien « Partager au destinataire » sera invalide sur un autre téléphone. Mets l’URL HTTPS de l’admin (ex. https://admin.tondomaine.com) dans EAS.',
+    'config'
+  );
 }
 
 if (!__DEV__ && (config.apiUrl.includes('localhost') || config.apiUrl.includes('127.0.0.1'))) {

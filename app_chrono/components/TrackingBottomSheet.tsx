@@ -21,6 +21,18 @@ interface TrackingBottomSheetProps {
   activeOrdersCount?: number;
 }
 
+async function shareTrackMessage(trackUrl: string): Promise<void> {
+  try {
+    await Share.share({
+      message: `Suivez votre livraison Krono en temps réel : ${trackUrl}`,
+      title: 'Lien de suivi Krono',
+    });
+  } catch (err) {
+    logger.error('Erreur partage lien', undefined, err);
+    Alert.alert('Erreur', 'Impossible de partager le lien');
+  }
+}
+
 const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   currentOrder,
   panResponder,
@@ -416,19 +428,33 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                   style={styles.shareLinkButton}
                   onPress={async () => {
                     const token = currentOrder?.trackingToken || currentOrder?.tracking_token;
-                    const baseUrl = (config as any).trackBaseUrl || 'http://localhost:3000';
+                    const raw = (config.trackBaseUrl || '').trim();
+                    const baseUrl = raw || 'http://localhost:3000';
                     const trackUrl = `${baseUrl.replace(/\/$/, '')}/track/${token}`;
-                    try {
-                      // Ne pas utiliser `url` séparément : sur iOS, message+url génère du bplist corrompu.
-                      // Le message contient déjà l'URL en texte brut → lien cliquable et partage propre.
-                      await Share.share({
-                        message: `Suivez votre livraison Krono en temps réel : ${trackUrl}`,
-                        title: 'Lien de suivi Krono',
-                      });
-                    } catch (err) {
-                      logger.error('Erreur partage lien', undefined, err);
-                      Alert.alert('Erreur', 'Impossible de partager le lien');
+                    const looksLocal =
+                      /localhost|127\.0\.0\.1/i.test(baseUrl) || (!raw && __DEV__);
+                    if (looksLocal && !__DEV__) {
+                      Alert.alert(
+                        'Lien de suivi non configuré',
+                        'L’application n’a pas d’URL publique pour la page de suivi (EXPO_PUBLIC_TRACK_BASE_URL). Configure-la dans EAS (ex. https://admin.tondomaine.com) puis refais un build. Sinon le destinataire reçoit un lien localhost invalide.'
+                      );
+                      return;
                     }
+                    if (looksLocal && __DEV__) {
+                      Alert.alert(
+                        'Mode développement',
+                        `Le lien partagé pointe vers ta machine : ${trackUrl}\nSur le téléphone du destinataire, ce lien ne fonctionnera pas. Pour un test réel, définis EXPO_PUBLIC_TRACK_BASE_URL (URL HTTPS de l’admin) et rebuild.`,
+                        [
+                          { text: 'Annuler', style: 'cancel' },
+                          {
+                            text: 'Partager quand même',
+                            onPress: () => void shareTrackMessage(trackUrl),
+                          },
+                        ]
+                      );
+                      return;
+                    }
+                    await shareTrackMessage(trackUrl);
                   }}
                 >
                   <Ionicons name="share-social-outline" size={18} color="#7C3AED" />

@@ -105,7 +105,9 @@ export default function OrderTrackingPage() {
     toggle: toggleRatingBottomSheet,
     expand: expandRatingBottomSheet,
     collapse: collapseRatingBottomSheet,
-  } = useBottomSheet();
+    expandForAddressInput: expandRatingSheetForCommentInput,
+    restoreAfterAddressInput: restoreRatingSheetAfterCommentInput,
+  } = useBottomSheet({ addressInputHeightFraction: 0.88 });
 
   const {
     animatedHeight: messageAnimatedHeight,
@@ -677,6 +679,8 @@ export default function OrderTrackingPage() {
           onToggle={toggleRatingBottomSheet}
           onRatingSubmitted={handleRatingSubmitted}
           onClose={handleRatingClose}
+          onCommentInputFocus={expandRatingSheetForCommentInput}
+          onCommentInputBlur={restoreRatingSheetAfterCommentInput}
         />
       )}
     </View>

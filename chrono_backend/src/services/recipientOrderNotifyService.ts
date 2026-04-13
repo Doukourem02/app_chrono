@@ -71,6 +71,16 @@ export function extractRecipientPhoneFromOrder(order: {
   return t.length >= 8 ? t : null;
 }
 
+/** Base URL publique de la page /track (admin Next), sans slash final — SMS avec lien cliquable. */
+export function publicTrackPageBaseUrl(): string | null {
+  const u =
+    process.env.PUBLIC_TRACK_BASE_URL?.trim() ||
+    process.env.TRACK_PAGE_BASE_URL?.trim() ||
+    '';
+  if (!u || u.includes('localhost') || u.includes('127.0.0.1')) return null;
+  return u.replace(/\/$/, '');
+}
+
 function parseJsonField(raw: unknown): any {
   if (raw == null) return null;
   if (typeof raw === 'object') return raw;
@@ -177,7 +187,15 @@ export async function notifyAllForOrderStatus(params: {
 
   if (!recipientUserId && recipientPhone && isTwilioSmsConfigured()) {
     const brand = process.env.TWILIO_SMS_BODY_BRAND?.trim() || 'Krono';
-    const smsBody = `${brand} — ${copy.title}. ${copy.body}`;
+    let smsBody = `${brand} — ${copy.title}. ${copy.body}`;
+    const trackBase = publicTrackPageBaseUrl();
+    if (trackingToken && trackBase) {
+      smsBody += ` Suivi: ${trackBase}/track/${trackingToken}`;
+    } else if (trackingToken && !trackBase) {
+      logger.warn(
+        '[recipient-notify] SMS sans lien /track : définir PUBLIC_TRACK_BASE_URL (URL HTTPS de l’admin, ex. https://admin.tondomaine.com)'
+      );
+    }
     void sendTransactionalSMSTwilio(recipientPhone, smsBody).catch((e: unknown) => {
       logger.warn('[recipient-notify] sms:', e instanceof Error ? e.message : String(e));
     });

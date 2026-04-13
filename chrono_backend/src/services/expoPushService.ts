@@ -19,6 +19,16 @@ function copyForPayerStatus(status: string): { title: string; body: string } | n
         title: 'En route',
         body: 'Le livreur est en route vers le point de collecte de colis.',
       };
+    case 'picked_up':
+      return {
+        title: 'Colis récupéré',
+        body: 'Le livreur a récupéré le colis.',
+      };
+    case 'delivering':
+      return {
+        title: 'En livraison',
+        body: 'Le livreur est en route vers le destinataire.',
+      };
     case 'completed':
       return {
         title: 'Livraison terminée',
@@ -137,7 +147,13 @@ async function sendPushToUser(
   data: Record<string, unknown>
 ): Promise<void> {
   const tokens = await fetchTokensForUser(userId, appRole);
-  if (!tokens.length) return;
+  if (!tokens.length) {
+    logger.warn('[expo-push] aucun token push en base pour cet utilisateur — pas d’envoi (vérifie POST /api/push/register depuis l’app, permissions notif, build EAS Android)', {
+      appRole,
+      userIdPrefix: userId?.slice(0, 8),
+    });
+    return;
+  }
   const messages = tokens.map((to) => ({
     to,
     sound: 'default' as const,

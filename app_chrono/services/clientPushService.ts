@@ -26,11 +26,11 @@ function ensureNotificationHandler(): void {
   });
 }
 
-async function registerTokenWithBackend(expoPushToken: string): Promise<void> {
+async function registerTokenWithBackend(expoPushToken: string): Promise<boolean> {
   const token = await userApiService.ensureAccessToken();
   if (!token) {
     logger.warn("registerPush: pas de JWT", "clientPush");
-    return;
+    return false;
   }
   const platform = Platform.OS === "ios" ? "ios" : "android";
   const response = await apiFetch(
@@ -58,12 +58,14 @@ async function registerTokenWithBackend(expoPushToken: string): Promise<void> {
     } catch {
       /* ignore */
     }
-    logger.warn("registerPush: HTTP non OK", "clientPush", {
+    logger.warn("registerPush: HTTP non OK — aucune ligne créée dans push_tokens", "clientPush", {
       status: response.status,
       errCode,
       body: text.slice(0, 300),
     });
+    return false;
   }
+  return true;
 }
 
 /**
@@ -106,10 +108,16 @@ export async function initializeClientPushNotifications(_userId: string): Promis
 
   try {
     const push = await Notifications.getExpoPushTokenAsync({ projectId });
-    await registerTokenWithBackend(push.data);
-    logger.info("Token push client enregistré côté API", "clientPush");
+    const saved = await registerTokenWithBackend(push.data);
+    if (saved) {
+      logger.info("Token push client enregistré côté API", "clientPush", { platform: Platform.OS });
+    }
   } catch (e) {
-    logger.warn("getExpoPushTokenAsync / register échoué", "clientPush", e);
+    logger.warn(
+      "getExpoPushTokenAsync ou register échoué (Android : souvent FCM non configuré sur expo.dev — voir docs/checklists/android-push-fcm.md)",
+      "clientPush",
+      e
+    );
   }
 }
 

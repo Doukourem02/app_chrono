@@ -11,9 +11,27 @@ function normalizeOriginUrl(raw: string): string | null {
   try {
     const normalized = /^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`;
     const u = new URL(normalized);
-    return `${u.protocol}//${u.host}`;
+    return canonicalizeOrigin(`${u.protocol}//${u.host}`);
   } catch {
     return null;
+  }
+}
+
+/**
+ * Forme unique pour comparer les Origin (navigateurs / clients Socket.IO envoient parfois :443 ou :80 explicites).
+ */
+export function canonicalizeOrigin(origin: string): string {
+  try {
+    const u = new URL(origin.trim());
+    const port = u.port;
+    const defaultHttps = u.protocol === 'https:' && (port === '' || port === '443');
+    const defaultHttp = u.protocol === 'http:' && (port === '' || port === '80');
+    if (defaultHttps || defaultHttp) {
+      return `${u.protocol}//${u.hostname}`;
+    }
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return origin.trim();
   }
 }
 
@@ -95,6 +113,7 @@ export function isOriginAllowed(origin: string | undefined): boolean {
   }
 
   const allowedOrigins = getAllowedOrigins();
+  const incoming = canonicalizeOrigin(origin);
 
   // En développement, accepter toutes les origines localhost et 192.168.*
   if (process.env.NODE_ENV !== 'production') {
@@ -108,11 +127,11 @@ export function isOriginAllowed(origin: string | undefined): boolean {
   }
 
   for (const candidate of getBackendPublicOriginCandidates()) {
-    if (origin === candidate) {
+    if (incoming === canonicalizeOrigin(candidate)) {
       return true;
     }
   }
 
-  return allowedOrigins.includes(origin);
+  return allowedOrigins.some((a) => incoming === canonicalizeOrigin(a));
 }
 

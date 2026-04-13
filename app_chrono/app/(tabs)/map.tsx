@@ -301,7 +301,9 @@ export default function MapPage() {
     expand: expandRatingBottomSheet,
     collapse: collapseRatingBottomSheet,
     toggle: toggleRatingBottomSheet,
-  } = useBottomSheet();
+    expandForAddressInput: expandRatingSheetForCommentInput,
+    restoreAfterAddressInput: restoreRatingSheetAfterCommentInput,
+  } = useBottomSheet({ addressInputHeightFraction: 0.88 });
 
   const {
     showRatingBottomSheet,
@@ -1263,6 +1265,8 @@ export default function MapPage() {
           onToggle={toggleRatingBottomSheet}
           onRatingSubmitted={handleRatingSubmitted}
           onClose={handleRatingClose}
+          onCommentInputFocus={expandRatingSheetForCommentInput}
+          onCommentInputBlur={restoreRatingSheetAfterCommentInput}
         />
       )}
 

@@ -93,6 +93,8 @@ module.exports = {
       mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000',
       socketUrl: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:4000',
+      /** URL publique de la page /track (admin Next). Obligatoire en prod pour « Partager le lien » et tests sur téléphone. */
+      trackBaseUrl: process.env.EXPO_PUBLIC_TRACK_BASE_URL || '',
       // Même noms que sur EAS (aligné driver_chrono + envCheck)
       EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
       EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL,

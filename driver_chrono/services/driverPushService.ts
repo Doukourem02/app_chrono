@@ -26,11 +26,11 @@ function ensureNotificationHandler(): void {
   });
 }
 
-async function registerTokenWithBackend(expoPushToken: string): Promise<void> {
+async function registerTokenWithBackend(expoPushToken: string): Promise<boolean> {
   const { token } = await apiService.ensureAccessToken();
   if (!token) {
     logger.warn("registerPush: pas de JWT", "driverPush");
-    return;
+    return false;
   }
   const platform = Platform.OS === "ios" ? "ios" : "android";
   const response = await apiFetch(`${config.apiUrl}/api/push/register`, {
@@ -54,12 +54,14 @@ async function registerTokenWithBackend(expoPushToken: string): Promise<void> {
     } catch {
       /* ignore */
     }
-    logger.warn("registerPush: HTTP non OK", "driverPush", {
+    logger.warn("registerPush: HTTP non OK — aucune ligne créée dans push_tokens", "driverPush", {
       status: response.status,
       errCode,
       body: text.slice(0, 300),
     });
+    return false;
   }
+  return true;
 }
 
 /**
@@ -101,10 +103,16 @@ export async function initializeDriverPushNotifications(_userId: string): Promis
 
   try {
     const push = await Notifications.getExpoPushTokenAsync({ projectId });
-    await registerTokenWithBackend(push.data);
-    logger.info("Token push livreur enregistré côté API", "driverPush");
+    const saved = await registerTokenWithBackend(push.data);
+    if (saved) {
+      logger.info("Token push livreur enregistré côté API", "driverPush", { platform: Platform.OS });
+    }
   } catch (e) {
-    logger.warn("getExpoPushTokenAsync / register échoué", "driverPush", e);
+    logger.warn(
+      "getExpoPushTokenAsync ou register échoué (Android : FCM sur expo.dev — voir docs/checklists/android-push-fcm.md)",
+      "driverPush",
+      e
+    );
   }
 }
 

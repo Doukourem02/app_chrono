@@ -1,15 +1,34 @@
 import { Ionicons } from '@expo/vector-icons';
 import Octicons from '@expo/vector-icons/Octicons';
 import { Tabs } from 'expo-router';
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { usePeriodicClientOrderSync } from '../../hooks/usePeriodicClientOrderSync';
 
 export default function TabLayout() {
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   usePeriodicClientOrderSync();
+
+  /**
+   * Ancien style : left 20 + marginHorizontal 80 → ~100 px de chaque côté sur un écran moyen.
+   * Une seule paire left/right évite les écarts iOS/Android ; bottom suit la barre de gestes.
+   */
+  const tabBarLayoutStyle = useMemo(() => {
+    const preferredSide = 100;
+    const minPillWidth = 200;
+    const maxSide = Math.max(16, (windowWidth - minPillWidth) / 2);
+    const side = Math.min(preferredSide, maxSide);
+    return {
+      bottom: 12 + insets.bottom,
+      left: side,
+      right: side,
+    };
+  }, [insets.bottom, windowWidth]);
 
   useEffect(() => {
     if (user?.id) {
@@ -26,7 +45,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: styles.navBar,
+        tabBarStyle: [styles.navBar, tabBarLayoutStyle],
       }}
     >
         {/* ACCUEIL */}
@@ -76,24 +95,19 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   navBar: {
     position: 'absolute',
-    bottom: 25,
-    left: 20,
-    right: 20,
-    marginHorizontal: 80, 
     height: 80,
     backgroundColor: '#fff',
     borderRadius: 40,
     flexDirection: 'row',
-    justifyContent: 'space-evenly', 
+    justifyContent: 'space-evenly',
     alignItems: 'center',
-    paddingHorizontal: 5, 
+    paddingHorizontal: 5,
 
-    // Ombre douce
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 10,
-    elevation: 7,
+    elevation: 8,
   },
 
   iconContainer: {
