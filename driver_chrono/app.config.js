@@ -41,6 +41,7 @@ module.exports = {
       favicon: "./assets/images/logo/LOGO_APP1.png"
     },
     plugins: [
+      './plugins/withRequireMapboxDownloadsTokenAndroid.js',
       [
         'expo-build-properties',
         {
