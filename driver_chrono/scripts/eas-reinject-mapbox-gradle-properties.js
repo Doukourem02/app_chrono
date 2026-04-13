@@ -17,7 +17,7 @@ const path = require('path');
 function verifyMapboxMavenAccessOptional(token) {
   return new Promise((resolve) => {
     const url =
-      'https://api.mapbox.com/downloads/v2/releases/maven/com/mapbox/maps/android/10.19.4/android-10.19.4.pom';
+      'https://api.mapbox.com/downloads/v2/releases/maven/com/mapbox/maps/android/10.19.1/android-10.19.1.pom';
     const req = https.request(
       url,
       {

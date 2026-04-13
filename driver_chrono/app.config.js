@@ -46,9 +46,9 @@ module.exports = {
         {
           android: {
             /**
-             * @rnmapbox/maps (10.19.x) : si targetSdk ≥ 35, Gradle demande com.mapbox.maps:android-ndk27:10.19.4,
-             * artefact non publié pour cette version → build EAS cassé. 34 conserve com.mapbox.maps:android:10.19.4.
-             * (Play Store pourra exiger 35+ plus tard : migrer Mapbox / rnmapbox ou token Maven à ce moment-là.)
+             * @rnmapbox/maps (10.19.x) : si targetSdk ≥ 35, Gradle peut résoudre com.mapbox.maps:android-ndk27.
+             * 10.19.4 n’existe pas sur le Maven Mapbox (404) — utiliser une version publiée (ex. 10.19.1).
+             * (Play Store pourra exiger 35+ plus tard : vérifier la variante -ndk27 pour la version choisie.)
              */
             targetSdkVersion: 34,
           },
@@ -77,8 +77,8 @@ module.exports = {
         "@rnmapbox/maps",
         {
           RNMapboxMapsImpl: "mapbox",
-          // Aligné sur MapboxNavigation 2.20 (Fleetbase patché) : MapboxMaps ~> 10.19. 11.x entre en conflit CocoaPods avec Navigation.
-          RNMapboxMapsVersion: "10.19.4",
+          // Ligne Maps 10.19.x (11.x : conflits CocoaPods possibles avec Navigation). 10.19.4 absente du Maven Mapbox ; 10.19.1 publiée.
+          RNMapboxMapsVersion: "10.19.1",
           ...(process.env.RNMAPBOX_MAPS_DOWNLOAD_TOKEN || process.env.MAPBOX_DOWNLOADS_TOKEN
             ? {
                 RNMapboxMapsDownloadToken:
@@ -88,7 +88,9 @@ module.exports = {
             : {}),
         },
       ],
-      /** Patch token dans le bloc Maven Mapbox du settings (si présent). RN 0.81 n’a souvent pas dependencyResolutionManagement. */
+      /** PREFER_SETTINGS + repos (Mapbox auth via env) pour que Gradle n’ignore plus les dépôts settings. */
+      './plugins/withMapboxSettingsDependencyResolution.js',
+      /** Patch token dans le bloc Maven Mapbox du settings (si présent). */
       './plugins/withMapboxSettingsGradleDownloadsToken.js',
       /** mapbox-init.gradle + apply from: settings (EAS n’applique pas toujours -I sur gradleCommand). */
       './plugins/withMapboxGradleApplyInitScript.js',
