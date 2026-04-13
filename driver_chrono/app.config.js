@@ -55,6 +55,7 @@ module.exports = {
           },
         },
       ],
+      './plugins/withGradleWrapperNetworkTimeout.js',
       "expo-asset",
       "expo-audio",
       "@driveapp/expo-plugin-pod-disable-paths",
@@ -83,6 +84,8 @@ module.exports = {
             : {}),
         },
       ],
+      /** Après @rnmapbox/maps : corrige la lecture du token Maven (Gradle 8 / EAS). */
+      './plugins/withMapboxMavenTokenFromRootProject.js',
       [
         "expo-location",
         {

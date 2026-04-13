@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "update-ip": "node ./scripts/update-env-ip.js",
+    "eas-build-post-install": "node ./scripts/eas-reinject-mapbox-gradle-properties.js",
     "postinstall": "patch-package && node scripts/apply-mapbox-navigation-patch.js && node scripts/verify-rnmapbox-android-patch.js",
     "fix-reroute": "node scripts/fix-mapbox-reroute-latency.js",
     "prestart": "npm run update-ip",
