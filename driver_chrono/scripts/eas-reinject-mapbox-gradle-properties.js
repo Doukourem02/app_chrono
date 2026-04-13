@@ -1,8 +1,7 @@
 /**
- * Sur EAS Build Android, s'assure que MAPBOX_DOWNLOADS_TOKEN est bien présent dans
- * android/gradle.properties juste avant ./gradlew (après prebuild / caches).
- * Gradle résout com.mapbox.maps sur api.mapbox.com avec ce secret ; sans ligne valide,
- * le bloc maven @rnmapbox n'envoie pas les credentials → « Could not find … ».
+ * EAS Android : réinjecte le secret Mapbox avant ./gradlew.
+ * - MAPBOX_DOWNLOADS_TOKEN dans gradle.properties
+ * - android/.mapbox_downloads_token (fallback lu par build.gradle, contourne soucis de parsing)
  */
 const fs = require('fs');
 const path = require('path');
@@ -21,15 +20,20 @@ function main() {
     .trim();
   if (!token) return;
 
-  const gradlePropsPath = path.join(__dirname, '..', 'android', 'gradle.properties');
-  if (!fs.existsSync(gradlePropsPath)) return;
+  const androidDir = path.join(__dirname, '..', 'android');
+  if (!fs.existsSync(androidDir)) return;
 
-  const content = fs.readFileSync(gradlePropsPath, 'utf8');
-  const lines = content.split(/\r?\n/);
-  const filtered = lines.filter((line) => !/^\s*MAPBOX_DOWNLOADS_TOKEN\s*=/.test(line));
-  filtered.push(`MAPBOX_DOWNLOADS_TOKEN=${token}`);
-  const out = filtered.join('\n');
-  fs.writeFileSync(gradlePropsPath, out.endsWith('\n') ? out : `${out}\n`);
+  const gradlePropsPath = path.join(androidDir, 'gradle.properties');
+  if (fs.existsSync(gradlePropsPath)) {
+    const content = fs.readFileSync(gradlePropsPath, 'utf8');
+    const lines = content.split(/\r?\n/);
+    const filtered = lines.filter((line) => !/^\s*MAPBOX_DOWNLOADS_TOKEN\s*=/.test(line));
+    filtered.push(`MAPBOX_DOWNLOADS_TOKEN=${token}`);
+    const out = filtered.join('\n');
+    fs.writeFileSync(gradlePropsPath, out.endsWith('\n') ? out : `${out}\n`);
+  }
+
+  fs.writeFileSync(path.join(androidDir, '.mapbox_downloads_token'), token, 'utf8');
 }
 
 main();
