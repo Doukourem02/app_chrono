@@ -53,3 +53,24 @@ if (fs.existsSync(podspecPath)) {
     console.log('[apply-mapbox-navigation-patch] Bumped Fleetbase MapboxNavigation pod to ~> 2.20 (Maps ~> 10.19)');
   }
 }
+
+const androidGradlePath = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  '@fleetbase',
+  'react-native-mapbox-navigation',
+  'android',
+  'build.gradle'
+);
+if (fs.existsSync(androidGradlePath)) {
+  const gradle = fs.readFileSync(androidGradlePath, 'utf8');
+  const nextGradle = gradle.replace(
+    /implementation\s+["']com\.mapbox\.navigation:android:[^"']+["']/,
+    'implementation "com.mapbox.navigation:android:2.20.4"'
+  );
+  if (gradle !== nextGradle) {
+    fs.writeFileSync(androidGradlePath, nextGradle);
+    console.log('[apply-mapbox-navigation-patch] Bumped Fleetbase Android MapboxNavigation to 2.20.4');
+  }
+}

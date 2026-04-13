@@ -4,9 +4,60 @@
  * - android/.mapbox_downloads_token (fallback lu par build.gradle, contourne soucis de parsing)
  */
 const fs = require('fs');
+const https = require('https');
 const path = require('path');
 
-function main() {
+/**
+ * Contrôle optionnel : ne doit pas faire échouer le build (Gradle reste la vérité).
+ * Mapbox renvoie souvent 404 pour les accès refusés ; Gradle peut quand même résoudre selon le contexte.
+ */
+function verifyMapboxMavenAccessOptional(token) {
+  return new Promise((resolve) => {
+    const url =
+      'https://api.mapbox.com/downloads/v2/releases/maven/com/mapbox/maps/android/10.19.4/android-10.19.4.pom';
+    const req = https.request(
+      url,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Basic ${Buffer.from(`mapbox:${token}`).toString('base64')}`,
+        },
+        timeout: 15000,
+      },
+      (res) => {
+        res.on('data', () => {});
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            console.error('[eas-reinject-mapbox] Vérification HTTP optionnelle : OK (200)');
+          } else {
+            console.warn(
+              `[eas-reinject-mapbox] Vérification HTTP optionnelle : HTTP ${res.statusCode} (non bloquant). ` +
+                'Sur le dépôt Mapbox, 401/403/404 indiquent souvent un token sans DOWNLOADS:READ ou un mauvais compte. ' +
+                'Si Gradle échoue ensuite sur com.mapbox.maps, régénère le secret sk. et les variables Expo.'
+            );
+          }
+          resolve();
+        });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy();
+      console.warn(
+        '[eas-reinject-mapbox] Vérification HTTP optionnelle : timeout (non bloquant).'
+      );
+      resolve();
+    });
+    req.on('error', (err) => {
+      console.warn(
+        `[eas-reinject-mapbox] Vérification HTTP optionnelle : ${err.message} (non bloquant).`
+      );
+      resolve();
+    });
+    req.end();
+  });
+}
+
+async function main() {
   if (process.env.EAS_BUILD !== 'true') return;
   const platform = (process.env.EAS_BUILD_PLATFORM || '').toLowerCase();
   if (platform && platform !== 'android') return;
@@ -36,6 +87,11 @@ function main() {
   console.error(
     `[eas-reinject-mapbox] android/ prêt : MAPBOX_DOWNLOADS_TOKEN + .mapbox_downloads_token (longueur ${token.length})`
   );
+
+  await verifyMapboxMavenAccessOptional(token);
 }
 
-main();
+main().catch((error) => {
+  console.error(error.message || error);
+  process.exit(1);
+});

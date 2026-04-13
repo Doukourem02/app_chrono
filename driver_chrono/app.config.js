@@ -89,6 +89,11 @@ module.exports = {
             : {}),
         },
       ],
+      /**
+       * PREFER_SETTINGS : le dépôt Mapbox dans settings.gradle doit avoir le secret (gradle.properties,
+       * env, .mapbox_downloads_token). Les allprojects du root build.gradle ne suffisent pas.
+       */
+      './plugins/withMapboxSettingsGradleDownloadsToken.js',
       [
         "expo-location",
         {
