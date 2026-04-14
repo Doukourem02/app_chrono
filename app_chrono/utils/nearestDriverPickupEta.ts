@@ -14,11 +14,12 @@ function driverMatchesMethod(d: OnlineDriver, method: ClientDeliveryMethod): boo
   return vt === method;
 }
 
-export function estimateNearestDriverEtaToPickup(
+/** Livreurs en ligne, disponibles, bon type de véhicule — pour ETA et UI « X livreurs près du collecte ». */
+export function getEligibleDriversForPickup(
   pickup: { latitude: number; longitude: number } | null,
   drivers: OnlineDriver[],
   deliveryMethod: ClientDeliveryMethod
-): { seconds: number } | null {
+): OnlineDriver[] {
   if (
     !pickup ||
     pickup.latitude == null ||
@@ -27,10 +28,10 @@ export function estimateNearestDriverEtaToPickup(
     Number.isNaN(pickup.longitude) ||
     !drivers.length
   ) {
-    return null;
+    return [];
   }
 
-  const eligible = drivers.filter(
+  return drivers.filter(
     (d) =>
       d.is_online === true &&
       d.is_available !== false &&
@@ -40,7 +41,37 @@ export function estimateNearestDriverEtaToPickup(
       !Number.isNaN(d.current_latitude) &&
       !Number.isNaN(d.current_longitude)
   );
-  if (!eligible.length) return null;
+}
+
+/** Même filtre que l’ETA, trié par distance au point de collecte (plus proche en premier). */
+export function listEligibleDriversSortedByPickup(
+  pickup: { latitude: number; longitude: number } | null,
+  drivers: OnlineDriver[],
+  deliveryMethod: ClientDeliveryMethod
+): OnlineDriver[] {
+  const eligible = getEligibleDriversForPickup(pickup, drivers, deliveryMethod);
+  if (!eligible.length || !pickup) return eligible;
+
+  return [...eligible].sort((a, b) => {
+    const ma = calculateDistance(pickup, {
+      latitude: a.current_latitude,
+      longitude: a.current_longitude,
+    });
+    const mb = calculateDistance(pickup, {
+      latitude: b.current_latitude,
+      longitude: b.current_longitude,
+    });
+    return ma - mb;
+  });
+}
+
+export function estimateNearestDriverEtaToPickup(
+  pickup: { latitude: number; longitude: number } | null,
+  drivers: OnlineDriver[],
+  deliveryMethod: ClientDeliveryMethod
+): { seconds: number } | null {
+  const eligible = getEligibleDriversForPickup(pickup, drivers, deliveryMethod);
+  if (!eligible.length || !pickup) return null;
 
   let bestMinutes = Infinity;
   for (const d of eligible) {

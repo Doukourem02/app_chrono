@@ -14,6 +14,8 @@ interface DriverInfo {
   rating?: number;
   phone?: string;
   email?: string;
+  vehicle_plate?: string;
+  vehicle_type?: string;
 }
 
 interface OrderInfo {
@@ -30,6 +32,10 @@ interface DriverSearchBottomSheetProps {
   searchSeconds: number;
   driver?: DriverInfo | null;
   order?: OrderInfo | null;
+  /** Livreurs en ligne + bon véhicule près du point de collecte (même logique que l’ETA). */
+  eligibleNearbyCount?: number;
+  /** Photo du livreur le plus proche (aperçu pendant l’attente). */
+  previewDriverAvatarUrl?: string;
   onCancel: () => void;
   onDetails: () => void;
   onBack?: () => void;
@@ -54,6 +60,8 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
   searchSeconds,
   driver,
   order,
+  eligibleNearbyCount = 0,
+  previewDriverAvatarUrl,
   onCancel,
   onDetails,
   onBack,
@@ -61,6 +69,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
   const progressAnim = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const [avatarError, setAvatarError] = useState(false);
+  const [previewAvatarError, setPreviewAvatarError] = useState(false);
   /** Durée d’un cycle de barre (alignée sur la fenêtre d’acceptation livreur côté serveur / driver_chrono). */
   const progressCycleSeconds = 30;
 
@@ -105,6 +114,10 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
       setAvatarError(false);
     }
   }, [driver?.id]);
+
+  useEffect(() => {
+    setPreviewAvatarError(false);
+  }, [previewDriverAvatarUrl]);
 
   // Formater le temps de recherche (MM:SS)
   const formatTime = (seconds: number) => {
@@ -161,6 +174,10 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     const deliveryMethod = order?.deliveryMethod ? DELIVERY_METHOD_LABELS[order.deliveryMethod] : null;
     const orderIdShort = order?.id ? `#${order.id.slice(0, 8).toUpperCase()}` : null;
     const priceFormatted = order?.price != null ? `${order.price.toLocaleString('fr-FR')} FCFA` : null;
+    const vehiclePlate = driver.vehicle_plate?.trim();
+    const vehicleTypeLabel = driver.vehicle_type
+      ? DELIVERY_METHOD_LABELS[driver.vehicle_type as keyof typeof DELIVERY_METHOD_LABELS] || driver.vehicle_type
+      : null;
 
     return (
       <View style={styles.container}>
@@ -221,6 +238,17 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
                 </View>
                 <Text style={styles.phoneText}>{driverPhone}</Text>
               </TouchableOpacity>
+            )}
+
+            {(vehiclePlate || vehicleTypeLabel) && (
+              <View style={styles.vehiclePlateRow}>
+                <Ionicons name="card-outline" size={16} color="#6B7280" />
+                <Text style={styles.vehiclePlateText}>
+                  {[vehiclePlate ? `Immat. ${vehiclePlate}` : null, vehicleTypeLabel || null]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              </View>
             )}
           </View>
         </View>
@@ -288,17 +316,69 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     outputRange: ['0%', '100%'],
   });
 
+  const socialLine =
+    eligibleNearbyCount <= 0
+      ? 'Aucun livreur compatible à proximité pour l’instant — nous continuons la recherche.'
+      : eligibleNearbyCount === 1
+        ? '1 livreur compatible est disponible près du point de collecte.'
+        : `${eligibleNearbyCount} livreurs compatibles sont disponibles près du point de collecte.`;
+
+  const method = order?.deliveryMethod;
+
+  const priceFormattedSearch =
+    order?.price != null ? `${order.price.toLocaleString('fr-FR')} FCFA` : null;
+  const deliveryMethodLabel = method ? DELIVERY_METHOD_LABELS[method] : null;
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Recherche d&apos;un livreur</Text>
-          <Text style={styles.timer}>{formatTime(searchSeconds)}</Text>
+      <View style={styles.searchHighlightCard}>
+        <View style={styles.searchHeaderRow}>
+          <Text style={styles.searchSocialText}>{socialLine}</Text>
+          <View style={styles.searchLucarneAvatar}>
+            {previewDriverAvatarUrl && !previewAvatarError ? (
+              <Image
+                source={{ uri: previewDriverAvatarUrl }}
+                style={styles.searchLucarneAvatarImg}
+                resizeMode="cover"
+                onError={() => setPreviewAvatarError(true)}
+              />
+            ) : (
+              <View style={styles.searchLucarnePlaceholder}>
+                {method === 'moto' ? (
+                  <Ionicons name="bicycle" size={22} color="#7C3AED" />
+                ) : method === 'cargo' ? (
+                  <Ionicons name="cube-outline" size={22} color="#7C3AED" />
+                ) : (
+                  <Ionicons name="car-outline" size={22} color="#7C3AED" />
+                )}
+              </View>
+            )}
+          </View>
         </View>
         <View style={styles.progressBarWrapper}>
-          <Animated.View style={[styles.progressBarContainer, { width: progressWidth }]} />
+          <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
         </View>
       </View>
+
+      <Text style={styles.searchMainTitle}>Recherche d&apos;un livreur à proximité</Text>
+      <Text style={styles.searchTimerSub}>
+        Temps écoulé · {formatTime(searchSeconds)}
+      </Text>
+
+      {(priceFormattedSearch || deliveryMethodLabel) && (
+        <View style={styles.farePreviewBox}>
+          {priceFormattedSearch && (
+            <Text style={styles.farePreviewAmount}>{priceFormattedSearch}</Text>
+          )}
+          <Text style={styles.farePreviewHint}>Tarif de cette course</Text>
+          {deliveryMethodLabel && (
+            <View style={styles.farePreviewModeRow}>
+              <Ionicons name="flash-outline" size={14} color="#6B7280" />
+              <Text style={styles.farePreviewMode}>{deliveryMethodLabel}</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       <View style={styles.actionsContainer}>
         <TouchableOpacity style={styles.actionButton} onPress={onCancel} activeOpacity={0.7}>
@@ -337,38 +417,120 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 15,
     zIndex: 1000,
-    minHeight: 200,
+    minHeight: 240,
   },
-  header: {
-    marginBottom: 24,
+  searchHighlightCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    marginBottom: 14,
   },
-  titleContainer: {
+  searchHeaderRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 12,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
+  searchSocialText: {
+    flex: 1,
+    paddingRight: 10,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+    color: '#374151',
   },
-  timer: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
+  searchLucarneAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#EDE9FE',
+    backgroundColor: '#FFFFFF',
+  },
+  searchLucarneAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  searchLucarnePlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
   },
   progressBarWrapper: {
     width: '100%',
-    height: 4,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 2,
+    height: 5,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
     overflow: 'hidden',
   },
-  progressBarContainer: {
+  progressBarFill: {
     height: '100%',
-    backgroundColor: '#8B5CF6', // Violet
-    borderRadius: 2,
+    backgroundColor: '#7C3AED',
+    borderRadius: 3,
+  },
+  searchMainTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  searchTimerSub: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    marginBottom: 14,
+  },
+  farePreviewBox: {
+    backgroundColor: '#FAFAFA',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  farePreviewAmount: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -0.5,
+  },
+  farePreviewHint: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  farePreviewModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 4,
+  },
+  farePreviewMode: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginLeft: 4,
+  },
+  vehiclePlateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 6,
+  },
+  vehiclePlateText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4B5563',
   },
   actionsContainer: {
     flexDirection: 'row',

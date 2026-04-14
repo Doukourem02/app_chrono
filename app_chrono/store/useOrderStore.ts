@@ -23,6 +23,8 @@ export interface OrderRequest {
     avatar_url?: string;
     profile_image_url?: string;
     rating?: number;
+    vehicle_plate?: string;
+    vehicle_type?: string;
   };
   pickup: {
     address: string;
