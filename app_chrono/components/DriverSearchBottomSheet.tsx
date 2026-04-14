@@ -9,10 +9,8 @@ import {
   Linking,
   Dimensions,
   ScrollView,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logger } from '../utils/logger';
 
@@ -49,7 +47,7 @@ interface DriverSearchBottomSheetProps {
   order?: OrderInfo | null;
   /** Livreurs en ligne et disponibles près du collecte pour ce mode (moto / véhicule / cargo) — même périmètre que l’ETA. */
   eligibleNearbyCount?: number;
-  /** Photo du livreur le plus proche (aperçu pendant l’attente). */
+  /** Photo du livreur le plus proche (mini-avatar à droite du statut, comme les apps type Uber). */
   previewDriverAvatarUrl?: string;
   onCancel: () => void;
   onDetails: () => void;
@@ -135,11 +133,6 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
   }, [previewDriverAvatarUrl]);
 
   const insets = useSafeAreaInsets();
-  const baseFare = order?.price ?? 0;
-  const [fareBonus, setFareBonus] = useState(0);
-  useEffect(() => {
-    setFareBonus(0);
-  }, [order?.id, order?.price]);
 
   // Formater le temps de recherche (MM:SS)
   const formatTime = (seconds: number) => {
@@ -353,30 +346,16 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     outputRange: ['0%', '100%'],
   });
 
-  const method = order?.deliveryMethod;
-  const deliveryMethodLabel = method ? DELIVERY_METHOD_LABELS[method] : null;
-
-  /** Ligne courte, ton actif (pas de message négatif dominant). */
+  /**
+   * Équivalent FR de la ligne type « n Driver(s) are viewing your request » (réf. Uber / Bolt).
+   * Au-dessus de la barre de progression, avec mini-avatar à droite.
+   */
   const statusLine =
-    eligibleNearbyCount > 0
-      ? `${eligibleNearbyCount} livreur${eligibleNearbyCount > 1 ? 's' : ''} dans la zone`
-      : 'Recherche en cours…';
-
-  const FARE_STEP = 100;
-  const FARE_MAX_BONUS = 5000;
-  const displayFare = baseFare + fareBonus;
-  const bumpFare = (delta: number) => {
-    void Haptics.selectionAsync();
-    setFareBonus((b) => {
-      const n = b + delta;
-      if (n < 0) return 0;
-      if (n > FARE_MAX_BONUS) return FARE_MAX_BONUS;
-      return n;
-    });
-  };
-
-  const priceFormattedSearch =
-    displayFare > 0 ? `${displayFare.toLocaleString('fr-FR')} FCFA` : null;
+    eligibleNearbyCount <= 0
+      ? 'Recherche en cours…'
+      : eligibleNearbyCount === 1
+        ? '1 livreur consulte votre demande'
+        : `${eligibleNearbyCount} livreurs consultent votre demande`;
 
   return (
     <View
@@ -389,72 +368,24 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
       <View style={styles.searchFloatCard}>
         <View style={styles.sheetHandle} />
 
+        <View style={styles.searchTopRow}>
+          <Text style={styles.searchStatusCompact}>{statusLine}</Text>
+          {previewDriverAvatarUrl && !previewAvatarError ? (
+            <Image
+              source={{ uri: previewDriverAvatarUrl }}
+              style={styles.searchMicroAvatar}
+              resizeMode="cover"
+              onError={() => setPreviewAvatarError(true)}
+            />
+          ) : null}
+        </View>
+
         <View style={styles.progressBarWrapper}>
           <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
         </View>
 
-        <View style={styles.searchHeaderRow}>
-          <Text style={styles.searchStatusCompact}>{statusLine}</Text>
-          <View style={styles.searchLucarneAvatar}>
-            {previewDriverAvatarUrl && !previewAvatarError ? (
-              <Image
-                source={{ uri: previewDriverAvatarUrl }}
-                style={styles.searchLucarneAvatarImg}
-                resizeMode="cover"
-                onError={() => setPreviewAvatarError(true)}
-              />
-            ) : (
-              <View style={styles.searchLucarnePlaceholder}>
-                {method === 'moto' ? (
-                  <Ionicons name="bicycle" size={20} color="#7C3AED" />
-                ) : method === 'cargo' ? (
-                  <Ionicons name="cube-outline" size={20} color="#7C3AED" />
-                ) : (
-                  <Ionicons name="car-outline" size={20} color="#7C3AED" />
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-
         <Text style={styles.searchMainTitle}>Un livreur pour vous</Text>
         <Text style={styles.searchTimerSub}>{formatTime(searchSeconds)}</Text>
-
-        {(priceFormattedSearch || deliveryMethodLabel) && (
-          <View style={styles.fareInteractiveBox}>
-            <View style={styles.fareStepperRow}>
-              <Pressable
-                style={[styles.fareStepBtn, fareBonus <= 0 && styles.fareStepBtnDim]}
-                onPress={() => bumpFare(-FARE_STEP)}
-                disabled={fareBonus <= 0}
-                hitSlop={8}
-              >
-                <Text style={styles.fareStepBtnText}>−</Text>
-              </Pressable>
-              <View style={styles.fareStepperCenter}>
-                <Text style={styles.farePreviewAmount}>{priceFormattedSearch}</Text>
-                <Text style={styles.farePreviewHint}>Tarif affiché</Text>
-              </View>
-              <Pressable
-                style={[
-                  styles.fareStepBtn,
-                  fareBonus >= FARE_MAX_BONUS && styles.fareStepBtnDim,
-                ]}
-                onPress={() => bumpFare(FARE_STEP)}
-                disabled={fareBonus >= FARE_MAX_BONUS}
-                hitSlop={8}
-              >
-                <Text style={styles.fareStepBtnText}>+</Text>
-              </Pressable>
-            </View>
-            {deliveryMethodLabel ? (
-              <View style={styles.farePreviewModeRow}>
-                <Ionicons name="flash-outline" size={14} color="#6B7280" />
-                <Text style={styles.farePreviewMode}>{deliveryMethodLabel}</Text>
-              </View>
-            ) : null}
-          </View>
-        )}
 
         <TouchableOpacity
           style={styles.searchPrimaryCta}
@@ -540,40 +471,29 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#E5E7EB',
     alignSelf: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  searchHeaderRow: {
+  searchTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   searchStatusCompact: {
     flex: 1,
-    paddingRight: 10,
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: '600',
+    paddingRight: 8,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
     color: '#111827',
   },
-  searchLucarneAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#EDE9FE',
-    backgroundColor: '#FFFFFF',
-  },
-  searchLucarneAvatarImg: {
-    width: '100%',
-    height: '100%',
-  },
-  searchLucarnePlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  searchMicroAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   progressBarWrapper: {
     width: '100%',
@@ -581,7 +501,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   progressBarFill: {
     height: '100%',
@@ -598,70 +518,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#9CA3AF',
-    marginBottom: 12,
+    marginBottom: 16,
     letterSpacing: 0.5,
-  },
-  fareInteractiveBox: {
-    backgroundColor: '#FAFAFA',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    marginBottom: 12,
-  },
-  fareStepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  fareStepBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fareStepBtnDim: {
-    opacity: 0.4,
-  },
-  fareStepBtnText: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: -2,
-  },
-  fareStepperCenter: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  farePreviewAmount: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#111827',
-    letterSpacing: -0.5,
-  },
-  farePreviewHint: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  farePreviewModeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  farePreviewMode: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginLeft: 4,
   },
   searchPrimaryCta: {
     flexDirection: 'row',
