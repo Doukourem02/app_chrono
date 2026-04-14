@@ -1,12 +1,6 @@
 @import "tailwindcss";
 @import "mapbox-gl/dist/mapbox-gl.css";
 
-/* Périmètre explicite (Tailwind v4) : évite des utilitaires absents sur certaines pages. */
-@source "../app/**/*.{js,ts,jsx,tsx,mdx}";
-@source "../components/**/*.{js,ts,jsx,tsx,mdx}";
-@source "../contexts/**/*.{js,ts,jsx,tsx,mdx}";
-@source "../hooks/**/*.{js,ts,jsx,tsx,mdx}";
-
 :root {
   --background: #ffffff;
   --foreground: #171717;
