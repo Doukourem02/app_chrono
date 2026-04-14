@@ -45,10 +45,6 @@ interface DriverSearchBottomSheetProps {
   searchSeconds: number;
   driver?: DriverInfo | null;
   order?: OrderInfo | null;
-  /** Livreurs en ligne et disponibles près du collecte pour ce mode (moto / véhicule / cargo) — même périmètre que l’ETA. */
-  eligibleNearbyCount?: number;
-  /** Photo du livreur le plus proche (mini-avatar à droite du statut, comme les apps type Uber). */
-  previewDriverAvatarUrl?: string;
   onCancel: () => void;
   onDetails: () => void;
   onBack?: () => void;
@@ -73,8 +69,6 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
   searchSeconds,
   driver,
   order,
-  eligibleNearbyCount = 0,
-  previewDriverAvatarUrl,
   onCancel,
   onDetails,
   onBack,
@@ -82,7 +76,6 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
   const progressAnim = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const [avatarError, setAvatarError] = useState(false);
-  const [previewAvatarError, setPreviewAvatarError] = useState(false);
   /** Durée d’un cycle de barre (alignée sur la fenêtre d’acceptation livreur côté serveur / driver_chrono). */
   const progressCycleSeconds = 30;
 
@@ -127,10 +120,6 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
       setAvatarError(false);
     }
   }, [driver?.id]);
-
-  useEffect(() => {
-    setPreviewAvatarError(false);
-  }, [previewDriverAvatarUrl]);
 
   const insets = useSafeAreaInsets();
 
@@ -346,63 +335,41 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     outputRange: ['0%', '100%'],
   });
 
-  /**
-   * Équivalent FR de la ligne type « n Driver(s) are viewing your request » (réf. Uber / Bolt).
-   * Au-dessus de la barre de progression, avec mini-avatar à droite.
-   */
-  const statusLine =
-    eligibleNearbyCount <= 0
-      ? 'Recherche en cours…'
-      : eligibleNearbyCount === 1
-        ? '1 livreur consulte votre demande'
-        : `${eligibleNearbyCount} livreurs consultent votre demande`;
-
   return (
     <View
       style={[
         styles.searchFloatOuter,
-        { paddingBottom: Math.max(insets.bottom, 10) },
+        { paddingBottom: Math.max(insets.bottom, 14) },
       ]}
       pointerEvents="box-none"
     >
       <View style={styles.searchFloatCard}>
         <View style={styles.sheetHandle} />
 
-        <View style={styles.searchTopRow}>
-          <Text style={styles.searchStatusCompact}>{statusLine}</Text>
-          {previewDriverAvatarUrl && !previewAvatarError ? (
-            <Image
-              source={{ uri: previewDriverAvatarUrl }}
-              style={styles.searchMicroAvatar}
-              resizeMode="cover"
-              onError={() => setPreviewAvatarError(true)}
-            />
-          ) : null}
+        <View style={styles.searchTitleRow}>
+          <Text style={styles.searchTitle}>Recherche d&apos;un livreur</Text>
+          <Text style={styles.searchTimer}>{formatTime(searchSeconds)}</Text>
         </View>
 
         <View style={styles.progressBarWrapper}>
           <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
         </View>
 
-        <Text style={styles.searchMainTitle}>Un livreur pour vous</Text>
-        <Text style={styles.searchTimerSub}>{formatTime(searchSeconds)}</Text>
+        <View style={styles.searchActionsRow}>
+          <TouchableOpacity style={styles.searchActionBtn} onPress={onCancel} activeOpacity={0.7}>
+            <View style={[styles.searchActionIconWrap, styles.searchActionIconCancel]}>
+              <Ionicons name="close" size={24} color="#6B7280" />
+            </View>
+            <Text style={styles.searchActionLabel}>Annuler</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.searchPrimaryCta}
-          onPress={onDetails}
-          activeOpacity={0.88}
-        >
-          <Ionicons name="navigate" size={20} color="#FFFFFF" />
-          <Text style={styles.searchPrimaryCtaText}>Suivi et détails</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.searchCancelTextBtn}
-          onPress={onCancel}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.searchCancelText}>Annuler la course</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.searchActionBtn} onPress={onDetails} activeOpacity={0.7}>
+            <View style={[styles.searchActionIconWrap, styles.searchActionIconDetails]}>
+              <Ionicons name="menu" size={24} color="#6B7280" />
+            </View>
+            <Text style={styles.searchActionLabel}>Détails</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -418,17 +385,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   searchFloatCard: {
-    marginHorizontal: 12,
-    marginBottom: 4,
-    maxHeight: SCREEN_H * 0.52,
+    marginHorizontal: 14,
+    marginBottom: 18,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 14,
+    paddingBottom: 22,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
@@ -471,79 +437,67 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#E5E7EB',
     alignSelf: 'center',
-    marginBottom: 10,
-  },
-  searchTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  searchStatusCompact: {
-    flex: 1,
-    paddingRight: 8,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
-    color: '#111827',
-  },
-  searchMicroAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  progressBarWrapper: {
-    width: '100%',
-    height: 5,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 3,
-    overflow: 'hidden',
     marginBottom: 12,
   },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#7C3AED',
-    borderRadius: 3,
+  searchTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  searchMainTitle: {
+  searchTitle: {
+    flex: 1,
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 2,
+    paddingRight: 12,
   },
-  searchTimerSub: {
-    fontSize: 13,
+  searchTimer: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#9CA3AF',
-    marginBottom: 16,
-    letterSpacing: 0.5,
+    color: '#6B7280',
   },
-  searchPrimaryCta: {
+  progressBarWrapper: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 22,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#8B5CF6',
+    borderRadius: 2,
+  },
+  searchActionsRow: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  searchActionBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#7C3AED',
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginBottom: 4,
+    minWidth: 80,
   },
-  searchPrimaryCtaText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  searchCancelTextBtn: {
-    paddingVertical: 10,
+  searchActionIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
-  searchCancelText: {
-    color: '#EF4444',
-    fontWeight: '600',
+  searchActionIconCancel: {
+    backgroundColor: '#F3F4F6',
+  },
+  searchActionIconDetails: {
+    backgroundColor: '#F3F4F6',
+  },
+  searchActionLabel: {
     fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   vehiclePlateRow: {
     flexDirection: 'row',

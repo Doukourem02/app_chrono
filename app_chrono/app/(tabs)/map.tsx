@@ -42,7 +42,6 @@ import { forwardGeocodeAddress } from "../../utils/forwardGeocodeAddress";
 import {
   estimateNearestDriverEtaToPickup,
   formatDriverPickupEtaBadge,
-  listEligibleDriversSortedByPickup,
   type ClientDeliveryMethod,
 } from "../../utils/nearestDriverPickupEta";
 
@@ -239,19 +238,6 @@ export default function MapPage() {
       ),
     [pickupCoords, onlineDrivers, selectedVehicleMethod]
   );
-
-  const eligibleDriversForSearchUi = useMemo(
-    () =>
-      listEligibleDriversSortedByPickup(
-        pickupCoords,
-        onlineDrivers,
-        selectedVehicleMethod
-      ),
-    [pickupCoords, onlineDrivers, selectedVehicleMethod]
-  );
-  const eligibleNearbyCount = eligibleDriversForSearchUi.length;
-  const searchPreviewAvatarUrl =
-    eligibleDriversForSearchUi[0]?.profile_image_url?.trim() || undefined;
 
   const pickupDriverEtaText = useMemo(
     () =>
@@ -1543,8 +1529,6 @@ export default function MapPage() {
                         hasDriverAssigned ? orderToDisplay!.driver : null
                       }
                     order={orderToDisplay ?? null}
-                    eligibleNearbyCount={eligibleNearbyCount}
-                    previewDriverAvatarUrl={searchPreviewAvatarUrl}
                     onCancel={() => {
                       if (orderToDisplay) {
                         _handleCancelOrder(orderToDisplay.id);
