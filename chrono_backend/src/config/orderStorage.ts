@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import pool from './db.js';
 import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
 import logger from '../utils/logger.js';
+import { resolveRecipientUserIdForOrder } from '../utils/resolveRecipientUserIdByPhone.js';
 
 /** Génère et enregistre un token de suivi public pour une commande */
 export async function generateAndSaveTrackingToken(orderId: string): Promise<string | null> {
@@ -191,6 +192,8 @@ export async function recordOrderAssignment(
 
 export async function saveOrder(order: Order): Promise<boolean> {
   try {
+    await resolveRecipientUserIdForOrder(order);
+
     const now = new Date();
     const createdAt = coerceDate(order.createdAt) || now;
     const acceptedAt = coerceDate(order.acceptedAt);

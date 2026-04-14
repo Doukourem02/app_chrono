@@ -161,11 +161,18 @@ export async function notifyAllForOrderStatus(params: {
     (params.recipientPhone && params.recipientPhone.trim()) ||
     null;
 
+  const trackBase = publicTrackPageBaseUrl();
+  const trackUrl =
+    trackingToken && trackBase
+      ? `${trackBase}/track/${encodeURIComponent(trackingToken)}`
+      : null;
+
   void notifyOrderStatusPushes({
     orderId,
     status,
     payerUserId,
     recipientUserId,
+    trackUrl,
   }).catch((e: unknown) => {
     logger.warn('[recipient-notify] expo:', e instanceof Error ? e.message : String(e));
   });

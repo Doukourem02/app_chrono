@@ -27,6 +27,7 @@ export default function TabLayout() {
           headerShown: false,
           tabBarShowLabel: false,
           tabBarStyle: styles.navBar,
+          tabBarItemStyle: styles.tabBarItem,
         }}
       >
         {/* ACCUEIL */}
@@ -36,7 +37,7 @@ export default function TabLayout() {
             title: 'Accueil',
             tabBarIcon: ({ focused }) => (
               <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-                <Octicons name="home" size={20} color={focused ? '#fff' : '#555'} />
+                <Octicons name="home" size={20} color={focused ? '#fff' : '#4B5563'} />
               </View>
             ),
           }}
@@ -50,7 +51,7 @@ export default function TabLayout() {
             tabBarStyle: { display: 'none' },
             tabBarIcon: ({ focused }) => (
               <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-                <Ionicons name="location" size={20} color={focused ? '#fff' : '#555'} />
+                <Ionicons name="location" size={20} color={focused ? '#fff' : '#4B5563'} />
               </View>
             ),
           }}
@@ -63,7 +64,7 @@ export default function TabLayout() {
             title: 'Profil',
             tabBarIcon: ({ focused }) => (
               <View style={[styles.iconContainer, focused && styles.activeIcon]}>
-                <Ionicons name="person" size={20} color={focused ? '#fff' : '#555'} />
+                <Ionicons name="person" size={20} color={focused ? '#fff' : '#4B5563'} />
               </View>
             ),
           }}
@@ -84,9 +85,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 40,
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 16,
 
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
@@ -95,14 +96,19 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
 
+  tabBarItem: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   iconContainer: {
     width: 58,
     height: 58,
-    borderRadius: 35,
+    borderRadius: 29,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f2f2f2',
-    marginTop: 5.5,
+    backgroundColor: '#F3F4F6',
   },
 
   activeIcon: {

@@ -48,6 +48,16 @@ function copyForPayerStatus(status: string): { title: string; body: string } | n
 function copyForRecipientStatus(status: string): { title: string; body: string } | null {
   const s = (status || '').toLowerCase();
   switch (s) {
+    case 'accepted':
+      return {
+        title: 'Course acceptée',
+        body: 'Une livraison est en route vers vous.',
+      };
+    case 'enroute':
+      return {
+        title: 'En route',
+        body: 'Le livreur est en route vers le point de collecte.',
+      };
     case 'picked_up':
       return {
         title: 'Colis récupéré',
@@ -57,6 +67,11 @@ function copyForRecipientStatus(status: string): { title: string; body: string }
       return {
         title: 'En livraison',
         body: 'Le livreur est en route vers vous.',
+      };
+    case 'completed':
+      return {
+        title: 'Livraison terminée',
+        body: 'Votre colis a été livré.',
       };
     case 'cancelled':
       return {
@@ -72,6 +87,13 @@ function truncateBody(text: string, max = 140): string {
   const t = text.replace(/\s+/g, ' ').trim();
   if (t.length <= max) return t;
   return `${t.slice(0, max - 1)}…`;
+}
+
+/** Corps de notif avec lien HTTPS de suivi (même base que SMS / partage app). */
+function withPublicTrackUrl(body: string, trackUrl: string | null | undefined): string {
+  const u = typeof trackUrl === 'string' ? trackUrl.trim() : '';
+  if (!u) return body;
+  return `${body}\n${u}`;
 }
 
 async function fetchTokensForUser(userId: string, appRole: AppPushRole): Promise<string[]> {
@@ -172,31 +194,46 @@ export async function notifyOrderStatusPushes(params: {
   status: string;
   payerUserId: string;
   recipientUserId?: string | null;
+  /** Lien public /track/{token} si PUBLIC_TRACK_BASE_URL est défini côté serveur. */
+  trackUrl?: string | null;
 }): Promise<void> {
-  const { orderId, status, payerUserId, recipientUserId } = params;
+  const { orderId, status, payerUserId, recipientUserId, trackUrl } = params;
   if (!orderId || !payerUserId) return;
 
   const normalized = status.toLowerCase();
   const payerCopy = copyForPayerStatus(normalized);
   const recipientCopy = copyForRecipientStatus(normalized);
 
+  const dataBase = {
+    type: 'order_status',
+    orderId,
+    status: normalized,
+    ...(typeof trackUrl === 'string' && trackUrl.trim()
+      ? { trackUrl: trackUrl.trim() }
+      : {}),
+  };
+
   if (payerCopy) {
-    void sendPushToUser(payerUserId, 'client', payerCopy.title, payerCopy.body, {
-      type: 'order_status',
-      orderId,
-      status: normalized,
-    }).catch((e: unknown) => {
+    void sendPushToUser(
+      payerUserId,
+      'client',
+      payerCopy.title,
+      withPublicTrackUrl(payerCopy.body, trackUrl),
+      dataBase
+    ).catch((e: unknown) => {
       logger.warn('[expo-push] payer:', e instanceof Error ? e.message : String(e));
     });
   }
 
   const rid = typeof recipientUserId === 'string' ? recipientUserId.trim() : '';
   if (recipientCopy && rid && rid !== payerUserId) {
-    void sendPushToUser(rid, 'client', recipientCopy.title, recipientCopy.body, {
-      type: 'order_status',
-      orderId,
-      status: normalized,
-    }).catch((e: unknown) => {
+    void sendPushToUser(
+      rid,
+      'client',
+      recipientCopy.title,
+      withPublicTrackUrl(recipientCopy.body, trackUrl),
+      dataBase
+    ).catch((e: unknown) => {
       logger.warn('[expo-push] recipient:', e instanceof Error ? e.message : String(e));
     });
   }
