@@ -1,7 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Animated, Image, Linking } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Animated,
+  Image,
+  Linking,
+  Dimensions,
+  ScrollView,
+  Pressable,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logger } from '../utils/logger';
+
+const { height: SCREEN_H } = Dimensions.get('window');
 
 interface DriverInfo {
   id?: string;
@@ -32,7 +47,7 @@ interface DriverSearchBottomSheetProps {
   searchSeconds: number;
   driver?: DriverInfo | null;
   order?: OrderInfo | null;
-  /** Livreurs en ligne + bon véhicule près du point de collecte (même logique que l’ETA). */
+  /** Livreurs en ligne et disponibles près du collecte pour ce mode (moto / véhicule / cargo) — même périmètre que l’ETA. */
   eligibleNearbyCount?: number;
   /** Photo du livreur le plus proche (aperçu pendant l’attente). */
   previewDriverAvatarUrl?: string;
@@ -119,6 +134,13 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     setPreviewAvatarError(false);
   }, [previewDriverAvatarUrl]);
 
+  const insets = useSafeAreaInsets();
+  const baseFare = order?.price ?? 0;
+  const [fareBonus, setFareBonus] = useState(0);
+  useEffect(() => {
+    setFareBonus(0);
+  }, [order?.id, order?.price]);
+
   // Formater le temps de recherche (MM:SS)
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -180,7 +202,20 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
       : null;
 
     return (
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.assignedFloatOuter,
+          { paddingBottom: Math.max(insets.bottom, 10) },
+        ]}
+        pointerEvents="box-none"
+      >
+        <ScrollView
+          style={styles.assignedScroll}
+          contentContainerStyle={styles.assignedScrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.assignedCard}>
         <View style={styles.driverHeader}>
           <Text style={styles.driverHeaderTitle}>Livreur assigné</Text>
           {orderIdShort && (
@@ -302,6 +337,8 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
             <Text style={styles.actionButtonSecondaryText}>Suivi en direct</Text>
           </TouchableOpacity>
         </View>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -316,24 +353,48 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     outputRange: ['0%', '100%'],
   });
 
-  const socialLine =
-    eligibleNearbyCount <= 0
-      ? 'Aucun livreur compatible à proximité pour l’instant — nous continuons la recherche.'
-      : eligibleNearbyCount === 1
-        ? '1 livreur compatible est disponible près du point de collecte.'
-        : `${eligibleNearbyCount} livreurs compatibles sont disponibles près du point de collecte.`;
-
   const method = order?.deliveryMethod;
-
-  const priceFormattedSearch =
-    order?.price != null ? `${order.price.toLocaleString('fr-FR')} FCFA` : null;
   const deliveryMethodLabel = method ? DELIVERY_METHOD_LABELS[method] : null;
 
+  /** Ligne courte, ton actif (pas de message négatif dominant). */
+  const statusLine =
+    eligibleNearbyCount > 0
+      ? `${eligibleNearbyCount} livreur${eligibleNearbyCount > 1 ? 's' : ''} dans la zone`
+      : 'Recherche en cours…';
+
+  const FARE_STEP = 100;
+  const FARE_MAX_BONUS = 5000;
+  const displayFare = baseFare + fareBonus;
+  const bumpFare = (delta: number) => {
+    void Haptics.selectionAsync();
+    setFareBonus((b) => {
+      const n = b + delta;
+      if (n < 0) return 0;
+      if (n > FARE_MAX_BONUS) return FARE_MAX_BONUS;
+      return n;
+    });
+  };
+
+  const priceFormattedSearch =
+    displayFare > 0 ? `${displayFare.toLocaleString('fr-FR')} FCFA` : null;
+
   return (
-    <View style={styles.container}>
-      <View style={styles.searchHighlightCard}>
+    <View
+      style={[
+        styles.searchFloatOuter,
+        { paddingBottom: Math.max(insets.bottom, 10) },
+      ]}
+      pointerEvents="box-none"
+    >
+      <View style={styles.searchFloatCard}>
+        <View style={styles.sheetHandle} />
+
+        <View style={styles.progressBarWrapper}>
+          <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
+        </View>
+
         <View style={styles.searchHeaderRow}>
-          <Text style={styles.searchSocialText}>{socialLine}</Text>
+          <Text style={styles.searchStatusCompact}>{statusLine}</Text>
           <View style={styles.searchLucarneAvatar}>
             {previewDriverAvatarUrl && !previewAvatarError ? (
               <Image
@@ -345,54 +406,71 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
             ) : (
               <View style={styles.searchLucarnePlaceholder}>
                 {method === 'moto' ? (
-                  <Ionicons name="bicycle" size={22} color="#7C3AED" />
+                  <Ionicons name="bicycle" size={20} color="#7C3AED" />
                 ) : method === 'cargo' ? (
-                  <Ionicons name="cube-outline" size={22} color="#7C3AED" />
+                  <Ionicons name="cube-outline" size={20} color="#7C3AED" />
                 ) : (
-                  <Ionicons name="car-outline" size={22} color="#7C3AED" />
+                  <Ionicons name="car-outline" size={20} color="#7C3AED" />
                 )}
               </View>
             )}
           </View>
         </View>
-        <View style={styles.progressBarWrapper}>
-          <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
-        </View>
-      </View>
 
-      <Text style={styles.searchMainTitle}>Recherche d&apos;un livreur à proximité</Text>
-      <Text style={styles.searchTimerSub}>
-        Temps écoulé · {formatTime(searchSeconds)}
-      </Text>
+        <Text style={styles.searchMainTitle}>Un livreur pour vous</Text>
+        <Text style={styles.searchTimerSub}>{formatTime(searchSeconds)}</Text>
 
-      {(priceFormattedSearch || deliveryMethodLabel) && (
-        <View style={styles.farePreviewBox}>
-          {priceFormattedSearch && (
-            <Text style={styles.farePreviewAmount}>{priceFormattedSearch}</Text>
-          )}
-          <Text style={styles.farePreviewHint}>Tarif de cette course</Text>
-          {deliveryMethodLabel && (
-            <View style={styles.farePreviewModeRow}>
-              <Ionicons name="flash-outline" size={14} color="#6B7280" />
-              <Text style={styles.farePreviewMode}>{deliveryMethodLabel}</Text>
+        {(priceFormattedSearch || deliveryMethodLabel) && (
+          <View style={styles.fareInteractiveBox}>
+            <View style={styles.fareStepperRow}>
+              <Pressable
+                style={[styles.fareStepBtn, fareBonus <= 0 && styles.fareStepBtnDim]}
+                onPress={() => bumpFare(-FARE_STEP)}
+                disabled={fareBonus <= 0}
+                hitSlop={8}
+              >
+                <Text style={styles.fareStepBtnText}>−</Text>
+              </Pressable>
+              <View style={styles.fareStepperCenter}>
+                <Text style={styles.farePreviewAmount}>{priceFormattedSearch}</Text>
+                <Text style={styles.farePreviewHint}>Tarif affiché</Text>
+              </View>
+              <Pressable
+                style={[
+                  styles.fareStepBtn,
+                  fareBonus >= FARE_MAX_BONUS && styles.fareStepBtnDim,
+                ]}
+                onPress={() => bumpFare(FARE_STEP)}
+                disabled={fareBonus >= FARE_MAX_BONUS}
+                hitSlop={8}
+              >
+                <Text style={styles.fareStepBtnText}>+</Text>
+              </Pressable>
             </View>
-          )}
-        </View>
-      )}
-
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.actionButton} onPress={onCancel} activeOpacity={0.7}>
-          <View style={[styles.actionIconContainer, styles.cancelIconContainer]}>
-            <Ionicons name="close" size={24} color="#6B7280" />
+            {deliveryMethodLabel ? (
+              <View style={styles.farePreviewModeRow}>
+                <Ionicons name="flash-outline" size={14} color="#6B7280" />
+                <Text style={styles.farePreviewMode}>{deliveryMethodLabel}</Text>
+              </View>
+            ) : null}
           </View>
-          <Text style={styles.actionLabel}>Annuler</Text>
+        )}
+
+        <TouchableOpacity
+          style={styles.searchPrimaryCta}
+          onPress={onDetails}
+          activeOpacity={0.88}
+        >
+          <Ionicons name="navigate" size={20} color="#FFFFFF" />
+          <Text style={styles.searchPrimaryCtaText}>Suivi et détails</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton} onPress={onDetails} activeOpacity={0.7}>
-          <View style={[styles.actionIconContainer, styles.detailsIconContainer]}>
-            <Ionicons name="menu" size={24} color="#6B7280" />
-          </View>
-          <Text style={styles.actionLabel}>Détails</Text>
+        <TouchableOpacity
+          style={styles.searchCancelTextBtn}
+          onPress={onCancel}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.searchCancelText}>Annuler la course</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -400,48 +478,83 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
 };
 
 const styles = StyleSheet.create({
-  container: {
+  searchFloatOuter: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 15,
+    bottom: 0,
     zIndex: 1000,
-    minHeight: 240,
+    backgroundColor: 'transparent',
   },
-  searchHighlightCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 12,
-    marginBottom: 14,
+  searchFloatCard: {
+    marginHorizontal: 12,
+    marginBottom: 4,
+    maxHeight: SCREEN_H * 0.52,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 16,
+  },
+  assignedFloatOuter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    backgroundColor: 'transparent',
+  },
+  assignedScroll: {
+    maxHeight: SCREEN_H * 0.76,
+  },
+  assignedScrollContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+  },
+  assignedCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 16,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center',
+    marginBottom: 12,
   },
   searchHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  searchSocialText: {
+  searchStatusCompact: {
     flex: 1,
     paddingRight: 10,
     fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '500',
-    color: '#374151',
+    lineHeight: 19,
+    fontWeight: '600',
+    color: '#111827',
   },
   searchLucarneAvatar: {
     width: 44,
@@ -468,6 +581,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     borderRadius: 3,
     overflow: 'hidden',
+    marginBottom: 10,
   },
   progressBarFill: {
     height: '100%',
@@ -478,23 +592,52 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   searchTimerSub: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#9CA3AF',
-    marginBottom: 14,
+    marginBottom: 12,
+    letterSpacing: 0.5,
   },
-  farePreviewBox: {
+  fareInteractiveBox: {
     backgroundColor: '#FAFAFA',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    marginBottom: 12,
+  },
+  fareStepperRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  fareStepBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fareStepBtnDim: {
+    opacity: 0.4,
+  },
+  fareStepBtnText: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: -2,
+  },
+  fareStepperCenter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   farePreviewAmount: {
     fontSize: 26,
@@ -503,22 +646,46 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   farePreviewHint: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: '#9CA3AF',
-    marginTop: 4,
+    marginTop: 2,
   },
   farePreviewModeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
-    gap: 4,
   },
   farePreviewMode: {
     fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
     marginLeft: 4,
+  },
+  searchPrimaryCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7C3AED',
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 4,
+  },
+  searchPrimaryCtaText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  searchCancelTextBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  searchCancelText: {
+    color: '#EF4444',
+    fontWeight: '600',
+    fontSize: 14,
   },
   vehiclePlateRow: {
     flexDirection: 'row',
@@ -531,34 +698,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#4B5563',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  actionButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  cancelIconContainer: {
-    backgroundColor: '#F3F4F6',
-  },
-  detailsIconContainer: {
-    backgroundColor: '#F3F4F6',
-  },
-  actionLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
   },
   driverHeader: {
     flexDirection: 'row',
