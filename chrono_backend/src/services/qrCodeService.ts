@@ -275,6 +275,7 @@ export class QRCodeService {
          SET delivery_qr_scanned_at = NOW(),
              delivery_qr_scanned_by = $1,
              status = 'completed',
+             completed_at = COALESCE(completed_at, NOW()),
              updated_at = NOW()
          WHERE id = $2`,
         [scannedBy, qrCodeData.orderId]

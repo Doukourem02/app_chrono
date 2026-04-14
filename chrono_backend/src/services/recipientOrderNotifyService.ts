@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import { lookupClientUserIdByPhone } from '../utils/resolveRecipientUserIdByPhone.js';
 import { notifyOrderStatusPushes } from './expoPushService.js';
 import { isTwilioSmsConfigured, sendTransactionalSMSTwilio } from './twilioSmsService.js';
 import {
@@ -15,6 +16,31 @@ const NOTIFY_STATUSES = new Set([
   'completed',
   'cancelled',
 ]);
+
+/**
+ * Une seule chaîne de notifications (Expo + web + SMS) par (commande, statut).
+ * Évite les doublons quand deux chemins métiers appellent notify (ex. scan QR + socket livreur).
+ */
+async function claimOrderStatusNotification(orderId: string, statusNorm: string): Promise<boolean> {
+  if (!process.env.DATABASE_URL) return true;
+  try {
+    const r = await pool.query(
+      `INSERT INTO order_status_push_sent (order_id, status, sent_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (order_id, status) DO NOTHING
+       RETURNING order_id`,
+      [orderId, statusNorm]
+    );
+    return (r.rowCount ?? 0) > 0;
+  } catch (e: unknown) {
+    const code = e && typeof e === 'object' && 'code' in e ? String((e as { code?: string }).code) : '';
+    if (code === '42P01') {
+      return true;
+    }
+    logger.warn('[recipient-notify] claim notification:', e instanceof Error ? e.message : String(e));
+    return true;
+  }
+}
 
 /**
  * Textes alignés sur les push app pour SMS / Web Push sur le lien de suivi.
@@ -146,9 +172,19 @@ export async function notifyAllForOrderStatus(params: {
   const { orderId, status, payerUserId } = params;
   if (!orderId || !payerUserId) return;
 
+  const statusNorm = status.toLowerCase();
+  const claimed = await claimOrderStatusNotification(orderId, statusNorm);
+  if (!claimed) {
+    logger.info('[recipient-notify] déjà notifié pour ce statut — ignoré (anti-doublon)', {
+      orderIdPrefix: orderId.slice(0, 8),
+      status: statusNorm,
+    });
+    return;
+  }
+
   const row = await loadOrderNotifyRow(orderId);
 
-  const recipientUserId =
+  let recipientUserId =
     row?.recipientUserId?.trim() ||
     (typeof params.recipientUserId === 'string' ? params.recipientUserId.trim() : null) ||
     null;
@@ -160,6 +196,35 @@ export async function notifyAllForOrderStatus(params: {
     row?.recipientPhone ||
     (params.recipientPhone && params.recipientPhone.trim()) ||
     null;
+
+  if (!recipientUserId && recipientPhone) {
+    const resolved = await lookupClientUserIdByPhone(recipientPhone);
+    if (resolved) {
+      recipientUserId = resolved;
+      void pool
+        .query(
+          `UPDATE orders
+           SET recipient_user_id = $1,
+               recipient_is_registered = true,
+               updated_at = NOW()
+           WHERE id = $2
+             AND recipient_user_id IS NULL`,
+          [resolved, orderId]
+        )
+        .then(() => {
+          logger.info('[recipient-notify] destinataire résolu au notify + persist DB', {
+            orderIdPrefix: orderId.slice(0, 8),
+            recipientUserIdPrefix: resolved.slice(0, 8),
+          });
+        })
+        .catch((e: unknown) => {
+          logger.warn(
+            '[recipient-notify] persist recipient_user_id:',
+            e instanceof Error ? e.message : String(e)
+          );
+        });
+    }
+  }
 
   const trackBase = publicTrackPageBaseUrl();
   const trackUrl =
@@ -177,16 +242,15 @@ export async function notifyAllForOrderStatus(params: {
     logger.warn('[recipient-notify] expo:', e instanceof Error ? e.message : String(e));
   });
 
-  const normalized = status.toLowerCase();
-  const copy = copyForPublicTrackStatus(normalized);
-  if (!copy || !NOTIFY_STATUSES.has(normalized)) return;
+  const copy = copyForPublicTrackStatus(statusNorm);
+  if (!copy || !NOTIFY_STATUSES.has(statusNorm)) return;
 
   if (trackingToken && isTrackWebPushConfigured()) {
     void sendTrackWebPushForSubscriptions(trackingToken, {
       title: copy.title,
       body: copy.body,
       openPath: `/track/${encodeURIComponent(trackingToken)}`,
-      data: { orderId, status: normalized, type: 'order_status' },
+      data: { orderId, status: statusNorm, type: 'order_status' },
     }).catch((e: unknown) => {
       logger.warn('[recipient-notify] web-push:', e instanceof Error ? e.message : String(e));
     });
@@ -195,7 +259,7 @@ export async function notifyAllForOrderStatus(params: {
   if (!recipientUserId && recipientPhone && isTwilioSmsConfigured()) {
     logger.info('[recipient-notify] fallback SMS (destinataire sans compte lié)', {
       orderIdPrefix: orderId.slice(0, 8),
-      status: normalized,
+      status: statusNorm,
     });
     const brand = process.env.TWILIO_SMS_BODY_BRAND?.trim() || 'Krono';
     let smsBody = `${brand} — ${copy.title}. ${copy.body}`;

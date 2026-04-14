@@ -26,7 +26,12 @@ export const OrdersListBottomSheet: React.FC<OrdersListBottomSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { activeOrders, pendingOrders, setSelectedOrder } = useOrderStore();
-  const totalOrders = activeOrders.length + pendingOrders.length;
+  const validActive = activeOrders.filter(
+    (o) => o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'declined'
+  );
+  const activeIds = new Set(validActive.map((o) => o.id));
+  const pendingOnly = pendingOrders.filter((p) => !activeIds.has(p.id));
+  const totalOrders = pendingOnly.length + validActive.length;
 
   const handleOrderSelect = (orderId: string) => {
     setSelectedOrder(orderId);

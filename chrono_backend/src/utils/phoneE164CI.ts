@@ -69,3 +69,12 @@ export function buildPhoneLookupDigitKeys(raw: string): string[] {
 
   return [...keys];
 }
+
+/** Derniers 10 chiffres (mobile CI) — fallback si le stockage en base varie. */
+export function buildPhoneLookupDigitSuffixKeys(digitKeys: string[]): string[] {
+  const out = new Set<string>();
+  for (const k of digitKeys) {
+    if (k.length >= 10) out.add(k.slice(-10));
+  }
+  return [...out];
+}

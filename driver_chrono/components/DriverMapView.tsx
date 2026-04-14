@@ -127,6 +127,11 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
     : [-4.024429, 5.345317];
   const defaultZoom = 14;
 
+  const ordersForMarkers = React.useMemo(() => {
+    const ids = new Set(activeOrders.map((o) => o.id));
+    return [...activeOrders, ...pendingOrders.filter((p) => !ids.has(p.id))];
+  }, [activeOrders, pendingOrders]);
+
   if (Platform.OS === 'web') {
     return (
       <View style={styles.map}>
@@ -199,7 +204,7 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
       )}
 
       {/* Marqueurs pickup et dropoff pour chaque commande */}
-      {[...activeOrders, ...pendingOrders].map((order) => {
+      {ordersForMarkers.map((order) => {
         const pickupCoord = resolveCoords(order.pickup);
         const dropoffCoord = resolveCoords(order.dropoff);
         const status = String(order.status || '');

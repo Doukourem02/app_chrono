@@ -94,9 +94,9 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({
   const validActive = activeOrders.filter(o => 
     o.status !== 'cancelled' && o.status !== 'completed' && o.status !== 'declined'
   );
-  const allOrders = showPending 
-    ? [...pendingOrders, ...validActive]
-    : validActive;
+  const activeIds = new Set(validActive.map((o) => o.id));
+  const pendingNotDuplicated = pendingOrders.filter((p) => !activeIds.has(p.id));
+  const allOrders = showPending ? [...pendingNotDuplicated, ...validActive] : validActive;
 
   if (allOrders.length === 0) {
     return (

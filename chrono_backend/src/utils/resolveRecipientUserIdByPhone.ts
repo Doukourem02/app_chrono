@@ -1,6 +1,51 @@
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
-import { buildPhoneLookupDigitKeys } from './phoneE164CI.js';
+import { buildPhoneLookupDigitKeys, buildPhoneLookupDigitSuffixKeys } from './phoneE164CI.js';
+
+/**
+ * Retourne l’id utilisateur client (unique) pour ce numéro, ou null si ambigu / introuvable.
+ */
+export async function lookupClientUserIdByPhone(raw: string): Promise<string | null> {
+  const trimmed = (raw || '').trim();
+  if (trimmed.length < 8) return null;
+  if (!process.env.DATABASE_URL) return null;
+
+  const keys = buildPhoneLookupDigitKeys(trimmed);
+  if (!keys.length) return null;
+  const suffixKeys = buildPhoneLookupDigitSuffixKeys(keys);
+
+  try {
+    const r = await pool.query<{ id: string }>(
+      `SELECT id FROM users
+       WHERE role::text = 'client'
+         AND phone IS NOT NULL
+         AND (
+           regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = ANY($1::text[])
+           OR (
+             COALESCE(array_length($2::text[], 1), 0) > 0
+             AND char_length(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g')) >= 10
+             AND right(regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g'), 10) = ANY($2::text[])
+           )
+         )
+       LIMIT 3`,
+      [keys, suffixKeys]
+    );
+
+    if (r.rows.length !== 1) {
+      if (r.rows.length > 1) {
+        logger.warn('[recipient-resolve] plusieurs comptes client pour ce numéro — pas d’attribution', {
+          keysCount: keys.length,
+        });
+      }
+      return null;
+    }
+
+    return r.rows[0].id;
+  } catch (e: unknown) {
+    logger.warn('[recipient-resolve] lookup', e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
 
 /**
  * Si le numéro du destinataire correspond à un compte client, renseigne recipient_user_id / recipient_is_registered.
@@ -26,47 +71,18 @@ export async function resolveRecipientUserIdForOrder(order: {
     '';
   if (raw.length < 8) return;
 
-  const keys = buildPhoneLookupDigitKeys(raw);
-  if (!keys.length) return;
-
-  if (!process.env.DATABASE_URL) return;
-
-  try {
-    const r = await pool.query<{ id: string }>(
-      `SELECT id FROM users
-       WHERE role = 'client'
-         AND phone IS NOT NULL
-         AND regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = ANY($1::text[])
-       LIMIT 2`,
-      [keys]
-    );
-
-    if (r.rows.length !== 1) {
-      if (r.rows.length > 1) {
-        logger.warn('[recipient-resolve] plusieurs comptes client pour les mêmes clés téléphone — pas d’attribution', {
-          orderIdPrefix: order.id?.slice(0, 8),
-          keysCount: keys.length,
-        });
-      } else {
-        logger.info('[recipient-resolve] aucun compte client correspondant au téléphone destinataire', {
-          orderIdPrefix: order.id?.slice(0, 8),
-          keysCount: keys.length,
-        });
-      }
-      return;
-    }
-
-    const rid = r.rows[0].id;
-    (order as { recipient_user_id?: string | null }).recipient_user_id = rid;
-    (order as { recipient_is_registered?: boolean }).recipient_is_registered = true;
-    logger.info('[recipient-resolve] destinataire auto-résolu', {
+  const rid = await lookupClientUserIdByPhone(raw);
+  if (!rid) {
+    logger.info('[recipient-resolve] aucun compte client correspondant au téléphone destinataire', {
       orderIdPrefix: order.id?.slice(0, 8),
-      recipientUserIdPrefix: rid.slice(0, 8),
     });
-  } catch (e: unknown) {
-    logger.warn(
-      '[recipient-resolve]',
-      e instanceof Error ? e.message : String(e)
-    );
+    return;
   }
+
+  (order as { recipient_user_id?: string | null }).recipient_user_id = rid;
+  (order as { recipient_is_registered?: boolean }).recipient_is_registered = true;
+  logger.info('[recipient-resolve] destinataire auto-résolu', {
+    orderIdPrefix: order.id?.slice(0, 8),
+    recipientUserIdPrefix: rid.slice(0, 8),
+  });
 }

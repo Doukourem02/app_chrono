@@ -110,6 +110,9 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   isReceivingOrders: true,
 
   addOrder: (order) => set((state) => {
+    // Une commande ne peut pas être à la fois en attente et active (sinon doublon dans « Mes commandes »).
+    const pendingWithoutThis = state.pendingOrders.filter((o) => o.id !== order.id);
+
     // Normaliser le statut pour la comparaison (insensible à la casse)
     const normalizedStatus = String(order.status || '').toLowerCase();
     
@@ -124,6 +127,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         }
         return {
           activeOrders: state.activeOrders.filter(o => o.id !== order.id),
+          pendingOrders: pendingWithoutThis,
           selectedOrderId: state.selectedOrderId === order.id ? null : state.selectedOrderId,
         };
       }
@@ -132,7 +136,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       if (__DEV__) {
         console.log(`[useOrderStore] Tentative d'ajout d'une commande complétée/annulée ignorée`, { orderId: order.id, status: order.status });
       }
-      return state;
+      return { ...state, pendingOrders: pendingWithoutThis };
     }
 
     const exists = state.activeOrders.some(o => o.id === order.id);
@@ -151,6 +155,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       );
       return {
         activeOrders: updatedActive,
+        pendingOrders: pendingWithoutThis,
       };
     }
     
@@ -166,11 +171,15 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     
     return {
       activeOrders: newOrders,
+      pendingOrders: pendingWithoutThis,
       selectedOrderId: shouldSelectNewOrder ? mappedOrder.id : state.selectedOrderId,
     };
   }),
 
   addPendingOrder: (order) => set((state) => {
+    if (state.activeOrders.some((o) => o.id === order.id)) {
+      return state;
+    }
     const exists = state.pendingOrders.some(o => o.id === order.id);
     if (exists) return state;
     
