@@ -92,3 +92,22 @@ if (fs.existsSync(androidGradlePath)) {
     fs.writeFileSync(androidGradlePath, gradle);
   }
 }
+
+// MapboxNavigationView.kt référence R.drawable.mapbox_navigation_puck_icon (SDK ancien) ;
+// avec Navigation 2.20 l’asset n’est plus dans le R du module → drawable local requis.
+const puckPatchPath = path.join(__dirname, 'patches', 'mapbox_navigation_puck_icon.xml');
+const fleetbaseAndroidRoot = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  '@fleetbase',
+  'react-native-mapbox-navigation',
+  'android'
+);
+const puckDrawableDir = path.join(fleetbaseAndroidRoot, 'src', 'main', 'res', 'drawable');
+const puckDestPath = path.join(puckDrawableDir, 'mapbox_navigation_puck_icon.xml');
+if (fs.existsSync(puckPatchPath) && fs.existsSync(fleetbaseAndroidRoot)) {
+  fs.mkdirSync(puckDrawableDir, { recursive: true });
+  fs.copyFileSync(puckPatchPath, puckDestPath);
+  console.log('[apply-mapbox-navigation-patch] Fleetbase android: added mapbox_navigation_puck_icon drawable');
+}
