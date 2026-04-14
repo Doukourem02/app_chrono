@@ -179,7 +179,7 @@ export default function TrackPage() {
     return (
       <div className="flex min-h-dvh flex-1 items-center justify-center bg-gradient-to-br from-violet-500 to-violet-700 p-6">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-xl">
-          <h1 className="text-xl font-bold text-gray-900">Suivi Krono</h1>
+          <h1 className="text-xl font-bold text-gray-900">Suivi de livraison</h1>
           <p className="mt-3 text-red-600">{error || 'Commande introuvable'}</p>
         </div>
       </div>

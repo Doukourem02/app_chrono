@@ -30,6 +30,11 @@ module.exports = {
     },
     android: {
       package: "com.anonymous.app_chrono",
+      /**
+       * "pan" évite adjustResize : sinon la fenêtre se redimensionne en même temps que le sheet
+       * animé (expandForAddressInput), ce qui provoque des tremblements au focus des champs adresse.
+       */
+      softwareKeyboardLayoutMode: "pan",
       adaptiveIcon: {
         backgroundColor: "#FFFFFF",
         foregroundImage: "./assets/images/logo/LOGO_APP2.png",

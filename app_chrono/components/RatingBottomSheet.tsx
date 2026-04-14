@@ -1,18 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  Animated,
-  PanResponderInstance,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from 'react-native';
+import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet,TextInput,ActivityIndicator,Alert,Platform,ScrollView,Keyboard,InteractionManager,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userApiService } from '../services/userApiService';
@@ -47,16 +34,62 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const commentBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const commentFocusedRef = useRef(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  /**
+   * iOS + Android : padding bas du ScrollView + scroll vers le commentaire.
+   * Pas de KeyboardAvoidingView ici (conflit avec la hauteur animée du sheet) — même stratégie sur les deux OS.
+   * iOS : keyboardWill* pour réagir un peu avant l’animation du clavier.
+   */
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === 'ios' ? ('keyboardWillShow' as const) : ('keyboardDidShow' as const);
+    const hideEvent =
+      Platform.OS === 'ios' ? ('keyboardWillHide' as const) : ('keyboardDidHide' as const);
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardInset(e.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardInset(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const scrollDelayMs = Platform.OS === 'ios' ? 380 : 320;
+
+  const scrollCommentIntoView = useCallback(() => {
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, scrollDelayMs);
+    });
+  }, [scrollDelayMs]);
+
+  useEffect(() => {
+    if (keyboardInset <= 0 || !commentFocusedRef.current) return;
+    const id = requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [keyboardInset]);
 
   const handleCommentFocus = useCallback(() => {
     if (commentBlurTimerRef.current) {
       clearTimeout(commentBlurTimerRef.current);
       commentBlurTimerRef.current = null;
     }
+    commentFocusedRef.current = true;
     onCommentInputFocus?.();
-  }, [onCommentInputFocus]);
+    scrollCommentIntoView();
+  }, [onCommentInputFocus, scrollCommentIntoView]);
 
   const handleCommentBlur = useCallback(() => {
+    commentFocusedRef.current = false;
     if (!onCommentInputBlur) return;
     if (commentBlurTimerRef.current) {
       clearTimeout(commentBlurTimerRef.current);
@@ -167,6 +200,9 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
 
   const handleClose = () => {
     if (isSubmitting) return;
+    commentFocusedRef.current = false;
+    Keyboard.dismiss();
+    setKeyboardInset(0);
     onClose();
     // Reset form on close
     setRating(0);
@@ -227,22 +263,20 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
         </View>
       )}
 
-      {/* État expandé — même logique que DeliveryBottomSheet (clavier) */}
+      {/* État expandé — clavier : padding + scroll (iOS & Android), sans KeyboardAvoidingView (sheet animé). */}
       {isExpanded && (
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoid}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          enabled={Platform.OS === 'ios'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 0}
-        >
+        <View style={styles.keyboardAvoid}>
           <ScrollView
+            ref={scrollRef}
             showsVerticalScrollIndicator={false}
             style={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             contentContainerStyle={[
               styles.scrollContentContainer,
-              { paddingBottom: Math.max(16, insets.bottom + 8) },
+              {
+                paddingBottom: Math.max(16, insets.bottom + 8) + keyboardInset,
+              },
             ]}
           >
             <View style={styles.expandedCard}>
@@ -322,7 +356,7 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
               )}
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
       )}
     </Animated.View>
   );

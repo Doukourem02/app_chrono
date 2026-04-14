@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Octicons from '@expo/vector-icons/Octicons';
 import { Tabs } from 'expo-router';
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/useAuthStore';
 import { userOrderSocketService } from '../../services/userOrderSocketService';
@@ -23,8 +23,10 @@ export default function TabLayout() {
     const minPillWidth = 200;
     const maxSide = Math.max(16, (windowWidth - minPillWidth) / 2);
     const side = Math.min(preferredSide, maxSide);
+    // Android : un peu plus d’air au-dessus de la barre de gestes + éviter l’impression d’icônes « tombées » en bas.
+    const bottomGap = Platform.OS === 'android' ? 18 : 12;
     return {
-      bottom: 12 + insets.bottom,
+      bottom: bottomGap + insets.bottom,
       left: side,
       right: side,
     };
@@ -46,6 +48,10 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: [styles.navBar, tabBarLayoutStyle],
+        tabBarItemStyle:
+          Platform.OS === 'android'
+            ? { paddingVertical: 0, marginVertical: 0 }
+            : undefined,
       }}
     >
         {/* ACCUEIL */}
@@ -54,7 +60,13 @@ export default function TabLayout() {
           options={{
             title: 'Accueil',
             tabBarIcon: ({ focused }) => (
-              <View style={[styles.iconContainer, focused && styles.activeIcon]}>
+              <View
+                style={[
+                  styles.iconContainer,
+                  Platform.OS === 'android' && styles.iconContainerAndroid,
+                  focused && styles.activeIcon,
+                ]}
+              >
                 <Octicons name="home" size={20} color={focused ? '#fff' : '#555'} />
               </View>
             ),
@@ -68,7 +80,13 @@ export default function TabLayout() {
             title: 'Localisation',
             tabBarStyle: { display: 'none' }, 
             tabBarIcon: ({ focused }) => (
-              <View style={[styles.iconContainer, focused && styles.activeIcon]}>
+              <View
+                style={[
+                  styles.iconContainer,
+                  Platform.OS === 'android' && styles.iconContainerAndroid,
+                  focused && styles.activeIcon,
+                ]}
+              >
                 <Ionicons name="location" size={20} color={focused ? '#fff' : '#555'} />
               </View>
             ),
@@ -81,7 +99,13 @@ export default function TabLayout() {
           options={{
             title: 'Profil',
             tabBarIcon: ({ focused }) => (
-              <View style={[styles.iconContainer, focused && styles.activeIcon]}>
+              <View
+                style={[
+                  styles.iconContainer,
+                  Platform.OS === 'android' && styles.iconContainerAndroid,
+                  focused && styles.activeIcon,
+                ]}
+              >
                 <Ionicons name="person" size={20} color={focused ? '#fff' : '#555'} />
               </View>
             ),
@@ -118,6 +142,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f2f2f2',
     marginTop: 5.5,
+  },
+
+  /** Sans ce correctif, le marginTop + padding des items fait descendre les pastilles sur Android. */
+  iconContainerAndroid: {
+    marginTop: 0,
   },
 
   activeIcon: {

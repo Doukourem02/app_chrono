@@ -52,11 +52,15 @@ export const useBottomSheet = (options?: UseBottomSheetOptions) => {
   const isAddressInputExpandedRef = useRef(isAddressInputExpanded);
   isAddressInputExpandedRef.current = isAddressInputExpanded;
 
+  /** Android : évite plusieurs springTo d’affilée (double onFocus Mapbox / changement de champ). */
+  const lastAddressExpandAtRef = useRef(0);
+
   const springTo = useCallback((toValue: number) => {
     if (Platform.OS === 'android') {
+      animatedHeight.stopAnimation();
       Animated.timing(animatedHeight, {
         toValue,
-        duration: 260,
+        duration: 300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }).start();
@@ -86,12 +90,22 @@ export const useBottomSheet = (options?: UseBottomSheetOptions) => {
       expand();
       return;
     }
+    if (Platform.OS === 'android') {
+      const now = Date.now();
+      if (now - lastAddressExpandAtRef.current < 320) {
+        return;
+      }
+      lastAddressExpandAtRef.current = now;
+    }
     setIsAddressInputExpanded(true);
     setIsExpanded(true);
     springTo(addressInputHeight);
   }, [addressInputHeight, expandedHeight, expand, springTo]);
 
   const restoreAfterAddressInput = useCallback(() => {
+    if (Platform.OS === 'android') {
+      lastAddressExpandAtRef.current = 0;
+    }
     setIsAddressInputExpanded(false);
     if (isExpandedRef.current) {
       springTo(expandedHeight);
@@ -99,6 +113,9 @@ export const useBottomSheet = (options?: UseBottomSheetOptions) => {
   }, [expandedHeight, springTo]);
 
   const collapse = useCallback(() => {
+    if (Platform.OS === 'android') {
+      lastAddressExpandAtRef.current = 0;
+    }
     setIsAddressInputExpanded(false);
     setIsExpanded(false);
     springTo(BOTTOM_SHEET_MIN_HEIGHT);

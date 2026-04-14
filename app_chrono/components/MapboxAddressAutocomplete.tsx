@@ -254,6 +254,8 @@ export default function MapboxAddressAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blurResolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAppliedSavedFingerprintRef = useRef<string>('');
+  /** Invalide les réponses Mapbox arrivées après un changement de requête (courses au clavier). */
+  const suggestFetchGenRef = useRef(0);
   const accessToken = config.mapboxAccessToken;
 
   const refCoords = useMemo(() => {
@@ -295,6 +297,7 @@ export default function MapboxAddressAutocomplete({
       lastAppliedSavedFingerprintRef.current = fingerprint;
 
       setSuppressSuggestionList(true);
+      suggestFetchGenRef.current += 1;
       setQuery(hit.label.trim());
       setSuggestions([]);
       onPlaceSelected({
@@ -322,14 +325,15 @@ export default function MapboxAddressAutocomplete({
 
   const fetchSuggestions = useCallback(
     async (searchText: string) => {
+      const gen = ++suggestFetchGenRef.current;
       const trimmed = searchText.trim();
       if (!trimmed || !accessToken) {
-        setSuggestions([]);
+        if (gen === suggestFetchGenRef.current) setSuggestions([]);
         return;
       }
       const minLen = isNumericQuery(trimmed) ? 1 : 2;
       if (trimmed.length < minLen) {
-        setSuggestions([]);
+        if (gen === suggestFetchGenRef.current) setSuggestions([]);
         return;
       }
 
@@ -547,9 +551,11 @@ export default function MapboxAddressAutocomplete({
         }
         // Réordonner : Zoo d'Abidjan en premier, etc. (style Yango)
         merged.sort((a, b) => getRelevanceScore(b, trimmed) - getRelevanceScore(a, trimmed));
+        if (gen !== suggestFetchGenRef.current) return;
         setSuggestions(merged.slice(0, 15));
       } catch (err) {
         logger.error('Mapbox suggest error', 'MapboxAddressAutocomplete', err);
+        if (gen !== suggestFetchGenRef.current) return;
         setSuggestions([]);
       }
     },
@@ -560,22 +566,37 @@ export default function MapboxAddressAutocomplete({
     (text: string) => {
       lastAppliedSavedFingerprintRef.current = '';
       setSuppressSuggestionList(false);
-      setQuery(singleLineAddressInput(text));
+      const next = singleLineAddressInput(text);
+      setQuery(next);
       onQueryChange?.(text);
-      setSuggestions([]);
+
+      const trimmed = next.trim();
+      const minLen = isNumericQuery(trimmed) ? 1 : 2;
+
+      /**
+       * Mode embedded (formulaire « Envoyer un colis ») : une Modal affiche les suggestions.
+       * Vider la liste à chaque frappe ouvrait/fermait la Modal en boucle → conflit clavier + bottom sheet (tremblements).
+       * On garde l’ancienne liste jusqu’à la réponse réseau ; on vide seulement si la requête est trop courte.
+       */
+      if (trimmed.length < minLen) {
+        suggestFetchGenRef.current += 1;
+        setSuggestions([]);
+      } else if (!embedded) {
+        setSuggestions([]);
+      }
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      const minLen = isNumericQuery(text) ? 1 : 2;
-      if (text.trim().length >= minLen) {
-        debounceRef.current = setTimeout(() => fetchSuggestions(text), 300);
+      if (trimmed.length >= minLen) {
+        debounceRef.current = setTimeout(() => fetchSuggestions(next), 300);
       }
     },
-    [fetchSuggestions, onQueryChange]
+    [fetchSuggestions, onQueryChange, embedded]
   );
 
   const handleSelectSuggestion = useCallback(
     async (suggestion: MapboxSuggestion) => {
       lastAppliedSavedFingerprintRef.current = '';
+      suggestFetchGenRef.current += 1;
       setSuppressSuggestionList(true);
       const raw = suggestion.full_address || suggestion.address || suggestion.name;
       const address = formatAutocompleteSelectedAddress(raw, query);
@@ -632,6 +653,7 @@ export default function MapboxAddressAutocomplete({
     !suppressSuggestionList && suggestions.length > 0;
 
   const dismissSuggestionUi = useCallback(() => {
+    suggestFetchGenRef.current += 1;
     setSuggestions([]);
     setSuppressSuggestionList(true);
   }, []);
