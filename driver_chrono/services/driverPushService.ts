@@ -64,6 +64,35 @@ async function registerTokenWithBackend(expoPushToken: string): Promise<boolean>
   return true;
 }
 
+export async function unregisterDriverPushNotifications(): Promise<void> {
+  if (Platform.OS === "web") return;
+
+  const { token } = await apiService.ensureAccessToken();
+  if (!token) return;
+
+  const projectId =
+    (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
+      ?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId || typeof projectId !== "string") return;
+
+  try {
+    const push = await Notifications.getExpoPushTokenAsync({ projectId });
+    await apiFetch(`${config.apiUrl}/api/push/register`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        app: "driver",
+        expoPushToken: push.data,
+      }),
+    });
+  } catch (e) {
+    logger.warn("unregisterPush: échec non bloquant", "driverPush", e);
+  }
+}
+
 /**
  * Permission + envoi du token à POST /api/push/register (après connexion).
  */
@@ -109,7 +138,7 @@ export async function initializeDriverPushNotifications(_userId: string): Promis
     }
   } catch (e) {
     logger.warn(
-      "getExpoPushTokenAsync ou register échoué (Android : FCM sur expo.dev — voir docs/checklists/android-push-fcm.md)",
+      "getExpoPushTokenAsync ou register échoué (Android : FCM sur expo.dev — voir docs/notifications-expo-token.md)",
       "driverPush",
       e
     );

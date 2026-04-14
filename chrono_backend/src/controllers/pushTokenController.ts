@@ -13,6 +13,12 @@ interface RegisterPushBody {
   deviceId?: string | null;
 }
 
+interface UnregisterPushBody {
+  expoPushToken?: string;
+  app?: string;
+  deviceId?: string | null;
+}
+
 function isValidExpoPushToken(token: string): boolean {
   const t = token.trim();
   if (t.length < 24 || t.length > 512) return false;
@@ -220,6 +226,84 @@ export const registerPushToken = async (
     }
 
     // Code court (PostgreSQL 23503, etc. ou Node ECONNREFUSED) — pas un secret, aide au debug sans ouvrir les logs
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      ...(err.code ? { errCode: err.code } : {}),
+    });
+  }
+};
+
+/**
+ * DELETE /api/push/register — invalide un token push courant (JWT requis).
+ * Body optionnel: { expoPushToken?, app: "client"|"driver" }
+ * Si expoPushToken absent: invalide tous les tokens actifs de l'utilisateur pour l'app demandée.
+ */
+export const unregisterPushToken = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!process.env.DATABASE_URL) {
+      res.status(503).json({ success: false, message: 'Base de données non configurée' });
+      return;
+    }
+
+    const user = req.user;
+    if (!user?.id) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+
+    const body = (req.body || {}) as UnregisterPushBody;
+    const app = (body.app || '').toLowerCase() as AppRole;
+    const token = typeof body.expoPushToken === 'string' ? body.expoPushToken.trim() : '';
+    const deviceId =
+      typeof body.deviceId === 'string' && body.deviceId.trim().length > 0
+        ? body.deviceId.trim().slice(0, 255)
+        : null;
+
+    if (app !== 'client' && app !== 'driver') {
+      res.status(400).json({
+        success: false,
+        message: 'app doit être "client" ou "driver"',
+      });
+      return;
+    }
+
+    let query = `UPDATE push_tokens
+      SET invalidated_at = COALESCE(invalidated_at, NOW()), updated_at = NOW()
+      WHERE user_id = $1 AND app_role = $2 AND invalidated_at IS NULL`;
+    const values: Array<string | null> = [user.id, app];
+
+    if (token) {
+      query += ' AND expo_push_token = $3';
+      values.push(token);
+    } else if (deviceId) {
+      query += ' AND device_id = $3';
+      values.push(deviceId);
+    }
+
+    const result = await pool.query(query, values);
+    logger.info('push_tokens invalidé(s) à la déconnexion', {
+      userId: user.id,
+      app_role: app,
+      count: result.rowCount || 0,
+      by: token ? 'token' : deviceId ? 'device_id' : 'app_scope',
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { invalidatedCount: result.rowCount || 0 },
+    });
+  } catch (error: unknown) {
+    const err = pickPgError(error);
+    logger.error('unregisterPushToken failed', {
+      code: err.code,
+      message: err.message,
+      detail: err.detail,
+      constraint: err.constraint,
+    });
     res.status(500).json({
       success: false,
       message: 'Erreur serveur',

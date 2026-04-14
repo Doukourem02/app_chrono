@@ -112,6 +112,27 @@ async function fetchTokensForUser(userId: string, appRole: AppPushRole): Promise
   }
 }
 
+async function invalidateExpoPushToken(token: string, reason: string): Promise<void> {
+  if (!process.env.DATABASE_URL || !token) return;
+  try {
+    const r = await pool.query(
+      `UPDATE push_tokens
+       SET invalidated_at = COALESCE(invalidated_at, NOW()), updated_at = NOW()
+       WHERE expo_push_token = $1 AND invalidated_at IS NULL`,
+      [token]
+    );
+    if (r.rowCount && r.rowCount > 0) {
+      logger.info('[expo-push] token invalidé', {
+        reason,
+        tokenPrefix: token.slice(0, 18),
+        updated: r.rowCount,
+      });
+    }
+  } catch (e: unknown) {
+    logger.warn('[expo-push] invalidation token:', e instanceof Error ? e.message : String(e));
+  }
+}
+
 async function postExpoPush(
   messages: Array<{
     to: string;
@@ -140,7 +161,11 @@ async function postExpoPush(
       body: JSON.stringify(messages),
     });
     const json = (await res.json()) as {
-      data?: Array<{ status?: string; message?: string }>;
+      data?: Array<{
+        status?: string;
+        message?: string;
+        details?: { error?: string; expoPushToken?: string };
+      }>;
       errors?: unknown;
     };
     if (!res.ok) {
@@ -149,9 +174,15 @@ async function postExpoPush(
     }
     const data = json.data;
     if (Array.isArray(data)) {
-      for (const item of data) {
+      for (let i = 0; i < data.length; i += 1) {
+        const item = data[i];
         if (item?.status === 'error') {
-          logger.warn('[expo-push] ticket:', item.message);
+          const expoError = item?.details?.error || '';
+          const token = messages[i]?.to;
+          logger.warn('[expo-push] ticket:', item.message, expoError ? `(${expoError})` : '');
+          if (token && expoError === 'DeviceNotRegistered') {
+            await invalidateExpoPushToken(token, expoError);
+          }
         }
       }
     }

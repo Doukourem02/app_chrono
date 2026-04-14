@@ -1,171 +1,75 @@
-# Notifications push — Expo, tokens et backend (PROJET_CHRONO)
+# Notifications push — État actuel et prochaines étapes (PROJET_CHRONO)
 
-**Rôle de ce fichier** : feuille de route partagée pour intégrer les **notifications push** (client + livreur), les **Expo push tokens**, et l’**envoi côté backend** quand une commande est **acceptée**, **en route** ou **terminée**. À lire avant d’implémenter.
+Ce document résume l’état réel des notifications push après les derniers travaux, puis liste les prochaines priorités.
 
-**Contexte repo** :
+## État actuel (avril 2026)
 
-| Zone | Dossier |
-|------|---------|
-| App client | `app_chrono` |
-| App livreur | `driver_chrono` |
-| API / Socket / logique métier | `chrono_backend` |
+### Ce qui est déjà en place
 
-**Tests** : tu installes déjà les builds sur **ton iPhone** via **TestFlight** — c’est le bon setup pour valider les push (voir § Simulator ci‑dessous).
+- Enregistrement des tokens Expo côté backend via `POST /api/push/register`.
+- Apps `app_chrono` et `driver_chrono` configurées avec `expo-notifications` + canal Android.
+- Envoi push backend via Expo (`chrono_backend/src/services/expoPushService.ts`).
+- Notifications reçues même app fermée (si token valide + permission utilisateur + config APNs/FCM OK).
 
----
+### Avancées récentes livrées
 
-## État — reprise (avril 2026)
+- **Résolution automatique du destinataire par téléphone** au moment de `saveOrder` :
+  - si le numéro correspond à un compte client unique, `recipient_user_id` est rempli.
+  - fichiers : `chrono_backend/src/utils/phoneE164CI.ts`, `chrono_backend/src/utils/resolveRecipientUserIdByPhone.ts`, appel dans `chrono_backend/src/config/orderStorage.ts`.
+- **Lien public de suivi ajouté au push** (`trackUrl`) :
+  - injecté dans le body (quand dispo) + dans `data`.
+  - aligne l’expérience push avec SMS / partage lien.
+- **Statuts push destinataire étendus** :
+  - destinataire inscrit reçoit maintenant : `accepted`, `enroute`, `picked_up`, `delivering`, `completed`, `cancelled`.
+- **Fiabilité Android validée** :
+  - présence confirmée de lignes `platform = android` dans `push_tokens`.
 
-**Dernière mise à jour de cette section** : avril 2026.
+## Flux de décision actuel (destinataire)
 
-**Dans le repo** :
+1. La commande contient un numéro destinataire.
+2. Le backend tente de mapper ce numéro vers un compte client (`recipient_user_id`).
+3. Si compte trouvé :
+   - push app au destinataire (et au payeur selon statut),
+   - pas de dépendance SMS pour notifier ce destinataire inscrit.
+4. Si aucun compte trouvé :
+   - fallback SMS / lien `/track` selon configuration.
 
-- Migration SQL : **`chrono_backend/migrations/023_create_push_tokens.sql`** — à exécuter sur la base liée à `DATABASE_URL` si la table n’existe pas encore (désactive **RLS** sur `push_tokens` pour éviter un `RETURNING` vide).
-- Backend : **`POST /api/push/register`** (`pushTokenController.ts`) — réponses d’erreur avec **`errCode`** (PostgreSQL) quand c’est pertinent.
-- **app_chrono** : `clientPushService` + appel depuis **`app/_layout.tsx`** après auth (déjà en place) ; logs enrichis (`errCode`) si l’API refuse l’enregistrement.
-- **driver_chrono** : **`services/driverPushService.ts`** + même schéma dans **`app/_layout.tsx`** après auth.
+## Vérifications terrain à finaliser
 
-**Priorité n°1 en prod** : appliquer **023** si besoin, puis vérifier que **`POST /api/push/register`** répond **200** depuis les deux apps (voir tableau ci‑dessous). Ensuite seulement : envoi Expo côté backend sur les changements de statut commande.
+Référence : `docs/checklists/recipient-track-notifications.md`.
 
-À ce stade, **`POST /api/push/register`** vers l’API déployée pouvait encore répondre **500** (« Erreur serveur ») **alors que** le JWT et le JSON étaient corrects (notamment : token Bearer **sans retour à la ligne** dans le shell). Ce blocage est la **première chose à lever** :
+- Destinataire avec compte : push bien reçus sur appareil réel.
+- Payeur : push inchangés.
+- Pas de doublon SMS quand `recipient_user_id` est présent.
 
-| À vérifier (même base que `DATABASE_URL` sur Render) | Pourquoi |
-|-----------------------------------------------------|----------|
-| `SELECT id, role FROM users WHERE id = '<uuid du JWT>'` retourne **une ligne** | Sinon **clé étrangère** vers `push_tokens` → échec insert (**23503**) |
-| Migration **023** appliquée, table **`push_tokens`** existe | Sinon table absente (**42P01**) |
-| **RLS** (Supabase) sur `push_tokens` : le rôle du pool peut **INSERT** et les lignes sont visibles pour **`RETURNING`**, ou politiques adaptées | Sinon insert « réussi » mais **0 ligne** renvoyée à l’API |
-| Backend **dernier commit** déployé (logs : `registerPushToken failed`, champ **`errCode`** dans le JSON si présent) | Pour identifier la cause exacte sans deviner |
+## Prochaines étapes (ordre recommandé)
 
-**Note** : `SELECT COUNT(*) FROM push_tokens` à **0** est **normal** tant qu’aucun enregistrement n’a réussi ; ce qui bloque est souvent **l’absence de l’utilisateur dans `users`** ou **RLS / droits**, pas une table « vide ».
+1. **Clore la validation terrain** (si tous les cas ne sont pas encore testés en réel).
+2. **Ajouter une observabilité légère** :
+   - log structuré quand un `recipient_user_id` est auto-résolu,
+   - compteur/trace de fallback SMS (absence de compte).
+3. **Durcir l’hygiène token push** :
+   - invalider les tokens `DeviceNotRegistered` (si pas encore fait partout),
+   - endpoint de désenregistrement explicite à la déconnexion.
+4. **Navigation au tap notification** :
+   - utiliser `data.trackUrl`/`data.orderId` pour ouvrir directement l’écran cible.
+5. **Documentation opérationnelle courte** :
+   - conserver `docs/checklists/recipient-track-notifications.md` comme checklist de run QA.
 
----
+## Notes produit
 
-## 1. Pourquoi Expo Push (et pas APNs/FCM « à la main » dans l’app)
+- Le push ne part pas “au numéro” ; il part aux tokens d’un `user_id`.
+- Le numéro sert à **résoudre** ce `user_id` dans votre base.
+- Si plusieurs comptes matchent le même numéro, l’attribution auto est volontairement bloquée pour éviter une notification au mauvais utilisateur.
 
-- L’app obtient un **`ExpoPushToken`** via `expo-notifications`.
-- Le **backend** envoie les messages à l’**Expo Push API** ; Expo relaie vers **APNs** (iOS) et **FCM** (Android).
-- **App fermée** : le système affiche la notification comme pour n’importe quelle app native, tant que les **credentials** (Apple + Google) sont correctement configurés dans **EAS**.
+## Références code
 
-La complexité est surtout **comptes Apple / Google**, **EAS**, **secrets** — pas sur une couche réseau custom dans l’app.
-
----
-
-## 2. Simulator iOS vs TestFlight / device réel
-
-- **Simulator iOS** : les **push distants sont très limités** (souvent inutilisables pour un vrai parcours). Ne pas s’y fier pour valider la chaîne.
-- **TestFlight + iPhone** : c’est la **référence** pour ce projet : même binaire que la prod, APNs de prod, comportement réel en arrière-plan / app tuée.
-
-Garde aussi un **Android physique** si tu publies le livreur ou le client sur le Play Store — mêmes idées (permission, canaux, FCM via Expo).
-
----
-
-## 3. Notifications « essentielles » (première itération)
-
-| Événement métier | Destinataire typique | Exemple de contenu | Données utiles (`data`) |
-|------------------|----------------------|--------------------|-------------------------|
-| Commande **acceptée** | Client | Titre court + « Votre course est acceptée » | `type`, `orderId`, écran cible |
-| Chauffeur **en route** | Client | « Votre livreur est en route » | idem |
-| Livraison **terminée** | Client | « Livraison terminée » | idem (+ éventuellement lien notation) |
-
-**À décider avant code** : est-ce que le **livreur** reçoit aussi des push dans cette phase (ex. nouvelle demande) — ici on se concentre sur le **client** pour ces trois états.
-
-**Règles produit** :
-
-- **Une notification par transition** utile (éviter les doublons : idempotence ou log « déjà notifié pour ce statut » côté backend).
-- **Opt-in** : si l’utilisateur refuse la permission, ne pas enregistrer de token (ou marquer `notifications_enabled = false`).
-- **Multi-appareils** : plusieurs tokens par utilisateur (téléphone + tablette).
-- **Déconnexion** : supprimer ou invalider les tokens du compte.
+- Orchestration destinataire/payer : `chrono_backend/src/services/recipientOrderNotifyService.ts`
+- Envoi Expo + copy statuts : `chrono_backend/src/services/expoPushService.ts`
+- Résolution destinataire par téléphone : `chrono_backend/src/utils/resolveRecipientUserIdByPhone.ts`
+- Normalisation téléphone CI : `chrono_backend/src/utils/phoneE164CI.ts`
+- Persistance commande (`saveOrder`) : `chrono_backend/src/config/orderStorage.ts`
 
 ---
 
-## 4. Checklist comptes et outils
-
-| Étape | Outil / lieu |
-|-------|----------------|
-| Projet Expo | Dashboard Expo (slug / `projectId` alignés avec `app.config` / EAS) |
-| Builds signés | **EAS Build** (`eas build`) |
-| iOS push | Compte **Apple Developer** ; capability **Push Notifications** ; credentials gérés par **EAS** (`eas credentials`) |
-| Android push | **FCM** lié au projet (selon la doc Expo en vigueur — clé serveur / FCM v1) |
-| Secrets | **EAS Secrets** pour tout ce qui ne doit pas être dans Git ; variables d’environnement **chrono_backend** pour `EXPO_ACCESS_TOKEN` si tu utilises l’API Expo authentifiée (recommandé en prod) |
-| Distribution test | **TestFlight** (déjà utilisé) |
-
-**Packages côté apps** : `expo-notifications` (+ config plugin dans `app.json` / `app.config.js`).
-
----
-
-## 5. Côté applications (`app_chrono` / `driver_chrono`)
-
-À implémenter quand on passera au code :
-
-1. **Permission** : demander l’autorisation au bon moment (souvent après login ou premier écran pertinent).
-2. **Obtenir le token** : `getExpoPushTokenAsync` (ou équivalent selon la doc Expo de ta SDK).
-3. **Canal Android** : créer un canal par défaut (Android 8+) pour un comportement prévisible.
-4. **Enregistrer sur le backend** : `POST` authentifié avec `{ expoPushToken, platform, app: 'client' | 'driver' }` (+ éventuellement `deviceId` stable).
-5. **Refresh** : si le token change, renvoyer au backend (listener / au prochain cold start).
-6. **Réception** :
-   - **Premier plan** : handler pour afficher une bannière in-app ou silencieux selon choix produit.
-   - **Tap sur la notification** : lire `data.orderId` (etc.) et **router** (Expo Router : écran suivi commande).
-7. **Logout** : appeler un endpoint `DELETE` (ou `POST` unregister) pour retirer le token.
-
-Fichiers probables : `app/_layout.tsx` ou un hook dédié `usePushNotifications.ts`, + appel depuis le service API existant (`userApiService` / `apiService`).
-
----
-
-## 6. Côté backend (`chrono_backend`)
-
-À implémenter :
-
-1. **Table** (exemple) : `push_tokens` — `user_id`, `expo_push_token`, `platform`, `app_role`, `created_at`, `updated_at`, `invalidated_at`.
-2. **Routes** :
-   - `POST /api/.../push/register` (JWT) — upsert par `(user_id, token)` ou `(user_id, device_id)`.
-   - `DELETE /api/.../push/register` ou par token — à la déconnexion.
-3. **Envoi** : après mise à jour **fiable** du statut commande (acceptée / en route / terminée), construire le message Expo :
-
-   - `to`: token(s) du **client** concerné,
-   - `title` / `body`,
-   - `data`: `{ type, orderId, ... }` pour le deep link,
-   - options Android (`channelId`, `priority`) si besoin.
-
-4. **API Expo** : `POST https://exp.host/--/api/v2/push/send` (ou SDK Node officiel), avec en-tête **`Authorization: Bearer <EXPO_ACCESS_TOKEN>`** en production si requis par ta config.
-
-5. **Erreurs** : si Expo indique **DeviceNotRegistered** (ou équivalent), **marquer le token invalide** en base pour ne pas réessayer en boucle.
-
-6. **Performance** : optionnel — mettre l’envoi dans une **file** (job async) pour ne pas bloquer la requête HTTP du changement de statut.
-
-Point d’accroche code : là où tu émets déjà les événements Socket / mets à jour la commande en base — **même endroit** (ou listener d’événement domaine) pour déclencher le push.
-
----
-
-## 7. Sécurité et contenu
-
-- Éviter les **données sensibles** dans le `body` visible sur l’écran de verrouillage ; détails dans `data` et chargement après ouverture app si nécessaire.
-- Alignement **RGPD** : finalité des notifs, préférences utilisateur si tu étends plus tard.
-
----
-
-## 8. Plan d’implémentation suggéré (ordre)
-
-1. Config **EAS** + **push** iOS (TestFlight) pour **une** app (ex. client).
-2. Backend : table + `register` + **script de test** qui envoie un push de démo à ton token (depuis ton Mac ou le serveur).
-3. `app_chrono` : permission + token + register après login.
-4. Brancher les **trois événements** métier côté backend.
-5. Deep link + test **app tuée** sur iPhone (TestFlight).
-6. Répéter pour `driver_chrono` si besoin (token séparé, `app_role: driver`).
-
----
-
-## 9. Liens utiles (à ouvrir au moment de l’implémentation)
-
-- Documentation Expo : *Push notifications* (guide officiel, aligné sur ta version de SDK Expo).
-- EAS : *Build*, *Submit*, *Using push notifications*.
-
----
-
-## 10. Croisement avec le reste de la doc
-
-- **Auth / cycle de vie** : `docs/ckprod.md` **§3.1 bis** (priorités **1–4** + carte fichiers **§7**). Les push sont **complémentaires** : app fermée → pas de socket ; le push **réveille** ; vérité **API** + resync à l’ouverture.
-- **Prod / qualité** : `docs/ckprod.md` pour le contexte déploiement.
-
----
-
-*Document rédigé pour travailler ensemble sur PROJET_CHRONO ; à mettre à jour au fil des choix produit (livreur, préférences, langues, etc.).*
+Document maintenu pour l’état réel de prod ; à mettre à jour après chaque lot de tests terrain.

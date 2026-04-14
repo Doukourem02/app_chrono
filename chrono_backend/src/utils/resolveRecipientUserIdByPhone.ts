@@ -47,6 +47,11 @@ export async function resolveRecipientUserIdForOrder(order: {
           orderIdPrefix: order.id?.slice(0, 8),
           keysCount: keys.length,
         });
+      } else {
+        logger.info('[recipient-resolve] aucun compte client correspondant au téléphone destinataire', {
+          orderIdPrefix: order.id?.slice(0, 8),
+          keysCount: keys.length,
+        });
       }
       return;
     }
@@ -54,6 +59,10 @@ export async function resolveRecipientUserIdForOrder(order: {
     const rid = r.rows[0].id;
     (order as { recipient_user_id?: string | null }).recipient_user_id = rid;
     (order as { recipient_is_registered?: boolean }).recipient_is_registered = true;
+    logger.info('[recipient-resolve] destinataire auto-résolu', {
+      orderIdPrefix: order.id?.slice(0, 8),
+      recipientUserIdPrefix: rid.slice(0, 8),
+    });
   } catch (e: unknown) {
     logger.warn(
       '[recipient-resolve]',

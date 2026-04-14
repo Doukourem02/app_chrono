@@ -193,6 +193,10 @@ export async function notifyAllForOrderStatus(params: {
   }
 
   if (!recipientUserId && recipientPhone && isTwilioSmsConfigured()) {
+    logger.info('[recipient-notify] fallback SMS (destinataire sans compte lié)', {
+      orderIdPrefix: orderId.slice(0, 8),
+      status: normalized,
+    });
     const brand = process.env.TWILIO_SMS_BODY_BRAND?.trim() || 'Krono';
     let smsBody = `${brand} — ${copy.title}. ${copy.body}`;
     const trackBase = publicTrackPageBaseUrl();

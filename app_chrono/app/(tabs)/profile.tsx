@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
 import { userApiService } from "../../services/userApiService";
+import { unregisterClientPushNotifications } from "../../services/clientPushService";
 import { useAuthStore } from "../../store/useAuthStore";
 import { formatUserName, isSyntheticAuthEmail } from "../../utils/formatName";
 import { logger } from "../../utils/logger";
@@ -215,7 +216,8 @@ export default function ProfilePage() {
       {
         text: "Déconnecter",
         style: "destructive",
-        onPress: () => {
+        onPress: async () => {
+          await unregisterClientPushNotifications();
           logout();
           router.replace("/(auth)" as any);
         },

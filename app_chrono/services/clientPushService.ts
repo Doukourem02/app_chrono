@@ -68,6 +68,39 @@ async function registerTokenWithBackend(expoPushToken: string): Promise<boolean>
   return true;
 }
 
+export async function unregisterClientPushNotifications(): Promise<void> {
+  if (Platform.OS === "web") return;
+
+  const token = await userApiService.ensureAccessToken();
+  if (!token) return;
+
+  const projectId =
+    (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
+      ?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId || typeof projectId !== "string") return;
+
+  try {
+    const push = await Notifications.getExpoPushTokenAsync({ projectId });
+    await apiFetch(
+      `${config.apiUrl}/api/push/register`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          app: "client",
+          expoPushToken: push.data,
+        }),
+      },
+      { maxRetries: 0 }
+    );
+  } catch (e) {
+    logger.warn("unregisterPush: échec non bloquant", "clientPush", e);
+  }
+}
+
 /**
  * Demande la permission + envoie le token Expo à POST /api/push/register.
  * À appeler après connexion (JWT disponible).
@@ -114,7 +147,7 @@ export async function initializeClientPushNotifications(_userId: string): Promis
     }
   } catch (e) {
     logger.warn(
-      "getExpoPushTokenAsync ou register échoué (Android : souvent FCM non configuré sur expo.dev — voir docs/checklists/android-push-fcm.md)",
+      "getExpoPushTokenAsync ou register échoué (Android : souvent FCM non configuré sur expo.dev — voir docs/notifications-expo-token.md)",
       "clientPush",
       e
     );
