@@ -1,6 +1,6 @@
 "use client";
 
-import { SkeletonLoader } from "@/components/animations";
+import { ScreenTransition, SkeletonLoader } from "@/components/animations";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { DateFilterProvider } from "@/contexts/DateFilterContext";
@@ -182,12 +182,37 @@ export default function DashboardLayout({
           <div style={contentWrapperStyle}>
             <div style={scrollableStyle}>
               {isTrackingPage ? (
-                <main style={{ height: "100%", padding: 0 }}>{children}</main>
+                <main
+                  style={{
+                    height: "100%",
+                    padding: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: 0,
+                  }}
+                >
+                  <ScreenTransition
+                    key={pathname ?? ""}
+                    direction="fade"
+                    style={{
+                      flex: 1,
+                      minHeight: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    {children}
+                  </ScreenTransition>
+                </main>
               ) : (
                 <div style={innerContainerStyle}>
                   <div style={maxWidthContainerStyle}>
                     <Header />
-                    <main>{children}</main>
+                    <main>
+                      <ScreenTransition key={pathname ?? ""} direction="fade">
+                        {children}
+                      </ScreenTransition>
+                    </main>
                   </div>
                 </div>
               )}
