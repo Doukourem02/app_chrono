@@ -1,6 +1,17 @@
 import { create } from 'zustand';
 import { mapAdminOrderFlags } from '../utils/mapAdminOrderFlags';
 
+const upsertOrderById = (orders: OrderRequest[], order: OrderRequest): OrderRequest[] => {
+  const existingIndex = orders.findIndex((o) => o.id === order.id);
+  if (existingIndex === -1) {
+    return [...orders, order];
+  }
+
+  const nextOrders = [...orders];
+  nextOrders[existingIndex] = { ...nextOrders[existingIndex], ...order };
+  return nextOrders;
+};
+
 export type OrderStatus = 'pending' | 'accepted' | 'declined' | 'in_progress' | 'enroute' | 'picked_up' | 'delivering' | 'completed' | 'cancelled';
 
 export interface OrderRequest {
@@ -282,7 +293,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       // Toujours sélectionner la nouvelle commande acceptée pour qu'elle s'affiche immédiatement
       // C'est important pour que le tracking order apparaisse automatiquement
       return {
-        activeOrders: [...state.activeOrders, acceptedOrder],
+        activeOrders: upsertOrderById(state.activeOrders, acceptedOrder),
         pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
         selectedOrderId: acceptedOrder.id, // Sélectionner automatiquement la nouvelle commande
         orderHistory: [acceptedOrder, ...state.orderHistory],
@@ -303,7 +314,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       } as OrderRequest;
       
       return {
-        activeOrders: [...state.activeOrders, newAcceptedOrder],
+        activeOrders: upsertOrderById(state.activeOrders, newAcceptedOrder),
         selectedOrderId: newAcceptedOrder.id, // Sélectionner automatiquement
       };
     }

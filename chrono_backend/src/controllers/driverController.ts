@@ -193,14 +193,27 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
     }
     
     try {
+      const latitudeParam =
+        current_latitude != null && current_latitude !== ''
+          ? parseFloat(current_latitude)
+          : null;
+      const longitudeParam =
+        current_longitude != null && current_longitude !== ''
+          ? parseFloat(current_longitude)
+          : null;
+      const isOnlineParam = typeof is_online === 'boolean' ? is_online : null;
+      const isAvailableParam = typeof is_available === 'boolean' ? is_available : null;
+
       await pool.query(
         `UPDATE driver_profiles 
-         SET is_online = $1, is_available = $2, 
-           current_latitude = $3, current_longitude = $4,
+         SET is_online = COALESCE($1, is_online),
+           is_available = COALESCE($2, is_available),
+           current_latitude = COALESCE($3, current_latitude),
+           current_longitude = COALESCE($4, current_longitude),
            heading_degrees = COALESCE($5::double precision, heading_degrees),
            updated_at = NOW()
          WHERE user_id = $6`,
-        [is_online, is_available, current_latitude, current_longitude, headingParam, userId]
+        [isOnlineParam, isAvailableParam, latitudeParam, longitudeParam, headingParam, userId]
       );
       if (
         current_latitude != null &&
