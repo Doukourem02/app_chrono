@@ -13,6 +13,7 @@ import { userOrderSocketService } from '../../services/userOrderSocketService';
 import { userMessageSocketService } from '../../services/userMessageSocketService';
 import { userApiService } from '../../services/userApiService';
 import { useOrderStore } from '../../store/useOrderStore';
+import { useShipmentStore } from '../../store/useShipmentStore';
 import { useRatingStore } from '../../store/useRatingStore';
 import { useBottomSheet } from '../../hooks/useBottomSheet';
 import { useMessageBottomSheet } from '../../hooks/useMessageBottomSheet';
@@ -22,9 +23,11 @@ import { formatUserName } from '../../utils/formatName';
 
 export default function OrderTrackingPage() {
   const { requireAuth } = useRequireAuth();
-  const params = useLocalSearchParams<{ orderId: string }>();
+  const params = useLocalSearchParams<{ orderId: string; openChat?: string }>();
   const { user } = useAuthStore();
   const orderId = params.orderId;
+  const openChatFromPush =
+    params.openChat === '1' || params.openChat === 'true';
   
   const storeOrder = useOrderStore((state) => 
     orderId ? state.activeOrders.find(o => o.id === orderId) : null
@@ -120,6 +123,7 @@ export default function OrderTrackingPage() {
 
   const [showMessageBottomSheet, setShowMessageBottomSheet] = React.useState(false);
   const hasAutoExpandedRef = useRef(false);
+  const openedChatFromPushRef = useRef(false);
   
   // Ouvrir automatiquement le bottom sheet de tracking au montage
   useEffect(() => {
@@ -485,6 +489,26 @@ export default function OrderTrackingPage() {
   }, [collapseMessageBottomSheet]);
 
   React.useEffect(() => {
+    if (
+      !openChatFromPush ||
+      openedChatFromPushRef.current ||
+      !currentOrder?.driverId
+    ) {
+      return;
+    }
+    openedChatFromPushRef.current = true;
+    const t = setTimeout(() => {
+      setShowMessageBottomSheet(true);
+      expandMessageBottomSheet();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [
+    openChatFromPush,
+    currentOrder?.driverId,
+    expandMessageBottomSheet,
+  ]);
+
+  React.useEffect(() => {
     if (!currentOrder && !isLoadingOrder) {
       const timer = setTimeout(() => {
         setShowError(true);
@@ -645,8 +669,11 @@ export default function OrderTrackingPage() {
           onCancel={() => handleCancelOrder(currentOrder.id)}
           onMessage={handleOpenMessage}
           onNewOrder={() => {
-            // Nettoyer la sélection de commande pour permettre la création d'une nouvelle commande
-            useOrderStore.getState().setSelectedOrder(null);
+            const o = useOrderStore.getState();
+            o.setSelectedOrder(null);
+            o.setPreferCreationForm(true);
+            o.setMapNewOrderIntentPending(true);
+            useShipmentStore.getState().resetShipment();
             router.push('/(tabs)/map');
           }}
           activeOrdersCount={useOrderStore.getState().activeOrders.length}

@@ -19,6 +19,7 @@ import {
 } from "../services/clientBackgroundLocation";
 import {
   initializeClientPushNotifications,
+  processClientPushColdStartNavigation,
   setupClientPushListeners,
 } from "../services/clientPushService";
 import { isNetworkOffline } from "../utils/isNetworkOffline";
@@ -70,7 +71,13 @@ export default function RootLayout() {
     const remove = setupClientPushListeners(() => {
       void runUserAppResync(user.id);
     });
-    return () => remove();
+    const coldStartTimer = setTimeout(() => {
+      processClientPushColdStartNavigation();
+    }, 500);
+    return () => {
+      remove();
+      clearTimeout(coldStartTimer);
+    };
   }, [isAuthenticated, user?.id]);
 
   // Localisation en arrière-plan : uniquement si une commande est en cours (hors terminée / annulée)

@@ -284,5 +284,10 @@ export async function notifyAllForOrderStatus(params: {
     void sendTransactionalSMSTwilio(recipientPhone, smsBody).catch((e: unknown) => {
       logger.warn('[recipient-notify] sms:', e instanceof Error ? e.message : String(e));
     });
+  } else if (recipientUserId && recipientPhone) {
+    logger.info('[recipient-notify] pas de SMS destinataire — compte lié (push / autres canaux)', {
+      orderIdPrefix: orderId.slice(0, 8),
+      status: statusNorm,
+    });
   }
 }

@@ -7,7 +7,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useDriverStore } from '../../store/useDriverStore';
 import { formatUserName } from '../../utils/formatName';
 import { apiService } from '../../services/apiService';
-import { unregisterDriverPushNotifications } from '../../services/driverPushService';
 import { logger } from '../../utils/logger';
 import { showUserFriendlyError } from '../../utils/errorFormatter';
 
@@ -214,8 +213,7 @@ export default function ProfilePage() {
         {
           text: 'Déconnexion',
           style: 'destructive',
-          onPress: async () => {
-            await unregisterDriverPushNotifications();
+          onPress: () => {
             logout();
             router.replace('/(auth)' as any);
           },

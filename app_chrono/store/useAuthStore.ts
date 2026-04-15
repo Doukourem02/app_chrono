@@ -47,14 +47,26 @@ export const useAuthStore = create<AuthState>()(
       },
       
       logout: () => {
-        clearSecureTokens().catch(() => {});
-        set({ 
-          user: null, 
-          isAuthenticated: false,
-          isLoading: false,
-          accessToken: null,
-          refreshToken: null,
-        });
+        void (async () => {
+          try {
+            const m = await import('../services/clientPushService');
+            await m.unregisterClientPushNotifications();
+          } catch {
+            /* non bloquant */
+          }
+          try {
+            await clearSecureTokens();
+          } catch {
+            /* ignore */
+          }
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            accessToken: null,
+            refreshToken: null,
+          });
+        })();
       },
       
       setLoading: (loading) => set({ isLoading: loading }),

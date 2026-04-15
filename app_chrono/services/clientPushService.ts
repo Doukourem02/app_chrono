@@ -4,13 +4,58 @@
  */
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
+import { router } from "expo-router";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { apiFetch } from "../utils/apiFetch";
 import { userApiService } from "./userApiService";
 
 let handlerConfigured = false;
+/** Évite de rejouer la dernière notif à chaque focus session (cold start une fois). */
+let coldStartNotificationHandled = false;
+
+function asPushString(v: unknown): string | undefined {
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return undefined;
+}
+
+/**
+ * Navigation depuis le payload `data` d’une notification Expo (tap ou cold start).
+ * Backend : `order_status` / `order_chat_message` + `orderId`, optionnel `trackUrl`, `conversationId`.
+ */
+export function navigateFromClientPushPayload(
+  data: Record<string, unknown> | undefined | null
+): void {
+  if (!data || typeof data !== "object") return;
+  const type = asPushString(data.type);
+  const orderId = asPushString(data.orderId);
+  const trackUrl = asPushString(data.trackUrl);
+
+  if (type === "order_chat_message" && orderId) {
+    router.push(`/order-tracking/${encodeURIComponent(orderId)}?openChat=1` as any);
+    return;
+  }
+  if (type === "order_status" && orderId) {
+    router.push(`/order-tracking/${encodeURIComponent(orderId)}` as any);
+    return;
+  }
+  if (trackUrl && /^https?:\/\//i.test(trackUrl)) {
+    void Linking.openURL(trackUrl);
+  }
+}
+
+/** À appeler une fois l’utilisateur connecté : ouvre l’écran si l’app a été lancée via une notif. */
+export function processClientPushColdStartNavigation(): void {
+  if (coldStartNotificationHandled) return;
+  coldStartNotificationHandled = true;
+  void Notifications.getLastNotificationResponseAsync().then((response) => {
+    if (!response) return;
+    const data = response.notification.request.content
+      .data as Record<string, unknown>;
+    navigateFromClientPushPayload(data);
+  });
+}
 
 function ensureNotificationHandler(): void {
   if (handlerConfigured) return;
@@ -163,7 +208,10 @@ export function setupClientPushListeners(onRefresh: () => void): () => void {
   const sub1 = Notifications.addNotificationReceivedListener(() => {
     onRefresh();
   });
-  const sub2 = Notifications.addNotificationResponseReceivedListener(() => {
+  const sub2 = Notifications.addNotificationResponseReceivedListener((response) => {
+    const data = response.notification.request.content
+      .data as Record<string, unknown>;
+    navigateFromClientPushPayload(data);
     onRefresh();
   });
 

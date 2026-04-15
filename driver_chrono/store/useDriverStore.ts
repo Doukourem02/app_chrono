@@ -125,21 +125,33 @@ export const useDriverStore = create<DriverStore>()(
       },
 
       logout: () => {
-        clearSecureTokens().catch(() => {});
-        set({
-          isAuthenticated: false,
-          user: null,
-          profile: null,
-          accessToken: null,
-          refreshToken: null,
-          isOnline: false,
-          currentLocation: null,
-          todayStats: {
-            deliveries: 0,
-            earnings: 0,
-            hours: 0,
-          },
-        });
+        void (async () => {
+          try {
+            const m = await import('../services/driverPushService');
+            await m.unregisterDriverPushNotifications();
+          } catch {
+            /* non bloquant */
+          }
+          try {
+            await clearSecureTokens();
+          } catch {
+            /* ignore */
+          }
+          set({
+            isAuthenticated: false,
+            user: null,
+            profile: null,
+            accessToken: null,
+            refreshToken: null,
+            isOnline: false,
+            currentLocation: null,
+            todayStats: {
+              deliveries: 0,
+              earnings: 0,
+              hours: 0,
+            },
+          });
+        })();
       },
 
       hydrateTokens: async () => {

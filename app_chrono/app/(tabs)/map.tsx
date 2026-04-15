@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {Alert,Animated,Dimensions,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
 import type { MapRefHandle } from "../../hooks/useMapLogic";
@@ -591,6 +591,41 @@ export default function MapPage() {
       setPreferCreationForm(false);
     }
   }, [selectedOrderId, isSearchingDriver, preferCreationForm, setPreferCreationForm]);
+
+  /** Depuis la page suivi : « Nouvelle commande » — réinitialiser la map et ouvrir le formulaire (même avec une course en cours). */
+  useFocusEffect(
+    useCallback(() => {
+      const store = useOrderStore.getState();
+      if (!store.mapNewOrderIntentPending) {
+        return;
+      }
+      store.setMapNewOrderIntentPending(false);
+      setPickupLocation("");
+      setDeliveryLocation("");
+      clearAddressRoutingOverrides();
+      setPickupCoords(null);
+      setDropoffCoords(null);
+      clearRoute();
+      if (isSearchingDriver) {
+        stopDriverSearch();
+      }
+      setIsCreatingNewOrder(true);
+      userManuallyClosedRef.current = false;
+      hasAutoOpenedRef.current = false;
+      scheduleBottomSheetOpen(100);
+    }, [
+      clearAddressRoutingOverrides,
+      clearRoute,
+      isSearchingDriver,
+      scheduleBottomSheetOpen,
+      setDeliveryLocation,
+      setDropoffCoords,
+      setIsCreatingNewOrder,
+      setPickupCoords,
+      setPickupLocation,
+      stopDriverSearch,
+    ])
+  );
 
   useEffect(() => {
     logger.debug("🔍 RatingBottomSheet state changed", "map.tsx", {
@@ -1296,7 +1331,7 @@ export default function MapPage() {
              (isCreatingNewOrder || preferCreationForm) && 
              !isSearchingDriver && 
              !pendingOrder && 
-             !hasOrderWithAssignedDriver && 
+             (!hasOrderWithAssignedDriver || preferCreationForm) && 
                 (selectedOrderId === null ||
                   preferCreationForm ||
                   !(
@@ -1485,7 +1520,9 @@ export default function MapPage() {
                 }
 
                 const shouldShowSearch =
-                  isSearchingDriver || (pendingOrder && !isCreatingNewOrder);
+                  !preferCreationForm &&
+                  (isSearchingDriver ||
+                    (pendingOrder && !isCreatingNewOrder));
                 const hasDriverAssigned =
                   orderToDisplay?.driver &&
                   (orderToDisplay?.status === "accepted" ||
@@ -1536,13 +1573,6 @@ export default function MapPage() {
                     }}
                     onDetails={() => {
                       if (orderToDisplay) {
-                        // Réinitialiser la map : au retour, afficher le formulaire de création
-                        setPreferCreationForm(true);
-                        setIsCreatingNewOrder(true);
-                        setSelectedOrder(null);
-                        userManuallyClosedRef.current = false;
-                        hasAutoOpenedRef.current = false;
-                        expandBottomSheet();
                         router.push(
                           `/order-tracking/${orderToDisplay.id}` as any
                         );

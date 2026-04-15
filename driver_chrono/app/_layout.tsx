@@ -20,6 +20,7 @@ import { driverMessageSocketService } from "../services/driverMessageSocketServi
 import { runDriverAppResync } from "../services/driverAppResync";
 import {
   initializeDriverPushNotifications,
+  processDriverPushColdStartNavigation,
   setupDriverPushListeners,
 } from "../services/driverPushService";
 import "../config/envCheck";
@@ -73,7 +74,13 @@ export default function RootLayout() {
     const remove = setupDriverPushListeners(() => {
       void runDriverAppResync(user.id);
     });
-    return () => remove();
+    const coldStartTimer = setTimeout(() => {
+      processDriverPushColdStartNavigation();
+    }, 500);
+    return () => {
+      remove();
+      clearTimeout(coldStartTimer);
+    };
   }, [isAuthenticated, user?.id]);
 
   // Rafraîchir la session + resync profil / commandes quand l'app revient au premier plan

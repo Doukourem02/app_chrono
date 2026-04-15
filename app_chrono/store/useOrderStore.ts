@@ -64,7 +64,9 @@ interface OrderStore {
   driverCoords: Map<string, { latitude: number; longitude: number }>;
   /** Quand true, afficher le formulaire de création au lieu du suivi (ex: retour depuis Détails de la course) */
   preferCreationForm: boolean;
-  
+  /** Un coup : l’utilisateur a choisi « Nouvelle commande » depuis le suivi — la map doit réinitialiser l’UI et ouvrir le formulaire même si une course est en cours. */
+  mapNewOrderIntentPending: boolean;
+
   addOrder: (order: OrderRequest) => void;
   updateOrder: (orderId: string, updates: Partial<OrderRequest>) => void;
   removeOrder: (orderId: string) => void;
@@ -74,7 +76,8 @@ interface OrderStore {
   updateFromSocket: (payload: { order?: Partial<OrderRequest> | null; location?: { latitude?: number; longitude?: number } | null; proof?: any }) => void;
   clear: () => void;
   setPreferCreationForm: (value: boolean) => void;
-  
+  setMapNewOrderIntentPending: (value: boolean) => void;
+
   getCurrentOrder: () => OrderRequest | null;
   getPendingOrder: () => OrderRequest | null;
   getAllPendingOrders: () => OrderRequest[];
@@ -86,6 +89,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   selectedOrderId: null,
   driverCoords: new Map(),
   preferCreationForm: false,
+  mapNewOrderIntentPending: false,
 
   addOrder: (order) => set((state) => {
     // Ne pas ajouter les commandes complétées, annulées ou déclinées
@@ -163,6 +167,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
 
   setSelectedOrder: (orderId) => set({ selectedOrderId: orderId }),
   setPreferCreationForm: (value) => set({ preferCreationForm: value }),
+  setMapNewOrderIntentPending: (value) => set({ mapNewOrderIntentPending: value }),
 
   setDriverCoordsForOrder: (orderId, coords) => set((state) => {
     const newCoords = new Map(state.driverCoords);
@@ -348,6 +353,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     selectedOrderId: null,
     driverCoords: new Map(),
     preferCreationForm: false,
+    mapNewOrderIntentPending: false,
   }),
 
   getCurrentOrder: () => {

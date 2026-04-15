@@ -5,12 +5,53 @@
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { router } from "expo-router";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { apiFetch } from "../utils/apiFetch";
 import { apiService } from "./apiService";
 
 let handlerConfigured = false;
+let coldStartNotificationHandled = false;
+
+function asPushString(v: unknown): string | undefined {
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return undefined;
+}
+
+/** Payload `data` des notifs Expo livreur (ex. message commande). */
+export function navigateFromDriverPushPayload(
+  data: Record<string, unknown> | undefined | null
+): void {
+  if (!data || typeof data !== "object") return;
+  const type = asPushString(data.type);
+  const conversationId = asPushString(data.conversationId);
+  const orderId = asPushString(data.orderId);
+
+  if (type === "order_chat_message" && conversationId) {
+    router.push(`/messages/${encodeURIComponent(conversationId)}` as any);
+    return;
+  }
+  if (type === "order_chat_message" && orderId) {
+    router.push(`/(tabs)` as any);
+    logger.warn(
+      "notification push: conversationId manquant — redirection accueil",
+      "driverPush",
+      { orderIdPrefix: orderId.slice(0, 8) }
+    );
+  }
+}
+
+export function processDriverPushColdStartNavigation(): void {
+  if (coldStartNotificationHandled) return;
+  coldStartNotificationHandled = true;
+  void Notifications.getLastNotificationResponseAsync().then((response) => {
+    if (!response) return;
+    const data = response.notification.request.content
+      .data as Record<string, unknown>;
+    navigateFromDriverPushPayload(data);
+  });
+}
 
 function ensureNotificationHandler(): void {
   if (handlerConfigured) return;
@@ -151,7 +192,10 @@ export function setupDriverPushListeners(onRefresh: () => void): () => void {
   const sub1 = Notifications.addNotificationReceivedListener(() => {
     onRefresh();
   });
-  const sub2 = Notifications.addNotificationResponseReceivedListener(() => {
+  const sub2 = Notifications.addNotificationResponseReceivedListener((response) => {
+    const data = response.notification.request.content
+      .data as Record<string, unknown>;
+    navigateFromDriverPushPayload(data);
     onRefresh();
   });
 
