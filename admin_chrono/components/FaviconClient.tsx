@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import config from '@/lib/config'
 
 /** Carré 512×512 — même URL que `metadata.icons` (pas le PNG portrait). Incrémente le query après changement d’icône pour casser le cache. */
-const iconHref = `${config.app.iconUrl}?v=krono3`
+const iconHref = `${config.app.iconUrl}?v=krono4`
 
 export function FaviconClient() {
   const pathname = usePathname()
