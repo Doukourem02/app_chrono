@@ -8,7 +8,7 @@ import { MapboxProvider } from "@/contexts/MapboxContext";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { useNotifications } from "@/hooks/useNotifications";
 import { soundService } from "@/utils/soundService";
@@ -178,7 +178,9 @@ export default function DashboardLayout({
     <DateFilterProvider>
       <MapboxProvider>
         <div style={containerStyle}>
-          <Sidebar />
+          <Suspense fallback={<div style={{ width: 72, flexShrink: 0 }} aria-hidden />}>
+            <Sidebar />
+          </Suspense>
           <div style={contentWrapperStyle}>
             <div style={scrollableStyle}>
               {isTrackingPage ? (

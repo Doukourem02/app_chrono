@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Search, Car, CarFront, Truck, Package, AlertTriangle, TrendingUp, Gauge, Wrench } from 'lucide-react'
@@ -42,7 +43,9 @@ interface ExpiringDocument {
 
 export default function FleetPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const t = useTranslation()
+  const activeTab = searchParams.get('tab') || 'overview'
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<VehicleStatus>('all')
@@ -56,6 +59,19 @@ export default function FleetPage() {
 
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  useEffect(() => {
+    const id =
+      activeTab === 'overview' ? 'maintenance-tab-overview' : `maintenance-tab-${activeTab}`
+    const el = typeof document !== 'undefined' ? document.getElementById(id) : null
+    if (el) {
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    } else if (activeTab === 'overview') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [activeTab])
 
   // Récupérer les véhicules
   const { data: vehiclesData, isLoading } = useQuery({
@@ -210,20 +226,21 @@ export default function FleetPage() {
   return (
     <ScreenTransition>
       <div style={containerStyle}>
-        {/* Header */}
-        <div style={headerRowStyle}>
-          <div>
-            <h1 style={titleStyle}>
-              {t('sidebar.sections.maintenance.title')}
-            </h1>
-            <p style={subtitleStyle}>
-              {t('sidebar.sections.maintenance.overview')}
-            </p>
+        <div id="maintenance-tab-overview" style={{ scrollMarginTop: 88 }}>
+          {/* Header */}
+          <div style={headerRowStyle}>
+            <div>
+              <h1 style={titleStyle}>
+                {t('sidebar.sections.maintenance.title')}
+              </h1>
+              <p style={subtitleStyle}>
+                {t('sidebar.sections.maintenance.overview')}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Statistiques globales avec KPICard */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Statistiques globales avec KPICard */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <KPICard
             title={t('maintenance.stats.totalVehicles')}
             value={stats.total}
@@ -264,64 +281,72 @@ export default function FleetPage() {
             isLoading={isLoading}
             index={3}
           />
+          </div>
         </div>
 
-        {/* Alertes documents expirant */}
-        {expiringDocuments.length > 0 && (
-          <AnimatedCard index={0} delay={0} style={{
-            backgroundColor: '#FEF3C7',
-            borderRadius: '16px',
-            padding: '20px',
-            border: '1px solid #FCD34D',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          }}>
-            <div className="flex items-center gap-3 mb-4">
-              <div style={{
-                padding: '8px',
-                borderRadius: '12px',
-                backgroundColor: '#F59E0B',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <AlertTriangle className="w-5 h-5 text-white" />
-              </div>
-              <h3 style={{
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#92400E',
-              }}>
-                {expiringDocuments.length} {t('maintenance.alerts.expiringDocuments')}
-              </h3>
-            </div>
-            <div className="space-y-2">
-              {expiringDocuments.slice(0, 5).map((doc) => (
-                <div key={doc.id} style={{
-                  fontSize: '14px',
-                  color: '#78350F',
-                  padding: '8px 12px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.5)',
-                  borderRadius: '8px',
-                }}>
-                  <span style={{ fontWeight: 600 }}>{doc.vehicle_plate}</span> - {doc.document_type} expire le{' '}
-                  {new Date(doc.expiry_date).toLocaleDateString('fr-FR')}
-                </div>
-              ))}
-              {expiringDocuments.length > 5 && (
+        {/* Documents (ancre pour ?tab=documents) */}
+        <div id="maintenance-tab-documents" style={{ scrollMarginTop: 88 }}>
+          {expiringDocuments.length > 0 ? (
+            <AnimatedCard index={0} delay={0} style={{
+              backgroundColor: '#FEF3C7',
+              borderRadius: '16px',
+              padding: '20px',
+              border: '1px solid #FCD34D',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            }}>
+              <div className="flex items-center gap-3 mb-4">
                 <div style={{
-                  fontSize: '13px',
-                  color: '#92400E',
-                  fontWeight: 600,
-                  padding: '8px 12px',
+                  padding: '8px',
+                  borderRadius: '12px',
+                  backgroundColor: '#F59E0B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}>
-                  +{expiringDocuments.length - 5} autre{expiringDocuments.length - 5 > 1 ? 's' : ''}
+                  <AlertTriangle className="w-5 h-5 text-white" />
                 </div>
-              )}
-            </div>
-          </AnimatedCard>
-        )}
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#92400E',
+                }}>
+                  {expiringDocuments.length} {t('maintenance.alerts.expiringDocuments')}
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {expiringDocuments.slice(0, 5).map((doc) => (
+                  <div key={doc.id} style={{
+                    fontSize: '14px',
+                    color: '#78350F',
+                    padding: '8px 12px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                    borderRadius: '8px',
+                  }}>
+                    <span style={{ fontWeight: 600 }}>{doc.vehicle_plate}</span> - {doc.document_type} expire le{' '}
+                    {new Date(doc.expiry_date).toLocaleDateString('fr-FR')}
+                  </div>
+                ))}
+                {expiringDocuments.length > 5 && (
+                  <div style={{
+                    fontSize: '13px',
+                    color: '#92400E',
+                    fontWeight: 600,
+                    padding: '8px 12px',
+                  }}>
+                    +{expiringDocuments.length - 5} autre{expiringDocuments.length - 5 > 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+            </AnimatedCard>
+          ) : (
+            <p style={{ fontSize: '14px', color: themeColors.textSecondary, marginBottom: '8px' }}>
+              Aucun document expirant dans les 30 prochains jours.
+            </p>
+          )}
+        </div>
 
         {/* Filtres et recherche */}
+        <div id="maintenance-tab-vehicles" style={{ scrollMarginTop: 88 }}>
         <div style={filtersContainerStyle}>
             {/* Recherche */}
             <div style={searchContainerStyle}>
@@ -630,6 +655,39 @@ export default function FleetPage() {
             </div>
           )}
         </AnimatedCard>
+        </div>
+
+        <div id="maintenance-tab-repairs" style={{ scrollMarginTop: 88 }}>
+          <AnimatedCard index={1} delay={0} style={{
+            backgroundColor: themeColors.cardBg,
+            borderRadius: '16px',
+            padding: '24px',
+            border: `1px solid ${themeColors.cardBorder}`,
+          }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 600, color: themeColors.textPrimary, marginBottom: '8px' }}>
+              Entretien & réparations
+            </h2>
+            <p style={{ fontSize: '14px', color: themeColors.textSecondary }}>
+              Vue dédiée à venir — les interventions sont pour l’instant listées au niveau de chaque véhicule.
+            </p>
+          </AnimatedCard>
+        </div>
+
+        <div id="maintenance-tab-budget" style={{ scrollMarginTop: 88 }}>
+          <AnimatedCard index={2} delay={0} style={{
+            backgroundColor: themeColors.cardBg,
+            borderRadius: '16px',
+            padding: '24px',
+            border: `1px solid ${themeColors.cardBorder}`,
+          }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 600, color: themeColors.textPrimary, marginBottom: '8px' }}>
+              Budget flotte
+            </h2>
+            <p style={{ fontSize: '14px', color: themeColors.textSecondary }}>
+              Synthèse budgétaire à venir.
+            </p>
+          </AnimatedCard>
+        </div>
       </div>
     </ScreenTransition>
   )

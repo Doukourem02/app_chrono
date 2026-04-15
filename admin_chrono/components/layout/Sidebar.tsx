@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,CarFront,Wrench,Shield,Sliders,PanelLeftClose,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/chrono.png";
@@ -109,10 +109,10 @@ const navigationSectionsKeys = [
     icon: CarFront,
     items: [
       { href: "/maintenance", icon: CarFront, key: "overview" },
-      { href: "/maintenance/vehicles", icon: Truck, key: "vehicles" },
-      { href: "/maintenance/repairs", icon: Wrench, key: "repairs" },
-      { href: "/maintenance/documents", icon: FileText, key: "documents" },
-      { href: "/maintenance/budget", icon: Wallet, key: "budget" },
+      { href: "/maintenance?tab=vehicles", icon: Truck, key: "vehicles" },
+      { href: "/maintenance?tab=repairs", icon: Wrench, key: "repairs" },
+      { href: "/maintenance?tab=documents", icon: FileText, key: "documents" },
+      { href: "/maintenance?tab=budget", icon: Wallet, key: "budget" },
     ],
   },
   {
@@ -128,8 +128,19 @@ const navigationSectionsKeys = [
   },
 ];
 
+function maintenanceTabFromHref(href: string): string {
+  if (!href.includes("?")) return "overview";
+  try {
+    const u = new URL(href, "http://local.invalid");
+    return u.searchParams.get("tab") || "overview";
+  } catch {
+    return "overview";
+  }
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user, signOut } = useAuthStore();
   const theme = useThemeStore((state) => state.theme);
@@ -881,9 +892,20 @@ export default function Sidebar() {
         {isExpanded && navigationSections.map((section) => {
           const SectionIcon = section.icon;
           const isExpanded = expandedSections.has(section.id);
-          const hasActiveItem = section.items.some(
-            (item) => pathname === item.href || pathname.startsWith(item.href + "/")
-          );
+          const hasActiveItem = section.items.some((item) => {
+            if (section.id === "maintenance") {
+              return pathname === "/maintenance" || pathname.startsWith("/maintenance/");
+            }
+            if (item.href === "/finances") {
+              if (item.key === "clientTransactions") {
+                return pathname === "/finance" || pathname.startsWith("/finance/");
+              }
+              if (item.key === "driverCommissions") {
+                return pathname === "/commissions" || pathname.startsWith("/commissions/");
+              }
+            }
+            return pathname === item.href || pathname.startsWith(item.href + "/");
+          });
 
           return (
             <div key={section.id} style={{ width: '100%', marginTop: '8px' }}>
@@ -951,9 +973,16 @@ export default function Sidebar() {
                   {section.items.map((item, index) => {
                     const ItemIcon = item.icon;
                     let active = false;
-                    
-                    // Détection spéciale pour les pages Finance/Commissions
-                    if (item.href === "/finances") {
+
+                    if (section.id === "maintenance") {
+                      if (pathname !== "/maintenance") {
+                        active = false;
+                      } else {
+                        const itemTab = maintenanceTabFromHref(item.href);
+                        const currentTab = searchParams.get("tab") || "overview";
+                        active = itemTab === currentTab;
+                      }
+                    } else if (item.href === "/finances") {
                       if (item.key === "clientTransactions") {
                         active = pathname === "/finance" || pathname.startsWith("/finance/");
                       } else if (item.key === "driverCommissions") {
@@ -964,13 +993,9 @@ export default function Sidebar() {
                       if (pathname === item.href) {
                         active = true;
                       } else if (pathname.startsWith(item.href + "/")) {
-                        // Vérifier qu'il n'y a pas d'autre item de la même section avec un href plus spécifique qui correspond
-                        // Un item est "plus spécifique" si son href est plus long et commence par l'href de l'item actuel + "/"
                         const hasMoreSpecificMatch = section.items.some(otherItem => {
-                          if (otherItem.href === item.href) return false; // Ignorer l'item actuel
-                          // Si l'autre item a un href qui est plus long et commence par l'href de l'item actuel
+                          if (otherItem.href === item.href) return false;
                           if (otherItem.href.startsWith(item.href + "/")) {
-                            // Vérifier si le pathname correspond à cet autre item (exactement ou avec un "/" après)
                             return pathname === otherItem.href || pathname.startsWith(otherItem.href + "/");
                           }
                           return false;
@@ -1011,9 +1036,20 @@ export default function Sidebar() {
         {/* Afficher les sections en mode collapsed comme des icônes simples */}
         {!isExpanded && navigationSections.map((section) => {
           const SectionIcon = section.icon;
-          const hasActiveItem = section.items.some(
-            (item) => pathname === item.href || pathname.startsWith(item.href + "/")
-          );
+          const hasActiveItem = section.items.some((item) => {
+            if (section.id === "maintenance") {
+              return pathname === "/maintenance" || pathname.startsWith("/maintenance/");
+            }
+            if (item.href === "/finances") {
+              if (item.key === "clientTransactions") {
+                return pathname === "/finance" || pathname.startsWith("/finance/");
+              }
+              if (item.key === "driverCommissions") {
+                return pathname === "/commissions" || pathname.startsWith("/commissions/");
+              }
+            }
+            return pathname === item.href || pathname.startsWith(item.href + "/");
+          });
 
           return (
             <div key={section.id} style={{ position: 'relative' }}>
