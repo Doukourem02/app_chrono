@@ -1,58 +1,38 @@
-# Checklist — Suivi destinataire (lien /track), SMS, Web Push, push app
+# Checklist — Suivi destinataire (reste à faire)
 
-Trace pour la livraison de la fonctionnalité « payeur + destinataire » : notifications alignées, SMS sans compte, Web Push sur le lien, Expo inchangé pour les comptes liés.
+**Déjà validé (ne plus recocher ici)** : push payeur ; destinataire **avec** compte Krono (Expo, pas de SMS en doublon) ; destinataire **sans** compte (SMS / suivi fonctionnels en test).
 
-## Prérequis & configuration
+---
 
-- [ ] `DATABASE_URL` défini (backend)
-- [ ] Twilio SMS opérationnel pour l’OTP (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_SMS_FROM` ou `TWILIO_SMS_MESSAGING_SERVICE_SID`)
-- [ ] Optionnel marque SMS : `TWILIO_SMS_BODY_BRAND=Krono` (ou équivalent)
-- [ ] Web Push : `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, `WEB_PUSH_SUBJECT=mailto:…` (générer avec `npx web-push generate-vapid-keys`)
-- [ ] `EXPO_ACCESS_TOKEN` si requis par ton projet Expo (push app existant)
-- [ ] `ALLOWED_ORIGINS` inclut l’origine qui sert la page `/track` (POST subscribe + fetch API)
+## À faire plus tard (détails produit & technique)
 
-## Base de données
+### Coûts des canaux « message sortant »
 
-- [ ] Migration appliquée : `cd chrono_backend && npm run migrate:track-web-push`
-- [ ] Vérifier présence table `track_web_push_subscriptions` (Supabase / psql)
+- **SMS (Twilio)** : facturé **par SMS** en production — chaque statut notifié par SMS = un coût.
+- **WhatsApp Business API** : en général **payant** aussi (facturation Meta / conversations), ce n’est pas un remplacement « gratuit » du SMS à grande échelle.
+- **Push Expo / compte** : pas de coût par message côté opérateur téléphonique (hors infra serveur / Expo).
 
-## Déploiement backend
+### Alternative sans coût « par notification » pour ceux qui n’ont pas l’app Chrono
 
-- [ ] Variables d’environnement chargées sur l’hôte (Render, VPS, etc.)
-- [ ] Build / redémarrage après ajout de `web-push` (`npm install` déjà fait en repo)
-- [ ] Aucune erreur au démarrage (logs `recipient-notify`, `web-push`, `expo-push`)
+- **Pas de magie** : sans ouvrir un lien, pas de notifs navigateur.
+- **Lien de suivi** : page du type `https://<PUBLIC_TRACK_BASE_URL>/track/<token>` (token lié à la commande). Le backend peut ajouter ce lien dans le SMS (variable `PUBLIC_TRACK_BASE_URL` côté serveur).
+- **Web Push (navigateur)** : l’utilisateur ouvre le lien **une fois**, active **« Activer les alertes navigateur »** sur la page `/track`, puis reçoit les mises à jour **dans Chrome / Safari** sans installer Chrono — **sans facturation au message** comme le SMS (hors hébergement / certificats habituels).
+- **Limite** : sur **iOS**, le Web Push est souvent limité (souvent mieux avec PWA installée) ; le SMS reste un filet si besoin.
 
-## Déploiement front (admin / page suivi)
+### Backend (options déjà prévues ou à brancher)
 
-- [ ] Déployer `admin_chrono` avec `public/sw.js` servi à la racine (`/sw.js`)
-- [ ] HTTPS obligatoire pour le service worker et les push navigateur
-- [ ] `config.apiUrl` pointe vers l’API utilisée en prod
+- Couper les SMS destinataire statut par statut sans retirer le code : `DISABLE_RECIPIENT_ORDER_SMS=true` (voir `recipientOrderNotifyService.ts`).
+- **Tap sur une notif** : ouvrir l’écran cible avec `data.orderId` / `data.trackUrl` (à finaliser côté apps si pas partout).
+- **Migrations** : s’assurer que **025** (`recipient_user_id`) et **026** (dédup push statut) sont appliquées sur l’environnement de prod utilisé.
 
-## Tests manuels — destinataire **sans** compte Krono
+### Infra / QA si pas encore fait un jour
 
-- [ ] Créer une commande avec téléphone destinataire, **sans** `recipient_user_id`
-- [ ] Chaque changement de statut pertinent envoie un **SMS** (si Twilio OK)
-- [ ] Ouvrir le lien `/track/{token}` : frise d’étapes + rafraîchissement ~5 s
-- [ ] Bouton « Activer les alertes navigateur » : permission accordée → inscription OK
-- [ ] Changement de statut → **notification navigateur** reçue (Chrome desktop ou Android)
-- [ ] Clic sur la notif → retour sur la page de suivi
+- Web Push : variables `WEB_PUSH_*`, table `track_web_push_subscriptions`, `admin_chrono` avec `sw.js` en HTTPS, `ALLOWED_ORIGINS` pour `/track`.
+- **Observabilité** : logs quand `recipient_user_id` est auto-résolu ; traces des fallbacks SMS.
 
-## Tests manuels — destinataire **avec** compte (`recipient_user_id`)
+---
 
-- [ ] **Push Expo** reçu pour `picked_up`, `delivering`, `cancelled` (pas de SMS en doublon)
-- [ ] Payeur reçoit toujours ses push (`accepted`, `enroute`, `completed`, `cancelled`)
-
-## Tests manuels — payeur (app client)
-
-- [ ] Push inchangés après livraison / annulation / scan QR → completed
-
-## Régression & limites connues
-
-- [ ] Web Push **iOS** : souvent réservé à une PWA installée ; SMS reste le filet de sécurité
-- [ ] Si table `track_web_push_subscriptions` absente : logs d’erreur SQL → appliquer migration
-- [ ] Si VAPID absent : `webPushAvailable: false`, pas de bouton ; SMS / Expo inchangés
-
-## Références code (repères rapides)
+## Références code
 
 | Sujet | Fichier |
 |--------|---------|
@@ -62,7 +42,3 @@ Trace pour la livraison de la fonctionnalité « payeur + destinataire » : noti
 | Web Push | `chrono_backend/src/services/trackWebPushService.ts` |
 | API track + subscribe | `chrono_backend/src/controllers/trackController.ts`, `routes/trackRoutes.ts` |
 | UI suivi | `admin_chrono/app/track/[token]/page.tsx`, `admin_chrono/public/sw.js` |
-
----
-
-*Pour les prochaines grosses features : copier ce fichier dans `docs/checklists/`, adapter le titre et les cases, garder la même structure (prérequis → DB → déploiement → tests → limites).*

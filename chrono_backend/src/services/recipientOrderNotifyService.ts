@@ -11,6 +11,7 @@ import {
 const NOTIFY_STATUSES = new Set([
   'accepted',
   'enroute',
+  'in_progress',
   'picked_up',
   'delivering',
   'completed',
@@ -57,6 +58,11 @@ export function copyForPublicTrackStatus(status: string): { title: string; body:
       return {
         title: 'En route',
         body: 'Le livreur est en route vers le point de collecte de colis.',
+      };
+    case 'in_progress':
+      return {
+        title: 'Course en cours',
+        body: 'Votre livreur poursuit la course.',
       };
     case 'picked_up':
       return {
@@ -256,7 +262,11 @@ export async function notifyAllForOrderStatus(params: {
     });
   }
 
-  if (!recipientUserId && recipientPhone && isTwilioSmsConfigured()) {
+  const smsDisabled =
+    String(process.env.DISABLE_RECIPIENT_ORDER_SMS || '').trim() === '1' ||
+    String(process.env.DISABLE_RECIPIENT_ORDER_SMS || '').toLowerCase() === 'true';
+
+  if (!smsDisabled && !recipientUserId && recipientPhone && isTwilioSmsConfigured()) {
     logger.info('[recipient-notify] fallback SMS (destinataire sans compte lié)', {
       orderIdPrefix: orderId.slice(0, 8),
       status: statusNorm,

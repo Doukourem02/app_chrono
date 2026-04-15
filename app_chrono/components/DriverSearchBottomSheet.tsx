@@ -9,6 +9,7 @@ import {
   Linking,
   Dimensions,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -336,18 +337,17 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
   });
 
   return (
-    <View
-      style={[
-        styles.searchFloatOuter,
-        { paddingBottom: Math.max(insets.bottom, 14) },
-      ]}
-      pointerEvents="box-none"
-    >
-      <View style={styles.searchFloatCard}>
-        <View style={styles.sheetHandle} />
-
+    <View style={styles.searchFloatOuter} pointerEvents="box-none">
+      <View
+        style={[
+          styles.searchFloatCard,
+          { paddingBottom: Math.max(insets.bottom, 20) },
+        ]}
+      >
         <View style={styles.searchTitleRow}>
-          <Text style={styles.searchTitle}>Recherche d&apos;un livreur</Text>
+          <Text style={styles.searchTitle} numberOfLines={1}>
+            Recherche d&apos;un livreur
+          </Text>
           <Text style={styles.searchTimer}>{formatTime(searchSeconds)}</Text>
         </View>
 
@@ -358,14 +358,14 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
         <View style={styles.searchActionsRow}>
           <TouchableOpacity style={styles.searchActionBtn} onPress={onCancel} activeOpacity={0.7}>
             <View style={[styles.searchActionIconWrap, styles.searchActionIconCancel]}>
-              <Ionicons name="close" size={24} color="#6B7280" />
+              <Ionicons name="close" size={22} color="#4B5563" />
             </View>
             <Text style={styles.searchActionLabel}>Annuler</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.searchActionBtn} onPress={onDetails} activeOpacity={0.7}>
             <View style={[styles.searchActionIconWrap, styles.searchActionIconDetails]}>
-              <Ionicons name="menu" size={24} color="#6B7280" />
+              <Ionicons name="menu" size={22} color="#4B5563" />
             </View>
             <Text style={styles.searchActionLabel}>Détails</Text>
           </TouchableOpacity>
@@ -384,22 +384,17 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     backgroundColor: 'transparent',
   },
+  /** Bandeau pleine largeur (ref. capture) : coins sup. arrondis, bord haut léger, pas d’ombre forte. */
   searchFloatCard: {
-    marginHorizontal: 14,
-    marginBottom: 18,
+    width: '100%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E8E8EA',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    ...(Platform.OS === 'android' ? { elevation: 2 } : {}),
   },
   assignedFloatOuter: {
     position: 'absolute',
@@ -431,39 +426,34 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 16,
   },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E5E7EB',
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
   searchTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   searchTitle: {
     flex: 1,
-    fontSize: 20,
+    flexShrink: 1,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
-    paddingRight: 12,
+    color: '#000000',
+    paddingRight: 10,
+    letterSpacing: -0.2,
   },
   searchTimer: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#1F2937',
+    fontVariant: ['tabular-nums'],
   },
   progressBarWrapper: {
     width: '100%',
-    height: 4,
+    height: 3,
     backgroundColor: '#F3F4F6',
     borderRadius: 2,
     overflow: 'hidden',
-    marginBottom: 22,
+    marginBottom: 26,
   },
   progressBarFill: {
     height: '100%',
@@ -473,20 +463,21 @@ const styles = StyleSheet.create({
   searchActionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingHorizontal: 8,
   },
   searchActionBtn: {
     alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 80,
+    justifyContent: 'flex-start',
+    minWidth: 88,
   },
   searchActionIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   searchActionIconCancel: {
     backgroundColor: '#F3F4F6',
@@ -496,8 +487,8 @@ const styles = StyleSheet.create({
   },
   searchActionLabel: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
+    fontWeight: '400',
+    color: '#4B5563',
   },
   vehiclePlateRow: {
     flexDirection: 'row',
