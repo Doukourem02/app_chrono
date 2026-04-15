@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { EXACT_WORKSPACE_PATH_SET } from '@/lib/workspacePaths'
 
 /**
  * Proxy pour protéger les routes du dashboard
@@ -18,6 +19,13 @@ export async function proxy(request: NextRequest) {
   // Routes API
   if (pathname.startsWith('/api/')) {
     return NextResponse.next()
+  }
+
+  // Une seule page /workspace : URLs plates (/orders, etc.) inchangées dans le navigateur
+  if (EXACT_WORKSPACE_PATH_SET.has(pathname)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/workspace'
+    return NextResponse.rewrite(url)
   }
 
   // Protéger toutes les routes /dashboard/*
