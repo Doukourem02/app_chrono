@@ -4,7 +4,7 @@
  */
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { Linking, Platform } from "react-native";
+import { AppState, Linking, Platform } from "react-native";
 import { router } from "expo-router";
 import { config } from "../config";
 import { logger } from "../utils/logger";
@@ -45,16 +45,43 @@ export function navigateFromClientPushPayload(
   }
 }
 
+/** iOS : Keychain peut refuser `errSecInteractionNotAllowed` (-25308) si l’app n’est pas encore « active ». */
+async function waitForIosPushKeychainReady(): Promise<void> {
+  if (Platform.OS !== "ios") return;
+  await new Promise<void>((resolve) => {
+    const finish = () => setTimeout(resolve, 500);
+    if (AppState.currentState === "active") {
+      finish();
+      return;
+    }
+    const timeout = setTimeout(() => {
+      sub.remove();
+      finish();
+    }, 12000);
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") {
+        clearTimeout(timeout);
+        sub.remove();
+        finish();
+      }
+    });
+  });
+}
+
 /** À appeler une fois l’utilisateur connecté : ouvre l’écran si l’app a été lancée via une notif. */
 export function processClientPushColdStartNavigation(): void {
   if (coldStartNotificationHandled) return;
   coldStartNotificationHandled = true;
-  void Notifications.getLastNotificationResponseAsync().then((response) => {
-    if (!response) return;
-    const data = response.notification.request.content
-      .data as Record<string, unknown>;
-    navigateFromClientPushPayload(data);
-  });
+  void Notifications.getLastNotificationResponseAsync()
+    .then((response) => {
+      if (!response) return;
+      const data = response.notification.request.content
+        .data as Record<string, unknown>;
+      navigateFromClientPushPayload(data);
+    })
+    .catch((e) => {
+      logger.warn("getLastNotificationResponseAsync (non bloquant)", "clientPush", e);
+    });
 }
 
 function ensureNotificationHandler(): void {
@@ -153,49 +180,67 @@ export async function unregisterClientPushNotifications(): Promise<void> {
 export async function initializeClientPushNotifications(_userId: string): Promise<void> {
   if (Platform.OS === "web") return;
 
-  ensureNotificationHandler();
-
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "Krono",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      sound: "default",
-    });
-  }
-
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let finalStatus = existing;
-  if (existing !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  if (finalStatus !== "granted") {
-    logger.warn("Notifications refusées par l’utilisateur", "clientPush");
-    return;
-  }
-
-  const projectId =
-    (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
-      ?.projectId ?? Constants.easConfig?.projectId;
-
-  if (!projectId || typeof projectId !== "string") {
-    logger.warn("EAS projectId manquant (extra.eas.projectId) — token push impossible", "clientPush");
-    return;
-  }
-
   try {
-    const push = await Notifications.getExpoPushTokenAsync({ projectId });
-    const saved = await registerTokenWithBackend(push.data);
-    if (saved) {
-      logger.info("Token push client enregistré côté API", "clientPush", { platform: Platform.OS });
+    await waitForIosPushKeychainReady();
+
+    ensureNotificationHandler();
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "Krono",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        sound: "default",
+      });
+    }
+
+    let existing: Notifications.PermissionStatus;
+    try {
+      const perm = await Notifications.getPermissionsAsync();
+      existing = perm.status;
+    } catch (e) {
+      logger.warn("getPermissionsAsync (notifications) — Keychain / timing iOS ?", "clientPush", e);
+      return;
+    }
+    let finalStatus = existing;
+    if (existing !== "granted") {
+      try {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      } catch (e) {
+        logger.warn("requestPermissionsAsync (notifications)", "clientPush", e);
+        return;
+      }
+    }
+    if (finalStatus !== "granted") {
+      logger.warn("Notifications refusées par l’utilisateur", "clientPush");
+      return;
+    }
+
+    const projectId =
+      (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
+        ?.projectId ?? Constants.easConfig?.projectId;
+
+    if (!projectId || typeof projectId !== "string") {
+      logger.warn("EAS projectId manquant (extra.eas.projectId) — token push impossible", "clientPush");
+      return;
+    }
+
+    try {
+      const push = await Notifications.getExpoPushTokenAsync({ projectId });
+      const saved = await registerTokenWithBackend(push.data);
+      if (saved) {
+        logger.info("Token push client enregistré côté API", "clientPush", { platform: Platform.OS });
+      }
+    } catch (e) {
+      logger.warn(
+        "getExpoPushTokenAsync ou register échoué (Android : souvent FCM non configuré sur expo.dev — voir docs/notifications-expo-token.md)",
+        "clientPush",
+        e
+      );
     }
   } catch (e) {
-    logger.warn(
-      "getExpoPushTokenAsync ou register échoué (Android : souvent FCM non configuré sur expo.dev — voir docs/notifications-expo-token.md)",
-      "clientPush",
-      e
-    );
+    logger.warn("initializeClientPushNotifications (non bloquant)", "clientPush", e);
   }
 }
 

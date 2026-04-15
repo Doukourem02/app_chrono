@@ -4,7 +4,7 @@
  */
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { router } from "expo-router";
 import { config } from "../config";
 import { logger } from "../utils/logger";
@@ -42,15 +42,41 @@ export function navigateFromDriverPushPayload(
   }
 }
 
+async function waitForIosPushKeychainReady(): Promise<void> {
+  if (Platform.OS !== "ios") return;
+  await new Promise<void>((resolve) => {
+    const finish = () => setTimeout(resolve, 500);
+    if (AppState.currentState === "active") {
+      finish();
+      return;
+    }
+    const timeout = setTimeout(() => {
+      sub.remove();
+      finish();
+    }, 12000);
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") {
+        clearTimeout(timeout);
+        sub.remove();
+        finish();
+      }
+    });
+  });
+}
+
 export function processDriverPushColdStartNavigation(): void {
   if (coldStartNotificationHandled) return;
   coldStartNotificationHandled = true;
-  void Notifications.getLastNotificationResponseAsync().then((response) => {
-    if (!response) return;
-    const data = response.notification.request.content
-      .data as Record<string, unknown>;
-    navigateFromDriverPushPayload(data);
-  });
+  void Notifications.getLastNotificationResponseAsync()
+    .then((response) => {
+      if (!response) return;
+      const data = response.notification.request.content
+        .data as Record<string, unknown>;
+      navigateFromDriverPushPayload(data);
+    })
+    .catch((e) => {
+      logger.warn("getLastNotificationResponseAsync (non bloquant)", "driverPush", e);
+    });
 }
 
 function ensureNotificationHandler(): void {
@@ -140,49 +166,67 @@ export async function unregisterDriverPushNotifications(): Promise<void> {
 export async function initializeDriverPushNotifications(_userId: string): Promise<void> {
   if (Platform.OS === "web") return;
 
-  ensureNotificationHandler();
-
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "Krono pro",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      sound: "default",
-    });
-  }
-
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let finalStatus = existing;
-  if (existing !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  if (finalStatus !== "granted") {
-    logger.warn("Notifications refusées par l’utilisateur", "driverPush");
-    return;
-  }
-
-  const projectId =
-    (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
-      ?.projectId ?? Constants.easConfig?.projectId;
-
-  if (!projectId || typeof projectId !== "string") {
-    logger.warn("EAS projectId manquant (extra.eas.projectId) — token push impossible", "driverPush");
-    return;
-  }
-
   try {
-    const push = await Notifications.getExpoPushTokenAsync({ projectId });
-    const saved = await registerTokenWithBackend(push.data);
-    if (saved) {
-      logger.info("Token push livreur enregistré côté API", "driverPush", { platform: Platform.OS });
+    await waitForIosPushKeychainReady();
+
+    ensureNotificationHandler();
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "Krono pro",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        sound: "default",
+      });
+    }
+
+    let existing: Notifications.PermissionStatus;
+    try {
+      const perm = await Notifications.getPermissionsAsync();
+      existing = perm.status;
+    } catch (e) {
+      logger.warn("getPermissionsAsync (notifications) — Keychain / timing iOS ?", "driverPush", e);
+      return;
+    }
+    let finalStatus = existing;
+    if (existing !== "granted") {
+      try {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      } catch (e) {
+        logger.warn("requestPermissionsAsync (notifications)", "driverPush", e);
+        return;
+      }
+    }
+    if (finalStatus !== "granted") {
+      logger.warn("Notifications refusées par l’utilisateur", "driverPush");
+      return;
+    }
+
+    const projectId =
+      (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
+        ?.projectId ?? Constants.easConfig?.projectId;
+
+    if (!projectId || typeof projectId !== "string") {
+      logger.warn("EAS projectId manquant (extra.eas.projectId) — token push impossible", "driverPush");
+      return;
+    }
+
+    try {
+      const push = await Notifications.getExpoPushTokenAsync({ projectId });
+      const saved = await registerTokenWithBackend(push.data);
+      if (saved) {
+        logger.info("Token push livreur enregistré côté API", "driverPush", { platform: Platform.OS });
+      }
+    } catch (e) {
+      logger.warn(
+        "getExpoPushTokenAsync ou register échoué (Android : FCM sur expo.dev — voir docs/notifications-expo-token.md)",
+        "driverPush",
+        e
+      );
     }
   } catch (e) {
-    logger.warn(
-      "getExpoPushTokenAsync ou register échoué (Android : FCM sur expo.dev — voir docs/notifications-expo-token.md)",
-      "driverPush",
-      e
-    );
+    logger.warn("initializeDriverPushNotifications (non bloquant)", "driverPush", e);
   }
 }
 

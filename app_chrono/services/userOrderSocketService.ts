@@ -258,12 +258,21 @@ class UserOrderSocketService {
 
     this.socket.on('connect_error', (error: Error & { type?: string }) => {
       this.retryCount = (this.retryCount || 0) + 1;
+      const msg = (error.message || '').toLowerCase();
+      /** Session socket longue durée : le serveur renvoie souvent HTTP 400 sur polling → reconnexion normale, pas une alerte Sentry prioritaire. */
+      const isLikelyStaleSocketSession =
+        msg.includes('400') ||
+        msg.includes('bad request') ||
+        msg.includes('session id unknown') ||
+        msg.includes('xhr post error') ||
+        msg.includes('xhr get error');
       const isTemporaryPollError =
         error.message?.includes('xhr poll error') ||
         error.message?.includes('poll error') ||
         error.message?.includes('transport unknown') ||
         error.message?.includes('websocket error') ||
-        (error as { type?: string }).type === 'TransportError';
+        (error as { type?: string }).type === 'TransportError' ||
+        isLikelyStaleSocketSession;
       const errorPayload = {
         socketUrl,
         message: error.message,
