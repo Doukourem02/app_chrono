@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { FaviconClient } from "@/components/FaviconClient";
 import config from "@/lib/config";
 import { getSiteUrl } from "@/lib/siteUrl";
 import "../lib/envCheck"; //validation des variables d'environnement au démarrage
@@ -36,10 +35,17 @@ export const metadata: Metadata = {
     title: appName,
     statusBarStyle: "default",
   },
+  /**
+   * Icônes explicites (app/icon.png, app/apple-icon.png) — évite les conflits avec le client
+   * qui réécrivait les balises et cassait l’affichage dans certains navigateurs.
+   */
   icons: {
-    icon: [{ url: iconUrl, type: "image/png", sizes: "512x512" }],
-    shortcut: iconUrl,
-    apple: iconUrl,
+    icon: [
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+    ],
+    shortcut: "/icon.png",
+    apple: "/apple-icon.png",
   },
   openGraph: {
     title: appName,
@@ -64,7 +70,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <FaviconClient />
         <Providers>{children}</Providers>
       </body>
     </html>
