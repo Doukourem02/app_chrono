@@ -19,7 +19,7 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
-      buildNumber: "52",
+      buildNumber: "53",
       supportsTablet: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -88,6 +88,16 @@ module.exports = {
         {
           /** iOS : mode distant en arrière-plan (utile pour événements type « en route »). */
           enableBackgroundRemoteNotifications: true,
+        },
+      ],
+      [
+        "expo-widgets",
+        {
+          bundleIdentifier: "com.anonymous.app-chrono.ExpoWidgetsTarget",
+          groupIdentifier: "group.com.anonymous.app-chrono",
+          /** Passer à true quand le backend enverra des mises à jour APNs pour la Live Activity. */
+          enablePushNotifications: false,
+          widgets: [],
         },
       ],
       "./plugins/withMergeBackgroundModes.js",
