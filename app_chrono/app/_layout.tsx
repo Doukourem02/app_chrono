@@ -25,10 +25,16 @@ import {
 import { isNetworkOffline } from "../utils/isNetworkOffline";
 import { logger } from "../utils/logger";
 import { locationService } from "../services/locationService";
+import { useOrderLiveActivitySync } from "../hooks/useOrderLiveActivitySync";
 import "../config/envCheck";
 import "../mapboxInit";
 
 initSentry();
+
+function LiveActivityBridge() {
+  useOrderLiveActivitySync();
+  return null;
+}
 
 export default function RootLayout() {
   const { isAuthenticated, user, hydrateTokens } = useAuthStore();
@@ -148,6 +154,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <ErrorModalsProvider>
         <View style={{ flex: 1 }}>
+          {isAuthenticated ? <LiveActivityBridge /> : null}
           <OfflineBanner />
           <RealtimeDegradedBanner />
           <View style={{ flex: 1 }}>

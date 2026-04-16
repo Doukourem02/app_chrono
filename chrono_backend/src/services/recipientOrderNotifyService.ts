@@ -2,7 +2,8 @@ import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { lookupClientUserIdByPhone } from '../utils/resolveRecipientUserIdByPhone.js';
 import { notifyOrderStatusPushes } from './expoPushService.js';
-import { isTwilioSmsConfigured, sendTransactionalSMSTwilio } from './twilioSmsService.js';
+// SMS transactionnel pour destinataires sans app Krono — désactivé temporairement (coût par envoi). Réactiver en décommentant.
+// import { isTwilioSmsConfigured, sendTransactionalSMSTwilio } from './twilioSmsService.js';
 import {
   isTrackWebPushConfigured,
   sendTrackWebPushForSubscriptions,
@@ -19,7 +20,7 @@ const NOTIFY_STATUSES = new Set([
 ]);
 
 /**
- * Une seule chaîne de notifications (Expo + web + SMS) par (commande, statut).
+ * Une seule chaîne de notifications (Expo + web ; SMS destinataire sans app commenté) par (commande, statut).
  * Évite les doublons quand deux chemins métiers appellent notify (ex. scan QR + socket livreur).
  */
 async function claimOrderStatusNotification(orderId: string, statusNorm: string): Promise<boolean> {
@@ -165,7 +166,8 @@ async function loadOrderNotifyRow(orderId: string): Promise<{
 }
 
 /**
- * Push Expo (payeur + destinataire inscrit), Web Push (abonnés du lien /track), SMS si pas de compte destinataire.
+ * Push Expo (payeur + destinataire inscrit), Web Push (abonnés du lien /track).
+ * SMS Twilio pour destinataire sans compte Krono : désactivé temporairement (voir bloc commenté en bas).
  */
 export async function notifyAllForOrderStatus(params: {
   orderId: string;
@@ -262,6 +264,7 @@ export async function notifyAllForOrderStatus(params: {
     });
   }
 
+  /*
   const smsDisabled =
     String(process.env.DISABLE_RECIPIENT_ORDER_SMS || '').trim() === '1' ||
     String(process.env.DISABLE_RECIPIENT_ORDER_SMS || '').toLowerCase() === 'true';
@@ -290,4 +293,5 @@ export async function notifyAllForOrderStatus(params: {
       status: statusNorm,
     });
   }
+  */
 }
