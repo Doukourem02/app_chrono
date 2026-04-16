@@ -194,25 +194,37 @@ export async function initializeClientPushNotifications(_userId: string): Promis
       });
     }
 
-    let existing: Notifications.PermissionStatus;
+    const isGranted = (perm: unknown): boolean => {
+      const p = perm as any;
+      // iOS (SDK55): p.ios.status is IosAuthorizationStatus (0..4). Granted = 2/3/4.
+      const iosStatus = p?.ios?.status;
+      if (typeof iosStatus === "number") {
+        return iosStatus === 2 || iosStatus === 3 || iosStatus === 4;
+      }
+      // Some Expo versions expose these directly.
+      if (typeof p?.granted === "boolean") return p.granted;
+      if (typeof p?.status === "string") return p.status === "granted";
+      return false;
+    };
+
+    let granted = false;
     try {
       const perm = await Notifications.getPermissionsAsync();
-      existing = perm.status;
+      granted = isGranted(perm);
     } catch (e) {
       logger.warn("getPermissionsAsync (notifications) — Keychain / timing iOS ?", "clientPush", e);
       return;
     }
-    let finalStatus = existing;
-    if (existing !== "granted") {
+    if (!granted) {
       try {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
+        const req = await Notifications.requestPermissionsAsync();
+        granted = isGranted(req);
       } catch (e) {
         logger.warn("requestPermissionsAsync (notifications)", "clientPush", e);
         return;
       }
     }
-    if (finalStatus !== "granted") {
+    if (!granted) {
       logger.warn("Notifications refusées par l’utilisateur", "clientPush");
       return;
     }

@@ -20,6 +20,11 @@ module.exports = {
       bundleIdentifier: "com.anonymous.app-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
       buildNumber: "53",
+      /**
+       * Live Activities / Dynamic Island (ActivityKit) requiert iOS 16.2+ côté target widget.
+       * Aligner la cible principale évite des erreurs CocoaPods pendant "Install pods".
+       */
+      deploymentTarget: "16.2",
       supportsTablet: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -50,6 +55,10 @@ module.exports = {
     plugins: [
       "expo-asset",
       "expo-router",
+      "@sentry/react-native",
+      "expo-audio",
+      "expo-font",
+      "expo-image",
       [
         "@rnmapbox/maps",
         {
@@ -83,6 +92,7 @@ module.exports = {
           }
         }
       ],
+      "expo-secure-store",
       [
         "expo-notifications",
         {
@@ -90,6 +100,7 @@ module.exports = {
           enableBackgroundRemoteNotifications: true,
         },
       ],
+      "expo-web-browser",
       [
         "expo-widgets",
         {
