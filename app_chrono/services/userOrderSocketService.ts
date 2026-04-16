@@ -5,7 +5,11 @@ import { useOrderStore } from '../store/useOrderStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { logger } from '../utils/logger';
-import { addSocketSuccessBreadcrumb, reportSocketIssue } from '../utils/sentry';
+import {
+  addSocketSuccessBreadcrumb,
+  captureError,
+  reportSocketIssue,
+} from '../utils/sentry';
 import { createOrderRecord } from './orderApi';
 import { userApiService } from './userApiService';
 import { soundService } from './soundService';
@@ -1015,6 +1019,27 @@ class UserOrderSocketService {
           httpStatus: error?.httpStatus,
           requestId: error?.requestId,
           raw: error,
+        });
+
+        let apiHost = '';
+        try {
+          apiHost = new URL(config.apiUrl).host;
+        } catch {
+          apiHost = 'invalid-api-url';
+        }
+        const toReport =
+          error instanceof Error
+            ? error
+            : new Error(
+                typeof error?.message === 'string' ? error.message : 'createOrderRecord failed'
+              );
+        captureError(toReport, {
+          source: 'createOrderRecord',
+          userId: this.userId ?? undefined,
+          code: error?.code,
+          httpStatus: error?.httpStatus,
+          requestId: error?.requestId,
+          apiHost,
         });
 
         // Supabase / Postgres function may return a custom error code when the
