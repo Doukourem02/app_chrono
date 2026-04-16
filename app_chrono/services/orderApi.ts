@@ -1,5 +1,6 @@
 import { config } from '../config';
 import { apiFetch, parseApiErrorBody } from '../utils/apiFetch';
+import { logger } from '../utils/logger';
 import { userApiService } from './userApiService';
 
 type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
@@ -119,28 +120,42 @@ export async function createOrderInDatabase(params: {
     throw err;
   }
 
-  const response = await apiFetch(`${config.apiUrl}/api/orders/record`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      userId: params.userId,
-      pickup: params.pickup,
-      dropoff: params.dropoff,
-      method: params.method,
-      priceCfa: params.priceCfa,
-      distanceKm: params.distanceKm,
-      ...(params.speedOptionId ? { speedOptionId: params.speedOptionId } : {}),
-      ...(params.routeDurationSeconds != null
-        ? { routeDurationSeconds: params.routeDurationSeconds }
-        : {}),
-      ...(params.routeDurationTypicalSeconds != null
-        ? { routeDurationTypicalSeconds: params.routeDurationTypicalSeconds }
-        : {}),
-    }),
-  });
+  const url = `${config.apiUrl}/api/orders/record`;
+  let response: Response;
+  try {
+    response = await apiFetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        userId: params.userId,
+        pickup: params.pickup,
+        dropoff: params.dropoff,
+        method: params.method,
+        priceCfa: params.priceCfa,
+        distanceKm: params.distanceKm,
+        ...(params.speedOptionId ? { speedOptionId: params.speedOptionId } : {}),
+        ...(params.routeDurationSeconds != null
+          ? { routeDurationSeconds: params.routeDurationSeconds }
+          : {}),
+        ...(params.routeDurationTypicalSeconds != null
+          ? { routeDurationTypicalSeconds: params.routeDurationTypicalSeconds }
+          : {}),
+      }),
+    });
+  } catch (e: unknown) {
+    logger.warn(
+      '[orders/record] échec réseau / timeout (client)',
+      'orderApi',
+      e instanceof Error ? { name: e.name, message: e.message } : { detail: String(e) }
+    );
+    throw e;
+  }
+
+  const requestId =
+    typeof response.headers?.get === 'function' ? response.headers.get('x-request-id') : null;
 
   let body: unknown;
   try {
@@ -151,9 +166,20 @@ export async function createOrderInDatabase(params: {
 
   if (!response.ok) {
     const msg = parseApiErrorBody(body, response.status, 'Impossible d’enregistrer la commande');
+    const code =
+      body && typeof body === 'object' && 'code' in body
+        ? (body as { code?: string }).code
+        : undefined;
+    logger.warn('[orders/record] réponse HTTP erreur (client)', 'orderApi', {
+      status: response.status,
+      requestId: requestId ?? undefined,
+      code: code ?? undefined,
+      message: msg,
+    });
     const err = new Error(msg);
-    const code = body && typeof body === 'object' && 'code' in body ? (body as { code?: string }).code : undefined;
     if (code) (err as any).code = code;
+    (err as any).httpStatus = response.status;
+    if (requestId) (err as any).requestId = requestId;
     throw err;
   }
 
@@ -163,7 +189,13 @@ export async function createOrderInDatabase(params: {
       : undefined;
   const orderId = data?.orderId;
   if (typeof orderId !== 'string' || !orderId) {
-    throw new Error('Réponse serveur invalide (orderId manquant)');
+    logger.warn('[orders/record] réponse 200 sans orderId (client)', 'orderApi', {
+      requestId: requestId ?? undefined,
+    });
+    const err = new Error('Réponse serveur invalide (orderId manquant)');
+    if (requestId) (err as any).requestId = requestId;
+    (err as any).httpStatus = response.status;
+    throw err;
   }
 
   return {

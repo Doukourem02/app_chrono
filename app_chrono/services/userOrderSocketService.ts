@@ -1008,8 +1008,14 @@ class UserOrderSocketService {
           routeDurationTypicalSeconds: orderData.routeDurationTypicalSeconds,
         });
       } catch (error: any) {
-        // Log full error for debugging
-        logger.error('Échec enregistrement commande Supabase', 'userOrderSocketService', error);
+        // Log full error for debugging (httpStatus / requestId si createOrderInDatabase les a posés)
+        logger.error('Échec enregistrement commande Supabase', 'userOrderSocketService', {
+          message: error?.message ?? String(error),
+          code: error?.code ?? undefined,
+          httpStatus: error?.httpStatus,
+          requestId: error?.requestId,
+          raw: error,
+        });
 
         // Supabase / Postgres function may return a custom error code when the
         // user/profile is not present (seen as PO001 in dev logs). Detect this
