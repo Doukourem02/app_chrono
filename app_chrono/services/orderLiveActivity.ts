@@ -29,23 +29,6 @@ function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
   return factory;
 }
 
-function statusLabelFr(status: OrderStatus): string {
-  switch (status) {
-    case "accepted":
-      return "Livreur assigné";
-    case "enroute":
-      return "En route";
-    case "picked_up":
-      return "Colis récupéré";
-    case "delivering":
-      return "En livraison";
-    case "in_progress":
-      return "Course en cours";
-    default:
-      return "Suivi Krono";
-  }
-}
-
 function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
   const driver = order.driver;
   const plate = driver?.vehicle_plate?.trim();
@@ -63,9 +46,9 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
       : "—";
 
   return {
-    statusLabel: statusLabelFr(order.status),
     etaLabel: eta,
-    detailLine: detail,
+    vehicleLabel: name || detail || "Krono",
+    plateLabel: plate || "KRONO",
   };
 }
 
@@ -77,9 +60,9 @@ async function endActive(): Promise<void> {
     await live.end(
       "immediate",
       {
-        statusLabel: "Terminé",
         etaLabel: "—",
-        detailLine: "",
+        vehicleLabel: "Course terminee",
+        plateLabel: "",
       },
       new Date()
     );
