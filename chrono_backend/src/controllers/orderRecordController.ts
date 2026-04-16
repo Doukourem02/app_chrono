@@ -21,6 +21,20 @@ type AuthenticatedRequest = {
 
 type Coords = { latitude?: number; longitude?: number };
 
+/** Toujours émettre une ligne recherchable `[orders/record]` dans Better Stack / Render. */
+function logOrderRecord(
+  level: 'info' | 'warn',
+  event: string,
+  meta?: Record<string, unknown>
+): void {
+  const payload = { event, ...meta };
+  if (level === 'info') {
+    logger.info('[orders/record]', payload);
+  } else {
+    logger.warn('[orders/record]', payload);
+  }
+}
+
 function readCoords(loc: unknown): { lat?: number; lon?: number } {
   if (!loc || typeof loc !== 'object') return {};
   const c = (loc as { coordinates?: Coords }).coordinates;
@@ -46,6 +60,7 @@ export const createOrderRecord = async (
   try {
     const authUser = req.user;
     if (!authUser?.id) {
+      logOrderRecord('warn', 'client_error', { status: 401, reason: 'non_authenticated' });
       res.status(401).json({ success: false, message: 'Non authentifié' });
       return;
     }
@@ -63,22 +78,27 @@ export const createOrderRecord = async (
     } = req.body;
 
     if (!userId || typeof userId !== 'string') {
+      logOrderRecord('warn', 'client_error', { status: 400, reason: 'userId_missing' });
       res.status(400).json({ success: false, message: 'userId requis' });
       return;
     }
     if (userId !== authUser.id) {
+      logOrderRecord('warn', 'client_error', { status: 403, reason: 'userId_mismatch' });
       res.status(403).json({ success: false, message: 'Accès refusé' });
       return;
     }
     if (pickup == null || dropoff == null) {
+      logOrderRecord('warn', 'client_error', { status: 400, reason: 'pickup_dropoff_missing' });
       res.status(400).json({ success: false, message: 'pickup et dropoff requis' });
       return;
     }
     if (!method || typeof method !== 'string') {
+      logOrderRecord('warn', 'client_error', { status: 400, reason: 'method_missing' });
       res.status(400).json({ success: false, message: 'method requis' });
       return;
     }
     if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm) || distanceKm <= 0) {
+      logOrderRecord('warn', 'client_error', { status: 400, reason: 'distanceKm_invalid' });
       res.status(400).json({ success: false, message: 'distanceKm requis (nombre > 0)' });
       return;
     }
@@ -114,6 +134,7 @@ export const createOrderRecord = async (
       const diff = Math.abs(priceCfa - serverPrice);
       if (diff > 5) {
         logger.warn('[orders/record] Écart prix client/serveur', {
+          event: 'price_mismatch',
           client: priceCfa,
           server: serverPrice,
           distanceKm,
@@ -140,7 +161,7 @@ export const createOrderRecord = async (
     });
 
     if (error) {
-      logger.warn('fn_create_order (serveur)', {
+      logOrderRecord('warn', 'fn_create_order_error', {
         message: error.message,
         code: error.code,
         details: error.details,
@@ -153,6 +174,7 @@ export const createOrderRecord = async (
       return;
     }
 
+    logOrderRecord('info', 'success', { orderId: data });
     res.json({
       success: true,
       data: {
@@ -166,6 +188,9 @@ export const createOrderRecord = async (
       },
     });
   } catch (e: unknown) {
+    logOrderRecord('warn', 'unexpected_error', {
+      message: e instanceof Error ? e.message : String(e),
+    });
     logger.error('createOrderRecord inattendu', e);
     res.status(500).json({
       success: false,
