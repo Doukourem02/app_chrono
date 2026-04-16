@@ -149,33 +149,22 @@ export const ErrorTypes = {
   },
 
   /**
-   * Erreur d'enregistrement
-   * Le message doit être précis sur ce qui n'a pas pu être enregistré et pourquoi
+   * Erreur d'enregistrement — message minimal côté utilisateur ; détails → logs (showSaveError).
    */
-  SAVE_ERROR: (item: string = 'les données', onRetry?: () => void, reason?: string): ErrorModalData => {
-    const reasonMessage = reason 
-      ? ` Raison : ${reason}`
-      : '';
-    
+  SAVE_ERROR: (_item = 'les données', _onRetry?: () => void, _reason?: string): ErrorModalData => {
+    void _item;
+    void _onRetry;
+    void _reason;
     return {
-      title: 'Erreur d\'enregistrement',
-      message: `Impossible d'enregistrer ${item}.${reasonMessage} Veuillez vérifier les informations et réessayer.`,
+      title: 'Enregistrement impossible',
+      message: 'Réessayez dans un instant.',
       errorCode: 'SAVE_ERROR',
       icon: 'alert',
       color: '#EF4444',
-      explanation: reason
-        ? `Une erreur s'est produite lors de l'enregistrement de ${item}. ${reason} Cela peut être dû à une validation échouée, une connexion instable, ou un problème serveur.`
-        : `Une erreur s'est produite lors de l'enregistrement de ${item}. Cela peut être dû à une connexion instable, un problème de synchronisation, une validation échouée, ou une erreur serveur temporaire.`,
-      suggestions: [
-        'Vérifiez que toutes les informations sont correctes',
-        'Vérifiez votre connexion internet',
-        'Réessayez d\'enregistrer',
-        'Si le problème persiste, contactez le support',
-      ],
-      actionLabel: 'Réessayer',
-      onAction: onRetry,
+      hideFooter: true,
+      closeOnBackdropPress: false,
       onClose: () => {},
-    }
+    };
   },
 
   /**

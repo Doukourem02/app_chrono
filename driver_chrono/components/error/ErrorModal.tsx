@@ -21,6 +21,8 @@ export interface ErrorModalData {
   actionLabel?: string;
   onAction?: () => void;
   onClose: () => void;
+  hideFooter?: boolean;
+  closeOnBackdropPress?: boolean;
 }
 
 interface ErrorModalProps {
@@ -102,6 +104,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
 
   const errorColor = error.color || '#EF4444';
   const iconName = error.icon || 'alert-circle-outline';
+  const closeOnBackdrop = error.closeOnBackdropPress !== false;
 
   return (
     <Modal
@@ -115,7 +118,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
         <TouchableOpacity
           style={styles.overlayTouchable}
           activeOpacity={1}
-          onPress={error.onClose}
+          onPress={closeOnBackdrop ? error.onClose : undefined}
         >
           <Animated.View style={[styles.modalContainer, modalStyle]}>
             <TouchableOpacity activeOpacity={1}>
@@ -148,16 +151,18 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
                 </ScrollView>
               </Animated.View>
 
-              <View style={styles.footer}>
-                <TouchableOpacity
-                  style={[styles.button, styles.primaryButton]}
-                  onPress={error.onClose}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    J&apos;ai compris
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              {!error.hideFooter && (
+                <View style={styles.footer}>
+                  <TouchableOpacity
+                    style={[styles.button, styles.primaryButton]}
+                    onPress={error.onClose}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      J&apos;ai compris
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </TouchableOpacity>
           </Animated.View>
         </TouchableOpacity>

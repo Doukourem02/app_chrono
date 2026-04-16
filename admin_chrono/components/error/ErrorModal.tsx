@@ -14,6 +14,8 @@ export interface ErrorModalData {
   actionLabel?: string
   onAction?: () => void
   onClose: () => void
+  hideFooter?: boolean
+  closeOnBackdropPress?: boolean
 }
 
 interface ErrorModalProps {
@@ -121,7 +123,10 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
           }
         }
       `}</style>
-      <div style={overlayStyle} onClick={error.onClose}>
+      <div
+        style={overlayStyle}
+        onClick={error.closeOnBackdropPress !== false ? error.onClose : undefined}
+      >
         <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
           {/* Header */}
           <div style={{ position: 'relative', paddingTop: '16px' }}>
@@ -299,79 +304,81 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
           </div>
 
           {/* Footer */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '12px',
-              padding: '20px',
-              borderTop: '1px solid #E5E7EB',
-            }}
-          >
-            {error.onAction && (
+          {!error.hideFooter && (
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                padding: '20px',
+                borderTop: '1px solid #E5E7EB',
+              }}
+            >
+              {error.onAction && (
+                <button
+                  onClick={() => {
+                    if (error.onAction) {
+                      error.onAction()
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '14px 20px',
+                    borderRadius: '12px',
+                    backgroundColor: '#F3F4F6',
+                    border: 'none',
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    color: '#8B5CF6',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#E5E7EB'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F3F4F6'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
+                >
+                  <Info size={20} />
+                  {error.actionLabel || 'Aide'}
+                </button>
+              )}
               <button
-                onClick={() => {
-                  if (error.onAction) {
-                    error.onAction()
-                  }
-                }}
+                onClick={error.onClose}
                 style={{
                   flex: 1,
                   padding: '14px 20px',
                   borderRadius: '12px',
-                  backgroundColor: '#F3F4F6',
+                  backgroundColor: '#8B5CF6',
                   border: 'none',
                   fontSize: '16px',
                   fontWeight: 600,
-                  color: '#8B5CF6',
+                  color: '#FFFFFF',
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#E5E7EB'
+                  e.currentTarget.style.backgroundColor = '#7C3AED'
                   e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F3F4F6'
+                  e.currentTarget.style.backgroundColor = '#8B5CF6'
                   e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)'
                 }}
               >
-                <Info size={20} />
-                {error.actionLabel || 'Aide'}
+                J&apos;ai compris
               </button>
-            )}
-            <button
-              onClick={error.onClose}
-              style={{
-                flex: 1,
-                padding: '14px 20px',
-                borderRadius: '12px',
-                backgroundColor: '#8B5CF6',
-                border: 'none',
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#FFFFFF',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#7C3AED'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(139, 92, 246, 0.4)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#8B5CF6'
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)'
-              }}
-            >
-              J&apos;ai compris
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </>

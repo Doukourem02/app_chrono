@@ -213,7 +213,7 @@ class AnalyticsService {
 export const analytics = new AnalyticsService();
 
 // Initialiser automatiquement
-if (typeof window !== 'undefined' || typeof global !== 'undefined') {
+if (typeof window !== 'undefined' || typeof globalThis !== 'undefined') {
   analytics.init();
 }
 

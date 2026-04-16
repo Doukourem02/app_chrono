@@ -7,7 +7,7 @@ import { ErrorTypes } from '../components/error/errorTypes';
 
 /**
  * Service centralisé pour afficher des messages d'erreur user-friendly
- * Utilise des modals animés avec explications détaillées au lieu de simples Alert.alert
+ * Modals animés ; le détail technique est journalisé plutôt qu’affiché pour les erreurs sensibles (ex. SAVE_ERROR).
  */
 export class UserFriendlyError {
   /**
@@ -92,16 +92,18 @@ export class UserFriendlyError {
   }
 
   /**
-   * Erreur lors de l'enregistrement
-   * @param item - Ce qui n'a pas pu être enregistré (ex: "la commande", "vos informations")
-   * @param onRetry - Fonction de retry
-   * @param reason - Raison précise de l'échec (ex: "L'adresse de livraison est invalide", "Le montant minimum n'est pas atteint")
+   * Erreur lors de l'enregistrement — UI courte ; la raison détaillée va dans les logs uniquement.
    */
   static showSaveError(
     item: string = 'les données',
     onRetry?: () => void,
     reason?: string
   ) {
+    if (reason) {
+      logger.warn('[UserFriendlyError] SAVE_ERROR', 'UserFriendlyError', { item, reason });
+    } else {
+      logger.warn('[UserFriendlyError] SAVE_ERROR', 'UserFriendlyError', { item });
+    }
     const errorData = ErrorTypes.SAVE_ERROR(item, onRetry, reason);
     errorData.onClose = () => {
       useErrorModalStore.getState().hideError();

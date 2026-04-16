@@ -22,6 +22,10 @@ export interface ErrorModalData {
   actionLabel?: string;
   onAction?: () => void;
   onClose: () => void;
+  /** Masque le pied de page (Réessayer / J’ai compris) — fermeture via la croix uniquement si closeOnBackdropPress est false. */
+  hideFooter?: boolean;
+  /** Si false, le tap sur le fond ne ferme pas (défaut : true). */
+  closeOnBackdropPress?: boolean;
 }
 
 interface ErrorModalProps {
@@ -105,6 +109,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
   const shouldShow = visible && !!error;
   const errorColor = error?.color || '#EF4444';
   const iconName = error?.icon || 'alert-circle-outline';
+  const closeOnBackdrop = error?.closeOnBackdropPress !== false;
 
   return (
     <Modal
@@ -118,7 +123,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
         <TouchableOpacity
           style={styles.overlayTouchable}
           activeOpacity={1}
-          onPress={handleClose}
+          onPress={closeOnBackdrop ? handleClose : undefined}
         >
           <Animated.View style={[styles.modalContainer, modalStyle]}>
             <TouchableOpacity activeOpacity={1}>
@@ -194,28 +199,29 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
                 </ScrollView>
               </Animated.View>
 
-              {/* Footer avec boutons */}
-              <View style={styles.footer}>
-                {error?.onAction && (
+              {!error?.hideFooter && (
+                <View style={styles.footer}>
+                  {error?.onAction && (
+                    <TouchableOpacity
+                      style={[styles.button, styles.secondaryButton]}
+                      onPress={error?.onAction}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="help-circle-outline" size={20} color="#8B5CF6" />
+                      <Text style={styles.secondaryButtonText}>
+                        {error?.actionLabel || 'Aide'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
-                    style={[styles.button, styles.secondaryButton]}
-                    onPress={error?.onAction}
+                    style={[styles.button, styles.primaryButton]}
+                    onPress={handleClose}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="help-circle-outline" size={20} color="#8B5CF6" />
-                    <Text style={styles.secondaryButtonText}>
-                      {error?.actionLabel || 'Aide'}
-                    </Text>
+                    <Text style={styles.primaryButtonText}>J&apos;ai compris</Text>
                   </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[styles.button, styles.primaryButton]}
-                  onPress={handleClose}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.primaryButtonText}>J&apos;ai compris</Text>
-                </TouchableOpacity>
-              </View>
+                </View>
+              )}
             </TouchableOpacity>
           </Animated.View>
         </TouchableOpacity>
