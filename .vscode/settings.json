@@ -1,5 +1,5 @@
 {
-  "typescript.tsdk": "chrono_backend/node_modules/typescript/lib",
+  "typescript.tsdk": "app_chrono/node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "typescript.experimental.useTsgo": false,
   "files.associations": {
