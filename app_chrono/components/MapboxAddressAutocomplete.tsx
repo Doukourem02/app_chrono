@@ -207,6 +207,141 @@ function formatDistance(km: number): string {
   return `${km.toFixed(1)} km`;
 }
 
+/** Debounce frappe — assez bas pour réagir vite sans saturer l’API */
+const SUGGEST_DEBOUNCE_MS = 160;
+
+function parseGeocodeFeature(f: GeocodeFeature): MapboxSuggestion | null {
+  const coords = f.geometry?.coordinates;
+  let lng: number | null = null;
+  let lat: number | null = null;
+  if (Array.isArray(coords) && coords.length > 0) {
+    const first = coords[0];
+    if (typeof first === 'number') {
+      [lng, lat] = coords as [number, number];
+    } else if (Array.isArray(first)) {
+      [lng, lat] = first as [number, number];
+    }
+  }
+  if (lat == null || lng == null) return null;
+  const props = f.properties || {};
+  const ctx = props.context || {};
+  const streetVal = ctx.street;
+  const streetName =
+    (typeof streetVal === 'string' ? streetVal : (streetVal as { name?: string })?.name) ??
+    ctx.address?.street_name ??
+    null;
+  const name =
+    props.name ||
+    props.name_preferred ||
+    props.full_address ||
+    streetName ||
+    (props.place_formatted ? String(props.place_formatted).split(',')[0]?.trim() : '') ||
+    '';
+  if (!name) return null;
+  const placeParts = [
+    ctx.place?.name,
+    ctx.locality?.name,
+    ctx.district?.name,
+    ctx.neighborhood?.name,
+  ].filter(Boolean);
+  const place_formatted = props.place_formatted || placeParts.join(', ') || '';
+  return {
+    name,
+    mapbox_id: props.mapbox_id || f.id || '',
+    feature_type: props.feature_type || 'address',
+    full_address: props.full_address,
+    place_formatted,
+    coordinates: { lat, lng },
+    source: 'geocode' as const,
+  };
+}
+
+/** Adresses enregistrées dont le libellé commence par la requête (affichage instantané). */
+function savedPrefixSuggestions(
+  q: string,
+  saved: SavedClientAddress[],
+): MapboxSuggestion[] {
+  const ql = q.trim().toLowerCase();
+  if (!ql || !saved.length) return [];
+  const out: MapboxSuggestion[] = [];
+  for (const a of saved) {
+    const label = a.label.trim();
+    if (!label) continue;
+    const ll = label.toLowerCase();
+    if (ll === ql) continue;
+    if (ll.startsWith(ql) || (ql.length >= 2 && ll.includes(ql))) {
+      out.push({
+        name: label,
+        mapbox_id: `saved-${a.id}`,
+        feature_type: 'saved',
+        full_address: a.addressLine,
+        place_formatted: a.addressLine,
+        coordinates: { lat: a.latitude, lng: a.longitude },
+        source: 'searchbox' as const,
+      });
+    }
+  }
+  return out;
+}
+
+function mergeSuggestionLists(
+  trimmed: string,
+  streetLike: boolean,
+  parts: {
+    fromCurated: MapboxSuggestion[];
+    fromSaved: MapboxSuggestion[];
+    fromSearchBox: MapboxSuggestion[];
+    fromOverpass: MapboxSuggestion[];
+    fromGeocode: MapboxSuggestion[];
+    fromGeocodeStreet: MapboxSuggestion[];
+    fromNominatim: MapboxSuggestion[];
+  },
+): MapboxSuggestion[] {
+  const {
+    fromCurated,
+    fromSaved,
+    fromSearchBox,
+    fromOverpass,
+    fromGeocode,
+    fromGeocodeStreet,
+    fromNominatim,
+  } = parts;
+
+  const sourcesToMerge = streetLike
+    ? [
+        ...fromGeocodeStreet,
+        ...fromGeocode,
+        ...fromNominatim,
+        ...fromCurated,
+        ...fromSaved,
+        ...fromSearchBox,
+        ...fromOverpass,
+      ]
+    : [
+        ...fromCurated,
+        ...fromSaved,
+        ...fromSearchBox,
+        ...fromOverpass,
+        ...fromGeocode,
+        ...fromGeocodeStreet,
+        ...fromNominatim,
+      ];
+
+  const seen = new Set<string>();
+  const merged: MapboxSuggestion[] = [];
+  for (const s of sourcesToMerge) {
+    if (shouldExcludeSuggestion(s, trimmed)) continue;
+    if (!suggestionMatchesQueryTokens(s, trimmed)) continue;
+    const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`;
+    if (key && !seen.has(key) && s.name) {
+      seen.add(key);
+      merged.push(s);
+    }
+  }
+  merged.sort((a, b) => getRelevanceScore(b, trimmed) - getRelevanceScore(a, trimmed));
+  return merged.slice(0, 15);
+}
+
 type Props = {
   placeholder?: string;
   initialValue?: string;
@@ -337,21 +472,43 @@ export default function MapboxAddressAutocomplete({
         return;
       }
 
+      const baseParams = { country, language: 'fr', proximity };
+      const extraTypes = isNumericQuery(trimmed) ? 'postcode,address' : undefined;
+      const streetLike = isStreetLikeQuery(trimmed);
+      const streetTypes = extraTypes || 'street,address';
+
+      const curatedData = searchCuratedPoi(trimmed);
+      const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
+        name: p.name,
+        mapbox_id: `curated-${p.name.toLowerCase().replace(/\s/g, '-')}-${i}`,
+        feature_type: p.category,
+        full_address: p.full_address,
+        place_formatted:
+          p.place_formatted + (p.hours ? ` · ${p.hours}` : '') + (p.phone ? ` · ${p.phone}` : ''),
+        coordinates: p.coordinates,
+        source: 'searchbox' as const,
+      }));
+      const fromSaved = savedPrefixSuggestions(trimmed, savedAddresses);
+
+      const instant = mergeSuggestionLists(trimmed, streetLike, {
+        fromCurated,
+        fromSaved,
+        fromSearchBox: [],
+        fromOverpass: [],
+        fromGeocode: [],
+        fromGeocodeStreet: [],
+        fromNominatim: [],
+      });
+      if (gen === suggestFetchGenRef.current) {
+        setSuggestions(instant);
+      }
+
       try {
-        const baseParams = { country, language: 'fr', proximity };
-        const extraTypes = isNumericQuery(trimmed) ? 'postcode,address' : undefined;
-        const streetLike = isStreetLikeQuery(trimmed);
-
-        // Pour "Rue L29" etc. : prioriser Geocode (rues) + Nominatim, éviter Search Box (retourne districts/landmarks)
-        const streetTypes = extraTypes || 'street,address';
-
-        const fetches: Promise<Response>[] = [];
-        let suggestRes: Response | null = null;
-        let geocodeRes: Response | null = null;
-        let geocodeStreetRes: Response | null = null;
+        const geocodeQ = streetLike ? `${trimmed}, Abidjan` : trimmed;
+        const fastFetches: Promise<Response>[] = [];
 
         if (!streetLike) {
-          fetches.push(
+          fastFetches.push(
             fetch(
               `${MAPBOX_SUGGEST_URL}?${new URLSearchParams({
                 q: trimmed,
@@ -360,17 +517,12 @@ export default function MapboxAddressAutocomplete({
                 ...baseParams,
                 limit: '6',
                 types: streetTypes,
-              })}`
-            ).then((r) => {
-              suggestRes = r;
-              return r;
-            })
+              })}`,
+            ),
           );
         }
 
-        // Pour "Rue L29" : 1 seul appel Geocode (plus rapide), sinon 2 pour diversité
-        const geocodeQ = streetLike ? `${trimmed}, Abidjan` : trimmed;
-        fetches.push(
+        fastFetches.push(
           fetch(
             `${MAPBOX_GEOCODE_URL}?${new URLSearchParams({
               q: geocodeQ,
@@ -379,15 +531,12 @@ export default function MapboxAddressAutocomplete({
               limit: streetLike ? '15' : '6',
               autocomplete: 'true',
               types: streetTypes,
-            })}`
-          ).then((r) => {
-            geocodeRes = r;
-            return r;
-          })
+            })}`,
+          ),
         );
 
         if (!streetLike) {
-          fetches.push(
+          fastFetches.push(
             fetch(
               `${MAPBOX_GEOCODE_URL}?${new URLSearchParams({
                 q: `${trimmed}, Abidjan`,
@@ -396,21 +545,53 @@ export default function MapboxAddressAutocomplete({
                 limit: '6',
                 autocomplete: 'true',
                 types: streetTypes,
-              })}`
-            ).then((r) => {
-              geocodeStreetRes = r;
-              return r;
-            })
+              })}`,
+            ),
           );
-        } else {
-          geocodeStreetRes = null;
+        }
+
+        const fastResponses = await Promise.all(fastFetches);
+        let ri = 0;
+        const suggestRes = !streetLike ? fastResponses[ri++] : null;
+        const geocodeRes = fastResponses[ri++];
+        const geocodeStreetRes = !streetLike ? fastResponses[ri++] : null;
+
+        const suggestData = suggestRes ? await suggestRes.json() : { suggestions: [] };
+        const geocodeData = geocodeRes ? await geocodeRes.json() : { features: [] };
+        const geocodeStreetData = geocodeStreetRes ? await geocodeStreetRes.json() : { features: [] };
+
+        const fromSearchBox: MapboxSuggestion[] = (suggestData?.suggestions || []).map(
+          (s: Record<string, unknown>) => ({
+            ...s,
+            source: 'searchbox' as const,
+          }),
+        ) as MapboxSuggestion[];
+
+        const fromGeocode = (geocodeData?.features || [])
+          .map(parseGeocodeFeature)
+          .filter(Boolean) as MapboxSuggestion[];
+        const fromGeocodeStreet = (geocodeStreetData?.features || [])
+          .map(parseGeocodeFeature)
+          .filter(Boolean) as MapboxSuggestion[];
+
+        const fastMerged = mergeSuggestionLists(trimmed, streetLike, {
+          fromCurated,
+          fromSaved,
+          fromSearchBox,
+          fromOverpass: [],
+          fromGeocode,
+          fromGeocodeStreet,
+          fromNominatim: [],
+        });
+        if (gen === suggestFetchGenRef.current) {
+          setSuggestions(fastMerged);
         }
 
         const [proxLng, proxLat] = proximity.split(',').map((x) => parseFloat(x.trim()));
         const overpassPromise = !streetLike
           ? searchOverpassPoi(
               trimmed,
-              Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined
+              Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined,
             ).catch((err) => {
               logger.warn('[MapboxAddressAutocomplete] Overpass non disponible:', err);
               return [] as OverpassPoiResult[];
@@ -422,12 +603,12 @@ export default function MapboxAddressAutocomplete({
           `${NOMINATIM_URL}?${new URLSearchParams({
             q: nominatimQ,
             format: 'json',
-            limit: '10',
+            limit: '8',
             countrycodes: 'ci',
             bounded: '0',
             viewbox: '-4.15,5.2,-3.85,5.45',
           })}`,
-          { headers: NOMINATIM_HEADERS }
+          { headers: NOMINATIM_HEADERS },
         )
           .then((r) => (r.ok ? r.json() : []))
           .catch((err) => {
@@ -435,71 +616,9 @@ export default function MapboxAddressAutocomplete({
             return [];
           });
 
-        const results = await Promise.all([...fetches, overpassPromise, nominatimPromise]);
-        const overpassData = results[results.length - 2] as OverpassPoiResult[];
-        const nominatimData = results[results.length - 1] as NominatimResult[];
+        const [overpassData, nominatimData] = await Promise.all([overpassPromise, nominatimPromise]);
+        if (gen !== suggestFetchGenRef.current) return;
 
-        const suggestData = suggestRes ? await (suggestRes as Response).json() : { suggestions: [] };
-        const fromSearchBox: MapboxSuggestion[] = (suggestData?.suggestions || []).map((s: Record<string, unknown>) => ({
-          ...s,
-          source: 'searchbox' as const,
-        })) as MapboxSuggestion[];
-
-        const geocodeData = geocodeRes ? await (geocodeRes as Response).json() : { features: [] };
-        const geocodeStreetData = geocodeStreetRes ? await (geocodeStreetRes as Response).json() : { features: [] };
-
-        const parseGeocodeFeature = (f: GeocodeFeature): MapboxSuggestion | null => {
-          const coords = f.geometry?.coordinates;
-          let lng: number | null = null;
-          let lat: number | null = null;
-          if (Array.isArray(coords) && coords.length > 0) {
-            const first = coords[0];
-            if (typeof first === 'number') {
-              [lng, lat] = coords as [number, number];
-            } else if (Array.isArray(first)) {
-              [lng, lat] = first as [number, number];
-            }
-          }
-          if (lat == null || lng == null) return null;
-          const props = f.properties || {};
-          const ctx = props.context || {};
-          const streetVal = ctx.street;
-          const streetName =
-            (typeof streetVal === 'string' ? streetVal : (streetVal as { name?: string })?.name) ??
-            ctx.address?.street_name ??
-            null;
-          const name =
-            props.name ||
-            props.name_preferred ||
-            props.full_address ||
-            streetName ||
-            (props.place_formatted ? String(props.place_formatted).split(',')[0]?.trim() : '') ||
-            '';
-          if (!name) return null;
-          const placeParts = [
-            ctx.place?.name,
-            ctx.locality?.name,
-            ctx.district?.name,
-            ctx.neighborhood?.name,
-          ].filter(Boolean);
-          const place_formatted = props.place_formatted || placeParts.join(', ') || '';
-          return {
-            name,
-            mapbox_id: props.mapbox_id || f.id || '',
-            feature_type: props.feature_type || 'address',
-            full_address: props.full_address,
-            place_formatted,
-            coordinates: { lat, lng },
-            source: 'geocode' as const,
-          };
-        };
-
-        const fromGeocode = (geocodeData?.features || []).map(parseGeocodeFeature).filter(Boolean) as MapboxSuggestion[];
-        const fromGeocodeStreet = (geocodeStreetData?.features || [])
-          .map(parseGeocodeFeature)
-          .filter(Boolean) as MapboxSuggestion[];
-
-        // Pour requêtes type "Rue L29" : prioriser Geocode + Nominatim (rues réelles)
         const fromNominatim: MapboxSuggestion[] = (nominatimData || [])
           .filter((r: NominatimResult) => r.lat && r.lon && r.display_name)
           .map((r: NominatimResult) => ({
@@ -522,44 +641,22 @@ export default function MapboxAddressAutocomplete({
           source: 'overpass' as const,
         }));
 
-        // POI curatés — toutes les succursales, style Yango
-        const curatedData = searchCuratedPoi(trimmed);
-        const fromCurated: MapboxSuggestion[] = curatedData.map((p, i) => ({
-          name: p.name,
-          mapbox_id: `curated-${p.name.toLowerCase().replace(/\s/g, '-')}-${i}`,
-          feature_type: p.category,
-          full_address: p.full_address,
-          place_formatted: p.place_formatted + (p.hours ? ` · ${p.hours}` : '') + (p.phone ? ` · ${p.phone}` : ''),
-          coordinates: p.coordinates,
-          source: 'searchbox' as const,
-        }));
-
-        // Ordre de merge : pour "Rue L29" → Geocode rues + Nominatim en premier
-        const seen = new Set<string>();
-        const merged: MapboxSuggestion[] = [];
-        const sourcesToMerge = streetLike
-          ? [...fromGeocodeStreet, ...fromGeocode, ...fromNominatim, ...fromCurated, ...fromSearchBox, ...fromOverpass]
-          : [...fromCurated, ...fromSearchBox, ...fromOverpass, ...fromGeocode, ...fromGeocodeStreet, ...fromNominatim];
-        for (const s of sourcesToMerge) {
-          if (shouldExcludeSuggestion(s, trimmed)) continue;
-          if (!suggestionMatchesQueryTokens(s, trimmed)) continue;
-          const key = `${(s.name || '').toLowerCase()}|${(s.place_formatted || '').toLowerCase()}`;
-          if (key && !seen.has(key) && s.name) {
-            seen.add(key);
-            merged.push(s);
-          }
-        }
-        // Réordonner : Zoo d'Abidjan en premier, etc. (style Yango)
-        merged.sort((a, b) => getRelevanceScore(b, trimmed) - getRelevanceScore(a, trimmed));
-        if (gen !== suggestFetchGenRef.current) return;
-        setSuggestions(merged.slice(0, 15));
+        const fullMerged = mergeSuggestionLists(trimmed, streetLike, {
+          fromCurated,
+          fromSaved,
+          fromSearchBox,
+          fromOverpass,
+          fromGeocode,
+          fromGeocodeStreet,
+          fromNominatim,
+        });
+        setSuggestions(fullMerged);
       } catch (err) {
         logger.error('Mapbox suggest error', 'MapboxAddressAutocomplete', err);
         if (gen !== suggestFetchGenRef.current) return;
-        setSuggestions([]);
       }
     },
-    [accessToken, sessionToken, country, proximity]
+    [accessToken, sessionToken, country, proximity, savedAddresses],
   );
 
   const handleInputChange = useCallback(
@@ -587,7 +684,7 @@ export default function MapboxAddressAutocomplete({
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (trimmed.length >= minLen) {
-        debounceRef.current = setTimeout(() => fetchSuggestions(next), 300);
+        debounceRef.current = setTimeout(() => fetchSuggestions(next), SUGGEST_DEBOUNCE_MS);
       }
     },
     [fetchSuggestions, onQueryChange, embedded]

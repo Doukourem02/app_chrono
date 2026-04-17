@@ -1,10 +1,29 @@
-import { Ellipse, HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
-import { font, foregroundStyle, frame, padding } from "@expo/ui/swift-ui/modifiers";
+import { HStack, Image, ProgressView, Text, VStack } from "@expo/ui/swift-ui";
+import {
+  font,
+  foregroundStyle,
+  frame,
+  padding,
+  progressViewStyle,
+} from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
 import { Image as RNImage } from "react-native";
 
-/** Même ressource que l’icône app (`app.config.js`) — bundle Metro pour SwiftUI `uiImage`. */
+/**
+ * Couleurs fixes pour l’îlot / Live Activity : le fond est quasi toujours noir.
+ * Les styles « hiérarchiques » SwiftUI peuvent rester sombres → texte illisible.
+ */
+const ON_DARK = {
+  title: "#FFFFFF",
+  body: "#EBEBF5",
+  muted: "#D1D1D6",
+  brand: "#E9D5FF",
+  accent: "#C4B5FD",
+  trackFill: "#FFFFFF",
+} as const;
+
+/** Même ressource que l’icône app (`app.config.js`). */
 const KRONO_LOGO_ASSET = require("../assets/images/logo/LOGO_APP2.png") as number;
 
 function kronoLogoUri(): string | undefined {
@@ -16,104 +35,78 @@ export type OrderTrackingLiveProps = {
   etaLabel: string;
   vehicleLabel?: string;
   plateLabel?: string;
-  /** Commande encore sans livreur (affichage compact + barre). */
   isPending?: boolean;
 };
 
-function OrderTrackingLive(
-  props: OrderTrackingLiveProps,
-  environment: LiveActivityEnvironment
-) {
+function OrderTrackingLive(props: OrderTrackingLiveProps, _environment: LiveActivityEnvironment) {
   "widget";
-  const baseAccent = "#8B5CF6";
-  const dimAccent = "#A78BFA";
-  const accent = environment.isLuminanceReduced ? dimAccent : baseAccent;
-  /** Sur l’îlot Dynamic Island, `colorScheme` peut rester « light » alors que le fond est noir. */
-  const primaryStyle = { type: "hierarchical" as const, style: "primary" as const };
-  const secondaryStyle = { type: "hierarchical" as const, style: "secondary" as const };
-  const tertiaryStyle = { type: "hierarchical" as const, style: "tertiary" as const };
-
   const vehicle = props.vehicleLabel?.trim() || "Krono";
   const plate = props.plateLabel?.trim() || "KRONO";
-
-  const trackDone = environment.colorScheme === "dark" ? "#4B5563" : "#9CA3AF";
-  const trackRemaining = environment.colorScheme === "dark" ? "#E5E7EB" : "#F3F4F6";
 
   const compactTitle = props.isPending ? "Recherche" : props.etaLabel;
   const brandLogoUri = kronoLogoUri();
 
-  /** Piste : fond clair pleine largeur, segment parcouru au-dessus, point d’arrivée. */
-  const bottomBar = props.isPending ? (
-    <VStack modifiers={[padding({ horizontal: 12, vertical: 6 })]}>
-      <ZStack alignment="leading">
-        <RoundedRectangle
-          cornerRadius={4}
-          modifiers={[frame({ height: 6, maxWidth: 300 }), foregroundStyle(trackRemaining)]}
-        />
-        <RoundedRectangle
-          cornerRadius={4}
-          modifiers={[frame({ width: 72, height: 6 }), foregroundStyle(trackDone)]}
-        />
-      </ZStack>
-    </VStack>
-  ) : (
-    <VStack modifiers={[padding({ horizontal: 12, vertical: 6 })]}>
-      <ZStack alignment="leading">
-        <RoundedRectangle
-          cornerRadius={4}
-          modifiers={[frame({ height: 6, maxWidth: 300 }), foregroundStyle(trackRemaining)]}
-        />
-        <HStack>
-          <RoundedRectangle
-            cornerRadius={4}
-            modifiers={[frame({ width: 120, height: 6 }), foregroundStyle(trackDone)]}
-          />
-          <Spacer minLength={0} />
-          <Ellipse modifiers={[frame({ width: 10, height: 10 }), foregroundStyle(accent)]} />
-        </HStack>
-      </ZStack>
+  /** Progress déterminé uniquement : sans `value`, SwiftUI affiche un spinner (indéterminé). */
+  const progressValue = props.isPending ? 0.22 : 0.5;
+
+  const bottomBar = (
+    <VStack modifiers={[padding({ horizontal: 12, vertical: 8 })]}>
+      <ProgressView
+        value={progressValue}
+        modifiers={[
+          progressViewStyle("linear"),
+          frame({ height: 6 }),
+          foregroundStyle(ON_DARK.trackFill),
+        ]}
+      />
     </VStack>
   );
 
   return {
     banner: (
       <VStack modifiers={[padding({ all: 12 })]}>
-        <Text modifiers={[font({ weight: "bold", size: 20 }), foregroundStyle(primaryStyle)]}>
+        <Text modifiers={[font({ weight: "bold", size: 20 }), foregroundStyle(ON_DARK.title)]}>
           {props.etaLabel}
         </Text>
-        <Text modifiers={[font({ size: 14 }), foregroundStyle(secondaryStyle)]}>{vehicle}</Text>
-        <Text modifiers={[font({ size: 12 }), foregroundStyle(tertiaryStyle)]}>{plate}</Text>
+        <Text modifiers={[font({ size: 14 }), foregroundStyle(ON_DARK.body)]}>{vehicle}</Text>
+        <Text modifiers={[font({ size: 12 }), foregroundStyle(ON_DARK.muted)]}>{plate}</Text>
       </VStack>
     ),
-    compactLeading: <Image systemName="car.fill" color={accent} />,
+    compactLeading: brandLogoUri ? (
+      <Image uiImage={brandLogoUri} modifiers={[frame({ width: 22, height: 22 })]} />
+    ) : (
+      <Image systemName="car.fill" color={ON_DARK.accent} size={18} />
+    ),
     compactTrailing: (
-      <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(primaryStyle)]}>
+      <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.title)]}>
         {compactTitle}
       </Text>
     ),
-    minimal: <Image systemName="car.fill" color={accent} />,
+    minimal: <Image systemName="car.fill" color={ON_DARK.accent} size={16} />,
     expandedCenter: (
       <VStack modifiers={[padding({ all: 8 })]}>
-        <Text modifiers={[font({ weight: "bold", size: 26 }), foregroundStyle(primaryStyle)]}>
+        <Text modifiers={[font({ weight: "bold", size: 26 }), foregroundStyle(ON_DARK.title)]}>
           {props.etaLabel}
         </Text>
-        <Text modifiers={[font({ size: 14 }), foregroundStyle(secondaryStyle)]}>{vehicle}</Text>
+        <Text modifiers={[font({ size: 14 }), foregroundStyle(ON_DARK.body)]}>{vehicle}</Text>
       </VStack>
     ),
     expandedLeading: (
       <HStack spacing={8} alignment="center" modifiers={[padding({ all: 10 })]}>
         {brandLogoUri ? (
-          <Image uiImage={brandLogoUri} modifiers={[frame({ width: 28, height: 28 })]} />
+          <Image uiImage={brandLogoUri} modifiers={[frame({ width: 30, height: 30 })]} />
         ) : null}
-        <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(accent)]}>KRONO</Text>
+        <Text modifiers={[font({ weight: "bold", size: 15 }), foregroundStyle(ON_DARK.brand)]}>
+          KRONO
+        </Text>
       </HStack>
     ),
     expandedTrailing: (
       <VStack modifiers={[padding({ all: 10 })]}>
-        <Text modifiers={[font({ weight: "bold", size: 16 }), foregroundStyle(primaryStyle)]}>
+        <Text modifiers={[font({ weight: "bold", size: 15 }), foregroundStyle(ON_DARK.title)]}>
           {plate}
         </Text>
-        <Image systemName="car.side.fill" color={accent} />
+        <Image systemName="car.side.fill" color={ON_DARK.accent} size={22} />
       </VStack>
     ),
     expandedBottom: bottomBar,
