@@ -1839,11 +1839,20 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         const { realDriverStatuses } = await import('../controllers/driverController.js');
         const existing = realDriverStatuses.get(driverId);
         if (existing && existing.is_online === true) {
+          const updatedAt = new Date().toISOString();
           realDriverStatuses.set(driverId, {
             ...existing,
             current_latitude: loc.lat,
             current_longitude: loc.lng,
-            updated_at: new Date().toISOString(),
+            updated_at: updatedAt,
+          });
+          // Même flux que le client (driver:location:update) : les admins ne doivent pas attendre
+          // le tick 2s de adminSocket pour voir le livreur bouger sur le tracking.
+          broadcastDriverStatusToAdmins(io, 'driver:position:update', {
+            userId: driverId,
+            current_latitude: loc.lat,
+            current_longitude: loc.lng,
+            updated_at: updatedAt,
           });
         }
 

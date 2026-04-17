@@ -1,3 +1,15 @@
 {
-  "expo": {}
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "2d0b87b5-bd08-4f0a-b891-860a1a061076"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.doukourem02.projetchrono",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
 }

@@ -207,8 +207,8 @@ function formatDistance(km: number): string {
   return `${km.toFixed(1)} km`;
 }
 
-/** Debounce frappe — assez bas pour réagir vite sans saturer l’API */
-const SUGGEST_DEBOUNCE_MS = 160;
+/** Debounce frappe — équilibre réactivité / nombre d’appels réseau */
+const SUGGEST_DEBOUNCE_MS = 220;
 
 function parseGeocodeFeature(f: GeocodeFeature): MapboxSuggestion | null {
   const coords = f.geometry?.coordinates;
@@ -499,11 +499,43 @@ export default function MapboxAddressAutocomplete({
         fromGeocodeStreet: [],
         fromNominatim: [],
       });
-      if (gen === suggestFetchGenRef.current) {
+      if (instant.length > 0 && gen === suggestFetchGenRef.current) {
         setSuggestions(instant);
       }
 
       try {
+        const [proxLng, proxLat] = proximity.split(',').map((x) => parseFloat(x.trim()));
+        /** Lancer tout de suite en parallèle des appels Mapbox — sinon temps total = Mapbox + Nominatim (régression). */
+        const overpassPromise = !streetLike
+          ? searchOverpassPoi(
+              trimmed,
+              Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined,
+            ).catch((err) => {
+              logger.warn('[MapboxAddressAutocomplete] Overpass non disponible:', err);
+              return [] as OverpassPoiResult[];
+            })
+          : Promise.resolve([] as OverpassPoiResult[]);
+
+        const nominatimQ = trimmed.toLowerCase().includes('abidjan') ? trimmed : `${trimmed}, Abidjan`;
+        const nominatimPromise = fetch(
+          `${NOMINATIM_URL}?${new URLSearchParams({
+            q: nominatimQ,
+            format: 'json',
+            limit: '8',
+            countrycodes: 'ci',
+            bounded: '0',
+            viewbox: '-4.15,5.2,-3.85,5.45',
+          })}`,
+          { headers: NOMINATIM_HEADERS },
+        )
+          .then((r) => (r.ok ? r.json() : []))
+          .catch((err) => {
+            logger.warn('[MapboxAddressAutocomplete] Nominatim non disponible:', err);
+            return [];
+          });
+
+        const slowSourcesBundle = Promise.all([overpassPromise, nominatimPromise]);
+
         const geocodeQ = streetLike ? `${trimmed}, Abidjan` : trimmed;
         const fastFetches: Promise<Response>[] = [];
 
@@ -587,36 +619,7 @@ export default function MapboxAddressAutocomplete({
           setSuggestions(fastMerged);
         }
 
-        const [proxLng, proxLat] = proximity.split(',').map((x) => parseFloat(x.trim()));
-        const overpassPromise = !streetLike
-          ? searchOverpassPoi(
-              trimmed,
-              Number.isFinite(proxLat) && Number.isFinite(proxLng) ? { lat: proxLat, lng: proxLng } : undefined,
-            ).catch((err) => {
-              logger.warn('[MapboxAddressAutocomplete] Overpass non disponible:', err);
-              return [] as OverpassPoiResult[];
-            })
-          : Promise.resolve([] as OverpassPoiResult[]);
-
-        const nominatimQ = trimmed.toLowerCase().includes('abidjan') ? trimmed : `${trimmed}, Abidjan`;
-        const nominatimPromise = fetch(
-          `${NOMINATIM_URL}?${new URLSearchParams({
-            q: nominatimQ,
-            format: 'json',
-            limit: '8',
-            countrycodes: 'ci',
-            bounded: '0',
-            viewbox: '-4.15,5.2,-3.85,5.45',
-          })}`,
-          { headers: NOMINATIM_HEADERS },
-        )
-          .then((r) => (r.ok ? r.json() : []))
-          .catch((err) => {
-            logger.warn('[MapboxAddressAutocomplete] Nominatim non disponible:', err);
-            return [];
-          });
-
-        const [overpassData, nominatimData] = await Promise.all([overpassPromise, nominatimPromise]);
+        const [overpassData, nominatimData] = await slowSourcesBundle;
         if (gen !== suggestFetchGenRef.current) return;
 
         const fromNominatim: MapboxSuggestion[] = (nominatimData || [])

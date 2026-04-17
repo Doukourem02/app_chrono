@@ -1,35 +1,18 @@
-import { HStack, Image, ProgressView, Text, VStack } from "@expo/ui/swift-ui";
-import {
-  font,
-  foregroundStyle,
-  frame,
-  padding,
-  progressViewStyle,
-} from "@expo/ui/swift-ui/modifiers";
+import { HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
+import { font, foregroundStyle, frame, padding } from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
-import { Image as RNImage } from "react-native";
 
-/**
- * Couleurs fixes pour l’îlot / Live Activity : le fond est quasi toujours noir.
- * Les styles « hiérarchiques » SwiftUI peuvent rester sombres → texte illisible.
- */
+/** Îlot / Live Activity : fond noir — texte + SF Symbols uniquement (pas d’image logo dans l’extension). */
 const ON_DARK = {
   title: "#FFFFFF",
   body: "#EBEBF5",
   muted: "#D1D1D6",
   brand: "#E9D5FF",
   accent: "#C4B5FD",
-  trackFill: "#FFFFFF",
+  trackDone: "#6B7280",
+  trackRemaining: "#E5E7EB",
 } as const;
-
-/** Même ressource que l’icône app (`app.config.js`). */
-const KRONO_LOGO_ASSET = require("../assets/images/logo/LOGO_APP2.png") as number;
-
-function kronoLogoUri(): string | undefined {
-  const r = RNImage.resolveAssetSource(KRONO_LOGO_ASSET);
-  return typeof r?.uri === "string" ? r.uri : undefined;
-}
 
 export type OrderTrackingLiveProps = {
   etaLabel: string;
@@ -44,21 +27,35 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, _environment: LiveActi
   const plate = props.plateLabel?.trim() || "KRONO";
 
   const compactTitle = props.isPending ? "Recherche" : props.etaLabel;
-  const brandLogoUri = kronoLogoUri();
 
-  /** Progress déterminé uniquement : sans `value`, SwiftUI affiche un spinner (indéterminé). */
-  const progressValue = props.isPending ? 0.22 : 0.5;
-
-  const bottomBar = (
+  const bottomBar = props.isPending ? (
     <VStack modifiers={[padding({ horizontal: 12, vertical: 8 })]}>
-      <ProgressView
-        value={progressValue}
-        modifiers={[
-          progressViewStyle("linear"),
-          frame({ height: 6 }),
-          foregroundStyle(ON_DARK.trackFill),
-        ]}
-      />
+      <ZStack alignment="leading">
+        <RoundedRectangle
+          cornerRadius={4}
+          modifiers={[frame({ height: 6, maxWidth: 300 }), foregroundStyle(ON_DARK.trackRemaining)]}
+        />
+        <RoundedRectangle
+          cornerRadius={4}
+          modifiers={[frame({ width: 64, height: 6 }), foregroundStyle(ON_DARK.trackDone)]}
+        />
+      </ZStack>
+    </VStack>
+  ) : (
+    <VStack modifiers={[padding({ horizontal: 12, vertical: 8 })]}>
+      <ZStack alignment="leading">
+        <RoundedRectangle
+          cornerRadius={4}
+          modifiers={[frame({ height: 6, maxWidth: 300 }), foregroundStyle(ON_DARK.trackRemaining)]}
+        />
+        <HStack>
+          <RoundedRectangle
+            cornerRadius={4}
+            modifiers={[frame({ width: 110, height: 6 }), foregroundStyle(ON_DARK.trackDone)]}
+          />
+          <Spacer minLength={0} />
+        </HStack>
+      </ZStack>
     </VStack>
   );
 
@@ -72,11 +69,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, _environment: LiveActi
         <Text modifiers={[font({ size: 12 }), foregroundStyle(ON_DARK.muted)]}>{plate}</Text>
       </VStack>
     ),
-    compactLeading: brandLogoUri ? (
-      <Image uiImage={brandLogoUri} modifiers={[frame({ width: 22, height: 22 })]} />
-    ) : (
-      <Image systemName="car.fill" color={ON_DARK.accent} size={18} />
-    ),
+    compactLeading: <Image systemName="car.fill" color={ON_DARK.accent} size={18} />,
     compactTrailing: (
       <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.title)]}>
         {compactTitle}
@@ -93,12 +86,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, _environment: LiveActi
     ),
     expandedLeading: (
       <HStack spacing={8} alignment="center" modifiers={[padding({ all: 10 })]}>
-        {brandLogoUri ? (
-          <Image uiImage={brandLogoUri} modifiers={[frame({ width: 30, height: 30 })]} />
-        ) : null}
-        <Text modifiers={[font({ weight: "bold", size: 15 }), foregroundStyle(ON_DARK.brand)]}>
-          KRONO
-        </Text>
+        <Text modifiers={[font({ weight: "bold", size: 15 }), foregroundStyle(ON_DARK.brand)]}>KRONO</Text>
       </HStack>
     ),
     expandedTrailing: (

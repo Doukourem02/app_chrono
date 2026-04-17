@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { Search, Filter } from 'lucide-react'
+import { Search, Filter, X } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import DeliveryCard from '@/components/tracking/DeliveryCard'
 import MapboxTrackingMap from '@/components/tracking/MapboxTrackingMap'
@@ -10,6 +10,7 @@ import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { formatDeliveryId } from '@/utils/formatDeliveryId'
 
 const DEFAULT_CENTER = { lat: 5.36, lng: -4.0083 }
 
@@ -158,33 +159,19 @@ export default function TrackingPage() {
     )
   }, [ongoingDeliveries, searchQuery])
 
-  // Sélectionner la première livraison par défaut
-  useEffect(() => {
-    if (filteredDeliveries.length > 0 && !selectedDelivery) {
-      // Utiliser un setTimeout pour éviter le rendu synchrone
-      const timer = setTimeout(() => {
-        setSelectedDelivery(filteredDeliveries[0])
-      }, 0)
-      return () => clearTimeout(timer)
-    }
-  }, [filteredDeliveries, selectedDelivery])
+  // Pas de commande présélectionnée : la carte reste en « vue flotte » (tous les livreurs).
+  // Le suivi dynamique (trajet + livreur animé) s’active uniquement au clic sur une carte commande.
 
-  // Désélectionner la livraison si elle est terminée ou annulée
+  // Désélectionner si la commande suivie n’est plus active (retour à la vue flotte).
   useEffect(() => {
     if (selectedDelivery) {
       const isStillActive = filteredDeliveries.some(
         (delivery: Delivery) => delivery.id === selectedDelivery.id
       )
-      
+
       if (!isStillActive) {
-        // La livraison sélectionnée n'est plus dans la liste active
-        // Désélectionner et sélectionner la première disponible
         const timer = setTimeout(() => {
-          if (filteredDeliveries.length > 0) {
-            setSelectedDelivery(filteredDeliveries[0])
-          } else {
-            setSelectedDelivery(null)
-          }
+          setSelectedDelivery(null)
         }, 0)
         return () => clearTimeout(timer)
       }
@@ -271,9 +258,13 @@ export default function TrackingPage() {
     return filteredDrivers
   }, [onlineDrivers])
 
-  // Fonction pour gérer la sélection d'une livraison
+  /** Choisir une autre commande = le suivi bascule dessus. Reclic sur la même = arrêt du suivi (vue flotte). */
   const handleDeliverySelect = (delivery: Delivery) => {
-    setSelectedDelivery(delivery)
+    setSelectedDelivery((prev) => (prev?.id === delivery.id ? null : delivery))
+  }
+
+  const stopTracking = () => {
+    setSelectedDelivery(null)
   }
 
   const containerStyle: React.CSSProperties = {
@@ -388,7 +379,74 @@ export default function TrackingPage() {
           </button>
         </div>
 
-        <h2 style={titleStyle}>Ongoing Delivery</h2>
+        <div style={{ marginBottom: '4px' }}>
+          <h2 style={{ ...titleStyle, marginBottom: '6px' }}>Ongoing Delivery</h2>
+          <p style={{ fontSize: '12px', color: themeColors.textSecondary, lineHeight: 1.4, margin: 0 }}>
+            Carte : tous les livreurs en course. Cliquez une commande pour son trajet en direct ; recliquez dessus ou
+            arrêtez le suivi pour revenir à la vue flotte. Cliquer une autre commande change le suivi.
+          </p>
+        </div>
+
+        {selectedDelivery && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              padding: '12px 14px',
+              backgroundColor: themeColors.grayLight,
+              borderRadius: '12px',
+              border: `1px solid ${themeColors.cardBorder}`,
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: themeColors.textSecondary, marginBottom: '2px' }}>
+                Suivi actif
+              </div>
+              <div
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: themeColors.textPrimary,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                title={formatDeliveryId(selectedDelivery.id, selectedDelivery.createdAt)}
+              >
+                {formatDeliveryId(selectedDelivery.id, selectedDelivery.createdAt)}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={stopTracking}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                flexShrink: 0,
+                padding: '8px 12px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: themeColors.textPrimary,
+                backgroundColor: themeColors.cardBg,
+                border: `1px solid ${themeColors.cardBorder}`,
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = themeColors.background
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = themeColors.cardBg
+              }}
+            >
+              <X size={16} />
+              Arrêter le suivi
+            </button>
+          </div>
+        )}
 
         <div style={deliveriesListStyle}>
           {isLoading ? (

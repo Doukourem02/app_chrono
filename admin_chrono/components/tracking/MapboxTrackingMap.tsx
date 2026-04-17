@@ -8,7 +8,7 @@ import { useMapbox } from '@/contexts/MapboxContext'
 import { fetchMapboxDirections } from '@/utils/mapboxDirections'
 import { extractMapboxTrafficData, type TrafficData } from '@/utils/trafficUtils'
 import { calculateDriverOffsets } from '@/utils/markerOffset'
-import { useAnimatedPosition } from '@/hooks/useAnimatedPosition'
+import { useInterpolateLngLat } from '@/hooks/useInterpolateLngLat'
 import { logger } from '@/utils/logger'
 import { searchOverpassPoi, type OverpassPoiResult } from '@/utils/overpassPoiSearch'
 import { searchCuratedPoi } from '@/utils/poiAbidjan'
@@ -199,7 +199,13 @@ export default function MapboxTrackingMap({
   const mapRef = useRef<import('mapbox-gl').Map | null>(null)
   const mapboxglRef = useRef<typeof import('mapbox-gl').default | null>(null)
   const markersRef = useRef<import('mapbox-gl').Marker[]>([])
-  const [previousDriverPosition, setPreviousDriverPosition] = useState<{ lat: number; lng: number } | null>(null)
+  /** Marqueur du livreur de la livraison sélectionnée — mis à jour par interpolation (pas recréé à chaque GPS). */
+  const selectedDriverMarkerRef = useRef<import('mapbox-gl').Marker | null>(null)
+  const lastSelectedDeliveryKeyRef = useRef<string>('')
+  /** Retrait / livraison — indépendant des positions GPS des livreurs */
+  const routeEndpointMarkersRef = useRef<import('mapbox-gl').Marker[]>([])
+  /** Dernière position connue du livreur sélectionné (évite de redéclencher l’effet marqueurs à chaque tick GPS). */
+  const currentVehiclePositionRef = useRef<{ lat: number; lng: number } | null>(null)
   const [fullRoutePath, setFullRoutePath] = useState<Array<{ lat: number; lng: number }>>([])
   const previousDeliveryIdRef = useRef<string | null>(null)
   const [currentZoom, setCurrentZoom] = useState<number>(OVERVIEW_ZOOM)
@@ -247,11 +253,19 @@ export default function MapboxTrackingMap({
     return null
   }, [assignedDriver])
 
-  const animatedDriverPosition = useAnimatedPosition({
-    currentPosition: currentVehiclePosition,
-    previousPosition: previousDriverPosition,
-    animationDuration: 5000,
-  })
+  currentVehiclePositionRef.current = currentVehiclePosition
+
+  // Même logique fluide que le suivi public (PublicTrackMap) : interpolation entre deux points GPS.
+  useInterpolateLngLat(
+    currentVehiclePosition,
+    (pt) => {
+      const m = selectedDriverMarkerRef.current
+      if (m && pt) {
+        m.setLngLat([pt.lng, pt.lat])
+      }
+    },
+    2200
+  )
 
   const driverOffsets = useMemo(() => {
     const validDrivers = onlineDrivers.filter(
@@ -674,12 +688,6 @@ export default function MapboxTrackingMap({
     })
   }, [selectedDelivery, accessToken, isLoaded, loadError, onTrafficData])
 
-  useEffect(() => {
-    if (currentVehiclePosition) {
-      requestAnimationFrame(() => setPreviousDriverPosition(currentVehiclePosition))
-    }
-  }, [currentVehiclePosition])
-
   // Initialize Mapbox map
   useEffect(() => {
     const container = mapContainerRef.current
@@ -832,14 +840,54 @@ export default function MapboxTrackingMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- center, selectedDelivery, routePathFallback, isDarkMode mis à jour par le 2e useEffect
   }, [accessToken, isLoaded, loadError])
 
-  // Update map center and markers when data changes
+  // Au clic sur une carte « Ongoing Delivery » : cadrer la course (itinéraire + livreur au moment du cadrage), pas seulement le point de retrait.
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    const mapboxgl = mapboxglRef.current
+    if (!map || !mapboxgl) return
 
-    map.setCenter([center.lng, center.lat])
-    map.setZoom(selectedDelivery && routePathFallback.length > 0 ? DELIVERY_ZOOM : OVERVIEW_ZOOM)
-  }, [center, selectedDelivery, routePathFallback])
+    if (!selectedDelivery) {
+      map.easeTo({
+        center: [adminLocation.lng, adminLocation.lat],
+        zoom: OVERVIEW_ZOOM,
+        duration: 700,
+      })
+      return
+    }
+
+    const routePts = fullRoutePath.length >= 2 ? fullRoutePath : routePathFallback
+    if (routePts.length >= 2) {
+      const bounds = new mapboxgl.LngLatBounds()
+      routePts.forEach((p) => bounds.extend([p.lng, p.lat]))
+      const driverPos = currentVehiclePositionRef.current
+      if (driverPos) bounds.extend([driverPos.lng, driverPos.lat])
+      try {
+        map.fitBounds(bounds, {
+          padding: { top: 72, bottom: 72, left: 72, right: 72 },
+          maxZoom: 14,
+          duration: 1000,
+        })
+      } catch {
+        map.easeTo({
+          center: [routePts[0].lng, routePts[0].lat],
+          zoom: DELIVERY_ZOOM,
+          duration: 700,
+        })
+      }
+      return
+    }
+
+    const p = selectedDelivery.pickup?.coordinates
+    if (p) {
+      map.easeTo({ center: [p.lng, p.lat], zoom: DELIVERY_ZOOM, duration: 700 })
+    }
+  }, [
+    selectedDelivery,
+    fullRoutePath,
+    routePathFallback,
+    adminLocation.lng,
+    adminLocation.lat,
+  ])
 
   // Draw route layer
   useEffect(() => {
@@ -886,11 +934,55 @@ export default function MapboxTrackingMap({
     }
   }, [fullRoutePath])
 
-  // Update markers
+  // Marqueurs pickup / dropoff uniquement (ne pas recréer à chaque mouvement livreur).
   useEffect(() => {
     const map = mapRef.current
     const mapboxgl = mapboxglRef.current
     if (!map || !mapboxgl) return
+
+    routeEndpointMarkersRef.current.forEach((m) => {
+      try {
+        m.remove()
+      } catch {
+        /* ignore */
+      }
+    })
+    routeEndpointMarkersRef.current = []
+
+    if (!selectedDelivery || routePathFallback.length < 2) return
+
+    const addEndpoint = (pos: { lat: number; lng: number }, color: string, scale = 10) => {
+      const el = document.createElement('div')
+      el.style.width = `${scale * 2}px`
+      el.style.height = `${scale * 2}px`
+      el.style.borderRadius = '50%'
+      el.style.backgroundColor = color
+      el.style.border = '2px solid white'
+      el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)'
+      const m = new mapboxgl.Marker(el).setLngLat([pos.lng, pos.lat]).addTo(map)
+      routeEndpointMarkersRef.current.push(m)
+    }
+
+    addEndpoint(routePathFallback[0], '#10B981', 10)
+    addEndpoint(routePathFallback[1], '#C4B5FD', 10)
+  }, [selectedDelivery, routePathFallback])
+
+  // Livreurs (autres) + marqueur livreur de la livraison sélectionnée — recalcul quand la flotte ou la sélection change, pas à chaque interpolation.
+  useEffect(() => {
+    const map = mapRef.current
+    const mapboxgl = mapboxglRef.current
+    if (!map || !mapboxgl) return
+
+    const deliveryKey = selectedDelivery ? `${selectedDelivery.id}:${selectedDelivery.driverId ?? ''}` : ''
+    if (deliveryKey !== lastSelectedDeliveryKeyRef.current) {
+      lastSelectedDeliveryKeyRef.current = deliveryKey
+      try {
+        selectedDriverMarkerRef.current?.remove()
+      } catch {
+        /* ignore */
+      }
+      selectedDriverMarkerRef.current = null
+    }
 
     markersRef.current.forEach((m) => m.remove())
     markersRef.current = []
@@ -907,24 +999,63 @@ export default function MapboxTrackingMap({
       markersRef.current.push(m)
     }
 
-    if (selectedDelivery && routePathFallback.length >= 2) {
-      addMarker(routePathFallback[0], '#10B981', 10)
-      addMarker(routePathFallback[1], '#C4B5FD', 10)
+    const pos = currentVehiclePositionRef.current
+    const showSelectedDriverMarker =
+      Boolean(selectedDelivery?.driverId) &&
+      routePathFallback.length >= 2 &&
+      assignedDriver?.is_online === true &&
+      pos != null
 
-      if (animatedDriverPosition && assignedDriver?.is_online === true) {
-        addMarker(animatedDriverPosition, '#C4B5FD', 14)
+    if (!showSelectedDriverMarker && selectedDriverMarkerRef.current) {
+      try {
+        selectedDriverMarkerRef.current.remove()
+      } catch {
+        /* ignore */
       }
+      selectedDriverMarkerRef.current = null
     }
 
     onlineDrivers.forEach((driver) => {
       if (driver.is_online !== true || !driver.current_latitude || !driver.current_longitude) return
+      // Ne pas dupliquer le marqueur du livreur déjà géré par selectedDriverMarkerRef (même livreur, taille / animation différentes).
+      if (selectedDelivery?.driverId && driver.userId === selectedDelivery.driverId) return
       const offsetData = driverOffsets.get(driver.userId)
       const pos = offsetData
         ? { lat: offsetData.lat, lng: offsetData.lng }
         : { lat: driver.current_latitude, lng: driver.current_longitude }
       addMarker(pos, '#C4B5FD', 8)
     })
-  }, [selectedDelivery, routePathFallback, animatedDriverPosition, assignedDriver, onlineDrivers, driverOffsets])
+  }, [selectedDelivery, routePathFallback, onlineDrivers, driverOffsets, assignedDriver?.is_online, assignedDriver?.userId])
+
+  // Première apparition du marqueur livreur (carte prête + première coordonnée) ; le mouvement est géré par useInterpolateLngLat.
+  useEffect(() => {
+    const map = mapRef.current
+    const mapboxgl = mapboxglRef.current
+    if (!map || !mapboxgl || !isLoaded) return
+    if (selectedDriverMarkerRef.current) return
+    if (!selectedDelivery?.driverId || routePathFallback.length < 2) return
+    if (assignedDriver?.is_online !== true) return
+    const p = currentVehiclePositionRef.current
+    if (!p) return
+
+    const el = document.createElement('div')
+    el.style.width = '28px'
+    el.style.height = '28px'
+    el.style.borderRadius = '50%'
+    el.style.backgroundColor = '#C4B5FD'
+    el.style.border = '2px solid white'
+    el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)'
+    el.title = 'Livreur (suivi temps réel)'
+    selectedDriverMarkerRef.current = new mapboxgl.Marker(el).setLngLat([p.lng, p.lat]).addTo(map)
+  }, [
+    isLoaded,
+    selectedDelivery?.id,
+    selectedDelivery?.driverId,
+    routePathFallback.length,
+    assignedDriver?.is_online,
+    currentVehiclePosition?.lat,
+    currentVehiclePosition?.lng,
+  ])
 
   if (loadError) {
     return (
