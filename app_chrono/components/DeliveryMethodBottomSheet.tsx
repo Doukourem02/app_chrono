@@ -1,19 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Animated,
-  Switch,
-  Dimensions,
-  PanResponder,
-  Alert,
-  TextInput,
-  Platform,
-} from 'react-native';
+import {StyleSheet,View,Text,TouchableOpacity,ScrollView,Image,Animated,Switch,Dimensions,PanResponder,Alert,TextInput,Platform,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
@@ -184,6 +170,8 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
   ) as 'moto' | 'vehicule' | 'cargo';
 
   const [selectedSpeed, setSelectedSpeed] = useState<string>('express');
+  /** Accordéon sous « Mode de livraison » — colis, messages, créneau (programmée). */
+  const [deliveryDetailsExpanded, setDeliveryDetailsExpanded] = useState(false);
   const dragHandleRef = useRef<View>(null);
 
   const selectedMethodData =
@@ -380,67 +368,6 @@ useEffect(() => {
             </TouchableOpacity>
           </View>
 
-          {effectiveMethod === 'moto' && (
-            <View style={styles.thermalTopSection}>
-              <Text style={styles.thermalTopSectionTitle}>Option pour votre colis</Text>
-              <View style={styles.thermalTopRow}>
-                <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={styles.thermalTopRowTitle}>Maintien de température</Text>
-                  <Text style={styles.thermalTopRowHint}>Sac isotherme recommandé si le contenu doit rester au frais ou au chaud</Text>
-                </View>
-                <Switch
-                  value={scheduledDeliveryExtras.thermalBag}
-                  onValueChange={(v) => {
-                    Haptics.selectionAsync();
-                    onScheduledDeliveryExtrasChange?.({
-                      ...scheduledDeliveryExtras,
-                      thermalBag: v,
-                    });
-                  }}
-                  trackColor={{ false: '#D1D5DB', true: '#8B5CF6' }}
-                  thumbColor={scheduledDeliveryExtras.thermalBag ? '#FFFFFF' : '#F3F4F6'}
-                />
-              </View>
-            </View>
-          )}
-
-          {effectiveMethod === 'moto' && (
-            <View style={styles.courseMessagesSection}>
-              <Text style={styles.courseMessagesSectionTitle}>Messages (facultatif)</Text>
-              <Text style={styles.courseMessagesSectionLead}>
-                Indications pour le coursier et le destinataire — valables pour tous les modes (express, standard, programmée).
-              </Text>
-              <Text style={styles.courseFieldLabel}>Pour le coursier</Text>
-              <TextInput
-                style={styles.courseTextInput}
-                placeholder="Ex. manipuler avec précaution, code, étage…"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                value={scheduledDeliveryExtras.courierNote}
-                onChangeText={(t) =>
-                  onScheduledDeliveryExtrasChange?.({
-                    ...scheduledDeliveryExtras,
-                    courierNote: t,
-                  })
-                }
-              />
-              <Text style={styles.courseFieldLabel}>Pour le destinataire</Text>
-              <TextInput
-                style={styles.courseTextInput}
-                placeholder="Message à transmettre au destinataire"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                value={scheduledDeliveryExtras.recipientMessage}
-                onChangeText={(t) =>
-                  onScheduledDeliveryExtrasChange?.({
-                    ...scheduledDeliveryExtras,
-                    recipientMessage: t,
-                  })
-                }
-              />
-            </View>
-          )}
-
           <View style={styles.largeVehicleContainer}>
             <Image
               source={selectedMethodData.largeImage}
@@ -590,25 +517,118 @@ useEffect(() => {
             </View>
           )}
 
-          {effectiveMethod === 'moto' && selectedSpeed === 'scheduled' && (
-            <View style={styles.scheduledSlotSection}>
-              <Text style={styles.courseFieldLabel}>Créneau souhaité</Text>
-              <Text style={styles.scheduledSlotHint}>
-                À quelle heure ou plage souhaitez-vous la livraison ? (ex. à partir de 10h)
-              </Text>
-              <TextInput
-                style={styles.courseTextInput}
-                placeholder="Ex. entre 10h et 12h"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                value={scheduledDeliveryExtras.scheduledSlotNote}
-                onChangeText={(t) =>
-                  onScheduledDeliveryExtrasChange?.({
-                    ...scheduledDeliveryExtras,
-                    scheduledSlotNote: t,
-                  })
+          {effectiveMethod === 'moto' && getDeliveryOptions(effectiveMethod).length > 0 && (
+            <View style={styles.deliveryDetailsAccordion}>
+              <TouchableOpacity
+                style={styles.deliveryDetailsAccordionHeader}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setDeliveryDetailsExpanded((e) => !e);
+                }}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  deliveryDetailsExpanded
+                    ? 'Replier les détails de la livraison'
+                    : 'Afficher les détails de la livraison'
                 }
-              />
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.deliveryDetailsAccordionTitle}>Détails de la livraison</Text>
+                  <Text style={styles.deliveryDetailsAccordionSubtitle} numberOfLines={2}>
+                    Colis, messages au coursier / destinataire
+                    {selectedSpeed === 'scheduled' ? ', créneau horaire' : ''}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={deliveryDetailsExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={24}
+                  color="#6B7280"
+                />
+              </TouchableOpacity>
+              {deliveryDetailsExpanded ? (
+                <View style={styles.deliveryDetailsAccordionBody}>
+                  <View style={styles.thermalTopSection}>
+                    <Text style={styles.thermalTopSectionTitle}>Option pour votre colis</Text>
+                    <View style={styles.thermalTopRow}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={styles.thermalTopRowTitle}>Maintien de température</Text>
+                        <Text style={styles.thermalTopRowHint}>
+                          Sac isotherme recommandé si le contenu doit rester au frais ou au chaud
+                        </Text>
+                      </View>
+                      <Switch
+                        value={scheduledDeliveryExtras.thermalBag}
+                        onValueChange={(v) => {
+                          Haptics.selectionAsync();
+                          onScheduledDeliveryExtrasChange?.({
+                            ...scheduledDeliveryExtras,
+                            thermalBag: v,
+                          });
+                        }}
+                        trackColor={{ false: '#D1D5DB', true: '#8B5CF6' }}
+                        thumbColor={scheduledDeliveryExtras.thermalBag ? '#FFFFFF' : '#F3F4F6'}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.courseMessagesSection}>
+                    <Text style={styles.courseMessagesSectionTitle}>Messages (facultatif)</Text>
+                    <Text style={styles.courseMessagesSectionLead}>
+                      Indications pour le coursier et le destinataire — valables pour tous les modes
+                      (express, standard, programmée).
+                    </Text>
+                    <Text style={styles.courseFieldLabel}>Pour le coursier</Text>
+                    <TextInput
+                      style={styles.courseTextInput}
+                      placeholder="Ex. manipuler avec précaution, code, étage…"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      value={scheduledDeliveryExtras.courierNote}
+                      onChangeText={(t) =>
+                        onScheduledDeliveryExtrasChange?.({
+                          ...scheduledDeliveryExtras,
+                          courierNote: t,
+                        })
+                      }
+                    />
+                    <Text style={styles.courseFieldLabel}>Pour le destinataire</Text>
+                    <TextInput
+                      style={styles.courseTextInput}
+                      placeholder="Message à transmettre au destinataire"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      value={scheduledDeliveryExtras.recipientMessage}
+                      onChangeText={(t) =>
+                        onScheduledDeliveryExtrasChange?.({
+                          ...scheduledDeliveryExtras,
+                          recipientMessage: t,
+                        })
+                      }
+                    />
+                  </View>
+                  {selectedSpeed === 'scheduled' ? (
+                    <View style={styles.scheduledSlotSection}>
+                      <Text style={styles.courseFieldLabel}>Créneau souhaité</Text>
+                      <Text style={styles.scheduledSlotHint}>
+                        À quelle heure ou plage souhaitez-vous la livraison ? (ex. à partir de 10h)
+                      </Text>
+                      <TextInput
+                        style={styles.courseTextInput}
+                        placeholder="Ex. entre 10h et 12h"
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        value={scheduledDeliveryExtras.scheduledSlotNote}
+                        onChangeText={(t) =>
+                          onScheduledDeliveryExtrasChange?.({
+                            ...scheduledDeliveryExtras,
+                            scheduledSlotNote: t,
+                          })
+                        }
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           )}
 
@@ -816,8 +836,41 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 4,
   },
+  deliveryDetailsAccordion: {
+    marginBottom: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  deliveryDetailsAccordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: '#FAF5FF',
+  },
+  deliveryDetailsAccordionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4C1D95',
+  },
+  deliveryDetailsAccordionSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  deliveryDetailsAccordionBody: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#EDE9FE',
+  },
   thermalTopSection: {
-    marginBottom: 16,
+    marginBottom: 12,
     padding: 14,
     backgroundColor: '#FAF5FF',
     borderRadius: 12,
@@ -849,7 +902,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   courseMessagesSection: {
-    marginBottom: 18,
+    marginBottom: 12,
   },
   courseMessagesSectionTitle: {
     fontSize: 16,
@@ -884,7 +937,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   scheduledSlotSection: {
-    marginBottom: 20,
+    marginBottom: 8,
   },
   scheduledSlotHint: {
     fontSize: 12,
