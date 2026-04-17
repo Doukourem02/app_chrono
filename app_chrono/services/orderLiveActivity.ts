@@ -21,6 +21,13 @@ let active: {
   live: LiveActivity<OrderTrackingLiveProps>;
 } | null = null;
 
+function supportsLiveActivitiesIOS(): boolean {
+  if (Platform.OS !== "ios") return false;
+  const version = Platform.Version;
+  if (typeof version !== "number") return true;
+  return version >= 16.2;
+}
+
 function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
   if (factory) return factory;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -90,7 +97,7 @@ async function endActive(): Promise<void> {
  * Android : no-op.
  */
 export async function syncOrderLiveActivity(order: OrderRequest | null): Promise<void> {
-  if (Platform.OS !== "ios") return;
+  if (!supportsLiveActivitiesIOS()) return;
 
   const shouldTrack = order && TRACKING_STATUSES.includes(order.status);
 
@@ -104,6 +111,15 @@ export async function syncOrderLiveActivity(order: OrderRequest | null): Promise
     const props = propsFromOrder(order!);
     const url = `appchrono://order-tracking/${encodeURIComponent(order!.id)}`;
 
+    // Après un redémarrage JS/app, récupérer une activité existante pour éviter
+    // de recréer inutilement (et potentiellement échouer sur les limites iOS).
+    if (!active) {
+      const instances = f.getInstances();
+      if (instances.length > 0) {
+        active = { orderId: order!.id, live: instances[0] };
+      }
+    }
+
     if (active?.orderId === order!.id) {
       await active.live.update(props);
       return;
@@ -113,6 +129,10 @@ export async function syncOrderLiveActivity(order: OrderRequest | null): Promise
     const live = f.start(props, url);
     active = { orderId: order!.id, live };
   } catch (e) {
-    logger.warn("[orderLiveActivity] sync échouée", "orderLiveActivity", e);
+    logger.warn(
+      "[orderLiveActivity] sync échouée",
+      "orderLiveActivity",
+      { orderId: order?.id, status: order?.status, error: e }
+    );
   }
 }
