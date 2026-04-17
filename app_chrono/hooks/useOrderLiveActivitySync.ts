@@ -4,7 +4,8 @@ import { syncOrderLiveActivity } from "../services/orderLiveActivity";
 import type { OrderRequest } from "../store/useOrderStore";
 import { useOrderStore } from "../store/useOrderStore";
 
-const TRACKING = new Set([
+const TRACKING = new Set<OrderRequest["status"]>([
+  "pending",
   "accepted",
   "enroute",
   "in_progress",

@@ -4,7 +4,9 @@ import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
 import type { OrderTrackingLiveProps } from "../widgets/orderTrackingLiveActivity";
 
+/** Inclut `pending` pour que l’utilisateur voie l’activité dès la commande créée (avant acceptation chauffeur). */
 const TRACKING_STATUSES: OrderStatus[] = [
+  "pending",
   "accepted",
   "enroute",
   "in_progress",
@@ -30,6 +32,18 @@ function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
 }
 
 function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
+  if (order.status === "pending") {
+    const eta =
+      typeof order.estimatedDuration === "string" && order.estimatedDuration.trim()
+        ? order.estimatedDuration.trim()
+        : "—";
+    return {
+      etaLabel: eta,
+      vehicleLabel: "Recherche d'un chauffeur",
+      plateLabel: order.dropoff?.address?.slice(0, 24) || "Krono",
+    };
+  }
+
   const driver = order.driver;
   const plate = driver?.vehicle_plate?.trim();
   const name =

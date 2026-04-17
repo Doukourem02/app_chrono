@@ -29,6 +29,8 @@ module.exports = {
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         CFBundleDisplayName: "Krono",
+        /** Obligatoire pour qu’iOS autorise ActivityKit (îlot / verrouillage). */
+        NSSupportsLiveActivities: true,
         NSContactsUsageDescription:
           "Krono a besoin d'accéder à vos contacts pour sélectionner le numéro du destinataire.",
       },
