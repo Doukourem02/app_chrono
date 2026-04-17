@@ -1,7 +1,7 @@
 import logger from '../utils/logger.js';
 import { maskPhoneNumber } from '../utils/maskSensitiveData.js';
 
-export type MobileMoneyProvider = 'orange_money' | 'wave';
+export type MobileMoneyProvider = 'orange_money' | 'wave' | 'mtn_money';
 
 export type PaymentStatus = 'pending' | 'paid' | 'refused' | 'failed';
 
@@ -36,6 +36,12 @@ export interface MobileMoneyConfig {
     merchantId: string;
     apiUrl?: string;
   };
+  mtnMoney?: {
+    apiKey: string;
+    apiSecret: string;
+    merchantId: string;
+    apiUrl?: string;
+  };
 }
 
 const config: MobileMoneyConfig = {
@@ -55,6 +61,14 @@ const config: MobileMoneyConfig = {
         apiSecret: process.env.WAVE_API_SECRET || '',
         merchantId: process.env.WAVE_MERCHANT_ID || '',
         apiUrl: process.env.WAVE_API_URL || 'https://api.wave.com/v',
+      }
+    : undefined,
+  mtnMoney: process.env.MTN_MONEY_API_KEY
+    ? {
+        apiKey: process.env.MTN_MONEY_API_KEY,
+        apiSecret: process.env.MTN_MONEY_API_SECRET || '',
+        merchantId: process.env.MTN_MONEY_MERCHANT_ID || '',
+        apiUrl: process.env.MTN_MONEY_API_URL || 'https://api.mtn.com/mobilemoney',
       }
     : undefined,
 };
@@ -149,6 +163,51 @@ async function initiateWavePayment(
   }
 }
 
+async function initiateMtnMoneyPayment(
+  params: MobileMoneyPaymentParams
+): Promise<MobileMoneyPaymentResponse> {
+  const { phoneNumber, amount, orderId } = params;
+
+  if (!config.mtnMoney) {
+    return {
+      success: false,
+      status: 'failed',
+      error: 'MTN Money non configuré',
+    };
+  }
+
+  try {
+    logger.info(`Initiation paiement MTN Money pour commande ${orderId}`, {
+      phone: maskPhoneNumber(phoneNumber),
+      amount,
+    });
+
+    const providerTransactionId = `MTN-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+
+    return {
+      success: true,
+      transactionId: providerTransactionId,
+      providerTransactionId,
+      status: 'pending',
+      message: 'Paiement MTN Money initié',
+      providerResponse: {
+        provider: 'mtn_money',
+        transactionId: providerTransactionId,
+        status: 'pending',
+      },
+    };
+  } catch (error: any) {
+    logger.error('Erreur paiement MTN Money:', error);
+    return {
+      success: false,
+      status: 'failed',
+      error: error.message || "Erreur lors de l'initiation du paiement MTN Money",
+    };
+  }
+}
+
 export async function checkPaymentStatus(
   provider: MobileMoneyProvider,
   providerTransactionId: string
@@ -187,6 +246,8 @@ export async function initiateMobileMoneyPayment(
       return await initiateOrangeMoneyPayment(params);
     case 'wave':
       return await initiateWavePayment(params);
+    case 'mtn_money':
+      return await initiateMtnMoneyPayment(params);
     default:
       return {
         success: false,
@@ -201,7 +262,7 @@ export function validateMobileMoneyParams(
 ): { valid: boolean; error?: string } {
   if (
     !params.provider ||
-    !['orange_money', 'wave'].includes(params.provider)
+    !['orange_money', 'wave', 'mtn_money'].includes(params.provider)
   ) {
     return { valid: false, error: 'Fournisseur Mobile Money invalide' };
   }

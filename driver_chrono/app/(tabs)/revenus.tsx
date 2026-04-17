@@ -1,9 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, FlatList, Image } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  FlatList,
+  Image,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDriverStore } from '../../store/useDriverStore';
 import { apiService } from '../../services/apiService';
 import { logger } from '../../utils/logger';
+
+/** Espace sous le contenu pour la tab bar flottante (~80px) + marge + safe area. */
+const TAB_BAR_FLOAT_OFFSET = 108;
 
 type Period = 'today' | 'week' | 'month' | 'all';
 
@@ -35,14 +49,30 @@ interface RevenuesData {
   }[];
 }
 
+function RevenusSkeleton() {
+  return (
+    <View style={styles.skeletonWrap}>
+      <View style={[styles.skeletonBlock, { height: 140, width: '100%' }]} />
+      <View style={styles.skeletonRow}>
+        <View style={[styles.skeletonBlock, { height: 100, flex: 1, marginRight: 8 }]} />
+        <View style={[styles.skeletonBlock, { height: 100, flex: 1, marginLeft: 8 }]} />
+      </View>
+      <View style={[styles.skeletonBlock, { height: 120, width: '100%' }]} />
+    </View>
+  );
+}
+
 export default function RevenusPage() {
+  const insets = useSafeAreaInsets();
   const { user } = useDriverStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('all'); // Commencer par 'all' pour voir toutes les données
   const [revenuesData, setRevenuesData] = useState<RevenuesData | null>(null);
 
-  const loadRevenues = useCallback(async () => {
+  const scrollBottomPadding = TAB_BAR_FLOAT_OFFSET + insets.bottom;
+
+  const loadRevenues = useCallback(async (isRefresh = false) => {
     if (!user?.id) {
       if (__DEV__) {
         logger.debug('[Revenus] Pas de user.id, impossible de charger les revenus');
@@ -53,7 +83,11 @@ export default function RevenusPage() {
     }
 
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const result = await apiService.getDriverRevenues(user.id, {
         period: selectedPeriod,
       });
@@ -115,17 +149,17 @@ export default function RevenusPage() {
 
   useEffect(() => {
     if (user?.id) {
-      loadRevenues();
+      loadRevenues(false);
     }
   }, [user?.id, loadRevenues]);
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadRevenues();
+    void loadRevenues(true);
   }, [loadRevenues]);
 
   const formatCurrency = (amount: number) => {
-    return `${amount.toFixed(0)} FCFA`;
+    const n = Math.round(amount);
+    return `${n.toLocaleString('fr-FR')} FCFA`;
   };
 
   const getMethodIcon = (method: string) => {
@@ -175,10 +209,11 @@ export default function RevenusPage() {
         selectedPeriod === item.key && styles.periodButtonActive,
       ]}
       onPress={() => {
-        // logger.debug('[Revenus] Changement période:', item.key); // Debug conservé
         logger.debug('[Revenus] Changement période:', item.key);
         setSelectedPeriod(item.key);
       }}
+      accessibilityRole="button"
+      accessibilityState={{ selected: selectedPeriod === item.key }}
     >
       <Text
         style={[
@@ -191,13 +226,25 @@ export default function RevenusPage() {
     </TouchableOpacity>
   );
 
-
   if (loading && !revenuesData) {
     return (
       <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top + 12, 60) }]}>
+          <Text style={styles.headerTitle}>Mes Revenus</Text>
+        </View>
+        <View style={styles.filtersWrapper}>
+          <FlatList
+            data={periods}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.periodsContent}
+            renderItem={renderPeriodItem}
+            keyExtractor={(item) => item.key}
+          />
+        </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Chargement de vos revenus...</Text>
+          <RevenusSkeleton />
+          <Text style={styles.loadingText}>Chargement de vos revenus…</Text>
         </View>
       </View>
     );
@@ -205,7 +252,7 @@ export default function RevenusPage() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + 12, 60) }]}>
         <Text style={styles.headerTitle}>Mes Revenus</Text>
       </View>
 
@@ -222,10 +269,24 @@ export default function RevenusPage() {
 
       <ScrollView
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: scrollBottomPadding }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#8B5CF6"
+            colors={['#8B5CF6']}
+          />
+        }
       >
-        <View style={styles.summaryGrid}>
+        {loading && revenuesData ? (
+          <View style={styles.inlineRefreshRow}>
+            <ActivityIndicator size="small" color="#8B5CF6" />
+            <Text style={styles.inlineRefreshText}>Mise à jour des chiffres…</Text>
+          </View>
+        ) : null}
+
+        <View style={[styles.summaryGrid, loading && revenuesData ? styles.contentDimmed : null]}>
           <View style={[styles.summaryCard, styles.summaryCardPrimary, styles.summaryCardFull]}>
             <View style={styles.summaryCardHeader}>
               <View style={[styles.summaryIcon, styles.summaryIconPrimary]}>
@@ -276,8 +337,9 @@ export default function RevenusPage() {
         </View>
 
         {methodKeys.length > 0 && (
-          <View style={styles.methodsContainer}>
+          <View style={[styles.methodsContainer, loading && revenuesData ? styles.contentDimmed : null]}>
             <Text style={styles.sectionTitle}>Par type de livraison</Text>
+            <Text style={styles.sectionSubtitle}>Détail par mode (sous-total)</Text>
             {methodKeys.map((method, index) => {
               const earnings = revenuesData?.earningsByMethod[method] || 0;
               const deliveries = revenuesData?.deliveriesByMethod[method] || 0;
@@ -315,8 +377,8 @@ export default function RevenusPage() {
         )}
 
         {revenuesData && revenuesData.orders && revenuesData.orders.length > 0 && (
-          <View style={styles.ordersContainer}>
-            <Text style={styles.sectionTitle}>Historique des commandes</Text>
+          <View style={[styles.ordersContainer, loading && revenuesData ? styles.contentDimmed : null]}>
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Historique des commandes</Text>
             <View style={styles.ordersList}>
               {revenuesData.orders.slice(0, 10).map((order, index) => (
                 <View key={order.id} style={[styles.orderItem, index === revenuesData.orders.length - 1 && styles.orderItemLast]}>
@@ -362,10 +424,15 @@ export default function RevenusPage() {
             <Ionicons name="card-outline" size={72} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>Aucun revenu</Text>
             <Text style={styles.emptyText}>
-              Vous n&apos;avez pas encore de livraisons {selectedPeriod === 'today' ? 'aujourd&apos;hui' :
-              selectedPeriod === 'week' ? 'cette semaine' :
-              selectedPeriod === 'month' ? 'ce mois' : ''}
+              {selectedPeriod === 'today'
+                ? "Vous n'avez pas encore de livraisons aujourd'hui."
+                : selectedPeriod === 'month'
+                  ? "Vous n'avez pas encore de livraisons ce mois-ci."
+                  : selectedPeriod === 'all'
+                    ? "Vous n'avez pas encore de livraisons enregistrées."
+                    : 'Aucune livraison sur cette période.'}
             </Text>
+            <Text style={styles.emptyHint}>Tirez vers le bas pour actualiser.</Text>
           </View>
         )}
       </ScrollView>
@@ -388,6 +455,35 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: '#6B7280',
+  },
+  skeletonWrap: {
+    width: '100%',
+    paddingHorizontal: 4,
+  },
+  skeletonBlock: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  inlineRefreshRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 16,
+    paddingVertical: 8,
+  },
+  inlineRefreshText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  contentDimmed: {
+    opacity: 0.55,
   },
   header: {
     backgroundColor: '#FFFFFF',
@@ -531,10 +627,19 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: '#111827',
+    marginBottom: 4,
+  },
+  sectionTitleSpaced: {
     marginBottom: 16,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 16,
+    lineHeight: 18,
   },
   emptySectionText: {
     fontSize: 13,
@@ -584,17 +689,20 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   methodEarningsContainer: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minWidth: 100,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 92,
     alignItems: 'flex-end',
   },
   methodEarnings: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#4C1D95',
+    color: '#334155',
+    fontVariant: ['tabular-nums'],
   },
   emptyContainer: {
     backgroundColor: '#FFFFFF',
@@ -616,6 +724,12 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     paddingHorizontal: 20,
+  },
+  emptyHint: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 16,
+    textAlign: 'center',
   },
   ordersContainer: {
     backgroundColor: '#FFFFFF',

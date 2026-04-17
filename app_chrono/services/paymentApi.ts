@@ -8,7 +8,7 @@ import { logger } from '../utils/logger';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? 'http://localhost:4000' : 'https://votre-api.com');
 
-export type PaymentMethodType = 'orange_money' | 'wave' | 'cash' | 'deferred';
+export type PaymentMethodType = 'orange_money' | 'wave' | 'mtn_money' | 'cash' | 'deferred';
 export type PaymentStatus = 'pending' | 'paid' | 'refused' | 'delayed' | 'refunded' | 'cancelled';
 export type DisputeType = 'refund_request' | 'payment_issue' | 'service_issue' | 'other';
 

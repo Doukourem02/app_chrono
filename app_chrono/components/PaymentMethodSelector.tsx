@@ -36,6 +36,13 @@ const PAYMENT_METHODS: {
     color: '#00A8E8',
     useImage: true,
   },
+  {
+    type: 'mtn_money',
+    name: 'MTN Money',
+    icon: 'phone-portrait',
+    color: '#FFCC00',
+    useImage: false,
+  },
   { type: 'cash', name: 'Espèces', icon: 'cash', color: '#28A745', useImage: false },
   { type: 'deferred', name: 'Paiement différé', icon: 'time', color: '#FFC107', useImage: false },
 ];

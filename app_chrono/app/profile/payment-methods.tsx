@@ -6,7 +6,7 @@ import { paymentApi } from '../../services/paymentApi';
 
 interface PaymentMethod {
   id: string;
-  method_type: 'orange_money' | 'wave' | 'cash' | 'deferred';
+  method_type: 'orange_money' | 'wave' | 'mtn_money' | 'cash' | 'deferred';
   provider_account?: string;
   provider_name?: string;
   is_default: boolean;
@@ -40,6 +40,8 @@ export default function PaymentMethodsPage() {
         return 'phone-portrait';
       case 'wave':
         return 'wallet';
+      case 'mtn_money':
+        return 'phone-portrait';
       case 'cash':
         return 'cash';
       case 'deferred':
@@ -55,6 +57,8 @@ export default function PaymentMethodsPage() {
         return 'Orange Money';
       case 'wave':
         return 'Wave';
+      case 'mtn_money':
+        return 'MTN Money';
       case 'cash':
         return 'Espèces';
       case 'deferred':

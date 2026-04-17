@@ -22,7 +22,7 @@ interface RequestWithUser extends Request {
 }
 
 interface CreatePaymentMethodBody {
-  methodType: 'orange_money' | 'wave' | 'cash' | 'deferred';
+  methodType: 'orange_money' | 'wave' | 'mtn_money' | 'cash' | 'deferred';
   providerAccount?: string;
   providerName?: string;
   isDefault?: boolean;
@@ -32,7 +32,7 @@ interface CreatePaymentMethodBody {
 interface InitiatePaymentBody {
   orderId: string;
   paymentMethodId?: string;
-  paymentMethodType: 'orange_money' | 'wave' | 'cash' | 'deferred';
+  paymentMethodType: 'orange_money' | 'wave' | 'mtn_money' | 'cash' | 'deferred';
   phoneNumber?: string;
   isPartial?: boolean;
   partialAmount?: number;
@@ -65,7 +65,7 @@ export const createPaymentMethod = async (req: RequestWithUser, res: Response): 
     const { methodType, providerAccount, providerName, isDefault = false, metadata } =
       req.body as CreatePaymentMethodBody;
 
-    if (!['orange_money', 'wave', 'cash', 'deferred'].includes(methodType)) {
+    if (!['orange_money', 'wave', 'mtn_money', 'cash', 'deferred'].includes(methodType)) {
       res.status(400).json({
         success: false,
         message: 'Type de méthode de paiement invalide'
@@ -73,7 +73,7 @@ export const createPaymentMethod = async (req: RequestWithUser, res: Response): 
       return;
     }
 
-    if ((methodType === 'orange_money' || methodType === 'wave') && !providerAccount) {
+    if ((methodType === 'orange_money' || methodType === 'wave' || methodType === 'mtn_money') && !providerAccount) {
       res.status(400).json({
         success: false,
         message: 'Numéro de téléphone requis pour Mobile Money',
@@ -320,7 +320,11 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       }
     }
 
-    if (paymentMethodType === 'orange_money' || paymentMethodType === 'wave') {
+    if (
+      paymentMethodType === 'orange_money' ||
+      paymentMethodType === 'wave' ||
+      paymentMethodType === 'mtn_money'
+    ) {
       if (!phone) {
         res.status(400).json({
           success: false,
@@ -330,7 +334,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       }
 
       const mobileMoneyParams = {
-        provider: paymentMethodType as 'orange_money' | 'wave',
+        provider: paymentMethodType as 'orange_money' | 'wave' | 'mtn_money',
         phoneNumber: phone,
         amount: amountToPay,
         orderId,
@@ -508,11 +512,12 @@ export const checkPayment = async (req: RequestWithUser, res: Response): Promise
 
     if (
       transaction.payment_method_type === 'orange_money' ||
-      transaction.payment_method_type === 'wave'
+      transaction.payment_method_type === 'wave' ||
+      transaction.payment_method_type === 'mtn_money'
     ) {
       if (transaction.provider_transaction_id) {
         const statusCheck = await checkPaymentStatus(
-          transaction.payment_method_type as 'orange_money' | 'wave',
+          transaction.payment_method_type as 'orange_money' | 'wave' | 'mtn_money',
           transaction.provider_transaction_id
         );
 
