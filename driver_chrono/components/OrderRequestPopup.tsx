@@ -6,6 +6,7 @@ import { AdminOrderInfo } from './AdminOrderInfo';
 import { logger } from '../utils/logger';
 import { formatUserName } from '../utils/formatName';
 import { parseClientOrderInstructions } from '../utils/clientOrderInstructions';
+import { driverFacingSpeedOptionLabel } from '../utils/speedOptionLabel';
 
 interface OrderRequest {
   id: string;
@@ -33,12 +34,16 @@ interface OrderRequest {
   };
   price: number;
   deliveryMethod: 'moto' | 'vehicule' | 'cargo';
+  /** express | standard | scheduled — côté client */
+  speedOptionId?: string;
   distance: number;
   estimatedDuration: string;
   createdAt: Date;
   isPhoneOrder?: boolean;
   placedByAdmin?: boolean;
   isB2BOrder?: boolean;
+  /** Champ « Notes (optionnel) » côté admin. */
+  operatorCourseNotes?: string;
   driverNotes?: string; // Notes spéciales pour le livreur
 }
 
@@ -324,6 +329,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
             isPhoneOrder={order.isPhoneOrder || false}
             placedByAdmin={order.placedByAdmin}
             isB2BOrder={order.isB2BOrder || false}
+            operatorCourseNotes={order.operatorCourseNotes}
             driverNotes={order.driverNotes}
             approximatePickupZoneLabel={order.pickup?.approximate_pickup_zone_label}
           />
@@ -340,6 +346,50 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
               <Text style={styles.durationText}>{order.estimatedDuration}</Text>
             </View>
           </View>
+
+          {(() => {
+            const modeLabel = driverFacingSpeedOptionLabel(order.speedOptionId);
+            if (!order.speedOptionId) return null;
+            return (
+              <View style={styles.serviceModeBanner}>
+                <Text style={styles.serviceModeLabel}>Mode de service</Text>
+                <Text style={styles.serviceModeValue}>{modeLabel}</Text>
+              </View>
+            );
+          })()}
+
+          {(() => {
+            const instr = parseClientOrderInstructions(
+              order.dropoff?.details as Record<string, unknown> | undefined
+            );
+            if (!instr) return null;
+            const hasDetailMessages =
+              (instr.courierNote && instr.courierNote.length > 0) ||
+              (instr.recipientMessage && instr.recipientMessage.length > 0);
+            return (
+              <View style={styles.preAcceptHints}>
+                {instr.thermalBag ? (
+                  <View style={styles.preAcceptRow}>
+                    <Text style={styles.preAcceptKey}>Maintien température</Text>
+                    <Text style={styles.preAcceptVal}>Oui</Text>
+                  </View>
+                ) : null}
+                {instr.scheduledWindowNote ? (
+                  <View style={styles.preAcceptBlock}>
+                    <Text style={styles.preAcceptKey}>Créneau souhaité</Text>
+                    <Text style={styles.preAcceptMultiline} numberOfLines={3}>
+                      {instr.scheduledWindowNote}
+                    </Text>
+                  </View>
+                ) : null}
+                {hasDetailMessages ? (
+                  <Text style={styles.preAcceptFootnote}>
+                    Consignes détaillées (livreur / destinataire) : consultez la fiche commande après acceptation.
+                  </Text>
+                ) : null}
+              </View>
+            );
+          })()}
 
           {/* Adresses */}
           <View style={styles.addressesContainer}>
@@ -369,36 +419,6 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
               </View>
             </View>
           </View>
-
-          {(() => {
-            const instr = parseClientOrderInstructions(
-              order.dropoff?.details as Record<string, unknown> | undefined
-            );
-            if (!instr) return null;
-            return (
-              <View style={styles.clientInstructionsBox}>
-                <Text style={styles.clientInstructionsTitle}>Consignes client</Text>
-                {instr.thermalBag ? (
-                  <View style={styles.clientInstructionRow}>
-                    <Text style={styles.clientInstructionLabel}>Sac isotherme</Text>
-                    <Text style={styles.clientInstructionValue}>Demandé</Text>
-                  </View>
-                ) : null}
-                {instr.courierNote ? (
-                  <View style={styles.clientInstructionBlock}>
-                    <Text style={styles.clientInstructionLabel}>Pour vous (livreur)</Text>
-                    <Text style={styles.clientInstructionMultiline}>{instr.courierNote}</Text>
-                  </View>
-                ) : null}
-                {instr.recipientMessage ? (
-                  <View style={styles.clientInstructionBlock}>
-                    <Text style={styles.clientInstructionLabel}>Message pour le destinataire</Text>
-                    <Text style={styles.clientInstructionMultiline}>{instr.recipientMessage}</Text>
-                  </View>
-                ) : null}
-              </View>
-            );
-          })()}
 
           {/* Boutons d'action */}
           <View style={styles.actionsContainer}>
@@ -584,6 +604,72 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
+  },
+  serviceModeBanner: {
+    backgroundColor: '#F5F3FF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  serviceModeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6D28D9',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  serviceModeValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#4C1D95',
+  },
+  preAcceptHints: {
+    marginBottom: 16,
+  },
+  preAcceptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  preAcceptKey: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  preAcceptVal: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  preAcceptBlock: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  preAcceptMultiline: {
+    fontSize: 13,
+    color: '#166534',
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  preAcceptFootnote: {
+    fontSize: 11,
+    color: '#6B7280',
+    lineHeight: 16,
+    fontStyle: 'italic',
   },
   addressesContainer: {
     marginBottom: 24,

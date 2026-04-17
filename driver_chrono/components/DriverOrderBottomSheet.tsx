@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {View,Text,TouchableOpacity,ScrollView,StyleSheet,Animated,PanResponderInstance,Dimensions,Alert,Linking} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,8 @@ import { QRCodeScanResult } from './QRCodeScanResult';
 import { qrCodeService } from '../services/qrCodeService';
 import { getQRScanErrorAlert } from '../utils/qrScanUserMessage';
 import { parseClientOrderInstructions } from '../utils/clientOrderInstructions';
+import { driverFacingSpeedOptionLabel } from '../utils/speedOptionLabel';
+import { OperatorCourseNotesBlock, OperatorDriverNotesBlock } from './AdminOrderInfo';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -39,6 +41,8 @@ interface DriverOrderBottomSheetProps {
   lastEtaMinutes?: number | null;
   /** Annule la course en cours (avec confirmation) */
   onCancelOrder?: () => void;
+  /** Ouvre le panneau (depuis l’état réduit) — ex. accès « Notes » sans alourdir la rangée d’icônes */
+  onExpandSheet?: () => void;
 }
 
 const resolveCoords = (candidate?: any): { latitude: number; longitude: number } | null => {
@@ -71,6 +75,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   onResumeNavigation,
   lastEtaMinutes = null,
   onCancelOrder,
+  onExpandSheet,
 }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('details');
@@ -161,6 +166,28 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     [currentOrder]
   );
 
+  const serviceModeLabel = useMemo(
+    () => driverFacingSpeedOptionLabel(currentOrder?.speedOptionId),
+    [currentOrder?.speedOptionId]
+  );
+
+  const hasNotesOrConsignes = useMemo(() => {
+    if (!currentOrder) return false;
+    const oc = (currentOrder.operatorCourseNotes || '').trim();
+    const dn = (currentOrder.driverNotes || '').trim();
+    if (oc.length > 0 || dn.length > 0) return true;
+    if (currentOrder.speedOptionId) return true;
+    return clientInstructions != null;
+  }, [currentOrder, clientInstructions]);
+
+  const handleOpenNotesFromCollapsed = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActiveTab('details');
+    if (!isExpanded) {
+      onExpandSheet?.();
+    }
+  }, [isExpanded, onExpandSheet]);
+
   if (!currentOrder) return null;
 
   const recipientPhone = currentOrder?.recipient?.phone || currentOrder?.dropoff?.details?.phone || currentOrder?.user?.phone || null;
@@ -170,6 +197,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   const placedByAdmin = currentOrder?.placedByAdmin === true;
   const isB2BOrder = currentOrder?.isB2BOrder === true;
   const driverNotes = currentOrder?.driverNotes || '';
+  const operatorCourseNotes = currentOrder?.operatorCourseNotes || '';
 
   const handleCall = () => {
     if (!recipientPhone && !currentOrder?.user?.phone) {
@@ -283,6 +311,18 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                       ? 'Suivi automatique — Arrivée détectée par géofencing'
                       : 'Livraison en cours'}
                 </Text>
+                {hasNotesOrConsignes ? (
+                  <TouchableOpacity
+                    style={styles.collapsedNotesHint}
+                    onPress={handleOpenNotesFromCollapsed}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Voir notes et consignes"
+                  >
+                    <Ionicons name="document-text-outline" size={13} color="#7C3AED" />
+                    <Text style={styles.collapsedNotesHintText}>Notes et consignes</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
             <View style={styles.collapsedActions}>
@@ -407,12 +447,6 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                             ? 'Sans point de retrait ou de livraison précis, la navigation intégrée ne peut pas calculer l’itinéraire. Appelez le client ou l’opérateur pour affiner l’adresse.'
                             : 'Cette commande a été créée avec la case « téléphone / hors-ligne » : les points sur la carte peuvent être approximatifs. Vérifiez ou appelez le client si besoin.'}
                         </Text>
-                        {driverNotes ? (
-                          <Text style={styles.driverNotesText}>
-                            <Text style={styles.driverNotesLabel}>Note: </Text>
-                            {driverNotes}
-                          </Text>
-                        ) : null}
                       </View>
                     </View>
                     <TouchableOpacity
@@ -426,6 +460,20 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   </View>
                 )}
 
+                {operatorCourseNotes || driverNotes ? (
+                  <View style={styles.section}>
+                    <OperatorCourseNotesBlock operatorCourseNotes={operatorCourseNotes} />
+                    <OperatorDriverNotesBlock driverNotes={driverNotes} />
+                  </View>
+                ) : null}
+
+                {currentOrder.speedOptionId ? (
+                  <View style={styles.serviceModeCard}>
+                    <Text style={styles.serviceModeCardLabel}>Mode de service (client)</Text>
+                    <Text style={styles.serviceModeCardValue}>{serviceModeLabel}</Text>
+                  </View>
+                ) : null}
+
                 {clientInstructions ? (
                   <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -435,8 +483,14 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                     <View style={styles.clientInstructionsCard}>
                       {clientInstructions.thermalBag ? (
                         <View style={styles.clientInstrRow}>
-                          <Text style={styles.clientInstrLabel}>Sac isotherme</Text>
-                          <Text style={styles.clientInstrEmphasis}>Demandé</Text>
+                          <Text style={styles.clientInstrLabel}>Maintien température</Text>
+                          <Text style={styles.clientInstrEmphasis}>Oui</Text>
+                        </View>
+                      ) : null}
+                      {clientInstructions.scheduledWindowNote ? (
+                        <View style={styles.clientInstrBlock}>
+                          <Text style={styles.clientInstrLabel}>Créneau souhaité</Text>
+                          <Text style={styles.clientInstrBody}>{clientInstructions.scheduledWindowNote}</Text>
                         </View>
                       ) : null}
                       {clientInstructions.courierNote ? (
@@ -747,6 +801,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
   },
+  collapsedNotesHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 5,
+    alignSelf: 'flex-start',
+  },
+  collapsedNotesHintText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#7C3AED',
+    letterSpacing: 0.2,
+  },
   collapsedActions: {
     flexDirection: 'row',
     gap: 8,
@@ -996,15 +1063,6 @@ const styles = StyleSheet.create({
     color: '#78350F',
     lineHeight: 18,
   },
-  driverNotesText: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#78350F',
-    lineHeight: 18,
-  },
-  driverNotesLabel: {
-    fontWeight: '600',
-  },
   callClientButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1042,6 +1100,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  serviceModeCard: {
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  serviceModeCardLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6D28D9',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  serviceModeCardValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4C1D95',
   },
   clientInstructionsCard: {
     backgroundColor: '#F5F3FF',

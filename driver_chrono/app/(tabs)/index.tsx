@@ -1196,6 +1196,7 @@ export default function Index() {
           isNavigationMinimized={isNavigationMinimized}
           onResumeNavigation={() => setIsNavigationMinimized(false)}
           lastEtaMinutes={lastEtaMinutes}
+          onExpandSheet={expandOrderBottomSheet}
           onCancelOrder={() => {
             setIsNavigationActive(false);
             orderSocketService.updateDeliveryStatus(currentOrder.id, 'cancelled', location);

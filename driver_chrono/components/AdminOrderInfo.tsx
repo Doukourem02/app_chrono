@@ -7,9 +7,42 @@ interface AdminOrderInfoProps {
   /** Commande créée depuis l’admin (client hors-ligne, saisie opérateur) */
   placedByAdmin?: boolean;
   isB2BOrder?: boolean;
+  /** Champ formulaire « Notes (optionnel) » (contexte course). */
+  operatorCourseNotes?: string;
+  /** Champ « Notes pour le livreur ». */
   driverNotes?: string;
   /** Commune / zone indiquée par l’opérateur quand le retrait n’a pas de GPS précis */
   approximatePickupZoneLabel?: string;
+}
+
+/** Notes générales de course saisies par l’opérateur (champ « Notes (optionnel) » du formulaire admin). */
+export function OperatorCourseNotesBlock({ operatorCourseNotes }: { operatorCourseNotes?: string }) {
+  const text = typeof operatorCourseNotes === 'string' ? operatorCourseNotes.trim() : '';
+  if (!text) return null;
+  return (
+    <View style={[styles.notesContainer, styles.notesContainerAmber]}>
+      <View style={styles.notesHeader}>
+        <Ionicons name="reader-outline" size={16} color="#B45309" />
+        <Text style={[styles.notesTitle, styles.notesTitleAmber]}>Notes commande (opérateur)</Text>
+      </View>
+      <Text style={styles.notesText}>{text}</Text>
+    </View>
+  );
+}
+
+/** Notes laissées par l’opérateur (admin) — réutilisable hors de la carte « commande admin » (ex. fiche commande en cours). */
+export function OperatorDriverNotesBlock({ driverNotes }: { driverNotes?: string }) {
+  const text = typeof driverNotes === 'string' ? driverNotes.trim() : '';
+  if (!text) return null;
+  return (
+    <View style={styles.notesContainer}>
+      <View style={styles.notesHeader}>
+        <Ionicons name="information-circle" size={16} color="#7C3AED" />
+        <Text style={styles.notesTitle}>Note pour le livreur</Text>
+      </View>
+      <Text style={styles.notesText}>{text}</Text>
+    </View>
+  );
 }
 
 /**
@@ -19,6 +52,7 @@ export const AdminOrderInfo: React.FC<AdminOrderInfoProps> = ({
   isPhoneOrder,
   placedByAdmin,
   isB2BOrder,
+  operatorCourseNotes,
   driverNotes,
   approximatePickupZoneLabel,
 }) => {
@@ -48,16 +82,8 @@ export const AdminOrderInfo: React.FC<AdminOrderInfoProps> = ({
         </View>
       </View>
 
-      {/* Notes pour le livreur */}
-      {driverNotes && (
-        <View style={styles.notesContainer}>
-          <View style={styles.notesHeader}>
-            <Ionicons name="information-circle" size={16} color="#7C3AED" />
-            <Text style={styles.notesTitle}>Note pour le livreur</Text>
-          </View>
-          <Text style={styles.notesText}>{driverNotes}</Text>
-        </View>
-      )}
+      <OperatorCourseNotesBlock operatorCourseNotes={operatorCourseNotes} />
+      <OperatorDriverNotesBlock driverNotes={driverNotes} />
 
       {approximatePickupZoneLabel ? (
         <View style={styles.zoneHint}>
@@ -150,6 +176,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#374151',
     lineHeight: 18,
+  },
+  notesContainerAmber: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+  },
+  notesTitleAmber: {
+    color: '#92400E',
   },
   infoMessage: {
     flexDirection: 'row',

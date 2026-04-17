@@ -3698,10 +3698,17 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       is_phone_order: isPhoneOrderBool,
       is_b2b_order: isB2BOrder === true,
     };
-    const dropoffDetailsMerged = {
+    const dropoffDetailsMerged: Record<string, unknown> = {
       ...(typeof dropoff.details === 'object' && dropoff.details ? dropoff.details : {}),
       phone: recipientPhoneInput,
     };
+    /** Champs formulaire admin « Notes (optionnel) » et « Notes pour le livreur » — dans le JSON dropoff pour la DB. */
+    if (typeof notes === 'string' && notes.trim()) {
+      dropoffDetailsMerged.operator_course_notes = notes.trim();
+    }
+    if (typeof driverNotes === 'string' && driverNotes.trim()) {
+      dropoffDetailsMerged.driver_notes = driverNotes.trim();
+    }
 
     const order = {
       id: orderId,
@@ -3756,8 +3763,11 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     if (isB2BOrder === true) {
       (order as any).is_b2b_order = true;
     }
-    if (driverNotes) {
-      (order as any).driver_notes = driverNotes;
+    if (typeof notes === 'string' && notes.trim()) {
+      (order as any).notes = notes.trim();
+    }
+    if (typeof driverNotes === 'string' && driverNotes.trim()) {
+      (order as any).driver_notes = driverNotes.trim();
     }
 
     // Sauvegarder la commande en base de données

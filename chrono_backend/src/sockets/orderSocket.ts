@@ -965,7 +965,15 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         }
 
         const clientProfile = await loadClientProfileForOrder(userId);
-        let initialPaymentStatus: 'pending' | 'delayed' = 'pending'; if (paymentMethodType === 'deferred') { initialPaymentStatus = 'delayed'; } const order: Order = {
+        let initialPaymentStatus: 'pending' | 'delayed' = 'pending'; if (paymentMethodType === 'deferred') { initialPaymentStatus = 'delayed'; }
+        const dropoffMerged = {
+          ...dropoff,
+          details: {
+            ...(typeof dropoff.details === 'object' && dropoff.details ? dropoff.details : {}),
+            ...(speedOptionId ? { speed_option_id: speedOptionId } : {}),
+          },
+        };
+        const order: Order = {
           id: providedOrderId || uuidv4(),
           user: {
             id: userId,
@@ -977,7 +985,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             phone: clientProfile.phone ?? userInfo?.phone,
           },
           pickup,
-          dropoff,
+          dropoff: dropoffMerged,
           recipient: recipient || (dropoff?.details?.phone ? { phone: dropoff.details.phone } : null),
           packageImages: packageImages || dropoff?.details?.photos || [],
           price,
@@ -985,7 +993,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           distance: Math.round(distance * 100) / 100,
           estimatedDuration,
           status: 'pending', createdAt: new Date(),
-        }; (order as any).payment_method_id = paymentMethodId || null;
+        };
+        if (speedOptionId) {
+          (order as any).speedOptionId = speedOptionId;
+        }
+        (order as any).payment_method_id = paymentMethodId || null;
         (order as any).payment_method_type = paymentMethodType;
         (order as any).payment_status = initialPaymentStatus;
         (order as any).payment_payer = paymentPayerType || 'client'; (order as any).is_partial_payment = isPartialPayment || false; (order as any).partial_amount = isPartialPayment && partialAmount ? partialAmount : null; (order as any).recipient_user_id = recipientUserId || null;

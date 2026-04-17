@@ -78,17 +78,14 @@ export default function MapPage() {
     thermalBag: boolean;
     courierNote: string;
     recipientMessage: string;
-  }>({ thermalBag: false, courierNote: "", recipientMessage: "" });
-
-  React.useEffect(() => {
-    if (deliverySpeedOptionId !== "scheduled") {
-      setScheduledDeliveryExtras({
-        thermalBag: false,
-        courierNote: "",
-        recipientMessage: "",
-      });
-    }
-  }, [deliverySpeedOptionId]);
+    /** Uniquement si mode « Programmée » — ex. à partir de 10 h */
+    scheduledSlotNote: string;
+  }>({
+    thermalBag: false,
+    courierNote: '',
+    recipientMessage: '',
+    scheduledSlotNote: '',
+  });
 
   const [mapStyle, setMapStyle] = React.useState<MapStyleType>('light');
   const setSelectedMethod = useShipmentStore((s) => s.setSelectedMethod);
@@ -1120,8 +1117,9 @@ export default function MapPage() {
     resetScheduledDeliveryExtras: () =>
       setScheduledDeliveryExtras({
         thermalBag: false,
-        courierNote: "",
-        recipientMessage: "",
+        courierNote: '',
+        recipientMessage: '',
+        scheduledSlotNote: '',
       }),
   });
 

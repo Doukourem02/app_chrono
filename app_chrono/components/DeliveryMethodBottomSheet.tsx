@@ -11,11 +11,8 @@ import {
   Dimensions,
   PanResponder,
   Alert,
-  Modal,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -53,16 +50,18 @@ interface DeliveryMethodBottomSheetProps {
   onBack: () => void;
   /** Remonte l’id d’option (express, pickup_service, …) pour create-order / serveur */
   onSpeedOptionChange?: (optionId: string | undefined) => void;
-  /** Options « livraison programmée » (sac isotherme, messages) — stockées dans dropoff.details côté commande */
+  /** Options course (isotherme, commentaires livreur/destinataire) — stockées dans dropoff.details ; l’isotherme s’applique à tout mode moto */
   scheduledDeliveryExtras?: {
     thermalBag: boolean;
     courierNote: string;
     recipientMessage: string;
+    scheduledSlotNote: string;
   };
   onScheduledDeliveryExtrasChange?: (extras: {
     thermalBag: boolean;
     courierNote: string;
     recipientMessage: string;
+    scheduledSlotNote: string;
   }) => void;
 }
 
@@ -176,6 +175,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
     thermalBag: false,
     courierNote: '',
     recipientMessage: '',
+    scheduledSlotNote: '',
   },
   onScheduledDeliveryExtrasChange,
 }) => {
@@ -184,29 +184,12 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
   ) as 'moto' | 'vehicule' | 'cargo';
 
   const [selectedSpeed, setSelectedSpeed] = useState<string>('express');
-  const [scheduledDetailsModalVisible, setScheduledDetailsModalVisible] = useState(false);
-  const [scheduledFormDraft, setScheduledFormDraft] = useState(scheduledDeliveryExtras);
   const dragHandleRef = useRef<View>(null);
-
-  useEffect(() => {
-    if (scheduledDetailsModalVisible) {
-      setScheduledFormDraft(scheduledDeliveryExtras);
-    }
-  }, [scheduledDetailsModalVisible, scheduledDeliveryExtras]);
 
   const selectedMethodData =
     deliveryMethods.find((m) => m.id === effectiveMethod) || deliveryMethods[0];
   
   const selectedSpeedOption = getDeliveryOptions(effectiveMethod).find(opt => opt.id === selectedSpeed);
-
-  const scheduledExtrasSummary = useMemo(() => {
-    const e = scheduledDeliveryExtras;
-    const parts: string[] = [];
-    if (e.thermalBag) parts.push('Sac isotherme');
-    if (e.courierNote.trim()) parts.push('Commentaire livreur');
-    if (e.recipientMessage.trim()) parts.push('Message destinataire');
-    return parts.length > 0 ? parts.join(' · ') : 'Appuyez pour renseigner les options';
-  }, [scheduledDeliveryExtras]);
 
   const legDistanceKm = useMemo(() => {
     if (!pickupCoords || !dropoffCoords) return null;
@@ -397,7 +380,67 @@ useEffect(() => {
             </TouchableOpacity>
           </View>
 
-      
+          {effectiveMethod === 'moto' && (
+            <View style={styles.thermalTopSection}>
+              <Text style={styles.thermalTopSectionTitle}>Option pour votre colis</Text>
+              <View style={styles.thermalTopRow}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.thermalTopRowTitle}>Maintien de température</Text>
+                  <Text style={styles.thermalTopRowHint}>Sac isotherme recommandé si le contenu doit rester au frais ou au chaud</Text>
+                </View>
+                <Switch
+                  value={scheduledDeliveryExtras.thermalBag}
+                  onValueChange={(v) => {
+                    Haptics.selectionAsync();
+                    onScheduledDeliveryExtrasChange?.({
+                      ...scheduledDeliveryExtras,
+                      thermalBag: v,
+                    });
+                  }}
+                  trackColor={{ false: '#D1D5DB', true: '#8B5CF6' }}
+                  thumbColor={scheduledDeliveryExtras.thermalBag ? '#FFFFFF' : '#F3F4F6'}
+                />
+              </View>
+            </View>
+          )}
+
+          {effectiveMethod === 'moto' && (
+            <View style={styles.courseMessagesSection}>
+              <Text style={styles.courseMessagesSectionTitle}>Messages (facultatif)</Text>
+              <Text style={styles.courseMessagesSectionLead}>
+                Indications pour le coursier et le destinataire — valables pour tous les modes (express, standard, programmée).
+              </Text>
+              <Text style={styles.courseFieldLabel}>Pour le coursier</Text>
+              <TextInput
+                style={styles.courseTextInput}
+                placeholder="Ex. manipuler avec précaution, code, étage…"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                value={scheduledDeliveryExtras.courierNote}
+                onChangeText={(t) =>
+                  onScheduledDeliveryExtrasChange?.({
+                    ...scheduledDeliveryExtras,
+                    courierNote: t,
+                  })
+                }
+              />
+              <Text style={styles.courseFieldLabel}>Pour le destinataire</Text>
+              <TextInput
+                style={styles.courseTextInput}
+                placeholder="Message à transmettre au destinataire"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                value={scheduledDeliveryExtras.recipientMessage}
+                onChangeText={(t) =>
+                  onScheduledDeliveryExtrasChange?.({
+                    ...scheduledDeliveryExtras,
+                    recipientMessage: t,
+                  })
+                }
+              />
+            </View>
+          )}
+
           <View style={styles.largeVehicleContainer}>
             <Image
               source={selectedMethodData.largeImage}
@@ -514,9 +557,6 @@ useEffect(() => {
                   onPress={() => {
                     Haptics.selectionAsync();
                     setSelectedSpeed(option.id);
-                    if (effectiveMethod === 'moto' && option.id === 'scheduled') {
-                      setScheduledDetailsModalVisible(true);
-                    }
                   }}
                   activeOpacity={0.7}
                 >
@@ -547,6 +587,28 @@ useEffect(() => {
                   </View>
                 </TouchableOpacity>
               ))}
+            </View>
+          )}
+
+          {effectiveMethod === 'moto' && selectedSpeed === 'scheduled' && (
+            <View style={styles.scheduledSlotSection}>
+              <Text style={styles.courseFieldLabel}>Créneau souhaité</Text>
+              <Text style={styles.scheduledSlotHint}>
+                À quelle heure ou plage souhaitez-vous la livraison ? (ex. à partir de 10h)
+              </Text>
+              <TextInput
+                style={styles.courseTextInput}
+                placeholder="Ex. entre 10h et 12h"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                value={scheduledDeliveryExtras.scheduledSlotNote}
+                onChangeText={(t) =>
+                  onScheduledDeliveryExtrasChange?.({
+                    ...scheduledDeliveryExtras,
+                    scheduledSlotNote: t,
+                  })
+                }
+              />
             </View>
           )}
 
@@ -609,94 +671,6 @@ useEffect(() => {
               </View>
             </>
           )}
-
-          {effectiveMethod === 'moto' && selectedSpeed === 'scheduled' && (
-            <TouchableOpacity
-              style={styles.scheduledExtrasRow}
-              onPress={() => setScheduledDetailsModalVisible(true)}
-              activeOpacity={0.7}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.scheduledExtrasTitle}>Options livraison programmée</Text>
-                <Text style={styles.scheduledExtrasHint} numberOfLines={2}>
-                  {scheduledExtrasSummary}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={22} color="#666" />
-            </TouchableOpacity>
-          )}
-
-          <Modal
-            visible={scheduledDetailsModalVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setScheduledDetailsModalVisible(false)}
-          >
-            <View style={styles.scheduledModalRoot}>
-              <Pressable
-                style={styles.scheduledModalBackdrop}
-                onPress={() => setScheduledDetailsModalVisible(false)}
-              />
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={styles.scheduledModalSheetWrap}
-              >
-              <View style={styles.scheduledModalSheet}>
-                <Text style={styles.scheduledModalTitle}>Livraison programmée</Text>
-                <View style={styles.scheduledModalSwitchRow}>
-                  <Text style={styles.additionalOptionText}>Sac de livraison isotherme</Text>
-                  <Switch
-                    value={scheduledFormDraft.thermalBag}
-                    onValueChange={(v) =>
-                      setScheduledFormDraft((d) => ({ ...d, thermalBag: v }))
-                    }
-                    trackColor={{ false: '#D1D5DB', true: '#8B5CF6' }}
-                    thumbColor={scheduledFormDraft.thermalBag ? '#FFFFFF' : '#F3F4F6'}
-                  />
-                </View>
-                <Text style={styles.scheduledFieldLabel}>Commentaire à l&apos;attention du livreur</Text>
-                <TextInput
-                  style={styles.scheduledTextInput}
-                  placeholder="Instructions de prise en charge, code, étage…"
-                  placeholderTextColor="#9CA3AF"
-                  multiline
-                  value={scheduledFormDraft.courierNote}
-                  onChangeText={(t) =>
-                    setScheduledFormDraft((d) => ({ ...d, courierNote: t }))
-                  }
-                />
-                <Text style={styles.scheduledFieldLabel}>Message pour le destinataire</Text>
-                <TextInput
-                  style={styles.scheduledTextInput}
-                  placeholder="Texte affiché ou transmis au destinataire"
-                  placeholderTextColor="#9CA3AF"
-                  multiline
-                  value={scheduledFormDraft.recipientMessage}
-                  onChangeText={(t) =>
-                    setScheduledFormDraft((d) => ({ ...d, recipientMessage: t }))
-                  }
-                />
-                <View style={styles.scheduledModalActions}>
-                  <TouchableOpacity
-                    style={styles.scheduledModalBtnSecondary}
-                    onPress={() => setScheduledDetailsModalVisible(false)}
-                  >
-                    <Text style={styles.scheduledModalBtnSecondaryText}>Annuler</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.scheduledModalBtnPrimary}
-                    onPress={() => {
-                      onScheduledDeliveryExtrasChange?.(scheduledFormDraft);
-                      setScheduledDetailsModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.scheduledModalBtnPrimaryText}>Enregistrer</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              </KeyboardAvoidingView>
-            </View>
-          </Modal>
 
           {/* Bouton de confirmation avec gradient */}
           <TouchableOpacity 
@@ -841,6 +815,82 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+  },
+  thermalTopSection: {
+    marginBottom: 16,
+    padding: 14,
+    backgroundColor: '#FAF5FF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  thermalTopSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6D28D9',
+    marginBottom: 10,
+  },
+  thermalTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  thermalTopRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111',
+    flex: 1,
+    paddingRight: 8,
+  },
+  thermalTopRowHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  courseMessagesSection: {
+    marginBottom: 18,
+  },
+  courseMessagesSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 6,
+  },
+  courseMessagesSectionLead: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 12,
+    lineHeight: 17,
+  },
+  courseFieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  courseTextInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#111',
+    minHeight: 72,
+    textAlignVertical: 'top',
+    marginBottom: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  scheduledSlotSection: {
+    marginBottom: 20,
+  },
+  scheduledSlotHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 8,
+    lineHeight: 17,
   },
   largeVehicleContainer: {
     alignItems: 'center',

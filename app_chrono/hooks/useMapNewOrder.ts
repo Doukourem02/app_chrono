@@ -44,11 +44,12 @@ interface UseMapNewOrderProps {
   setPaymentPartialInfo: (info: { isPartial?: boolean; partialAmount?: number }) => void;
   /** Option tarifaire (express, pickup_service, …) — alignée serveur */
   deliverySpeedOptionId?: string | undefined;
-  /** Extras « programmée » — envoyés dans dropoff.details si option = scheduled */
+  /** Extras course — dropoff.details (tous modes moto) */
   scheduledDeliveryExtras?: {
     thermalBag: boolean;
     courierNote: string;
     recipientMessage: string;
+    scheduledSlotNote: string;
   };
   resetScheduledDeliveryExtras?: () => void;
   /** Itinéraire Mapbox (km + durée) — enregistrement commande / prix */
@@ -144,8 +145,16 @@ export function useMapNewOrder({
           resetAfterDriverSearch();
         } catch {}
 
+        /** Extras (isotherme, commentaires, créneau si programmée) — pour tous les modes moto concernés. */
+        const hasSlot =
+          deliverySpeedOptionId === 'scheduled' &&
+          (scheduledDeliveryExtras?.scheduledSlotNote || '').trim();
         const scheduledExtras =
-          deliverySpeedOptionId === 'scheduled' && scheduledDeliveryExtras
+          scheduledDeliveryExtras &&
+          (scheduledDeliveryExtras.thermalBag ||
+            scheduledDeliveryExtras.courierNote.trim() ||
+            scheduledDeliveryExtras.recipientMessage.trim() ||
+            hasSlot)
             ? {
                 ...(scheduledDeliveryExtras.thermalBag ? { thermal_bag: true } : {}),
                 ...(scheduledDeliveryExtras.courierNote.trim()
@@ -153,6 +162,11 @@ export function useMapNewOrder({
                   : {}),
                 ...(scheduledDeliveryExtras.recipientMessage.trim()
                   ? { recipient_message: scheduledDeliveryExtras.recipientMessage.trim() }
+                  : {}),
+                ...(hasSlot
+                  ? {
+                      scheduled_window_note: (scheduledDeliveryExtras.scheduledSlotNote || '').trim(),
+                    }
                   : {}),
               }
             : {};

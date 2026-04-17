@@ -1,6 +1,42 @@
 import { create } from 'zustand';
 import { mapAdminOrderFlags } from '../utils/mapAdminOrderFlags';
 
+/** Notes opérateur : racine API (`driver_notes`) ou champ persisté dans `dropoff.details` après resync DB. */
+function resolveDriverNotes(order: Record<string, unknown> | null | undefined): string | undefined {
+  if (!order || typeof order !== 'object') return undefined;
+  const root = order.driver_notes ?? order.driverNotes;
+  if (typeof root === 'string' && root.trim()) return root.trim();
+  const drop = order.dropoff as Record<string, unknown> | undefined;
+  const details = drop?.details as Record<string, unknown> | undefined;
+  const fromDetails = details?.driver_notes;
+  if (typeof fromDetails === 'string' && fromDetails.trim()) return fromDetails.trim();
+  return undefined;
+}
+
+/** Client : express | standard | scheduled — racine ou `dropoff.details.speed_option_id`. */
+function resolveSpeedOptionId(order: Record<string, unknown> | null | undefined): string | undefined {
+  if (!order || typeof order !== 'object') return undefined;
+  const root = order.speedOptionId ?? order.speed_option_id;
+  if (typeof root === 'string' && root.trim()) return root.trim();
+  const drop = order.dropoff as Record<string, unknown> | undefined;
+  const details = drop?.details as Record<string, unknown> | undefined;
+  const sid = details?.speed_option_id ?? details?.speedOptionId;
+  if (typeof sid === 'string' && sid.trim()) return sid.trim();
+  return undefined;
+}
+
+/** Formulaire admin « Notes (optionnel) » — racine ou `dropoff.details.operator_course_notes` (persisté DB). */
+function resolveOperatorCourseNotes(order: Record<string, unknown> | null | undefined): string | undefined {
+  if (!order || typeof order !== 'object') return undefined;
+  const root = order.notes;
+  if (typeof root === 'string' && root.trim()) return root.trim();
+  const drop = order.dropoff as Record<string, unknown> | undefined;
+  const details = drop?.details as Record<string, unknown> | undefined;
+  const fromDetails = details?.operator_course_notes;
+  if (typeof fromDetails === 'string' && fromDetails.trim()) return fromDetails.trim();
+  return undefined;
+}
+
 const upsertOrderById = (orders: OrderRequest[], order: OrderRequest): OrderRequest[] => {
   const existingIndex = orders.findIndex((o) => o.id === order.id);
   if (existingIndex === -1) {
@@ -53,6 +89,12 @@ export interface OrderRequest {
       /** Options client (ex. livraison programmée) — même schéma que la commande en base */
       thermal_bag?: boolean;
       courier_note?: string;
+      /** Saisie admin — notes pour le livreur (persistées dans le JSON dropoff). */
+      driver_notes?: string;
+      /** Saisie admin — champ « Notes (optionnel) » sur la course. */
+      operator_course_notes?: string;
+      /** Créneau livraison programmée (texte libre client). */
+      scheduled_window_note?: string;
       recipient_message?: string;
     };
   };
@@ -73,6 +115,10 @@ export interface OrderRequest {
   acceptedAt?: Date;
   completedAt?: Date;
   notes?: string;
+  /** Option tarifaire client (express | standard | scheduled | …). */
+  speedOptionId?: string;
+  /** Notes générales saisies par l’opérateur (formulaire « Notes (optionnel) ») — affichées au livreur. */
+  operatorCourseNotes?: string;
   /** Case admin « téléphone / hors-ligne » (coords souvent approximatives) — pas toutes les commandes admin */
   isPhoneOrder?: boolean;
   /** Toute commande créée via l’admin — badge informatif ; navigation = identique au client si GPS OK */
@@ -152,11 +198,14 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
 
     const exists = state.activeOrders.some(o => o.id === order.id);
 
-    const flags = mapAdminOrderFlags(order as unknown as Record<string, unknown>);
+    const raw = order as unknown as Record<string, unknown>;
+    const flags = mapAdminOrderFlags(raw);
     const mappedOrder: OrderRequest = {
       ...order,
       ...flags,
-      driverNotes: (order as any).driver_notes ?? (order as any).driverNotes ?? undefined,
+      driverNotes: resolveDriverNotes(raw),
+      operatorCourseNotes: resolveOperatorCourseNotes(raw),
+      speedOptionId: resolveSpeedOptionId(raw),
     };
 
     if (exists) {
@@ -194,11 +243,14 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     const exists = state.pendingOrders.some(o => o.id === order.id);
     if (exists) return state;
     
-    const flags = mapAdminOrderFlags(order as unknown as Record<string, unknown>);
+    const raw = order as unknown as Record<string, unknown>;
+    const flags = mapAdminOrderFlags(raw);
     const mappedOrder: OrderRequest = {
       ...order,
       ...flags,
-      driverNotes: (order as any).driver_notes ?? (order as any).driverNotes ?? undefined,
+      driverNotes: resolveDriverNotes(raw),
+      operatorCourseNotes: resolveOperatorCourseNotes(raw),
+      speedOptionId: resolveSpeedOptionId(raw),
     };
 
     return {
@@ -209,7 +261,18 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
   updateOrder: (orderId, updates) => set((state) => {
     const applyPatch = (o: OrderRequest): OrderRequest => {
       const merged = { ...o, ...updates } as OrderRequest;
-      return { ...merged, ...mapAdminOrderFlags(merged as unknown as Record<string, unknown>) };
+      const flags = mapAdminOrderFlags(merged as unknown as Record<string, unknown>);
+      const raw = merged as unknown as Record<string, unknown>;
+      const dn = resolveDriverNotes(raw);
+      const oc = resolveOperatorCourseNotes(raw);
+      const sp = resolveSpeedOptionId(raw);
+      return {
+        ...merged,
+        ...flags,
+        ...(dn !== undefined ? { driverNotes: dn } : {}),
+        ...(oc !== undefined ? { operatorCourseNotes: oc } : {}),
+        ...(sp !== undefined ? { speedOptionId: sp } : {}),
+      };
     };
     const updatedActive = state.activeOrders.map((order) =>
       order.id === orderId ? applyPatch(order) : order

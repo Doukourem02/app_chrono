@@ -6,6 +6,8 @@ export type ClientOrderInstructions = {
   thermalBag: boolean;
   courierNote: string;
   recipientMessage: string;
+  /** Mode programmé — créneau indiqué par le client (ex. à partir de 10h) */
+  scheduledWindowNote: string;
 };
 
 export function parseClientOrderInstructions(
@@ -17,6 +19,10 @@ export function parseClientOrderInstructions(
     typeof details.courier_note === 'string' ? details.courier_note.trim() : '';
   const recipientMessage =
     typeof details.recipient_message === 'string' ? details.recipient_message.trim() : '';
-  if (!thermalBag && !courierNote && !recipientMessage) return null;
-  return { thermalBag, courierNote, recipientMessage };
+  const scheduledWindowNote =
+    typeof details.scheduled_window_note === 'string'
+      ? details.scheduled_window_note.trim()
+      : '';
+  if (!thermalBag && !courierNote && !recipientMessage && !scheduledWindowNote) return null;
+  return { thermalBag, courierNote, recipientMessage, scheduledWindowNote };
 }
