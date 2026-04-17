@@ -49,6 +49,12 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         void (async () => {
           try {
+            const { syncOrderLiveActivity } = await import("../services/orderLiveActivity");
+            await syncOrderLiveActivity(null);
+          } catch {
+            /* non bloquant */
+          }
+          try {
             const m = await import('../services/clientPushService');
             await m.unregisterClientPushNotifications();
           } catch {

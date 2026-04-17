@@ -12,6 +12,7 @@ interface DriverStatus {
   is_available?: boolean;
   current_latitude?: number;
   current_longitude?: number;
+  heading_degrees?: number;
   updated_at?: string;
   [key: string]: any;
 }
@@ -151,6 +152,10 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
       updatedDriver.current_longitude = parseFloat(current_longitude);
     }
 
+    if (headingParam != null) {
+      updatedDriver.heading_degrees = headingParam;
+    }
+
     realDriverStatuses.set(userId, updatedDriver);
 
     try {
@@ -180,6 +185,9 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
               current_latitude: updatedDriver.current_latitude,
               current_longitude: updatedDriver.current_longitude,
               updated_at: updatedDriver.updated_at,
+              ...(updatedDriver.heading_degrees != null && Number.isFinite(updatedDriver.heading_degrees)
+                ? { heading_degrees: updatedDriver.heading_degrees }
+                : {}),
             });
             if (process.env.DEBUG_SOCKETS === 'true') {
               logger.info(`[updateDriverStatus] Événement driver:online émis immédiatement pour ${maskUserId(userId)}`);
@@ -695,7 +703,10 @@ export const getOnlineDrivers = async (req: Request, res: Response): Promise<voi
             is_available: driverData.is_available || false,
             rating,
             total_deliveries: 0,
-            updated_at: driverData.updated_at || new Date().toISOString()
+            updated_at: driverData.updated_at || new Date().toISOString(),
+            ...(driverData.heading_degrees != null && Number.isFinite(driverData.heading_degrees)
+              ? { heading_degrees: driverData.heading_degrees }
+              : {}),
           };
           
           allDrivers.push(driverProfile);

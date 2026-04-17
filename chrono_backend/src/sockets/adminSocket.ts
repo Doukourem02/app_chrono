@@ -71,6 +71,9 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
             current_latitude: status.current_latitude,
             current_longitude: status.current_longitude,
             updated_at: status.updated_at,
+            ...(status.heading_degrees != null && Number.isFinite(status.heading_degrees)
+              ? { heading_degrees: status.heading_degrees }
+              : {}),
           }));
 
         if (DEBUG) {
@@ -182,6 +185,7 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
         current_latitude: status.current_latitude,
         current_longitude: status.current_longitude,
         updated_at: status.updated_at,
+        heading_degrees: status.heading_degrees,
       });
 
       const lastStatus = lastDriverStatuses.get(userId);
@@ -196,6 +200,9 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
           current_latitude: status.current_latitude,
           current_longitude: status.current_longitude,
           updated_at: status.updated_at,
+          ...(status.heading_degrees != null && Number.isFinite(status.heading_degrees)
+            ? { heading_degrees: status.heading_degrees }
+            : {}),
         });
       }
 
@@ -209,6 +216,9 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
           current_latitude: status.current_latitude,
           current_longitude: status.current_longitude,
           updated_at: status.updated_at,
+          ...(status.heading_degrees != null && Number.isFinite(status.heading_degrees)
+            ? { heading_degrees: status.heading_degrees }
+            : {}),
         });
       }
 
@@ -220,19 +230,23 @@ export const setupAdminSocket = (io: SocketIOServer): void => {
         });
       }
 
-      // Détecter si la position a changé (pour les drivers en ligne)
+      // Détecter si la position ou le cap a changé (pour les drivers en ligne)
       if (
         status.is_online === true &&
         lastStatus &&
         lastStatus.is_online === true &&
         (lastStatus.current_latitude !== status.current_latitude ||
-          lastStatus.current_longitude !== status.current_longitude)
+          lastStatus.current_longitude !== status.current_longitude ||
+          lastStatus.heading_degrees !== status.heading_degrees)
       ) {
         broadcastToAdmins('driver:position:update', {
           userId,
           current_latitude: status.current_latitude,
           current_longitude: status.current_longitude,
           updated_at: status.updated_at,
+          ...(status.heading_degrees != null && Number.isFinite(status.heading_degrees)
+            ? { heading_degrees: status.heading_degrees }
+            : {}),
         });
       }
     }

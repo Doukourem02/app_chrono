@@ -21,6 +21,32 @@ const TRACKING_STATUSES: OrderStatus[] = [
   "delivering",
 ];
 
+/** Même logique que le hook de sync : statut API parfois mal câblé (casse, tirets). */
+export function shouldSyncLiveActivityForOrder(order: OrderRequest): boolean {
+  const n = normalizeOrderStatus(order.status);
+  return n != null && TRACKING_STATUSES.includes(n);
+}
+
+/** Normalise pour comparaison avec les statuts du store / API. */
+function normalizeOrderStatus(raw: unknown): OrderStatus | null {
+  if (raw == null) return null;
+  let s = String(raw).trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+  if (s === "inprogress") s = "in_progress";
+  if (s === "pickedup") s = "picked_up";
+  const allowed: OrderStatus[] = [
+    "pending",
+    "accepted",
+    "enroute",
+    "in_progress",
+    "picked_up",
+    "delivering",
+    "completed",
+    "declined",
+    "cancelled",
+  ];
+  return (allowed as string[]).includes(s) ? (s as OrderStatus) : null;
+}
+
 let factory: LiveActivityFactory<OrderTrackingLiveProps> | null = null;
 
 let active: {
@@ -52,7 +78,8 @@ function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
 }
 
 function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
-  if (order.status === "pending") {
+  const status = normalizeOrderStatus(order.status) ?? order.status;
+  if (status === "pending") {
     const eta =
       typeof order.estimatedDuration === "string" && order.estimatedDuration.trim()
         ? order.estimatedDuration.trim()
@@ -108,7 +135,7 @@ async function endAllLiveActivities(): Promise<void> {
 async function syncOrderLiveActivityImpl(order: OrderRequest | null): Promise<void> {
   if (!supportsLiveActivitiesIOS()) return;
 
-  const shouldTrack = order && TRACKING_STATUSES.includes(order.status);
+  const shouldTrack = order && shouldSyncLiveActivityForOrder(order);
 
   if (!shouldTrack) {
     await endAllLiveActivities();
@@ -133,11 +160,17 @@ async function syncOrderLiveActivityImpl(order: OrderRequest | null): Promise<vo
     await endAllLiveActivities();
     const live = f.start(props, url);
     active = { orderId: order!.id, live };
+    if (__DEV__) {
+      logger.info("[orderLiveActivity] Live Activity démarrée", "orderLiveActivity", {
+        orderId: order!.id,
+        status: order!.status,
+      });
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     /** ActivityKit refuse `start` si Live Activities désactivées pour Krono (Réglages) ou mode basse conso. */
     logger.warn(
-      "[orderLiveActivity] sync échouée — vérifier Réglages → Krono → Live Activities, et que l’app n’est pas une vieille build sans extension ExpoWidgets.",
+      "[orderLiveActivity] start/update ActivityKit a échoué (réglages peuvent être OK) — build iOS avec extension ExpoWidgets, iOS 16.2+, ou limite ActivityKit.",
       "orderLiveActivity",
       { orderId: order?.id, status: order?.status, errorMessage: msg, error: e }
     );

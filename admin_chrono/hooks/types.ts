@@ -4,6 +4,8 @@ export interface OnlineDriver {
   is_available: boolean
   current_latitude?: number
   current_longitude?: number
+  /** Cap GPS (0–360°), aligné suivi public / order:driver:location */
+  heading_degrees?: number
   updated_at?: string
   vehicle_type?: 'moto' | 'vehicule' | 'cargo'
 }

@@ -1852,12 +1852,19 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         const existing = realDriverStatuses.get(driverId);
         if (existing && existing.is_online === true) {
           const updatedAt = new Date().toISOString();
-          realDriverStatuses.set(driverId, {
+          const headingOk =
+            loc.heading != null &&
+            Number.isFinite(loc.heading) &&
+            loc.heading >= 0 &&
+            loc.heading <= 360;
+          const nextStatus = {
             ...existing,
             current_latitude: loc.lat,
             current_longitude: loc.lng,
             updated_at: updatedAt,
-          });
+            ...(headingOk ? { heading_degrees: loc.heading } : {}),
+          };
+          realDriverStatuses.set(driverId, nextStatus);
           // Même flux que le client (driver:location:update) : les admins ne doivent pas attendre
           // le tick 2s de adminSocket pour voir le livreur bouger sur le tracking.
           broadcastDriverStatusToAdmins(io, 'driver:position:update', {
@@ -1865,6 +1872,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             current_latitude: loc.lat,
             current_longitude: loc.lng,
             updated_at: updatedAt,
+            ...(headingOk ? { heading_degrees: loc.heading } : {}),
           });
         }
 

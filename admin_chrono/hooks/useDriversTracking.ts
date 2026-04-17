@@ -61,6 +61,10 @@ export function useDriversTracking(isSocketConnected: boolean) {
             current_longitude: driver.current_longitude,
             // L'API ne retourne pas updated_at, on utilise la date actuelle comme approximation
             updated_at: new Date().toISOString(),
+            ...(typeof (driver as { heading_degrees?: number }).heading_degrees === 'number' &&
+            Number.isFinite((driver as { heading_degrees?: number }).heading_degrees)
+              ? { heading_degrees: (driver as { heading_degrees?: number }).heading_degrees }
+              : {}),
           }
 
           if (isDriverValid(onlineDriver)) {
@@ -137,10 +141,21 @@ export function useDriversTracking(isSocketConnected: boolean) {
     const unsubscribeDriverOnline = adminSocketService.on('driver:online', (data: unknown) => {
       const typedData = data as OnlineDriver
       if (typedData.is_online === true) {
-        updateDriver(typedData)
-        const hasCoords = typeof typedData.current_latitude === 'number' && typeof typedData.current_longitude === 'number'
+        const prev = driversRef.current.get(typedData.userId)
+        updateDriver({
+          userId: typedData.userId,
+          is_online: true,
+          is_available: typedData.is_available,
+          current_latitude: typedData.current_latitude ?? prev?.current_latitude,
+          current_longitude: typedData.current_longitude ?? prev?.current_longitude,
+          updated_at: typedData.updated_at ?? prev?.updated_at ?? new Date().toISOString(),
+          heading_degrees: typedData.heading_degrees ?? prev?.heading_degrees,
+          vehicle_type: typedData.vehicle_type ?? prev?.vehicle_type,
+        })
+        const hasCoords =
+          typeof (typedData.current_latitude ?? prev?.current_latitude) === 'number' &&
+          typeof (typedData.current_longitude ?? prev?.current_longitude) === 'number'
         if (!hasCoords) {
-          // Recharger la liste complète pour récupérer la dernière position connue
           loadDriversFromAPI()
         }
       } else {
@@ -159,8 +174,9 @@ export function useDriversTracking(isSocketConnected: boolean) {
         current_latitude?: number
         current_longitude?: number
         updated_at?: string
+        heading_degrees?: number
       }
-      
+
       const currentDriver = driversRef.current.get(typedData.userId)
       const hasCoords =
         typeof typedData.current_latitude === 'number' &&
@@ -176,6 +192,9 @@ export function useDriversTracking(isSocketConnected: boolean) {
           current_latitude: typedData.current_latitude,
           current_longitude: typedData.current_longitude,
           updated_at: typedData.updated_at,
+          ...(typeof typedData.heading_degrees === 'number' && Number.isFinite(typedData.heading_degrees)
+            ? { heading_degrees: typedData.heading_degrees }
+            : {}),
         })
       } else {
         // Ne pas inventer un livreur « en ligne » uniquement à partir d’une position :

@@ -1,27 +1,18 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
-import { syncOrderLiveActivity } from "../services/orderLiveActivity";
+import { AppState, Platform } from "react-native";
+import { shouldSyncLiveActivityForOrder, syncOrderLiveActivity } from "../services/orderLiveActivity";
 import type { OrderRequest } from "../store/useOrderStore";
 import { useOrderStore } from "../store/useOrderStore";
-
-const TRACKING = new Set<OrderRequest["status"]>([
-  "pending",
-  "accepted",
-  "enroute",
-  "in_progress",
-  "picked_up",
-  "delivering",
-]);
 
 function pickTrackedOrder(
   orders: OrderRequest[],
   selectedOrderId: string | null
 ): OrderRequest | null {
   if (selectedOrderId) {
-    const o = orders.find((x) => x.id === selectedOrderId && TRACKING.has(x.status));
+    const o = orders.find((x) => x.id === selectedOrderId && shouldSyncLiveActivityForOrder(x));
     if (o) return o;
   }
-  return orders.find((o) => TRACKING.has(o.status)) ?? null;
+  return orders.find((o) => shouldSyncLiveActivityForOrder(o)) ?? null;
 }
 
 /**
@@ -38,11 +29,15 @@ export function useOrderLiveActivitySync() {
     void syncOrderLiveActivity(order);
   }, [activeOrders, selectedOrderId]);
 
-  /** À la déconnexion, le bridge disparaît : terminer les Live Activities sinon elles restent « fantômes ». */
+  /** Au retour premier plan : une tentative ratée ou une activité fermée peut être relancée. */
   useEffect(() => {
     if (Platform.OS !== "ios") return;
-    return () => {
-      void syncOrderLiveActivity(null);
-    };
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next !== "active") return;
+      const { activeOrders: list, selectedOrderId: sel } = useOrderStore.getState();
+      const order = pickTrackedOrder(list, sel);
+      void syncOrderLiveActivity(order);
+    });
+    return () => sub.remove();
   }, []);
 }

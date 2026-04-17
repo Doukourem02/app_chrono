@@ -9,6 +9,8 @@ import { fetchMapboxDirections } from '@/utils/mapboxDirections'
 import { extractMapboxTrafficData, type TrafficData } from '@/utils/trafficUtils'
 import { calculateDriverOffsets } from '@/utils/markerOffset'
 import { useInterpolateLngLat } from '@/hooks/useInterpolateLngLat'
+import { bearingDegrees, distanceMeters } from '@/utils/geoBearing'
+import { buildDriverMarkerShell, trackDriverIconUrl } from '@/utils/trackDriverMarker'
 import { logger } from '@/utils/logger'
 import { searchOverpassPoi, type OverpassPoiResult } from '@/utils/overpassPoiSearch'
 import { searchCuratedPoi } from '@/utils/poiAbidjan'
@@ -182,6 +184,7 @@ interface MapboxTrackingMapProps {
     is_available: boolean
     current_latitude?: number
     current_longitude?: number
+    heading_degrees?: number
     updated_at?: string
     vehicle_type?: 'moto' | 'vehicule' | 'cargo'
   }>
@@ -201,6 +204,9 @@ export default function MapboxTrackingMap({
   const markersRef = useRef<import('mapbox-gl').Marker[]>([])
   /** Marqueur du livreur de la livraison sélectionnée — mis à jour par interpolation (pas recréé à chaque GPS). */
   const selectedDriverMarkerRef = useRef<import('mapbox-gl').Marker | null>(null)
+  const selectedDriverRotateRef = useRef<((deg: number) => void) | null>(null)
+  const prevRawDriverForBearingRef = useRef<{ lat: number; lng: number } | null>(null)
+  const lastArrowRotationRef = useRef(0)
   const lastSelectedDeliveryKeyRef = useRef<string>('')
   /** Retrait / livraison — indépendant des positions GPS des livreurs */
   const routeEndpointMarkersRef = useRef<import('mapbox-gl').Marker[]>([])
@@ -254,6 +260,33 @@ export default function MapboxTrackingMap({
   }, [assignedDriver])
 
   currentVehiclePositionRef.current = currentVehiclePosition
+
+  const headingFromDriver =
+    assignedDriver?.heading_degrees != null &&
+    Number.isFinite(assignedDriver.heading_degrees) &&
+    assignedDriver.heading_degrees >= 0 &&
+    assignedDriver.heading_degrees <= 360
+      ? assignedDriver.heading_degrees
+      : null
+
+  // Orientation de la flèche (même logique que PublicTrackMap : cap GPS ou bearing entre deux points).
+  useEffect(() => {
+    const setRot = selectedDriverRotateRef.current
+    if (!setRot || !currentVehiclePosition) return
+
+    let rot = lastArrowRotationRef.current
+    if (headingFromDriver != null) {
+      rot = headingFromDriver
+    } else {
+      const prev = prevRawDriverForBearingRef.current
+      if (prev && distanceMeters(prev, currentVehiclePosition) > 4) {
+        rot = bearingDegrees(prev, currentVehiclePosition)
+      }
+    }
+    lastArrowRotationRef.current = rot
+    prevRawDriverForBearingRef.current = currentVehiclePosition
+    setRot(rot)
+  }, [currentVehiclePosition, headingFromDriver])
 
   // Même logique fluide que le suivi public (PublicTrackMap) : interpolation entre deux points GPS.
   useInterpolateLngLat(
@@ -982,6 +1015,9 @@ export default function MapboxTrackingMap({
         /* ignore */
       }
       selectedDriverMarkerRef.current = null
+      selectedDriverRotateRef.current = null
+      prevRawDriverForBearingRef.current = null
+      lastArrowRotationRef.current = 0
     }
 
     markersRef.current.forEach((m) => m.remove())
@@ -1013,6 +1049,9 @@ export default function MapboxTrackingMap({
         /* ignore */
       }
       selectedDriverMarkerRef.current = null
+      selectedDriverRotateRef.current = null
+      prevRawDriverForBearingRef.current = null
+      lastArrowRotationRef.current = 0
     }
 
     onlineDrivers.forEach((driver) => {
@@ -1038,21 +1077,27 @@ export default function MapboxTrackingMap({
     const p = currentVehiclePositionRef.current
     if (!p) return
 
-    const el = document.createElement('div')
-    el.style.width = '28px'
-    el.style.height = '28px'
-    el.style.borderRadius = '50%'
-    el.style.backgroundColor = '#C4B5FD'
-    el.style.border = '2px solid white'
-    el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)'
-    el.title = 'Livreur (suivi temps réel)'
-    selectedDriverMarkerRef.current = new mapboxgl.Marker(el).setLngLat([p.lng, p.lat]).addTo(map)
+    const { element, setRotation } = buildDriverMarkerShell(trackDriverIconUrl())
+    selectedDriverRotateRef.current = setRotation
+    const h = assignedDriver?.heading_degrees
+    let initialRot = 0
+    if (h != null && Number.isFinite(h) && h >= 0 && h <= 360) {
+      initialRot = h
+    }
+    setRotation(initialRot)
+    lastArrowRotationRef.current = initialRot
+    prevRawDriverForBearingRef.current = p
+
+    selectedDriverMarkerRef.current = new mapboxgl.Marker({ element, anchor: 'center' })
+      .setLngLat([p.lng, p.lat])
+      .addTo(map)
   }, [
     isLoaded,
     selectedDelivery?.id,
     selectedDelivery?.driverId,
     routePathFallback.length,
     assignedDriver?.is_online,
+    assignedDriver?.heading_degrees,
     currentVehiclePosition?.lat,
     currentVehiclePosition?.lng,
   ])
