@@ -11,6 +11,7 @@ import {
   reportSocketIssue,
 } from '../utils/sentry';
 import { createOrderRecord } from './orderApi';
+import type { PaymentMethodType } from './paymentApi';
 import { userApiService } from './userApiService';
 import { soundService } from './soundService';
 import { UserFriendlyError } from '../utils/userFriendlyError';
@@ -337,6 +338,23 @@ class UserOrderSocketService {
     this.listenersSetup = true;
   }
 
+  /**
+   * Annulation côté serveur : le backend n’utilise pas le même nom d’événement partout.
+   * - `order-cancelled` : flux orderSocket (timeout livreurs, aucun dispo, etc.)
+   * - `order:cancelled` : cancel HTTP, admin, et autres chemins (voir deliveryController, adminController)
+   * Sans écouter les deux, le store peut rester en `pending` → Dynamic Island bloqué sur « recherche ».
+   */
+  private handleUserOrderCancelled = (data: { orderId?: string; reason?: string }) => {
+    logger.info('Commande annulée (socket)', 'userOrderSocketService', data);
+    try {
+      if (data?.orderId) {
+        useOrderStore.getState().updateOrderStatus(data.orderId, 'cancelled');
+      }
+    } catch (err) {
+      logger.warn('Error handling order cancelled event', 'userOrderSocketService', err);
+    }
+  };
+
   // Méthode séparée pour installer uniquement les listeners d'événements (pas connect/disconnect)
   private installEventListeners(userId: string) {
     if (!this.socket) return;
@@ -607,17 +625,8 @@ class UserOrderSocketService {
     });
 
     // Autres listeners...
-    this.socket.on('order-cancelled', (data) => {
-      logger.info('Commande annulée', 'userOrderSocketService', data);
-      try {
-        if (data?.orderId) {
-          const store = useOrderStore.getState();
-          store.updateOrderStatus(data.orderId, 'cancelled');
-        }
-      } catch (err) {
-        logger.warn('Error handling order-cancelled', 'userOrderSocketService', err);
-      }
-    });
+    this.socket.on('order-cancelled', this.handleUserOrderCancelled);
+    this.socket.on('order:cancelled', this.handleUserOrderCancelled);
 
     this.socket.on('order-error', (data) => {
       logger.warn('Erreur commande', 'userOrderSocketService', data);
@@ -757,6 +766,7 @@ class UserOrderSocketService {
     this.socket.removeAllListeners('order-accepted');
     this.socket.removeAllListeners('order-created');
     this.socket.removeAllListeners('order-cancelled');
+    this.socket.removeAllListeners('order:cancelled');
     this.socket.removeAllListeners('order-error');
     this.socket.removeAllListeners('no-drivers-available');
     this.socket.removeAllListeners('order:status:update');
@@ -784,6 +794,7 @@ class UserOrderSocketService {
         this.socket.removeAllListeners('order-accepted');
         this.socket.removeAllListeners('order-created');
         this.socket.removeAllListeners('order-cancelled');
+        this.socket.removeAllListeners('order:cancelled');
         this.socket.removeAllListeners('order-error');
         this.socket.removeAllListeners('no-drivers-available');
         this.socket.removeAllListeners('order:status:update');
@@ -931,7 +942,7 @@ class UserOrderSocketService {
     };
     packageImages?: string[];
     // Informations de paiement
-    paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred';
+    paymentMethodType?: PaymentMethodType;
     paymentPhone?: string;
     estimatedPrice?: number;
   }): Promise<boolean> {

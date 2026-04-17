@@ -56,6 +56,9 @@ function toRadians(deg: number) {
   return deg * (Math.PI / 180);
 }
 
+/** Distance minimale envoyée à `/api/orders/record` (évite 400 si points identiques ou arrondi à 0). */
+export const MIN_ORDER_DISTANCE_KM = 0.01;
+
 export function getDistanceInKm(
   start: { latitude: number; longitude: number },
   end: { latitude: number; longitude: number },
@@ -231,12 +234,16 @@ export async function createOrderRecord(options: {
   // negatives where the client cannot read `profiles` but the server can
   // create the missing profile from `auth.users`.
   const fallbackKm = getDistanceInKm(options.pickup.coordinates, options.dropoff.coordinates);
-  const distanceKm =
+  const rawKm =
     options.routeDistanceKm != null &&
     Number.isFinite(options.routeDistanceKm) &&
     options.routeDistanceKm > 0
-      ? Math.round(options.routeDistanceKm * 100) / 100
+      ? options.routeDistanceKm
       : fallbackKm;
+  const roundedKm =
+    Number.isFinite(rawKm) && rawKm > 0 ? Math.round(rawKm * 100) / 100 : 0;
+  const distanceKm =
+    roundedKm > 0 ? Math.max(MIN_ORDER_DISTANCE_KM, roundedKm) : MIN_ORDER_DISTANCE_KM;
 
   const priceCfa = computeOrderPriceCfa(distanceKm, options.method, options.speedOptionId);
 

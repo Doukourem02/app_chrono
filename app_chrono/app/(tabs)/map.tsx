@@ -31,7 +31,10 @@ import { useOrderStore } from "../../store/useOrderStore";
 import { usePaymentErrorStore } from "../../store/usePaymentErrorStore";
 import { usePaymentStore } from "../../store/usePaymentStore";
 import { useRatingStore } from "../../store/useRatingStore";
-import { useSavedAddressesStore } from "../../store/useSavedAddressesStore";
+import {
+  useSavedAddressesStore,
+  type SavedClientAddress,
+} from "../../store/useSavedAddressesStore";
 import { useShipmentStore } from "../../store/useShipmentStore";
 import { logger } from "../../utils/logger";
 import type { RouteMetricsSource } from "../../utils/routePricingLabels";
@@ -52,6 +55,16 @@ type Coordinates = {
   latitude: number;
   longitude: number;
 };
+
+/** Libellé exact d’une adresse enregistrée (ex. « Home ») — même logique que MapboxAddressAutocomplete.resolveSavedLabelIfExact */
+function findSavedAddressByLabel(
+  text: string,
+  list: SavedClientAddress[],
+): SavedClientAddress | null {
+  const q = text.trim().toLowerCase();
+  if (!q) return null;
+  return list.find((a) => a.label.trim().toLowerCase() === q) ?? null;
+}
 
 const MAP_STYLES = ['standard', 'light', 'dark', 'streets'] as const;
 type MapStyleType = (typeof MAP_STYLES)[number];
@@ -86,6 +99,8 @@ export default function MapPage() {
   const setDeliveryRoutingAddress = useShipmentStore(
     (s) => s.setDeliveryRoutingAddress
   );
+  const pickupRoutingAddress = useShipmentStore((s) => s.pickupRoutingAddress);
+  const deliveryRoutingAddress = useShipmentStore((s) => s.deliveryRoutingAddress);
   const defaultSavedAddressId = useSavedAddressesStore((s) => s.defaultAddressId);
   const rawSavedAddresses = useSavedAddressesStore((s) => s.addresses);
   const savedAddresses = useMemo(() => {
@@ -994,6 +1009,60 @@ export default function MapPage() {
   }, [pickupCoords, dropoffCoords, selectedMethod, routeSnapshot]);
 
   const handleConfirm = async () => {
+    // Les libellés enregistrés ne sont appliqués qu’après blur (délai dans l’autocomplete) :
+    // l’utilisateur peut appuyer sur « Choix méthode » avant que les coords existent → pas d’itinéraire / distance 0.
+    let resolvedPickup = pickupCoords;
+    let resolvedDropoff = dropoffCoords;
+
+    const pickHit =
+      !resolvedPickup && pickupLocation.trim()
+        ? findSavedAddressByLabel(pickupLocation, savedAddresses)
+        : null;
+    if (
+      pickHit &&
+      Number.isFinite(pickHit.latitude) &&
+      Number.isFinite(pickHit.longitude)
+    ) {
+      await handlePickupSelected({
+        description: pickHit.label.trim(),
+        coords: { latitude: pickHit.latitude, longitude: pickHit.longitude },
+        routingAddress: pickHit.addressLine,
+      });
+      resolvedPickup = {
+        latitude: pickHit.latitude,
+        longitude: pickHit.longitude,
+      };
+    }
+
+    const dropHit =
+      !resolvedDropoff && deliveryLocation.trim()
+        ? findSavedAddressByLabel(deliveryLocation, savedAddresses)
+        : null;
+    if (
+      dropHit &&
+      Number.isFinite(dropHit.latitude) &&
+      Number.isFinite(dropHit.longitude)
+    ) {
+      await handleDeliverySelected({
+        description: dropHit.label.trim(),
+        coords: { latitude: dropHit.latitude, longitude: dropHit.longitude },
+        routingAddress: dropHit.addressLine,
+      });
+      resolvedDropoff = {
+        latitude: dropHit.latitude,
+        longitude: dropHit.longitude,
+      };
+    }
+
+    if (!resolvedPickup || !resolvedDropoff) {
+      Alert.alert(
+        "Itinéraire impossible",
+        "Les deux adresses doivent être placées sur la carte. Pour une adresse enregistrée, tapez son nom (ex. Home) puis attendez la ligne violette, ou choisissez une suggestion dans la liste.",
+      );
+      return;
+    }
+
+    fetchRoute(resolvedPickup, resolvedDropoff);
     handleShowDeliveryMethod();
   };
 
@@ -1364,6 +1433,8 @@ export default function MapPage() {
                 onConfirm={handleConfirm}
                 onAddressInputFocus={expandForAddressInput}
                 onAddressInputBlur={restoreAfterAddressInput}
+                pickupAddressDetail={pickupRoutingAddress}
+                deliveryAddressDetail={deliveryRoutingAddress}
               />
             )}
 

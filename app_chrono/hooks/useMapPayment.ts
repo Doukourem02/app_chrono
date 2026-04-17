@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useOrderStore } from '../store/useOrderStore';
+import type { PaymentMethodType } from '../services/paymentApi';
 import { logger } from '../utils/logger';
 
 interface UseMapPaymentProps {
@@ -10,9 +11,8 @@ interface UseMapPaymentProps {
 export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps) {
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
   const [paymentPayerType, setPaymentPayerType] = useState<'client' | 'recipient'>('client');
-  const [selectedPaymentMethodType, setSelectedPaymentMethodType] = useState<
-    'orange_money' | 'wave' | 'cash' | 'deferred' | null
-  >(null);
+  const [selectedPaymentMethodType, setSelectedPaymentMethodType] =
+    useState<PaymentMethodType | null>(null);
   const [recipientInfo, setRecipientInfo] = useState<{
     userId?: string;
     phone?: string;
@@ -94,10 +94,11 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
       return;
     }
 
-    // Afficher le PaymentBottomSheet pour Orange Money, Wave, ou si aucune méthode n'est sélectionnée
+    // Afficher le PaymentBottomSheet pour mobile money, ou si aucune méthode n'est sélectionnée
     if (
       selectedPaymentMethodType === 'orange_money' ||
       selectedPaymentMethodType === 'wave' ||
+      selectedPaymentMethodType === 'mtn_money' ||
       !selectedPaymentMethodType
     ) {
       if (__DEV__) {

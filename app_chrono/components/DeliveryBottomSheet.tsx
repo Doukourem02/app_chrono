@@ -40,6 +40,12 @@ interface DeliveryBottomSheetProps {
   onAddressInputFocus?: () => void;
   /** Repasse à la hauteur « demi-feuille » quand l’utilisateur quitte le champ. */
   onAddressInputBlur?: () => void;
+  /**
+   * Adresse complète liée au libellé court (ex. adresse enregistrée « Home » → rue complète).
+   * Affichée sous le récap pour montrer ce que la carte / la commande utilisent réellement.
+   */
+  pickupAddressDetail?: string | null;
+  deliveryAddressDetail?: string | null;
 }
 
 const deliveryMethods = [
@@ -67,6 +73,8 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   onConfirm,
   onAddressInputFocus,
   onAddressInputBlur,
+  pickupAddressDetail = null,
+  deliveryAddressDetail = null,
 }) => {
   const { createShipment } = useShipmentStore();
   const insets = useSafeAreaInsets();
@@ -238,9 +246,26 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
           onPress={onToggle} 
           activeOpacity={0.8}
         >
-          <Text style={styles.peekText} numberOfLines={1}>
-            {pickupLocation ? `De: ${pickupLocation}` : 'De: Ma position'} → {deliveryLocation ? `À: ${deliveryLocation}` : 'Choisissez une destination'}
-          </Text>
+          <View>
+            <Text style={styles.peekText} numberOfLines={1}>
+              {pickupLocation ? `De: ${pickupLocation}` : 'De: Ma position'} → {deliveryLocation ? `À: ${deliveryLocation}` : 'Choisissez une destination'}
+            </Text>
+            {(() => {
+              const p = pickupAddressDetail?.trim();
+              const d = deliveryAddressDetail?.trim();
+              const pShow = Boolean(p && p !== pickupLocation.trim());
+              const dShow = Boolean(d && d !== deliveryLocation.trim());
+              if (!pShow && !dShow) return null;
+              const leftSeg = pShow && p ? p : (pickupLocation ? pickupLocation : 'Ma position');
+              const rightSeg = dShow && d ? d : deliveryLocation;
+              if (!rightSeg) return null;
+              return (
+                <Text style={styles.peekDetail} numberOfLines={2}>
+                  {leftSeg} → {rightSeg}
+                </Text>
+              );
+            })()}
+          </View>
         </TouchableOpacity>
       )}
     </Animated.View>
@@ -379,6 +404,12 @@ const styles = StyleSheet.create({
   peekText: {
     fontSize: 14,
     color: '#333',
+  },
+  peekDetail: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    lineHeight: 16,
   },
   tripInfo: {
     backgroundColor: '#F8FAFC',

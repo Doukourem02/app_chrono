@@ -4,6 +4,13 @@ import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
 import type { OrderTrackingLiveProps } from "../widgets/orderTrackingLiveActivity";
 
+const END_PROPS: OrderTrackingLiveProps = {
+  etaLabel: "—",
+  vehicleLabel: "Course terminée",
+  plateLabel: "",
+  isPending: false,
+};
+
 /** Inclut `pending` pour que l’utilisateur voie l’activité dès la commande créée (avant acceptation chauffeur). */
 const TRACKING_STATUSES: OrderStatus[] = [
   "pending",
@@ -43,11 +50,13 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
     const eta =
       typeof order.estimatedDuration === "string" && order.estimatedDuration.trim()
         ? order.estimatedDuration.trim()
-        : "—";
+        : "";
     return {
-      etaLabel: eta,
-      vehicleLabel: "Recherche d'un chauffeur",
-      plateLabel: order.dropoff?.address?.slice(0, 24) || "Krono",
+      /** L’îlot met l’accent sur le statut ; l’ETA reste en second plan. */
+      etaLabel: "Recherche chauffeur",
+      vehicleLabel: eta ? `≈ ${eta}` : "En attente d’un livreur",
+      plateLabel: order.dropoff?.address?.slice(0, 28) || "Krono",
+      isPending: true,
     };
   }
 
@@ -70,23 +79,22 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
     etaLabel: eta,
     vehicleLabel: name || detail || "Krono",
     plateLabel: plate || "KRONO",
+    isPending: false,
   };
 }
 
-async function endActive(): Promise<void> {
-  if (!active) return;
-  const { live } = active;
+/** Termine toutes les Live Activities de ce type (évite les activités orphelines après annulation). */
+async function endAllLiveActivities(): Promise<void> {
   active = null;
   try {
-    await live.end(
-      "immediate",
-      {
-        etaLabel: "—",
-        vehicleLabel: "Course terminee",
-        plateLabel: "",
-      },
-      new Date()
-    );
+    const f = getFactory();
+    for (const live of f.getInstances()) {
+      try {
+        await live.end("immediate", END_PROPS, new Date());
+      } catch {
+        /* ignore */
+      }
+    }
   } catch {
     /* ignore */
   }
@@ -102,7 +110,7 @@ export async function syncOrderLiveActivity(order: OrderRequest | null): Promise
   const shouldTrack = order && TRACKING_STATUSES.includes(order.status);
 
   if (!shouldTrack) {
-    await endActive();
+    await endAllLiveActivities();
     return;
   }
 
@@ -125,7 +133,7 @@ export async function syncOrderLiveActivity(order: OrderRequest | null): Promise
       return;
     }
 
-    await endActive();
+    await endAllLiveActivities();
     const live = f.start(props, url);
     active = { orderId: order!.id, live };
   } catch (e) {

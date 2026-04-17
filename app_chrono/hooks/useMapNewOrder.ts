@@ -7,6 +7,7 @@ import { useShipmentStore } from '../store/useShipmentStore';
 import { userOrderSocketService } from '../services/userOrderSocketService';
 import { locationService } from '../services/locationService';
 import { logger } from '../utils/logger';
+import type { PaymentMethodType } from '../services/paymentApi';
 
 interface UseMapNewOrderProps {
   user: ReturnType<typeof useAuthStore.getState>['user'];
@@ -38,7 +39,7 @@ interface UseMapNewOrderProps {
   hasAutoOpenedRef: React.MutableRefObject<boolean>;
   setShowPaymentSheet: (show: boolean) => void;
   setPaymentPayerType: (type: 'client' | 'recipient') => void;
-  setSelectedPaymentMethodType: (type: 'orange_money' | 'wave' | 'cash' | 'deferred' | null) => void;
+  setSelectedPaymentMethodType: (type: PaymentMethodType | null) => void;
   setRecipientInfo: (info: { userId?: string; phone?: string; isRegistered?: boolean }) => void;
   setPaymentPartialInfo: (info: { isPartial?: boolean; partialAmount?: number }) => void;
   /** Option tarifaire (express, pickup_service, …) — alignée serveur */
@@ -104,7 +105,7 @@ export function useMapNewOrder({
       payerType?: 'client' | 'recipient',
       isPartialPayment?: boolean,
       partialAmount?: number,
-      paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred',
+      paymentMethodType?: PaymentMethodType,
       paymentMethodId?: string | null
     ) => {
       // Vérifier l'authentification avant de créer la commande
