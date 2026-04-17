@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {View,Text,TouchableOpacity,ScrollView,StyleSheet,Animated,PanResponderInstance,Dimensions,Alert,Linking} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,7 @@ import { QRCodeScanner } from './QRCodeScanner';
 import { QRCodeScanResult } from './QRCodeScanResult';
 import { qrCodeService } from '../services/qrCodeService';
 import { getQRScanErrorAlert } from '../utils/qrScanUserMessage';
-import { parseClientOrderInstructions } from '../utils/clientOrderInstructions';
+import { normalizeDropoffDetails, parseClientOrderInstructions } from '../utils/clientOrderInstructions';
 import { driverFacingSpeedOptionLabel } from '../utils/speedOptionLabel';
 import { OperatorCourseNotesBlock, OperatorDriverNotesBlock } from './AdminOrderInfo';
 
@@ -86,6 +86,21 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     creatorName: string;
     orderNumber: string;
   } | null>(null);
+
+  const detailsScrollRef = useRef<ScrollView>(null);
+  const scrollDetailsToTopPending = useRef(false);
+
+  const dropoffDetailsRecord = useMemo(
+    () => normalizeDropoffDetails(currentOrder?.dropoff?.details),
+    [currentOrder?.dropoff?.details]
+  );
+
+  const effectiveSpeedOptionId = useMemo(() => {
+    const root = currentOrder?.speedOptionId;
+    if (typeof root === 'string' && root.trim()) return root.trim();
+    const sid = dropoffDetailsRecord?.speed_option_id ?? dropoffDetailsRecord?.speedOptionId;
+    return typeof sid === 'string' && sid.trim() ? sid.trim() : undefined;
+  }, [currentOrder?.speedOptionId, dropoffDetailsRecord]);
 
   // Handler pour scanner le QR code
   const handleScanQRCode = async (qrCodeData: string) => {
@@ -167,8 +182,8 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   );
 
   const serviceModeLabel = useMemo(
-    () => driverFacingSpeedOptionLabel(currentOrder?.speedOptionId),
-    [currentOrder?.speedOptionId]
+    () => driverFacingSpeedOptionLabel(effectiveSpeedOptionId),
+    [effectiveSpeedOptionId]
   );
 
   const hasNotesOrConsignes = useMemo(() => {
@@ -176,23 +191,52 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     const oc = (currentOrder.operatorCourseNotes || '').trim();
     const dn = (currentOrder.driverNotes || '').trim();
     if (oc.length > 0 || dn.length > 0) return true;
-    if (currentOrder.speedOptionId) return true;
+    if (effectiveSpeedOptionId) return true;
     return clientInstructions != null;
-  }, [currentOrder, clientInstructions]);
+  }, [currentOrder, clientInstructions, effectiveSpeedOptionId]);
 
   const handleOpenNotesFromCollapsed = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveTab('details');
+    const runScroll = () => {
+      detailsScrollRef.current?.scrollTo({ y: 0, animated: true });
+    };
     if (!isExpanded) {
+      scrollDetailsToTopPending.current = true;
       onExpandSheet?.();
+    } else {
+      requestAnimationFrame(runScroll);
     }
   }, [isExpanded, onExpandSheet]);
 
+  useEffect(() => {
+    if (!isExpanded || !scrollDetailsToTopPending.current) return;
+    scrollDetailsToTopPending.current = false;
+    const id = requestAnimationFrame(() => {
+      detailsScrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [isExpanded]);
+
   if (!currentOrder) return null;
 
-  const recipientPhone = currentOrder?.recipient?.phone || currentOrder?.dropoff?.details?.phone || currentOrder?.user?.phone || null;
-  const dropoffDetails = currentOrder.dropoff?.details;
-  const packageImages = currentOrder?.packageImages || currentOrder?.dropoff?.details?.photos || [];
+  const recipientPhone =
+    currentOrder?.recipient?.phone ||
+    (typeof dropoffDetailsRecord?.phone === 'string' ? dropoffDetailsRecord.phone : undefined) ||
+    currentOrder?.user?.phone ||
+    null;
+  const dropoffDetails = dropoffDetailsRecord;
+  const packageImages: string[] = (() => {
+    const fromOrder = currentOrder.packageImages;
+    if (Array.isArray(fromOrder)) {
+      return fromOrder.filter((u): u is string => typeof u === 'string');
+    }
+    const photos = dropoffDetailsRecord?.photos;
+    if (Array.isArray(photos)) {
+      return photos.filter((u): u is string => typeof u === 'string');
+    }
+    return [];
+  })();
   const isPhoneOrder = currentOrder?.isPhoneOrder || false;
   const placedByAdmin = currentOrder?.placedByAdmin === true;
   const isB2BOrder = currentOrder?.isB2BOrder === true;
@@ -426,40 +470,14 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
 
           {/* Contenu selon l'onglet actif */}
           <ScrollView
+            ref={detailsScrollRef}
             showsVerticalScrollIndicator={false}
             style={styles.scrollContent}
             nestedScrollEnabled={true}
           >
             {activeTab === 'details' ? (
               <View style={styles.detailsContent}>
-                {showOfflineAssistBlock && (
-                  <View style={styles.offlineSection}>
-                    <View style={styles.offlineAlert}>
-                      <Ionicons name="warning-outline" size={20} color="#EA580C" />
-                      <View style={styles.offlineAlertText}>
-                        <Text style={styles.offlineAlertTitle}>
-                          {!hasPickupCoords || !hasDropoffCoords
-                            ? 'Coordonnées GPS incomplètes'
-                            : 'Commande hors ligne (téléphone)'}
-                        </Text>
-                        <Text style={styles.offlineAlertSubtitle}>
-                          {!hasPickupCoords || !hasDropoffCoords
-                            ? 'Sans point de retrait ou de livraison précis, la navigation intégrée ne peut pas calculer l’itinéraire. Appelez le client ou l’opérateur pour affiner l’adresse.'
-                            : 'Cette commande a été créée avec la case « téléphone / hors-ligne » : les points sur la carte peuvent être approximatifs. Vérifiez ou appelez le client si besoin.'}
-                        </Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.callClientButton}
-                      onPress={handleCall}
-                      accessibilityLabel="Appeler le client"
-                    >
-                      <Ionicons name="call" size={20} color="#FFFFFF" />
-                      <Text style={styles.callClientButtonText}>Appeler le client</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
+                {/* Notes / mode / consignes en premier : visibles dès l’ouverture ou le tap « Notes et consignes » */}
                 {operatorCourseNotes || driverNotes ? (
                   <View style={styles.section}>
                     <OperatorCourseNotesBlock operatorCourseNotes={operatorCourseNotes} />
@@ -467,7 +485,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   </View>
                 ) : null}
 
-                {currentOrder.speedOptionId ? (
+                {effectiveSpeedOptionId ? (
                   <View style={styles.serviceModeCard}>
                     <Text style={styles.serviceModeCardLabel}>Mode de service (client)</Text>
                     <Text style={styles.serviceModeCardValue}>{serviceModeLabel}</Text>
@@ -509,6 +527,34 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                   </View>
                 ) : null}
 
+                {showOfflineAssistBlock && (
+                  <View style={styles.offlineSection}>
+                    <View style={styles.offlineAlert}>
+                      <Ionicons name="warning-outline" size={20} color="#EA580C" />
+                      <View style={styles.offlineAlertText}>
+                        <Text style={styles.offlineAlertTitle}>
+                          {!hasPickupCoords || !hasDropoffCoords
+                            ? 'Coordonnées GPS incomplètes'
+                            : 'Commande hors ligne (téléphone)'}
+                        </Text>
+                        <Text style={styles.offlineAlertSubtitle}>
+                          {!hasPickupCoords || !hasDropoffCoords
+                            ? 'Sans point de retrait ou de livraison précis, la navigation intégrée ne peut pas calculer l’itinéraire. Appelez le client ou l’opérateur pour affiner l’adresse.'
+                            : 'Cette commande a été créée avec la case « téléphone / hors-ligne » : les points sur la carte peuvent être approximatifs. Vérifiez ou appelez le client si besoin.'}
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.callClientButton}
+                      onPress={handleCall}
+                      accessibilityLabel="Appeler le client"
+                    >
+                      <Ionicons name="call" size={20} color="#FFFFFF" />
+                      <Text style={styles.callClientButtonText}>Appeler le client</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* Actions de statut */}
                 {availableActions.length > 0 && (
                   <View style={styles.section}>
@@ -541,7 +587,9 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                 )}
 
                 {/* Point de collecte - visible en phase 1 (avant récupération du colis) */}
-                {['accepted', 'enroute', 'in_progress'].includes(String(currentOrder.status)) && currentOrder.pickup?.address && (
+                {['accepted', 'enroute', 'in_progress'].includes(String(currentOrder.status)) &&
+                  typeof currentOrder.pickup?.address === 'string' &&
+                  currentOrder.pickup.address.trim().length > 0 && (
                   <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                       <Ionicons name="cube-outline" size={20} color="#7C3AED" />
@@ -643,43 +691,43 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                 )}
 
                 {/* Détails supplémentaires */}
-                {(dropoffDetails?.entrance ||
-                  dropoffDetails?.apartment ||
-                  dropoffDetails?.floor ||
-                  dropoffDetails?.intercom) && (
+                {(typeof dropoffDetails?.entrance === 'string' && dropoffDetails.entrance.trim() ? true : false) ||
+                (typeof dropoffDetails?.apartment === 'string' && dropoffDetails.apartment.trim() ? true : false) ||
+                (typeof dropoffDetails?.floor === 'string' && dropoffDetails.floor.trim() ? true : false) ||
+                (typeof dropoffDetails?.intercom === 'string' && dropoffDetails.intercom.trim() ? true : false) ? (
                   <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                       <Ionicons name="information-circle-outline" size={20} color="#7C3AED" />
                       <Text style={styles.sectionTitle}>Détails de l&apos;adresse</Text>
                     </View>
                     <View style={styles.detailsCard}>
-                      {dropoffDetails?.entrance && (
+                      {typeof dropoffDetails?.entrance === 'string' && dropoffDetails.entrance.trim() ? (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Entrée</Text>
                           <Text style={styles.detailValue}>{dropoffDetails.entrance}</Text>
                         </View>
-                      )}
-                      {dropoffDetails?.apartment && (
+                      ) : null}
+                      {typeof dropoffDetails?.apartment === 'string' && dropoffDetails.apartment.trim() ? (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Appartement</Text>
                           <Text style={styles.detailValue}>{dropoffDetails.apartment}</Text>
                         </View>
-                      )}
-                      {dropoffDetails?.floor && (
+                      ) : null}
+                      {typeof dropoffDetails?.floor === 'string' && dropoffDetails.floor.trim() ? (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Étage</Text>
                           <Text style={styles.detailValue}>{dropoffDetails.floor}</Text>
                         </View>
-                      )}
-                      {dropoffDetails?.intercom && (
+                      ) : null}
+                      {typeof dropoffDetails?.intercom === 'string' && dropoffDetails.intercom.trim() ? (
                         <View style={styles.detailRow}>
                           <Text style={styles.detailLabel}>Interphone</Text>
                           <Text style={styles.detailValue}>{dropoffDetails.intercom}</Text>
                         </View>
-                      )}
+                      ) : null}
                     </View>
                   </View>
-                )}
+                ) : null}
 
                 {/* Photos du colis */}
                 {packageImages.length > 0 && (

@@ -28,6 +28,12 @@ let active: {
   live: LiveActivity<OrderTrackingLiveProps>;
 } | null = null;
 
+/**
+ * Une seule file d’attente : évite deux `start()` en parallèle (effets React / Strict Mode),
+ * ce qui créait deux Live Activities noires sur l’écran de verrouillage.
+ */
+let syncChain: Promise<void> = Promise.resolve();
+
 function supportsLiveActivitiesIOS(): boolean {
   if (Platform.OS !== "ios") return false;
   const version = Platform.Version;
@@ -52,7 +58,6 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
         ? order.estimatedDuration.trim()
         : "";
     return {
-      /** L’îlot met l’accent sur le statut ; l’ETA reste en second plan. */
       etaLabel: "Recherche chauffeur",
       vehicleLabel: eta ? `≈ ${eta}` : "En attente d’un livreur",
       plateLabel: order.dropoff?.address?.slice(0, 28) || "Krono",
@@ -83,7 +88,7 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
   };
 }
 
-/** Termine toutes les Live Activities de ce type (évite les activités orphelines après annulation). */
+/** Termine toutes les Live Activities de ce type. */
 async function endAllLiveActivities(): Promise<void> {
   active = null;
   try {
@@ -100,11 +105,7 @@ async function endAllLiveActivities(): Promise<void> {
   }
 }
 
-/**
- * Synchronise la Live Activity iOS (îlot / verrouillage) avec la commande suivie.
- * Android : no-op.
- */
-export async function syncOrderLiveActivity(order: OrderRequest | null): Promise<void> {
+async function syncOrderLiveActivityImpl(order: OrderRequest | null): Promise<void> {
   if (!supportsLiveActivitiesIOS()) return;
 
   const shouldTrack = order && TRACKING_STATUSES.includes(order.status);
@@ -119,28 +120,39 @@ export async function syncOrderLiveActivity(order: OrderRequest | null): Promise
     const props = propsFromOrder(order!);
     const url = `appchrono://order-tracking/${encodeURIComponent(order!.id)}`;
 
-    // Après un redémarrage JS/app, récupérer une activité existante pour éviter
-    // de recréer inutilement (et potentiellement échouer sur les limites iOS).
-    if (!active) {
-      const instances = f.getInstances();
-      if (instances.length > 0) {
-        active = { orderId: order!.id, live: instances[0] };
-      }
-    }
-
     if (active?.orderId === order!.id) {
       await active.live.update(props);
       return;
     }
 
+    /**
+     * Changement de commande ou première ouverture : on ferme **toutes** les instances
+     * (y compris orphelines / doublons), puis une seule `start()`.
+     * On ne réutilise plus `getInstances()[0]` : avec plusieurs activités, ça en laissait une vivante.
+     */
     await endAllLiveActivities();
     const live = f.start(props, url);
     active = { orderId: order!.id, live };
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    /** ActivityKit refuse `start` si Live Activities désactivées pour Krono (Réglages) ou mode basse conso. */
     logger.warn(
-      "[orderLiveActivity] sync échouée",
+      "[orderLiveActivity] sync échouée — vérifier Réglages → Krono → Live Activities, et que l’app n’est pas une vieille build sans extension ExpoWidgets.",
       "orderLiveActivity",
-      { orderId: order?.id, status: order?.status, error: e }
+      { orderId: order?.id, status: order?.status, errorMessage: msg, error: e }
     );
   }
+}
+
+/**
+ * Synchronise la Live Activity iOS (îlot / verrouillage) avec la commande suivie.
+ * Android : no-op.
+ */
+export function syncOrderLiveActivity(order: OrderRequest | null): Promise<void> {
+  syncChain = syncChain
+    .then(() => syncOrderLiveActivityImpl(order))
+    .catch(() => {
+      /* éviter de bloquer la file */
+    });
+  return syncChain;
 }

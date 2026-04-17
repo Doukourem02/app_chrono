@@ -37,4 +37,12 @@ export function useOrderLiveActivitySync() {
     const order = pickTrackedOrder(activeOrders, selectedOrderId);
     void syncOrderLiveActivity(order);
   }, [activeOrders, selectedOrderId]);
+
+  /** À la déconnexion, le bridge disparaît : terminer les Live Activities sinon elles restent « fantômes ». */
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    return () => {
+      void syncOrderLiveActivity(null);
+    };
+  }, []);
 }

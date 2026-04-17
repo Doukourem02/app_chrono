@@ -1,5 +1,10 @@
 import { create } from 'zustand';
 import { mapAdminOrderFlags } from '../utils/mapAdminOrderFlags';
+import { normalizeDropoffDetails } from '../utils/clientOrderInstructions';
+
+function detailsAsRecord(details: unknown): Record<string, unknown> | undefined {
+  return normalizeDropoffDetails(details) ?? undefined;
+}
 
 /** Notes opérateur : racine API (`driver_notes`) ou champ persisté dans `dropoff.details` après resync DB. */
 function resolveDriverNotes(order: Record<string, unknown> | null | undefined): string | undefined {
@@ -7,7 +12,7 @@ function resolveDriverNotes(order: Record<string, unknown> | null | undefined): 
   const root = order.driver_notes ?? order.driverNotes;
   if (typeof root === 'string' && root.trim()) return root.trim();
   const drop = order.dropoff as Record<string, unknown> | undefined;
-  const details = drop?.details as Record<string, unknown> | undefined;
+  const details = detailsAsRecord(drop?.details);
   const fromDetails = details?.driver_notes;
   if (typeof fromDetails === 'string' && fromDetails.trim()) return fromDetails.trim();
   return undefined;
@@ -19,7 +24,7 @@ function resolveSpeedOptionId(order: Record<string, unknown> | null | undefined)
   const root = order.speedOptionId ?? order.speed_option_id;
   if (typeof root === 'string' && root.trim()) return root.trim();
   const drop = order.dropoff as Record<string, unknown> | undefined;
-  const details = drop?.details as Record<string, unknown> | undefined;
+  const details = detailsAsRecord(drop?.details);
   const sid = details?.speed_option_id ?? details?.speedOptionId;
   if (typeof sid === 'string' && sid.trim()) return sid.trim();
   return undefined;
@@ -31,7 +36,7 @@ function resolveOperatorCourseNotes(order: Record<string, unknown> | null | unde
   const root = order.notes;
   if (typeof root === 'string' && root.trim()) return root.trim();
   const drop = order.dropoff as Record<string, unknown> | undefined;
-  const details = drop?.details as Record<string, unknown> | undefined;
+  const details = detailsAsRecord(drop?.details);
   const fromDetails = details?.operator_course_notes;
   if (typeof fromDetails === 'string' && fromDetails.trim()) return fromDetails.trim();
   return undefined;
