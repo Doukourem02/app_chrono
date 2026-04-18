@@ -19,7 +19,7 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
-      buildNumber: "67",
+      buildNumber: "68",
       /**
        * Live Activities / Dynamic Island (ActivityKit) requiert iOS 16.2+ côté target widget.
        * Aligner la cible principale évite des erreurs CocoaPods pendant "Install pods".
