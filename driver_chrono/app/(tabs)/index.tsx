@@ -618,15 +618,20 @@ export default function Index() {
     };
   }, [isOnline, user?.id]);
 
-  // Connexion Socket pour la messagerie
+  // Messagerie : léger décalage après le socket commandes pour éviter deux handshakes Engine.IO en parallèle (400 sid / timeout).
   useEffect(() => {
-    if (user?.id) {
-      driverMessageSocketService.connect(user.id);
+    if (!user?.id || !isOnline) {
+      driverMessageSocketService.disconnect();
+      return;
     }
+    const t = setTimeout(() => {
+      driverMessageSocketService.connect(user.id);
+    }, 450);
     return () => {
+      clearTimeout(t);
       driverMessageSocketService.disconnect();
     };
-  }, [user?.id]);
+  }, [user?.id, isOnline]);
 
   const handleColisRecupere = useCallback(() => {
     if (!currentOrder || !location) return;

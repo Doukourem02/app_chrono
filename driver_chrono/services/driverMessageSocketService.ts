@@ -15,11 +15,21 @@ class DriverMessageSocketService {
   private isConnected = false;
   private lastSocketAuthToken: string | null = null;
   private connectGeneration = 0;
+  private connectErrorRetryCount = 0;
   private messageCallbacks: ((message: Message, conversation: Conversation) => void)[] = [];
   private typingCallbacks: ((data: { userId: string; isTyping: boolean }) => void)[] = [];
 
   connect(driverId: string) {
     if (this.socket && this.isConnected && this.socket.connected && this.driverId === driverId) {
+      return;
+    }
+    if (
+      this.socket &&
+      this.driverId === driverId &&
+      this.socket.active &&
+      !this.socket.connected
+    ) {
+      logger.debug("Socket messagerie: connexion déjà en cours, ignoré", "driverMessageSocketService");
       return;
     }
     this.connectGeneration += 1;
@@ -61,19 +71,20 @@ class DriverMessageSocketService {
     this.isConnected = false;
 
     this.socket = io(SOCKET_URL, {
-      transports: __DEV__ ? ['websocket', 'polling'] : ['polling'],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
       reconnectionAttempts: 24,
-      timeout: 20000,
+      timeout: 25_000,
       forceNew: false,
-      upgrade: __DEV__,
+      upgrade: true,
       autoConnect: true,
       auth: {
         token,
       },
     });
+    this.connectErrorRetryCount = 0;
 
     this.socket.io.on('reconnect_failed', () => {
       logger.warn('Socket messagerie: reconnexions épuisées', 'driverMessageSocketService');
@@ -87,6 +98,7 @@ class DriverMessageSocketService {
       useRealtimeDegradedStore.getState().setMessagesSocketDegraded(false);
       logger.info('🔌 Socket connecté pour messagerie', 'driverMessageSocketService');
       this.isConnected = true;
+      this.connectErrorRetryCount = 0;
       this.socket?.emit('driver-connect', driverId);
     });
 
@@ -97,29 +109,41 @@ class DriverMessageSocketService {
 
     this.socket.on('connect_error', (error) => {
       this.isConnected = false;
+      const errText = `${error.message || ""} ${String((error as { description?: unknown }).description ?? "")}`.toLowerCase();
       const isTemporaryPollError =
-        error.message?.includes('xhr poll error') ||
-        error.message?.includes('poll error') ||
-        error.message?.includes('transport unknown') ||
-        error.message?.includes('websocket error') ||
-        (error as any).type === 'TransportError';
+        errText.includes("xhr poll error") ||
+        errText.includes("poll error") ||
+        errText.includes("transport unknown") ||
+        errText.includes("websocket error") ||
+        errText.includes("timeout") ||
+        errText.includes("status code 400") ||
+        errText.includes("bad request") ||
+        (error as { type?: string }).type === "TransportError";
 
-      if (!isTemporaryPollError) {
-        if (__DEV__) {
-          logger.debug(
-            'Erreur connexion socket messagerie (tentative de reconnexion en cours)',
-            'driverMessageSocketService',
-            {
-              message: error.message,
-              type: (error as any).type,
-            }
-          );
-        }
-        reportSocketIssue('driver_messages_connect_error', {
+      this.connectErrorRetryCount += 1;
+
+      const shouldReportSentry =
+        (!isTemporaryPollError && this.connectErrorRetryCount >= 3) ||
+        (isTemporaryPollError && this.connectErrorRetryCount >= 8);
+
+      if (shouldReportSentry) {
+        reportSocketIssue("driver_messages_connect_error", {
           socketUrl: SOCKET_URL,
           message: error.message,
-          type: String((error as { type?: string }).type ?? ''),
+          type: String((error as { type?: string }).type ?? ""),
+          retryCount: this.connectErrorRetryCount,
+          temporaryPollError: isTemporaryPollError,
         });
+      } else if (__DEV__) {
+        logger.debug(
+          "Erreur connexion socket messagerie (transitoire ou avant seuil Sentry)",
+          "driverMessageSocketService",
+          {
+            message: error.message,
+            type: (error as { type?: string }).type,
+            retryCount: this.connectErrorRetryCount,
+          }
+        );
       }
     });
 
@@ -148,6 +172,7 @@ class DriverMessageSocketService {
 
   disconnect() {
     this.connectGeneration += 1;
+    this.connectErrorRetryCount = 0;
     useRealtimeDegradedStore.getState().setMessagesSocketDegraded(false);
     if (this.socket) {
       this.socket.disconnect();

@@ -3,7 +3,14 @@ import { font, foregroundStyle, frame, padding } from "@expo/ui/swift-ui/modifie
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
 
-/** Texte + SF Symbols + barre simple (pas d’`uiImage`, pas de `ProgressView`). */
+/**
+ * Présentations Apple (pas de « scène 3 » officielle) :
+ * - Bannière : écran verrouillé / Notification Center
+ * - Compact / minimal : îlot au repos
+ * - Étendu : leading + center + trailing + bottom autour de l’îlot
+ *
+ * Sous iOS 26+, `levelOfDetail === 'simplified'` peut exiger moins de vues ; sinon l’îlot peut rester sur un indicateur de chargement.
+ */
 const ON_DARK = {
   title: "#FFFFFF",
   body: "#EBEBF5",
@@ -21,11 +28,13 @@ export type OrderTrackingLiveProps = {
   isPending?: boolean;
 };
 
-function OrderTrackingLive(props: OrderTrackingLiveProps, _environment: LiveActivityEnvironment) {
+function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActivityEnvironment) {
   "widget";
   const vehicle = props.vehicleLabel?.trim() || "Krono";
   const plate = props.plateLabel?.trim() || "KRONO";
-  const compactTitle = props.isPending ? "Recherche" : props.etaLabel;
+  const etaDisplay = (props.etaLabel ?? "").trim() || "—";
+  const compactTitle = props.isPending ? "Recherche" : etaDisplay;
+  const simplified = environment.levelOfDetail === "simplified";
 
   const bottomBar = props.isPending ? (
     <VStack modifiers={[padding({ horizontal: 12, vertical: 8 })]}>
@@ -58,28 +67,46 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, _environment: LiveActi
     </VStack>
   );
 
+  const banner = (
+    <VStack modifiers={[padding({ all: 12 })]}>
+      <Text modifiers={[font({ weight: "bold", size: 20 }), foregroundStyle(ON_DARK.title)]}>{etaDisplay}</Text>
+      <Text modifiers={[font({ size: 14 }), foregroundStyle(ON_DARK.body)]}>{vehicle}</Text>
+      <Text modifiers={[font({ size: 12 }), foregroundStyle(ON_DARK.muted)]}>{plate}</Text>
+    </VStack>
+  );
+
+  const compactLeading = <Image systemName="car.fill" color={ON_DARK.accent} size={18} />;
+  const compactTrailing = (
+    <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.title)]}>{compactTitle}</Text>
+  );
+  const minimal = <Image systemName="car.fill" color={ON_DARK.accent} size={16} />;
+
+  /** Une seule colonne : évite les layouts multi-régions trop denses sous iOS 26+ simplified. */
+  if (simplified) {
+    return {
+      banner,
+      compactLeading,
+      compactTrailing,
+      minimal,
+      expandedCenter: (
+        <VStack modifiers={[padding({ horizontal: 10, vertical: 8 })]}>
+          <Text modifiers={[font({ weight: "bold", size: 12 }), foregroundStyle(ON_DARK.brand)]}>KRONO</Text>
+          <Text modifiers={[font({ weight: "bold", size: 24 }), foregroundStyle(ON_DARK.title)]}>{etaDisplay}</Text>
+          <Text modifiers={[font({ size: 13 }), foregroundStyle(ON_DARK.body)]}>{vehicle}</Text>
+          <Text modifiers={[font({ size: 12 }), foregroundStyle(ON_DARK.muted)]}>{plate}</Text>
+        </VStack>
+      ),
+    };
+  }
+
   return {
-    banner: (
-      <VStack modifiers={[padding({ all: 12 })]}>
-        <Text modifiers={[font({ weight: "bold", size: 20 }), foregroundStyle(ON_DARK.title)]}>
-          {props.etaLabel}
-        </Text>
-        <Text modifiers={[font({ size: 14 }), foregroundStyle(ON_DARK.body)]}>{vehicle}</Text>
-        <Text modifiers={[font({ size: 12 }), foregroundStyle(ON_DARK.muted)]}>{plate}</Text>
-      </VStack>
-    ),
-    compactLeading: <Image systemName="car.fill" color={ON_DARK.accent} size={18} />,
-    compactTrailing: (
-      <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.title)]}>
-        {compactTitle}
-      </Text>
-    ),
-    minimal: <Image systemName="car.fill" color={ON_DARK.accent} size={16} />,
+    banner,
+    compactLeading,
+    compactTrailing,
+    minimal,
     expandedCenter: (
       <VStack modifiers={[padding({ all: 8 })]}>
-        <Text modifiers={[font({ weight: "bold", size: 26 }), foregroundStyle(ON_DARK.title)]}>
-          {props.etaLabel}
-        </Text>
+        <Text modifiers={[font({ weight: "bold", size: 26 }), foregroundStyle(ON_DARK.title)]}>{etaDisplay}</Text>
         <Text modifiers={[font({ size: 14 }), foregroundStyle(ON_DARK.body)]}>{vehicle}</Text>
       </VStack>
     ),
@@ -90,9 +117,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, _environment: LiveActi
     ),
     expandedTrailing: (
       <VStack modifiers={[padding({ all: 10 })]}>
-        <Text modifiers={[font({ weight: "bold", size: 15 }), foregroundStyle(ON_DARK.title)]}>
-          {plate}
-        </Text>
+        <Text modifiers={[font({ weight: "bold", size: 15 }), foregroundStyle(ON_DARK.title)]}>{plate}</Text>
         <Image systemName="car.side.fill" color={ON_DARK.accent} size={22} />
       </VStack>
     ),

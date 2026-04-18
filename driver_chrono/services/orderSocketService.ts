@@ -27,6 +27,16 @@ class OrderSocketService {
     ) {
       return;
     }
+    /** Évite deux handshakes parallèles (sinon 400 sur sid / transport error côté Engine.IO). */
+    if (
+      this.socket &&
+      this.driverId === driverId &&
+      this.socket.active &&
+      !this.socket.connected
+    ) {
+      logger.debug("Socket commandes: connexion déjà en cours, ignoré", "orderSocketService");
+      return;
+    }
     this.connectGeneration += 1;
     const gen = this.connectGeneration;
     void this.establishSocket(driverId, gen);
@@ -70,15 +80,19 @@ class OrderSocketService {
     this.retryCount = 0;
     this.isConnected = false;
 
+    /**
+     * Prod : polling seul derrière Redis / LB sans sticky sessions → GET /socket.io/?sid=… en 400.
+     * WebSocket en premier puis fallback polling (upgrade) stabilise la session sur un seul transport.
+     */
     this.socket = io(config.socketUrl, {
-      transports: __DEV__ ? ['websocket', 'polling'] : ['polling'],
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
       reconnectionAttempts: 24,
-      timeout: 20000,
+      timeout: 25_000,
       forceNew: false,
-      upgrade: __DEV__,
+      upgrade: true,
       autoConnect: true,
       auth: {
         token,
@@ -365,12 +379,16 @@ class OrderSocketService {
     this.socket.on('connect_error', (error) => {
       this.isConnected = false;
 
-      // Ignorer les erreurs de polling temporaires (Socket.IO essaie plusieurs transports)
-      const isTemporaryPollError = error.message?.includes('xhr poll error') ||
-        error.message?.includes('poll error') ||
-        error.message?.includes('transport unknown') ||
-        error.message?.includes('websocket error') ||
-        (error as any).type === 'TransportError';
+      const errText = `${error.message || ""} ${String((error as { description?: unknown }).description ?? "")}`.toLowerCase();
+      const isTemporaryPollError =
+        errText.includes("xhr poll error") ||
+        errText.includes("poll error") ||
+        errText.includes("transport unknown") ||
+        errText.includes("websocket error") ||
+        errText.includes("timeout") ||
+        errText.includes("status code 400") ||
+        errText.includes("bad request") ||
+        (error as { type?: string }).type === "TransportError";
 
       // Ne logger que les erreurs importantes après plusieurs tentatives
       // Ignorer les erreurs si le backend est simplement inaccessible (normal en développement)
