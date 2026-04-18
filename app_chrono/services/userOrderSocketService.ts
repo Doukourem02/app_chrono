@@ -11,6 +11,7 @@ import {
   reportSocketIssue,
 } from '../utils/sentry';
 import { createOrderRecord } from './orderApi';
+import { syncOrderLiveActivity } from './orderLiveActivity';
 import type { PaymentMethodType } from './paymentApi';
 import { userApiService } from './userApiService';
 import { soundService } from './soundService';
@@ -375,6 +376,16 @@ class UserOrderSocketService {
             previousSelectedId: store.selectedOrderId,
           });
           store.setSelectedOrder(order.id);
+          /**
+           * Live Activity : le premier `ActivityKit.start()` doit avoir lieu **au premier plan**.
+           * En QA (un seul iPhone : client → livreur → client), si on n’appelle `start` qu’après
+           * acceptation, l’app client est en arrière-plan → échec « Target is not foreground ».
+           * Ici la commande est `pending` : l’utilisateur est encore sur la map — on enchaîne tout de suite.
+           */
+          const placed = useOrderStore.getState().activeOrders.find((o) => o.id === order.id);
+          if (placed) {
+            void syncOrderLiveActivity(placed);
+          }
         }
         // If backend reported persistence failure, inform the user
         if (data && data.dbSaved === false) {

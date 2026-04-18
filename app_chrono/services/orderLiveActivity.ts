@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import type { LiveActivity, LiveActivityFactory } from "expo-widgets";
 import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
@@ -121,6 +121,19 @@ function isStaleLiveActivityNativeError(message: string): boolean {
   );
 }
 
+/**
+ * ActivityKit refuse `start()` tant que l’app n’est pas au premier plan (ExpoWidgets / Swift).
+ * On diffère le `start` au retour `active` (voir `useOrderLiveActivitySync`).
+ */
+function isActivityKitNotForegroundError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("not foreground") || m.includes("target is not foreground");
+}
+
+function appIsActiveForLiveActivity(): boolean {
+  return AppState.currentState === "active";
+}
+
 /** Termine toutes les Live Activities de ce type. */
 async function endAllLiveActivities(): Promise<void> {
   active = null;
@@ -203,7 +216,21 @@ async function syncOrderLiveActivityImpl(
      * Changement de commande ou première ouverture : on ferme **toutes** les instances
      * (y compris orphelines / doublons), puis une seule `start()`.
      * On ne réutilise plus `getInstances()[0]` : avec plusieurs activités, ça en laissait une vivante.
+     *
+     * Pas de `start` en arrière-plan : iOS lève « Target is not foreground » et Sentry se remplit.
+     * Le hook relance la sync au retour au premier plan.
      */
+    if (!appIsActiveForLiveActivity()) {
+      if (__DEV__) {
+        logger.debug(
+          "[orderLiveActivity] start différé — app pas au premier plan (ActivityKit)",
+          "orderLiveActivity",
+          { orderId: order!.id }
+        );
+      }
+      return;
+    }
+
     await endAllLiveActivities();
     const live = f.start(props, url);
     active = { orderId: order!.id, live };
@@ -215,6 +242,14 @@ async function syncOrderLiveActivityImpl(
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    if (isActivityKitNotForegroundError(msg)) {
+      if (__DEV__) {
+        logger.debug("[orderLiveActivity] start ignoré (hors premier plan)", "orderLiveActivity", {
+          orderId: order?.id,
+        });
+      }
+      return;
+    }
     /** ActivityKit refuse `start` si Live Activities désactivées pour Krono (Réglages) ou mode basse conso. */
     logger.warn(
       "[orderLiveActivity] start/update ActivityKit a échoué (réglages peuvent être OK) — build iOS avec extension ExpoWidgets, iOS 16.2+, ou limite ActivityKit.",
@@ -242,6 +277,9 @@ export function syncOrderLiveActivity(
     .then(() => syncOrderLiveActivityImpl(order, opts))
     .catch((e) => {
       const errorMessage = e instanceof Error ? e.message : String(e);
+      if (isActivityKitNotForegroundError(errorMessage)) {
+        return;
+      }
       logger.warn("[orderLiveActivity] syncChain", "orderLiveActivity", {
         errorMessage,
       });
