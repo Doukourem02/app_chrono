@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import {View,Text,TouchableOpacity,ScrollView,StyleSheet,Animated,PanResponderInstance,Dimensions,Alert,Linking} from 'react-native';
+import {View,Text,TouchableOpacity,ScrollView,StyleSheet,Animated,PanResponderInstance,Alert,Linking} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OrderRequest } from '../store/useOrderStore';
@@ -13,13 +13,10 @@ import { normalizeDropoffDetails, parseClientOrderInstructions } from '../utils/
 import { driverFacingSpeedOptionLabel } from '../utils/speedOptionLabel';
 import { OperatorCourseNotesBlock, OperatorDriverNotesBlock } from './AdminOrderInfo';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 const NAV_BAR_HEIGHT = 80;
 const NAV_BAR_BOTTOM = 25;
 const SPACING_ABOVE_NAV = 15;
 const BOTTOM_OFFSET = NAV_BAR_HEIGHT + NAV_BAR_BOTTOM + SPACING_ABOVE_NAV; // 120px
-const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT - BOTTOM_OFFSET - 500; 
 
 type TabType = 'details' | 'messages';
 
@@ -195,6 +192,18 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     return clientInstructions != null;
   }, [currentOrder, clientInstructions, effectiveSpeedOptionId]);
 
+  /** Libellé du lien : « Notes » seulement s’il y a du texte / consignes ; sinon souvent seul le mode (express…) est présent. */
+  const collapsedDetailsLinkLabel = useMemo(() => {
+    if (!currentOrder) return 'Notes et consignes';
+    const oc = (currentOrder.operatorCourseNotes || '').trim();
+    const dn = (currentOrder.driverNotes || '').trim();
+    const hasWritten =
+      oc.length > 0 || dn.length > 0 || clientInstructions != null;
+    if (hasWritten) return 'Notes et consignes';
+    if (effectiveSpeedOptionId) return 'Mode de livraison';
+    return 'Notes et consignes';
+  }, [currentOrder, clientInstructions, effectiveSpeedOptionId]);
+
   const handleOpenNotesFromCollapsed = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveTab('details');
@@ -328,6 +337,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
         {
           height: animatedHeight,
           bottom: Math.max(insets.bottom, BOTTOM_OFFSET),
+          flexDirection: 'column',
         },
       ]}
     >
@@ -361,10 +371,14 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                     onPress={handleOpenNotesFromCollapsed}
                     hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                     accessibilityRole="button"
-                    accessibilityLabel="Voir notes et consignes"
+                    accessibilityLabel={
+                      collapsedDetailsLinkLabel === 'Mode de livraison'
+                        ? 'Voir le mode de livraison'
+                        : 'Voir notes et consignes'
+                    }
                   >
                     <Ionicons name="document-text-outline" size={13} color="#7C3AED" />
-                    <Text style={styles.collapsedNotesHintText}>Notes et consignes</Text>
+                    <Text style={styles.collapsedNotesHintText}>{collapsedDetailsLinkLabel}</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -473,6 +487,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
             ref={detailsScrollRef}
             showsVerticalScrollIndicator={false}
             style={styles.scrollContent}
+            contentContainerStyle={styles.scrollContentContainer}
             nestedScrollEnabled={true}
           >
             {activeTab === 'details' ? (
@@ -877,6 +892,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
   },
   expandedCard: {
+    flex: 1,
+    minHeight: 0,
     width: '92%',
     backgroundColor: '#fff',
     borderRadius: 24,
@@ -889,7 +906,6 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     shadowOffset: { width: 0, height: 8 },
     elevation: 10,
-    maxHeight: BOTTOM_SHEET_MAX_HEIGHT - 40,
   },
   header: {
     marginTop: 16, // Ajouté pour compenser le paddingTop supprimé
@@ -956,6 +972,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flex: 1,
+    minHeight: 0,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
+    paddingBottom: 8,
   },
   detailsContent: {
     paddingBottom: 20,

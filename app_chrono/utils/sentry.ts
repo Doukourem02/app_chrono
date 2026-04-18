@@ -125,3 +125,40 @@ export function addSocketSuccessBreadcrumb(
     data,
   });
 }
+
+const liveActivityReportLastAt: Record<string, number> = {};
+const LIVE_ACTIVITY_REPORT_COOLDOWN_MS = 90_000;
+
+/**
+ * ActivityKit (îlot / verrouillage) : breadcrumb + message Sentry en prod TestFlight / App Store.
+ * Cooldown pour éviter le spam si iOS refuse en boucle (réglages, limite ActivityKit).
+ */
+export function reportLiveActivityIssue(
+  reason: string,
+  data: Record<string, unknown>
+): void {
+  if (__DEV__ || !hasSentryDsn()) {
+    return;
+  }
+
+  Sentry.addBreadcrumb({
+    category: 'live_activity',
+    level: 'warning',
+    message: reason,
+    data,
+  });
+
+  const now = Date.now();
+  const key = reason;
+  const last = liveActivityReportLastAt[key] ?? 0;
+  if (now - last < LIVE_ACTIVITY_REPORT_COOLDOWN_MS) {
+    return;
+  }
+  liveActivityReportLastAt[key] = now;
+
+  Sentry.captureMessage(`LiveActivity: ${reason}`, {
+    level: 'warning',
+    tags: { live_activity_reason: reason },
+    extra: data,
+  });
+}

@@ -6,9 +6,11 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const NAV_BAR_HEIGHT = 80;
 const NAV_BAR_BOTTOM = 25;
 const SPACING_ABOVE_NAV = 15;
-const BOTTOM_OFFSET = NAV_BAR_HEIGHT + NAV_BAR_BOTTOM + SPACING_ABOVE_NAV; 
+const BOTTOM_OFFSET = NAV_BAR_HEIGHT + NAV_BAR_BOTTOM + SPACING_ABOVE_NAV;
 const BOTTOM_SHEET_MIN_HEIGHT = 120;
-const BOTTOM_SHEET_MAX_HEIGHT = SCREEN_HEIGHT - BOTTOM_OFFSET - 500; 
+/** Hauteur panneau ouvert : laisser un peu de carte visible en haut (l’ancien `-500` plafonnait ~200px et vidait le ScrollView). */
+const TOP_PEEK_FOR_MAP = 72;
+const BOTTOM_SHEET_MAX_HEIGHT = Math.max(340, SCREEN_HEIGHT - BOTTOM_OFFSET - TOP_PEEK_FOR_MAP);
 
 export const useBottomSheet = () => {
   const animatedHeight = useRef(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT)).current;

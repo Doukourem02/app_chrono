@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {RefreshControl,ScrollView,StyleSheet,Text,View,useColorScheme,} from "react-native";
 import {estimateDurationMinutes,formatDurationLabel,} from "../services/orderApi";
+import { mergeInProgressOrdersIntoStore } from "../services/mergeInProgressOrdersIntoStore";
 import { userApiService } from "../services/userApiService";
 import { useAuthStore } from "../store/useAuthStore";
 import {OrderRequest,OrderStatus,useOrderStore,} from "../store/useOrderStore";
@@ -522,6 +523,8 @@ export default function ShipmentList() {
               return dateB - dateA;
             });
         }
+
+        mergeInProgressOrdersIntoStore(inProgressCombined as OrderRequest[]);
 
         setOrders(finalOrders);
       } else {

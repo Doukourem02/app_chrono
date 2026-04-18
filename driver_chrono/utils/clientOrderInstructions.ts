@@ -31,20 +31,24 @@ export function normalizeDropoffDetails(details: unknown): Record<string, unknow
   return null;
 }
 
+function readTrimmedString(obj: Record<string, unknown>, snake: string, camel: string): string {
+  const raw = obj[snake] ?? obj[camel];
+  return typeof raw === 'string' ? raw.trim() : '';
+}
+
 export function parseClientOrderInstructions(
   details: Record<string, unknown> | string | null | undefined
 ): ClientOrderInstructions | null {
   const obj = normalizeDropoffDetails(details);
   if (!obj) return null;
-  const thermalBag = obj.thermal_bag === true;
-  const courierNote =
-    typeof obj.courier_note === 'string' ? obj.courier_note.trim() : '';
-  const recipientMessage =
-    typeof obj.recipient_message === 'string' ? obj.recipient_message.trim() : '';
-  const scheduledWindowNote =
-    typeof obj.scheduled_window_note === 'string'
-      ? obj.scheduled_window_note.trim()
-      : '';
+  const thermalBag = obj.thermal_bag === true || obj.thermalBag === true;
+  const courierNote = readTrimmedString(obj, 'courier_note', 'courierNote');
+  const recipientMessage = readTrimmedString(obj, 'recipient_message', 'recipientMessage');
+  const scheduledWindowNote = readTrimmedString(
+    obj,
+    'scheduled_window_note',
+    'scheduledWindowNote'
+  );
   if (!thermalBag && !courierNote && !recipientMessage && !scheduledWindowNote) return null;
   return { thermalBag, courierNote, recipientMessage, scheduledWindowNote };
 }

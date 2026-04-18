@@ -50,7 +50,7 @@ export const useAuthStore = create<AuthState>()(
         void (async () => {
           try {
             const { syncOrderLiveActivity } = await import("../services/orderLiveActivity");
-            await syncOrderLiveActivity(null);
+            await syncOrderLiveActivity(null, { immediateEnd: true });
           } catch {
             /* non bloquant */
           }

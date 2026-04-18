@@ -3,28 +3,17 @@ import { useOrderStore, type OrderRequest, type OrderStatus } from "../store/use
 import { useUserDataResyncStore } from "../store/useUserDataResyncStore";
 import { formatUserName } from "../utils/formatName";
 import { logger } from "../utils/logger";
+import { isDeliveryInProgressStatus, normalizeOrderStatus } from "../utils/orderStatusNormalize";
 import { userApiService } from "./userApiService";
 import { userOrderSocketService } from "./userOrderSocketService";
 
 const RESYNC_DEBOUNCE_MS = 2000;
 let lastUserAppResyncAt = 0;
 
-const IN_PROGRESS: OrderStatus[] = [
-  "pending",
-  "accepted",
-  "enroute",
-  "in_progress",
-  "picked_up",
-  "delivering",
-];
-
-function isInProgressStatus(status: string): boolean {
-  return IN_PROGRESS.includes(status as OrderStatus);
-}
-
 /** Aligné sur `order-tracking/[orderId].tsx` (vérité serveur pour le store). */
 function formatApiDeliveryRow(order: any): OrderRequest {
-  const orderStatus = order.status as OrderStatus;
+  const orderStatus: OrderStatus =
+    normalizeOrderStatus(order.status) ?? ((order.status || "pending") as OrderStatus);
   let proof: OrderRequest["proof"];
   if (order.proof) {
     try {
@@ -115,7 +104,7 @@ export async function syncClientOrdersFromApi(userId: string): Promise<void> {
     for (const row of result.data) {
       const st = String(row.status || "");
       // Toujours fusionner les livraisons en cours même absentes du store (socket raté, 2e commande…).
-      if (!isInProgressStatus(st) && !localIds.has(row.id)) continue;
+      if (!isDeliveryInProgressStatus(st) && !localIds.has(row.id)) continue;
       try {
         const formatted = formatApiDeliveryRow(row);
         useOrderStore.getState().updateFromSocket({ order: formatted as any });

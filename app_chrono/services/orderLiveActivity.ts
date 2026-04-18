@@ -2,6 +2,8 @@ import { Platform } from "react-native";
 import type { LiveActivity, LiveActivityFactory } from "expo-widgets";
 import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
+import { reportLiveActivityIssue } from "../utils/sentry";
+import { DELIVERY_IN_PROGRESS_STATUSES, normalizeOrderStatus } from "../utils/orderStatusNormalize";
 import type { OrderTrackingLiveProps } from "../widgets/orderTrackingLiveActivity";
 
 const END_PROPS: OrderTrackingLiveProps = {
@@ -12,39 +14,12 @@ const END_PROPS: OrderTrackingLiveProps = {
 };
 
 /** Inclut `pending` pour que l’utilisateur voie l’activité dès la commande créée (avant acceptation chauffeur). */
-const TRACKING_STATUSES: OrderStatus[] = [
-  "pending",
-  "accepted",
-  "enroute",
-  "in_progress",
-  "picked_up",
-  "delivering",
-];
+const TRACKING_STATUSES = DELIVERY_IN_PROGRESS_STATUSES;
 
 /** Même logique que le hook de sync : statut API parfois mal câblé (casse, tirets). */
 export function shouldSyncLiveActivityForOrder(order: OrderRequest): boolean {
   const n = normalizeOrderStatus(order.status);
   return n != null && TRACKING_STATUSES.includes(n);
-}
-
-/** Normalise pour comparaison avec les statuts du store / API. */
-function normalizeOrderStatus(raw: unknown): OrderStatus | null {
-  if (raw == null) return null;
-  let s = String(raw).trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
-  if (s === "inprogress") s = "in_progress";
-  if (s === "pickedup") s = "picked_up";
-  const allowed: OrderStatus[] = [
-    "pending",
-    "accepted",
-    "enroute",
-    "in_progress",
-    "picked_up",
-    "delivering",
-    "completed",
-    "declined",
-    "cancelled",
-  ];
-  return (allowed as string[]).includes(s) ? (s as OrderStatus) : null;
 }
 
 let factory: LiveActivityFactory<OrderTrackingLiveProps> | null = null;
@@ -59,6 +34,27 @@ let active: {
  * ce qui créait deux Live Activities noires sur l’écran de verrouillage.
  */
 let syncChain: Promise<void> = Promise.resolve();
+
+/** Évite de fermer l’îlot au cold start tant que `activeOrders` n’est pas encore repeuplé par l’API / socket. */
+let endDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const END_DEBOUNCE_MS = 1600;
+
+function clearScheduledEnd(): void {
+  if (endDebounceTimer != null) {
+    clearTimeout(endDebounceTimer);
+    endDebounceTimer = null;
+  }
+}
+
+function scheduleDebouncedEnd(): void {
+  if (endDebounceTimer != null) {
+    clearTimeout(endDebounceTimer);
+  }
+  endDebounceTimer = setTimeout(() => {
+    endDebounceTimer = null;
+    void endAllLiveActivities();
+  }, END_DEBOUNCE_MS);
+}
 
 function supportsLiveActivitiesIOS(): boolean {
   if (Platform.OS !== "ios") return false;
@@ -78,7 +74,7 @@ function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
 }
 
 function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
-  const status = normalizeOrderStatus(order.status) ?? order.status;
+  const status = normalizeOrderStatus(order.status) ?? (order.status as OrderStatus);
   if (status === "pending") {
     const eta =
       typeof order.estimatedDuration === "string" && order.estimatedDuration.trim()
@@ -132,15 +128,30 @@ async function endAllLiveActivities(): Promise<void> {
   }
 }
 
-async function syncOrderLiveActivityImpl(order: OrderRequest | null): Promise<void> {
+export type SyncOrderLiveActivityOptions = {
+  /** Déconnexion / arrêt explicite : fermer tout de suite sans attendre le debounce cold start. */
+  immediateEnd?: boolean;
+};
+
+async function syncOrderLiveActivityImpl(
+  order: OrderRequest | null,
+  options: SyncOrderLiveActivityOptions
+): Promise<void> {
   if (!supportsLiveActivitiesIOS()) return;
 
   const shouldTrack = order && shouldSyncLiveActivityForOrder(order);
 
   if (!shouldTrack) {
-    await endAllLiveActivities();
+    if (options.immediateEnd) {
+      clearScheduledEnd();
+      await endAllLiveActivities();
+      return;
+    }
+    scheduleDebouncedEnd();
     return;
   }
+
+  clearScheduledEnd();
 
   try {
     const f = getFactory();
@@ -174,6 +185,11 @@ async function syncOrderLiveActivityImpl(order: OrderRequest | null): Promise<vo
       "orderLiveActivity",
       { orderId: order?.id, status: order?.status, errorMessage: msg, error: e }
     );
+    reportLiveActivityIssue("activitykit_start_or_update_failed", {
+      orderId: order?.id ?? null,
+      status: order?.status ?? null,
+      errorMessage: msg,
+    });
   }
 }
 
@@ -181,11 +197,19 @@ async function syncOrderLiveActivityImpl(order: OrderRequest | null): Promise<vo
  * Synchronise la Live Activity iOS (îlot / verrouillage) avec la commande suivie.
  * Android : no-op.
  */
-export function syncOrderLiveActivity(order: OrderRequest | null): Promise<void> {
+export function syncOrderLiveActivity(
+  order: OrderRequest | null,
+  options?: SyncOrderLiveActivityOptions
+): Promise<void> {
+  const opts = options ?? {};
   syncChain = syncChain
-    .then(() => syncOrderLiveActivityImpl(order))
-    .catch(() => {
-      /* éviter de bloquer la file */
+    .then(() => syncOrderLiveActivityImpl(order, opts))
+    .catch((e) => {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      logger.warn("[orderLiveActivity] syncChain", "orderLiveActivity", {
+        errorMessage,
+      });
+      reportLiveActivityIssue("activitykit_sync_chain_failed", { errorMessage });
     });
   return syncChain;
 }
