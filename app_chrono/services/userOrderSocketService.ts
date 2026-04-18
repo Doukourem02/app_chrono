@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import Constants from 'expo-constants';
 import { config } from '../config';
-import { useOrderStore } from '../store/useOrderStore';
+import { useOrderStore, type OrderRequest } from '../store/useOrderStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
 import { logger } from '../utils/logger';
@@ -368,7 +368,12 @@ class UserOrderSocketService {
         const order = data?.order;
         if (order && order.id) {
           const store = useOrderStore.getState();
-          store.addOrder(order as any);
+          const already = store.activeOrders.find((o) => o.id === order.id);
+          if (already) {
+            store.updateFromSocket({ order: order as any });
+          } else {
+            store.addOrder(order as any);
+          }
           // Sélectionner automatiquement la nouvelle commande créée
           // Cela garantit que la recherche de livreur se fait pour la nouvelle commande, pas pour l'ancienne
           logger.info('Sélection automatique de la nouvelle commande créée', 'userOrderSocketService', {
@@ -1091,6 +1096,52 @@ class UserOrderSocketService {
 
         finishOrderCreation(false);
         return;
+      }
+
+      /**
+       * Commande `pending` en store + Live Activity **dès la persistance HTTP**, avant `create-order` / `order-created`.
+       * Sinon l’événement socket arrive souvent après que l’utilisateur ait déjà ouvert l’app livreur → `start` hors premier plan.
+       */
+      try {
+        const { user } = useAuthStore.getState();
+        const displayName =
+          orderData.userInfo.name ||
+          [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
+          user?.email ||
+          "Client";
+        const optimistic: OrderRequest = {
+          id: dbRecord.orderId,
+          user: {
+            id: this.userId!,
+            name: displayName,
+          },
+          pickup: {
+            address: orderData.pickup.address,
+            coordinates: orderData.pickup.coordinates,
+          },
+          dropoff: {
+            address: orderData.dropoff.address,
+            coordinates: orderData.dropoff.coordinates,
+          },
+          price: dbRecord.priceCfa,
+          deliveryMethod: orderData.deliveryMethod,
+          distance: dbRecord.distanceKm,
+          estimatedDuration: dbRecord.etaLabel || undefined,
+          status: "pending",
+        };
+        const st = useOrderStore.getState();
+        if (!st.activeOrders.some((o) => o.id === optimistic.id)) {
+          st.addOrder(optimistic);
+        } else {
+          st.updateOrder(optimistic.id, optimistic);
+        }
+        st.setSelectedOrder(optimistic.id);
+        const placed = useOrderStore.getState().activeOrders.find((o) => o.id === dbRecord.orderId);
+        if (placed) {
+          void syncOrderLiveActivity(placed);
+        }
+      } catch (e) {
+        logger.warn("Commande optimiste / Live Activity après HTTP", "userOrderSocketService", e);
       }
 
       const payload = {
