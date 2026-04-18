@@ -9,6 +9,9 @@ import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
  * - Compact / minimal : îlot au repos
  * - Étendu : leading + center + trailing + bottom autour de l’îlot
  *
+ * Icônes : **SF Symbols uniquement** — pas de logo image (asset / uiImage), volontairement retiré
+ * (Live Activities + expo-ui : les bitmaps embarqués ont été une source de friction / rendu).
+ *
  * Sous iOS 26+, `levelOfDetail === 'simplified'` peut exiger moins de vues ; sinon l’îlot peut rester sur un indicateur de chargement.
  */
 const ON_DARK = {
