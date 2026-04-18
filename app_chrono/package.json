@@ -10,7 +10,8 @@
     "android": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo run:android",
     "ios": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo run:ios",
     "web": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo start --web",
-    "lint": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo lint"
+    "lint": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo lint",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo/ui": "~55.0.11",
@@ -65,11 +66,12 @@
     "baseline-browser-mapping": "^2.9.2",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.0",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   },
   "private": true,
   "engines": {
-  "node": "20.x",
-  "npm": "10.x"
-}
+    "node": "20.x",
+    "npm": "10.x"
+  }
 }

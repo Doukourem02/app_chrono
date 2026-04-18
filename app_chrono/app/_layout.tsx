@@ -1,7 +1,7 @@
 import { Stack } from "expo-router";
 import { getNetworkStateAsync, useNetworkState } from "expo-network";
 import { useEffect, useRef } from "react";
-import { AppState, AppStateStatus, View } from "react-native";
+import { AppState, AppStateStatus, Platform, View } from "react-native";
 import { initSentry } from "../utils/sentry";
 import { ErrorBoundary } from "../components/error/ErrorBoundary";
 import { ErrorModalsProvider } from "../components/error/ErrorModalsProvider";
@@ -30,6 +30,12 @@ import "../config/envCheck";
 import "../mapboxInit";
 
 initSentry();
+
+/** Pré-enregistre le layout Live Activity (App Group) au démarrage — uniquement iOS. */
+if (Platform.OS === "ios") {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("../widgets/orderTrackingLiveActivity");
+}
 
 function LiveActivityBridge() {
   useOrderLiveActivitySync();

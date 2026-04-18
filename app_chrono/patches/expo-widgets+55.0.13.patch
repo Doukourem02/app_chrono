@@ -1,0 +1,31 @@
+diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
+index 1111111..2222222 100644
+--- a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
++++ b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
+@@ -1,7 +1,16 @@
+ import Foundation
+ import JavaScriptCore
+ 
++/// Cache JSContext par chaîne de layout. Recréer un JSC et charger ExpoWidgets.bundle à chaque
++/// réévaluation de l’îlot (très fréquent) dépasse souvent le budget mémoire de l’extension et
++/// provoque des vues vides / spinners (expo/expo#44543).
++private var cachedWidgetContexts: [String: JSContext] = [:]
++
+ func createWidgetContext(layout: String) -> JSContext? {
++  if !layout.isEmpty, let cached = cachedWidgetContexts[layout] {
++    return cached
++  }
++
+   guard let context = JSContext() else {
+     return nil
+   }
+@@ -25,5 +34,9 @@ func createWidgetContext(layout: String) -> JSContext? {
+   // Inject layout
+   let layoutValue = context.evaluateScript("(\(layout))")
+   context.setObject(layoutValue, forKeyedSubscript: "__expoWidgetLayout" as NSString)
++
++  if !layout.isEmpty {
++    cachedWidgetContexts[layout] = context
++  }
+   return context
+ }
