@@ -111,6 +111,16 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
   };
 }
 
+/** iOS a déjà retiré l’activité (utilisateur, système, fin) alors que le bridge garde encore l’objet `update`. */
+function isStaleLiveActivityNativeError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("can't find live activity") ||
+    m.includes("cannot find live activity") ||
+    m.includes("find live activity with id")
+  );
+}
+
 /** Termine toutes les Live Activities de ce type. */
 async function endAllLiveActivities(): Promise<void> {
   active = null;
@@ -159,8 +169,34 @@ async function syncOrderLiveActivityImpl(
     const url = `appchrono://order-tracking/${encodeURIComponent(order!.id)}`;
 
     if (active?.orderId === order!.id) {
-      await active.live.update(props);
-      return;
+      try {
+        await active.live.update(props);
+        return;
+      } catch (e) {
+        const updateMsg = e instanceof Error ? e.message : String(e);
+        if (!isStaleLiveActivityNativeError(updateMsg)) {
+          logger.warn(
+            "[orderLiveActivity] update ActivityKit a échoué",
+            "orderLiveActivity",
+            { orderId: order!.id, status: order!.status, errorMessage: updateMsg, error: e }
+          );
+          reportLiveActivityIssue("activitykit_start_or_update_failed", {
+            orderId: order!.id,
+            status: order!.status,
+            errorMessage: updateMsg,
+          });
+          return;
+        }
+        if (__DEV__) {
+          logger.info(
+            "[orderLiveActivity] Référence Live Activity obsolète côté iOS — recréation",
+            "orderLiveActivity",
+            { orderId: order!.id }
+          );
+        }
+        active = null;
+        // enchaîner sur end + start ci-dessous
+      }
     }
 
     /**
