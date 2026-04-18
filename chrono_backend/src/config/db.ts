@@ -59,7 +59,11 @@ if (process.env.DATABASE_URL) {
     // Test de connexion initial (plusieurs essais : la DB peut être lente au premier contact après déploiement)
     const verifyAttempts = parseInt(process.env.DB_POOL_VERIFY_ATTEMPTS || '4', 10);
     const verifyRetryDelayMs = parseInt(process.env.DB_POOL_VERIFY_RETRY_DELAY_MS || '3000', 10);
+    const verifyInitialDelayMs = parseInt(process.env.DB_POOL_VERIFY_INITIAL_DELAY_MS || '0', 10);
     void (async () => {
+      if (verifyInitialDelayMs > 0) {
+        await new Promise((r) => setTimeout(r, verifyInitialDelayMs));
+      }
       let lastErr: unknown;
       for (let attempt = 1; attempt <= verifyAttempts; attempt++) {
         try {
@@ -71,9 +75,10 @@ if (process.env.DATABASE_URL) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           const errorCode = (err as { code?: string })?.code;
           if (attempt < verifyAttempts) {
-            logger.warn(
-              `Test PostgreSQL échoué (essai ${attempt}/${verifyAttempts}), nouvel essai dans ${verifyRetryDelayMs} ms`,
-              { error: errorMessage, code: errorCode },
+            // info : fréquent au cold start (Render ↔ Supabase) ; warn réservé à l'échec définitif
+            logger.info(
+              `PostgreSQL: premier contact lent ou indisponible (essai ${attempt}/${verifyAttempts}), nouvel essai dans ${verifyRetryDelayMs} ms`,
+              { detail: errorMessage, code: errorCode },
             );
             await new Promise((r) => setTimeout(r, verifyRetryDelayMs));
           }
