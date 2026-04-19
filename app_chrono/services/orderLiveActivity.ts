@@ -23,7 +23,29 @@ const END_PROPS: OrderTrackingLiveProps = {
   isPending: false,
   statusLabel: "Terminee",
   progress: 1,
+  driverAvatarUrl: "",
+  driverPhone: "",
+  bannerClockLabel: "",
 };
+
+/** Chiffres pour `tel:` / `sms:` (Live Activity). */
+function digitsForTel(phone: string | undefined): string {
+  if (!phone?.trim()) return "";
+  return phone.replace(/[^\d+]/g, "");
+}
+
+function formatBannerClock(order: OrderRequest): string {
+  const raw = order.createdAt;
+  if (raw == null) return "—";
+  const d =
+    typeof raw === "string" || typeof raw === "number"
+      ? new Date(raw)
+      : raw instanceof Date
+        ? raw
+        : new Date(String(raw));
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(d);
+}
 
 /** Inclut `pending` pour que l’utilisateur voie l’activité dès la commande créée (avant acceptation chauffeur). */
 const TRACKING_STATUSES = DELIVERY_IN_PROGRESS_STATUSES;
@@ -177,10 +199,18 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
       isPending: true,
       statusLabel: liveStatusLabel(status),
       progress: progressFromStatus(status),
+      driverAvatarUrl: "",
+      driverPhone: "",
+      bannerClockLabel: formatBannerClock(order),
     };
   }
 
   const driver = order.driver;
+  const avatarRaw =
+    driver?.avatar_url?.trim() ||
+    driver?.profile_image_url?.trim() ||
+    driver?.avatar?.trim() ||
+    "";
   const plate = driver?.vehicle_plate?.trim();
   const name =
     driver?.name?.trim() ||
@@ -202,6 +232,9 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
     isPending: false,
     statusLabel: liveStatusLabel(status),
     progress: clampProgress(progressFromStatus(status)),
+    driverAvatarUrl: avatarRaw,
+    driverPhone: digitsForTel(driver?.phone),
+    bannerClockLabel: formatBannerClock(order),
   };
 }
 

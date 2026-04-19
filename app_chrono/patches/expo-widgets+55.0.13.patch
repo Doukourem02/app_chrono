@@ -249,40 +249,228 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..3897a03 100644
+index 3e6ff0b..faf2a93 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -13,7 +13,27 @@ struct LiveActivityBanner: View {
+@@ -1,6 +1,207 @@
+ import SwiftUI
+ import WidgetKit
+ 
++private let kronoBannerAction = Color(red: 1.0, green: 0.42, blue: 0.21)
++private let kronoBannerChip = Color(red: 0.173, green: 0.173, blue: 0.18)
++
++@available(iOS 16.1, *)
++struct OrderTrackingBannerFallback: View {
++  let propsJson: String
++
++  private var p: (eta: String?, vehicle: String?, status: String?, plate: String?) {
++    ExpoWidgetsLiveActivityPropsFallback.parse(propsJson)
++  }
++
++  private var b: (phone: String?, avatar: String?, clock: String?, pending: Bool) {
++    ExpoWidgetsLiveActivityPropsFallback.parseBannerExtras(propsJson)
++  }
++
++  private var riderTitle: String {
++    b.pending ? "Livreur" : "Votre livreur"
++  }
++
++  private var vehicleLine: String {
++    p.vehicle ?? "Krono"
++  }
++
++  private var clockLine: String {
++    if let c = b.clock, !c.isEmpty { return c }
++    return "—"
++  }
++
++  private var etaMain: String {
++    if b.pending { return "Recherche" }
++    guard let e = p.eta, !e.isEmpty else { return "—" }
++    let t = e.trimmingCharacters(in: .whitespacesAndNewlines)
++    if let n = Int(t), String(n) == t { return String(n) }
++    let parts = t.split(whereSeparator: { $0.isWhitespace })
++    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
++      return String(n)
++    }
++    return t
++  }
++
++  private var etaSuffix: String {
++    if b.pending { return "" }
++    guard let e = p.eta, !e.isEmpty else { return "" }
++    let t = e.trimmingCharacters(in: .whitespacesAndNewlines)
++    if let n = Int(t), String(n) == t { return " min" }
++    let parts = t.split(whereSeparator: { $0.isWhitespace })
++    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), Int(parts[0]) != nil { return " min" }
++    return ""
++  }
++
++  var body: some View {
++    VStack(alignment: .leading, spacing: 8) {
++      HStack(alignment: .center, spacing: 12) {
++        avatarView
++        VStack(alignment: .leading, spacing: 3) {
++          Text(riderTitle)
++            .font(.caption.weight(.medium))
++            .foregroundStyle(.secondary)
++          Text(vehicleLine)
++            .font(.headline.weight(.bold))
++            .foregroundStyle(.primary)
++        }
++        Spacer(minLength: 0)
++        HStack(spacing: 10) {
++          phoneButton
++          messageButton
++        }
++      }
++      .padding(.horizontal, 4)
++
++      RoundedRectangle(cornerRadius: 0.5)
++        .fill(Color(red: 0.23, green: 0.23, blue: 0.24))
++        .frame(height: 1)
++        .frame(maxWidth: .infinity)
++
++      HStack(alignment: .center, spacing: 12) {
++        HStack(spacing: 10) {
++          ZStack {
++            Circle()
++              .fill(kronoBannerChip)
++              .frame(width: 36, height: 36)
++            Image(systemName: "clock.fill")
++              .foregroundStyle(kronoBannerAction)
++              .font(.system(size: 16))
++          }
++          VStack(alignment: .leading, spacing: 2) {
++            Text("Heure")
++              .font(.caption2.weight(.medium))
++              .foregroundStyle(.secondary)
++            Text(clockLine)
++              .font(.subheadline.weight(.semibold))
++              .foregroundStyle(.primary)
++          }
++        }
++        Spacer(minLength: 0)
++        HStack(alignment: .firstTextBaseline, spacing: 2) {
++          Text(etaMain)
++            .font(.system(size: 28, weight: .bold))
++            .foregroundStyle(kronoBannerAction)
++          if !etaSuffix.isEmpty {
++            Text(etaSuffix)
++              .font(.system(size: 16, weight: .bold))
++              .foregroundStyle(kronoBannerAction)
++          }
++        }
++      }
++      .padding(.horizontal, 4)
++      .padding(.top, 2)
++    }
++    .padding(12)
++  }
++
++  @ViewBuilder
++  private var avatarView: some View {
++    ZStack {
++      Circle()
++        .fill(kronoBannerChip)
++        .frame(width: 52, height: 52)
++      if let urlStr = b.avatar, let url = URL(string: urlStr) {
++        AsyncImage(url: url) { phase in
++          switch phase {
++          case .success(let image):
++            image
++              .resizable()
++              .scaledToFill()
++              .frame(width: 48, height: 48)
++              .clipShape(Circle())
++          case .failure:
++            Image(systemName: "person.crop.circle.fill")
++              .foregroundStyle(.secondary)
++              .font(.system(size: 30))
++          default:
++            Image(systemName: "person.crop.circle.fill")
++              .foregroundStyle(.tertiary)
++              .font(.system(size: 30))
++          }
++        }
++      } else {
++        Image(systemName: "person.crop.circle.fill")
++          .foregroundStyle(.secondary)
++          .font(.system(size: 30))
++      }
++    }
++    .frame(width: 52, height: 52)
++  }
++
++  @ViewBuilder
++  private var phoneButton: some View {
++    if let tel = b.phone, !tel.isEmpty, let url = URL(string: "tel:\(tel)") {
++      Link(destination: url) {
++        ZStack {
++          Circle()
++            .fill(kronoBannerChip)
++            .frame(width: 44, height: 44)
++          Image(systemName: "phone.fill")
++            .foregroundStyle(kronoBannerAction)
++            .font(.system(size: 18))
++        }
++      }
++      .frame(width: 44, height: 44)
++    } else {
++      ZStack {
++        Circle()
++          .fill(Color(red: 0.11, green: 0.11, blue: 0.12))
++          .frame(width: 44, height: 44)
++        Image(systemName: "phone.fill")
++          .foregroundStyle(Color(red: 0.32, green: 0.32, blue: 0.32))
++          .font(.system(size: 18))
++      }
++      .frame(width: 44, height: 44)
++    }
++  }
++
++  @ViewBuilder
++  private var messageButton: some View {
++    if let tel = b.phone, !tel.isEmpty, let url = URL(string: "sms:\(tel)") {
++      Link(destination: url) {
++        ZStack {
++          Circle()
++            .fill(kronoBannerChip)
++            .frame(width: 44, height: 44)
++          Image(systemName: "message.fill")
++            .foregroundStyle(kronoBannerAction)
++            .font(.system(size: 18))
++        }
++      }
++      .frame(width: 44, height: 44)
++    } else {
++      ZStack {
++        Circle()
++          .fill(Color(red: 0.11, green: 0.11, blue: 0.12))
++          .frame(width: 44, height: 44)
++        Image(systemName: "message.fill")
++          .foregroundStyle(Color(red: 0.32, green: 0.32, blue: 0.32))
++          .font(.system(size: 18))
++      }
++      .frame(width: 44, height: 44)
++    }
++  }
++}
++
+ @available(iOS 18.0, *)
+ struct LiveActivityBanner: View {
+   @Environment(\.activityFamily) var activityFamily
+@@ -13,7 +214,7 @@ struct LiveActivityBanner: View {
      } else if let node = nodes?["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
 -      EmptyView()
-+      let p = ExpoWidgetsLiveActivityPropsFallback.parse(context.state.props)
-+      VStack(alignment: .leading, spacing: 6) {
-+        Text("Krono")
-+          .font(.headline)
-+          .foregroundStyle(.orange)
-+        if let eta = p.eta {
-+          Text(eta).font(.title3.weight(.bold)).foregroundStyle(.primary)
-+        }
-+        if let v = p.vehicle {
-+          Text(v).font(.subheadline).foregroundStyle(.secondary)
-+        }
-+        if let st = p.status {
-+          Text(st).font(.caption).foregroundStyle(.tertiary)
-+        }
-+        if p.eta == nil, p.vehicle == nil, p.status == nil {
-+          Text("Bannière indisponible")
-+            .font(.caption)
-+            .foregroundStyle(.secondary)
-+        }
-+      }
-+      .padding(12)
++      OrderTrackingBannerFallback(propsJson: context.state.props)
      }
    }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..06ab212 100644
+index 1cd5ca9..1c4c149 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
 @@ -2,6 +2,13 @@ import SwiftUI
@@ -362,25 +550,65 @@ index 1cd5ca9..06ab212 100644
    }
    return nil
  }
-@@ -86,6 +125,24 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
+@@ -86,6 +125,64 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
    return env
  }
  
 +/// Parse `ActivityKit` `ContentState.props` JSON for native fallback when `__expoWidgetRender` returns `{}`.
 +enum ExpoWidgetsLiveActivityPropsFallback {
++  private static func stringField(_ key: String, _ root: [String: Any]) -> String? {
++    if let v = root[key] as? String {
++      let t = v.trimmingCharacters(in: .whitespacesAndNewlines)
++      return t.isEmpty ? nil : t
++    }
++    if let v = root[key] as? Int { return String(v) }
++    if let v = root[key] as? Double {
++      if v.rounded() == v { return String(Int(v)) }
++      return String(v)
++    }
++    return nil
++  }
++
++  /// Aligné sur `orderTrackingLiveActivity.tsx` : `compactTitle = isPending ? "Recherche" : etaDisplay`.
++  static func compactTrailingLine(_ propsJson: String) -> String {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return "—"
++    }
++    let pending = root["isPending"] as? Bool == true
++    if pending { return "Recherche" }
++    if let eta = stringField("etaLabel", root) { return eta }
++    return "—"
++  }
++
 +  static func parse(_ propsJson: String) -> (eta: String?, vehicle: String?, status: String?, plate: String?) {
 +    guard let data = propsJson.data(using: .utf8),
 +          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
 +      return (nil, nil, nil, nil)
 +    }
-+    func s(_ key: String) -> String? {
-+      guard let v = root[key] as? String else { return nil }
-+      let t = v.trimmingCharacters(in: .whitespacesAndNewlines)
-+      return t.isEmpty ? nil : t
++    let pending = root["isPending"] as? Bool == true
++    let status = stringField("statusLabel", root) ?? (pending ? "Recherche chauffeur" : nil)
++    return (
++      stringField("etaLabel", root),
++      stringField("vehicleLabel", root),
++      status,
++      stringField("plateLabel", root)
++    )
++  }
++
++  /// Champs additionnels pour la bannière verrouillage (photo, téléphone, heure affichée).
++  static func parseBannerExtras(_ propsJson: String) -> (phone: String?, avatar: String?, clock: String?, pending: Bool) {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return (nil, nil, nil, false)
 +    }
 +    let pending = root["isPending"] as? Bool == true
-+    let status = s("statusLabel") ?? (pending ? "Recherche chauffeur" : nil)
-+    return (s("etaLabel"), s("vehicleLabel"), status, s("plateLabel"))
++    return (
++      stringField("driverPhone", root),
++      stringField("driverAvatarUrl", root),
++      stringField("bannerClockLabel", root),
++      pending
++    )
 +  }
 +}
 +
@@ -494,7 +722,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..dc1c39a 100644
+index 9eae718..bf9bb06 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -12,39 +12,33 @@ struct LiveActivityAttributes: ActivityAttributes {
@@ -545,7 +773,7 @@ index 9eae718..dc1c39a 100644
        }
        .widgetURL(getLiveActivityUrl(forName: context.state.name))
      }
-@@ -52,13 +46,95 @@ public struct WidgetLiveActivity: Widget {
+@@ -52,13 +46,99 @@ public struct WidgetLiveActivity: Widget {
    }
  }
  
@@ -571,57 +799,61 @@ index 9eae718..dc1c39a 100644
 +        .foregroundStyle(.orange)
 +        .imageScale(.medium)
 +    case "compactTrailing":
-+      if let eta = p.eta {
-+        Text(eta)
-+          .font(.caption.weight(.semibold))
-+          .foregroundStyle(.orange)
-+          .lineLimit(1)
-+          .minimumScaleFactor(0.75)
-+      } else {
-+        Image(systemName: "car.fill")
-+          .foregroundStyle(.orange)
-+          .imageScale(.medium)
-+      }
++      Text(ExpoWidgetsLiveActivityPropsFallback.compactTrailingLine(propsJson))
++        .font(.caption.weight(.semibold))
++        .foregroundStyle(.orange)
++        .lineLimit(1)
++        .minimumScaleFactor(0.75)
 +    case "expandedCenter":
++      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
++    case "expandedLeading":
 +      VStack(alignment: .leading, spacing: 4) {
-+        Text("Krono")
++        Text("KRONO")
 +          .font(.caption.weight(.bold))
-+          .foregroundStyle(.orange)
++          .foregroundStyle(Color(red: 0.545, green: 0.361, blue: 0.965))
 +        if let eta = p.eta {
 +          Text(eta).font(.title3.weight(.bold)).foregroundStyle(.primary)
 +        }
 +        if let v = p.vehicle {
 +          Text(v).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
 +        }
-+        if let st = p.status {
-+          Text(st).font(.caption).foregroundStyle(.tertiary).lineLimit(2)
-+        }
 +      }
-+      .padding(6)
-+    case "expandedLeading":
-+      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
++      .frame(maxWidth: 200, alignment: .leading)
++      .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 6))
 +    case "expandedTrailing":
 +      VStack(alignment: .trailing, spacing: 6) {
 +        if let plate = p.plate {
-+          Text(plate)
-+            .font(.caption.weight(.bold))
-+            .foregroundStyle(.white)
-+            .padding(.horizontal, 10)
-+            .padding(.vertical, 6)
-+            .background(Capsule().fill(Color(white: 0.12)))
++          ZStack {
++            RoundedRectangle(cornerRadius: 10)
++              .fill(Color(red: 0.95, green: 0.95, blue: 0.96))
++              .frame(width: 146, height: 42)
++            RoundedRectangle(cornerRadius: 8)
++              .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
++              .frame(width: 138, height: 34)
++            Text(plate)
++              .font(.caption.weight(.bold))
++              .foregroundStyle(.white)
++          }
 +        }
 +        Image(systemName: "car.side.fill")
-+          .foregroundStyle(.orange)
++          .foregroundStyle(Color(red: 0.769, green: 0.71, blue: 0.98))
 +      }
-+      .padding(6)
++      .frame(maxWidth: .infinity, alignment: .trailing)
++      .padding(EdgeInsets(top: 8, leading: 6, bottom: 8, trailing: 8))
 +    case "expandedBottom":
-+      if let st = p.status {
-+        Text(st).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-+      } else {
-+        Text("Suivi Krono")
-+          .font(.caption2)
-+          .foregroundStyle(.tertiary)
++      VStack(alignment: .leading, spacing: 8) {
++        if let st = p.status {
++          Text(st).font(.caption).foregroundStyle(.secondary).lineLimit(2)
++        } else {
++          Text("Suivi Krono")
++            .font(.caption)
++            .foregroundStyle(.tertiary)
++        }
++        RoundedRectangle(cornerRadius: 4)
++          .fill(Color(red: 0.9, green: 0.9, blue: 0.92))
++          .frame(width: 250, height: 6)
 +      }
++      .padding(EdgeInsets(top: 4, leading: 12, bottom: 10, trailing: 12))
 +    default:
 +      Image(systemName: "car.fill")
 +        .foregroundStyle(.orange)
@@ -642,7 +874,7 @@ index 9eae718..dc1c39a 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -67,17 +143,19 @@ private struct LiveActivitySectionView: View {
+@@ -67,17 +147,19 @@ private struct LiveActivitySectionView: View {
      if let node = nodes[sectionName] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
@@ -664,32 +896,12 @@ index 9eae718..dc1c39a 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -88,7 +166,27 @@ private struct LiveActivityBannerView: View {
+@@ -88,7 +170,7 @@ private struct LiveActivityBannerView: View {
      } else if let node = nodes["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
 -      EmptyView()
-+      let p = ExpoWidgetsLiveActivityPropsFallback.parse(context.state.props)
-+      VStack(alignment: .leading, spacing: 6) {
-+        Text("Krono")
-+          .font(.headline)
-+          .foregroundStyle(.orange)
-+        if let eta = p.eta {
-+          Text(eta).font(.title3.weight(.bold)).foregroundStyle(.primary)
-+        }
-+        if let v = p.vehicle {
-+          Text(v).font(.subheadline).foregroundStyle(.secondary)
-+        }
-+        if let st = p.status {
-+          Text(st).font(.caption).foregroundStyle(.tertiary)
-+        }
-+        if p.eta == nil, p.vehicle == nil, p.status == nil {
-+          Text("Bannière indisponible")
-+            .font(.caption)
-+            .foregroundStyle(.secondary)
-+        }
-+      }
-+      .padding(12)
++      OrderTrackingBannerFallback(propsJson: context.state.props)
      }
    }
  }
