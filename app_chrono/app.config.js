@@ -19,7 +19,7 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
-      buildNumber: "73",
+      buildNumber: "74",
       /**
        * Live Activities / Dynamic Island (ActivityKit) requiert iOS 16.2+ côté target widget.
        * Aligner la cible principale évite des erreurs CocoaPods pendant "Install pods".
@@ -57,7 +57,14 @@ module.exports = {
     plugins: [
       "expo-asset",
       "expo-router",
-      "@sentry/react-native",
+      [
+        "@sentry/react-native",
+        {
+          /** Slugs Sentry (Settings → Organization / Project). Écrits dans ios/android/sentry.properties au prebuild. */
+          organization: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT,
+        },
+      ],
       "expo-audio",
       "expo-font",
       "expo-image",

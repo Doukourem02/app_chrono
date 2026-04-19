@@ -64,16 +64,60 @@ index 947fc2e..c7ebb7e 100644
 +    )
 +  }
  }
+diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
+index 1cd5ca9..9a89fab 100644
+--- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
++++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
+@@ -47,7 +47,7 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
+   widgetEnvironment["timestamp"] = Int(Date.now.timeIntervalSince1970 * 1000)
+ 
+   let result = context.objectForKeyedSubscript("__expoWidgetRender")?.call(
+-    withArguments: [propsDict, environment]
++    withArguments: [propsDict, widgetEnvironment]
+   )
+   return result?.toObject() as? [String: Any] ?? [:]
+ }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-index 68ff52a..ffed070 100644
+index 68ff52a..f9caece 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-@@ -1,7 +1,14 @@
+@@ -1,7 +1,45 @@
  import Foundation
  import JavaScriptCore
  
 +// Cache JSContext per layout string. expo/expo#44543 - avoid recreation on each island refresh.
 +private var cachedWidgetContexts: [String: JSContext] = [:]
++
++/// Marker for `Bundle(for:)` — resources may live in the pod framework instead of `Bundle.main` in some embeds.
++private final class ExpoWidgetsResourceMarker {}
++
++/// Loads Metro output for the widget runtime (nested bundle, flat file, or framework bundle). expo/expo#43654
++private func loadExpoWidgetsJS() -> String? {
++  let bundles: [Bundle] = [Bundle.main, Bundle(for: ExpoWidgetsResourceMarker.self)]
++
++  for bundle in bundles {
++    if let outerURL = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle"),
++       let outer = Bundle(url: outerURL),
++       let innerURL = outer.url(forResource: "ExpoWidgets", withExtension: "bundle"),
++       let js = try? String(contentsOf: innerURL, encoding: .utf8) {
++      return js
++    }
++  }
++
++  for bundle in bundles {
++    if let flatURL = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle") {
++      var isDir: ObjCBool = false
++      if FileManager.default.fileExists(atPath: flatURL.path, isDirectory: &isDir),
++         !isDir.boolValue,
++         let js = try? String(contentsOf: flatURL, encoding: .utf8) {
++        return js
++      }
++    }
++  }
++
++  print("[ExpoWidgets] Missing ExpoWidgets.bundle (nested, flat, and framework bundle lookups failed)")
++  return nil
++}
 +
  func createWidgetContext(layout: String) -> JSContext? {
 +  if !layout.isEmpty, let cached = cachedWidgetContexts[layout] {
@@ -83,7 +127,21 @@ index 68ff52a..ffed070 100644
    guard let context = JSContext() else {
      return nil
    }
-@@ -25,5 +32,9 @@ func createWidgetContext(layout: String) -> JSContext? {
+@@ -12,12 +50,7 @@ func createWidgetContext(layout: String) -> JSContext? {
+     }
+   }
+ 
+-  // Inject ExpoUI bundle
+-  guard let bundleURL = Bundle.main.url(forResource: "ExpoWidgets", withExtension: "bundle"),
+-        let bundle = Bundle(url: bundleURL),
+-        let url = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle"),
+-        let bundleJS = try? String(contentsOf: url, encoding: .utf8) else {
+-    print("[ExpoWidgets] Missing ExpoWidgets.bundle")
++  guard let bundleJS = loadExpoWidgetsJS() else {
+     return nil
+   }
+   context.evaluateScript(bundleJS)
+@@ -25,5 +58,9 @@ func createWidgetContext(layout: String) -> JSContext? {
    // Inject layout
    let layoutValue = context.evaluateScript("(\(layout))")
    context.setObject(layoutValue, forKeyedSubscript: "__expoWidgetLayout" as NSString)
