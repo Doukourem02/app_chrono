@@ -11,10 +11,63 @@ const END_PROPS: OrderTrackingLiveProps = {
   vehicleLabel: "Course terminée",
   plateLabel: "",
   isPending: false,
+  statusLabel: "Terminee",
+  progress: 1,
 };
 
 /** Inclut `pending` pour que l’utilisateur voie l’activité dès la commande créée (avant acceptation chauffeur). */
 const TRACKING_STATUSES = DELIVERY_IN_PROGRESS_STATUSES;
+
+function clampProgress(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}
+
+function progressFromStatus(status: OrderStatus): number {
+  switch (status) {
+    case "pending":
+      return 0.08;
+    case "accepted":
+      return 0.2;
+    case "enroute":
+      return 0.38;
+    case "in_progress":
+      return 0.52;
+    case "picked_up":
+      return 0.7;
+    case "delivering":
+      return 0.88;
+    case "completed":
+      return 1;
+    default:
+      return 0.12;
+  }
+}
+
+function liveStatusLabel(status: OrderStatus): string {
+  switch (status) {
+    case "pending":
+      return "Recherche chauffeur";
+    case "accepted":
+      return "Livreur assigne";
+    case "enroute":
+      return "Vers le point de retrait";
+    case "in_progress":
+      return "Course en preparation";
+    case "picked_up":
+      return "Colis recupere";
+    case "delivering":
+      return "En livraison";
+    case "completed":
+      return "Livraison terminee";
+    case "cancelled":
+      return "Commande annulee";
+    case "declined":
+      return "Commande refusee";
+    default:
+      return "Suivi Krono";
+  }
+}
 
 /** Même logique que le hook de sync : statut API parfois mal câblé (casse, tirets). */
 export function shouldSyncLiveActivityForOrder(order: OrderRequest): boolean {
@@ -85,6 +138,8 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
       vehicleLabel: eta ? `≈ ${eta}` : "En attente d’un livreur",
       plateLabel: order.dropoff?.address?.slice(0, 28) || "Krono",
       isPending: true,
+      statusLabel: liveStatusLabel(status),
+      progress: progressFromStatus(status),
     };
   }
 
@@ -108,6 +163,8 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
     vehicleLabel: name || detail || "Krono",
     plateLabel: plate || "KRONO",
     isPending: false,
+    statusLabel: liveStatusLabel(status),
+    progress: clampProgress(progressFromStatus(status)),
   };
 }
 
