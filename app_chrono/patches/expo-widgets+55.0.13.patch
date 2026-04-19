@@ -116,6 +116,38 @@ index 1d2b971..9783ee6 100644
      },
      :execution_position => :before_compile,
      :input_files  => ["#{__dir__}/../bundle/build/ExpoWidgets.bundle"]
+diff --git a/node_modules/expo-widgets/ios/LiveActivityFactory.swift b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
+index caf1e05..afd4ed8 100644
+--- a/node_modules/expo-widgets/ios/LiveActivityFactory.swift
++++ b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
+@@ -3,6 +3,8 @@ import ActivityKit
+ 
+ final class LiveActivityFactory: SharedObject {
+   let name: String
++  /** Kept so we can re-persist the Metro layout immediately before `Activity.request` (extension reads App Group). */
++  private let layout: String
+ 
+   static var pushNotificationsEnabled: Bool {
+     Bundle.main.object(forInfoDictionaryKey: pushNotificationsEnabledKey) as? Bool ?? false
+@@ -10,6 +12,7 @@ final class LiveActivityFactory: SharedObject {
+ 
+   init(name: String, layout: String) {
+     self.name = name
++    self.layout = layout
+     WidgetsStorage.set(layout, forKey: "__expo_widgets_live_activity_\(name)_layout")
+   }
+ 
+@@ -19,6 +22,10 @@ final class LiveActivityFactory: SharedObject {
+       throw LiveActivitiesNotSupportedException()
+     }
+ 
++    // Widget extension evaluates `layout` from shared UserDefaults; write again right before the activity exists
++    // so the extension never renders with a missing/empty layout (black Dynamic Island).
++    WidgetsStorage.set(layout, forKey: "__expo_widgets_live_activity_\(name)_layout")
++
+     if let url {
+       WidgetsStorage.set(url.absoluteString, forKey: "__expo_widgets_live_activity_\(name)_url")
+     }
 diff --git a/node_modules/expo-widgets/ios/Widgets/EntryView.swift b/node_modules/expo-widgets/ios/Widgets/EntryView.swift
 index 947fc2e..c7ebb7e 100644
 --- a/node_modules/expo-widgets/ios/Widgets/EntryView.swift
@@ -165,10 +197,35 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..9a89fab 100644
+index 1cd5ca9..039f714 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-@@ -47,7 +47,7 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
+@@ -2,6 +2,10 @@ import SwiftUI
+ import WidgetKit
+ import Foundation
+ 
++private enum ExpoWidgetsLiveActivityDiagnostics {
++  static var didLogEmptyLayout = false
++}
++
+ func parseTimeline(identifier: String, name: String, family: WidgetFamily) -> [WidgetsTimelineEntry] {
+   let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(name)_timeline") ?? []
+ 
+@@ -37,6 +41,13 @@ func evaluateLayout(
+ 
+ func getLiveActivityNodes(forName name: String, props: String = "{}", environment: [String: Any]) -> [String: Any] {
+   let layout = WidgetsStorage.getString(forKey: "__expo_widgets_live_activity_\(name)_layout") ?? ""
++  if layout.isEmpty, !ExpoWidgetsLiveActivityDiagnostics.didLogEmptyLayout {
++    ExpoWidgetsLiveActivityDiagnostics.didLogEmptyLayout = true
++    print(
++      "[ExpoWidgets] Live Activity layout string is empty for \"\(name)\" — Dynamic Island / lock screen will show no UI. " +
++        "Ensure the app process wrote to the App Group before ActivityKit started (Krono loads createLiveActivity on launch)."
++    )
++  }
+   let propsData = props.data(using: .utf8)
+   let propsDict = propsData.flatMap { try? JSONSerialization.jsonObject(with: $0, options: []) as? [String: Any] } ?? [:]
+   guard let context = createWidgetContext(layout: layout) else {
+@@ -47,7 +58,7 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
    widgetEnvironment["timestamp"] = Int(Date.now.timeIntervalSince1970 * 1000)
  
    let result = context.objectForKeyedSubscript("__expoWidgetRender")?.call(
@@ -332,6 +389,69 @@ index 9eae718..e3cf42f 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
+diff --git a/node_modules/expo-widgets/ios/WidgetsStorage.swift b/node_modules/expo-widgets/ios/WidgetsStorage.swift
+index 74c905a..9eb1c1d 100644
+--- a/node_modules/expo-widgets/ios/WidgetsStorage.swift
++++ b/node_modules/expo-widgets/ios/WidgetsStorage.swift
+@@ -1,31 +1,54 @@
+ enum WidgetsStorage {
+   static var appGroupIdentifier: String? = Bundle.main.object(forInfoDictionaryKey: "ExpoWidgetsAppGroupIdentifier") as? String
+   static let defaults = UserDefaults(suiteName: appGroupIdentifier)
++  private static var hasLoggedMissingSuite = false
+ 
+   static func set(_ value: [String: Any], forKey key: String) {
+-    guard let defaults else { return }
++    guard let defaults else {
++      logMissingSuiteIfNeeded()
++      return
++    }
+ 
+     defaults.set(value, forKey: key)
+   }
+ 
+   static func set(_ value: [[String: Any]], forKey key: String) {
+-    guard let defaults else { return }
++    guard let defaults else {
++      logMissingSuiteIfNeeded()
++      return
++    }
+ 
+     defaults.set(value, forKey: key)
+   }
+ 
+   static func set(_ value: String, forKey key: String) {
+-    guard let defaults else { return }
++    guard let defaults else {
++      logMissingSuiteIfNeeded()
++      return
++    }
+ 
+     defaults.set(value, forKey: key)
+   }
+ 
+   static func set(_ value: Data, forKey key: String) {
+-    guard let defaults else { return }
++    guard let defaults else {
++      logMissingSuiteIfNeeded()
++      return
++    }
+ 
+     defaults.set(value, forKey: key)
+   }
+ 
++  private static func logMissingSuiteIfNeeded() {
++    guard !hasLoggedMissingSuite else { return }
++    hasLoggedMissingSuite = true
++    print(
++      "[ExpoWidgets] WidgetsStorage: UserDefaults(suiteName:) is nil — App Group UserDefaults unavailable. " +
++        "Check ExpoWidgetsAppGroupIdentifier in Info.plist and com.apple.security.application-groups entitlements " +
++        "(bundle=\(Bundle.main.bundleIdentifier ?? "?"))."
++    )
++  }
++
+   static func getDictionary(forKey key: String) -> [String: Any]? {
+     guard let defaults else { return nil }
+ 
 diff --git a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
 index 7dd91dc..13b5a27 100755
 --- a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
