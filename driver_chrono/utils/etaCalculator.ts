@@ -92,7 +92,7 @@ export function formatETA(etaMinutes: number): string {
  * @param driverPosition Position actuelle du driver
  * @param destination Position de destination
  * @param vehicleType Type de véhicule (optionnel)
- * @param trafficData Données de trafic Mapbox/Google (optionnel)
+ * @param trafficData Données de trafic (optionnel)
  * @param weatherAdjustment Ajustement météo (optionnel)
  * @returns Objet avec distance (mètres) et ETA (minutes)
  */
@@ -148,4 +148,3 @@ export function calculateFullETA(
     formattedETA,
   }
 }
-

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "types": ["node", "jest", "@types/supertest"],
     "skipLibCheck": true,
+    "isolatedModules": true,
     "noImplicitAny": false,
     "strict": false,
     "strictNullChecks": false,

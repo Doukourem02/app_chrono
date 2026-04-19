@@ -2,24 +2,18 @@
  * Tests unitaires pour le middleware verifyJWT
  */
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
-// Mock de jwt utils AVANT l'import du middleware
 const mockVerifyAccessToken = jest.fn();
-jest.mock('../../../src/utils/jwt.js', () => {
-  const actual = jest.requireActual('../../../src/utils/jwt.js') as any;
+
+await jest.unstable_mockModule('../../../src/utils/jwt.js', () => {
   return {
     __esModule: true,
-    generateTokens: actual.generateTokens,
-    verifyToken: actual.verifyToken,
-    refreshAccessToken: actual.refreshAccessToken,
     verifyAccessToken: mockVerifyAccessToken,
   };
 });
 
-// Import du middleware APRÈS le mock
-import { verifyJWT } from '../../../src/middleware/verifyToken.js';
-import { generateTokens } from '../../../src/utils/jwt.js';
+const { verifyJWT } = await import('../../../src/middleware/verifyToken.js');
 
 describe('verifyJWT Middleware', () => {
   let mockRequest: Partial<Request>;
@@ -46,8 +40,7 @@ describe('verifyJWT Middleware', () => {
 
   describe('Success cases', () => {
     it('should allow request with valid Bearer token', () => {
-      const user = { id: 'user-123', role: 'client' };
-      const { accessToken } = generateTokens(user);
+      const accessToken = 'valid-access-token';
 
       mockRequest.headers = {
         authorization: `Bearer ${accessToken}`,
@@ -73,8 +66,7 @@ describe('verifyJWT Middleware', () => {
     });
 
     it('should handle Authorization header with different case', () => {
-      const user = { id: 'user-123', role: 'client' };
-      const { accessToken } = generateTokens(user);
+      const accessToken = 'valid-access-token';
 
       mockRequest.headers = {
         Authorization: `Bearer ${accessToken}`, // Majuscule
@@ -212,19 +204,23 @@ describe('verifyJWT Middleware', () => {
       expect(mockVerifyAccessToken).toHaveBeenCalledWith('');
     });
 
-    it('should handle token with only whitespace', () => {
+    it('should reject token with only whitespace as invalid format', () => {
       mockRequest.headers = {
         authorization: 'Bearer    ',
       };
 
       verifyJWT(mockRequest as Request, mockResponse as Response, nextFunction);
 
-      expect(mockVerifyAccessToken).toHaveBeenCalled();
+      expect(mockVerifyAccessToken).not.toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(401);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        success: false,
+        message: 'Format d\'autorisation invalide. Attendu: Bearer <token>',
+      });
     });
 
     it('should set user in request object when token is valid', () => {
-      const user = { id: 'user-123', role: 'admin' };
-      const { accessToken } = generateTokens(user);
+      const accessToken = 'admin-access-token';
 
       mockRequest.headers = {
         authorization: `Bearer ${accessToken}`,
@@ -244,4 +240,3 @@ describe('verifyJWT Middleware', () => {
     });
   });
 });
-

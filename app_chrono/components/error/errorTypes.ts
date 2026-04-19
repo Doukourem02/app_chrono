@@ -288,7 +288,7 @@ export const ErrorTypes = {
         message: 'Impossible d\'ouvrir WhatsApp.',
         explanation: 'WhatsApp n\'est pas installé sur votre appareil ou n\'est pas correctement configuré.',
         suggestions: [
-          'Installez WhatsApp depuis l\'App Store ou Google Play',
+          'Installez WhatsApp depuis la boutique d\'applications de votre appareil',
           'Ouvrez WhatsApp et configurez votre compte',
           'Réessayez après installation',
         ],
@@ -334,4 +334,3 @@ export const ErrorTypes = {
     onClose: () => {},
   }),
 };
-

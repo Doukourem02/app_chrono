@@ -288,7 +288,7 @@ export const ErrorTypes = {
         message: 'Impossible d\'ouvrir WhatsApp.',
         explanation: 'WhatsApp n\'est pas installé sur votre appareil ou n\'est pas correctement configuré.',
         suggestions: [
-          'Installez WhatsApp depuis l\'App Store ou Google Play',
+          'Installez WhatsApp depuis la boutique d\'applications de votre appareil',
           'Ouvrez WhatsApp et configurez votre compte',
           'Réessayez après installation',
         ],
@@ -296,9 +296,9 @@ export const ErrorTypes = {
       navigation: {
         title: 'Application de navigation non disponible',
         message: 'Impossible d\'ouvrir l\'application de navigation.',
-        explanation: 'Votre appareil ne peut pas ouvrir une application de navigation. Cela peut être dû à l\'absence d\'une application de navigation installée (Google Maps, Waze, etc.).',
+        explanation: 'Votre appareil ne peut pas ouvrir une application de navigation. Cela peut être dû à l\'absence d\'une application de navigation installée.',
         suggestions: [
-          'Installez une application de navigation (Google Maps, Waze, etc.)',
+          'Installez une application de navigation compatible',
           'Réessayez après installation',
         ],
       },
@@ -334,4 +334,3 @@ export const ErrorTypes = {
     onClose: () => {},
   }),
 };
-

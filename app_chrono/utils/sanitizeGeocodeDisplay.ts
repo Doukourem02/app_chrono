@@ -1,5 +1,5 @@
 /**
- * Retire des artefacts parfois présents dans les libellés Mapbox / Nominatim / Google.
+ * Retire des artefacts parfois présents dans les libellés Mapbox / Nominatim / géocodeurs tiers.
  */
 export function sanitizeGeocodeDisplayString(raw: string): string {
   if (!raw || typeof raw !== 'string') return '';

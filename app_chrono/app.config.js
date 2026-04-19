@@ -2,8 +2,8 @@ require('dotenv').config({ path: '.env' });
 const fs = require('fs');
 const path = require('path');
 
-const googleServicesPath = path.join(__dirname, 'google-services.json');
-const hasGoogleServices = fs.existsSync(googleServicesPath);
+const androidServicesConfigPath = path.join(__dirname, 'google-services.json');
+const hasAndroidServicesConfig = fs.existsSync(androidServicesConfigPath);
 
 module.exports = {
   expo: {
@@ -48,7 +48,7 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      ...(hasGoogleServices ? { googleServicesFile: './google-services.json' } : {}),
+      ...(hasAndroidServicesConfig ? { googleServicesFile: './google-services.json' } : {}),
     },
     web: {
       output: "static",
@@ -148,4 +148,3 @@ module.exports = {
     }
   }
 };
-

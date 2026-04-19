@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import {View,Text,TouchableOpacity,ScrollView,StyleSheet,Animated,PanResponderInstance,Alert,Linking} from 'react-native';
+import {View,Text,TouchableOpacity,ScrollView,StyleSheet,Animated,PanResponderInstance,Alert,Linking,Platform} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OrderRequest } from '../store/useOrderStore';
@@ -285,7 +285,10 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     if (onStartNavigation) {
       onStartNavigation();
     } else {
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${coords.latitude},${coords.longitude}`;
+      const url =
+        Platform.OS === 'ios'
+          ? `maps://?daddr=${encodeURIComponent(`${coords.latitude},${coords.longitude}`)}&dirflg=d`
+          : `geo:${coords.latitude},${coords.longitude}?q=${coords.latitude},${coords.longitude}`;
       Linking.openURL(url).catch(() => {
         Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application de navigation');
       });
@@ -1297,4 +1300,3 @@ const styles = StyleSheet.create({
 });
 
 export default DriverOrderBottomSheet;
-

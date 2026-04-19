@@ -13,6 +13,7 @@ import {
   Text,
   Alert,
   Linking,
+  Platform,
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -173,15 +174,18 @@ export function MapboxNavigationScreen({
     );
   }
 
-  const openGoogleMaps = () => {
+  const openExternalNavigation = () => {
     const o =
       origin?.latitude != null && origin?.longitude != null
         ? `${origin.latitude},${origin.longitude}`
         : '';
     const d = `${destination.latitude},${destination.longitude}`;
-    const url = o
-      ? `https://www.google.com/maps/dir/?api=1&origin=${o}&destination=${d}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${d}`;
+    const url =
+      Platform.OS === 'ios'
+        ? o
+          ? `maps://?saddr=${encodeURIComponent(o)}&daddr=${encodeURIComponent(d)}&dirflg=d`
+          : `maps://?daddr=${encodeURIComponent(d)}&dirflg=d`
+        : `geo:${destination.latitude},${destination.longitude}?q=${destination.latitude},${destination.longitude}`;
     Linking.openURL(url).catch(() =>
       Alert.alert('Erreur', "Impossible d'ouvrir la navigation")
     );
@@ -189,23 +193,23 @@ export function MapboxNavigationScreen({
   };
 
   if (!MapboxNavigation) {
-    // Fallback : ouvrir Google Maps directement pour une expérience navigation identique
-    const handleOpenGoogleMaps = () => {
-      openGoogleMaps();
+    // Fallback : ouvrir l'application de navigation disponible sur l'appareil
+    const handleOpenExternalNavigation = () => {
+      openExternalNavigation();
     };
 
     return (
       <View style={[styles.fallback, { paddingTop: insets.top }]}>
         <Text style={styles.fallbackTitle}>Navigation intégrée non disponible</Text>
         <Text style={styles.fallbackText}>
-          Utilisez Google Maps pour le guidage vocal et les instructions tour-à-tour.
+          Utilisez votre application de navigation pour le guidage vocal et les instructions tour-à-tour.
         </Text>
         <TouchableOpacity
-          style={[styles.backButton, styles.googleMapsButton]}
-          onPress={handleOpenGoogleMaps}
+          style={[styles.backButton, styles.externalNavigationButton]}
+          onPress={handleOpenExternalNavigation}
         >
           <Ionicons name="navigate" size={24} color="#fff" />
-          <Text style={styles.backButtonText}>Démarrer la navigation (Google Maps)</Text>
+          <Text style={styles.backButtonText}>Ouvrir la navigation</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.backButton} onPress={onCancel}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -338,7 +342,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
-  googleMapsButton: {
+  externalNavigationButton: {
     backgroundColor: '#4285F4',
     marginBottom: 12,
   },

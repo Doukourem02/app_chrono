@@ -11,7 +11,7 @@ Console d'administration web pour la plateforme Chrono Livraison.
 - **React Query** - Gestion des données et cache
 - **Zustand** - State management
 - **Recharts** - Graphiques et visualisations
-- **Google Maps** - Cartes et géolocalisation
+- **Mapbox** - Cartes et géolocalisation
 - **Socket.IO** - Communication temps réel
 - **Lucide React** - Icônes
 
@@ -20,7 +20,7 @@ Console d'administration web pour la plateforme Chrono Livraison.
 - Node.js >= 18.x
 - npm ou yarn
 - Compte Supabase
-- Clé API Google Maps
+- Token d'accès Mapbox
 
 ## 🔧 Installation
 
@@ -44,8 +44,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 NEXT_PUBLIC_API_URL=http://localhost:4000
 NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
 
-# Google Maps
-NEXT_PUBLIC_GOOGLE_API_KEY=your_google_maps_api_key
+# Mapbox
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_public_token
 ```
 
 3. **Démarrer le serveur de développement**
@@ -103,7 +103,7 @@ L'interface suit un design moderne avec :
 - Header avec recherche et filtres
 - Cards pour les KPIs et statistiques
 - Graphiques interactifs avec Recharts
-- Cartes Google Maps pour le suivi
+- Cartes Mapbox pour le suivi
 
 ## 🛠️ Développement
 
