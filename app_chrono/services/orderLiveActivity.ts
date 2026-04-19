@@ -1,10 +1,20 @@
-import { AppState, Platform } from "react-native";
+import { AppState, InteractionManager, Platform } from "react-native";
 import type { LiveActivity, LiveActivityFactory } from "expo-widgets";
 import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
 import { reportLiveActivityIssue } from "../utils/sentry";
 import { DELIVERY_IN_PROGRESS_STATUSES, normalizeOrderStatus } from "../utils/orderStatusNormalize";
 import type { OrderTrackingLiveProps } from "../widgets/orderTrackingLiveActivity";
+
+/** Préfixe unique pour Console / Xcode : filtrer sur `ExpoWidgets`, `LiveActivity`, `OrderTrackingLive`, `orderLiveActivity`. */
+const LA_LOG_PREFIX =
+  "[ExpoWidgets][LiveActivity][OrderTrackingLive][orderLiveActivity]";
+
+/**
+ * Court délai après `end` + runAfterInteractions pour limiter la course entre
+ * l’écriture App Group / runtime widget et `Activity.request` (logs iOS : Archive was nil).
+ */
+const LIVE_ACTIVITY_PRE_START_YIELD_MS = 72;
 
 const END_PROPS: OrderTrackingLiveProps = {
   etaLabel: "—",
@@ -116,6 +126,32 @@ function supportsLiveActivitiesIOS(): boolean {
   return version >= 16.2;
 }
 
+function laTrace(stage: string, extra?: Record<string, unknown>): void {
+  if (!__DEV__) return;
+  if (extra && Object.keys(extra).length > 0) {
+    console.log(`${LA_LOG_PREFIX} ${stage}`, extra);
+  } else {
+    console.log(`${LA_LOG_PREFIX} ${stage}`);
+  }
+  logger.debug(`${LA_LOG_PREFIX} ${stage}`, "orderLiveActivity", extra);
+}
+
+/**
+ * Laisse le bridge natif et le thread UI finir après une série d’opérations widget,
+ * puis un tick court avant `LiveActivityFactory.start` (warm-up anti îlot vide).
+ */
+function yieldBeforeLiveActivityStart(): Promise<void> {
+  return new Promise((resolve) => {
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, LIVE_ACTIVITY_PRE_START_YIELD_MS);
+        });
+      });
+    });
+  });
+}
+
 function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
   if (factory) return factory;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -123,6 +159,7 @@ function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
     default: LiveActivityFactory<OrderTrackingLiveProps>;
   };
   factory = mod.default;
+  laTrace("factory résolu (createLiveActivity / layout enregistré côté natif)");
   return factory;
 }
 
@@ -213,6 +250,25 @@ export type SyncOrderLiveActivityOptions = {
   immediateEnd?: boolean;
 };
 
+let didWarmNativeBridge = false;
+
+/**
+ * Précharge le factory `OrderTrackingLive` et laisse une fenêtre au runtime natif
+ * avant le premier `start()` (appel idéal depuis `_layout` au cold start iOS).
+ */
+export async function warmOrderLiveActivityNativeBridge(): Promise<void> {
+  if (!supportsLiveActivitiesIOS()) return;
+  getFactory();
+  if (didWarmNativeBridge) {
+    laTrace("warmOrderLiveActivityNativeBridge: déjà exécuté — skip délai");
+    return;
+  }
+  didWarmNativeBridge = true;
+  laTrace("warmOrderLiveActivityNativeBridge: début");
+  await yieldBeforeLiveActivityStart();
+  laTrace("warmOrderLiveActivityNativeBridge: fin");
+}
+
 async function syncOrderLiveActivityImpl(
   order: OrderRequest | null,
   options: SyncOrderLiveActivityOptions
@@ -237,6 +293,11 @@ async function syncOrderLiveActivityImpl(
     const f = getFactory();
     const props = propsFromOrder(order!);
     const url = `appchrono://order-tracking/${encodeURIComponent(order!.id)}`;
+    laTrace("sync: entrée start/update", {
+      orderId: order!.id,
+      status: order!.status,
+      appState: AppState.currentState,
+    });
 
     if (active?.orderId === order!.id) {
       try {
@@ -288,9 +349,16 @@ async function syncOrderLiveActivityImpl(
       return;
     }
 
+    laTrace("sync: avant endAllLiveActivities", { orderId: order!.id });
     await endAllLiveActivities();
+    laTrace("sync: après endAllLiveActivities — warm-up (layout → bridge → tick)", {
+      orderId: order!.id,
+    });
+    await yieldBeforeLiveActivityStart();
+    laTrace("sync: avant f.start (Activity.request)", { orderId: order!.id });
     const live = f.start(props, url);
     active = { orderId: order!.id, live };
+    laTrace("sync: après f.start", { orderId: order!.id });
     if (__DEV__) {
       logger.info("[orderLiveActivity] Live Activity démarrée", "orderLiveActivity", {
         orderId: order!.id,

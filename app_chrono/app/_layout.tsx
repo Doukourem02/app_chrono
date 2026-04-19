@@ -26,6 +26,7 @@ import { isNetworkOffline } from "../utils/isNetworkOffline";
 import { logger } from "../utils/logger";
 import { locationService } from "../services/locationService";
 import { useOrderLiveActivitySync } from "../hooks/useOrderLiveActivitySync";
+import { warmOrderLiveActivityNativeBridge } from "../services/orderLiveActivity";
 import "../config/envCheck";
 import "../mapboxInit";
 
@@ -35,6 +36,7 @@ initSentry();
 if (Platform.OS === "ios") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require("../widgets/orderTrackingLiveActivity");
+  void warmOrderLiveActivityNativeBridge();
 }
 
 function LiveActivityBridge() {

@@ -99,14 +99,26 @@ index 0000000..70a6aea
 +__r(0);
 \ No newline at end of file
 diff --git a/node_modules/expo-widgets/ios/ExpoWidgets.podspec b/node_modules/expo-widgets/ios/ExpoWidgets.podspec
-index 1d2b971..9783ee6 100644
+index 1d2b971..e092830 100644
 --- a/node_modules/expo-widgets/ios/ExpoWidgets.podspec
 +++ b/node_modules/expo-widgets/ios/ExpoWidgets.podspec
-@@ -42,9 +42,11 @@ Pod::Spec.new do |s|
+@@ -34,20 +34,23 @@ Pod::Spec.new do |s|
+     :script => project_root_env_var + 'bash -l -c "$PODS_TARGET_SRCROOT/../scripts/xcode-build-bundle.sh"',
+     :execution_position => :before_compile,
+     # NOTE(@krystofwoldrich): Ideally we would specify `__dir__/**/*`, but Xcode doesn't support patterns
+-    :input_files  => ["#{__dir__}/../package.json"],
+-    :output_files  => ["#{__dir__}/../bundle/build/ExpoWidgets.bundle"],
++    # Use $(PODS_TARGET_SRCROOT) so paths stay valid after moving the repo (no stale absolute __dir__ from pod install).
++    :input_files  => ['$(PODS_TARGET_SRCROOT)/../package.json'],
++    :output_files  => ['$(PODS_TARGET_SRCROOT)/../bundle/build/ExpoWidgets.bundle'],
+   }
+   copy_bundle_script = {
+     :name => 'Prepare ExpoWidgets Resources',
      :script => %Q{
        echo "Preparing ExpoWidgets.bundle..."
-       source="#{__dir__}/../bundle/build/ExpoWidgets.bundle"
+-      source="#{__dir__}/../bundle/build/ExpoWidgets.bundle"
 -      dest="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoWidgets.bundle"
++      source="${PODS_TARGET_SRCROOT}/../bundle/build/ExpoWidgets.bundle"
 +      # expo/expo#43654 - JS runtime must land inside resource bundle embedded in .appex
 +      dest="${TARGET_BUILD_DIR}/ExpoWidgets.bundle/ExpoWidgets.bundle"
        echo "Copying ${source} to ${dest}"
@@ -115,9 +127,13 @@ index 1d2b971..9783ee6 100644
 +      cp -R "${source}" "${dest}"
      },
      :execution_position => :before_compile,
-     :input_files  => ["#{__dir__}/../bundle/build/ExpoWidgets.bundle"]
+-    :input_files  => ["#{__dir__}/../bundle/build/ExpoWidgets.bundle"]
++    :input_files  => ['$(PODS_TARGET_SRCROOT)/../bundle/build/ExpoWidgets.bundle']
+   }
+   # :always_out_of_date is only available in CocoaPods 1.13.0 and later
+   if Gem::Version.new(Pod::VERSION) >= Gem::Version.new('1.13.0')
 diff --git a/node_modules/expo-widgets/ios/LiveActivityFactory.swift b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
-index caf1e05..afd4ed8 100644
+index caf1e05..e867c6c 100644
 --- a/node_modules/expo-widgets/ios/LiveActivityFactory.swift
 +++ b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
 @@ -3,6 +3,8 @@ import ActivityKit
@@ -129,15 +145,21 @@ index caf1e05..afd4ed8 100644
  
    static var pushNotificationsEnabled: Bool {
      Bundle.main.object(forInfoDictionaryKey: pushNotificationsEnabledKey) as? Bool ?? false
-@@ -10,6 +12,7 @@ final class LiveActivityFactory: SharedObject {
+@@ -10,7 +12,13 @@ final class LiveActivityFactory: SharedObject {
  
    init(name: String, layout: String) {
      self.name = name
 +    self.layout = layout
      WidgetsStorage.set(layout, forKey: "__expo_widgets_live_activity_\(name)_layout")
++    // Filtre Console : ExpoWidgets | LiveActivity | native-app
++    print(
++      "[ExpoWidgets][LiveActivity][native-app] factory init name=\(name) layoutChars=\(layout.count) " +
++        "appGroup=\(WidgetsStorage.appGroupIdentifier ?? "nil") bundle=\(Bundle.main.bundleIdentifier ?? "?")"
++    )
    }
  
-@@ -19,6 +22,10 @@ final class LiveActivityFactory: SharedObject {
+   func start(props: String, url: URL?) throws -> LiveActivity {
+@@ -19,10 +27,23 @@ final class LiveActivityFactory: SharedObject {
        throw LiveActivitiesNotSupportedException()
      }
  
@@ -148,6 +170,36 @@ index caf1e05..afd4ed8 100644
      if let url {
        WidgetsStorage.set(url.absoluteString, forKey: "__expo_widgets_live_activity_\(name)_url")
      }
+ 
++    let layoutKey = "__expo_widgets_live_activity_\(name)_layout"
++    let readBack = WidgetsStorage.getString(forKey: layoutKey) ?? ""
++    let propsPreview = props.count > 120 ? String(props.prefix(120)) + "…" : props
++    print(
++      "[ExpoWidgets][LiveActivity][native-app] Activity.request pending name=\(name) " +
++        "layoutChars=\(layout.count) readBackChars=\(readBack.count) readBackMatches=\(readBack == layout) " +
++        "propsChars=\(props.count) propsPreview=\(propsPreview)"
++    )
++
+     do {
+       let initialState = LiveActivityAttributes.ContentState(name: name, props: props)
+       let activity = try Activity.request(
+@@ -31,10 +52,16 @@ final class LiveActivityFactory: SharedObject {
+         pushType: LiveActivityFactory.pushNotificationsEnabled ? .token : nil
+       )
+ 
++      print(
++        "[ExpoWidgets][LiveActivity][native-app] Activity.request OK activityId=\(activity.id) pushType=\(LiveActivityFactory.pushNotificationsEnabled ? "token" : "nil")"
++      )
+       let instance = LiveActivity(id: activity.id, name: name)
+       instance.observePushTokenUpdates(for: activity, pushNotificationsEnabled: LiveActivityFactory.pushNotificationsEnabled)
+       return instance
+     } catch {
++      print(
++        "[ExpoWidgets][LiveActivity][native-app] Activity.request FAILED name=\(name) error=\(error.localizedDescription)"
++      )
+       throw StartLiveActivityException(error.localizedDescription)
+     }
+   }
 diff --git a/node_modules/expo-widgets/ios/Widgets/EntryView.swift b/node_modules/expo-widgets/ios/Widgets/EntryView.swift
 index 947fc2e..c7ebb7e 100644
 --- a/node_modules/expo-widgets/ios/Widgets/EntryView.swift
@@ -197,21 +249,24 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..039f714 100644
+index 1cd5ca9..19af327 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-@@ -2,6 +2,10 @@ import SwiftUI
+@@ -2,6 +2,13 @@ import SwiftUI
  import WidgetKit
  import Foundation
  
 +private enum ExpoWidgetsLiveActivityDiagnostics {
 +  static var didLogEmptyLayout = false
++  static var didLogNilContextNames = Set<String>()
++  static var didLogEmptyNodesNames = Set<String>()
++  static var didLogNonEmptyNodesNames = Set<String>()
 +}
 +
  func parseTimeline(identifier: String, name: String, family: WidgetFamily) -> [WidgetsTimelineEntry] {
    let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(name)_timeline") ?? []
  
-@@ -37,6 +41,13 @@ func evaluateLayout(
+@@ -37,9 +44,22 @@ func evaluateLayout(
  
  func getLiveActivityNodes(forName name: String, props: String = "{}", environment: [String: Any]) -> [String: Any] {
    let layout = WidgetsStorage.getString(forKey: "__expo_widgets_live_activity_\(name)_layout") ?? ""
@@ -225,20 +280,46 @@ index 1cd5ca9..039f714 100644
    let propsData = props.data(using: .utf8)
    let propsDict = propsData.flatMap { try? JSONSerialization.jsonObject(with: $0, options: []) as? [String: Any] } ?? [:]
    guard let context = createWidgetContext(layout: layout) else {
-@@ -47,7 +58,7 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
++    if ExpoWidgetsLiveActivityDiagnostics.didLogNilContextNames.insert(name).inserted {
++      print(
++        "[ExpoWidgets][LiveActivity][native-ext] createWidgetContext returned nil name=\(name) layoutChars=\(layout.count) " +
++          "bundle=\(Bundle.main.bundleIdentifier ?? "?") — îlot vide probable (pas de JSContext / bundle JS)."
++      )
++    }
+     return [:]
+   }
+ 
+@@ -47,9 +67,23 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
    widgetEnvironment["timestamp"] = Int(Date.now.timeIntervalSince1970 * 1000)
  
    let result = context.objectForKeyedSubscript("__expoWidgetRender")?.call(
 -    withArguments: [propsDict, environment]
 +    withArguments: [propsDict, widgetEnvironment]
    )
-   return result?.toObject() as? [String: Any] ?? [:]
+-  return result?.toObject() as? [String: Any] ?? [:]
++  let nodes = result?.toObject() as? [String: Any] ?? [:]
++  if nodes.isEmpty {
++    if ExpoWidgetsLiveActivityDiagnostics.didLogEmptyNodesNames.insert(name).inserted {
++      print(
++        "[ExpoWidgets][LiveActivity][native-ext] __expoWidgetRender returned empty name=\(name) layoutChars=\(layout.count) " +
++          "— WidgetRenderer peut logguer « Archive was nil » / îlot noir."
++      )
++    }
++  } else if ExpoWidgetsLiveActivityDiagnostics.didLogNonEmptyNodesNames.insert(name).inserted {
++    let keys = nodes.keys.sorted().joined(separator: ",")
++    print(
++      "[ExpoWidgets][LiveActivity][native-ext] nodes OK name=\(name) keys=[\(keys)] (premier rendu avec layout non vide)"
++    )
++  }
++  return nodes
  }
+ 
+ func getLiveActivityUrl(forName name: String) -> URL? {
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-index 68ff52a..f9caece 100644
+index 68ff52a..617ab21 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-@@ -1,7 +1,45 @@
+@@ -1,7 +1,48 @@
  import Foundation
  import JavaScriptCore
  
@@ -272,7 +353,10 @@ index 68ff52a..f9caece 100644
 +    }
 +  }
 +
-+  print("[ExpoWidgets] Missing ExpoWidgets.bundle (nested, flat, and framework bundle lookups failed)")
++  print(
++    "[ExpoWidgets][LiveActivity][native-ext] Missing ExpoWidgets.bundle " +
++      "(nested, flat, framework) bundle=\(Bundle.main.bundleIdentifier ?? "?")"
++  )
 +  return nil
 +}
 +
@@ -284,7 +368,7 @@ index 68ff52a..f9caece 100644
    guard let context = JSContext() else {
      return nil
    }
-@@ -12,12 +50,7 @@ func createWidgetContext(layout: String) -> JSContext? {
+@@ -12,18 +53,23 @@ func createWidgetContext(layout: String) -> JSContext? {
      }
    }
  
@@ -298,9 +382,15 @@ index 68ff52a..f9caece 100644
      return nil
    }
    context.evaluateScript(bundleJS)
-@@ -25,5 +58,9 @@ func createWidgetContext(layout: String) -> JSContext? {
+ 
    // Inject layout
    let layoutValue = context.evaluateScript("(\(layout))")
++  if layoutValue == nil || layoutValue!.isUndefined {
++    print(
++      "[ExpoWidgets][LiveActivity][native-ext] evaluateScript(layout) is nil/undefined layoutChars=\(layout.count) " +
++        "bundle=\(Bundle.main.bundleIdentifier ?? "?")"
++    )
++  }
    context.setObject(layoutValue, forKeyedSubscript: "__expoWidgetLayout" as NSString)
 +
 +  if !layout.isEmpty {
