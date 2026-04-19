@@ -248,8 +248,29 @@ index 947fc2e..c7ebb7e 100644
 +    )
 +  }
  }
+diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
+index 3e6ff0b..48f9b7f 100644
+--- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
++++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
+@@ -13,7 +13,15 @@ struct LiveActivityBanner: View {
+     } else if let node = nodes?["banner"] as? [String: Any] {
+       WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
+     } else {
+-      EmptyView()
++      VStack(alignment: .leading, spacing: 4) {
++        Text("Krono")
++          .font(.headline)
++          .foregroundStyle(.orange)
++        Text("Bannière indisponible")
++          .font(.caption)
++          .foregroundStyle(.secondary)
++      }
++      .padding(12)
+     }
+   }
+ }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..19af327 100644
+index 1cd5ca9..dad2a6f 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
 @@ -2,6 +2,13 @@ import SwiftUI
@@ -289,7 +310,7 @@ index 1cd5ca9..19af327 100644
      return [:]
    }
  
-@@ -47,9 +67,23 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
+@@ -47,15 +67,34 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
    widgetEnvironment["timestamp"] = Int(Date.now.timeIntervalSince1970 * 1000)
  
    let result = context.objectForKeyedSubscript("__expoWidgetRender")?.call(
@@ -315,11 +336,25 @@ index 1cd5ca9..19af327 100644
  }
  
  func getLiveActivityUrl(forName name: String) -> URL? {
+-  let data = WidgetsStorage.getData(forKey: "__expo_widgets_live_activity_\(name)_url")
+-  if let data, let url = String(data: data, encoding: .utf8) {
+-    return URL(string: url)
++  let key = "__expo_widgets_live_activity_\(name)_url"
++  if let s = WidgetsStorage.getString(forKey: key), let url = URL(string: s) {
++    return url
++  }
++  if let data = WidgetsStorage.getData(forKey: key),
++     let s = String(data: data, encoding: .utf8),
++     let url = URL(string: s) {
++    return url
+   }
+   return nil
+ }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-index 68ff52a..617ab21 100644
+index 68ff52a..6cd2258 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
-@@ -1,7 +1,48 @@
+@@ -1,7 +1,71 @@
  import Foundation
  import JavaScriptCore
  
@@ -334,23 +369,46 @@ index 68ff52a..617ab21 100644
 +  let bundles: [Bundle] = [Bundle.main, Bundle(for: ExpoWidgetsResourceMarker.self)]
 +
 +  for bundle in bundles {
-+    if let outerURL = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle"),
-+       let outer = Bundle(url: outerURL),
++    guard let outerURL = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle") else {
++      continue
++    }
++
++    // 1) Resource bundle directory: inner `ExpoWidgets.bundle` file (Metro JS) copied by podspec script.
++    if let outer = Bundle(url: outerURL),
 +       let innerURL = outer.url(forResource: "ExpoWidgets", withExtension: "bundle"),
-+       let js = try? String(contentsOf: innerURL, encoding: .utf8) {
++       let js = try? String(contentsOf: innerURL, encoding: .utf8),
++       !js.isEmpty {
++      return js
++    }
++
++    // 2) Same as (1) but file on disk only — not always exposed via `url(forResource:)` in every embed.
++    let manualInnerURL = outerURL.appendingPathComponent("ExpoWidgets.bundle")
++    var innerIsDir: ObjCBool = false
++    if FileManager.default.fileExists(atPath: manualInnerURL.path, isDirectory: &innerIsDir),
++       !innerIsDir.boolValue,
++       let js = try? String(contentsOf: manualInnerURL, encoding: .utf8),
++       !js.isEmpty {
++      return js
++    }
++
++    // 3) Flat file at bundle root (single-file `ExpoWidgets.bundle`).
++    var outerIsDir: ObjCBool = false
++    if FileManager.default.fileExists(atPath: outerURL.path, isDirectory: &outerIsDir),
++       !outerIsDir.boolValue,
++       let js = try? String(contentsOf: outerURL, encoding: .utf8),
++       !js.isEmpty {
 +      return js
 +    }
 +  }
 +
-+  for bundle in bundles {
-+    if let flatURL = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle") {
-+      var isDir: ObjCBool = false
-+      if FileManager.default.fileExists(atPath: flatURL.path, isDirectory: &isDir),
-+         !isDir.boolValue,
-+         let js = try? String(contentsOf: flatURL, encoding: .utf8) {
-+        return js
-+      }
-+    }
++  // 4) Optional embedded framework (some CocoaPods / linkage layouts).
++  let fwURL = Bundle.main.bundleURL.appendingPathComponent("Frameworks/ExpoWidgets.framework/ExpoWidgets.bundle")
++  var fwIsDir: ObjCBool = false
++  if FileManager.default.fileExists(atPath: fwURL.path, isDirectory: &fwIsDir),
++     !fwIsDir.boolValue,
++     let js = try? String(contentsOf: fwURL, encoding: .utf8),
++     !js.isEmpty {
++    return js
 +  }
 +
 +  print(
@@ -368,7 +426,7 @@ index 68ff52a..617ab21 100644
    guard let context = JSContext() else {
      return nil
    }
-@@ -12,18 +53,23 @@ func createWidgetContext(layout: String) -> JSContext? {
+@@ -12,18 +76,23 @@ func createWidgetContext(layout: String) -> JSContext? {
      }
    }
  
@@ -399,7 +457,7 @@ index 68ff52a..617ab21 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..e3cf42f 100644
+index 9eae718..568da2b 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -12,39 +12,33 @@ struct LiveActivityAttributes: ActivityAttributes {
@@ -450,8 +508,39 @@ index 9eae718..e3cf42f 100644
        }
        .widgetURL(getLiveActivityUrl(forName: context.state.name))
      }
-@@ -54,11 +48,13 @@ public struct WidgetLiveActivity: Widget {
+@@ -52,13 +46,44 @@ public struct WidgetLiveActivity: Widget {
+   }
+ }
  
++/// Si le pipeline JS → nœuds échoue, `EmptyView()` laisse l’îlot **noir** (WidgetRenderer n’a rien à archiver).
++/// Un fallback 100 % natif prouve que l’extension tourne et évite l’îlot vide en dégradé.
++@available(iOS 16.1, *)
++private struct LiveActivitySectionFallback: View {
++  let sectionName: String
++
++  var body: some View {
++    switch sectionName {
++    case "minimal", "compactLeading", "compactTrailing":
++      Image(systemName: "car.fill")
++        .foregroundStyle(.orange)
++        .imageScale(.medium)
++    case "expandedCenter", "expandedLeading", "expandedTrailing", "expandedBottom":
++      VStack(alignment: .leading, spacing: 4) {
++        Text("Krono")
++          .font(.headline)
++          .foregroundStyle(.orange)
++        Text("Suivi indisponible")
++          .font(.caption2)
++          .foregroundStyle(.secondary)
++      }
++      .padding(6)
++    default:
++      Image(systemName: "car.fill")
++        .foregroundStyle(.orange)
++    }
++  }
++}
++
  @available(iOS 16.1, *)
  private struct LiveActivitySectionView: View {
 +  @Environment(\.self) private var env
@@ -465,7 +554,15 @@ index 9eae718..e3cf42f 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -74,10 +70,12 @@ private struct LiveActivitySectionView: View {
+@@ -67,17 +92,19 @@ private struct LiveActivitySectionView: View {
+     if let node = nodes[sectionName] as? [String: Any] {
+       WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
+     } else {
+-      EmptyView()
++      LiveActivitySectionFallback(sectionName: sectionName)
+     }
+   }
+ }
  
  @available(iOS 16.1, *)
  private struct LiveActivityBannerView: View {
@@ -479,6 +576,23 @@ index 9eae718..e3cf42f 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
+@@ -88,7 +115,15 @@ private struct LiveActivityBannerView: View {
+     } else if let node = nodes["banner"] as? [String: Any] {
+       WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
+     } else {
+-      EmptyView()
++      VStack(alignment: .leading, spacing: 4) {
++        Text("Krono")
++          .font(.headline)
++          .foregroundStyle(.orange)
++        Text("Bannière indisponible")
++          .font(.caption)
++          .foregroundStyle(.secondary)
++      }
++      .padding(12)
+     }
+   }
+ }
 diff --git a/node_modules/expo-widgets/ios/WidgetsStorage.swift b/node_modules/expo-widgets/ios/WidgetsStorage.swift
 index 74c905a..9eb1c1d 100644
 --- a/node_modules/expo-widgets/ios/WidgetsStorage.swift
