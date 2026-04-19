@@ -249,28 +249,40 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..48f9b7f 100644
+index 3e6ff0b..3897a03 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -13,7 +13,15 @@ struct LiveActivityBanner: View {
+@@ -13,7 +13,27 @@ struct LiveActivityBanner: View {
      } else if let node = nodes?["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
 -      EmptyView()
-+      VStack(alignment: .leading, spacing: 4) {
++      let p = ExpoWidgetsLiveActivityPropsFallback.parse(context.state.props)
++      VStack(alignment: .leading, spacing: 6) {
 +        Text("Krono")
 +          .font(.headline)
 +          .foregroundStyle(.orange)
-+        Text("Bannière indisponible")
-+          .font(.caption)
-+          .foregroundStyle(.secondary)
++        if let eta = p.eta {
++          Text(eta).font(.title3.weight(.bold)).foregroundStyle(.primary)
++        }
++        if let v = p.vehicle {
++          Text(v).font(.subheadline).foregroundStyle(.secondary)
++        }
++        if let st = p.status {
++          Text(st).font(.caption).foregroundStyle(.tertiary)
++        }
++        if p.eta == nil, p.vehicle == nil, p.status == nil {
++          Text("Bannière indisponible")
++            .font(.caption)
++            .foregroundStyle(.secondary)
++        }
 +      }
 +      .padding(12)
      }
    }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..dad2a6f 100644
+index 1cd5ca9..06ab212 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
 @@ -2,6 +2,13 @@ import SwiftUI
@@ -350,6 +362,31 @@ index 1cd5ca9..dad2a6f 100644
    }
    return nil
  }
+@@ -86,6 +125,24 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
+   return env
+ }
+ 
++/// Parse `ActivityKit` `ContentState.props` JSON for native fallback when `__expoWidgetRender` returns `{}`.
++enum ExpoWidgetsLiveActivityPropsFallback {
++  static func parse(_ propsJson: String) -> (eta: String?, vehicle: String?, status: String?, plate: String?) {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return (nil, nil, nil, nil)
++    }
++    func s(_ key: String) -> String? {
++      guard let v = root[key] as? String else { return nil }
++      let t = v.trimmingCharacters(in: .whitespacesAndNewlines)
++      return t.isEmpty ? nil : t
++    }
++    let pending = root["isPending"] as? Bool == true
++    let status = s("statusLabel") ?? (pending ? "Recherche chauffeur" : nil)
++    return (s("etaLabel"), s("vehicleLabel"), status, s("plateLabel"))
++  }
++}
++
+ func getLiveActivityEnvironment(environment: EnvironmentValues) -> [String: Any] {
+   var env: [String: Any] = [
+     "colorScheme": "\(environment.colorScheme)"
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
 index 68ff52a..6cd2258 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
@@ -457,7 +494,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..568da2b 100644
+index 9eae718..dc1c39a 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -12,39 +12,33 @@ struct LiveActivityAttributes: ActivityAttributes {
@@ -508,7 +545,7 @@ index 9eae718..568da2b 100644
        }
        .widgetURL(getLiveActivityUrl(forName: context.state.name))
      }
-@@ -52,13 +46,44 @@ public struct WidgetLiveActivity: Widget {
+@@ -52,13 +46,95 @@ public struct WidgetLiveActivity: Widget {
    }
  }
  
@@ -517,23 +554,74 @@ index 9eae718..568da2b 100644
 +@available(iOS 16.1, *)
 +private struct LiveActivitySectionFallback: View {
 +  let sectionName: String
++  let propsJson: String
++
++  private var p: (eta: String?, vehicle: String?, status: String?, plate: String?) {
++    ExpoWidgetsLiveActivityPropsFallback.parse(propsJson)
++  }
 +
 +  var body: some View {
 +    switch sectionName {
-+    case "minimal", "compactLeading", "compactTrailing":
++    case "minimal":
++      Image(systemName: "car.fill")
++        .foregroundStyle(.orange)
++        .imageScale(.small)
++    case "compactLeading":
 +      Image(systemName: "car.fill")
 +        .foregroundStyle(.orange)
 +        .imageScale(.medium)
-+    case "expandedCenter", "expandedLeading", "expandedTrailing", "expandedBottom":
++    case "compactTrailing":
++      if let eta = p.eta {
++        Text(eta)
++          .font(.caption.weight(.semibold))
++          .foregroundStyle(.orange)
++          .lineLimit(1)
++          .minimumScaleFactor(0.75)
++      } else {
++        Image(systemName: "car.fill")
++          .foregroundStyle(.orange)
++          .imageScale(.medium)
++      }
++    case "expandedCenter":
 +      VStack(alignment: .leading, spacing: 4) {
 +        Text("Krono")
-+          .font(.headline)
++          .font(.caption.weight(.bold))
 +          .foregroundStyle(.orange)
-+        Text("Suivi indisponible")
-+          .font(.caption2)
-+          .foregroundStyle(.secondary)
++        if let eta = p.eta {
++          Text(eta).font(.title3.weight(.bold)).foregroundStyle(.primary)
++        }
++        if let v = p.vehicle {
++          Text(v).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
++        }
++        if let st = p.status {
++          Text(st).font(.caption).foregroundStyle(.tertiary).lineLimit(2)
++        }
 +      }
 +      .padding(6)
++    case "expandedLeading":
++      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
++    case "expandedTrailing":
++      VStack(alignment: .trailing, spacing: 6) {
++        if let plate = p.plate {
++          Text(plate)
++            .font(.caption.weight(.bold))
++            .foregroundStyle(.white)
++            .padding(.horizontal, 10)
++            .padding(.vertical, 6)
++            .background(Capsule().fill(Color(white: 0.12)))
++        }
++        Image(systemName: "car.side.fill")
++          .foregroundStyle(.orange)
++      }
++      .padding(6)
++    case "expandedBottom":
++      if let st = p.status {
++        Text(st).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
++      } else {
++        Text("Suivi Krono")
++          .font(.caption2)
++          .foregroundStyle(.tertiary)
++      }
 +    default:
 +      Image(systemName: "car.fill")
 +        .foregroundStyle(.orange)
@@ -554,12 +642,12 @@ index 9eae718..568da2b 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -67,17 +92,19 @@ private struct LiveActivitySectionView: View {
+@@ -67,17 +143,19 @@ private struct LiveActivitySectionView: View {
      if let node = nodes[sectionName] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
 -      EmptyView()
-+      LiveActivitySectionFallback(sectionName: sectionName)
++      LiveActivitySectionFallback(sectionName: sectionName, propsJson: context.state.props)
      }
    }
  }
@@ -576,18 +664,30 @@ index 9eae718..568da2b 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -88,7 +115,15 @@ private struct LiveActivityBannerView: View {
+@@ -88,7 +166,27 @@ private struct LiveActivityBannerView: View {
      } else if let node = nodes["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
 -      EmptyView()
-+      VStack(alignment: .leading, spacing: 4) {
++      let p = ExpoWidgetsLiveActivityPropsFallback.parse(context.state.props)
++      VStack(alignment: .leading, spacing: 6) {
 +        Text("Krono")
 +          .font(.headline)
 +          .foregroundStyle(.orange)
-+        Text("Bannière indisponible")
-+          .font(.caption)
-+          .foregroundStyle(.secondary)
++        if let eta = p.eta {
++          Text(eta).font(.title3.weight(.bold)).foregroundStyle(.primary)
++        }
++        if let v = p.vehicle {
++          Text(v).font(.subheadline).foregroundStyle(.secondary)
++        }
++        if let st = p.status {
++          Text(st).font(.caption).foregroundStyle(.tertiary)
++        }
++        if p.eta == nil, p.vehicle == nil, p.status == nil {
++          Text("Bannière indisponible")
++            .font(.caption)
++            .foregroundStyle(.secondary)
++        }
 +      }
 +      .padding(12)
      }
