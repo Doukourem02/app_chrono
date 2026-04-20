@@ -1403,10 +1403,22 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           let lastName = driverData.last_name;
           let phone = driverData.phone;
           let profileImageUrl = driverData.profile_image_url;
-          if (!firstName || firstName === 'Livreur') {
+          if (
+            !firstName ||
+            firstName === 'Livreur' ||
+            !profileImageUrl ||
+            !driverData.vehicle_plate ||
+            !driverData.vehicle_type ||
+            !driverData.vehicle_color
+          ) {
             try {
               const userResult = await (pool as any).query(
-                'SELECT u.first_name, u.last_name, u.phone, dp.profile_image_url FROM users u LEFT JOIN driver_profiles dp ON dp.user_id = u.id WHERE u.id = $1',
+                `SELECT u.first_name, u.last_name, u.phone,
+                        dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
+                        dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
+                 FROM users u
+                 LEFT JOIN driver_profiles dp ON dp.user_id = u.id
+                 WHERE u.id = $1`,
                 [driverId]
               );
               if (userResult?.rows?.[0]) {
@@ -1415,6 +1427,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                 lastName = row.last_name || driverId?.substring(0, 8) || null;
                 phone = row.phone || phone;
                 profileImageUrl = row.profile_image_url || profileImageUrl;
+                driverData.vehicle_plate = row.vehicle_plate || driverData.vehicle_plate;
+                driverData.vehicle_type = row.vehicle_type || driverData.vehicle_type;
+                driverData.vehicle_brand = row.vehicle_brand || driverData.vehicle_brand;
+                driverData.vehicle_model = row.vehicle_model || driverData.vehicle_model;
+                driverData.vehicle_color = row.vehicle_color || driverData.vehicle_color;
               }
             } catch (dbErr: any) {
               logger.warn(`Enrichissement profil driver ${maskUserId(driverId)}:`, dbErr?.message);
@@ -1428,6 +1445,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             current_longitude: driverData.current_longitude || null,
             phone: phone || null,
             profile_image_url: profileImageUrl || null,
+            vehicle_plate: driverData.vehicle_plate || null,
+            vehicle_type: driverData.vehicle_type || null,
+            vehicle_brand: driverData.vehicle_brand || null,
+            vehicle_model: driverData.vehicle_model || null,
+            vehicle_color: driverData.vehicle_color || null,
           };
 
           // Vérifier une dernière fois que le socket est toujours connecté avant d'envoyer
@@ -2368,4 +2390,3 @@ export {
   connectedUsers, estimateDuration,
   findNearbyDrivers, findAllAvailableDrivers, setupOrderSocket, notifyDriversForOrder
 };
-

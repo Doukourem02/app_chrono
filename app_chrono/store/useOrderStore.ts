@@ -25,6 +25,9 @@ export interface OrderRequest {
     rating?: number;
     vehicle_plate?: string;
     vehicle_type?: string;
+    vehicle_brand?: string;
+    vehicle_model?: string;
+    vehicle_color?: string;
   };
   pickup: {
     address: string;

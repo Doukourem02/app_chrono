@@ -1,4 +1,4 @@
-import { Circle, HStack, Image, Link, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
+import { Circle, HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
 import { font, foregroundStyle, frame, offset, padding } from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
@@ -29,8 +29,8 @@ function palette(environment: LiveActivityEnvironment) {
     /** Accent marque (charte Krono) */
     brand: "#8B5CF6",
     accent: "#C4B5FD",
-    /** Accent actions / ETA bannière (proche ref. type Uber) */
-    bannerAction: "#FF6B35",
+    /** Accent actions / ETA bannière : violet pour rester cohérent avec Krono */
+    bannerAction: dim ? "#C4B5FD" : "#A78BFA",
     plateBg: "#1A1A1A",
     plateBorder: "#F2F2F7",
     plateText: "#FFFFFF",
@@ -45,8 +45,10 @@ function palette(environment: LiveActivityEnvironment) {
 export type OrderTrackingLiveProps = {
   etaLabel: string;
   vehicleLabel?: string;
+  vehicleInfoLabel?: string;
   plateLabel?: string;
   isPending?: boolean;
+  statusCode?: string;
   statusLabel?: string;
   progress?: number;
   /** URL https ou chemin `file://` pour la photo livreur (bannière). */
@@ -57,26 +59,70 @@ export type OrderTrackingLiveProps = {
   bannerClockLabel?: string;
 };
 
-function bannerEtaParts(isPending: boolean, etaRaw: string): { value: string; unit: string } {
-  if (isPending) return { value: "Recherche", unit: "" };
+function normalizeEtaLabel(etaRaw: string): string {
   const t = (etaRaw ?? "").trim();
-  if (!t || t === "—") return { value: "—", unit: "" };
-  const n = parseInt(t, 10);
-  if (Number.isFinite(n) && String(n) === t) return { value: String(n), unit: " min" };
-  const m = t.match(/^(\d+)\s*min\b/i);
-  if (m) return { value: m[1], unit: " min" };
-  return { value: t, unit: "" };
+  if (!t || t === "—" || t === "-" || t === "–") return "";
+  const m = t.match(/^(\d+)\s*(?:min|mn|minutes?)?$/i);
+  if (m) return `${m[1]} min`;
+  return t.replace(/\s+/g, " ");
+}
+
+function minimalEtaLabel(etaRaw: string): string {
+  return normalizeEtaLabel(etaRaw);
+}
+
+function compactFallbackLabel(statusCode: string | undefined): string {
+  switch ((statusCode ?? "").trim()) {
+    case "accepted":
+    case "enroute":
+      return "Bientot";
+    case "in_progress":
+      return "Preparation";
+    case "picked_up":
+    case "delivering":
+      return "En route";
+    case "completed":
+      return "Arrive";
+    default:
+      return "Suivi";
+  }
+}
+
+function minimalFallbackLabel(statusCode: string | undefined): string {
+  switch ((statusCode ?? "").trim()) {
+    case "accepted":
+    case "enroute":
+      return "ETA";
+    case "in_progress":
+      return "Prep";
+    case "picked_up":
+    case "delivering":
+      return "Route";
+    case "completed":
+      return "OK";
+    default:
+      return "ETA";
+  }
+}
+
+function etaHeadline(statusCode: string | undefined, eta: string, isPending: boolean | undefined): string {
+  if (isPending) return eta ? `Pickup in ${eta}` : "Finding pickup";
+  const status = (statusCode ?? "").trim();
+  if (status === "picked_up" || status === "delivering") {
+    return eta ? `Dropoff in ${eta}` : "On the way";
+  }
+  return eta ? `Pickup in ${eta}` : "Pickup soon";
 }
 
 function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActivityEnvironment) {
   "widget";
   const ON_DARK = palette(environment);
-  const ACTION = ON_DARK.bannerAction;
-  const vehicle = props.vehicleLabel?.trim() || "Krono";
-  const plate = props.plateLabel?.trim() || "KRONO";
+  const vehicleInfo = props.vehicleInfoLabel?.trim() || "Krono delivery";
   const etaDisplay = (props.etaLabel ?? "").trim() || "—";
-  const statusLabel = props.statusLabel?.trim() || (props.isPending ? "Recherche chauffeur" : "Livraison en cours");
-  const compactTitle = props.isPending ? "Recherche" : etaDisplay;
+  const normalizedEta = normalizeEtaLabel(etaDisplay);
+  const compactTitle = props.isPending
+    ? "Recherche"
+    : normalizedEta || compactFallbackLabel(props.statusCode);
   const simplified = environment.levelOfDetail === "simplified";
   const progress = Math.max(0.04, Math.min(1, props.progress ?? (props.isPending ? 0.08 : 0.56)));
   const trackWidth = simplified ? 214 : 250;
@@ -84,165 +130,123 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const carOffset = Math.max(0, Math.min(trackWidth - 28, traveledWidth - 14));
   const destinationOffset = Math.max(0, trackWidth - 18);
 
-  const driverPhone = (props.driverPhone ?? "").trim();
   const avatarUrl = (props.driverAvatarUrl ?? "").trim();
-  const clockText = (props.bannerClockLabel ?? "").trim() || "—";
-  const etaParts = bannerEtaParts(props.isPending === true, etaDisplay);
 
-  const bottomBar = (
-    <VStack spacing={8} modifiers={[padding({ horizontal: 12, vertical: 10 })]}>
-      <Text modifiers={[font({ size: 11 }), foregroundStyle(ON_DARK.muted), frame({ maxWidth: trackWidth, alignment: "leading" })]}>
-        {statusLabel}
-      </Text>
-      <ZStack alignment="leading">
-        <RoundedRectangle
-          cornerRadius={5}
-          modifiers={[frame({ width: trackWidth, height: 8 }), foregroundStyle(ON_DARK.trackRemaining)]}
-        />
-        <RoundedRectangle
-          cornerRadius={5}
-          modifiers={[frame({ width: traveledWidth, height: 8 }), foregroundStyle(ON_DARK.trackDone)]}
-        />
-        <ZStack modifiers={[offset({ x: carOffset })]}>
-          <Circle modifiers={[frame({ width: 28, height: 28 }), foregroundStyle(ON_DARK.trackKnob)]} />
-          <Image systemName="car.side.fill" color="#6B7280" size={14} />
-        </ZStack>
-        <ZStack modifiers={[offset({ x: destinationOffset })]}>
-          <Circle modifiers={[frame({ width: 18, height: 18 }), foregroundStyle(ON_DARK.trackDestination)]} />
-          <Circle modifiers={[frame({ width: 8, height: 8 }), foregroundStyle("#FFFFFF")]} />
-        </ZStack>
-      </ZStack>
-    </VStack>
-  );
-
-  const riderLabel = props.isPending === true ? "Livreur" : "Votre livreur";
-
-  const avatarBlock = (
-    <ZStack modifiers={[frame({ width: 52, height: 52 })]}>
-      <Circle modifiers={[frame({ width: 52, height: 52 }), foregroundStyle(ON_DARK.bannerChip)]} />
+  const driverAvatar = (
+    <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
+      <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle("#FFFFFF")]} />
+      <Circle modifiers={[frame({ width: 38, height: 38 }), foregroundStyle(ON_DARK.bannerChip)]} />
       {avatarUrl ? (
-        <Image uiImage={avatarUrl} modifiers={[frame({ width: 48, height: 48 })]} />
+        <Image uiImage={avatarUrl} modifiers={[frame({ width: 36, height: 36 })]} />
       ) : (
-        <Image systemName="person.crop.circle.fill" color="#8E8E93" size={30} />
+        <Image systemName="person.crop.circle.fill" color="#8E8E93" size={28} />
       )}
     </ZStack>
   );
 
-  const telDest = driverPhone ? `tel:${driverPhone}` : "";
-  const smsDest = driverPhone ? `sms:${driverPhone}` : "";
-
-  const phoneChip = driverPhone ? (
-    <Link destination={telDest} modifiers={[frame({ width: 44, height: 44 })]}>
-      <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
-        <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle(ON_DARK.bannerChip)]} />
-        <Image systemName="phone.fill" color={ACTION} size={18} />
-      </ZStack>
-    </Link>
+  const compactLeading = <Image systemName="car.fill" color={ON_DARK.accent} size={18} />;
+  const compactTrailing = (
+    <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.accent)]}>{compactTitle}</Text>
+  );
+  const minimalTitle = props.isPending
+    ? "ETA"
+    : minimalEtaLabel(etaDisplay) || minimalFallbackLabel(props.statusCode);
+  const minimal = minimalTitle ? (
+    <Text modifiers={[font({ weight: "bold", size: 13 }), foregroundStyle(ON_DARK.accent)]}>{minimalTitle}</Text>
   ) : (
-    <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
-      <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle("#1C1C1E")]} />
-      <Image systemName="phone.fill" color="#505050" size={18} />
-    </ZStack>
+    <Image systemName="car.fill" color={ON_DARK.accent} size={16} />
   );
 
-  const messageChip = driverPhone ? (
-    <Link destination={smsDest} modifiers={[frame({ width: 44, height: 44 })]}>
-      <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
-        <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle(ON_DARK.bannerChip)]} />
-        <Image systemName="message.fill" color={ACTION} size={18} />
-      </ZStack>
-    </Link>
-  ) : (
-    <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
-      <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle("#1C1C1E")]} />
-      <Image systemName="message.fill" color="#505050" size={18} />
-    </ZStack>
+  const headline = etaHeadline(props.statusCode, normalizedEta, props.isPending);
+  const shortVehicleInfo = vehicleInfo.length > 31 ? `${vehicleInfo.slice(0, 28)}...` : vehicleInfo;
+  const bannerTrackWidth = simplified ? 280 : 310;
+  const bannerTraveledWidth = Math.max(16, Math.round(bannerTrackWidth * progress));
+  const bannerCarOffset = Math.max(0, Math.min(bannerTrackWidth - 26, bannerTraveledWidth - 13));
+  const bannerDestinationOffset = Math.max(0, bannerTrackWidth - 14);
+  const etaSize = simplified ? 22 : 26;
+  const infoSize = simplified ? 12 : 13;
+  const pad = simplified ? 8 : 10;
+  const leadPad = simplified ? 6 : 8;
+
+  const expandedLeading = (
+    <VStack spacing={0} modifiers={[padding({ leading: leadPad, trailing: 4, top: pad, bottom: 4 }), frame({ maxWidth: 130, alignment: "leading" })]}>
+      <Text modifiers={[font({ weight: "bold", size: simplified ? 12 : 13 }), foregroundStyle(ON_DARK.title)]}>KRONO</Text>
+    </VStack>
   );
 
-  const bannerTopRow = (
-    <HStack spacing={12} modifiers={[padding({ horizontal: 4, vertical: 2 })]}>
-      {avatarBlock}
-      <VStack spacing={3} modifiers={[frame({ alignment: "leading" })]}>
-        <Text modifiers={[font({ size: 11, weight: "medium" }), foregroundStyle(ON_DARK.muted)]}>{riderLabel}</Text>
-        <Text modifiers={[font({ weight: "bold", size: 17 }), foregroundStyle(ON_DARK.title)]}>{vehicle}</Text>
-      </VStack>
-      <Spacer minLength={0} />
-      <HStack spacing={10}>
-        {phoneChip}
-        {messageChip}
-      </HStack>
-    </HStack>
-  );
-
-  const bannerDivider = (
-    <RoundedRectangle cornerRadius={0.5} modifiers={[frame({ width: 320, height: 1 }), foregroundStyle("#3A3A3C")]} />
-  );
-
-  const bannerBottomRow = (
-    <HStack spacing={12} modifiers={[padding({ horizontal: 4, top: 6, bottom: 2 })]}>
-      <HStack spacing={10}>
-        <ZStack modifiers={[frame({ width: 36, height: 36 })]}>
-          <Circle modifiers={[frame({ width: 36, height: 36 }), foregroundStyle(ON_DARK.bannerChip)]} />
-          <Image systemName="clock.fill" color={ACTION} size={16} />
-        </ZStack>
-        <VStack spacing={2} modifiers={[frame({ alignment: "leading" })]}>
-          <Text modifiers={[font({ size: 10, weight: "medium" }), foregroundStyle(ON_DARK.muted)]}>Heure</Text>
-          <Text modifiers={[font({ weight: "semibold", size: 15 }), foregroundStyle(ON_DARK.title)]}>{clockText}</Text>
-        </VStack>
-      </HStack>
-      <Spacer minLength={0} />
-      <HStack spacing={2} modifiers={[frame({ alignment: "trailing" })]}>
-        <Text modifiers={[font({ weight: "bold", size: 28 }), foregroundStyle(ACTION)]}>{etaParts.value}</Text>
-        {etaParts.unit ? (
-          <Text modifiers={[font({ weight: "bold", size: 16 }), foregroundStyle(ACTION)]}>{etaParts.unit}</Text>
-        ) : null}
-      </HStack>
-    </HStack>
+  const expandedTrailing = (
+    <VStack spacing={0} modifiers={[padding({ leading: 4, trailing: leadPad, top: pad, bottom: 4 }), frame({ alignment: "trailing" })]}>
+      <Image systemName="car.side.fill" color={ON_DARK.accent} size={18} />
+    </VStack>
   );
 
   const banner = (
-    <VStack spacing={8} modifiers={[padding({ horizontal: 12, vertical: 12 })]}>
-      {bannerTopRow}
-      {bannerDivider}
-      {bannerBottomRow}
+    <VStack spacing={12} modifiers={[padding({ horizontal: 16, vertical: 18 }), frame({ minHeight: 122 })]}>
+      <Text modifiers={[font({ weight: "bold", size: 12 }), foregroundStyle(ON_DARK.title), frame({ maxWidth: bannerTrackWidth, alignment: "leading" })]}>
+        KRONO
+      </Text>
+      <HStack spacing={10}>
+        <VStack spacing={3} modifiers={[frame({ maxWidth: 230, alignment: "leading" })]}>
+          <Text modifiers={[font({ weight: "bold", size: 18 }), foregroundStyle(ON_DARK.title)]}>{headline}</Text>
+          <Text modifiers={[font({ weight: "medium", size: 12 }), foregroundStyle(ON_DARK.accent), frame({ alignment: "leading" })]}>
+            {shortVehicleInfo}
+          </Text>
+        </VStack>
+        <Spacer minLength={0} />
+        {driverAvatar}
+      </HStack>
+      <ZStack alignment="leading">
+        <RoundedRectangle
+          cornerRadius={5}
+          modifiers={[frame({ width: bannerTrackWidth, height: 5 }), foregroundStyle("#5E6168")]}
+        />
+        <RoundedRectangle
+          cornerRadius={5}
+          modifiers={[frame({ width: bannerTraveledWidth, height: 5 }), foregroundStyle("#A7C7FF")]}
+        />
+        <ZStack modifiers={[offset({ x: bannerCarOffset })]}>
+          <Circle modifiers={[frame({ width: 24, height: 24 }), foregroundStyle("#F2F2F7")]} />
+          <Image systemName="car.side.fill" color="#111827" size={12} />
+        </ZStack>
+        <ZStack modifiers={[offset({ x: bannerDestinationOffset })]}>
+          <Circle modifiers={[frame({ width: 14, height: 14 }), foregroundStyle("#A7C7FF")]} />
+          <Circle modifiers={[frame({ width: 6, height: 6 }), foregroundStyle("#111827")]} />
+        </ZStack>
+      </ZStack>
     </VStack>
   );
 
-  const compactLeading = <Image systemName="car.fill" color={ON_DARK.accent} size={18} />;
-  const compactTrailing = (
-    <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.title)]}>{compactTitle}</Text>
-  );
-  const minimal = <Image systemName="car.fill" color={ON_DARK.accent} size={16} />;
-
-  const etaSize = simplified ? 22 : 26;
-  const subSize = simplified ? 13 : 14;
-  const plateSize = simplified ? 13 : 14;
-  const iconSize = simplified ? 20 : 22;
-  const pad = simplified ? 8 : 10;
-  const plateWidth = simplified ? 120 : 138;
-  const plateHeight = simplified ? 34 : 38;
-  const leadPad = simplified ? 6 : 8;
-
-  const expandedTripColumn = (
-    <VStack spacing={4} modifiers={[padding({ leading: leadPad, trailing: 6, top: pad, bottom: pad }), frame({ maxWidth: 200, alignment: "leading" })]}>
-      <Text modifiers={[font({ weight: "bold", size: simplified ? 12 : 13 }), foregroundStyle(ON_DARK.brand)]}>KRONO</Text>
-      <Text modifiers={[font({ weight: "bold", size: etaSize }), foregroundStyle(ON_DARK.title)]}>{etaDisplay}</Text>
-      <Text modifiers={[font({ size: subSize }), foregroundStyle(ON_DARK.body), frame({ alignment: "leading" })]}>{vehicle}</Text>
+  const expandedBottom = (
+    <VStack spacing={10} modifiers={[padding({ horizontal: 12, top: 2, bottom: 10 })]}>
+      <HStack spacing={10}>
+        <VStack spacing={3} modifiers={[frame({ maxWidth: 230, alignment: "leading" })]}>
+          <Text modifiers={[font({ weight: "bold", size: etaSize }), foregroundStyle(ON_DARK.title)]}>{headline}</Text>
+          <Text modifiers={[font({ weight: "medium", size: infoSize }), foregroundStyle(ON_DARK.accent), frame({ alignment: "leading" })]}>
+            {shortVehicleInfo}
+          </Text>
+        </VStack>
+        <Spacer minLength={0} />
+        {driverAvatar}
+      </HStack>
+      <ZStack alignment="leading">
+        <RoundedRectangle
+          cornerRadius={5}
+          modifiers={[frame({ width: trackWidth, height: 5 }), foregroundStyle("#5E6168")]}
+        />
+        <RoundedRectangle
+          cornerRadius={5}
+          modifiers={[frame({ width: traveledWidth, height: 5 }), foregroundStyle("#A7C7FF")]}
+        />
+        <ZStack modifiers={[offset({ x: carOffset })]}>
+          <Circle modifiers={[frame({ width: 24, height: 24 }), foregroundStyle("#F2F2F7")]} />
+          <Image systemName="car.side.fill" color="#111827" size={12} />
+        </ZStack>
+        <ZStack modifiers={[offset({ x: destinationOffset })]}>
+          <Circle modifiers={[frame({ width: 14, height: 14 }), foregroundStyle("#A7C7FF")]} />
+          <Circle modifiers={[frame({ width: 6, height: 6 }), foregroundStyle("#111827")]} />
+        </ZStack>
+      </ZStack>
     </VStack>
-  );
-
-  const plateFrame = (
-    <ZStack>
-      <RoundedRectangle
-        cornerRadius={10}
-        modifiers={[frame({ width: plateWidth + 4, height: plateHeight + 4 }), foregroundStyle(ON_DARK.plateBorder)]}
-      />
-      <RoundedRectangle
-        cornerRadius={8}
-        modifiers={[frame({ width: plateWidth, height: plateHeight }), foregroundStyle(ON_DARK.plateBg)]}
-      />
-      <Text modifiers={[font({ weight: "bold", size: plateSize }), foregroundStyle(ON_DARK.plateText)]}>{plate}</Text>
-    </ZStack>
   );
 
   return {
@@ -251,17 +255,9 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
     compactTrailing,
     minimal,
     expandedCenter: <Spacer minLength={0} />,
-    expandedLeading: expandedTripColumn,
-    expandedTrailing: (
-      <VStack spacing={6} modifiers={[padding({ leading: 6, trailing: leadPad, top: pad, bottom: pad }), frame({ alignment: "trailing" })]}>
-        {plateFrame}
-        <HStack spacing={6}>
-          <Spacer minLength={0} />
-          <Image systemName="car.side.fill" color={ON_DARK.accent} size={iconSize} />
-        </HStack>
-      </VStack>
-    ),
-    expandedBottom: bottomBar,
+    expandedLeading,
+    expandedTrailing,
+    expandedBottom,
   };
 }
 

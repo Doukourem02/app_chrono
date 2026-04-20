@@ -21,6 +21,7 @@ const END_PROPS: OrderTrackingLiveProps = {
   vehicleLabel: "Course terminée",
   plateLabel: "",
   isPending: false,
+  statusCode: "completed",
   statusLabel: "Terminee",
   progress: 1,
   driverAvatarUrl: "",
@@ -99,6 +100,24 @@ function liveStatusLabel(status: OrderStatus): string {
     default:
       return "Suivi Krono";
   }
+}
+
+function vehicleTypeLabel(value: string | undefined): string {
+  const v = (value ?? "").trim().toLowerCase();
+  if (v === "moto") return "Moto";
+  if (v === "cargo") return "Cargo";
+  if (v === "vehicule" || v === "vehicle" || v === "car") return "Voiture";
+  return value?.trim() || "Voiture";
+}
+
+function vehicleInfoLabel(order: OrderRequest): string {
+  const driver = order.driver;
+  const vehicleType = vehicleTypeLabel(driver?.vehicle_type || order.deliveryMethod);
+  const model = [driver?.vehicle_brand, driver?.vehicle_model].filter(Boolean).join(" ").trim();
+  const color = driver?.vehicle_color?.trim();
+  const plate = driver?.vehicle_plate?.trim();
+  const vehicle = [color, model || vehicleType].filter(Boolean).join(" ");
+  return [plate, vehicle].filter(Boolean).join(" · ") || vehicleType;
 }
 
 /** Même logique que le hook de sync : statut API parfois mal câblé (casse, tirets). */
@@ -195,8 +214,10 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
     return {
       etaLabel: "Recherche chauffeur",
       vehicleLabel: eta ? `≈ ${eta}` : "En attente d’un livreur",
+      vehicleInfoLabel: vehicleInfoLabel(order),
       plateLabel: order.dropoff?.address?.slice(0, 28) || "Krono",
       isPending: true,
+      statusCode: status,
       statusLabel: liveStatusLabel(status),
       progress: progressFromStatus(status),
       driverAvatarUrl: "",
@@ -223,13 +244,15 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
   const eta =
     typeof order.estimatedDuration === "string" && order.estimatedDuration.trim()
       ? order.estimatedDuration.trim()
-      : "—";
+      : "";
 
   return {
     etaLabel: eta,
     vehicleLabel: name || detail || "Krono",
+    vehicleInfoLabel: vehicleInfoLabel(order),
     plateLabel: plate || "KRONO",
     isPending: false,
+    statusCode: status,
     statusLabel: liveStatusLabel(status),
     progress: clampProgress(progressFromStatus(status)),
     driverAvatarUrl: avatarRaw,

@@ -41,6 +41,11 @@ function formatApiDeliveryRow(order: any): OrderRequest {
           email: order.driver?.email,
           avatar_url: order.driver?.avatar_url,
           rating: order.driver?.rating,
+          vehicle_plate: order.driver?.vehicle_plate,
+          vehicle_type: order.driver?.vehicle_type,
+          vehicle_brand: order.driver?.vehicle_brand,
+          vehicle_model: order.driver?.vehicle_model,
+          vehicle_color: order.driver?.vehicle_color,
         }
       : undefined,
     pickup: (() => {

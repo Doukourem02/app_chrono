@@ -568,6 +568,11 @@ class UserOrderSocketService {
                 avatar_url: driverInfo.profile_image_url || undefined,
                 profile_image_url: driverInfo.profile_image_url || undefined,
                 rating: driverInfo.rating || undefined,
+                vehicle_plate: driverInfo.vehicle_plate || undefined,
+                vehicle_type: driverInfo.vehicle_type || undefined,
+                vehicle_brand: driverInfo.vehicle_brand || undefined,
+                vehicle_model: driverInfo.vehicle_model || undefined,
+                vehicle_color: driverInfo.vehicle_color || undefined,
                 ...(driverInfo.current_latitude && driverInfo.current_longitude
                   ? {
                       current_latitude: driverInfo.current_latitude,
