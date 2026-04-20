@@ -106,18 +106,21 @@ function minimalFallbackLabel(statusCode: string | undefined): string {
 }
 
 function etaHeadline(statusCode: string | undefined, eta: string, isPending: boolean | undefined): string {
-  if (isPending) return eta ? `Pickup in ${eta}` : "Finding pickup";
+  if (isPending) return eta ? `Recherche livreur · ${eta}` : "Recherche livreur";
   const status = (statusCode ?? "").trim();
+  if (status === "completed") return "Livraison terminée";
+  if (status === "cancelled") return "Commande annulée";
+  if (status === "declined") return "Commande refusée";
   if (status === "picked_up" || status === "delivering") {
-    return eta ? `Dropoff in ${eta}` : "On the way";
+    return eta ? `Livraison dans ${eta}` : "En livraison";
   }
-  return eta ? `Pickup in ${eta}` : "Pickup soon";
+  return eta ? `Prise en charge dans ${eta}` : "Vers la prise en charge";
 }
 
 function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActivityEnvironment) {
   "widget";
   const ON_DARK = palette(environment);
-  const vehicleInfo = props.vehicleInfoLabel?.trim() || "Krono delivery";
+  const vehicleInfo = props.vehicleInfoLabel?.trim() || "Livraison Krono";
   const etaDisplay = (props.etaLabel ?? "").trim() || "—";
   const normalizedEta = normalizeEtaLabel(etaDisplay);
   const compactTitle = normalizedEta || (props.isPending ? "Recherche" : compactFallbackLabel(props.statusCode));
@@ -161,24 +164,12 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const bannerDestinationOffset = Math.max(0, bannerTrackWidth - 14);
   const etaSize = simplified ? 22 : 26;
   const infoSize = simplified ? 12 : 13;
-  const pad = simplified ? 8 : 10;
-  const leadPad = simplified ? 6 : 8;
-
-  const expandedLeading = (
-    <VStack spacing={0} modifiers={[padding({ leading: leadPad, trailing: 4, top: pad, bottom: 4 }), frame({ maxWidth: 130, alignment: "leading" })]}>
-      <Text modifiers={[font({ weight: "bold", size: simplified ? 12 : 13 }), foregroundStyle(ON_DARK.title)]}>KRONO</Text>
-    </VStack>
-  );
-
-  const expandedTrailing = (
-    <VStack spacing={0} modifiers={[padding({ leading: 4, trailing: leadPad, top: pad, bottom: 4 }), frame({ alignment: "trailing" })]}>
-      <Image systemName="car.side.fill" color={ON_DARK.accent} size={18} />
-    </VStack>
-  );
+  const expandedLeading = <Spacer minLength={0} />;
+  const expandedTrailing = <Spacer minLength={0} />;
 
   const banner = (
     <VStack spacing={12} modifiers={[padding({ horizontal: 16, vertical: 18 }), frame({ minHeight: 122 })]}>
-      <Text modifiers={[font({ weight: "bold", size: 12 }), foregroundStyle(ON_DARK.title), frame({ maxWidth: bannerTrackWidth, alignment: "leading" })]}>
+      <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.brand), frame({ maxWidth: bannerTrackWidth, alignment: "leading" })]}>
         KRONO
       </Text>
       <HStack spacing={10}>
@@ -213,7 +204,10 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   );
 
   const expandedBottom = (
-    <VStack spacing={10} modifiers={[padding({ horizontal: 12, top: 2, bottom: 10 })]}>
+    <VStack spacing={9} modifiers={[padding({ horizontal: 12, top: 0, bottom: 10 })]}>
+      <Text modifiers={[font({ weight: "bold", size: simplified ? 13 : 14 }), foregroundStyle(ON_DARK.brand), frame({ maxWidth: trackWidth, alignment: "leading" })]}>
+        KRONO
+      </Text>
       <HStack spacing={10}>
         <VStack spacing={3} modifiers={[frame({ maxWidth: 230, alignment: "leading" })]}>
           <Text modifiers={[font({ weight: "bold", size: etaSize }), foregroundStyle(ON_DARK.title)]}>{headline}</Text>

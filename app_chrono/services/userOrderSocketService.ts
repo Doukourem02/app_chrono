@@ -599,6 +599,10 @@ class UserOrderSocketService {
                   : {}),
               },
             } as any);
+            const refreshedOrder = useOrderStore.getState().activeOrders.find(o => o.id === order.id);
+            if (refreshedOrder) {
+              void syncOrderLiveActivity(refreshedOrder);
+            }
           }
         }
         // If DB persistence failed for the assignment, notify user

@@ -249,10 +249,10 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..4e27153 100644
+index 3e6ff0b..5d2e96e 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,154 @@
+@@ -1,6 +1,162 @@
  import SwiftUI
  import WidgetKit
  
@@ -274,7 +274,7 @@ index 3e6ff0b..4e27153 100644
 +  }
 +
 +  private var vehicleLine: String {
-+    p.vehicle ?? "Krono delivery"
++    p.vehicle ?? "Livraison Krono"
 +  }
 +
 +  private var normalizedEta: String? {
@@ -291,18 +291,26 @@ index 3e6ff0b..4e27153 100644
 +
 +  private var headline: String {
 +    if b.pending {
-+      if let eta = normalizedEta { return "Pickup in \(eta)" }
-+      return "Finding pickup"
++      if let eta = normalizedEta { return "Recherche livreur · \(eta)" }
++      return "Recherche livreur"
 +    }
-+    if let eta = normalizedEta { return "Pickup in \(eta)" }
-+    return "Pickup soon"
++    let status = p.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
++    if status.contains("terminee") || status.contains("terminée") { return "Livraison terminée" }
++    if status.contains("annulee") || status.contains("annulée") { return "Commande annulée" }
++    if status.contains("refusee") || status.contains("refusée") { return "Commande refusée" }
++    if status.contains("colis") || status.contains("livraison") {
++      if let eta = normalizedEta { return "Livraison dans \(eta)" }
++      return "En livraison"
++    }
++    if let eta = normalizedEta { return "Prise en charge dans \(eta)" }
++    return "Vers la prise en charge"
 +  }
 +
 +  var body: some View {
 +    VStack(alignment: .leading, spacing: 12) {
 +      Text("KRONO")
-+        .font(.caption.weight(.bold))
-+        .foregroundStyle(.white)
++        .font(.subheadline.weight(.bold))
++        .foregroundStyle(kronoBannerAction)
 +
 +      HStack(alignment: .center, spacing: 12) {
 +        VStack(alignment: .leading, spacing: 3) {
@@ -407,7 +415,7 @@ index 3e6ff0b..4e27153 100644
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -13,7 +161,7 @@ struct LiveActivityBanner: View {
+@@ -13,7 +169,7 @@ struct LiveActivityBanner: View {
      } else if let node = nodes?["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
@@ -701,7 +709,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..3648639 100644
+index 9eae718..b5950bd 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -3,6 +3,8 @@ import WidgetKit
@@ -782,7 +790,7 @@ index 9eae718..3648639 100644
 +  }
 +
 +  private var vehicleLine: String {
-+    p.vehicle ?? "Krono delivery"
++    p.vehicle ?? "Livraison Krono"
 +  }
 +
 +  private var normalizedEta: String? {
@@ -799,11 +807,19 @@ index 9eae718..3648639 100644
 +
 +  private var headline: String {
 +    if b.pending {
-+      if let eta = normalizedEta { return "Pickup in \(eta)" }
-+      return "Finding pickup"
++      if let eta = normalizedEta { return "Recherche livreur · \(eta)" }
++      return "Recherche livreur"
 +    }
-+    if let eta = normalizedEta { return "Pickup in \(eta)" }
-+    return "Pickup soon"
++    let status = p.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
++    if status.contains("terminee") || status.contains("terminée") { return "Livraison terminée" }
++    if status.contains("annulee") || status.contains("annulée") { return "Commande annulée" }
++    if status.contains("refusee") || status.contains("refusée") { return "Commande refusée" }
++    if status.contains("colis") || status.contains("livraison") {
++      if let eta = normalizedEta { return "Livraison dans \(eta)" }
++      return "En livraison"
++    }
++    if let eta = normalizedEta { return "Prise en charge dans \(eta)" }
++    return "Vers la prise en charge"
 +  }
 +
 +  var body: some View {
@@ -827,21 +843,9 @@ index 9eae718..3648639 100644
 +    case "expandedCenter":
 +      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
 +    case "expandedLeading":
-+      VStack(alignment: .leading, spacing: 0) {
-+        Text("KRONO")
-+          .font(.caption.weight(.bold))
-+          .foregroundStyle(.white)
-+      }
-+      .frame(maxWidth: 130, alignment: .leading)
-+      .padding(EdgeInsets(top: 8, leading: 8, bottom: 4, trailing: 4))
++      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
 +    case "expandedTrailing":
-+      VStack(alignment: .trailing, spacing: 0) {
-+        Image(systemName: "car.side.fill")
-+          .foregroundStyle(kronoLiveActivityAccent)
-+          .font(.system(size: 18, weight: .semibold))
-+      }
-+      .frame(maxWidth: .infinity, alignment: .trailing)
-+      .padding(EdgeInsets(top: 8, leading: 4, bottom: 4, trailing: 8))
++      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
 +    case "expandedBottom":
 +      expandedTrackingBottom
 +    default:
@@ -890,6 +894,10 @@ index 9eae718..3648639 100644
 +  @ViewBuilder
 +  private var expandedTrackingBottom: some View {
 +    VStack(alignment: .leading, spacing: 8) {
++      Text("KRONO")
++        .font(.subheadline.weight(.bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++        .lineLimit(1)
 +      HStack(alignment: .center, spacing: 10) {
 +        VStack(alignment: .leading, spacing: 2) {
 +          Text(headline)

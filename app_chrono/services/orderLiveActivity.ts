@@ -234,8 +234,8 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
         ? order.estimatedDuration.trim()
         : "";
     return {
-      etaLabel: "Recherche chauffeur",
-      vehicleLabel: eta ? `≈ ${eta}` : "En attente d’un livreur",
+      etaLabel: eta || "—",
+      vehicleLabel: "Recherche livreur",
       vehicleInfoLabel: vehicleInfoLabel(order),
       plateLabel: order.dropoff?.address?.slice(0, 28) || "Krono",
       isPending: true,
