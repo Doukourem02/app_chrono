@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,CarFront,Wrench,Shield,Sliders,PanelLeftClose,} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,CarFront,Wrench,Shield,Sliders,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/chrono.png";
-import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
@@ -14,43 +14,6 @@ import { themeColors } from "@/utils/theme";
 import { useThemeStore } from "@/stores/themeStore";
 import { useTranslation } from "@/hooks/useTranslation";
 import config from "@/lib/config";
-
-const SIDEBAR_EXPANDED_SESSION_KEY = "krono-admin-sidebar-expanded";
-
-const sidebarExpandedListeners = new Set<() => void>();
-
-function readSidebarExpandedFromStorage(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return sessionStorage.getItem(SIDEBAR_EXPANDED_SESSION_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function subscribeSidebarExpanded(onStoreChange: () => void) {
-  sidebarExpandedListeners.add(onStoreChange);
-  return () => {
-    sidebarExpandedListeners.delete(onStoreChange);
-  };
-}
-
-function emitSidebarExpandedChange() {
-  sidebarExpandedListeners.forEach((l) => l());
-}
-
-function writeSidebarExpandedStorage(expanded: boolean) {
-  try {
-    if (expanded) {
-      sessionStorage.setItem(SIDEBAR_EXPANDED_SESSION_KEY, "1");
-    } else {
-      sessionStorage.removeItem(SIDEBAR_EXPANDED_SESSION_KEY);
-    }
-  } catch {
-    /* ignore */
-  }
-  emitSidebarExpandedChange();
-}
 
 interface NavItem {
   href: string;
@@ -162,11 +125,7 @@ export default function Sidebar() {
     }))
   }));
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const isExpanded = useSyncExternalStore(
-    subscribeSidebarExpanded,
-    readSidebarExpandedFromStorage,
-    () => false
-  );
+  const [isExpanded, setIsExpanded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string; first_name?: string | null; last_name?: string | null } | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -175,10 +134,6 @@ export default function Sidebar() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['analyses', 'gestion', 'administration']));
   const isOpeningMenuRef = useRef(false);
   const menuJustOpenedRef = useRef(false);
-
-  const collapseSidebar = useCallback(() => {
-    writeSidebarExpandedStorage(false);
-  }, []);
 
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -471,7 +426,7 @@ export default function Sidebar() {
   };
 
   const handleSignOut = async () => {
-    writeSidebarExpandedStorage(false);
+    setIsExpanded(false);
     await signOut();
     router.push('/login');
   };
@@ -528,7 +483,7 @@ export default function Sidebar() {
     fontSize: '13px',
     fontWeight: 600,
     color: themeColors.textPrimary,
-    letterSpacing: '-0.025em',
+    letterSpacing: 0,
     opacity: isExpanded ? 1 : 0,
     transform: `translateX(${isExpanded ? 0 : -10}px)`,
     transition: 'opacity 0.2s ease, transform 0.2s ease',
@@ -790,11 +745,8 @@ export default function Sidebar() {
   return (
     <div
       style={sidebarStyle}
-      onMouseEnter={() => {
-        if (!showProfileMenu) {
-          writeSidebarExpandedStorage(true);
-        }
-      }}
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
     >
       <div style={logoContainerStyle}>
         <div
@@ -802,7 +754,7 @@ export default function Sidebar() {
             display: "flex",
             width: "100%",
             alignItems: "flex-start",
-            justifyContent: isExpanded ? "space-between" : "center",
+            justifyContent: "center",
             flexDirection: isExpanded ? "row" : "column",
             gap: isExpanded ? 8 : 12,
           }}
@@ -836,32 +788,6 @@ export default function Sidebar() {
             </div>
             <p style={logoTextStyle}>{t("sidebar.logo")}</p>
           </div>
-          {isExpanded && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                collapseSidebar();
-              }}
-              aria-label="Réduire le menu"
-              style={{
-                flexShrink: 0,
-                marginTop: 4,
-                padding: 8,
-                border: "none",
-                borderRadius: 10,
-                backgroundColor: "transparent",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#6B7280",
-              }}
-              title="Réduire le menu"
-            >
-              <PanelLeftClose size={20} />
-            </button>
-          )}
         </div>
       </div>
 

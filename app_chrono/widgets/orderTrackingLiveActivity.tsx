@@ -188,7 +188,6 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
             {shortVehicleInfo}
           </Text>
         </VStack>
-        <Spacer minLength={0} />
         {driverAvatar}
       </HStack>
       <ZStack alignment="leading">
@@ -227,7 +226,6 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
             {shortVehicleInfo}
           </Text>
         </VStack>
-        <Spacer minLength={0} />
         {driverAvatar}
       </HStack>
       <ZStack alignment="leading">
