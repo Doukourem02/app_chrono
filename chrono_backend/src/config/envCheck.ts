@@ -31,6 +31,10 @@ const requiredVars: EnvVar[] = [
   },
 ];
 
+function envValue(name: string): string {
+  return process.env[name]?.trim() || '';
+}
+
 export function validateEnvironment(): void {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -113,6 +117,30 @@ export function validateEnvironment(): void {
     if (!process.env.SLACK_WEBHOOK_URL?.trim()) {
       warnings.push(
         'SLACK_WEBHOOK_URL absent : notifications Slack désactivées.'
+      );
+    }
+
+    const apnsPrivateKeyReady = Boolean(
+      envValue('APNS_PRIVATE_KEY') || envValue('APNS_PRIVATE_KEY_BASE64')
+    );
+    const apnsRequired = [
+      ['APNS_BUNDLE_ID', envValue('APNS_BUNDLE_ID')],
+      ['APNS_TEAM_ID', envValue('APNS_TEAM_ID')],
+      ['APNS_KEY_ID', envValue('APNS_KEY_ID')],
+      ['APNS_PRIVATE_KEY ou APNS_PRIVATE_KEY_BASE64', apnsPrivateKeyReady ? 'ok' : ''],
+    ] as const;
+    const apnsMissing = apnsRequired
+      .filter(([, value]) => !value)
+      .map(([name]) => name);
+    if (apnsMissing.length > 0) {
+      warnings.push(
+        `APNs Live Activity incomplet : ${apnsMissing.join(', ')} manquant(s). L’îlot iOS ne pourra pas être mis à jour si l’app client est fermée.`
+      );
+    }
+    const apnsEnv = envValue('APNS_ENV').toLowerCase();
+    if (apnsEnv && apnsEnv !== 'production') {
+      warnings.push(
+        `APNS_ENV=${apnsEnv} en production Render : utiliser APNS_ENV=production pour TestFlight/App Store.`
       );
     }
   }

@@ -1,19 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {Alert,ScrollView,StyleSheet,Text,TouchableOpacity,View,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  useSavedAddressesStore,
-  type SavedClientAddress,
-} from '../../store/useSavedAddressesStore';
+import {useSavedAddressesStore,type SavedClientAddress,} from '../../store/useSavedAddressesStore';
 
 export default function AddressesPage() {
   const insets = useSafeAreaInsets();

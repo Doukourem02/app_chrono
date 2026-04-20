@@ -1,17 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {Alert,KeyboardAvoidingView,Platform,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapboxAddressAutocomplete from '../../components/MapboxAddressAutocomplete';
 import { useSavedAddressesStore } from '../../store/useSavedAddressesStore';

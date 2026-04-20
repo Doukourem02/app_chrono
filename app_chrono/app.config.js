@@ -116,8 +116,9 @@ module.exports = {
         {
           bundleIdentifier: "com.anonymous.app-chrono.ExpoWidgetsTarget",
           groupIdentifier: "group.com.anonymous.app-chrono",
-          /** Passer à true quand le backend enverra des mises à jour APNs pour la Live Activity. */
-          enablePushNotifications: false,
+          /** APNs ActivityKit : permet au backend de mettre à jour l’îlot même app fermée. */
+          enablePushNotifications: true,
+          frequentUpdates: true,
           widgets: [],
         },
       ],

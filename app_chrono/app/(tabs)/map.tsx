@@ -31,10 +31,7 @@ import { useOrderStore } from "../../store/useOrderStore";
 import { usePaymentErrorStore } from "../../store/usePaymentErrorStore";
 import { usePaymentStore } from "../../store/usePaymentStore";
 import { useRatingStore } from "../../store/useRatingStore";
-import {
-  useSavedAddressesStore,
-  type SavedClientAddress,
-} from "../../store/useSavedAddressesStore";
+import {useSavedAddressesStore,type SavedClientAddress,} from "../../store/useSavedAddressesStore";
 import { useShipmentStore } from "../../store/useShipmentStore";
 import { logger } from "../../utils/logger";
 import type { RouteMetricsSource } from "../../utils/routePricingLabels";
@@ -42,11 +39,7 @@ import { distanceMetricCaption } from "../../utils/routePricingLabels";
 import { sanitizeGeocodeDisplayString, singleLineAddressInput } from "../../utils/sanitizeGeocodeDisplay";
 import { isDeliveryMethodEnabledForClient } from "../../constants/clientDeliveryMethods";
 import { forwardGeocodeAddress } from "../../utils/forwardGeocodeAddress";
-import {
-  estimateNearestDriverEtaToPickup,
-  formatDriverPickupEtaBadge,
-  type ClientDeliveryMethod,
-} from "../../utils/nearestDriverPickupEta";
+import {estimateNearestDriverEtaToPickup,formatDriverPickupEtaBadge,type ClientDeliveryMethod,} from "../../utils/nearestDriverPickupEta";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PENDING_STATUS: OrderStatus = "pending";

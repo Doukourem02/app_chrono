@@ -13,15 +13,9 @@ import { useOrderStore } from "../store/useOrderStore";
 import { userApiService } from "../services/userApiService";
 import { userOrderSocketService } from "../services/userOrderSocketService";
 import { runUserAppResync } from "../services/userAppResync";
-import {
-  startClientBackgroundAlignment,
-  stopClientBackgroundAlignment,
-} from "../services/clientBackgroundLocation";
-import {
-  initializeClientPushNotifications,
-  processClientPushColdStartNavigation,
-  setupClientPushListeners,
-} from "../services/clientPushService";
+import {startClientBackgroundAlignment,stopClientBackgroundAlignment,} from "../services/clientBackgroundLocation";
+import {initializeClientPushNotifications,processClientPushColdStartNavigation,setupClientPushListeners,} from "../services/clientPushService";
+import {cancelClientSmartReminders,reconcileClientSmartReminders,} from "../services/clientSmartReminderService";
 import { isNetworkOffline } from "../utils/isNetworkOffline";
 import { logger } from "../utils/logger";
 import { locationService } from "../services/locationService";
@@ -44,8 +38,14 @@ function LiveActivityBridge() {
   return null;
 }
 
+function isOrderStillActive(status: unknown): boolean {
+  const s = String(status || "").toLowerCase();
+  return s !== "completed" && s !== "cancelled" && s !== "declined";
+}
+
 export default function RootLayout() {
   const { isAuthenticated, user, hydrateTokens } = useAuthStore();
+  const activeOrders = useOrderStore((state) => state.activeOrders);
   const network = useNetworkState();
   const prevNetworkOfflineRef = useRef<boolean | null>(null);
 
@@ -98,8 +98,15 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isAuthenticated) {
       void stopClientBackgroundAlignment();
+      void cancelClientSmartReminders();
     }
   }, [isAuthenticated]);
+
+  // Rappels locaux intelligents : uniquement si une commande reste longtemps dans un état.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void reconcileClientSmartReminders(activeOrders);
+  }, [activeOrders, isAuthenticated]);
 
   // Rafraîchir la session + resync ciblé quand l'app revient au premier plan ; arrêt tâche AR plan au retour
   useEffect(() => {
@@ -107,12 +114,15 @@ export default function RootLayout() {
       if (nextAppState === "background") {
         const uid = useAuthStore.getState().user?.id;
         if (!uid || !isAuthenticated) return;
-        const hasInFlight = useOrderStore.getState().activeOrders.some((o) => {
-          const s = String(o.status || "").toLowerCase();
-          return s !== "completed" && s !== "cancelled" && s !== "declined";
-        });
-        if (hasInFlight) {
-          void startClientBackgroundAlignment(uid);
+        const orderState = useOrderStore.getState();
+        const trackedOrder =
+          orderState.activeOrders.find(
+            (o) => o.id === orderState.selectedOrderId && isOrderStillActive(o.status)
+          ) ||
+          orderState.activeOrders.find((o) => isOrderStillActive(o.status)) ||
+          null;
+        if (trackedOrder) {
+          void startClientBackgroundAlignment(uid, trackedOrder);
         }
         return;
       }

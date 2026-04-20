@@ -227,8 +227,10 @@ export async function notifyOrderStatusPushes(params: {
   recipientUserId?: string | null;
   /** Lien public /track/{token} si PUBLIC_TRACK_BASE_URL est défini côté serveur. */
   trackUrl?: string | null;
+  /** Évite une push classique payeur quand APNs Live Activity a déjà affiché le même statut. */
+  suppressPayerPush?: boolean;
 }): Promise<void> {
-  const { orderId, status, payerUserId, recipientUserId, trackUrl } = params;
+  const { orderId, status, payerUserId, recipientUserId, trackUrl, suppressPayerPush } = params;
   if (!orderId || !payerUserId) return;
 
   const normalized = status.toLowerCase();
@@ -244,7 +246,7 @@ export async function notifyOrderStatusPushes(params: {
       : {}),
   };
 
-  if (payerCopy) {
+  if (payerCopy && !suppressPayerPush) {
     void sendPushToUser(
       payerUserId,
       'client',
@@ -253,6 +255,11 @@ export async function notifyOrderStatusPushes(params: {
       dataBase
     ).catch((e: unknown) => {
       logger.warn('[expo-push] payer:', e instanceof Error ? e.message : String(e));
+    });
+  } else if (payerCopy && suppressPayerPush) {
+    logger.info('[expo-push] payeur non notifié : Live Activity APNs déjà mise à jour', {
+      orderIdPrefix: orderId.slice(0, 8),
+      status: normalized,
     });
   }
 

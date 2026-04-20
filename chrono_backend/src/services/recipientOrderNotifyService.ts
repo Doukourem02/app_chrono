@@ -2,6 +2,7 @@ import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { lookupClientUserIdByPhone } from '../utils/resolveRecipientUserIdByPhone.js';
 import { notifyOrderStatusPushes } from './expoPushService.js';
+import { notifyLiveActivitiesForOrderStatus } from './liveActivityApnsService.js';
 import { isTwilioSmsConfigured, sendTransactionalSMSTwilio } from './twilioSmsService.js';
 import {
   isTrackWebPushConfigured,
@@ -238,12 +239,19 @@ export async function notifyAllForOrderStatus(params: {
       ? `${trackBase}/track/${encodeURIComponent(trackingToken)}`
       : null;
 
+  const liveActivityResult = await notifyLiveActivitiesForOrderStatus({
+    orderId,
+    status: statusNorm,
+    payerUserId,
+  });
+
   void notifyOrderStatusPushes({
     orderId,
     status,
     payerUserId,
     recipientUserId,
     trackUrl,
+    suppressPayerPush: liveActivityResult.shouldSuppressClassicPush,
   }).catch((e: unknown) => {
     logger.warn('[recipient-notify] expo:', e instanceof Error ? e.message : String(e));
   });

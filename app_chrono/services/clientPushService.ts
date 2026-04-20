@@ -36,7 +36,7 @@ export function navigateFromClientPushPayload(
     router.push(`/order-tracking/${encodeURIComponent(orderId)}?openChat=1` as any);
     return;
   }
-  if (type === "order_status" && orderId) {
+  if ((type === "order_status" || type === "order_status_reminder") && orderId) {
     router.push(`/order-tracking/${encodeURIComponent(orderId)}` as any);
     return;
   }

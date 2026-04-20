@@ -1,16 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  Animated,
-  Image,
-  Linking,
-  Dimensions,
-  ScrollView,
-  Platform,
-} from 'react-native';
+import {StyleSheet,View,Text,TouchableOpacity,Animated,Image,Linking,Dimensions,ScrollView,Platform,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logger } from '../utils/logger';

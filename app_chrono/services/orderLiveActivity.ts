@@ -2,11 +2,14 @@ import { AppState, InteractionManager, Platform } from "react-native";
 import { Asset } from "expo-asset";
 import type { LiveActivity, LiveActivityFactory } from "expo-widgets";
 import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
+import { config } from "../config";
+import { apiFetch } from "../utils/apiFetch";
 import { logger } from "../utils/logger";
 import { reportLiveActivityIssue } from "../utils/sentry";
 import { calculateDistance, calculateETAForVehicle, formatETA } from "../utils/etaCalculator";
 import { DELIVERY_IN_PROGRESS_STATUSES, normalizeOrderStatus } from "../utils/orderStatusNormalize";
 import type { OrderTrackingLiveProps } from "../widgets/orderTrackingLiveActivity";
+import { userApiService } from "./userApiService";
 
 /** Préfixe unique pour Console / Xcode : filtrer sur `ExpoWidgets`, `LiveActivity`, `OrderTrackingLive`, `orderLiveActivity`. */
 const LA_LOG_PREFIX =
@@ -308,6 +311,10 @@ let factory: LiveActivityFactory<OrderTrackingLiveProps> | null = null;
 let active: {
   orderId: string;
   live: LiveActivity<OrderTrackingLiveProps>;
+  pushToken?: string;
+  pushTokenSub?: { remove: () => void };
+  lastRegisteredPushToken?: string;
+  lastRegisteredPropsKey?: string;
 } | null = null;
 
 /**
@@ -491,8 +498,129 @@ function markLiveActivityUpdated(orderId: string, props: OrderTrackingLiveProps)
   };
 }
 
+function registrationPropsKey(props: OrderTrackingLiveProps): string {
+  return JSON.stringify({
+    etaLabel: props.etaLabel,
+    statusCode: props.statusCode,
+    vehicleInfoLabel: props.vehicleInfoLabel,
+    driverAvatarUrl: props.driverAvatarUrl,
+    vehicleMarkerUrl: props.vehicleMarkerUrl,
+  });
+}
+
+async function registerLiveActivityPushToken(
+  orderId: string,
+  pushToken: string,
+  props: OrderTrackingLiveProps,
+  activityId?: string,
+): Promise<void> {
+  const cleanPushToken = pushToken.trim();
+  if (!cleanPushToken) return;
+
+  const current = active;
+  const propsKey = registrationPropsKey(props);
+  if (
+    current?.orderId === orderId &&
+    current.lastRegisteredPushToken === cleanPushToken &&
+    current.lastRegisteredPropsKey === propsKey
+  ) {
+    return;
+  }
+
+  const token = await userApiService.ensureAccessToken();
+  if (!token) {
+    logger.warn("[orderLiveActivity] token JWT absent — push token ActivityKit non envoyé", "orderLiveActivity");
+    return;
+  }
+
+  const response = await apiFetch(
+    `${config.apiUrl}/api/push/live-activity/register`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        orderId,
+        activityId: activityId || null,
+        pushToken: cleanPushToken,
+        liveActivityName: "OrderTrackingLive",
+        props,
+      }),
+    },
+    { maxRetries: 1 }
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    logger.warn("[orderLiveActivity] enregistrement push token ActivityKit refusé", "orderLiveActivity", {
+      orderId,
+      status: response.status,
+      body: text.slice(0, 240),
+    });
+    return;
+  }
+
+  if (active?.orderId === orderId) {
+    active.pushToken = cleanPushToken;
+    active.lastRegisteredPushToken = cleanPushToken;
+    active.lastRegisteredPropsKey = propsKey;
+  }
+  laTrace("push token ActivityKit enregistré backend", { orderId, hasActivityId: Boolean(activityId) });
+}
+
+function syncLiveActivityPushToken(
+  orderId: string,
+  live: LiveActivity<OrderTrackingLiveProps>,
+  props: OrderTrackingLiveProps,
+): void {
+  const sub = live.addPushTokenListener((event) => {
+    void registerLiveActivityPushToken(orderId, event.pushToken, props, event.activityId).catch((e) => {
+      logger.warn("[orderLiveActivity] listener push token ActivityKit", "orderLiveActivity", e);
+    });
+  });
+
+  if (active?.orderId === orderId) {
+    active.pushTokenSub?.remove();
+    active.pushTokenSub = sub;
+  }
+
+  void live
+    .getPushToken()
+    .then((pushToken) => {
+      if (!pushToken) return;
+      return registerLiveActivityPushToken(orderId, pushToken, props);
+    })
+    .catch((e) => {
+      logger.warn("[orderLiveActivity] getPushToken ActivityKit non disponible", "orderLiveActivity", e);
+    });
+}
+
+async function markBackendLiveActivityEnded(orderId: string | null | undefined): Promise<void> {
+  if (!orderId) return;
+  const token = await userApiService.ensureAccessToken();
+  if (!token) return;
+  await apiFetch(
+    `${config.apiUrl}/api/push/live-activity/end`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ orderId }),
+    },
+    { maxRetries: 0 }
+  ).catch((e) => {
+    logger.warn("[orderLiveActivity] marquage Live Activity terminée non bloquant", "orderLiveActivity", e);
+  });
+}
+
 /** Termine toutes les Live Activities de ce type. */
 async function endAllLiveActivities(): Promise<void> {
+  const previousOrderId = active?.orderId ?? null;
+  active?.pushTokenSub?.remove();
   active = null;
   lastLiveActivityUpdate = null;
   try {
@@ -507,6 +635,7 @@ async function endAllLiveActivities(): Promise<void> {
   } catch {
     /* ignore */
   }
+  void markBackendLiveActivityEnded(previousOrderId);
 }
 
 export type SyncOrderLiveActivityOptions = {
@@ -574,6 +703,11 @@ async function syncOrderLiveActivityImpl(
       try {
         await active.live.update(props);
         markLiveActivityUpdated(order!.id, props);
+        if (active.pushToken) {
+          void registerLiveActivityPushToken(order!.id, active.pushToken, props).catch((e) => {
+            logger.warn("[orderLiveActivity] refresh props ActivityKit token", "orderLiveActivity", e);
+          });
+        }
         return;
       } catch (e) {
         const updateMsg = e instanceof Error ? e.message : String(e);
@@ -597,6 +731,7 @@ async function syncOrderLiveActivityImpl(
             { orderId: order!.id }
           );
         }
+        active.pushTokenSub?.remove();
         active = null;
         // enchaîner sur end + start ci-dessous
       }
@@ -631,6 +766,7 @@ async function syncOrderLiveActivityImpl(
     const live = f.start(props, url);
     active = { orderId: order!.id, live };
     markLiveActivityUpdated(order!.id, props);
+    syncLiveActivityPushToken(order!.id, live, props);
     laTrace("sync: après f.start", { orderId: order!.id });
     if (__DEV__) {
       logger.info("[orderLiveActivity] Live Activity démarrée", "orderLiveActivity", {

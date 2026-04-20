@@ -38,6 +38,7 @@ coverage/
 backups/
 backups-test/
 *.sql
+!migrations/027_live_activity_tokens.sql
 *.sql.gz
 *.json.backup
 backup_metadata.json
