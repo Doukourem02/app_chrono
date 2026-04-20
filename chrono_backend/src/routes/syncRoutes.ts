@@ -4,9 +4,8 @@ import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 
 const router: Router = express.Router();
 
-// SÉCURITÉ go-live : ces endpoints exposaient données / actions sans auth (§2.7 ckprod.md).
+// SÉCURITÉ go-live : ces endpoints exposaient données / actions sans auth (voir docs/checklist-fonctionnalites-app.md).
 router.post('/sync-users', verifyAdminSupabase, syncUsersFromAuth);
 router.get('/sync-status', verifyAdminSupabase, checkSyncStatus);
 
 export default router;
-

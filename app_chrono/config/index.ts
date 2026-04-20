@@ -14,7 +14,7 @@ export const config = {
   trackBaseUrl: normalizeExpoUrl(rawTrack as string | undefined, 'http://localhost:3000'),
   sentryDsn: Constants.expoConfig?.extra?.sentryDsn || process.env.EXPO_PUBLIC_SENTRY_DSN,
 
-  /** URLs des documents légaux (§2.5 ckprod.md) — même contenu que la politique en ligne. */
+  /** URLs des documents légaux (voir docs/krono-reference-unique.md) — même contenu que la politique en ligne. */
   legal: {
     cguUrl:
       Constants.expoConfig?.extra?.legalCguUrl ||

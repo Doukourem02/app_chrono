@@ -31,7 +31,7 @@ Ce dossier décrit le **schéma Postgres** attendu par l’API Node. Les fichier
 | 20  | `020_driver_locations_and_admin_notifications.sql` | `driver_locations`, `admin_notification_feed`                                                                            |
 | 21  | `021_payment_messaging_history_profiles.sql`       | `profiles` (minimal), `payment_methods`, `transactions`, `invoices`, `order_status_history`, `conversations`, `messages` |
 | 22  | `022_qr_code_scans_unique_order_scanner.sql`       | Index unique `(order_id, scanned_by)` sur `qr_code_scans` (requis pour les `ON CONFLICT` du service QR)                  |
-| 23  | `023_create_push_tokens.sql`                       | `push_tokens` — Expo push (client / driver), voir `docs/notifications-expo-token.md`                                     |
+| 23  | `023_create_push_tokens.sql`                       | `push_tokens` — Expo push (client / driver), voir `docs/krono-reference-unique.md`                                       |
 | 24  | `024_users_name_avatar_columns.sql`                | `users.first_name`, `last_name`, `avatar_url` — requis pour compléter le profil (app livreur / client)                   |
 | 25  | `025_orders_recipient_user_id.sql`                 | `orders.recipient_user_id` — lien compte destinataire (push in-app)                                                      |
 | 26  | `026_order_status_push_dedup.sql`                  | `order_status_push_sent` — anti-doublon notifications par `(order_id, status)`                                           |
@@ -87,4 +87,3 @@ Attendu : **2 lignes** pour la première requête (`recipient_user_id`, `recipie
 - **Ne modifie pas** un fichier déjà appliqué en prod : ajoute `022_...sql`.
 - **013 / 014** suppriment des tables : lis-les avant ; sauvegarde si doute.
 - Tester sur une copie / projet de dev avant la prod.
-

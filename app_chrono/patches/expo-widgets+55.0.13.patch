@@ -380,7 +380,7 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..20ad8dc 100644
+index 3e6ff0b..a68e3fd 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 @@ -1,6 +1,179 @@
@@ -518,7 +518,7 @@ index 3e6ff0b..20ad8dc 100644
 +    GeometryReader { geo in
 +      let trackWidth = max(CGFloat(220), geo.size.width)
 +      let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
-+      let markerWidth = CGFloat(42)
++      let markerWidth = CGFloat(50)
 +      let markerHalf = markerWidth / 2
 +      let markerCenter = min(max(markerHalf, traveled), trackWidth - markerHalf)
 +      let destinationOffset = max(CGFloat(0), trackWidth - 7)
@@ -542,7 +542,7 @@ index 3e6ff0b..20ad8dc 100644
 +          .offset(x: destinationOffset - trackWidth / 2)
 +      }
 +    }
-+    .frame(height: 32)
++    .frame(height: 38)
 +  }
 +
 +  @ViewBuilder
@@ -551,10 +551,10 @@ index 3e6ff0b..20ad8dc 100644
 +      Image(uiImage: uiImage)
 +        .resizable()
 +        .scaledToFit()
-+        .frame(width: 42, height: 28)
++        .frame(width: 50, height: 33)
 +    } else {
 +      Image(systemName: "bicycle")
-+        .font(.system(size: 21, weight: .bold))
++        .font(.system(size: 24, weight: .bold))
 +        .foregroundStyle(.white)
 +    }
 +  }
@@ -876,7 +876,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..2c3cbc2 100644
+index 9eae718..1e3c293 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -2,6 +2,9 @@ import SwiftUI
@@ -1094,7 +1094,7 @@ index 9eae718..2c3cbc2 100644
 +      ZStack(alignment: .leading) {
 +        let trackWidth = CGFloat(250)
 +        let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
-+        let markerWidth = CGFloat(42)
++        let markerWidth = CGFloat(50)
 +        let markerHalf = markerWidth / 2
 +        let carOffset = min(max(CGFloat(0), traveled - markerHalf), trackWidth - markerWidth)
 +        let destinationOffset = max(CGFloat(0), trackWidth - 14)
@@ -1123,10 +1123,10 @@ index 9eae718..2c3cbc2 100644
 +      Image(uiImage: uiImage)
 +        .resizable()
 +        .scaledToFit()
-+        .frame(width: 42, height: 28)
++        .frame(width: 50, height: 33)
 +    } else {
 +      Image(systemName: "bicycle")
-+        .font(.system(size: 21, weight: .bold))
++        .font(.system(size: 24, weight: .bold))
 +        .foregroundStyle(.white)
 +    }
 +  }

@@ -13,7 +13,7 @@ PROJET_CHRONO/
 ├── admin_chrono/
 ├── app_chrono/
 ├── driver_chrono/
-├── docs/                 # ckprod, mobile auth, paiements, etc.
+├── docs/                 # 2 docs vivants : actions + référence projet
 ├── supabase/             # SQL / RLS (selon usage)
 ├── scripts/              # IP locale, utilitaires repo
 └── README.md
@@ -605,8 +605,8 @@ npx expo run:android
 
 ### Guides de configuration
 
-- **Prod / TestFlight / EAS + tâches manuelles** (OTP, session, sockets, Sentry, logs) : `docs/ckprod.md` — **§3.1 bis** (ordre prioritaire + carte du code §7)
-- **Krono (calibration, B2B/B2C, paiements / QR, PSP, pointeurs tarif)** : `docs/krono-reference-unique.md`
+- **Actions à exécuter** (priorités, Live Activity, Android ongoing, prod, app mature) : `docs/checklist-fonctionnalites-app.md`
+- **Référence projet** (carte fichiers, décisions produit, push, prod, pricing, paiements / QR, PSP) : `docs/krono-reference-unique.md`
 - **Variables** : fichiers `.env.example` à la racine de chaque package (`chrono_backend`, `admin_chrono`, `app_chrono`, `driver_chrono`)
 
 - **Scaling et production** : `chrono_backend/docs/SCALING_SETUP.md`
@@ -626,8 +626,8 @@ npx expo run:android
 ```
 PROJET_CHRONO/
 ├── docs/
-│   ├── ckprod.md                       # Déploiement + §3.1 bis (OTP → session → observabilité + carte code §7)
-│   └── krono-reference-unique.md      # Produit : calibration, B2B/B2C, paiements/QR, roadmap PSP (§5)
+│   ├── checklist-fonctionnalites-app.md # Actions à exécuter, priorisées
+│   └── krono-reference-unique.md        # Référence projet + carte de fichiers
 ├── admin_chrono/docs/
 │   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers
 │   ├── NOTIFICATIONS_BEHAVIOR.md       # Comportement des notifications

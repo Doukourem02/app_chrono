@@ -1,173 +1,238 @@
-# Krono — référence unique (Côte d’Ivoire)
+# Krono — référence unique projet
 
-**Dernière mise à jour** : avril 2026  
+Ce fichier est la **mémoire courte du projet**.
+Il ne sert pas à suivre les tâches à faire : les actions sont dans `docs/checklist-fonctionnalites-app.md`.
 
-**Rôle** : garder une **vérité produit** courte (monétisation future, règles paiements / QR, calibration marché, **roadmap PSP**). Le détail technique des tarifs déjà livrés est dans le code — voir **§1**.
+Règle :
 
-**Règle** : évolutions tarif, trafic, météo, surge, distance routière et paiements restent **cohérentes** avec ce document (y compris **§5** intégrations opérateurs).
-
-**Autre doc** : `driver_chrono/docs/navigation-suivi-livreur.md`.
-
----
-
-## Vue d’ensemble
-
-| Section | Contenu |
-|--------|---------|
-| [§1](#1-déjà-en-place-résumé-code) | Ce qui est implémenté (A–D) — pointeurs code |
-| [§2](#2-calibration-restante-avant-prod) | À faire : trajets témoins, grille, plafonds |
-| [§3](#3-monétisation-b2c--b2b-futur) | Leviers B2C / B2B (pas la V1 livrée) |
-| [§4](#4-paiements-livraison-et-qr) | Circuits d’argent, QR, fichiers, **reste à durcir** |
-| [§5](#5-intégrations-psp-orange-money-wave-mtn--roadmap) | Accords marchands, API opérateurs, branchement backend |
-| [§6](#6-idées-futures-hors-v1) | Backlog léger |
+- Si c’est une tâche à exécuter, elle va dans la checklist.
+- Si c’est une décision produit, une carte de fichiers ou une règle à retenir, elle reste ici.
 
 ---
 
-## 1. Déjà en place (résumé code)
+## 1. Carte rapide des fichiers utiles
 
-Les étapes **A–D** du ancien plan sont **livrées** :
+### App client
 
-| Thème | Côté code (indicatif) |
-|-------|------------------------|
-| Prix unifiés, grille base + km, options vitesse | `chrono_backend/src/services/priceCalculator.ts` ; alignement client `app_chrono/services/orderApi.ts` |
-| Distance / durée **route** Mapbox ; repli Haversine si pas d’itinéraire | `app_chrono/utils/mapboxDirections.ts`, `useMapLogic.ts` ; enregistrement + socket avec km route |
-| Tarif **dynamique** (météo Open-Meteo, surge socket, heure, trafic durée vs typique), plafond contexte | `chrono_backend/src/services/dynamicPricing.ts`, `openMeteoPricing.ts`, `surgePricing.ts` ; `paymentController`, `orderSocket`, `orderRecordController` |
-| Transparence ligne droite / route (libellés) | `app_chrono/utils/routePricingLabels.ts` et écrans associés |
+| Sujet | Fichier |
+|-------|---------|
+| Live Activity / Dynamic Island | `app_chrono/services/orderLiveActivity.ts` |
+| UI Dynamic Island SwiftUI/Expo UI | `app_chrono/widgets/orderTrackingLiveActivity.tsx` |
+| Sync Live Activity depuis le store | `app_chrono/hooks/useOrderLiveActivitySync.ts` |
+| Socket commande client | `app_chrono/services/userOrderSocketService.ts` |
+| Push client / tap notification | `app_chrono/services/clientPushService.ts` |
+| Notification Android foreground service client | `app_chrono/services/clientBackgroundLocation.ts` |
+| Écran suivi commande | `app_chrono/app/order-tracking/[orderId].tsx` |
+| Auth client | `app_chrono/store/useAuthStore.ts` |
+| Refresh token client | `app_chrono/utils/secureTokenStorage.ts` |
 
-**Principe produit conservé** : le fournisseur carto fournit trafic / durées ; la météo vient d’une API externe ; le « cerveau » est la **logique de prix** côté backend avec **plafonds** et facteurs **bornés**.
+### App chauffeur
 
----
+| Sujet | Fichier |
+|-------|---------|
+| Push chauffeur / tap notification | `driver_chrono/services/driverPushService.ts` |
+| Notification Android foreground service chauffeur | `driver_chrono/services/driverBackgroundLocation.ts` |
+| Auth chauffeur | `driver_chrono/store/useDriverStore.ts` |
+| Sockets commandes | `driver_chrono/services/orderSocketService.ts` |
+| Sockets messages | `driver_chrono/services/driverMessageSocketService.ts` |
+| Dépannage app chauffeur | `driver_chrono/docs/TROUBLESHOOTING.md` |
 
-## 2. Calibration restante (avant prod)
+### Backend
 
-À faire **sur le terrain** (pas une étape A–D dans le repo) :
+| Sujet | Fichier |
+|-------|---------|
+| Socket commande | `chrono_backend/src/sockets/orderSocket.ts` |
+| Push Expo | `chrono_backend/src/services/expoPushService.ts` |
+| Notifications destinataire | `chrono_backend/src/services/recipientOrderNotifyService.ts` |
+| SMS Twilio | `chrono_backend/src/services/twilioSmsService.ts` |
+| Track public | `chrono_backend/src/controllers/trackController.ts`, `routes/trackRoutes.ts` |
+| Prix livraison | `chrono_backend/src/services/priceCalculator.ts` |
+| Tarification dynamique | `chrono_backend/src/services/dynamicPricing.ts` |
+| QR livraison | `chrono_backend/src/services/qrCodeService.ts` |
+| Commission livreur | `chrono_backend/src/services/commissionService.ts` |
 
-1. Définir **10–20 trajets témoins** Grand Abidjan (court / moyen / long, lagune, pointe / creux).
-2. Noter **km route**, **durée**, **prix concurrent** si visible.
-3. Ajuster base, per km, minimums, **plafonds** surge / contexte dans `priceCalculator` / `dynamicPricing` selon décision produit.
-4. **Geler** la grille (config versionnée ou futur admin).
+### Admin / web
 
-**Critères de crédibilité** (rappel) : distance routière, temps (trafic), engin, urgence modérée, surge transparent et plafonné, minimum de course, benchmark concurrence.
-
----
-
-## 3. Monétisation B2C / B2B (futur)
-
-Hors périmètre de la V1 technique tarif/carte ci-dessus ; à trancher produit / juridique plus tard.
-
-### 3.1 B2C
-
-| Levier | Description |
-|--------|-------------|
-| Commission sur la livraison | % ou fixe sur le prix course |
-| Frais petite commande | supplément course très courte |
-| Options payantes | urgence, assurance, isotherme, multi-stop |
-| Abonnement (optionnel) | packages mensuels |
-| Partenariats marchands | visibilité, campagnes |
-
-### 3.2 B2B
-
-| Levier | Description |
-|--------|-------------|
-| Compte pro / facturation | multi-utilisateurs, centres de coût |
-| Forfaits mensuels | volume km ou courses |
-| Tarifs dégressifs | au seuil de volume |
-| SLA / créneaux | priorité, garanties |
-| API / intégration | ERP, e-commerce |
-| Dernier km externalisé | contrats cadres, KPI |
+| Sujet | Fichier |
+|-------|---------|
+| Page tracking public | `admin_chrono/app/track/[token]/page.tsx` |
+| Web push tracking | `admin_chrono/public/sw.js` |
 
 ---
 
-## 4. Paiements, livraison et QR
+## 2. Dynamic Island / Live Activity — décisions produit
 
-**Périmètre** : paiements commande (différé, partiel), **commission prépayée** livreur partenaire, **QR de livraison** = preuve de remise (**pas** de QR « paiement » opérateur dupliqué dans l’app — règle produit ; branchement réel des PSP : **§5**).
+Objectif : raconter une commande en cours de façon simple, utile et élégante.
 
-### 4.1 Deux circuits d’argent
+### États visibles côté client
 
-| Circuit | Qui | Objet | Tables / concepts |
-|---------|-----|--------|-------------------|
-| **Paiement de la course** | Client / destinataire | Prix livraison | `orders`, `transactions`, `invoices`, `payment_methods` |
-| **Commission partenaire** | Livreur **partner** | Crédit prépayé, débit après livraison | `commission_balance`, `commission_transactions`, `driver_profiles.driver_type` |
+| État commande | Message principal | Support système attendu |
+|---------------|-------------------|-------------------------|
+| `pending` / recherche | `Recherche` / `Recherche livreur` | Dynamic Island compact + lock screen sans ETA |
+| livreur accepté / vers pickup | `Prise en charge dans X min` | Live Activity avec véhicule, plaque, avatar, progression |
+| colis récupéré / livraison | `Livraison dans X min` ou `En livraison` | Même composant, progression vers destination |
+| terminé | `Livraison terminée` | Fin propre de l’activité + notification seulement si utile |
+| annulé / aucun livreur | Message explicite | Fin activité + push classique si l’utilisateur doit agir |
 
-### 4.2 Modes (rappel)
+### Règles UX
 
-| Mode | Argent avant livraison ? | À la porte | Après scan |
-|------|---------------------------|------------|------------|
-| OM / Wave acquitté | Oui | QR = preuve | Non (sauf reliquat / partiel) |
-| Espèces | Non | QR puis cash | Si dû |
-| Différé | Dette enregistrée | QR = preuve | Règlement in-app |
-| Partiel | Partie payée | QR + reliquat | Souvent reliquat in-app |
-
-**Règles produit** : un QR par commande ; pas de fusion QR livraison / paiement opérateur ; mode de paiement choisi par le **commanditaire** ; différé / reliquat réglés **dans l’app** sur `order_id`.
-
-**Limites différé** : `chrono_backend/src/utils/deferredPaymentLimits.ts`.
-
-| Type livreur | `driver_type` | Commission prépayée |
-|--------------|---------------|---------------------|
-| Interne | `internal` | Non |
-| Partenaire | `partner` | Oui |
-
-### 4.3 Fichiers utiles
-
-| Sujet | Emplacement |
-|-------|-------------|
-| Commande + socket | `chrono_backend/src/sockets/orderSocket.ts` |
-| Init paiement / calcul prix | `chrono_backend/src/controllers/paymentController.ts` |
-| Transactions | `chrono_backend/src/utils/createTransactionForOrder.ts` |
-| Différé | `chrono_backend/src/utils/deferredPaymentLimits.ts` |
-| Commission | `chrono_backend/src/services/commissionService.ts`, `commissionController.ts` |
-| UI paiement client | `app_chrono/components/PaymentBottomSheet.tsx`, `OrderDetailsSheet.tsx` |
-| QR backend | `chrono_backend/src/services/qrCodeService.ts` |
-| Recharge commission | `driver_chrono/components/RechargeModal.tsx`, `store/useCommissionStore.ts` |
-
-Schémas SQL indicatifs (colonnes QR, table `qr_code_scans`) : migrations **020** / **021** / **022** dans le dépôt.
-
-### 4.4 Reste à durcir
-
-- Migration **022** appliquée sur **toutes** les bases déjà en prod.
-- Option **scan QR obligatoire** avant statut `completed` (règle produit + enforcement serveur).
-- Flux **« Payer le reste »** complet (OM / Wave), aligné **§5** (intégrations PSP).
-- **`QR_CODE_SECRET`** identique sur toutes les instances backend prod (`chrono_backend/.env.example`).
+- Une commande suivie doit avoir une seule représentation système active côté client.
+- L’îlot ne doit pas devenir une fiche contact livreur.
+- Priorité d’affichage : état immédiat, minutes, véhicule, plaque, progression.
+- Le texte visible côté client doit rester en français.
+- La couleur de marque est le violet Krono, pas l’orange.
+- `ETA` est un terme technique interne : il ne doit pas être affiché à l’utilisateur.
+- Pendant `pending`, on affiche `Recherche`, pas un temps estimé.
+- Si la Live Activity est impossible ou désactivée, les notifications classiques deviennent le fallback.
+- Android a déjà une base foreground service pour le suivi en arrière-plan ; le reste est de l’enrichir avec statut, ETA, actions et arrêt propre.
 
 ---
 
-## 5. Intégrations PSP (Orange Money, Wave, MTN) — roadmap
+## 3. Notifications push — comportement retenu
 
-Travail **hors code** en tête : accords marchands et accès API auprès des opérateurs (ou agrégateur agréé).
+### Ce qui existe
 
-### 5.1 Périmètre
+- Tokens Expo via `POST /api/push/register`.
+- Apps `app_chrono` / `driver_chrono` avec `expo-notifications`.
+- Envoi backend via `chrono_backend/src/services/expoPushService.ts`.
+- `DeviceNotRegistered` invalide la ligne en base.
+- Tap notification client : `app_chrono/services/clientPushService.ts`.
+- Tap notification chauffeur : `driver_chrono/services/driverPushService.ts`.
+- Résolution destinataire par téléphone : `recipient_user_id` si compte client unique.
+- Anti-doublon statut par commande : `order_status_push_sent` si migration `026` appliquée.
 
-- **Paiement course** : initier un encaissement, recevoir le statut (succès / échec), idempotence, webhooks.
-- **Recharge commission livreur partenaire** : même principe ; montants crédités seulement après **confirmation PSP**.
-- **Pas de duplication** des QR « paiement » des opérateurs dans l’app Chrono — aligné **§4**.
+### Règle anti-spam
 
-### 5.2 Étapes typiques côté entreprise
+- Si une Live Activity active affiche déjà un statut non critique, éviter une push classique identique.
+- Garder les push classiques pour : annulation, aucun livreur, livraison terminée si app absente, message livreur, problème paiement.
+- Si Live Activity absente / refusée / fermée, reprendre le canal push classique pour les statuts importants.
 
-1. **Compte marchand / agrégateur** auprès d’Orange Money, Wave, MTN, ou d’un **agrégateur** agréé (souvent plus simple qu’un contrat direct par opérateur).
-2. Récupération des **clés API**, URLs **sandbox** puis **production**, documentation des **webhooks** (signature, retries).
-3. **Conformité** : KYC, conditions d’utilisation, plafonds, litiges et remboursements (produit + juridique).
-4. Brancher dans `chrono_backend` : `paymentController`, `commissionController` (remplacer les parties « simulation » par appels PSP + persistance `transactions` / `commission_transactions`).
+### Flux destinataire
 
-### 5.3 Fichiers à faire évoluer (indicatif)
+1. Numéro destinataire sur la commande.
+2. Backend tente `recipient_user_id`.
+3. Compte trouvé : push app.
+4. Pas de compte : fallback SMS / lien `/track` selon config.
 
-- `chrono_backend/src/controllers/paymentController.ts`
-- `chrono_backend/src/controllers/commissionController.ts`
-- Variables d’environnement (clés API, secrets webhook) — **ne pas commiter** ; documenter dans `.env.example` sans valeurs réelles.
-
-### 5.4 Ressources
-
-- Contacter les **équipes entreprise / API** des opérateurs concernés (Côte d’Ivoire ou pays cible).
-- Compléter cette section avec les **liens officiels** de documentation une fois les accès obtenus.
-
----
-
-## 6. Idées futures (hors V1)
-
-| Idée | Statut |
-|------|--------|
-| QR paiement fusionné avec QR livraison | **Non retenu** |
-| Suivi public enrichi, retour, multi-colis | Backlog |
+Rappel : le push part aux tokens d’un `user_id`, pas à un numéro seul.
 
 ---
 
-*À faire évoluer avec juridique, produit et accords PSP.*
+## 4. Prod / TestFlight — rappels essentiels
+
+Le build EAS production ne lit pas le `.env` local.
+Toutes les variables utiles doivent être dans l’environnement EAS `production`.
+
+Variables à vérifier :
+
+- `EXPO_PUBLIC_API_URL`
+- `EXPO_PUBLIC_SOCKET_URL`
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN`
+- `EXPO_PUBLIC_LEGAL_CGU_URL`
+- `EXPO_PUBLIC_LEGAL_PRIVACY_URL`
+- `EXPO_PUBLIC_SENTRY_DSN`
+- variables Sentry build si upload sourcemaps activé
+
+Smoke tests prod :
+
+- API : `GET https://api.kro-no-delivery.com/health`
+- API : `GET https://api.kro-no-delivery.com/health/live`
+- Admin : `https://admin.kro-no-delivery.com`
+- iPhone réel : login, commande, carte Mapbox, sockets, Live Activity.
+- Android réel : login, commande, carte, sockets, push.
+
+---
+
+## 5. Pricing, paiements, QR
+
+### Déjà en place
+
+| Thème | Côté code |
+|-------|-----------|
+| Prix unifiés, base + km, options vitesse | `chrono_backend/src/services/priceCalculator.ts`, `app_chrono/services/orderApi.ts` |
+| Distance / durée route Mapbox, fallback Haversine | `app_chrono/utils/mapboxDirections.ts`, `useMapLogic.ts` |
+| Tarification dynamique météo / surge / heure / trafic | `chrono_backend/src/services/dynamicPricing.ts`, `openMeteoPricing.ts`, `surgePricing.ts` |
+| Transparence route / ligne droite | `app_chrono/utils/routePricingLabels.ts` |
+
+### Paiement et QR
+
+- QR de livraison = preuve de remise, pas QR de paiement opérateur.
+- Un QR par commande.
+- Mode de paiement choisi par le commanditaire.
+- Différé / reliquat réglés dans l’app sur `order_id`.
+- Migration `022` : index unique `(order_id, scanned_by)` sur `qr_code_scans`.
+- `QR_CODE_SECRET` doit être identique sur toutes les instances backend prod.
+
+### PSP plus tard
+
+Travail hors code en premier :
+
+- Compte marchand / agrégateur pour Orange Money, Wave, MTN.
+- Clés API sandbox puis production.
+- Webhooks signés, retries, idempotence.
+- KYC, litiges, remboursements.
+- Branchement backend : `paymentController`, `commissionController`, transactions.
+
+---
+
+## 6. Migrations importantes
+
+| Migration | Sujet |
+|----------|-------|
+| `023_create_push_tokens.sql` | `push_tokens` Expo push client / driver |
+| `024_users_name_avatar_columns.sql` | `users.first_name`, `last_name`, `avatar_url` |
+| `025_orders_recipient_user_id.sql` | lien compte destinataire |
+| `026_order_status_push_dedup.sql` | anti-doublon notifications par `(order_id, status)` |
+
+Migrations SQL : voir `chrono_backend/migrations/README.md`.
+
+---
+
+## 7. Décisions encore ouvertes
+
+- Plusieurs commandes actives : commande sélectionnée, plus récente, ou priorité statut métier.
+- APNs Live Activity : fréquence maximale des updates backend.
+- Notifications : liste exacte des statuts qui doivent vibrer / sonner.
+- Android : enrichissement de la base foreground service existante avec statut, ETA, actions et arrêt propre.
+- Notifications périodiques : quels rappels sont utiles, lesquels seraient perçus comme du spam.
+- Widgets écran d’accueil : choisir les données visibles sans exposer trop d’informations privées.
+- Rétention : niveau acceptable de gamification et de messages d’engagement.
+- Paiement : choix PSP direct opérateur ou agrégateur.
+- QR : scan obligatoire avant `completed` ou seulement preuve complémentaire.
+
+---
+
+## 8. Vision app mature
+
+Une application Krono mature ne doit pas seulement suivre une livraison. Elle doit donner confiance, rester utile sans être lourde, et créer une impression premium.
+
+### Notifications intelligentes
+
+- Les notifications doivent être utiles, actionnables et annulables.
+- Les rappels périodiques doivent être rares et justifiés : dette/reliquat, récap accepté, note à laisser, mission chauffeur.
+- Les notifications marketing doivent être désactivables et séparées des notifications opérationnelles.
+
+### Widgets écran d’accueil
+
+- Client : commande active, ETA, raccourci suivi, nouvelle livraison.
+- Chauffeur : disponibilité, course active, revenus du jour.
+- Les widgets doivent avoir de beaux états vides, sinon ils donnent une impression d’application inachevée.
+
+### Attractivité
+
+- Onboarding clair et rassurant.
+- Fin de commande soignée : résumé, note, support, nouvelle livraison.
+- Historique lisible et valorisant.
+- Micro-interactions discrètes, jamais gratuites.
+- Gamification chauffeur utile : objectifs, revenus, badges, mais sans infantiliser.
+
+---
+
+## 9. Documents vivants
+
+Il ne doit rester que deux fichiers principaux dans `docs/` :
+
+- `docs/checklist-fonctionnalites-app.md` : actions à exécuter, priorisées.
+- `docs/krono-reference-unique.md` : référence projet, décisions, cartes de fichiers.

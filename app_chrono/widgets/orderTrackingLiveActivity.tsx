@@ -129,8 +129,8 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const compactTitle = props.isPending ? "Recherche" : normalizedEta || compactFallbackLabel(props.statusCode);
   const simplified = environment.levelOfDetail === "simplified";
   const progress = Math.max(0.04, Math.min(1, props.progress ?? (props.isPending ? 0.08 : 0.56)));
-  const markerWidth = 42;
-  const markerHeight = 28;
+  const markerWidth = 50;
+  const markerHeight = 33;
   const markerHalf = markerWidth / 2;
   const trackWidth = simplified ? 214 : 250;
   const traveledWidth = Math.max(14, Math.round(trackWidth * progress));

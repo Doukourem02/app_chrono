@@ -246,7 +246,7 @@ export async function initializeClientPushNotifications(_userId: string): Promis
       }
     } catch (e) {
       logger.warn(
-        "getExpoPushTokenAsync ou register échoué (Android : souvent FCM non configuré sur expo.dev — voir docs/notifications-expo-token.md)",
+        "getExpoPushTokenAsync ou register échoué (Android : souvent FCM non configuré sur expo.dev — voir docs/krono-reference-unique.md)",
         "clientPush",
         e
       );

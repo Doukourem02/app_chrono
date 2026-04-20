@@ -220,7 +220,7 @@ export async function initializeDriverPushNotifications(_userId: string): Promis
       }
     } catch (e) {
       logger.warn(
-        "getExpoPushTokenAsync ou register échoué (Android : FCM sur expo.dev — voir docs/notifications-expo-token.md)",
+        "getExpoPushTokenAsync ou register échoué (Android : FCM sur expo.dev — voir docs/krono-reference-unique.md)",
         "driverPush",
         e
       );
