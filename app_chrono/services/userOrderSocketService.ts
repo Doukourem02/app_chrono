@@ -574,7 +574,10 @@ class UserOrderSocketService {
             const vehicleBrand = readRecordString(driverInfo, ['vehicle_brand', 'vehicleBrand']);
             const vehicleModel = readRecordString(driverInfo, ['vehicle_model', 'vehicleModel']);
             const vehicleColor = readRecordString(driverInfo, ['vehicle_color', 'vehicleColor']);
-            const avatarUrl = readRecordString(driverInfo, ['avatar_url', 'profile_image_url', 'avatar']);
+            const avatarUrl =
+              readRecordString(driverInfo, ['avatar_url', 'profile_image_url', 'avatar']) ||
+              readRecordString(order?.driver, ['avatar_url', 'profile_image_url', 'avatar']) ||
+              readRecordString(existingOrder.driver, ['avatar_url', 'profile_image_url', 'avatar']);
             store.updateOrder(order.id, {
               driver: {
                 id: driverInfo.id,

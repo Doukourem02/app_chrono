@@ -1,5 +1,5 @@
 import { Circle, HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
-import { font, foregroundStyle, frame, offset, padding, scaleEffect } from "@expo/ui/swift-ui/modifiers";
+import { font, foregroundStyle, frame, offset, padding } from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
 
@@ -57,6 +57,8 @@ export type OrderTrackingLiveProps = {
   driverPhone?: string;
   /** Heure affichée sous « Heure » (ex. création commande, formatée côté app). */
   bannerClockLabel?: string;
+  /** Image locale/packagée utilisée comme indicateur de progression. */
+  vehicleMarkerUrl?: string;
 };
 
 function normalizeEtaLabel(etaRaw: string): string {
@@ -128,10 +130,11 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const progress = Math.max(0.04, Math.min(1, props.progress ?? (props.isPending ? 0.08 : 0.56)));
   const trackWidth = simplified ? 214 : 250;
   const traveledWidth = Math.max(14, Math.round(trackWidth * progress));
-  const carOffset = Math.max(0, Math.min(trackWidth - 28, traveledWidth - 14));
+  const carOffset = Math.max(0, Math.min(trackWidth - 34, traveledWidth - 17));
   const destinationOffset = Math.max(0, trackWidth - 14);
 
   const avatarUrl = (props.driverAvatarUrl ?? "").trim();
+  const vehicleMarkerUrl = (props.vehicleMarkerUrl ?? "").trim();
 
   const driverAvatar = (
     <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
@@ -160,7 +163,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const shortVehicleInfo = vehicleInfo.length > 31 ? `${vehicleInfo.slice(0, 28)}...` : vehicleInfo;
   const bannerTrackWidth = simplified ? 280 : 310;
   const bannerTraveledWidth = Math.max(16, Math.round(bannerTrackWidth * progress));
-  const bannerCarOffset = Math.max(0, Math.min(bannerTrackWidth - 26, bannerTraveledWidth - 13));
+  const bannerCarOffset = Math.max(0, Math.min(bannerTrackWidth - 34, bannerTraveledWidth - 17));
   const bannerDestinationOffset = Math.max(0, bannerTrackWidth - 14);
   const etaSize = simplified ? 22 : 26;
   const infoSize = simplified ? 12 : 13;
@@ -192,8 +195,11 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
           modifiers={[frame({ width: bannerTraveledWidth, height: 5 }), foregroundStyle("#A7C7FF")]}
         />
         <ZStack modifiers={[offset({ x: bannerCarOffset })]}>
-          <Circle modifiers={[frame({ width: 24, height: 24 }), foregroundStyle("#F2F2F7")]} />
-          <Image systemName="car.side.fill" color="#111827" size={12} modifiers={[scaleEffect({ x: -1, y: 1 })]} />
+          {vehicleMarkerUrl ? (
+            <Image uiImage={vehicleMarkerUrl} modifiers={[frame({ width: 34, height: 23 })]} />
+          ) : (
+            <Image systemName="bicycle" color="#F2F2F7" size={18} />
+          )}
         </ZStack>
         <ZStack modifiers={[offset({ x: bannerDestinationOffset })]}>
           <Circle modifiers={[frame({ width: 14, height: 14 }), foregroundStyle("#A7C7FF")]} />
@@ -228,8 +234,11 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
           modifiers={[frame({ width: traveledWidth, height: 5 }), foregroundStyle("#A7C7FF")]}
         />
         <ZStack modifiers={[offset({ x: carOffset })]}>
-          <Circle modifiers={[frame({ width: 24, height: 24 }), foregroundStyle("#F2F2F7")]} />
-          <Image systemName="car.side.fill" color="#111827" size={12} modifiers={[scaleEffect({ x: -1, y: 1 })]} />
+          {vehicleMarkerUrl ? (
+            <Image uiImage={vehicleMarkerUrl} modifiers={[frame({ width: 34, height: 23 })]} />
+          ) : (
+            <Image systemName="bicycle" color="#F2F2F7" size={18} />
+          )}
         </ZStack>
         <ZStack modifiers={[offset({ x: destinationOffset })]}>
           <Circle modifiers={[frame({ width: 14, height: 14 }), foregroundStyle("#A7C7FF")]} />

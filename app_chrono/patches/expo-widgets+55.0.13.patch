@@ -132,21 +132,149 @@ index 1d2b971..e092830 100644
    }
    # :always_out_of_date is only available in CocoaPods 1.13.0 and later
    if Gem::Version.new(Pod::VERSION) >= Gem::Version.new('1.13.0')
+diff --git a/node_modules/expo-widgets/ios/LiveActivity.swift b/node_modules/expo-widgets/ios/LiveActivity.swift
+index a603765..bda5e15 100644
+--- a/node_modules/expo-widgets/ios/LiveActivity.swift
++++ b/node_modules/expo-widgets/ios/LiveActivity.swift
+@@ -19,7 +19,7 @@ final class LiveActivity: SharedObject {
+       throw LiveActivityNotFoundException(id)
+     }
+
+-    let newState = LiveActivityAttributes.ContentState(name: name, props: props)
++    let newState = LiveActivityAttributes.ContentState(name: name, props: LiveActivityAvatarCache.enrichProps(props))
+     await activity.update(ActivityContent(state: newState, staleDate: nil))
+   }
+
+@@ -32,7 +32,7 @@ final class LiveActivity: SharedObject {
+
+     let content: ActivityContent<LiveActivityAttributes.ContentState>?
+     if let props {
+-      content = ActivityContent(state: LiveActivityAttributes.ContentState(name: name, props: props), staleDate: nil)
++      content = ActivityContent(state: LiveActivityAttributes.ContentState(name: name, props: LiveActivityAvatarCache.enrichProps(props)), staleDate: nil)
+     } else {
+       content = nil
+     }
+diff --git a/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
+new file mode 100644
+index 0000000..9fbeabb
+--- /dev/null
++++ b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
+@@ -0,0 +1,100 @@
++import Foundation
++
++enum LiveActivityAvatarCache {
++  private static let keyPrefix = "__expo_widgets_live_activity_avatar_"
++  private static let maxAvatarBytes = 1_500_000
++
++  static func enrichProps(_ props: String) -> String {
++    guard var root = parseProps(props) else {
++      return props
++    }
++
++    cacheImageField("driverAvatarUrl", into: "driverAvatarCacheKey", in: &root)
++    cacheImageField("vehicleMarkerUrl", into: "vehicleMarkerCacheKey", in: &root)
++    guard let data = try? JSONSerialization.data(withJSONObject: root),
++          let enriched = String(data: data, encoding: .utf8) else {
++      return props
++    }
++    return enriched
++  }
++
++  static func imageData(from propsJson: String) -> Data? {
++    guard let root = parseProps(propsJson),
++          let key = stringField("driverAvatarCacheKey", root) else {
++      return nil
++    }
++    return WidgetsStorage.getData(forKey: key)
++  }
++
++  static func markerImageData(from propsJson: String) -> Data? {
++    guard let root = parseProps(propsJson),
++          let key = stringField("vehicleMarkerCacheKey", root) else {
++      return nil
++    }
++    return WidgetsStorage.getData(forKey: key)
++  }
++
++  private static func parseProps(_ props: String) -> [String: Any]? {
++    guard let data = props.data(using: .utf8) else { return nil }
++    return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
++  }
++
++  private static func stringField(_ key: String, _ root: [String: Any]) -> String? {
++    guard let raw = root[key] as? String else { return nil }
++    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
++    return value.isEmpty ? nil : value
++  }
++
++  private static func cacheKey(for avatarURLString: String) -> String {
++    let encoded = Data(avatarURLString.utf8)
++      .base64EncodedString()
++      .replacingOccurrences(of: "/", with: "_")
++      .replacingOccurrences(of: "+", with: "-")
++      .replacingOccurrences(of: "=", with: "")
++    return keyPrefix + encoded
++  }
++
++  private static func cacheImageField(_ sourceField: String, into cacheField: String, in root: inout [String: Any]) {
++    guard let source = stringField(sourceField, root) else { return }
++    let key = cacheKey(for: source)
++    if WidgetsStorage.getData(forKey: key) == nil,
++       let data = imageData(fromSource: source),
++       data.count <= maxAvatarBytes {
++      WidgetsStorage.set(data, forKey: key)
++    }
++    if WidgetsStorage.getData(forKey: key) != nil {
++      root[cacheField] = key
++    }
++  }
++
++  private static func imageData(fromSource source: String) -> Data? {
++    if source.lowercased().hasPrefix("http") {
++      return downloadAvatarData(from: source)
++    }
++    guard let url = URL(string: source) else { return nil }
++    return try? Data(contentsOf: url)
++  }
++
++  private static func downloadAvatarData(from avatarURLString: String) -> Data? {
++    guard let url = URL(string: avatarURLString) else { return nil }
++    let semaphore = DispatchSemaphore(value: 0)
++    var result: Data?
++
++    let task = URLSession.shared.dataTask(with: url) { data, response, _ in
++      defer { semaphore.signal() }
++      guard let http = response as? HTTPURLResponse,
++            (200...299).contains(http.statusCode),
++            let data else {
++        return
++      }
++      result = data
++    }
++    task.resume()
++
++    if semaphore.wait(timeout: .now() + 2.5) == .timedOut {
++      task.cancel()
++      return nil
++    }
++    return result
++  }
++}
 diff --git a/node_modules/expo-widgets/ios/LiveActivityFactory.swift b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
-index caf1e05..e867c6c 100644
+index caf1e05..5c0bf3d 100644
 --- a/node_modules/expo-widgets/ios/LiveActivityFactory.swift
 +++ b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
 @@ -3,6 +3,8 @@ import ActivityKit
- 
+
  final class LiveActivityFactory: SharedObject {
    let name: String
 +  /** Kept so we can re-persist the Metro layout immediately before `Activity.request` (extension reads App Group). */
 +  private let layout: String
- 
+
    static var pushNotificationsEnabled: Bool {
      Bundle.main.object(forInfoDictionaryKey: pushNotificationsEnabledKey) as? Bool ?? false
 @@ -10,7 +12,13 @@ final class LiveActivityFactory: SharedObject {
- 
+
    init(name: String, layout: String) {
      self.name = name
 +    self.layout = layout
@@ -157,12 +285,12 @@ index caf1e05..e867c6c 100644
 +        "appGroup=\(WidgetsStorage.appGroupIdentifier ?? "nil") bundle=\(Bundle.main.bundleIdentifier ?? "?")"
 +    )
    }
- 
+
    func start(props: String, url: URL?) throws -> LiveActivity {
-@@ -19,10 +27,23 @@ final class LiveActivityFactory: SharedObject {
+@@ -19,22 +27,42 @@ final class LiveActivityFactory: SharedObject {
        throw LiveActivitiesNotSupportedException()
      }
- 
+
 +    // Widget extension evaluates `layout` from shared UserDefaults; write again right before the activity exists
 +    // so the extension never renders with a missing/empty layout (black Dynamic Island).
 +    WidgetsStorage.set(layout, forKey: "__expo_widgets_live_activity_\(name)_layout")
@@ -170,23 +298,26 @@ index caf1e05..e867c6c 100644
      if let url {
        WidgetsStorage.set(url.absoluteString, forKey: "__expo_widgets_live_activity_\(name)_url")
      }
- 
+
++    let enrichedProps = LiveActivityAvatarCache.enrichProps(props)
 +    let layoutKey = "__expo_widgets_live_activity_\(name)_layout"
 +    let readBack = WidgetsStorage.getString(forKey: layoutKey) ?? ""
-+    let propsPreview = props.count > 120 ? String(props.prefix(120)) + "…" : props
++    let propsPreview = enrichedProps.count > 120 ? String(enrichedProps.prefix(120)) + "…" : enrichedProps
 +    print(
 +      "[ExpoWidgets][LiveActivity][native-app] Activity.request pending name=\(name) " +
 +        "layoutChars=\(layout.count) readBackChars=\(readBack.count) readBackMatches=\(readBack == layout) " +
-+        "propsChars=\(props.count) propsPreview=\(propsPreview)"
++        "propsChars=\(enrichedProps.count) propsPreview=\(propsPreview)"
 +    )
 +
      do {
-       let initialState = LiveActivityAttributes.ContentState(name: name, props: props)
+-      let initialState = LiveActivityAttributes.ContentState(name: name, props: props)
++      let initialState = LiveActivityAttributes.ContentState(name: name, props: enrichedProps)
        let activity = try Activity.request(
-@@ -31,10 +52,16 @@ final class LiveActivityFactory: SharedObject {
+         attributes: LiveActivityAttributes(),
+         content: .init(state: initialState, staleDate: nil),
          pushType: LiveActivityFactory.pushNotificationsEnabled ? .token : nil
        )
- 
+
 +      print(
 +        "[ExpoWidgets][LiveActivity][native-app] Activity.request OK activityId=\(activity.id) pushType=\(LiveActivityFactory.pushNotificationsEnabled ? "token" : "nil")"
 +      )
@@ -249,13 +380,14 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..5d2e96e 100644
+index 3e6ff0b..2cfee7f 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,162 @@
+@@ -1,6 +1,175 @@
  import SwiftUI
++import UIKit
  import WidgetKit
- 
+
 +private let kronoBannerAction = Color(red: 0.655, green: 0.545, blue: 0.98)
 +private let kronoBannerChip = Color.white.opacity(0.12)
 +private let kronoBannerTrack = Color.white.opacity(0.24)
@@ -345,7 +477,13 @@ index 3e6ff0b..5d2e96e 100644
 +      Circle()
 +        .fill(kronoBannerChip)
 +        .frame(width: 38, height: 38)
-+      if let urlStr = b.avatar, let url = URL(string: urlStr) {
++      if let data = LiveActivityAvatarCache.imageData(from: propsJson), let uiImage = UIImage(data: data) {
++        Image(uiImage: uiImage)
++          .resizable()
++          .scaledToFill()
++          .frame(width: 36, height: 36)
++          .clipShape(Circle())
++      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
 +        AsyncImage(url: url) { phase in
 +          switch phase {
 +          case .success(let image):
@@ -378,7 +516,7 @@ index 3e6ff0b..5d2e96e 100644
 +    GeometryReader { geo in
 +      let trackWidth = max(CGFloat(220), geo.size.width)
 +      let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
-+      let carOffset = min(max(CGFloat(0), traveled - 13), trackWidth - 26)
++      let carOffset = min(max(CGFloat(0), traveled - 17), trackWidth - 34)
 +      let destinationOffset = max(CGFloat(0), trackWidth - 7)
 +      ZStack {
 +        RoundedRectangle(cornerRadius: 4)
@@ -391,15 +529,7 @@ index 3e6ff0b..5d2e96e 100644
 +          Spacer(minLength: 0)
 +        }
 +        .frame(maxWidth: .infinity, alignment: .leading)
-+        Circle()
-+          .fill(.white)
-+          .frame(width: 24, height: 24)
-+          .overlay(
-+            Image(systemName: "car.side.fill")
-+              .font(.system(size: 12))
-+              .foregroundStyle(Color.black)
-+              .scaleEffect(x: -1, y: 1)
-+          )
++        markerView
 +          .offset(x: carOffset - trackWidth / 2)
 +        Circle()
 +          .fill(kronoBannerTrackDone)
@@ -410,12 +540,34 @@ index 3e6ff0b..5d2e96e 100644
 +    }
 +    .frame(height: 26)
 +  }
++
++  @ViewBuilder
++  private var markerView: some View {
++    if let data = LiveActivityAvatarCache.markerImageData(from: propsJson), let uiImage = UIImage(data: data) {
++      Image(uiImage: uiImage)
++        .resizable()
++        .scaledToFit()
++        .frame(width: 34, height: 23)
++    } else {
++      Image(systemName: "bicycle")
++        .font(.system(size: 18, weight: .bold))
++        .foregroundStyle(.white)
++    }
++  }
 +}
 +
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -13,7 +169,7 @@ struct LiveActivityBanner: View {
+@@ -8,12 +177,14 @@ struct LiveActivityBanner: View {
+   var nodes: [String: Any]?
+
+   var body: some View {
+-    if activityFamily == .small, let node = nodes?["bannerSmall"] as? [String: Any] {
++    if context.state.name == "OrderTrackingLive" {
++      OrderTrackingBannerFallback(propsJson: context.state.props)
++    } else if activityFamily == .small, let node = nodes?["bannerSmall"] as? [String: Any] {
+       WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else if let node = nodes?["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
@@ -431,7 +583,7 @@ index 1cd5ca9..68828e0 100644
 @@ -2,6 +2,13 @@ import SwiftUI
  import WidgetKit
  import Foundation
- 
+
 +private enum ExpoWidgetsLiveActivityDiagnostics {
 +  static var didLogEmptyLayout = false
 +  static var didLogNilContextNames = Set<String>()
@@ -441,9 +593,9 @@ index 1cd5ca9..68828e0 100644
 +
  func parseTimeline(identifier: String, name: String, family: WidgetFamily) -> [WidgetsTimelineEntry] {
    let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(name)_timeline") ?? []
- 
+
 @@ -37,9 +44,22 @@ func evaluateLayout(
- 
+
  func getLiveActivityNodes(forName name: String, props: String = "{}", environment: [String: Any]) -> [String: Any] {
    let layout = WidgetsStorage.getString(forKey: "__expo_widgets_live_activity_\(name)_layout") ?? ""
 +  if layout.isEmpty, !ExpoWidgetsLiveActivityDiagnostics.didLogEmptyLayout {
@@ -464,10 +616,10 @@ index 1cd5ca9..68828e0 100644
 +    }
      return [:]
    }
- 
+
 @@ -47,15 +67,34 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
    widgetEnvironment["timestamp"] = Int(Date.now.timeIntervalSince1970 * 1000)
- 
+
    let result = context.objectForKeyedSubscript("__expoWidgetRender")?.call(
 -    withArguments: [propsDict, environment]
 +    withArguments: [propsDict, widgetEnvironment]
@@ -489,7 +641,7 @@ index 1cd5ca9..68828e0 100644
 +  }
 +  return nodes
  }
- 
+
  func getLiveActivityUrl(forName name: String) -> URL? {
 -  let data = WidgetsStorage.getData(forKey: "__expo_widgets_live_activity_\(name)_url")
 -  if let data, let url = String(data: data, encoding: .utf8) {
@@ -508,7 +660,7 @@ index 1cd5ca9..68828e0 100644
 @@ -86,6 +125,106 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
    return env
  }
- 
+
 +/// Parse `ActivityKit` `ContentState.props` JSON for native fallback when `__expoWidgetRender` returns `{}`.
 +enum ExpoWidgetsLiveActivityPropsFallback {
 +  private static func stringField(_ key: String, _ root: [String: Any]) -> String? {
@@ -619,7 +771,7 @@ index 68ff52a..6cd2258 100644
 @@ -1,7 +1,71 @@
  import Foundation
  import JavaScriptCore
- 
+
 +// Cache JSContext per layout string. expo/expo#44543 - avoid recreation on each island refresh.
 +private var cachedWidgetContexts: [String: JSContext] = [:]
 +
@@ -691,7 +843,7 @@ index 68ff52a..6cd2258 100644
 @@ -12,18 +76,23 @@ func createWidgetContext(layout: String) -> JSContext? {
      }
    }
- 
+
 -  // Inject ExpoUI bundle
 -  guard let bundleURL = Bundle.main.url(forResource: "ExpoWidgets", withExtension: "bundle"),
 -        let bundle = Bundle(url: bundleURL),
@@ -702,7 +854,7 @@ index 68ff52a..6cd2258 100644
      return nil
    }
    context.evaluateScript(bundleJS)
- 
+
    // Inject layout
    let layoutValue = context.evaluateScript("(\(layout))")
 +  if layoutValue == nil || layoutValue!.isUndefined {
@@ -719,32 +871,33 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..b5950bd 100644
+index 9eae718..477c2d3 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-@@ -3,6 +3,8 @@ import WidgetKit
+@@ -2,6 +2,9 @@ import SwiftUI
+ import WidgetKit
  import ExpoModulesCore
  import ActivityKit
- 
-+private let kronoLiveActivityAccent = Color(red: 0.655, green: 0.545, blue: 0.98)
++import UIKit
 +
++private let kronoLiveActivityAccent = Color(red: 0.655, green: 0.545, blue: 0.98)
+
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-     var name: String
-@@ -12,53 +14,224 @@ struct LiveActivityAttributes: ActivityAttributes {
- 
+@@ -12,83 +15,272 @@ struct LiveActivityAttributes: ActivityAttributes {
+
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
 -  @Environment(\.self) var env
--  
+-
    let widgetContext: AppContext = AppContext()
- 
+
 -  var environment: [String: Any] {
 -    return getLiveActivityEnvironment(environment: env)
 -  }
 -
    public init() {}
- 
+
    public var body: some WidgetConfiguration {
      ActivityConfiguration(for: LiveActivityAttributes.self) { context in
 -      LiveActivityBannerView(context: context, environment: environment)
@@ -783,7 +936,7 @@ index 9eae718..b5950bd 100644
      .supplementalActivityFamiliesIfAvailable()
    }
  }
- 
+
 +/// Si le pipeline JS → nœuds échoue, `EmptyView()` laisse l’îlot **noir** (WidgetRenderer n’a rien à archiver).
 +/// Un fallback 100 % natif prouve que l’extension tourne et évite l’îlot vide en dégradé.
 +@available(iOS 16.1, *)
@@ -873,7 +1026,13 @@ index 9eae718..b5950bd 100644
 +      Circle()
 +        .fill(Color.white.opacity(0.12))
 +        .frame(width: 31, height: 31)
-+      if let urlStr = b.avatar, let url = URL(string: urlStr) {
++      if let data = LiveActivityAvatarCache.imageData(from: propsJson), let uiImage = UIImage(data: data) {
++        Image(uiImage: uiImage)
++          .resizable()
++          .scaledToFill()
++          .frame(width: 30, height: 30)
++          .clipShape(Circle())
++      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
 +        AsyncImage(url: url) { phase in
 +          switch phase {
 +          case .success(let image):
@@ -928,7 +1087,7 @@ index 9eae718..b5950bd 100644
 +      ZStack(alignment: .leading) {
 +        let trackWidth = CGFloat(250)
 +        let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
-+        let carOffset = min(max(CGFloat(0), traveled - 13), trackWidth - 26)
++        let carOffset = min(max(CGFloat(0), traveled - 17), trackWidth - 34)
 +        let destinationOffset = max(CGFloat(0), trackWidth - 14)
 +
 +        RoundedRectangle(cornerRadius: 4)
@@ -937,15 +1096,7 @@ index 9eae718..b5950bd 100644
 +        RoundedRectangle(cornerRadius: 4)
 +          .fill(kronoLiveActivityAccent)
 +          .frame(width: traveled, height: 5)
-+        Circle()
-+          .fill(.white)
-+          .frame(width: 24, height: 24)
-+          .overlay(
-+            Image(systemName: "car.side.fill")
-+              .font(.system(size: 12))
-+              .foregroundStyle(Color.black)
-+              .scaleEffect(x: -1, y: 1)
-+          )
++        markerView
 +          .offset(x: carOffset)
 +        Circle()
 +          .fill(kronoLiveActivityAccent)
@@ -956,6 +1107,20 @@ index 9eae718..b5950bd 100644
 +    }
 +    .padding(EdgeInsets(top: 2, leading: 12, bottom: 10, trailing: 12))
 +  }
++
++  @ViewBuilder
++  private var markerView: some View {
++    if let data = LiveActivityAvatarCache.markerImageData(from: propsJson), let uiImage = UIImage(data: data) {
++      Image(uiImage: uiImage)
++        .resizable()
++        .scaledToFit()
++        .frame(width: 34, height: 23)
++    } else {
++      Image(systemName: "bicycle")
++        .font(.system(size: 18, weight: .bold))
++        .foregroundStyle(.white)
++    }
++  }
 +}
 +
  @available(iOS 16.1, *)
@@ -965,14 +1130,18 @@ index 9eae718..b5950bd 100644
    let context: ActivityViewContext<LiveActivityAttributes>
 -  let environment: [String: Any]
    let sectionName: String
- 
+
    var body: some View {
 +    let environment = getLiveActivityEnvironment(environment: env)
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -67,17 +240,19 @@ private struct LiveActivitySectionView: View {
-     if let node = nodes[sectionName] as? [String: Any] {
+       environment: environment
+     )
+-    if let node = nodes[sectionName] as? [String: Any] {
++    if context.state.name == "OrderTrackingLive" {
++      LiveActivitySectionFallback(sectionName: sectionName, propsJson: context.state.props)
++    } else if let node = nodes[sectionName] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
 -      EmptyView()
@@ -980,20 +1149,26 @@ index 9eae718..b5950bd 100644
      }
    }
  }
- 
+
  @available(iOS 16.1, *)
  private struct LiveActivityBannerView: View {
 +  @Environment(\.self) private var env
 +
    var context: ActivityViewContext<LiveActivityAttributes>
 -  let environment: [String: Any]
- 
+
    var body: some View {
 +    let environment = getLiveActivityEnvironment(environment: env)
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -88,7 +263,7 @@ private struct LiveActivityBannerView: View {
+       environment: environment
+     )
+-    if #available(iOS 18.0, *) {
++    if context.state.name == "OrderTrackingLive" {
++      OrderTrackingBannerFallback(propsJson: context.state.props)
++    } else if #available(iOS 18.0, *) {
+       LiveActivityBanner(context: context, nodes: nodes)
      } else if let node = nodes["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
@@ -1011,47 +1186,47 @@ index 74c905a..9eb1c1d 100644
    static var appGroupIdentifier: String? = Bundle.main.object(forInfoDictionaryKey: "ExpoWidgetsAppGroupIdentifier") as? String
    static let defaults = UserDefaults(suiteName: appGroupIdentifier)
 +  private static var hasLoggedMissingSuite = false
- 
+
    static func set(_ value: [String: Any], forKey key: String) {
 -    guard let defaults else { return }
 +    guard let defaults else {
 +      logMissingSuiteIfNeeded()
 +      return
 +    }
- 
+
      defaults.set(value, forKey: key)
    }
- 
+
    static func set(_ value: [[String: Any]], forKey key: String) {
 -    guard let defaults else { return }
 +    guard let defaults else {
 +      logMissingSuiteIfNeeded()
 +      return
 +    }
- 
+
      defaults.set(value, forKey: key)
    }
- 
+
    static func set(_ value: String, forKey key: String) {
 -    guard let defaults else { return }
 +    guard let defaults else {
 +      logMissingSuiteIfNeeded()
 +      return
 +    }
- 
+
      defaults.set(value, forKey: key)
    }
- 
+
    static func set(_ value: Data, forKey key: String) {
 -    guard let defaults else { return }
 +    guard let defaults else {
 +      logMissingSuiteIfNeeded()
 +      return
 +    }
- 
+
      defaults.set(value, forKey: key)
    }
- 
+
 +  private static func logMissingSuiteIfNeeded() {
 +    guard !hasLoggedMissingSuite else { return }
 +    hasLoggedMissingSuite = true
@@ -1064,15 +1239,15 @@ index 74c905a..9eb1c1d 100644
 +
    static func getDictionary(forKey key: String) -> [String: Any]? {
      guard let defaults else { return nil }
- 
+
 diff --git a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
 index 7dd91dc..13b5a27 100755
 --- a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
 +++ b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
 @@ -4,15 +4,7 @@ set -eo pipefail
- 
+
  EXPO_WIDGETS_PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
- 
+
 -# For classic main project build phases integration, will be no-op to prevent duplicated bundle creation.
 -#
 -# `$PROJECT_DIR` is passed by Xcode as the directory to the xcodeproj file.
@@ -1083,6 +1258,6 @@ index 7dd91dc..13b5a27 100755
 -  exit 0
 -fi
 +# expo/expo#43654 - do not exit when PROJECT_DIR is "ios" (expo run:ios); bundle would never build.
- 
+
  # If PROJECT_ROOT is not specified, fallback to use Xcode PROJECT_DIR
  PROJECT_ROOT=${PROJECT_ROOT:-"$PROJECT_DIR/../.."}

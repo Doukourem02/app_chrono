@@ -1,4 +1,5 @@
 import { AppState, InteractionManager, Platform } from "react-native";
+import { Asset } from "expo-asset";
 import type { LiveActivity, LiveActivityFactory } from "expo-widgets";
 import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
@@ -27,7 +28,14 @@ const END_PROPS: OrderTrackingLiveProps = {
   driverAvatarUrl: "",
   driverPhone: "",
   bannerClockLabel: "",
+  vehicleMarkerUrl: "",
 };
+
+const BIKER_MARKER_ASSET = Asset.fromModule(require("../assets/images/biker.png"));
+
+function bikerMarkerUri(): string {
+  return BIKER_MARKER_ASSET.localUri || BIKER_MARKER_ASSET.uri || "";
+}
 
 /** Chiffres pour `tel:` / `sms:` (Live Activity). */
 function digitsForTel(phone: string | undefined): string {
@@ -245,6 +253,7 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
       driverAvatarUrl: "",
       driverPhone: "",
       bannerClockLabel: formatBannerClock(order),
+      vehicleMarkerUrl: bikerMarkerUri(),
     };
   }
 
@@ -280,6 +289,7 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
     driverAvatarUrl: avatarRaw,
     driverPhone: digitsForTel(driver?.phone),
     bannerClockLabel: formatBannerClock(order),
+    vehicleMarkerUrl: bikerMarkerUri(),
   };
 }
 
@@ -374,6 +384,7 @@ async function syncOrderLiveActivityImpl(
     laTrace("sync: entrée start/update", {
       orderId: order!.id,
       status: order!.status,
+      hasDriverAvatarUrl: Boolean(props.driverAvatarUrl?.trim()),
       appState: AppState.currentState,
     });
 

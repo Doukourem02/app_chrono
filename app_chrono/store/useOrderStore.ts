@@ -66,6 +66,20 @@ export interface OrderRequest {
   packageType?: 'standard' | 'fragile' | 'hot_sensitive'; 
 }
 
+function mergeOrderDriver(
+  existing: OrderRequest["driver"],
+  incoming: Partial<OrderRequest["driver"]> | undefined
+): OrderRequest["driver"] {
+  if (!incoming) return existing;
+  return {
+    ...existing,
+    ...incoming,
+    avatar: incoming.avatar || incoming.avatar_url || incoming.profile_image_url || existing?.avatar,
+    avatar_url: incoming.avatar_url || incoming.profile_image_url || incoming.avatar || existing?.avatar_url || existing?.profile_image_url || existing?.avatar,
+    profile_image_url: incoming.profile_image_url || incoming.avatar_url || incoming.avatar || existing?.profile_image_url || existing?.avatar_url || existing?.avatar,
+  };
+}
+
 interface OrderStore {
   activeOrders: OrderRequest[]; 
   selectedOrderId: string | null; 
@@ -138,7 +152,13 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
 
   updateOrder: (orderId, updates) => set((state) => {
     const updatedOrders = state.activeOrders.map(order =>
-      order.id === orderId ? { ...order, ...updates } : order
+      order.id === orderId
+        ? {
+            ...order,
+            ...updates,
+            driver: mergeOrderDriver(order.driver, updates.driver),
+          }
+        : order
     );
     return { activeOrders: updatedOrders };
   }),
@@ -238,6 +258,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
                   ? { 
                       ...o, 
                       ...order,
+                      driver: mergeOrderDriver(o.driver, order.driver as Partial<OrderRequest["driver"]> | undefined),
                       status, // Garder le statut actuel
                     }
                   : o
@@ -266,6 +287,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
                   ? { 
                       ...o, 
                       ...order,
+                      driver: mergeOrderDriver(o.driver, order.driver as Partial<OrderRequest["driver"]> | undefined),
                       status, // Nouveau statut - FORCER le statut
                       // Ajouter completed_at si la commande est complétée
                       ...(status === 'completed' && !o.completed_at 
