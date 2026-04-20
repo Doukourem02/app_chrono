@@ -380,10 +380,10 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..2cfee7f 100644
+index 3e6ff0b..20ad8dc 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,175 @@
+@@ -1,6 +1,179 @@
  import SwiftUI
 +import UIKit
  import WidgetKit
@@ -412,18 +412,18 @@ index 3e6ff0b..2cfee7f 100644
 +  private var normalizedEta: String? {
 +    guard let e = p.eta, !e.isEmpty else { return nil }
 +    let t = e.trimmingCharacters(in: .whitespacesAndNewlines)
-+    if t == "—" || t == "-" || t == "–" { return nil }
++    let lower = t.lowercased()
++    if t == "—" || t == "-" || t == "–" || ["eta", "n/a", "null", "undefined"].contains(lower) { return nil }
 +    if let n = Int(t), String(n) == t { return "\(n) min" }
 +    let parts = t.split(whereSeparator: { $0.isWhitespace })
 +    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
 +      return "\(n) min"
 +    }
-+    return t
++    return nil
 +  }
 +
 +  private var headline: String {
 +    if b.pending {
-+      if let eta = normalizedEta { return "Recherche livreur · \(eta)" }
 +      return "Recherche livreur"
 +    }
 +    let status = p.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
@@ -471,17 +471,11 @@ index 3e6ff0b..2cfee7f 100644
 +  @ViewBuilder
 +  private var avatarView: some View {
 +    ZStack {
-+      Circle()
-+        .fill(.white)
-+        .frame(width: 44, height: 44)
-+      Circle()
-+        .fill(kronoBannerChip)
-+        .frame(width: 38, height: 38)
 +      if let data = LiveActivityAvatarCache.imageData(from: propsJson), let uiImage = UIImage(data: data) {
 +        Image(uiImage: uiImage)
 +          .resizable()
 +          .scaledToFill()
-+          .frame(width: 36, height: 36)
++          .frame(width: 44, height: 44)
 +          .clipShape(Circle())
 +      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
 +        AsyncImage(url: url) { phase in
@@ -490,25 +484,33 @@ index 3e6ff0b..2cfee7f 100644
 +            image
 +              .resizable()
 +              .scaledToFill()
-+              .frame(width: 36, height: 36)
++              .frame(width: 44, height: 44)
 +              .clipShape(Circle())
 +          case .failure:
-+            Image(systemName: "person.crop.circle.fill")
-+              .foregroundStyle(.secondary)
-+              .font(.system(size: 28))
++            fallbackAvatar
 +          default:
-+            Image(systemName: "person.crop.circle.fill")
-+              .foregroundStyle(.tertiary)
-+              .font(.system(size: 28))
++            fallbackAvatar
 +          }
 +        }
 +      } else {
-+        Image(systemName: "person.crop.circle.fill")
-+          .foregroundStyle(.secondary)
-+          .font(.system(size: 28))
++        fallbackAvatar
 +      }
 +    }
 +    .frame(width: 44, height: 44)
++  }
++
++  private var fallbackAvatar: some View {
++    ZStack {
++      Circle()
++        .fill(.white)
++        .frame(width: 44, height: 44)
++      Circle()
++        .fill(kronoBannerChip)
++        .frame(width: 38, height: 38)
++      Image(systemName: "person.crop.circle.fill")
++        .foregroundStyle(.secondary)
++        .font(.system(size: 28))
++    }
 +  }
 +
 +  @ViewBuilder
@@ -516,7 +518,9 @@ index 3e6ff0b..2cfee7f 100644
 +    GeometryReader { geo in
 +      let trackWidth = max(CGFloat(220), geo.size.width)
 +      let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
-+      let carOffset = min(max(CGFloat(0), traveled - 17), trackWidth - 34)
++      let markerWidth = CGFloat(42)
++      let markerHalf = markerWidth / 2
++      let markerCenter = min(max(markerHalf, traveled), trackWidth - markerHalf)
 +      let destinationOffset = max(CGFloat(0), trackWidth - 7)
 +      ZStack {
 +        RoundedRectangle(cornerRadius: 4)
@@ -530,7 +534,7 @@ index 3e6ff0b..2cfee7f 100644
 +        }
 +        .frame(maxWidth: .infinity, alignment: .leading)
 +        markerView
-+          .offset(x: carOffset - trackWidth / 2)
++          .offset(x: markerCenter - trackWidth / 2)
 +        Circle()
 +          .fill(kronoBannerTrackDone)
 +          .frame(width: 14, height: 14)
@@ -538,7 +542,7 @@ index 3e6ff0b..2cfee7f 100644
 +          .offset(x: destinationOffset - trackWidth / 2)
 +      }
 +    }
-+    .frame(height: 26)
++    .frame(height: 32)
 +  }
 +
 +  @ViewBuilder
@@ -547,10 +551,10 @@ index 3e6ff0b..2cfee7f 100644
 +      Image(uiImage: uiImage)
 +        .resizable()
 +        .scaledToFit()
-+        .frame(width: 34, height: 23)
++        .frame(width: 42, height: 28)
 +    } else {
 +      Image(systemName: "bicycle")
-+        .font(.system(size: 18, weight: .bold))
++        .font(.system(size: 21, weight: .bold))
 +        .foregroundStyle(.white)
 +    }
 +  }
@@ -559,7 +563,7 @@ index 3e6ff0b..2cfee7f 100644
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -8,12 +177,14 @@ struct LiveActivityBanner: View {
+@@ -8,12 +181,14 @@ struct LiveActivityBanner: View {
    var nodes: [String: Any]?
 
    var body: some View {
@@ -577,7 +581,7 @@ index 3e6ff0b..2cfee7f 100644
    }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..68828e0 100644
+index 1cd5ca9..ca5e0c6 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
 @@ -2,6 +2,13 @@ import SwiftUI
@@ -657,7 +661,7 @@ index 1cd5ca9..68828e0 100644
    }
    return nil
  }
-@@ -86,6 +125,106 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
+@@ -86,6 +125,107 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
    return env
  }
 
@@ -686,13 +690,14 @@ index 1cd5ca9..68828e0 100644
 +  private static func normalizedEta(_ value: String?) -> String? {
 +    guard let value else { return nil }
 +    let t = value.trimmingCharacters(in: .whitespacesAndNewlines)
-+    if t.isEmpty || t == "—" || t == "-" || t == "–" { return nil }
++    let lower = t.lowercased()
++    if t.isEmpty || t == "—" || t == "-" || t == "–" || ["eta", "n/a", "null", "undefined"].contains(lower) { return nil }
 +    if let n = Int(t), String(n) == t { return "\(n) min" }
 +    let parts = t.split(whereSeparator: { $0.isWhitespace })
 +    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
 +      return "\(n) min"
 +    }
-+    return t
++    return nil
 +  }
 +
 +  /// Aligné sur `orderTrackingLiveActivity.tsx` : le temps restant prime toujours sur l'état.
@@ -702,8 +707,8 @@ index 1cd5ca9..68828e0 100644
 +      return "—"
 +    }
 +    let pending = root["isPending"] as? Bool == true
-+    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
 +    if pending { return "Recherche" }
++    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
 +    if let status = stringField("statusLabel", root) { return status }
 +    return "Suivi"
 +  }
@@ -713,8 +718,8 @@ index 1cd5ca9..68828e0 100644
 +          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
 +      return "—"
 +    }
-+    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
 +    if root["isPending"] as? Bool == true { return "Recherche" }
++    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
 +    switch stringField("statusCode", root) {
 +    case "in_progress":
 +      return "Prep"
@@ -871,7 +876,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..477c2d3 100644
+index 9eae718..2c3cbc2 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -2,6 +2,9 @@ import SwiftUI
@@ -884,7 +889,7 @@ index 9eae718..477c2d3 100644
 
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-@@ -12,83 +15,272 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -12,83 +15,276 @@ struct LiveActivityAttributes: ActivityAttributes {
 
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
@@ -959,18 +964,18 @@ index 9eae718..477c2d3 100644
 +  private var normalizedEta: String? {
 +    guard let e = p.eta, !e.isEmpty else { return nil }
 +    let t = e.trimmingCharacters(in: .whitespacesAndNewlines)
-+    if t == "—" || t == "-" || t == "–" { return nil }
++    let lower = t.lowercased()
++    if t == "—" || t == "-" || t == "–" || ["eta", "n/a", "null", "undefined"].contains(lower) { return nil }
 +    if let n = Int(t), String(n) == t { return "\(n) min" }
 +    let parts = t.split(whereSeparator: { $0.isWhitespace })
 +    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
 +      return "\(n) min"
 +    }
-+    return t
++    return nil
 +  }
 +
 +  private var headline: String {
 +    if b.pending {
-+      if let eta = normalizedEta { return "Recherche livreur · \(eta)" }
 +      return "Recherche livreur"
 +    }
 +    let status = p.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
@@ -1020,17 +1025,11 @@ index 9eae718..477c2d3 100644
 +  @ViewBuilder
 +  private var avatarView: some View {
 +    ZStack {
-+      Circle()
-+        .fill(.white)
-+        .frame(width: 36, height: 36)
-+      Circle()
-+        .fill(Color.white.opacity(0.12))
-+        .frame(width: 31, height: 31)
 +      if let data = LiveActivityAvatarCache.imageData(from: propsJson), let uiImage = UIImage(data: data) {
 +        Image(uiImage: uiImage)
 +          .resizable()
 +          .scaledToFill()
-+          .frame(width: 30, height: 30)
++          .frame(width: 36, height: 36)
 +          .clipShape(Circle())
 +      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
 +        AsyncImage(url: url) { phase in
@@ -1039,25 +1038,33 @@ index 9eae718..477c2d3 100644
 +            image
 +              .resizable()
 +              .scaledToFill()
-+              .frame(width: 30, height: 30)
++              .frame(width: 36, height: 36)
 +              .clipShape(Circle())
 +          case .failure:
-+            Image(systemName: "person.crop.circle.fill")
-+              .foregroundStyle(.secondary)
-+              .font(.system(size: 24))
++            fallbackAvatar
 +          default:
-+            Image(systemName: "person.crop.circle.fill")
-+              .foregroundStyle(.tertiary)
-+              .font(.system(size: 24))
++            fallbackAvatar
 +          }
 +        }
 +      } else {
-+        Image(systemName: "person.crop.circle.fill")
-+          .foregroundStyle(.secondary)
-+          .font(.system(size: 24))
++        fallbackAvatar
 +      }
 +    }
 +    .frame(width: 36, height: 36)
++  }
++
++  private var fallbackAvatar: some View {
++    ZStack {
++      Circle()
++        .fill(.white)
++        .frame(width: 36, height: 36)
++      Circle()
++        .fill(Color.white.opacity(0.12))
++        .frame(width: 31, height: 31)
++      Image(systemName: "person.crop.circle.fill")
++        .foregroundStyle(.secondary)
++        .font(.system(size: 24))
++    }
 +  }
 +
 +  @ViewBuilder
@@ -1087,7 +1094,9 @@ index 9eae718..477c2d3 100644
 +      ZStack(alignment: .leading) {
 +        let trackWidth = CGFloat(250)
 +        let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
-+        let carOffset = min(max(CGFloat(0), traveled - 17), trackWidth - 34)
++        let markerWidth = CGFloat(42)
++        let markerHalf = markerWidth / 2
++        let carOffset = min(max(CGFloat(0), traveled - markerHalf), trackWidth - markerWidth)
 +        let destinationOffset = max(CGFloat(0), trackWidth - 14)
 +
 +        RoundedRectangle(cornerRadius: 4)
@@ -1114,10 +1123,10 @@ index 9eae718..477c2d3 100644
 +      Image(uiImage: uiImage)
 +        .resizable()
 +        .scaledToFit()
-+        .frame(width: 34, height: 23)
++        .frame(width: 42, height: 28)
 +    } else {
 +      Image(systemName: "bicycle")
-+        .font(.system(size: 18, weight: .bold))
++        .font(.system(size: 21, weight: .bold))
 +        .foregroundStyle(.white)
 +    }
 +  }

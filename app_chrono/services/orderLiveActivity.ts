@@ -237,12 +237,8 @@ function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
 function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
   const status = normalizeOrderStatus(order.status) ?? (order.status as OrderStatus);
   if (status === "pending") {
-    const eta =
-      typeof order.estimatedDuration === "string" && order.estimatedDuration.trim()
-        ? order.estimatedDuration.trim()
-        : "";
     return {
-      etaLabel: eta || "—",
+      etaLabel: "—",
       vehicleLabel: "Recherche livreur",
       vehicleInfoLabel: vehicleInfoLabel(order),
       plateLabel: order.dropoff?.address?.slice(0, 28) || "Krono",

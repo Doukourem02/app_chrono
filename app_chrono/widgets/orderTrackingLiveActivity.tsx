@@ -63,10 +63,11 @@ export type OrderTrackingLiveProps = {
 
 function normalizeEtaLabel(etaRaw: string): string {
   const t = (etaRaw ?? "").trim();
-  if (!t || t === "—" || t === "-" || t === "–") return "";
+  const lower = t.toLowerCase();
+  if (!t || t === "—" || t === "-" || t === "–" || ["eta", "n/a", "null", "undefined"].includes(lower)) return "";
   const m = t.match(/^(\d+)\s*(?:min|mn|minutes?)?$/i);
   if (m) return `${m[1]} min`;
-  return t.replace(/\s+/g, " ");
+  return "";
 }
 
 function minimalEtaLabel(etaRaw: string): string {
@@ -108,7 +109,7 @@ function minimalFallbackLabel(statusCode: string | undefined): string {
 }
 
 function etaHeadline(statusCode: string | undefined, eta: string, isPending: boolean | undefined): string {
-  if (isPending) return eta ? `Recherche livreur · ${eta}` : "Recherche livreur";
+  if (isPending) return "Recherche livreur";
   const status = (statusCode ?? "").trim();
   if (status === "completed") return "Livraison terminée";
   if (status === "cancelled") return "Commande annulée";
@@ -125,12 +126,15 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const vehicleInfo = props.vehicleInfoLabel?.trim() || "Livraison Krono";
   const etaDisplay = (props.etaLabel ?? "").trim() || "—";
   const normalizedEta = normalizeEtaLabel(etaDisplay);
-  const compactTitle = normalizedEta || (props.isPending ? "Recherche" : compactFallbackLabel(props.statusCode));
+  const compactTitle = props.isPending ? "Recherche" : normalizedEta || compactFallbackLabel(props.statusCode);
   const simplified = environment.levelOfDetail === "simplified";
   const progress = Math.max(0.04, Math.min(1, props.progress ?? (props.isPending ? 0.08 : 0.56)));
+  const markerWidth = 42;
+  const markerHeight = 28;
+  const markerHalf = markerWidth / 2;
   const trackWidth = simplified ? 214 : 250;
   const traveledWidth = Math.max(14, Math.round(trackWidth * progress));
-  const carOffset = Math.max(0, Math.min(trackWidth - 34, traveledWidth - 17));
+  const carOffset = Math.max(0, Math.min(trackWidth - markerWidth, traveledWidth - markerHalf));
   const destinationOffset = Math.max(0, trackWidth - 14);
 
   const avatarUrl = (props.driverAvatarUrl ?? "").trim();
@@ -138,12 +142,14 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
 
   const driverAvatar = (
     <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
-      <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle("#FFFFFF")]} />
-      <Circle modifiers={[frame({ width: 38, height: 38 }), foregroundStyle(ON_DARK.bannerChip)]} />
       {avatarUrl ? (
-        <Image uiImage={avatarUrl} modifiers={[frame({ width: 36, height: 36 })]} />
+        <Image uiImage={avatarUrl} modifiers={[frame({ width: 44, height: 44 })]} />
       ) : (
-        <Image systemName="person.crop.circle.fill" color="#8E8E93" size={28} />
+        <>
+          <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle("#FFFFFF")]} />
+          <Circle modifiers={[frame({ width: 38, height: 38 }), foregroundStyle(ON_DARK.bannerChip)]} />
+          <Image systemName="person.crop.circle.fill" color="#8E8E93" size={28} />
+        </>
       )}
     </ZStack>
   );
@@ -152,7 +158,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const compactTrailing = (
     <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.accent)]}>{compactTitle}</Text>
   );
-  const minimalTitle = minimalEtaLabel(etaDisplay) || (props.isPending ? "Recherche" : minimalFallbackLabel(props.statusCode));
+  const minimalTitle = props.isPending ? "Recherche" : minimalEtaLabel(etaDisplay) || minimalFallbackLabel(props.statusCode);
   const minimal = minimalTitle ? (
     <Text modifiers={[font({ weight: "bold", size: 13 }), foregroundStyle(ON_DARK.accent)]}>{minimalTitle}</Text>
   ) : (
@@ -163,7 +169,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const shortVehicleInfo = vehicleInfo.length > 31 ? `${vehicleInfo.slice(0, 28)}...` : vehicleInfo;
   const bannerTrackWidth = simplified ? 280 : 310;
   const bannerTraveledWidth = Math.max(16, Math.round(bannerTrackWidth * progress));
-  const bannerCarOffset = Math.max(0, Math.min(bannerTrackWidth - 34, bannerTraveledWidth - 17));
+  const bannerCarOffset = Math.max(0, Math.min(bannerTrackWidth - markerWidth, bannerTraveledWidth - markerHalf));
   const bannerDestinationOffset = Math.max(0, bannerTrackWidth - 14);
   const etaSize = simplified ? 22 : 26;
   const infoSize = simplified ? 12 : 13;
@@ -196,9 +202,9 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
         />
         <ZStack modifiers={[offset({ x: bannerCarOffset })]}>
           {vehicleMarkerUrl ? (
-            <Image uiImage={vehicleMarkerUrl} modifiers={[frame({ width: 34, height: 23 })]} />
+            <Image uiImage={vehicleMarkerUrl} modifiers={[frame({ width: markerWidth, height: markerHeight })]} />
           ) : (
-            <Image systemName="bicycle" color="#F2F2F7" size={18} />
+            <Image systemName="bicycle" color="#F2F2F7" size={21} />
           )}
         </ZStack>
         <ZStack modifiers={[offset({ x: bannerDestinationOffset })]}>
@@ -235,9 +241,9 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
         />
         <ZStack modifiers={[offset({ x: carOffset })]}>
           {vehicleMarkerUrl ? (
-            <Image uiImage={vehicleMarkerUrl} modifiers={[frame({ width: 34, height: 23 })]} />
+            <Image uiImage={vehicleMarkerUrl} modifiers={[frame({ width: markerWidth, height: markerHeight })]} />
           ) : (
-            <Image systemName="bicycle" color="#F2F2F7" size={18} />
+            <Image systemName="bicycle" color="#F2F2F7" size={21} />
           )}
         </ZStack>
         <ZStack modifiers={[offset({ x: destinationOffset })]}>
