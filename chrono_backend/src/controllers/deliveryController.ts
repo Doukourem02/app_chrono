@@ -89,6 +89,7 @@ export const getUserDeliveries = async (
         id: order.id,
         user_id: order.user?.id,
         driver_id: order.driverId || order.driver?.id || null,
+        driver: order.driver || null,
         pickup,
         dropoff,
         pickup_address: pickup,
@@ -152,9 +153,16 @@ export const getUserDeliveries = async (
         d.first_name as driver_first_name,
         d.last_name as driver_last_name,
         d.avatar_url as driver_avatar_url,
-        d.role as driver_role
+        d.role as driver_role,
+        dp.profile_image_url as driver_profile_image_url,
+        dp.vehicle_plate as driver_vehicle_plate,
+        dp.vehicle_type as driver_vehicle_type,
+        dp.vehicle_brand as driver_vehicle_brand,
+        dp.vehicle_model as driver_vehicle_model,
+        dp.vehicle_color as driver_vehicle_color
       FROM orders o
       LEFT JOIN users d ON o.driver_id = d.id
+      LEFT JOIN driver_profiles dp ON dp.user_id = o.driver_id
       WHERE o.user_id = $1
     `;
     let countQuery = 'SELECT COUNT(*) FROM orders WHERE user_id = $1';
@@ -222,8 +230,14 @@ export const getUserDeliveries = async (
           last_name: order.driver_last_name,
           email: order.driver_email,
           phone: order.driver_phone,
-          avatar_url: order.driver_avatar_url,
+          avatar_url: order.driver_avatar_url || order.driver_profile_image_url,
+          profile_image_url: order.driver_profile_image_url || order.driver_avatar_url,
           role: order.driver_role,
+          vehicle_plate: order.driver_vehicle_plate,
+          vehicle_type: order.driver_vehicle_type,
+          vehicle_brand: order.driver_vehicle_brand,
+          vehicle_model: order.driver_vehicle_model,
+          vehicle_color: order.driver_vehicle_color,
         } : null;
 
         return {

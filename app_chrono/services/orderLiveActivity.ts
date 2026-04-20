@@ -110,14 +110,36 @@ function vehicleTypeLabel(value: string | undefined): string {
   return value?.trim() || "Voiture";
 }
 
+function readDriverString(
+  driver: OrderRequest["driver"] | undefined,
+  keys: string[],
+): string {
+  const record = driver as Record<string, unknown> | undefined;
+  if (!record) return "";
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function driverVehiclePlate(driver: OrderRequest["driver"] | undefined): string {
+  return readDriverString(driver, ["vehicle_plate", "vehiclePlate"]);
+}
+
 function vehicleInfoLabel(order: OrderRequest): string {
   const driver = order.driver;
-  const vehicleType = vehicleTypeLabel(driver?.vehicle_type || order.deliveryMethod);
-  const model = [driver?.vehicle_brand, driver?.vehicle_model].filter(Boolean).join(" ").trim();
-  const color = driver?.vehicle_color?.trim();
-  const plate = driver?.vehicle_plate?.trim();
-  const vehicle = [color, model || vehicleType].filter(Boolean).join(" ");
-  return [plate, vehicle].filter(Boolean).join(" · ") || vehicleType;
+  const vehicleType = vehicleTypeLabel(
+    readDriverString(driver, ["vehicle_type", "vehicleType"]) || order.deliveryMethod,
+  );
+  const brand = readDriverString(driver, ["vehicle_brand", "vehicleBrand"]);
+  const modelName = readDriverString(driver, ["vehicle_model", "vehicleModel"]);
+  const model = [brand, modelName].filter(Boolean).join(" ").trim();
+  const color = readDriverString(driver, ["vehicle_color", "vehicleColor"]);
+  const plate = driverVehiclePlate(driver);
+  return [plate, color, model || vehicleType].filter(Boolean).join(" · ") || vehicleType;
 }
 
 /** Même logique que le hook de sync : statut API parfois mal câblé (casse, tirets). */
@@ -232,7 +254,7 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
     driver?.profile_image_url?.trim() ||
     driver?.avatar?.trim() ||
     "";
-  const plate = driver?.vehicle_plate?.trim();
+  const plate = driverVehiclePlate(driver);
   const name =
     driver?.name?.trim() ||
     [driver?.first_name, driver?.last_name].filter(Boolean).join(" ").trim();

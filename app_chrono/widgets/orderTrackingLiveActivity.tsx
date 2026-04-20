@@ -1,5 +1,5 @@
 import { Circle, HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
-import { font, foregroundStyle, frame, offset, padding } from "@expo/ui/swift-ui/modifiers";
+import { font, foregroundStyle, frame, offset, padding, scaleEffect } from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
 
@@ -120,15 +120,13 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const vehicleInfo = props.vehicleInfoLabel?.trim() || "Krono delivery";
   const etaDisplay = (props.etaLabel ?? "").trim() || "—";
   const normalizedEta = normalizeEtaLabel(etaDisplay);
-  const compactTitle = props.isPending
-    ? "Recherche"
-    : normalizedEta || compactFallbackLabel(props.statusCode);
+  const compactTitle = normalizedEta || (props.isPending ? "Recherche" : compactFallbackLabel(props.statusCode));
   const simplified = environment.levelOfDetail === "simplified";
   const progress = Math.max(0.04, Math.min(1, props.progress ?? (props.isPending ? 0.08 : 0.56)));
   const trackWidth = simplified ? 214 : 250;
   const traveledWidth = Math.max(14, Math.round(trackWidth * progress));
   const carOffset = Math.max(0, Math.min(trackWidth - 28, traveledWidth - 14));
-  const destinationOffset = Math.max(0, trackWidth - 18);
+  const destinationOffset = Math.max(0, trackWidth - 14);
 
   const avatarUrl = (props.driverAvatarUrl ?? "").trim();
 
@@ -148,9 +146,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const compactTrailing = (
     <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.accent)]}>{compactTitle}</Text>
   );
-  const minimalTitle = props.isPending
-    ? "ETA"
-    : minimalEtaLabel(etaDisplay) || minimalFallbackLabel(props.statusCode);
+  const minimalTitle = minimalEtaLabel(etaDisplay) || (props.isPending ? "ETA" : minimalFallbackLabel(props.statusCode));
   const minimal = minimalTitle ? (
     <Text modifiers={[font({ weight: "bold", size: 13 }), foregroundStyle(ON_DARK.accent)]}>{minimalTitle}</Text>
   ) : (
@@ -206,7 +202,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
         />
         <ZStack modifiers={[offset({ x: bannerCarOffset })]}>
           <Circle modifiers={[frame({ width: 24, height: 24 }), foregroundStyle("#F2F2F7")]} />
-          <Image systemName="car.side.fill" color="#111827" size={12} />
+          <Image systemName="car.side.fill" color="#111827" size={12} modifiers={[scaleEffect({ x: -1, y: 1 })]} />
         </ZStack>
         <ZStack modifiers={[offset({ x: bannerDestinationOffset })]}>
           <Circle modifiers={[frame({ width: 14, height: 14 }), foregroundStyle("#A7C7FF")]} />
@@ -239,7 +235,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
         />
         <ZStack modifiers={[offset({ x: carOffset })]}>
           <Circle modifiers={[frame({ width: 24, height: 24 }), foregroundStyle("#F2F2F7")]} />
-          <Image systemName="car.side.fill" color="#111827" size={12} />
+          <Image systemName="car.side.fill" color="#111827" size={12} modifiers={[scaleEffect({ x: -1, y: 1 })]} />
         </ZStack>
         <ZStack modifiers={[offset({ x: destinationOffset })]}>
           <Circle modifiers={[frame({ width: 14, height: 14 }), foregroundStyle("#A7C7FF")]} />

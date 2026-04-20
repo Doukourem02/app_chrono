@@ -31,6 +31,18 @@ function readJwtExpEpochSeconds(token: string): number | null {
   }
 }
 
+function readRecordString(source: unknown, keys: string[]): string | undefined {
+  const record = source as Record<string, unknown> | null | undefined;
+  if (!record) return undefined;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
 class UserOrderSocketService {
   private socket: Socket | null = null;
   private userId: string | null = null;
@@ -557,6 +569,12 @@ class UserOrderSocketService {
             const name = driverInfo.first_name
               ? `${driverInfo.first_name} ${driverInfo.last_name || ''}`.trim()
               : undefined;
+            const vehiclePlate = readRecordString(driverInfo, ['vehicle_plate', 'vehiclePlate']);
+            const vehicleType = readRecordString(driverInfo, ['vehicle_type', 'vehicleType']);
+            const vehicleBrand = readRecordString(driverInfo, ['vehicle_brand', 'vehicleBrand']);
+            const vehicleModel = readRecordString(driverInfo, ['vehicle_model', 'vehicleModel']);
+            const vehicleColor = readRecordString(driverInfo, ['vehicle_color', 'vehicleColor']);
+            const avatarUrl = readRecordString(driverInfo, ['profile_image_url', 'avatar_url', 'avatar']);
             store.updateOrder(order.id, {
               driver: {
                 id: driverInfo.id,
@@ -564,15 +582,15 @@ class UserOrderSocketService {
                 first_name: driverInfo.first_name || undefined,
                 last_name: driverInfo.last_name || undefined,
                 phone: driverInfo.phone || undefined,
-                avatar: driverInfo.profile_image_url || undefined,
-                avatar_url: driverInfo.profile_image_url || undefined,
-                profile_image_url: driverInfo.profile_image_url || undefined,
+                avatar: avatarUrl,
+                avatar_url: avatarUrl,
+                profile_image_url: avatarUrl,
                 rating: driverInfo.rating || undefined,
-                vehicle_plate: driverInfo.vehicle_plate || undefined,
-                vehicle_type: driverInfo.vehicle_type || undefined,
-                vehicle_brand: driverInfo.vehicle_brand || undefined,
-                vehicle_model: driverInfo.vehicle_model || undefined,
-                vehicle_color: driverInfo.vehicle_color || undefined,
+                vehicle_plate: vehiclePlate,
+                vehicle_type: vehicleType,
+                vehicle_brand: vehicleBrand,
+                vehicle_model: vehicleModel,
+                vehicle_color: vehicleColor,
                 ...(driverInfo.current_latitude && driverInfo.current_longitude
                   ? {
                       current_latitude: driverInfo.current_latitude,

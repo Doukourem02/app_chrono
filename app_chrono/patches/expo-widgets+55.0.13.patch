@@ -249,10 +249,10 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..1d31e57 100644
+index 3e6ff0b..4e27153 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,153 @@
+@@ -1,6 +1,154 @@
  import SwiftUI
  import WidgetKit
  
@@ -371,7 +371,7 @@ index 3e6ff0b..1d31e57 100644
 +      let trackWidth = max(CGFloat(220), geo.size.width)
 +      let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
 +      let carOffset = min(max(CGFloat(0), traveled - 13), trackWidth - 26)
-+      let destinationOffset = max(CGFloat(0), trackWidth - 14)
++      let destinationOffset = max(CGFloat(0), trackWidth - 7)
 +      ZStack {
 +        RoundedRectangle(cornerRadius: 4)
 +          .fill(kronoBannerTrack)
@@ -390,6 +390,7 @@ index 3e6ff0b..1d31e57 100644
 +            Image(systemName: "car.side.fill")
 +              .font(.system(size: 12))
 +              .foregroundStyle(Color.black)
++              .scaleEffect(x: -1, y: 1)
 +          )
 +          .offset(x: carOffset - trackWidth / 2)
 +        Circle()
@@ -406,7 +407,7 @@ index 3e6ff0b..1d31e57 100644
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -13,7 +160,7 @@ struct LiveActivityBanner: View {
+@@ -13,7 +161,7 @@ struct LiveActivityBanner: View {
      } else if let node = nodes?["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
@@ -416,7 +417,7 @@ index 3e6ff0b..1d31e57 100644
    }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..6f75758 100644
+index 1cd5ca9..24e4dd6 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
 @@ -2,6 +2,13 @@ import SwiftUI
@@ -496,7 +497,7 @@ index 1cd5ca9..6f75758 100644
    }
    return nil
  }
-@@ -86,6 +125,75 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
+@@ -86,6 +125,96 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
    return env
  }
  
@@ -522,17 +523,38 @@ index 1cd5ca9..6f75758 100644
 +    return nil
 +  }
 +
-+  /// Aligné sur `orderTrackingLiveActivity.tsx` : `compactTitle = isPending ? "Recherche" : etaDisplay`.
++  private static func normalizedEta(_ value: String?) -> String? {
++    guard let value else { return nil }
++    let t = value.trimmingCharacters(in: .whitespacesAndNewlines)
++    if t.isEmpty || t == "—" || t == "-" || t == "–" { return nil }
++    if let n = Int(t), String(n) == t { return "\(n) min" }
++    let parts = t.split(whereSeparator: { $0.isWhitespace })
++    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
++      return "\(n) min"
++    }
++    return t
++  }
++
++  /// Aligné sur `orderTrackingLiveActivity.tsx` : l'ETA prime toujours sur l'état.
 +  static func compactTrailingLine(_ propsJson: String) -> String {
 +    guard let data = propsJson.data(using: .utf8),
 +          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
 +      return "—"
 +    }
 +    let pending = root["isPending"] as? Bool == true
++    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
 +    if pending { return "Recherche" }
-+    if let eta = stringField("etaLabel", root) { return eta }
 +    if let status = stringField("statusLabel", root) { return status }
 +    return "Suivi"
++  }
++
++  static func minimalLine(_ propsJson: String) -> String {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return "ETA"
++    }
++    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
++    return "ETA"
 +  }
 +
 +  static func parse(_ propsJson: String) -> (eta: String?, vehicle: String?, status: String?, plate: String?) {
@@ -679,20 +701,19 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..f9b3ba1 100644
+index 9eae718..3648639 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-@@ -3,6 +3,9 @@ import WidgetKit
+@@ -3,6 +3,8 @@ import WidgetKit
  import ExpoModulesCore
  import ActivityKit
  
 +private let kronoLiveActivityAccent = Color(red: 0.655, green: 0.545, blue: 0.98)
-+private let kronoLiveActivityBackground = Color(red: 0.035, green: 0.039, blue: 0.05).opacity(0.78)
 +
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
      var name: String
-@@ -12,53 +15,136 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -12,53 +14,224 @@ struct LiveActivityAttributes: ActivityAttributes {
  
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
@@ -741,8 +762,6 @@ index 9eae718..f9b3ba1 100644
        .widgetURL(getLiveActivityUrl(forName: context.state.name))
 +      .keylineTint(kronoLiveActivityAccent)
      }
-+    .activityBackgroundTint(kronoLiveActivityBackground)
-+    .activitySystemActionForegroundColor(kronoLiveActivityAccent)
      .supplementalActivityFamiliesIfAvailable()
    }
  }
@@ -758,12 +777,43 @@ index 9eae718..f9b3ba1 100644
 +    ExpoWidgetsLiveActivityPropsFallback.parse(propsJson)
 +  }
 +
++  private var b: (phone: String?, avatar: String?, clock: String?, pending: Bool, progress: Double) {
++    ExpoWidgetsLiveActivityPropsFallback.parseBannerExtras(propsJson)
++  }
++
++  private var vehicleLine: String {
++    p.vehicle ?? "Krono delivery"
++  }
++
++  private var normalizedEta: String? {
++    guard let e = p.eta, !e.isEmpty else { return nil }
++    let t = e.trimmingCharacters(in: .whitespacesAndNewlines)
++    if t == "—" || t == "-" || t == "–" { return nil }
++    if let n = Int(t), String(n) == t { return "\(n) min" }
++    let parts = t.split(whereSeparator: { $0.isWhitespace })
++    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
++      return "\(n) min"
++    }
++    return t
++  }
++
++  private var headline: String {
++    if b.pending {
++      if let eta = normalizedEta { return "Pickup in \(eta)" }
++      return "Finding pickup"
++    }
++    if let eta = normalizedEta { return "Pickup in \(eta)" }
++    return "Pickup soon"
++  }
++
 +  var body: some View {
 +    switch sectionName {
 +    case "minimal":
-+      Image(systemName: "car.fill")
++      Text(ExpoWidgetsLiveActivityPropsFallback.minimalLine(propsJson))
++        .font(.caption2.weight(.bold))
 +        .foregroundStyle(kronoLiveActivityAccent)
-+        .imageScale(.small)
++        .lineLimit(1)
++        .minimumScaleFactor(0.62)
 +    case "compactLeading":
 +      Image(systemName: "car.fill")
 +        .foregroundStyle(kronoLiveActivityAccent)
@@ -777,57 +827,116 @@ index 9eae718..f9b3ba1 100644
 +    case "expandedCenter":
 +      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
 +    case "expandedLeading":
-+      VStack(alignment: .leading, spacing: 4) {
++      VStack(alignment: .leading, spacing: 0) {
 +        Text("KRONO")
 +          .font(.caption.weight(.bold))
-+          .foregroundStyle(Color(red: 0.545, green: 0.361, blue: 0.965))
-+        if let eta = p.eta {
-+          Text(eta).font(.title3.weight(.bold)).foregroundStyle(.primary)
-+        }
-+        if let v = p.vehicle {
-+          Text(v).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
-+        }
++          .foregroundStyle(.white)
 +      }
-+      .frame(maxWidth: 200, alignment: .leading)
-+      .padding(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 6))
++      .frame(maxWidth: 130, alignment: .leading)
++      .padding(EdgeInsets(top: 8, leading: 8, bottom: 4, trailing: 4))
 +    case "expandedTrailing":
-+      VStack(alignment: .trailing, spacing: 6) {
-+        if let plate = p.plate {
-+          ZStack {
-+            RoundedRectangle(cornerRadius: 10)
-+              .fill(Color(red: 0.95, green: 0.95, blue: 0.96))
-+              .frame(width: 146, height: 42)
-+            RoundedRectangle(cornerRadius: 8)
-+              .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
-+              .frame(width: 138, height: 34)
-+            Text(plate)
-+              .font(.caption.weight(.bold))
-+              .foregroundStyle(.white)
-+          }
-+        }
++      VStack(alignment: .trailing, spacing: 0) {
 +        Image(systemName: "car.side.fill")
-+          .foregroundStyle(Color(red: 0.769, green: 0.71, blue: 0.98))
++          .foregroundStyle(kronoLiveActivityAccent)
++          .font(.system(size: 18, weight: .semibold))
 +      }
 +      .frame(maxWidth: .infinity, alignment: .trailing)
-+      .padding(EdgeInsets(top: 8, leading: 6, bottom: 8, trailing: 8))
++      .padding(EdgeInsets(top: 8, leading: 4, bottom: 4, trailing: 8))
 +    case "expandedBottom":
-+      VStack(alignment: .leading, spacing: 8) {
-+        if let st = p.status {
-+          Text(st).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-+        } else {
-+          Text("Suivi Krono")
-+            .font(.caption)
-+            .foregroundStyle(.tertiary)
-+        }
-+        RoundedRectangle(cornerRadius: 4)
-+          .fill(Color(red: 0.9, green: 0.9, blue: 0.92))
-+          .frame(width: 250, height: 6)
-+      }
-+      .padding(EdgeInsets(top: 4, leading: 12, bottom: 10, trailing: 12))
++      expandedTrackingBottom
 +    default:
 +      Image(systemName: "car.fill")
 +        .foregroundStyle(kronoLiveActivityAccent)
 +    }
++  }
++
++  @ViewBuilder
++  private var avatarView: some View {
++    ZStack {
++      Circle()
++        .fill(.white)
++        .frame(width: 36, height: 36)
++      Circle()
++        .fill(Color.white.opacity(0.12))
++        .frame(width: 31, height: 31)
++      if let urlStr = b.avatar, let url = URL(string: urlStr) {
++        AsyncImage(url: url) { phase in
++          switch phase {
++          case .success(let image):
++            image
++              .resizable()
++              .scaledToFill()
++              .frame(width: 30, height: 30)
++              .clipShape(Circle())
++          case .failure:
++            Image(systemName: "person.crop.circle.fill")
++              .foregroundStyle(.secondary)
++              .font(.system(size: 24))
++          default:
++            Image(systemName: "person.crop.circle.fill")
++              .foregroundStyle(.tertiary)
++              .font(.system(size: 24))
++          }
++        }
++      } else {
++        Image(systemName: "person.crop.circle.fill")
++          .foregroundStyle(.secondary)
++          .font(.system(size: 24))
++      }
++    }
++    .frame(width: 36, height: 36)
++  }
++
++  @ViewBuilder
++  private var expandedTrackingBottom: some View {
++    VStack(alignment: .leading, spacing: 8) {
++      HStack(alignment: .center, spacing: 10) {
++        VStack(alignment: .leading, spacing: 2) {
++          Text(headline)
++            .font(.title3.weight(.bold))
++            .foregroundStyle(.white)
++            .lineLimit(1)
++            .minimumScaleFactor(0.76)
++          Text(vehicleLine)
++            .font(.caption.weight(.medium))
++            .foregroundStyle(kronoLiveActivityAccent)
++            .lineLimit(1)
++            .minimumScaleFactor(0.76)
++        }
++        Spacer(minLength: 0)
++        avatarView
++      }
++
++      ZStack(alignment: .leading) {
++        let trackWidth = CGFloat(250)
++        let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
++        let carOffset = min(max(CGFloat(0), traveled - 13), trackWidth - 26)
++        let destinationOffset = max(CGFloat(0), trackWidth - 14)
++
++        RoundedRectangle(cornerRadius: 4)
++          .fill(Color.white.opacity(0.24))
++          .frame(width: trackWidth, height: 5)
++        RoundedRectangle(cornerRadius: 4)
++          .fill(kronoLiveActivityAccent)
++          .frame(width: traveled, height: 5)
++        Circle()
++          .fill(.white)
++          .frame(width: 24, height: 24)
++          .overlay(
++            Image(systemName: "car.side.fill")
++              .font(.system(size: 12))
++              .foregroundStyle(Color.black)
++              .scaleEffect(x: -1, y: 1)
++          )
++          .offset(x: carOffset)
++        Circle()
++          .fill(kronoLiveActivityAccent)
++          .frame(width: 14, height: 14)
++          .overlay(Circle().fill(Color.black.opacity(0.72)).frame(width: 6, height: 6))
++          .offset(x: destinationOffset)
++      }
++    }
++    .padding(EdgeInsets(top: 2, leading: 12, bottom: 10, trailing: 12))
 +  }
 +}
 +
@@ -844,7 +953,7 @@ index 9eae718..f9b3ba1 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -67,17 +153,19 @@ private struct LiveActivitySectionView: View {
+@@ -67,17 +240,19 @@ private struct LiveActivitySectionView: View {
      if let node = nodes[sectionName] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {
@@ -866,7 +975,7 @@ index 9eae718..f9b3ba1 100644
      let nodes = getLiveActivityNodes(
        forName: context.state.name,
        props: context.state.props,
-@@ -88,7 +176,7 @@ private struct LiveActivityBannerView: View {
+@@ -88,7 +263,7 @@ private struct LiveActivityBannerView: View {
      } else if let node = nodes["banner"] as? [String: Any] {
        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
      } else {

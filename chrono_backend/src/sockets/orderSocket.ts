@@ -1402,7 +1402,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           let firstName = driverData.first_name;
           let lastName = driverData.last_name;
           let phone = driverData.phone;
-          let profileImageUrl = driverData.profile_image_url;
+          let profileImageUrl = driverData.profile_image_url || driverData.avatar_url || driverData.avatar;
           if (
             !firstName ||
             firstName === 'Livreur' ||
@@ -1413,7 +1413,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           ) {
             try {
               const userResult = await (pool as any).query(
-                `SELECT u.first_name, u.last_name, u.phone,
+                `SELECT u.first_name, u.last_name, u.phone, u.avatar_url,
                         dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
                         dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
                  FROM users u
@@ -1426,7 +1426,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                 firstName = row.first_name || 'Livreur';
                 lastName = row.last_name || driverId?.substring(0, 8) || null;
                 phone = row.phone || phone;
-                profileImageUrl = row.profile_image_url || profileImageUrl;
+                profileImageUrl = row.profile_image_url || row.avatar_url || profileImageUrl;
                 driverData.vehicle_plate = row.vehicle_plate || driverData.vehicle_plate;
                 driverData.vehicle_type = row.vehicle_type || driverData.vehicle_type;
                 driverData.vehicle_brand = row.vehicle_brand || driverData.vehicle_brand;
@@ -1445,6 +1445,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             current_longitude: driverData.current_longitude || null,
             phone: phone || null,
             profile_image_url: profileImageUrl || null,
+            avatar_url: profileImageUrl || null,
             vehicle_plate: driverData.vehicle_plate || null,
             vehicle_type: driverData.vehicle_type || null,
             vehicle_brand: driverData.vehicle_brand || null,

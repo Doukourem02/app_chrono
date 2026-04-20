@@ -24,10 +24,15 @@ export interface OrderRequest {
     profile_image_url?: string;
     rating?: number;
     vehicle_plate?: string;
+    vehiclePlate?: string;
     vehicle_type?: string;
+    vehicleType?: string;
     vehicle_brand?: string;
+    vehicleBrand?: string;
     vehicle_model?: string;
+    vehicleModel?: string;
     vehicle_color?: string;
+    vehicleColor?: string;
   };
   pickup: {
     address: string;
