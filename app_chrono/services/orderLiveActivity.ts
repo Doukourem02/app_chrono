@@ -4,6 +4,7 @@ import type { LiveActivity, LiveActivityFactory } from "expo-widgets";
 import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
 import { reportLiveActivityIssue } from "../utils/sentry";
+import { calculateDistance, calculateETAForVehicle, formatETA } from "../utils/etaCalculator";
 import { DELIVERY_IN_PROGRESS_STATUSES, normalizeOrderStatus } from "../utils/orderStatusNormalize";
 import type { OrderTrackingLiveProps } from "../widgets/orderTrackingLiveActivity";
 
@@ -16,6 +17,10 @@ const LA_LOG_PREFIX =
  * l’écriture App Group / runtime widget et `Activity.request` (logs iOS : Archive was nil).
  */
 const LIVE_ACTIVITY_PRE_START_YIELD_MS = 72;
+const MIN_LIVE_ACTIVITY_GPS_UPDATE_MS = 6000;
+const MIN_PROGRESS_DELTA_FOR_FAST_UPDATE = 0.03;
+const MIN_PROGRESS_DELTA_FOR_UPDATE = 0.015;
+const ARRIVAL_RADIUS_METERS = 45;
 
 const END_PROPS: OrderTrackingLiveProps = {
   etaLabel: "—",
@@ -30,6 +35,30 @@ const END_PROPS: OrderTrackingLiveProps = {
   bannerClockLabel: "",
   vehicleMarkerUrl: "",
 };
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+type ProgressPhase = "pickup" | "dropoff";
+
+type PhaseProgressState = {
+  phase: ProgressPhase;
+  initialDistanceMeters: number;
+  lastProgress: number;
+};
+
+type LastLiveActivityUpdate = {
+  orderId: string;
+  statusCode?: string;
+  progress: number;
+  etaLabel: string;
+  at: number;
+};
+
+const phaseProgressByOrder = new Map<string, PhaseProgressState>();
+let lastLiveActivityUpdate: LastLiveActivityUpdate | null = null;
 
 const BIKER_MARKER_ASSET = Asset.fromModule(require("../assets/images/biker.png"));
 
@@ -83,6 +112,124 @@ function progressFromStatus(status: OrderStatus): number {
     default:
       return 0.12;
   }
+}
+
+function progressPhaseForStatus(status: OrderStatus): ProgressPhase | null {
+  switch (status) {
+    case "accepted":
+    case "enroute":
+    case "in_progress":
+      return "pickup";
+    case "picked_up":
+    case "delivering":
+      return "dropoff";
+    default:
+      return null;
+  }
+}
+
+function phaseTargetForOrder(order: OrderRequest, phase: ProgressPhase): Coordinates | null {
+  const coords = phase === "pickup" ? order.pickup?.coordinates : order.dropoff?.coordinates;
+  if (
+    !coords ||
+    typeof coords.latitude !== "number" ||
+    typeof coords.longitude !== "number" ||
+    !Number.isFinite(coords.latitude) ||
+    !Number.isFinite(coords.longitude)
+  ) {
+    return null;
+  }
+  return coords;
+}
+
+function phaseProgressRange(phase: ProgressPhase): { start: number; end: number } {
+  if (phase === "pickup") {
+    return { start: 0.14, end: 0.54 };
+  }
+  return { start: 0.58, end: 0.96 };
+}
+
+function statusFloorProgress(status: OrderStatus): number {
+  switch (status) {
+    case "accepted":
+      return 0.14;
+    case "enroute":
+      return 0.24;
+    case "in_progress":
+      return 0.34;
+    case "picked_up":
+      return 0.58;
+    case "delivering":
+      return 0.64;
+    default:
+      return progressFromStatus(status);
+  }
+}
+
+function liveActivityVehicleType(
+  value: OrderRequest["deliveryMethod"],
+): "moto" | "vehicule" | "cargo" | null {
+  return value === "moto" || value === "vehicule" || value === "cargo" ? value : null;
+}
+
+function progressFromDriverMovement(
+  order: OrderRequest,
+  status: OrderStatus,
+  driverCoords: Coordinates | null | undefined,
+): { progress: number; etaLabel?: string } {
+  const statusProgress = clampProgress(progressFromStatus(status));
+  const phase = progressPhaseForStatus(status);
+  if (!phase) {
+    phaseProgressByOrder.delete(order.id);
+    return { progress: statusProgress };
+  }
+
+  const existing = phaseProgressByOrder.get(order.id);
+  if (!driverCoords) {
+    return {
+      progress:
+        existing && existing.phase === phase
+          ? Math.max(statusProgress, existing.lastProgress)
+          : statusProgress,
+    };
+  }
+
+  const target = phaseTargetForOrder(order, phase);
+  if (!target) {
+    return { progress: statusProgress };
+  }
+
+  const remainingMeters = calculateDistance(driverCoords, target);
+  if (!Number.isFinite(remainingMeters)) {
+    return { progress: statusProgress };
+  }
+
+  const range = phaseProgressRange(phase);
+  const floor = Math.max(range.start, statusFloorProgress(status));
+  const shouldResetPhase = !existing || existing.phase !== phase;
+  const previousInitial = shouldResetPhase ? 0 : existing.initialDistanceMeters;
+  const initialDistanceMeters = Math.max(remainingMeters, previousInitial, ARRIVAL_RADIUS_METERS);
+  const phaseRatio =
+    remainingMeters <= ARRIVAL_RADIUS_METERS
+      ? 1
+      : clampProgress(1 - remainingMeters / initialDistanceMeters);
+  const phaseProgress = range.start + phaseRatio * (range.end - range.start);
+  const cappedProgress =
+    remainingMeters <= ARRIVAL_RADIUS_METERS ? range.end : Math.min(range.end - 0.015, phaseProgress);
+  const lastProgress = shouldResetPhase ? floor : existing.lastProgress;
+  const progress = clampProgress(Math.max(floor, cappedProgress, lastProgress));
+
+  phaseProgressByOrder.set(order.id, {
+    phase,
+    initialDistanceMeters,
+    lastProgress: progress,
+  });
+
+  const etaMinutes = calculateETAForVehicle(remainingMeters, liveActivityVehicleType(order.deliveryMethod));
+  return {
+    progress,
+    etaLabel: formatETA(Math.max(1, etaMinutes)),
+  };
 }
 
 function liveStatusLabel(status: OrderStatus): string {
@@ -234,9 +381,13 @@ function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
   return factory;
 }
 
-function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
+function propsFromOrder(
+  order: OrderRequest,
+  driverCoords?: Coordinates | null,
+): OrderTrackingLiveProps {
   const status = normalizeOrderStatus(order.status) ?? (order.status as OrderStatus);
   if (status === "pending") {
+    phaseProgressByOrder.delete(order.id);
     return {
       etaLabel: "—",
       vehicleLabel: "Recherche livreur",
@@ -272,16 +423,17 @@ function propsFromOrder(order: OrderRequest): OrderTrackingLiveProps {
     typeof order.estimatedDuration === "string" && order.estimatedDuration.trim()
       ? order.estimatedDuration.trim()
       : "";
+  const movement = progressFromDriverMovement(order, status, driverCoords);
 
   return {
-    etaLabel: eta,
+    etaLabel: movement.etaLabel || eta,
     vehicleLabel: name || detail || "Krono",
     vehicleInfoLabel: vehicleInfoLabel(order),
     plateLabel: plate || "KRONO",
     isPending: false,
     statusCode: status,
     statusLabel: liveStatusLabel(status),
-    progress: clampProgress(progressFromStatus(status)),
+    progress: movement.progress,
     driverAvatarUrl: avatarRaw,
     driverPhone: digitsForTel(driver?.phone),
     bannerClockLabel: formatBannerClock(order),
@@ -312,9 +464,37 @@ function appIsActiveForLiveActivity(): boolean {
   return AppState.currentState === "active";
 }
 
+function shouldSkipLiveActivityUpdate(orderId: string, props: OrderTrackingLiveProps): boolean {
+  if (!lastLiveActivityUpdate || lastLiveActivityUpdate.orderId !== orderId) {
+    return false;
+  }
+
+  const progress = props.progress ?? 0;
+  const progressDelta = Math.abs(progress - lastLiveActivityUpdate.progress);
+  const etaLabel = props.etaLabel ?? "";
+  const sameStatus = props.statusCode === lastLiveActivityUpdate.statusCode;
+  const sameEta = etaLabel === lastLiveActivityUpdate.etaLabel;
+  const elapsedMs = Date.now() - lastLiveActivityUpdate.at;
+
+  if (!sameStatus) return false;
+  if (sameEta && progressDelta < MIN_PROGRESS_DELTA_FOR_UPDATE) return true;
+  return elapsedMs < MIN_LIVE_ACTIVITY_GPS_UPDATE_MS && progressDelta < MIN_PROGRESS_DELTA_FOR_FAST_UPDATE;
+}
+
+function markLiveActivityUpdated(orderId: string, props: OrderTrackingLiveProps): void {
+  lastLiveActivityUpdate = {
+    orderId,
+    statusCode: props.statusCode,
+    progress: props.progress ?? 0,
+    etaLabel: props.etaLabel ?? "",
+    at: Date.now(),
+  };
+}
+
 /** Termine toutes les Live Activities de ce type. */
 async function endAllLiveActivities(): Promise<void> {
   active = null;
+  lastLiveActivityUpdate = null;
   try {
     const f = getFactory();
     for (const live of f.getInstances()) {
@@ -332,6 +512,8 @@ async function endAllLiveActivities(): Promise<void> {
 export type SyncOrderLiveActivityOptions = {
   /** Déconnexion / arrêt explicite : fermer tout de suite sans attendre le debounce cold start. */
   immediateEnd?: boolean;
+  /** Position livreur temps réel : permet une progression fluide entre deux statuts. */
+  driverCoords?: Coordinates | null;
 };
 
 let didWarmNativeBridge = false;
@@ -362,6 +544,7 @@ async function syncOrderLiveActivityImpl(
   const shouldTrack = order && shouldSyncLiveActivityForOrder(order);
 
   if (!shouldTrack) {
+    if (order?.id) phaseProgressByOrder.delete(order.id);
     if (options.immediateEnd) {
       clearScheduledEnd();
       await endAllLiveActivities();
@@ -375,7 +558,7 @@ async function syncOrderLiveActivityImpl(
 
   try {
     const f = getFactory();
-    const props = propsFromOrder(order!);
+    const props = propsFromOrder(order!, options.driverCoords);
     const url = `appchrono://order-tracking/${encodeURIComponent(order!.id)}`;
     laTrace("sync: entrée start/update", {
       orderId: order!.id,
@@ -385,8 +568,12 @@ async function syncOrderLiveActivityImpl(
     });
 
     if (active?.orderId === order!.id) {
+      if (shouldSkipLiveActivityUpdate(order!.id, props)) {
+        return;
+      }
       try {
         await active.live.update(props);
+        markLiveActivityUpdated(order!.id, props);
         return;
       } catch (e) {
         const updateMsg = e instanceof Error ? e.message : String(e);
@@ -443,6 +630,7 @@ async function syncOrderLiveActivityImpl(
     laTrace("sync: avant f.start (Activity.request)", { orderId: order!.id });
     const live = f.start(props, url);
     active = { orderId: order!.id, live };
+    markLiveActivityUpdated(order!.id, props);
     laTrace("sync: après f.start", { orderId: order!.id });
     if (__DEV__) {
       logger.info("[orderLiveActivity] Live Activity démarrée", "orderLiveActivity", {

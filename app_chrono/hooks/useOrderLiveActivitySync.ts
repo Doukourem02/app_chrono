@@ -22,21 +22,27 @@ function pickTrackedOrder(
 export function useOrderLiveActivitySync() {
   const activeOrders = useOrderStore((s) => s.activeOrders);
   const selectedOrderId = useOrderStore((s) => s.selectedOrderId);
+  const trackedDriverCoords = useOrderStore((s) => {
+    const order = pickTrackedOrder(s.activeOrders, s.selectedOrderId);
+    return order ? s.driverCoords.get(order.id) ?? null : null;
+  });
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
     const order = pickTrackedOrder(activeOrders, selectedOrderId);
-    void syncOrderLiveActivity(order);
-  }, [activeOrders, selectedOrderId]);
+    void syncOrderLiveActivity(order, { driverCoords: trackedDriverCoords });
+  }, [activeOrders, selectedOrderId, trackedDriverCoords]);
 
   /** Au retour premier plan : une tentative ratée ou une activité fermée peut être relancée. */
   useEffect(() => {
     if (Platform.OS !== "ios") return;
     const sub = AppState.addEventListener("change", (next) => {
       if (next !== "active") return;
-      const { activeOrders: list, selectedOrderId: sel } = useOrderStore.getState();
+      const { activeOrders: list, selectedOrderId: sel, driverCoords } = useOrderStore.getState();
       const order = pickTrackedOrder(list, sel);
-      void syncOrderLiveActivity(order);
+      void syncOrderLiveActivity(order, {
+        driverCoords: order ? driverCoords.get(order.id) ?? null : null,
+      });
     });
     return () => sub.remove();
   }, []);
