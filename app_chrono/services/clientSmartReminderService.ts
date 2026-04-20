@@ -1,18 +1,20 @@
 /**
- * Rappels locaux côté client : utiles quand une commande reste longtemps dans un état,
- * sans doubler les notifications serveur immédiates ni la Live Activity.
+ * Rappels locaux côté client : uniquement les rappels utiles hors tracking.
+ * Le suivi temps réel est déjà couvert par l’écran de tracking, la Live Activity et les push statut.
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
+import type { OrderRequest } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
+import { userApiService } from "./userApiService";
 
 const REMINDER_CHANNEL_ID = "krono-reminders";
 const REMINDER_PREFIX = "krono:client-reminder:";
 const REMINDER_STATE_KEY = "@krono_client_smart_reminders";
 const KRONO_PURPLE = "#A78BFA";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const RATING_REMINDER_DELAY_SECONDS = 30 * 60;
 
 type ReminderPlan = {
   identifier: string;
@@ -23,79 +25,36 @@ type ReminderPlan = {
   data: Record<string, string>;
 };
 
-function cleanText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+function ratingReminderIdentifier(orderId: string): string {
+  return `${REMINDER_PREFIX}${orderId}:rating`;
 }
 
-function normalizeEtaLabel(value: unknown): string {
-  const raw = cleanText(value);
-  if (!raw) return "";
-  const numberMatch = raw.match(/\d+/);
-  if (!numberMatch) return "";
-  return `${numberMatch[0]} min`;
+async function hasExistingRating(orderId: string): Promise<boolean> {
+  try {
+    const result = await userApiService.getOrderRating(orderId);
+    return Boolean(result.success && result.data);
+  } catch {
+    return false;
+  }
 }
 
-function isFinalStatus(status: OrderStatus): boolean {
-  return status === "cancelled" || status === "declined";
-}
+async function buildReminderPlan(order: OrderRequest): Promise<ReminderPlan | null> {
+  if (order.status !== "completed") return null;
+  if (!(order.driverId || order.driver?.id)) return null;
+  if (await hasExistingRating(order.id)) return null;
 
-function reminderIdentifier(orderId: string, status: OrderStatus): string {
-  return `${REMINDER_PREFIX}${orderId}:${status}`;
-}
-
-function buildReminderPlan(order: OrderRequest): ReminderPlan | null {
-  const eta = normalizeEtaLabel(order.estimatedDuration);
-  const baseData = {
-    type: "order_status_reminder",
-    orderId: order.id,
-    status: order.status,
+  return {
+    identifier: ratingReminderIdentifier(order.id),
+    title: "Votre avis compte",
+    body: "Pensez à noter votre livreur. Votre retour aide Krono à garder un service fiable.",
+    seconds: RATING_REMINDER_DELAY_SECONDS,
+    cooldownMs: 7 * DAY_MS,
+    data: {
+      type: "order_rating_reminder",
+      orderId: order.id,
+      status: order.status,
+    },
   };
-
-  if (order.status === "pending") {
-    return {
-      identifier: reminderIdentifier(order.id, order.status),
-      title: "Recherche toujours en cours",
-      body: "Nous cherchons encore un livreur pour votre commande.",
-      seconds: 7 * 60,
-      cooldownMs: 30 * 60 * 1000,
-      data: baseData,
-    };
-  }
-
-  if (order.status === "accepted" || order.status === "enroute" || order.status === "in_progress") {
-    return {
-      identifier: reminderIdentifier(order.id, order.status),
-      title: eta ? `Prise en charge dans ${eta}` : "Prise en charge en cours",
-      body: "Ouvrez Krono pour suivre l’arrivée du livreur.",
-      seconds: 15 * 60,
-      cooldownMs: 45 * 60 * 1000,
-      data: baseData,
-    };
-  }
-
-  if (order.status === "picked_up" || order.status === "delivering") {
-    return {
-      identifier: reminderIdentifier(order.id, order.status),
-      title: eta ? `Livraison dans ${eta}` : "Livraison en cours",
-      body: "Votre colis est toujours suivi en temps réel.",
-      seconds: 20 * 60,
-      cooldownMs: 45 * 60 * 1000,
-      data: baseData,
-    };
-  }
-
-  if (order.status === "completed") {
-    return {
-      identifier: reminderIdentifier(order.id, order.status),
-      title: "Votre avis compte",
-      body: "Notez votre livreur pour aider Krono à garder un service fiable.",
-      seconds: 10 * 60,
-      cooldownMs: 7 * DAY_MS,
-      data: baseData,
-    };
-  }
-
-  return null;
 }
 
 async function ensureReminderChannel(): Promise<void> {
@@ -159,10 +118,9 @@ export async function reconcileClientSmartReminders(activeOrders: OrderRequest[]
   if (Platform.OS === "web") return;
 
   try {
-    const plans = activeOrders
-      .filter((order) => !isFinalStatus(order.status))
-      .map(buildReminderPlan)
-      .filter((plan): plan is ReminderPlan => Boolean(plan));
+    const plans = (
+      await Promise.all(activeOrders.map((order) => buildReminderPlan(order)))
+    ).filter((plan): plan is ReminderPlan => Boolean(plan));
 
     const wantedIds = new Set(plans.map((plan) => plan.identifier));
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -216,6 +174,22 @@ export async function reconcileClientSmartReminders(activeOrders: OrderRequest[]
     await writeReminderState(state);
   } catch (e) {
     logger.warn("[client-reminders] reconciliation échouée", "clientSmartReminder", e);
+  }
+}
+
+export async function cancelClientRatingReminder(orderId: string | null | undefined): Promise<void> {
+  if (Platform.OS === "web" || !orderId) return;
+
+  try {
+    const id = ratingReminderIdentifier(orderId);
+    await Notifications.cancelScheduledNotificationAsync(id);
+    const state = await readReminderState();
+    if (state[id]) {
+      delete state[id];
+      await writeReminderState(state);
+    }
+  } catch (e) {
+    logger.warn("[client-reminders] annulation rappel notation échouée", "clientSmartReminder", e);
   }
 }
 

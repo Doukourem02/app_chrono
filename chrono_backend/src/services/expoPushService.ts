@@ -217,6 +217,16 @@ async function sendPushToUser(
   await postExpoPush(messages);
 }
 
+export async function sendCampaignPushToUser(params: {
+  userId: string;
+  appRole: AppPushRole;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+}): Promise<void> {
+  await sendPushToUser(params.userId, params.appRole, params.title, params.body, params.data);
+}
+
 /**
  * Push statut commande : payeur (toujours app client) + destinataire inscrit si différent.
  */

@@ -3,6 +3,7 @@ import {View,Text,Animated,PanResponderInstance,TouchableOpacity,StyleSheet,Text
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { userApiService } from '../services/userApiService';
+import { cancelClientRatingReminder } from '../services/clientSmartReminderService';
 import { logger } from '../utils/logger';
 
 interface RatingBottomSheetProps {
@@ -172,6 +173,7 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
       const result = await userApiService.submitRating(orderId, rating, comment.trim() || undefined);
       
       if (result.success) {
+        void cancelClientRatingReminder(orderId);
         Alert.alert(
           'Merci !',
           existingRating
@@ -541,4 +543,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-

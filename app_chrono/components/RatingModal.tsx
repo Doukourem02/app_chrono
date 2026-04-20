@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {View,Text,StyleSheet,Modal,TouchableOpacity,TextInput,Alert,ActivityIndicator,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { userApiService } from '../services/userApiService';
+import { cancelClientRatingReminder } from '../services/clientSmartReminderService';
 import { logger } from '../utils/logger';
 
 interface RatingModalProps {
@@ -70,6 +71,7 @@ export const RatingModal: React.FC<RatingModalProps> = ({
       const result = await userApiService.submitRating(orderId, rating, comment.trim() || undefined);
       
       if (result.success) {
+        void cancelClientRatingReminder(orderId);
         Alert.alert(
           'Merci !',
           existingRating
@@ -341,4 +343,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-

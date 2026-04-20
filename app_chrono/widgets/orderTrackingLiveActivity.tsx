@@ -78,17 +78,41 @@ function compactFallbackLabel(statusCode: string | undefined): string {
   switch ((statusCode ?? "").trim()) {
     case "accepted":
     case "enroute":
-      return "Bientot";
+      return "En route";
     case "in_progress":
-      return "Preparation";
+      return "Arrivé";
     case "picked_up":
     case "delivering":
       return "En route";
     case "completed":
-      return "Arrive";
+      return "Terminé";
+    case "cancelled":
+      return "Annulé";
+    case "declined":
+      return "Refusé";
     default:
       return "Suivi";
   }
+}
+
+function compactTrailingLabel(
+  statusCode: string | undefined,
+  eta: string,
+  isPending: boolean | undefined,
+): string {
+  if (isPending) return "Recherche livreurs";
+  if ((statusCode ?? "").trim() === "in_progress") return "Arrivé";
+  return eta || compactFallbackLabel(statusCode);
+}
+
+function shouldShowArrivedCompactVisual(statusCode: string | undefined, statusLabel: string | undefined): boolean {
+  const status = (statusCode ?? "").trim().toLowerCase();
+  if (status === "in_progress" || status === "arrived" || status === "at_pickup" || status === "at_dropoff") {
+    return true;
+  }
+
+  const label = (statusLabel ?? "").trim().toLowerCase();
+  return label.includes("arriv");
 }
 
 function minimalFallbackLabel(statusCode: string | undefined): string {
@@ -126,7 +150,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const vehicleInfo = props.vehicleInfoLabel?.trim() || "Livraison Krono";
   const etaDisplay = (props.etaLabel ?? "").trim() || "—";
   const normalizedEta = normalizeEtaLabel(etaDisplay);
-  const compactTitle = props.isPending ? "Recherche" : normalizedEta || compactFallbackLabel(props.statusCode);
+  const compactTitle = compactTrailingLabel(props.statusCode, normalizedEta, props.isPending);
   const simplified = environment.levelOfDetail === "simplified";
   const progress = Math.max(0.04, Math.min(1, props.progress ?? (props.isPending ? 0.08 : 0.56)));
   const markerWidth = 50;
@@ -139,6 +163,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
 
   const avatarUrl = (props.driverAvatarUrl ?? "").trim();
   const vehicleMarkerUrl = (props.vehicleMarkerUrl ?? "").trim();
+  const compactArrivedVisual = shouldShowArrivedCompactVisual(props.statusCode, props.statusLabel);
 
   const driverAvatar = (
     <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
@@ -153,9 +178,26 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
       )}
     </ZStack>
   );
+  const compactDriverAvatar = avatarUrl ? (
+    <Image uiImage={avatarUrl} modifiers={[frame({ width: 24, height: 24 })]} />
+  ) : (
+    <ZStack modifiers={[frame({ width: 24, height: 24 })]}>
+      <Circle modifiers={[frame({ width: 24, height: 24 }), foregroundStyle("#FFFFFF")]} />
+      <Image systemName="person.crop.circle.fill" color="#8E8E93" size={20} />
+    </ZStack>
+  );
 
-  const compactLeading = <Image systemName="car.fill" color={ON_DARK.accent} size={18} />;
-  const compactTrailing = (
+  const compactLeading = (
+    <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.accent)]}>
+      KRONO
+    </Text>
+  );
+  const compactTrailing = compactArrivedVisual ? (
+    <HStack spacing={3}>
+      <Image systemName="hand.raised.fill" color={ON_DARK.title} size={14} />
+      {compactDriverAvatar}
+    </HStack>
+  ) : (
     <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.accent)]}>{compactTitle}</Text>
   );
   const minimalTitle = props.isPending ? "Recherche" : minimalEtaLabel(etaDisplay) || minimalFallbackLabel(props.statusCode);
