@@ -231,7 +231,7 @@ export const getUserDeliveries = async (
           email: order.driver_email,
           phone: order.driver_phone,
           avatar_url: order.driver_avatar_url || order.driver_profile_image_url,
-          profile_image_url: order.driver_profile_image_url || order.driver_avatar_url,
+          profile_image_url: order.driver_avatar_url || order.driver_profile_image_url,
           role: order.driver_role,
           vehicle_plate: order.driver_vehicle_plate,
           vehicle_type: order.driver_vehicle_type,

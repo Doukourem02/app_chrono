@@ -1398,44 +1398,37 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         try {
           const { realDriverStatuses } = await import('../controllers/driverController.js');
           const driverData: any = realDriverStatuses.get(driverId) || {};
-          // Enrichir avec le profil users/driver_profiles pour éviter que le client appelle getUserProfile (403)
+          // Enrichir systématiquement : users.avatar_url est la source fiable de l'avatar public.
           let firstName = driverData.first_name;
           let lastName = driverData.last_name;
           let phone = driverData.phone;
-          let profileImageUrl = driverData.profile_image_url || driverData.avatar_url || driverData.avatar;
-          if (
-            !firstName ||
-            firstName === 'Livreur' ||
-            !profileImageUrl ||
-            !driverData.vehicle_plate ||
-            !driverData.vehicle_type ||
-            !driverData.vehicle_color
-          ) {
-            try {
-              const userResult = await (pool as any).query(
-                `SELECT u.first_name, u.last_name, u.phone, u.avatar_url,
-                        dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
-                        dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
-                 FROM users u
-                 LEFT JOIN driver_profiles dp ON dp.user_id = u.id
-                 WHERE u.id = $1`,
-                [driverId]
-              );
-              if (userResult?.rows?.[0]) {
-                const row = userResult.rows[0];
-                firstName = row.first_name || 'Livreur';
-                lastName = row.last_name || driverId?.substring(0, 8) || null;
-                phone = row.phone || phone;
-                profileImageUrl = row.profile_image_url || row.avatar_url || profileImageUrl;
-                driverData.vehicle_plate = row.vehicle_plate || driverData.vehicle_plate;
-                driverData.vehicle_type = row.vehicle_type || driverData.vehicle_type;
-                driverData.vehicle_brand = row.vehicle_brand || driverData.vehicle_brand;
-                driverData.vehicle_model = row.vehicle_model || driverData.vehicle_model;
-                driverData.vehicle_color = row.vehicle_color || driverData.vehicle_color;
-              }
-            } catch (dbErr: any) {
-              logger.warn(`Enrichissement profil driver ${maskUserId(driverId)}:`, dbErr?.message);
+          let avatarUrl = driverData.avatar_url || driverData.avatar || driverData.profile_image_url;
+          try {
+            const userResult = await (pool as any).query(
+              `SELECT u.first_name, u.last_name, u.phone, u.avatar_url,
+                      dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
+                      dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
+               FROM users u
+               LEFT JOIN driver_profiles dp ON dp.user_id = u.id
+               WHERE u.id = $1`,
+              [driverId]
+            );
+            if (userResult?.rows?.[0]) {
+              const row = userResult.rows[0];
+              firstName = row.first_name || 'Livreur';
+              lastName = row.last_name || driverId?.substring(0, 8) || null;
+              phone = row.phone || phone;
+              avatarUrl = row.avatar_url || row.profile_image_url || avatarUrl;
+              driverData.avatar_url = row.avatar_url || driverData.avatar_url;
+              driverData.profile_image_url = row.profile_image_url || driverData.profile_image_url;
+              driverData.vehicle_plate = row.vehicle_plate || driverData.vehicle_plate;
+              driverData.vehicle_type = row.vehicle_type || driverData.vehicle_type;
+              driverData.vehicle_brand = row.vehicle_brand || driverData.vehicle_brand;
+              driverData.vehicle_model = row.vehicle_model || driverData.vehicle_model;
+              driverData.vehicle_color = row.vehicle_color || driverData.vehicle_color;
             }
+          } catch (dbErr: any) {
+            logger.warn(`Enrichissement profil driver ${maskUserId(driverId)}:`, dbErr?.message);
           }
           const driverInfo = {
             id: driverId,
@@ -1444,8 +1437,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             current_latitude: driverData.current_latitude || null,
             current_longitude: driverData.current_longitude || null,
             phone: phone || null,
-            profile_image_url: profileImageUrl || null,
-            avatar_url: profileImageUrl || null,
+            avatar_url: avatarUrl || null,
+            profile_image_url: avatarUrl || null,
             vehicle_plate: driverData.vehicle_plate || null,
             vehicle_type: driverData.vehicle_type || null,
             vehicle_brand: driverData.vehicle_brand || null,

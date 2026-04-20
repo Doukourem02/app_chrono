@@ -12,11 +12,11 @@ import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
  * Toujours fournir **les quatre** zones étendues : en omettre (ex. mode « simplified » iOS 26+)
  * peut laisser l’îlot sur un indicateur de chargement.
  *
- * Îlot étendu (inspiration type ride-hailing) : leading = marque + ETA + livreur,
+ * Îlot étendu (inspiration type ride-hailing) : leading = marque + temps restant + livreur,
  * center = espaceur, trailing = plaque + icône, bottom = statut + piste progression.
  *
  * Bannière verrouillage : deux bandes — haut : photo livreur + libellés + appel / SMS ;
- * séparateur ; bas : horloge + heure de référence + ETA mise en avant (style apps course).
+ * séparateur ; bas : horloge + temps restant mis en avant (style apps course).
  *
  * Photo : `driverAvatarUrl` (https ou file). Icônes : SF Symbols.
  */
@@ -29,7 +29,7 @@ function palette(environment: LiveActivityEnvironment) {
     /** Accent marque (charte Krono) */
     brand: "#8B5CF6",
     accent: "#C4B5FD",
-    /** Accent actions / ETA bannière : violet pour rester cohérent avec Krono */
+    /** Accent actions / temps restant bannière : violet pour rester cohérent avec Krono */
     bannerAction: dim ? "#C4B5FD" : "#A78BFA",
     plateBg: "#1A1A1A",
     plateBorder: "#F2F2F7",
@@ -92,7 +92,7 @@ function minimalFallbackLabel(statusCode: string | undefined): string {
   switch ((statusCode ?? "").trim()) {
     case "accepted":
     case "enroute":
-      return "ETA";
+      return "Suivi";
     case "in_progress":
       return "Prep";
     case "picked_up":
@@ -101,7 +101,7 @@ function minimalFallbackLabel(statusCode: string | undefined): string {
     case "completed":
       return "OK";
     default:
-      return "ETA";
+      return "Suivi";
   }
 }
 
@@ -149,7 +149,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const compactTrailing = (
     <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.accent)]}>{compactTitle}</Text>
   );
-  const minimalTitle = minimalEtaLabel(etaDisplay) || (props.isPending ? "ETA" : minimalFallbackLabel(props.statusCode));
+  const minimalTitle = minimalEtaLabel(etaDisplay) || (props.isPending ? "Recherche" : minimalFallbackLabel(props.statusCode));
   const minimal = minimalTitle ? (
     <Text modifiers={[font({ weight: "bold", size: 13 }), foregroundStyle(ON_DARK.accent)]}>{minimalTitle}</Text>
   ) : (
