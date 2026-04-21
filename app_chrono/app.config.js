@@ -19,7 +19,7 @@ module.exports = {
     ios: {
       bundleIdentifier: "com.anonymous.app-chrono",
       /** À incrémenter (+1) avant chaque build TestFlight / App Store (autoIncrement incompatible avec app.config.js). */
-      buildNumber: "91",
+      buildNumber: "92",
       /**
        * Live Activities / Dynamic Island (ActivityKit) requiert iOS 16.2+ côté target widget.
        * Aligner la cible principale évite des erreurs CocoaPods pendant "Install pods".
@@ -37,7 +37,7 @@ module.exports = {
     },
     android: {
       package: "com.anonymous.app_chrono",
-      versionCode: 91,
+      versionCode: 92,
       /**
        * "pan" évite adjustResize : sinon la fenêtre se redimensionne en même temps que le sheet
        * animé (expandForAddressInput), ce qui provoque des tremblements au focus des champs adresse.
