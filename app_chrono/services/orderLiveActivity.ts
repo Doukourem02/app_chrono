@@ -24,6 +24,7 @@ const MIN_LIVE_ACTIVITY_GPS_UPDATE_MS = 6000;
 const MIN_PROGRESS_DELTA_FOR_FAST_UPDATE = 0.03;
 const MIN_PROGRESS_DELTA_FOR_UPDATE = 0.015;
 const ARRIVAL_RADIUS_METERS = 45;
+const SAME_STOP_RADIUS_METERS = 80;
 
 const END_PROPS: OrderTrackingLiveProps = {
   etaLabel: "—",
@@ -55,6 +56,7 @@ type PhaseProgressState = {
 type LastLiveActivityUpdate = {
   orderId: string;
   statusCode?: string;
+  statusLabel?: string;
   progress: number;
   etaLabel: string;
   at: number;
@@ -175,11 +177,19 @@ function liveActivityVehicleType(
   return value === "moto" || value === "vehicule" || value === "cargo" ? value : null;
 }
 
+function pickupToDropoffDistance(order: OrderRequest): number | null {
+  const pickup = phaseTargetForOrder(order, "pickup");
+  const dropoff = phaseTargetForOrder(order, "dropoff");
+  if (!pickup || !dropoff) return null;
+  const distance = calculateDistance(pickup, dropoff);
+  return Number.isFinite(distance) ? distance : null;
+}
+
 function progressFromDriverMovement(
   order: OrderRequest,
   status: OrderStatus,
   driverCoords: Coordinates | null | undefined,
-): { progress: number; etaLabel?: string } {
+): { progress: number; etaLabel?: string; arrivedAtStop?: boolean } {
   const statusProgress = clampProgress(progressFromStatus(status));
   const phase = progressPhaseForStatus(status);
   if (!phase) {
@@ -188,6 +198,25 @@ function progressFromDriverMovement(
   }
 
   const existing = phaseProgressByOrder.get(order.id);
+  const sameStopDistanceMeters = phase === "dropoff" ? pickupToDropoffDistance(order) : null;
+  if (
+    phase === "dropoff" &&
+    sameStopDistanceMeters != null &&
+    sameStopDistanceMeters <= SAME_STOP_RADIUS_METERS
+  ) {
+    const progress = Math.max(phaseProgressRange("dropoff").end, existing?.lastProgress ?? 0);
+    phaseProgressByOrder.set(order.id, {
+      phase,
+      initialDistanceMeters: Math.max(sameStopDistanceMeters, ARRIVAL_RADIUS_METERS),
+      lastProgress: progress,
+    });
+    return {
+      progress,
+      etaLabel: "1 min",
+      arrivedAtStop: true,
+    };
+  }
+
   if (!driverCoords) {
     return {
       progress:
@@ -232,6 +261,7 @@ function progressFromDriverMovement(
   return {
     progress,
     etaLabel: formatETA(Math.max(1, etaMinutes)),
+    arrivedAtStop: remainingMeters <= ARRIVAL_RADIUS_METERS,
   };
 }
 
@@ -439,7 +469,7 @@ function propsFromOrder(
     plateLabel: plate || "KRONO",
     isPending: false,
     statusCode: status,
-    statusLabel: liveStatusLabel(status),
+    statusLabel: movement.arrivedAtStop ? "Arrivé" : liveStatusLabel(status),
     progress: movement.progress,
     driverAvatarUrl: avatarRaw,
     driverPhone: digitsForTel(driver?.phone),
@@ -480,10 +510,12 @@ function shouldSkipLiveActivityUpdate(orderId: string, props: OrderTrackingLiveP
   const progressDelta = Math.abs(progress - lastLiveActivityUpdate.progress);
   const etaLabel = props.etaLabel ?? "";
   const sameStatus = props.statusCode === lastLiveActivityUpdate.statusCode;
+  const sameStatusLabel = props.statusLabel === lastLiveActivityUpdate.statusLabel;
   const sameEta = etaLabel === lastLiveActivityUpdate.etaLabel;
   const elapsedMs = Date.now() - lastLiveActivityUpdate.at;
 
   if (!sameStatus) return false;
+  if (!sameStatusLabel) return false;
   if (sameEta && progressDelta < MIN_PROGRESS_DELTA_FOR_UPDATE) return true;
   return elapsedMs < MIN_LIVE_ACTIVITY_GPS_UPDATE_MS && progressDelta < MIN_PROGRESS_DELTA_FOR_FAST_UPDATE;
 }
@@ -492,6 +524,7 @@ function markLiveActivityUpdated(orderId: string, props: OrderTrackingLiveProps)
   lastLiveActivityUpdate = {
     orderId,
     statusCode: props.statusCode,
+    statusLabel: props.statusLabel,
     progress: props.progress ?? 0,
     etaLabel: props.etaLabel ?? "",
     at: Date.now(),
@@ -502,6 +535,7 @@ function registrationPropsKey(props: OrderTrackingLiveProps): string {
   return JSON.stringify({
     etaLabel: props.etaLabel,
     statusCode: props.statusCode,
+    statusLabel: props.statusLabel,
     vehicleInfoLabel: props.vehicleInfoLabel,
     driverAvatarUrl: props.driverAvatarUrl,
     vehicleMarkerUrl: props.vehicleMarkerUrl,

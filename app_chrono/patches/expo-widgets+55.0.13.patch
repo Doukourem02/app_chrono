@@ -139,14 +139,14 @@ index a603765..bda5e15 100644
 @@ -19,7 +19,7 @@ final class LiveActivity: SharedObject {
        throw LiveActivityNotFoundException(id)
      }
-
+ 
 -    let newState = LiveActivityAttributes.ContentState(name: name, props: props)
 +    let newState = LiveActivityAttributes.ContentState(name: name, props: LiveActivityAvatarCache.enrichProps(props))
      await activity.update(ActivityContent(state: newState, staleDate: nil))
    }
-
+ 
 @@ -32,7 +32,7 @@ final class LiveActivity: SharedObject {
-
+ 
      let content: ActivityContent<LiveActivityAttributes.ContentState>?
      if let props {
 -      content = ActivityContent(state: LiveActivityAttributes.ContentState(name: name, props: props), staleDate: nil)
@@ -265,16 +265,16 @@ index caf1e05..5c0bf3d 100644
 --- a/node_modules/expo-widgets/ios/LiveActivityFactory.swift
 +++ b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
 @@ -3,6 +3,8 @@ import ActivityKit
-
+ 
  final class LiveActivityFactory: SharedObject {
    let name: String
 +  /** Kept so we can re-persist the Metro layout immediately before `Activity.request` (extension reads App Group). */
 +  private let layout: String
-
+ 
    static var pushNotificationsEnabled: Bool {
      Bundle.main.object(forInfoDictionaryKey: pushNotificationsEnabledKey) as? Bool ?? false
 @@ -10,7 +12,13 @@ final class LiveActivityFactory: SharedObject {
-
+ 
    init(name: String, layout: String) {
      self.name = name
 +    self.layout = layout
@@ -285,12 +285,12 @@ index caf1e05..5c0bf3d 100644
 +        "appGroup=\(WidgetsStorage.appGroupIdentifier ?? "nil") bundle=\(Bundle.main.bundleIdentifier ?? "?")"
 +    )
    }
-
+ 
    func start(props: String, url: URL?) throws -> LiveActivity {
 @@ -19,22 +27,42 @@ final class LiveActivityFactory: SharedObject {
        throw LiveActivitiesNotSupportedException()
      }
-
+ 
 +    // Widget extension evaluates `layout` from shared UserDefaults; write again right before the activity exists
 +    // so the extension never renders with a missing/empty layout (black Dynamic Island).
 +    WidgetsStorage.set(layout, forKey: "__expo_widgets_live_activity_\(name)_layout")
@@ -298,7 +298,7 @@ index caf1e05..5c0bf3d 100644
      if let url {
        WidgetsStorage.set(url.absoluteString, forKey: "__expo_widgets_live_activity_\(name)_url")
      }
-
+ 
 +    let enrichedProps = LiveActivityAvatarCache.enrichProps(props)
 +    let layoutKey = "__expo_widgets_live_activity_\(name)_layout"
 +    let readBack = WidgetsStorage.getString(forKey: layoutKey) ?? ""
@@ -317,7 +317,7 @@ index caf1e05..5c0bf3d 100644
          content: .init(state: initialState, staleDate: nil),
          pushType: LiveActivityFactory.pushNotificationsEnabled ? .token : nil
        )
-
+ 
 +      print(
 +        "[ExpoWidgets][LiveActivity][native-app] Activity.request OK activityId=\(activity.id) pushType=\(LiveActivityFactory.pushNotificationsEnabled ? "token" : "nil")"
 +      )
@@ -380,14 +380,14 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..6c085f6 100644
+index 3e6ff0b..fbfe7e4 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,178 @@
+@@ -1,6 +1,179 @@
  import SwiftUI
 +import UIKit
  import WidgetKit
-
+ 
 +private let kronoBannerAction = Color(red: 0.655, green: 0.545, blue: 0.98)
 +private let kronoBannerChip = Color.white.opacity(0.12)
 +private let kronoBannerTrack = Color.white.opacity(0.24)
@@ -459,6 +459,7 @@ index 3e6ff0b..6c085f6 100644
 +        }
 +        avatarView
 +      }
++      .padding(.leading, 18)
 +
 +      progressTrack
 +    }
@@ -562,9 +563,9 @@ index 3e6ff0b..6c085f6 100644
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -8,12 +180,14 @@ struct LiveActivityBanner: View {
+@@ -8,12 +181,14 @@ struct LiveActivityBanner: View {
    var nodes: [String: Any]?
-
+ 
    var body: some View {
 -    if activityFamily == .small, let node = nodes?["bannerSmall"] as? [String: Any] {
 +    if context.state.name == "OrderTrackingLive" {
@@ -586,7 +587,7 @@ index 1cd5ca9..e4ceea4 100644
 @@ -2,6 +2,13 @@ import SwiftUI
  import WidgetKit
  import Foundation
-
+ 
 +private enum ExpoWidgetsLiveActivityDiagnostics {
 +  static var didLogEmptyLayout = false
 +  static var didLogNilContextNames = Set<String>()
@@ -596,9 +597,9 @@ index 1cd5ca9..e4ceea4 100644
 +
  func parseTimeline(identifier: String, name: String, family: WidgetFamily) -> [WidgetsTimelineEntry] {
    let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(name)_timeline") ?? []
-
+ 
 @@ -37,9 +44,22 @@ func evaluateLayout(
-
+ 
  func getLiveActivityNodes(forName name: String, props: String = "{}", environment: [String: Any]) -> [String: Any] {
    let layout = WidgetsStorage.getString(forKey: "__expo_widgets_live_activity_\(name)_layout") ?? ""
 +  if layout.isEmpty, !ExpoWidgetsLiveActivityDiagnostics.didLogEmptyLayout {
@@ -619,10 +620,10 @@ index 1cd5ca9..e4ceea4 100644
 +    }
      return [:]
    }
-
+ 
 @@ -47,15 +67,34 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
    widgetEnvironment["timestamp"] = Int(Date.now.timeIntervalSince1970 * 1000)
-
+ 
    let result = context.objectForKeyedSubscript("__expoWidgetRender")?.call(
 -    withArguments: [propsDict, environment]
 +    withArguments: [propsDict, widgetEnvironment]
@@ -644,7 +645,7 @@ index 1cd5ca9..e4ceea4 100644
 +  }
 +  return nodes
  }
-
+ 
  func getLiveActivityUrl(forName name: String) -> URL? {
 -  let data = WidgetsStorage.getData(forKey: "__expo_widgets_live_activity_\(name)_url")
 -  if let data, let url = String(data: data, encoding: .utf8) {
@@ -663,7 +664,7 @@ index 1cd5ca9..e4ceea4 100644
 @@ -86,6 +125,147 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
    return env
  }
-
+ 
 +/// Parse `ActivityKit` `ContentState.props` JSON for native fallback when `__expoWidgetRender` returns `{}`.
 +enum ExpoWidgetsLiveActivityPropsFallback {
 +  private static func stringField(_ key: String, _ root: [String: Any]) -> String? {
@@ -815,7 +816,7 @@ index 68ff52a..6cd2258 100644
 @@ -1,7 +1,71 @@
  import Foundation
  import JavaScriptCore
-
+ 
 +// Cache JSContext per layout string. expo/expo#44543 - avoid recreation on each island refresh.
 +private var cachedWidgetContexts: [String: JSContext] = [:]
 +
@@ -887,7 +888,7 @@ index 68ff52a..6cd2258 100644
 @@ -12,18 +76,23 @@ func createWidgetContext(layout: String) -> JSContext? {
      }
    }
-
+ 
 -  // Inject ExpoUI bundle
 -  guard let bundleURL = Bundle.main.url(forResource: "ExpoWidgets", withExtension: "bundle"),
 -        let bundle = Bundle(url: bundleURL),
@@ -898,7 +899,7 @@ index 68ff52a..6cd2258 100644
      return nil
    }
    context.evaluateScript(bundleJS)
-
+ 
    // Inject layout
    let layoutValue = context.evaluateScript("(\(layout))")
 +  if layoutValue == nil || layoutValue!.isUndefined {
@@ -915,7 +916,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..59da29d 100644
+index 9eae718..91eeec2 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -2,6 +2,9 @@ import SwiftUI
@@ -925,23 +926,23 @@ index 9eae718..59da29d 100644
 +import UIKit
 +
 +private let kronoLiveActivityAccent = Color(red: 0.655, green: 0.545, blue: 0.98)
-
+ 
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-@@ -12,83 +15,329 @@ struct LiveActivityAttributes: ActivityAttributes {
-
+@@ -12,83 +15,330 @@ struct LiveActivityAttributes: ActivityAttributes {
+ 
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
 -  @Environment(\.self) var env
--
+-  
    let widgetContext: AppContext = AppContext()
-
+ 
 -  var environment: [String: Any] {
 -    return getLiveActivityEnvironment(environment: env)
 -  }
 -
    public init() {}
-
+ 
    public var body: some WidgetConfiguration {
      ActivityConfiguration(for: LiveActivityAttributes.self) { context in
 -      LiveActivityBannerView(context: context, environment: environment)
@@ -980,7 +981,7 @@ index 9eae718..59da29d 100644
      .supplementalActivityFamiliesIfAvailable()
    }
  }
-
+ 
 +/// Si le pipeline JS → nœuds échoue, `EmptyView()` laisse l’îlot **noir** (WidgetRenderer n’a rien à archiver).
 +/// Un fallback 100 % natif prouve que l’extension tourne et évite l’îlot vide en dégradé.
 +@available(iOS 16.1, *)
@@ -1182,6 +1183,7 @@ index 9eae718..59da29d 100644
 +        }
 +        avatarView
 +      }
++      .padding(.leading, 18)
 +
 +      ZStack(alignment: .leading) {
 +        let trackWidth = CGFloat(250)
@@ -1231,7 +1233,7 @@ index 9eae718..59da29d 100644
    let context: ActivityViewContext<LiveActivityAttributes>
 -  let environment: [String: Any]
    let sectionName: String
-
+ 
    var body: some View {
 +    let environment = getLiveActivityEnvironment(environment: env)
      let nodes = getLiveActivityNodes(
@@ -1250,14 +1252,14 @@ index 9eae718..59da29d 100644
      }
    }
  }
-
+ 
  @available(iOS 16.1, *)
  private struct LiveActivityBannerView: View {
 +  @Environment(\.self) private var env
 +
    var context: ActivityViewContext<LiveActivityAttributes>
 -  let environment: [String: Any]
-
+ 
    var body: some View {
 +    let environment = getLiveActivityEnvironment(environment: env)
      let nodes = getLiveActivityNodes(
@@ -1287,47 +1289,47 @@ index 74c905a..9eb1c1d 100644
    static var appGroupIdentifier: String? = Bundle.main.object(forInfoDictionaryKey: "ExpoWidgetsAppGroupIdentifier") as? String
    static let defaults = UserDefaults(suiteName: appGroupIdentifier)
 +  private static var hasLoggedMissingSuite = false
-
+ 
    static func set(_ value: [String: Any], forKey key: String) {
 -    guard let defaults else { return }
 +    guard let defaults else {
 +      logMissingSuiteIfNeeded()
 +      return
 +    }
-
+ 
      defaults.set(value, forKey: key)
    }
-
+ 
    static func set(_ value: [[String: Any]], forKey key: String) {
 -    guard let defaults else { return }
 +    guard let defaults else {
 +      logMissingSuiteIfNeeded()
 +      return
 +    }
-
+ 
      defaults.set(value, forKey: key)
    }
-
+ 
    static func set(_ value: String, forKey key: String) {
 -    guard let defaults else { return }
 +    guard let defaults else {
 +      logMissingSuiteIfNeeded()
 +      return
 +    }
-
+ 
      defaults.set(value, forKey: key)
    }
-
+ 
    static func set(_ value: Data, forKey key: String) {
 -    guard let defaults else { return }
 +    guard let defaults else {
 +      logMissingSuiteIfNeeded()
 +      return
 +    }
-
+ 
      defaults.set(value, forKey: key)
    }
-
+ 
 +  private static func logMissingSuiteIfNeeded() {
 +    guard !hasLoggedMissingSuite else { return }
 +    hasLoggedMissingSuite = true
@@ -1340,15 +1342,15 @@ index 74c905a..9eb1c1d 100644
 +
    static func getDictionary(forKey key: String) -> [String: Any]? {
      guard let defaults else { return nil }
-
+ 
 diff --git a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
 index 7dd91dc..13b5a27 100755
 --- a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
 +++ b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
 @@ -4,15 +4,7 @@ set -eo pipefail
-
+ 
  EXPO_WIDGETS_PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-
+ 
 -# For classic main project build phases integration, will be no-op to prevent duplicated bundle creation.
 -#
 -# `$PROJECT_DIR` is passed by Xcode as the directory to the xcodeproj file.
@@ -1359,6 +1361,6 @@ index 7dd91dc..13b5a27 100755
 -  exit 0
 -fi
 +# expo/expo#43654 - do not exit when PROJECT_DIR is "ios" (expo run:ios); bundle would never build.
-
+ 
  # If PROJECT_ROOT is not specified, fallback to use Xcode PROJECT_DIR
  PROJECT_ROOT=${PROJECT_ROOT:-"$PROJECT_DIR/../.."}

@@ -55,6 +55,8 @@ export function useGeofencing({
   const onEnteredZoneRef = useRef(onEnteredZone);
   const onEnteredPickupZoneRef = useRef(onEnteredPickupZone);
   const onEnteredDropoffZoneRef = useRef(onEnteredDropoffZone);
+  const targetLatitude = targetPosition?.latitude ?? null;
+  const targetLongitude = targetPosition?.longitude ?? null;
 
   useEffect(() => {
     onEnteredZoneRef.current = onEnteredZone;
@@ -62,19 +64,19 @@ export function useGeofencing({
     onEnteredDropoffZoneRef.current = onEnteredDropoffZone;
   }, [onEnteredZone, onEnteredPickupZone, onEnteredDropoffZone]);
 
-  // Réinitialiser quand l'ordre change
+  // Réinitialiser quand la cible ou la phase change.
+  // Important : si pickup == dropoff, le livreur ne bouge pas entre "Colis récupéré"
+  // et la phase livraison ; il faut quand même recalculer pour afficher le bouton dropoff.
   useEffect(() => {
-    if (!orderId) {
-      setGeofenceState({
-        status: GeofenceStatus.OUTSIDE,
-        distance: null,
-        enteredAt: null,
-        timeInZone: 0,
-      });
-      previousStateRef.current = null;
-      return;
-    }
-  }, [orderId]);
+    setGeofenceState({
+      status: GeofenceStatus.OUTSIDE,
+      distance: null,
+      enteredAt: null,
+      timeInZone: 0,
+    });
+    previousStateRef.current = null;
+    lastDriverPositionRef.current = null;
+  }, [orderId, orderStatus, targetLatitude, targetLongitude]);
 
   // Calculer l'état du géofencing
   useEffect(() => {
@@ -196,4 +198,3 @@ export function useGeofencing({
     timeUntilValidation: null,
   };
 }
-
