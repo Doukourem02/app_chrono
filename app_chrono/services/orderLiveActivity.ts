@@ -66,9 +66,21 @@ const phaseProgressByOrder = new Map<string, PhaseProgressState>();
 let lastLiveActivityUpdate: LastLiveActivityUpdate | null = null;
 
 const BIKER_MARKER_ASSET = Asset.fromModule(require("../assets/images/biker.png"));
+let didPrepareBikerMarkerAsset = false;
 
 function bikerMarkerUri(): string {
   return BIKER_MARKER_ASSET.localUri || BIKER_MARKER_ASSET.uri || "";
+}
+
+async function prepareLiveActivityAssets(): Promise<void> {
+  if (didPrepareBikerMarkerAsset && bikerMarkerUri()) return;
+  try {
+    await BIKER_MARKER_ASSET.downloadAsync();
+    didPrepareBikerMarkerAsset = true;
+  } catch (error) {
+    didPrepareBikerMarkerAsset = false;
+    logger.warn("[orderLiveActivity] marqueur livreur Live Activity indisponible", "orderLiveActivity", error);
+  }
 }
 
 /** Chiffres pour `tel:` / `sms:` (Live Activity). */
@@ -185,6 +197,27 @@ function pickupToDropoffDistance(order: OrderRequest): number | null {
   return Number.isFinite(distance) ? distance : null;
 }
 
+function normalizedStopAddress(value: string | undefined): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function isSamePickupDropoffStop(order: OrderRequest): boolean {
+  const pickupAddress = normalizedStopAddress(order.pickup?.address);
+  const dropoffAddress = normalizedStopAddress(order.dropoff?.address);
+  if (pickupAddress && dropoffAddress && pickupAddress === dropoffAddress) {
+    return true;
+  }
+
+  const distance = pickupToDropoffDistance(order);
+  return distance != null && distance <= SAME_STOP_RADIUS_METERS;
+}
+
 function progressFromDriverMovement(
   order: OrderRequest,
   status: OrderStatus,
@@ -198,12 +231,8 @@ function progressFromDriverMovement(
   }
 
   const existing = phaseProgressByOrder.get(order.id);
-  const sameStopDistanceMeters = phase === "dropoff" ? pickupToDropoffDistance(order) : null;
-  if (
-    phase === "dropoff" &&
-    sameStopDistanceMeters != null &&
-    sameStopDistanceMeters <= SAME_STOP_RADIUS_METERS
-  ) {
+  if (phase === "dropoff" && isSamePickupDropoffStop(order)) {
+    const sameStopDistanceMeters = pickupToDropoffDistance(order) ?? 0;
     const progress = Math.max(phaseProgressRange("dropoff").end, existing?.lastProgress ?? 0);
     phaseProgressByOrder.set(order.id, {
       phase,
@@ -456,14 +485,10 @@ function propsFromOrder(
       ? [plate, name].filter(Boolean).join(" · ")
       : order.dropoff?.address?.slice(0, 42) || "Krono";
 
-  const eta =
-    typeof order.estimatedDuration === "string" && order.estimatedDuration.trim()
-      ? order.estimatedDuration.trim()
-      : "";
   const movement = progressFromDriverMovement(order, status, driverCoords);
 
   return {
-    etaLabel: movement.etaLabel || eta,
+    etaLabel: movement.etaLabel || "",
     vehicleLabel: name || detail || "Krono",
     vehicleInfoLabel: vehicleInfoLabel(order),
     plateLabel: plate || "KRONO",
@@ -687,6 +712,7 @@ let didWarmNativeBridge = false;
  */
 export async function warmOrderLiveActivityNativeBridge(): Promise<void> {
   if (!supportsLiveActivitiesIOS()) return;
+  await prepareLiveActivityAssets();
   getFactory();
   if (didWarmNativeBridge) {
     laTrace("warmOrderLiveActivityNativeBridge: déjà exécuté — skip délai");
@@ -720,6 +746,7 @@ async function syncOrderLiveActivityImpl(
   clearScheduledEnd();
 
   try {
+    await prepareLiveActivityAssets();
     const f = getFactory();
     const props = propsFromOrder(order!, options.driverCoords);
     const url = `appchrono://order-tracking/${encodeURIComponent(order!.id)}`;

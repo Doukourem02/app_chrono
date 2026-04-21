@@ -156,10 +156,10 @@ index a603765..bda5e15 100644
      }
 diff --git a/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
 new file mode 100644
-index 0000000..9fbeabb
+index 0000000..83d78c8
 --- /dev/null
 +++ b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,128 @@
 +import Foundation
 +
 +enum LiveActivityAvatarCache {
@@ -224,8 +224,36 @@ index 0000000..9fbeabb
 +       data.count <= maxAvatarBytes {
 +      WidgetsStorage.set(data, forKey: key)
 +    }
-+    if WidgetsStorage.getData(forKey: key) != nil {
-+      root[cacheField] = key
++
++    guard let data = WidgetsStorage.getData(forKey: key) else {
++      return
++    }
++
++    root[cacheField] = key
++    if let fileURL = writeImageDataToSharedFile(data, forKey: key) {
++      root[sourceField] = fileURL.absoluteString
++    }
++  }
++
++  private static func writeImageDataToSharedFile(_ data: Data, forKey key: String) -> URL? {
++    guard let groupIdentifier = WidgetsStorage.appGroupIdentifier,
++          let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) else {
++      return nil
++    }
++
++    let directoryURL = containerURL.appendingPathComponent("LiveActivityImages", isDirectory: true)
++    try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
++
++    let fileURL = directoryURL.appendingPathComponent(key).appendingPathExtension("img")
++    if FileManager.default.fileExists(atPath: fileURL.path) {
++      return fileURL
++    }
++
++    do {
++      try data.write(to: fileURL, options: [.atomic])
++      return fileURL
++    } catch {
++      return nil
 +    }
 +  }
 +
@@ -380,10 +408,10 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..6c085f6 100644
+index 3e6ff0b..f7fff32 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,178 @@
+@@ -1,6 +1,176 @@
  import SwiftUI
 +import UIKit
  import WidgetKit
@@ -552,9 +580,7 @@ index 3e6ff0b..6c085f6 100644
 +        .scaledToFit()
 +        .frame(width: 50, height: 33)
 +    } else {
-+      Image(systemName: "bicycle")
-+        .font(.system(size: 24, weight: .bold))
-+        .foregroundStyle(.white)
++      Color.clear.frame(width: 50, height: 33)
 +    }
 +  }
 +}
@@ -562,7 +588,7 @@ index 3e6ff0b..6c085f6 100644
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -8,12 +180,14 @@ struct LiveActivityBanner: View {
+@@ -8,12 +178,14 @@ struct LiveActivityBanner: View {
    var nodes: [String: Any]?
  
    var body: some View {
@@ -915,7 +941,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..21fe9e1 100644
+index 9eae718..ccc8a68 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -2,6 +2,9 @@ import SwiftUI
@@ -928,7 +954,7 @@ index 9eae718..21fe9e1 100644
  
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-@@ -12,83 +15,329 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -12,83 +15,357 @@ struct LiveActivityAttributes: ActivityAttributes {
  
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
@@ -1045,12 +1071,12 @@ index 9eae718..21fe9e1 100644
 +        .minimumScaleFactor(0.72)
 +    case "compactTrailing":
 +      if ExpoWidgetsLiveActivityPropsFallback.shouldShowArrivedCompactVisual(propsJson) {
-+        HStack(spacing: 4) {
-+          Image(systemName: "hand.wave.fill")
-+            .font(.system(size: 18, weight: .semibold))
-+            .foregroundStyle(.white)
-+          avatarView
++        HStack(spacing: 2) {
++          compactArrivedHand
++          compactAvatarView
 +        }
++        .frame(width: 52, height: 30)
++        .fixedSize(horizontal: true, vertical: true)
 +      } else {
 +        Text(ExpoWidgetsLiveActivityPropsFallback.compactTrailingLine(propsJson))
 +          .font(.caption.weight(.semibold))
@@ -1073,6 +1099,28 @@ index 9eae718..21fe9e1 100644
 +    }
 +  }
 +
++  private var compactArrivedHand: some View {
++    ZStack {
++      Image(systemName: "hand.raised.fill")
++        .font(.system(size: 17, weight: .semibold))
++        .foregroundStyle(.white)
++      Image(systemName: "chevron.left")
++        .font(.system(size: 7, weight: .bold))
++        .foregroundStyle(.white)
++        .offset(x: -8, y: -5)
++      Image(systemName: "chevron.left")
++        .font(.system(size: 7, weight: .bold))
++        .foregroundStyle(.white)
++        .offset(x: -8, y: 5)
++      Image(systemName: "chevron.left")
++        .font(.system(size: 6, weight: .bold))
++        .foregroundStyle(.white)
++        .offset(x: -11)
++    }
++    .frame(width: 19, height: 22)
++    .fixedSize(horizontal: true, vertical: true)
++  }
++
 +  @ViewBuilder
 +  private var compactAvatarView: some View {
 +    ZStack {
@@ -1080,7 +1128,7 @@ index 9eae718..21fe9e1 100644
 +        Image(uiImage: uiImage)
 +          .resizable()
 +          .scaledToFill()
-+          .frame(width: 24, height: 24)
++          .frame(width: 30, height: 30)
 +          .clipShape(Circle())
 +      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
 +        AsyncImage(url: url) { phase in
@@ -1089,7 +1137,7 @@ index 9eae718..21fe9e1 100644
 +            image
 +              .resizable()
 +              .scaledToFill()
-+              .frame(width: 24, height: 24)
++              .frame(width: 30, height: 30)
 +              .clipShape(Circle())
 +          case .failure:
 +            compactFallbackAvatar
@@ -1101,18 +1149,26 @@ index 9eae718..21fe9e1 100644
 +        compactFallbackAvatar
 +      }
 +    }
-+    .frame(width: 24, height: 24)
++    .frame(width: 30, height: 30)
++    .clipShape(Circle())
++    .fixedSize(horizontal: true, vertical: true)
 +  }
 +
 +  private var compactFallbackAvatar: some View {
 +    ZStack {
 +      Circle()
 +        .fill(.white)
-+        .frame(width: 24, height: 24)
++        .frame(width: 30, height: 30)
++      Circle()
++        .fill(Color.white.opacity(0.12))
++        .frame(width: 25, height: 25)
 +      Image(systemName: "person.crop.circle.fill")
 +        .foregroundStyle(.secondary)
-+        .font(.system(size: 20))
++        .font(.system(size: 19))
 +    }
++    .frame(width: 30, height: 30)
++    .clipShape(Circle())
++    .fixedSize(horizontal: true, vertical: true)
 +  }
 +
 +  @ViewBuilder
@@ -1217,9 +1273,7 @@ index 9eae718..21fe9e1 100644
 +        .scaledToFit()
 +        .frame(width: 50, height: 33)
 +    } else {
-+      Image(systemName: "bicycle")
-+        .font(.system(size: 24, weight: .bold))
-+        .foregroundStyle(.white)
++      Color.clear.frame(width: 50, height: 33)
 +    }
 +  }
 +}

@@ -1,5 +1,5 @@
 import { Circle, HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
-import { font, foregroundStyle, frame, offset, padding } from "@expo/ui/swift-ui/modifiers";
+import { clipShape, fixedSize, font, foregroundStyle, frame, offset, padding } from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
 
@@ -167,24 +167,31 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
 
   const driverAvatar = (
     <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
+      <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle("#FFFFFF")]} />
+      <Circle modifiers={[frame({ width: 38, height: 38 }), foregroundStyle(ON_DARK.bannerChip)]} />
+      <Image systemName="person.crop.circle.fill" color="#8E8E93" size={28} />
       {avatarUrl ? (
-        <Image uiImage={avatarUrl} modifiers={[frame({ width: 44, height: 44 })]} />
-      ) : (
-        <>
-          <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle("#FFFFFF")]} />
-          <Circle modifiers={[frame({ width: 38, height: 38 }), foregroundStyle(ON_DARK.bannerChip)]} />
-          <Image systemName="person.crop.circle.fill" color="#8E8E93" size={28} />
-        </>
-      )}
+        <Image uiImage={avatarUrl} modifiers={[frame({ width: 44, height: 44 }), clipShape("circle")]} />
+      ) : null}
     </ZStack>
   );
-  const compactDriverAvatar = avatarUrl ? (
-    <Image uiImage={avatarUrl} modifiers={[frame({ width: 36, height: 36 })]} />
-  ) : (
-    <ZStack modifiers={[frame({ width: 36, height: 36 })]}>
-      <Circle modifiers={[frame({ width: 36, height: 36 }), foregroundStyle("#FFFFFF")]} />
-      <Circle modifiers={[frame({ width: 31, height: 31 }), foregroundStyle(ON_DARK.bannerChip)]} />
-      <Image systemName="person.crop.circle.fill" color="#8E8E93" size={24} />
+  const compactDriverAvatar = (
+    <ZStack modifiers={[frame({ width: 30, height: 30 }), fixedSize({ horizontal: true, vertical: true })]}>
+      <Circle modifiers={[frame({ width: 30, height: 30 }), foregroundStyle("#FFFFFF")]} />
+      <Circle modifiers={[frame({ width: 25, height: 25 }), foregroundStyle(ON_DARK.bannerChip)]} />
+      <Image systemName="person.crop.circle.fill" color="#8E8E93" size={19} />
+      {avatarUrl ? (
+        <Image uiImage={avatarUrl} modifiers={[frame({ width: 30, height: 30 }), clipShape("circle")]} />
+      ) : null}
+    </ZStack>
+  );
+
+  const compactArrivedHand = (
+    <ZStack modifiers={[frame({ width: 19, height: 22 }), fixedSize({ horizontal: true, vertical: true })]}>
+      <Image systemName="hand.raised.fill" color={ON_DARK.title} size={17} modifiers={[offset({ x: 0 })]} />
+      <Image systemName="chevron.left" color={ON_DARK.title} size={7} modifiers={[offset({ x: -8, y: -5 })]} />
+      <Image systemName="chevron.left" color={ON_DARK.title} size={7} modifiers={[offset({ x: -8, y: 5 })]} />
+      <Image systemName="chevron.left" color={ON_DARK.title} size={6} modifiers={[offset({ x: -11 })]} />
     </ZStack>
   );
 
@@ -194,8 +201,8 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
     </Text>
   );
   const compactTrailing = compactArrivedVisual ? (
-    <HStack spacing={4}>
-      <Image systemName="hand.wave.fill" color={ON_DARK.title} size={18} />
+    <HStack spacing={2} modifiers={[frame({ width: 52, height: 30 }), fixedSize({ horizontal: true, vertical: true })]}>
+      {compactArrivedHand}
       {compactDriverAvatar}
     </HStack>
   ) : (
@@ -245,9 +252,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
         <ZStack modifiers={[offset({ x: bannerCarOffset })]}>
           {vehicleMarkerUrl ? (
             <Image uiImage={vehicleMarkerUrl} modifiers={[frame({ width: markerWidth, height: markerHeight })]} />
-          ) : (
-            <Image systemName="bicycle" color="#F2F2F7" size={21} />
-          )}
+          ) : null}
         </ZStack>
         <ZStack modifiers={[offset({ x: bannerDestinationOffset })]}>
           <Circle modifiers={[frame({ width: 14, height: 14 }), foregroundStyle("#A7C7FF")]} />
@@ -283,9 +288,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
         <ZStack modifiers={[offset({ x: carOffset })]}>
           {vehicleMarkerUrl ? (
             <Image uiImage={vehicleMarkerUrl} modifiers={[frame({ width: markerWidth, height: markerHeight })]} />
-          ) : (
-            <Image systemName="bicycle" color="#F2F2F7" size={21} />
-          )}
+          ) : null}
         </ZStack>
         <ZStack modifiers={[offset({ x: destinationOffset })]}>
           <Circle modifiers={[frame({ width: 14, height: 14 }), foregroundStyle("#A7C7FF")]} />
