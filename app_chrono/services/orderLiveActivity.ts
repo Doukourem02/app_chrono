@@ -35,6 +35,7 @@ const END_PROPS: OrderTrackingLiveProps = {
   statusLabel: "Terminee",
   progress: 1,
   driverAvatarUrl: "",
+  driverInitials: "",
   driverPhone: "",
   bannerClockLabel: "",
   vehicleMarkerUrl: "",
@@ -129,6 +130,50 @@ function progressFromStatus(status: OrderStatus): number {
     default:
       return 0.12;
   }
+}
+
+function etaMinutesFromLabel(label: string | undefined): number | null {
+  const raw = (label ?? "").trim();
+  if (!raw || raw === "—" || raw === "-" || raw === "–") return null;
+  const match = raw.match(/(\d+(?:[.,]\d+)?)/);
+  if (!match) return null;
+  const minutes = Number(match[1].replace(",", "."));
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+}
+
+function etaLabelFromOrder(order: OrderRequest): string {
+  const rawEta = (order as unknown as { eta_minutes?: unknown; etaMinutes?: unknown }).eta_minutes ??
+    (order as unknown as { eta_minutes?: unknown; etaMinutes?: unknown }).etaMinutes;
+  if (typeof rawEta === "number" && Number.isFinite(rawEta) && rawEta > 0) {
+    return formatETA(Math.max(1, Math.round(rawEta)));
+  }
+
+  const rawDuration = (order.estimatedDuration ?? "").trim();
+  if (!rawDuration) return "";
+  const minutes = etaMinutesFromLabel(rawDuration);
+  return minutes != null ? formatETA(Math.max(1, Math.round(minutes))) : rawDuration;
+}
+
+function etaProgressCap(status: OrderStatus, etaLabel: string | undefined): number | null {
+  const minutes = etaMinutesFromLabel(etaLabel);
+  if (minutes == null) return null;
+
+  let cap = 0.96;
+  if (minutes >= 10) cap = 0.58;
+  else if (minutes >= 7) cap = 0.66;
+  else if (minutes >= 5) cap = 0.74;
+  else if (minutes >= 3) cap = 0.82;
+  else if (minutes >= 2) cap = 0.9;
+
+  const phase = progressPhaseForStatus(status);
+  if (phase === "pickup") return Math.min(cap, phaseProgressRange("pickup").end);
+  return cap;
+}
+
+function progressWithEtaCap(status: OrderStatus, progress: number, etaLabel: string | undefined): number {
+  if (status === "completed") return 1;
+  const cap = etaProgressCap(status, etaLabel);
+  return cap == null ? clampProgress(progress) : clampProgress(Math.min(progress, cap));
 }
 
 function progressPhaseForStatus(status: OrderStatus): ProgressPhase | null {
@@ -346,6 +391,31 @@ function driverVehiclePlate(driver: OrderRequest["driver"] | undefined): string 
   return readDriverString(driver, ["vehicle_plate", "vehiclePlate"]);
 }
 
+function liveActivityImageUrl(...values: Array<string | undefined>): string {
+  for (const value of values) {
+    const url = value?.trim();
+    if (!url) continue;
+    if (/^(https?:\/\/|file:\/\/|data:image\/)/i.test(url)) return url;
+    if (url.startsWith("//")) return `https:${url}`;
+  }
+  return "";
+}
+
+function driverInitials(driver: OrderRequest["driver"] | undefined): string {
+  const first = readDriverString(driver, ["first_name", "firstName"]);
+  const last = readDriverString(driver, ["last_name", "lastName"]);
+  const name = readDriverString(driver, ["name"]);
+  const source = [first, last].filter(Boolean).join(" ").trim() || name || "Krono";
+  const initials = source
+    .split(/\s+/)
+    .map((part) => part.trim()[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return initials || "K";
+}
+
 function vehicleInfoLabel(order: OrderRequest): string {
   const driver = order.driver;
   const vehicleType = vehicleTypeLabel(
@@ -464,6 +534,7 @@ function propsFromOrder(
       statusLabel: liveStatusLabel(status),
       progress: progressFromStatus(status),
       driverAvatarUrl: "",
+      driverInitials: "",
       driverPhone: "",
       bannerClockLabel: formatBannerClock(order),
       vehicleMarkerUrl: bikerMarkerUri(),
@@ -471,11 +542,7 @@ function propsFromOrder(
   }
 
   const driver = order.driver;
-  const avatarRaw =
-    driver?.avatar_url?.trim() ||
-    driver?.profile_image_url?.trim() ||
-    driver?.avatar?.trim() ||
-    "";
+  const avatarRaw = liveActivityImageUrl(driver?.avatar_url, driver?.profile_image_url, driver?.avatar);
   const plate = driverVehiclePlate(driver);
   const name =
     driver?.name?.trim() ||
@@ -486,17 +553,20 @@ function propsFromOrder(
       : order.dropoff?.address?.slice(0, 42) || "Krono";
 
   const movement = progressFromDriverMovement(order, status, driverCoords);
+  const etaLabel = movement.etaLabel || etaLabelFromOrder(order);
+  const progress = progressWithEtaCap(status, movement.progress, etaLabel);
 
   return {
-    etaLabel: movement.etaLabel || "",
+    etaLabel,
     vehicleLabel: name || detail || "Krono",
     vehicleInfoLabel: vehicleInfoLabel(order),
     plateLabel: plate || "KRONO",
     isPending: false,
     statusCode: status,
     statusLabel: movement.arrivedAtStop ? "Arrivé" : liveStatusLabel(status),
-    progress: movement.progress,
+    progress,
     driverAvatarUrl: avatarRaw,
+    driverInitials: driverInitials(driver),
     driverPhone: digitsForTel(driver?.phone),
     bannerClockLabel: formatBannerClock(order),
     vehicleMarkerUrl: bikerMarkerUri(),

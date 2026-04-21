@@ -53,6 +53,8 @@ export type OrderTrackingLiveProps = {
   progress?: number;
   /** URL https ou chemin `file://` pour la photo livreur (bannière). */
   driverAvatarUrl?: string;
+  /** Initiales affichées si iOS ne peut pas charger l'avatar dans l'îlot. */
+  driverInitials?: string;
   /** Chiffres / + pour `tel:` et `sms:` (sans préfixe). */
   driverPhone?: string;
   /** Heure affichée sous « Heure » (ex. création commande, formatée côté app). */

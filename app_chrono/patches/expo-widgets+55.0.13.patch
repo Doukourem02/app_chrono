@@ -156,10 +156,10 @@ index a603765..bda5e15 100644
      }
 diff --git a/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
 new file mode 100644
-index 0000000..83d78c8
+index 0000000..f40afd7
 --- /dev/null
 +++ b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,140 @@
 +import Foundation
 +
 +enum LiveActivityAvatarCache {
@@ -181,19 +181,31 @@ index 0000000..83d78c8
 +  }
 +
 +  static func imageData(from propsJson: String) -> Data? {
-+    guard let root = parseProps(propsJson),
-+          let key = stringField("driverAvatarCacheKey", root) else {
++    guard let root = parseProps(propsJson) else {
 +      return nil
 +    }
-+    return WidgetsStorage.getData(forKey: key)
++    if let key = stringField("driverAvatarCacheKey", root),
++       let data = WidgetsStorage.getData(forKey: key) {
++      return data
++    }
++    if let source = stringField("driverAvatarUrl", root) {
++      return WidgetsStorage.getData(forKey: cacheKey(for: source))
++    }
++    return nil
 +  }
 +
 +  static func markerImageData(from propsJson: String) -> Data? {
-+    guard let root = parseProps(propsJson),
-+          let key = stringField("vehicleMarkerCacheKey", root) else {
++    guard let root = parseProps(propsJson) else {
 +      return nil
 +    }
-+    return WidgetsStorage.getData(forKey: key)
++    if let key = stringField("vehicleMarkerCacheKey", root),
++       let data = WidgetsStorage.getData(forKey: key) {
++      return data
++    }
++    if let source = stringField("vehicleMarkerUrl", root) {
++      return WidgetsStorage.getData(forKey: cacheKey(for: source))
++    }
++    return nil
 +  }
 +
 +  private static func parseProps(_ props: String) -> [String: Any]? {
@@ -408,10 +420,10 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..f7fff32 100644
+index 3e6ff0b..2571533 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,176 @@
+@@ -1,6 +1,181 @@
  import SwiftUI
 +import UIKit
  import WidgetKit
@@ -435,6 +447,10 @@ index 3e6ff0b..f7fff32 100644
 +
 +  private var vehicleLine: String {
 +    p.vehicle ?? "Livraison Krono"
++  }
++
++  private var driverInitials: String {
++    ExpoWidgetsLiveActivityPropsFallback.driverInitials(propsJson)
 +  }
 +
 +  private var normalizedEta: String? {
@@ -534,9 +550,10 @@ index 3e6ff0b..f7fff32 100644
 +      Circle()
 +        .fill(kronoBannerChip)
 +        .frame(width: 38, height: 38)
-+      Image(systemName: "person.crop.circle.fill")
-+        .foregroundStyle(.secondary)
-+        .font(.system(size: 28))
++      Text(driverInitials)
++        .font(.system(size: 15, weight: .bold))
++        .foregroundStyle(kronoBannerAction)
++        .lineLimit(1)
 +    }
 +  }
 +
@@ -588,7 +605,7 @@ index 3e6ff0b..f7fff32 100644
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -8,12 +178,14 @@ struct LiveActivityBanner: View {
+@@ -8,12 +183,14 @@ struct LiveActivityBanner: View {
    var nodes: [String: Any]?
  
    var body: some View {
@@ -606,7 +623,7 @@ index 3e6ff0b..f7fff32 100644
    }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..e4ceea4 100644
+index 1cd5ca9..f166353 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
 @@ -2,6 +2,13 @@ import SwiftUI
@@ -686,7 +703,7 @@ index 1cd5ca9..e4ceea4 100644
    }
    return nil
  }
-@@ -86,6 +125,147 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
+@@ -86,6 +125,165 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
    return env
  }
  
@@ -795,6 +812,24 @@ index 1cd5ca9..e4ceea4 100644
 +    default:
 +      return "Suivi"
 +    }
++  }
++
++  static func driverInitials(_ propsJson: String) -> String {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return "K"
++    }
++    let raw =
++      stringField("driverInitials", root) ??
++      stringField("vehicleLabel", root) ??
++      "Krono"
++    let initials = raw
++      .split(whereSeparator: { $0.isWhitespace })
++      .compactMap { $0.first }
++      .prefix(2)
++      .map { String($0).uppercased() }
++      .joined()
++    return initials.isEmpty ? "K" : initials
 +  }
 +
 +  static func parse(_ propsJson: String) -> (eta: String?, vehicle: String?, status: String?, plate: String?) {
@@ -941,7 +976,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..ccc8a68 100644
+index 9eae718..80b5f9a 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -2,6 +2,9 @@ import SwiftUI
@@ -954,7 +989,7 @@ index 9eae718..ccc8a68 100644
  
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-@@ -12,83 +15,357 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -12,83 +15,363 @@ struct LiveActivityAttributes: ActivityAttributes {
  
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
@@ -1024,6 +1059,10 @@ index 9eae718..ccc8a68 100644
 +
 +  private var vehicleLine: String {
 +    p.vehicle ?? "Livraison Krono"
++  }
++
++  private var driverInitials: String {
++    ExpoWidgetsLiveActivityPropsFallback.driverInitials(propsJson)
 +  }
 +
 +  private var normalizedEta: String? {
@@ -1162,9 +1201,10 @@ index 9eae718..ccc8a68 100644
 +      Circle()
 +        .fill(Color.white.opacity(0.12))
 +        .frame(width: 25, height: 25)
-+      Image(systemName: "person.crop.circle.fill")
-+        .foregroundStyle(.secondary)
-+        .font(.system(size: 19))
++      Text(driverInitials)
++        .font(.system(size: 11, weight: .bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++        .lineLimit(1)
 +    }
 +    .frame(width: 30, height: 30)
 +    .clipShape(Circle())
@@ -1210,9 +1250,10 @@ index 9eae718..ccc8a68 100644
 +      Circle()
 +        .fill(Color.white.opacity(0.12))
 +        .frame(width: 31, height: 31)
-+      Image(systemName: "person.crop.circle.fill")
-+        .foregroundStyle(.secondary)
-+        .font(.system(size: 24))
++      Text(driverInitials)
++        .font(.system(size: 13, weight: .bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++        .lineLimit(1)
 +    }
 +  }
 +

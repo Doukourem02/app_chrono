@@ -1469,7 +1469,10 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 
           // Émettre aussi order:status:update pour garantir la synchronisation du statut
           currentSocket.emit('order:status:update', {
-            order: orderToSend,
+            order: {
+              ...orderToSend,
+              driver: driverInfo,
+            },
             location: null
           });
 
@@ -1485,7 +1488,10 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             });
             // Émettre aussi order:status:update même en cas d'erreur
             currentSocket.emit('order:status:update', {
-              order: orderToSend,
+              order: {
+                ...orderToSend,
+                driver: { id: driverId },
+              },
               location: null
             });
             logger.debug(`order-accepted et order:status:update émis (mode fallback) pour commande ${maskOrderId(orderId)}`);
@@ -1665,11 +1671,53 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         // Cela garantit que le client reçoit la mise à jour même si la commande est complétée
         const userSocketId = connectedUsers.get(order.user.id);
         if (userSocketId) {
+          let driverInfoForClient: any = null;
+          try {
+            const driverInfoResult = await (pool as any).query(
+              `SELECT u.id, u.email, u.phone, u.first_name, u.last_name, u.avatar_url,
+                      dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
+                      dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
+               FROM users u
+               LEFT JOIN driver_profiles dp ON dp.user_id = u.id
+               WHERE u.id = $1`,
+              [driverId]
+            );
+            const driverRow = driverInfoResult?.rows?.[0];
+            if (driverRow) {
+              const avatarUrl = driverRow.avatar_url || driverRow.profile_image_url || null;
+              driverInfoForClient = {
+                id: driverRow.id,
+                email: driverRow.email,
+                phone: driverRow.phone,
+                first_name: driverRow.first_name,
+                last_name: driverRow.last_name,
+                name:
+                  driverRow.first_name && driverRow.last_name
+                    ? `${driverRow.first_name} ${driverRow.last_name}`.trim()
+                    : driverRow.first_name || driverRow.last_name || driverRow.email,
+                avatar: avatarUrl,
+                avatar_url: avatarUrl,
+                profile_image_url: avatarUrl,
+                vehicle_plate: driverRow.vehicle_plate || null,
+                vehicle_type: driverRow.vehicle_type || null,
+                vehicle_brand: driverRow.vehicle_brand || null,
+                vehicle_model: driverRow.vehicle_model || null,
+                vehicle_color: driverRow.vehicle_color || null,
+              };
+            }
+          } catch (driverInfoError: any) {
+            logger.warn(
+              `[DIAGNOSTIC] Enrichissement driver status update ignoré pour ${maskUserId(driverId)}:`,
+              driverInfoError?.message || driverInfoError
+            );
+          }
+
           // S'assurer que le statut est bien défini dans l'objet order avant l'émission
           const orderToEmit = {
             ...order,
             status: status, // Forcer le statut à jour
             completedAt: status === 'completed' ? order.completedAt : order.completedAt,
+            ...(driverInfoForClient ? { driver: driverInfoForClient } : {}),
           };
           
           // Vérifier que le socket est toujours connecté
@@ -2066,11 +2114,17 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             // Enrichir avec les informations driver si nécessaire
             if (dbOrder.driver_id) {
               const driverResult = await (pool as any).query(
-                'SELECT id, email, phone, first_name, last_name, avatar_url FROM users WHERE id = $1',
+                `SELECT u.id, u.email, u.phone, u.first_name, u.last_name, u.avatar_url,
+                        dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
+                        dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
+                 FROM users u
+                 LEFT JOIN driver_profiles dp ON dp.user_id = u.id
+                 WHERE u.id = $1`,
                 [dbOrder.driver_id]
               );
               if (driverResult.rows.length > 0) {
                 const driver = driverResult.rows[0];
+                const avatarUrl = driver.avatar_url || driver.profile_image_url || null;
                 ordersFromDB.set(dbOrder.id, {
                   ...dbOrder,
                   driver: {
@@ -2080,7 +2134,16 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                     name: driver.first_name && driver.last_name 
                       ? `${driver.first_name} ${driver.last_name}` 
                       : driver.email,
-                    avatar: driver.avatar_url,
+                    first_name: driver.first_name,
+                    last_name: driver.last_name,
+                    avatar: avatarUrl,
+                    avatar_url: avatarUrl,
+                    profile_image_url: avatarUrl,
+                    vehicle_plate: driver.vehicle_plate || null,
+                    vehicle_type: driver.vehicle_type || null,
+                    vehicle_brand: driver.vehicle_brand || null,
+                    vehicle_model: driver.vehicle_model || null,
+                    vehicle_color: driver.vehicle_color || null,
                   },
                   driverId: dbOrder.driver_id,
                   status: dbOrder.status,

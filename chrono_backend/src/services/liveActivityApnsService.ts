@@ -45,6 +45,7 @@ type OrderTrackingLiveProps = {
   statusLabel?: string;
   progress?: number;
   driverAvatarUrl?: string;
+  driverInitials?: string;
   driverPhone?: string;
   bannerClockLabel?: string;
   vehicleMarkerUrl?: string;
@@ -150,6 +151,40 @@ function progressFromStatus(status: string): number {
   }
 }
 
+function etaMinutesFromLabel(label: string | undefined): number | null {
+  const raw = (label || '').trim();
+  if (!raw || raw === '—' || raw === '-' || raw === '–') return null;
+  const match = raw.match(/(\d+(?:[.,]\d+)?)/);
+  if (!match) return null;
+  const minutes = Number(match[1].replace(',', '.'));
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+}
+
+function etaProgressCap(status: string, eta: string | undefined): number | null {
+  const minutes = etaMinutesFromLabel(eta);
+  if (minutes == null) return null;
+
+  let cap = 0.96;
+  if (minutes >= 10) cap = 0.58;
+  else if (minutes >= 7) cap = 0.66;
+  else if (minutes >= 5) cap = 0.74;
+  else if (minutes >= 3) cap = 0.82;
+  else if (minutes >= 2) cap = 0.9;
+
+  const normalized = normalizeStatus(status);
+  if (normalized === 'accepted' || normalized === 'enroute' || normalized === 'in_progress') {
+    return Math.min(cap, 0.54);
+  }
+  return cap;
+}
+
+function progressWithEtaCap(status: string, progress: number, eta: string | undefined): number {
+  if (normalizeStatus(status) === 'completed') return 1;
+  const cap = etaProgressCap(status, eta);
+  const normalized = Math.min(1, Math.max(0, Number(progress) || 0));
+  return cap == null ? normalized : Math.min(normalized, cap);
+}
+
 function statusLabel(status: string): string {
   switch (normalizeStatus(status)) {
     case 'pending':
@@ -205,6 +240,21 @@ function driverName(row: OrderLiveActivityRow): string {
   return [row.driver_first_name, row.driver_last_name].filter(Boolean).join(' ').trim();
 }
 
+function driverInitials(row: OrderLiveActivityRow | null, fallbackName: string | undefined): string {
+  const source =
+    [row?.driver_first_name, row?.driver_last_name].filter(Boolean).join(' ').trim() ||
+    fallbackName?.trim() ||
+    'Krono';
+  const initials = source
+    .split(/\s+/)
+    .map((part) => part.trim()[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return initials || 'K';
+}
+
 function vehicleInfoLabel(row: OrderLiveActivityRow): string {
   const model = [row.driver_vehicle_brand, row.driver_vehicle_model].filter(Boolean).join(' ').trim();
   return [
@@ -221,6 +271,16 @@ function digitsForTel(phone: string | null): string {
   return phone.replace(/[^\d+]/g, '');
 }
 
+function liveActivityImageUrl(...values: Array<string | null | undefined>): string {
+  for (const value of values) {
+    const url = value?.trim();
+    if (!url) continue;
+    if (/^(https?:\/\/|file:\/\/|data:image\/)/i.test(url)) return url;
+    if (url.startsWith('//')) return `https:${url}`;
+  }
+  return '';
+}
+
 function mergeProps(
   base: Record<string, unknown> | null,
   row: OrderLiveActivityRow | null,
@@ -231,21 +291,24 @@ function mergeProps(
   const driver = row ? driverName(row) : '';
   const info = row ? vehicleInfoLabel(row) : '';
   const fallback = (base || {}) as Partial<OrderTrackingLiveProps>;
+  const eta = row ? etaLabel(row, statusCode) : fallback.etaLabel || (pending ? '—' : '');
+  const baseProgress = Math.max(progressFromStatus(statusCode), Number(fallback.progress || 0) || 0);
 
   return {
-    etaLabel: row ? etaLabel(row, statusCode) : fallback.etaLabel || (pending ? '—' : ''),
+    etaLabel: eta,
     vehicleLabel: pending ? 'Recherche livreur' : driver || fallback.vehicleLabel || 'Krono',
     vehicleInfoLabel: pending ? fallback.vehicleInfoLabel || 'Recherche livreur' : info || fallback.vehicleInfoLabel || 'Livraison Krono',
     plateLabel: row?.driver_vehicle_plate?.trim() || fallback.plateLabel || 'KRONO',
     isPending: pending,
     statusCode,
     statusLabel: statusLabel(statusCode),
-    progress: Math.max(progressFromStatus(statusCode), Number(fallback.progress || 0) || 0),
-    driverAvatarUrl:
-      row?.driver_avatar_url?.trim() ||
-      row?.driver_profile_image_url?.trim() ||
-      fallback.driverAvatarUrl ||
-      '',
+    progress: progressWithEtaCap(statusCode, baseProgress, eta),
+    driverAvatarUrl: liveActivityImageUrl(
+      row?.driver_avatar_url,
+      row?.driver_profile_image_url,
+      fallback.driverAvatarUrl,
+    ),
+    driverInitials: driverInitials(row, fallback.vehicleLabel),
     driverPhone: row ? digitsForTel(row.driver_phone) : fallback.driverPhone || '',
     bannerClockLabel: row ? clockLabel(row.created_at) : fallback.bannerClockLabel || '—',
     vehicleMarkerUrl: fallback.vehicleMarkerUrl || '',
