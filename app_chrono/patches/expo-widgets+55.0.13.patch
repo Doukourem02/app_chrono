@@ -380,10 +380,10 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..fbfe7e4 100644
+index 3e6ff0b..6c085f6 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,179 @@
+@@ -1,6 +1,178 @@
  import SwiftUI
 +import UIKit
  import WidgetKit
@@ -459,7 +459,6 @@ index 3e6ff0b..fbfe7e4 100644
 +        }
 +        avatarView
 +      }
-+      .padding(.leading, 18)
 +
 +      progressTrack
 +    }
@@ -563,7 +562,7 @@ index 3e6ff0b..fbfe7e4 100644
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -8,12 +181,14 @@ struct LiveActivityBanner: View {
+@@ -8,12 +180,14 @@ struct LiveActivityBanner: View {
    var nodes: [String: Any]?
  
    var body: some View {
@@ -916,7 +915,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..91eeec2 100644
+index 9eae718..21fe9e1 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -2,6 +2,9 @@ import SwiftUI
@@ -929,7 +928,7 @@ index 9eae718..91eeec2 100644
  
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-@@ -12,83 +15,330 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -12,83 +15,329 @@ struct LiveActivityAttributes: ActivityAttributes {
  
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
@@ -1046,11 +1045,11 @@ index 9eae718..91eeec2 100644
 +        .minimumScaleFactor(0.72)
 +    case "compactTrailing":
 +      if ExpoWidgetsLiveActivityPropsFallback.shouldShowArrivedCompactVisual(propsJson) {
-+        HStack(spacing: 3) {
-+          Image(systemName: "hand.raised.fill")
-+            .font(.system(size: 14, weight: .semibold))
++        HStack(spacing: 4) {
++          Image(systemName: "hand.wave.fill")
++            .font(.system(size: 18, weight: .semibold))
 +            .foregroundStyle(.white)
-+          compactAvatarView
++          avatarView
 +        }
 +      } else {
 +        Text(ExpoWidgetsLiveActivityPropsFallback.compactTrailingLine(propsJson))
@@ -1183,7 +1182,6 @@ index 9eae718..91eeec2 100644
 +        }
 +        avatarView
 +      }
-+      .padding(.leading, 18)
 +
 +      ZStack(alignment: .leading) {
 +        let trackWidth = CGFloat(250)

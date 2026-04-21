@@ -179,11 +179,12 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
     </ZStack>
   );
   const compactDriverAvatar = avatarUrl ? (
-    <Image uiImage={avatarUrl} modifiers={[frame({ width: 24, height: 24 })]} />
+    <Image uiImage={avatarUrl} modifiers={[frame({ width: 36, height: 36 })]} />
   ) : (
-    <ZStack modifiers={[frame({ width: 24, height: 24 })]}>
-      <Circle modifiers={[frame({ width: 24, height: 24 }), foregroundStyle("#FFFFFF")]} />
-      <Image systemName="person.crop.circle.fill" color="#8E8E93" size={20} />
+    <ZStack modifiers={[frame({ width: 36, height: 36 })]}>
+      <Circle modifiers={[frame({ width: 36, height: 36 }), foregroundStyle("#FFFFFF")]} />
+      <Circle modifiers={[frame({ width: 31, height: 31 }), foregroundStyle(ON_DARK.bannerChip)]} />
+      <Image systemName="person.crop.circle.fill" color="#8E8E93" size={24} />
     </ZStack>
   );
 
@@ -193,8 +194,8 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
     </Text>
   );
   const compactTrailing = compactArrivedVisual ? (
-    <HStack spacing={3}>
-      <Image systemName="hand.raised.fill" color={ON_DARK.title} size={14} />
+    <HStack spacing={4}>
+      <Image systemName="hand.wave.fill" color={ON_DARK.title} size={18} />
       {compactDriverAvatar}
     </HStack>
   ) : (
@@ -215,7 +216,6 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const bannerDestinationOffset = Math.max(0, bannerTrackWidth - 14);
   const etaSize = simplified ? 22 : 26;
   const infoSize = simplified ? 12 : 13;
-  const headerGroupOffsetX = simplified ? 12 : 18;
   const expandedLeading = <Spacer minLength={0} />;
   const expandedTrailing = <Spacer minLength={0} />;
 
@@ -224,7 +224,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
       <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.brand), frame({ maxWidth: bannerTrackWidth, alignment: "leading" })]}>
         KRONO
       </Text>
-      <HStack spacing={10} modifiers={[offset({ x: headerGroupOffsetX })]}>
+      <HStack spacing={10}>
         <VStack spacing={3} modifiers={[frame({ maxWidth: 230, alignment: "leading" })]}>
           <Text modifiers={[font({ weight: "bold", size: 18 }), foregroundStyle(ON_DARK.title)]}>{headline}</Text>
           <Text modifiers={[font({ weight: "medium", size: 12 }), foregroundStyle(ON_DARK.accent), frame({ alignment: "leading" })]}>
@@ -262,7 +262,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
       <Text modifiers={[font({ weight: "bold", size: simplified ? 13 : 14 }), foregroundStyle(ON_DARK.brand), frame({ maxWidth: trackWidth, alignment: "leading" })]}>
         KRONO
       </Text>
-      <HStack spacing={10} modifiers={[offset({ x: headerGroupOffsetX })]}>
+      <HStack spacing={10}>
         <VStack spacing={3} modifiers={[frame({ maxWidth: 230, alignment: "leading" })]}>
           <Text modifiers={[font({ weight: "bold", size: etaSize }), foregroundStyle(ON_DARK.title)]}>{headline}</Text>
           <Text modifiers={[font({ weight: "medium", size: infoSize }), foregroundStyle(ON_DARK.accent), frame({ alignment: "leading" })]}>

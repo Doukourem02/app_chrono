@@ -3,8 +3,9 @@ index 0d1e365..5d5a4c2 100644
 --- a/node_modules/@rnmapbox/maps/android/build.gradle
 +++ b/node_modules/@rnmapbox/maps/android/build.gradle
 @@ -307,7 +307,8 @@ dependencies {
-            // See: https://github.com/rnmapbox/maps/issues/3896
-            // Mapbox Docs: https://docs.mapbox.com/android/maps/guides/#ndk-27
+             // Required by Google Play for apps targeting Android 15+ by November 1, 2025
+             // See: https://github.com/rnmapbox/maps/issues/3896
+             // Mapbox Docs: https://docs.mapbox.com/android/maps/guides/#ndk-27
 -            if (targetSdk >= 35) {
 +            // Krono: Mapbox 10.19.x n’a pas d’artefact android-ndk27 publié → EAS Gradle échoue. Forcer android:.*
 +            if (false) {
