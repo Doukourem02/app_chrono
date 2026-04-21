@@ -47,6 +47,17 @@ function isFinalOrderStatus(status: unknown): boolean {
   return status === 'completed' || status === 'cancelled' || status === 'declined';
 }
 
+function normalizeSocketLocation(value: unknown): { latitude: number; longitude: number } | null {
+  const record = value as Record<string, unknown> | null | undefined;
+  if (!record) return null;
+  const rawLat = record.latitude ?? record.lat;
+  const rawLng = record.longitude ?? record.lng;
+  const latitude = typeof rawLat === 'number' ? rawLat : Number(rawLat);
+  const longitude = typeof rawLng === 'number' ? rawLng : Number(rawLng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
+}
+
 class UserOrderSocketService {
   private socket: Socket | null = null;
   private userId: string | null = null;
@@ -724,10 +735,11 @@ class UserOrderSocketService {
         socketConnected: this.socket?.connected,
       });
       try {
-        const { order } = data || {};
+        const { order, location } = data || {};
         if (order && order.id) {
           const store = useOrderStore.getState();
           const existingOrder = store.activeOrders.find(o => o.id === order.id);
+          const statusLocation = normalizeSocketLocation(location);
           
           logger.info('📦 [order:status:update] État AVANT updateFromSocket', 'userOrderSocketService', {
             orderId: order.id,
@@ -735,23 +747,31 @@ class UserOrderSocketService {
             existingStatus: existingOrder?.status,
             existsInStore: !!existingOrder,
             activeOrdersCount: store.activeOrders.length,
+            hasStatusLocation: !!statusLocation,
           });
           
           // CRITIQUE : Toujours utiliser updateFromSocket pour garantir la synchronisation
-          store.updateFromSocket({ order: order as any });
-          if (isFinalOrderStatus(order.status)) {
-            void syncOrderLiveActivity(null, { immediateEnd: true });
-          }
-          
+          store.updateFromSocket({ order: order as any, location: statusLocation });
+
           // Vérifier que la mise à jour a bien eu lieu
           const updatedStore = useOrderStore.getState();
           const updatedOrder = updatedStore.activeOrders.find(o => o.id === order.id);
+          if (isFinalOrderStatus(order.status)) {
+            // Finir l'activité avec les dernières props connues, dont l'avatar conservé/enrichi du livreur.
+            void syncOrderLiveActivity(updatedOrder ?? (order as any), {
+              driverCoords: statusLocation,
+              immediateEnd: true,
+            });
+          } else if (updatedOrder && statusLocation) {
+            void syncOrderLiveActivity(updatedOrder, { driverCoords: statusLocation });
+          }
           
           logger.info('✅ [order:status:update] État APRÈS updateFromSocket', 'userOrderSocketService', {
             orderId: order.id,
             expectedStatus: order.status,
             actualStatus: updatedOrder?.status,
             stillInStore: !!updatedOrder,
+            liveActivityEtaSource: statusLocation ? 'status-location' : 'store-location',
             shouldBeRemoved: order.status === 'completed' || order.status === 'cancelled' || order.status === 'declined',
             activeOrdersCount: updatedStore.activeOrders.length,
           });
@@ -765,16 +785,11 @@ class UserOrderSocketService {
 
     this.socket.on('driver:location:update', (data) => {
       try {
-        const { orderId, latitude, longitude } = data || {};
-        if (
-          orderId &&
-          typeof latitude === 'number' &&
-          typeof longitude === 'number' &&
-          Number.isFinite(latitude) &&
-          Number.isFinite(longitude)
-        ) {
+        const { orderId } = data || {};
+        const location = normalizeSocketLocation(data);
+        if (orderId && location) {
           const store = useOrderStore.getState();
-          store.setDriverCoordsForOrder(orderId, { latitude, longitude });
+          store.setDriverCoordsForOrder(orderId, location);
         }
       } catch (err) {
         logger.warn('Error handling driver:location:update', 'userOrderSocketService', err);

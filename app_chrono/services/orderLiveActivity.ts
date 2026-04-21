@@ -758,8 +758,11 @@ async function markBackendLiveActivityEnded(orderId: string | null | undefined):
 }
 
 /** Termine toutes les Live Activities de ce type. */
-async function endAllLiveActivities(): Promise<void> {
-  const previousOrderId = active?.orderId ?? null;
+async function endAllLiveActivities(
+  finalProps: OrderTrackingLiveProps = END_PROPS,
+  orderIdOverride?: string | null,
+): Promise<void> {
+  const previousOrderId = orderIdOverride ?? active?.orderId ?? null;
   active?.pushTokenSub?.remove();
   active = null;
   lastLiveActivityUpdate = null;
@@ -767,7 +770,7 @@ async function endAllLiveActivities(): Promise<void> {
     const f = getFactory();
     for (const live of f.getInstances()) {
       try {
-        await live.end("immediate", END_PROPS, new Date());
+        await live.end("immediate", finalProps, new Date());
       } catch {
         /* ignore */
       }
@@ -817,7 +820,10 @@ async function syncOrderLiveActivityImpl(
     if (order?.id) phaseProgressByOrder.delete(order.id);
     if (options.immediateEnd) {
       clearScheduledEnd();
-      await endAllLiveActivities();
+      await endAllLiveActivities(
+        order ? propsFromOrder(order, options.driverCoords) : END_PROPS,
+        order?.id,
+      );
       return;
     }
     scheduleDebouncedEnd();
