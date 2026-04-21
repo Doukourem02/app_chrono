@@ -380,10 +380,10 @@ index 947fc2e..c7ebb7e 100644
 +  }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-index 3e6ff0b..a68e3fd 100644
+index 3e6ff0b..6c085f6 100644
 --- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
-@@ -1,6 +1,179 @@
+@@ -1,6 +1,178 @@
  import SwiftUI
 +import UIKit
  import WidgetKit
@@ -457,7 +457,6 @@ index 3e6ff0b..a68e3fd 100644
 +            .lineLimit(1)
 +            .minimumScaleFactor(0.78)
 +        }
-+        Spacer(minLength: 0)
 +        avatarView
 +      }
 +
@@ -563,7 +562,7 @@ index 3e6ff0b..a68e3fd 100644
  @available(iOS 18.0, *)
  struct LiveActivityBanner: View {
    @Environment(\.activityFamily) var activityFamily
-@@ -8,12 +181,14 @@ struct LiveActivityBanner: View {
+@@ -8,12 +180,14 @@ struct LiveActivityBanner: View {
    var nodes: [String: Any]?
 
    var body: some View {
@@ -581,7 +580,7 @@ index 3e6ff0b..a68e3fd 100644
    }
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
-index 1cd5ca9..ca5e0c6 100644
+index 1cd5ca9..e4ceea4 100644
 --- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
 @@ -2,6 +2,13 @@ import SwiftUI
@@ -661,7 +660,7 @@ index 1cd5ca9..ca5e0c6 100644
    }
    return nil
  }
-@@ -86,6 +125,107 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
+@@ -86,6 +125,147 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
    return env
  }
 
@@ -700,17 +699,57 @@ index 1cd5ca9..ca5e0c6 100644
 +    return nil
 +  }
 +
-+  /// Aligné sur `orderTrackingLiveActivity.tsx` : le temps restant prime toujours sur l'état.
++  private static func normalizedStatusText(_ value: String?) -> String {
++    (value ?? "")
++      .trimmingCharacters(in: .whitespacesAndNewlines)
++      .folding(options: .diacriticInsensitive, locale: nil)
++      .lowercased()
++  }
++
++  private static func compactFallbackLine(_ statusCode: String?) -> String {
++    switch normalizedStatusText(statusCode) {
++    case "accepted", "enroute":
++      return "En route"
++    case "in_progress":
++      return "Arrivé"
++    case "picked_up", "delivering":
++      return "En route"
++    case "completed":
++      return "Terminé"
++    case "cancelled":
++      return "Annulé"
++    case "declined":
++      return "Refusé"
++    default:
++      return "Suivi"
++    }
++  }
++
++  static func shouldShowArrivedCompactVisual(_ propsJson: String) -> Bool {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return false
++    }
++    let statusCode = normalizedStatusText(stringField("statusCode", root))
++    if ["in_progress", "arrived", "at_pickup", "at_dropoff"].contains(statusCode) {
++      return true
++    }
++
++    let statusLabel = normalizedStatusText(stringField("statusLabel", root))
++    return statusLabel.contains("arriv")
++  }
++
++  /// Aligné sur `orderTrackingLiveActivity.tsx` : recherche -> texte, route -> ETA, arrivé -> visuel dédié.
 +  static func compactTrailingLine(_ propsJson: String) -> String {
 +    guard let data = propsJson.data(using: .utf8),
 +          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
 +      return "—"
 +    }
 +    let pending = root["isPending"] as? Bool == true
-+    if pending { return "Recherche" }
++    if pending { return "Recherche livreurs" }
++    if shouldShowArrivedCompactVisual(propsJson) { return "Arrivé" }
 +    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
-+    if let status = stringField("statusLabel", root) { return status }
-+    return "Suivi"
++    return compactFallbackLine(stringField("statusCode", root))
 +  }
 +
 +  static func minimalLine(_ propsJson: String) -> String {
@@ -876,7 +915,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..1e3c293 100644
+index 9eae718..59da29d 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -2,6 +2,9 @@ import SwiftUI
@@ -889,7 +928,7 @@ index 9eae718..1e3c293 100644
 
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-@@ -12,83 +15,276 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -12,83 +15,329 @@ struct LiveActivityAttributes: ActivityAttributes {
 
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
@@ -999,15 +1038,26 @@ index 9eae718..1e3c293 100644
 +        .lineLimit(1)
 +        .minimumScaleFactor(0.62)
 +    case "compactLeading":
-+      Image(systemName: "car.fill")
-+        .foregroundStyle(kronoLiveActivityAccent)
-+        .imageScale(.medium)
-+    case "compactTrailing":
-+      Text(ExpoWidgetsLiveActivityPropsFallback.compactTrailingLine(propsJson))
-+        .font(.caption.weight(.semibold))
++      Text("KRONO")
++        .font(.caption.weight(.bold))
 +        .foregroundStyle(kronoLiveActivityAccent)
 +        .lineLimit(1)
-+        .minimumScaleFactor(0.75)
++        .minimumScaleFactor(0.72)
++    case "compactTrailing":
++      if ExpoWidgetsLiveActivityPropsFallback.shouldShowArrivedCompactVisual(propsJson) {
++        HStack(spacing: 3) {
++          Image(systemName: "hand.raised.fill")
++            .font(.system(size: 14, weight: .semibold))
++            .foregroundStyle(.white)
++          compactAvatarView
++        }
++      } else {
++        Text(ExpoWidgetsLiveActivityPropsFallback.compactTrailingLine(propsJson))
++          .font(.caption.weight(.semibold))
++          .foregroundStyle(kronoLiveActivityAccent)
++          .lineLimit(1)
++          .minimumScaleFactor(0.75)
++      }
 +    case "expandedCenter":
 +      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
 +    case "expandedLeading":
@@ -1017,8 +1067,51 @@ index 9eae718..1e3c293 100644
 +    case "expandedBottom":
 +      expandedTrackingBottom
 +    default:
-+      Image(systemName: "car.fill")
++      Text("KRONO")
++        .font(.caption.weight(.bold))
 +        .foregroundStyle(kronoLiveActivityAccent)
++    }
++  }
++
++  @ViewBuilder
++  private var compactAvatarView: some View {
++    ZStack {
++      if let data = LiveActivityAvatarCache.imageData(from: propsJson), let uiImage = UIImage(data: data) {
++        Image(uiImage: uiImage)
++          .resizable()
++          .scaledToFill()
++          .frame(width: 24, height: 24)
++          .clipShape(Circle())
++      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
++        AsyncImage(url: url) { phase in
++          switch phase {
++          case .success(let image):
++            image
++              .resizable()
++              .scaledToFill()
++              .frame(width: 24, height: 24)
++              .clipShape(Circle())
++          case .failure:
++            compactFallbackAvatar
++          default:
++            compactFallbackAvatar
++          }
++        }
++      } else {
++        compactFallbackAvatar
++      }
++    }
++    .frame(width: 24, height: 24)
++  }
++
++  private var compactFallbackAvatar: some View {
++    ZStack {
++      Circle()
++        .fill(.white)
++        .frame(width: 24, height: 24)
++      Image(systemName: "person.crop.circle.fill")
++        .foregroundStyle(.secondary)
++        .font(.system(size: 20))
 +    }
 +  }
 +
@@ -1087,7 +1180,6 @@ index 9eae718..1e3c293 100644
 +            .lineLimit(1)
 +            .minimumScaleFactor(0.76)
 +        }
-+        Spacer(minLength: 0)
 +        avatarView
 +      }
 +
