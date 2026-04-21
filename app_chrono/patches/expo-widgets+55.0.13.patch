@@ -976,7 +976,7 @@ index 68ff52a..6cd2258 100644
    return context
  }
 diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
-index 9eae718..80b5f9a 100644
+index 9eae718..9db3b9f 100644
 --- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 +++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
 @@ -2,6 +2,9 @@ import SwiftUI
@@ -989,7 +989,7 @@ index 9eae718..80b5f9a 100644
  
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-@@ -12,83 +15,363 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -12,83 +15,339 @@ struct LiveActivityAttributes: ActivityAttributes {
  
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
@@ -1162,32 +1162,8 @@ index 9eae718..80b5f9a 100644
 +
 +  @ViewBuilder
 +  private var compactAvatarView: some View {
-+    ZStack {
-+      if let data = LiveActivityAvatarCache.imageData(from: propsJson), let uiImage = UIImage(data: data) {
-+        Image(uiImage: uiImage)
-+          .resizable()
-+          .scaledToFill()
-+          .frame(width: 30, height: 30)
-+          .clipShape(Circle())
-+      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
-+        AsyncImage(url: url) { phase in
-+          switch phase {
-+          case .success(let image):
-+            image
-+              .resizable()
-+              .scaledToFill()
-+              .frame(width: 30, height: 30)
-+              .clipShape(Circle())
-+          case .failure:
-+            compactFallbackAvatar
-+          default:
-+            compactFallbackAvatar
-+          }
-+        }
-+      } else {
-+        compactFallbackAvatar
-+      }
-+    }
++    avatarView
++      .scaleEffect(30 / 36)
 +    .frame(width: 30, height: 30)
 +    .clipShape(Circle())
 +    .fixedSize(horizontal: true, vertical: true)

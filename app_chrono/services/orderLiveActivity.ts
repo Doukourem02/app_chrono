@@ -141,7 +141,18 @@ function etaMinutesFromLabel(label: string | undefined): number | null {
   return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
 }
 
-function etaLabelFromOrder(order: OrderRequest): string {
+function etaLabelFromOrder(order: OrderRequest, status: OrderStatus): string {
+  if (
+    status === "in_progress" ||
+    status === "picked_up" ||
+    status === "delivering" ||
+    status === "completed" ||
+    status === "cancelled" ||
+    status === "declined"
+  ) {
+    return "";
+  }
+
   const rawEta = (order as unknown as { eta_minutes?: unknown; etaMinutes?: unknown }).eta_minutes ??
     (order as unknown as { eta_minutes?: unknown; etaMinutes?: unknown }).etaMinutes;
   if (typeof rawEta === "number" && Number.isFinite(rawEta) && rawEta > 0) {
@@ -553,7 +564,7 @@ function propsFromOrder(
       : order.dropoff?.address?.slice(0, 42) || "Krono";
 
   const movement = progressFromDriverMovement(order, status, driverCoords);
-  const etaLabel = movement.etaLabel || etaLabelFromOrder(order);
+  const etaLabel = movement.etaLabel || etaLabelFromOrder(order, status);
   const progress = progressWithEtaCap(status, movement.progress, etaLabel);
 
   return {

@@ -43,6 +43,10 @@ function readRecordString(source: unknown, keys: string[]): string | undefined {
   return undefined;
 }
 
+function isFinalOrderStatus(status: unknown): boolean {
+  return status === 'completed' || status === 'cancelled' || status === 'declined';
+}
+
 class UserOrderSocketService {
   private socket: Socket | null = null;
   private userId: string | null = null;
@@ -363,6 +367,7 @@ class UserOrderSocketService {
       if (data?.orderId) {
         useOrderStore.getState().updateOrderStatus(data.orderId, 'cancelled');
       }
+      void syncOrderLiveActivity(null, { immediateEnd: true });
     } catch (err) {
       logger.warn('Error handling order cancelled event', 'userOrderSocketService', err);
     }
@@ -433,6 +438,7 @@ class UserOrderSocketService {
           // Fallback si aucun orderId n'est fourni
           useOrderStore.getState().clear();
         }
+        void syncOrderLiveActivity(null, { immediateEnd: true });
 
         // Afficher une alerte à l'utilisateur
         UserFriendlyError.showInfo(
@@ -733,6 +739,9 @@ class UserOrderSocketService {
           
           // CRITIQUE : Toujours utiliser updateFromSocket pour garantir la synchronisation
           store.updateFromSocket({ order: order as any });
+          if (isFinalOrderStatus(order.status)) {
+            void syncOrderLiveActivity(null, { immediateEnd: true });
+          }
           
           // Vérifier que la mise à jour a bien eu lieu
           const updatedStore = useOrderStore.getState();

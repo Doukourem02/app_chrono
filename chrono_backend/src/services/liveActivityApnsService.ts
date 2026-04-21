@@ -219,7 +219,18 @@ function vehicleTypeLabel(value: string | null | undefined): string {
 }
 
 function etaLabel(row: OrderLiveActivityRow, status: string): string {
-  if (normalizeStatus(status) === 'pending') return '—';
+  const normalized = normalizeStatus(status);
+  if (normalized === 'pending') return '—';
+  if (
+    normalized === 'in_progress' ||
+    normalized === 'picked_up' ||
+    normalized === 'delivering' ||
+    normalized === 'completed' ||
+    normalized === 'cancelled' ||
+    normalized === 'declined'
+  ) {
+    return '';
+  }
   if (typeof row.eta_minutes === 'number' && Number.isFinite(row.eta_minutes) && row.eta_minutes > 0) {
     return `${Math.max(1, Math.round(row.eta_minutes))} min`;
   }
@@ -291,7 +302,14 @@ function mergeProps(
   const driver = row ? driverName(row) : '';
   const info = row ? vehicleInfoLabel(row) : '';
   const fallback = (base || {}) as Partial<OrderTrackingLiveProps>;
-  const eta = row ? etaLabel(row, statusCode) : fallback.etaLabel || (pending ? '—' : '');
+  const eta =
+    row
+      ? etaLabel(row, statusCode)
+      : statusCode === 'accepted' || statusCode === 'enroute'
+        ? fallback.etaLabel || ''
+        : pending
+          ? '—'
+          : '';
   const baseProgress = Math.max(progressFromStatus(statusCode), Number(fallback.progress || 0) || 0);
 
   return {

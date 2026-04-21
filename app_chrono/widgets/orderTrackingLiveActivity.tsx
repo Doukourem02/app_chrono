@@ -1,5 +1,5 @@
 import { Circle, HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
-import { clipShape, fixedSize, font, foregroundStyle, frame, offset, padding } from "@expo/ui/swift-ui/modifiers";
+import { clipShape, fixedSize, font, foregroundStyle, frame, offset, padding, scaleEffect } from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
 
@@ -178,13 +178,10 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
     </ZStack>
   );
   const compactDriverAvatar = (
-    <ZStack modifiers={[frame({ width: 30, height: 30 }), fixedSize({ horizontal: true, vertical: true })]}>
-      <Circle modifiers={[frame({ width: 30, height: 30 }), foregroundStyle("#FFFFFF")]} />
-      <Circle modifiers={[frame({ width: 25, height: 25 }), foregroundStyle(ON_DARK.bannerChip)]} />
-      <Image systemName="person.crop.circle.fill" color="#8E8E93" size={19} />
-      {avatarUrl ? (
-        <Image uiImage={avatarUrl} modifiers={[frame({ width: 30, height: 30 }), clipShape("circle")]} />
-      ) : null}
+    <ZStack modifiers={[frame({ width: 30, height: 30 }), clipShape("circle"), fixedSize({ horizontal: true, vertical: true })]}>
+      <ZStack modifiers={[frame({ width: 44, height: 44 }), scaleEffect(30 / 44)]}>
+        {driverAvatar}
+      </ZStack>
     </ZStack>
   );
 
