@@ -1,0 +1,1478 @@
+diff --git a/node_modules/expo-widgets/bundle/build/ExpoWidgets.bundle b/node_modules/expo-widgets/bundle/build/ExpoWidgets.bundle
+new file mode 100644
+index 0000000..70a6aea
+--- /dev/null
++++ b/node_modules/expo-widgets/bundle/build/ExpoWidgets.bundle
+@@ -0,0 +1,93 @@
++var __BUNDLE_START_TIME__=globalThis.nativePerformanceNow?nativePerformanceNow():Date.now(),__DEV__=false,process=globalThis.process||{},__METRO_GLOBAL_PREFIX__='';process.env=process.env||{};process.env.NODE_ENV=process.env.NODE_ENV||"production";
++!(function(e){'use strict';e[`${__METRO_GLOBAL_PREFIX__}__d`]||(e.__r=i,e[`${__METRO_GLOBAL_PREFIX__}__d`]=function(e,n,o){if(r.has(n))return;var i={dependencyMap:o,factory:e,hasError:!1,importedAll:t,importedDefault:t,isInitialized:!1,publicModule:{exports:{}}};r.set(n,i)},e.__c=o,e.__registerSegment=function(e,t,n){f[e]=t,n&&n.forEach(t=>{r.has(t)||c.has(t)||c.set(t,e)})});var r=o(),t={},n={}.hasOwnProperty;function o(){return r=new Map}function i(e,t){if(null===e)throw new Error('Cannot find module');var n=r.get(e);return n&&n.isInitialized?n.publicModule.exports:d(e,n,t)}function l(e,n){var o;if(r.has(e)&&(null==(o=r.get(e))?void 0:o.importedDefault)!==t)return r.get(e).importedDefault;var l=i(e,n),u=l&&l.__esModule?l.default:l;return r.get(e).importedDefault=u}function u(e,o){var l;if(r.has(e)&&(null==(l=r.get(e))?void 0:l.importedAll)!==t)return r.get(e).importedAll;var u,a=i(e,o);if(a&&a.__esModule)u=a;else{if(u={},a)for(var d in a)n.call(a,d)&&(u[d]=a[d]);u.default=a}return r.get(e).importedAll=u}i.importDefault=l,i[Symbol.for('expo.require')]=!0,i.importAll=u,i.context=function(){throw new Error('The experimental Metro feature `require.context` is not enabled in your project.')},i.resolveWeak=function(){throw new Error('require.resolveWeak cannot be called dynamically.')},i.unguarded=function(e,t){var n=r.get(e);return n&&n.isInitialized?n.publicModule.exports:p(e,n,t)};var a=!1;function d(r,t,n){if(!a&&e.ErrorUtils){var o;a=!0;try{o=p(r,t,n)}catch(r){e.ErrorUtils.reportFatalError(r)}return a=!1,o}return p(r,t,n)}i.unpackModuleId=function(e){if('number'!=typeof e)throw new Error('Module ID must be a number in unpackModuleId.');return{segmentId:e>>>16,localId:65535&e}},i.packModuleId=function(e){return(e.segmentId<<16)+e.localId};var f=[],c=new Map;function p(t,n,o){if(!n&&f.length>0){var a=c.get(t)??0,d=f[a];null!=d&&(d(t),n=r.get(t),c.delete(t))}if(!n)throw s(t,o);if(n.hasError)throw n.error;n.isInitialized=!0;var p=n,_=p.factory,h=p.dependencyMap;try{var m=n.publicModule;return m.id=t,null==_||_(e,i,l,u,m,m.exports,h),n.factory=void 0,n.dependencyMap=void 0,m.exports}catch(e){throw n.hasError=!0,n.error=e,n.isInitialized=!1,n.publicModule.exports=void 0,e}}function s(e,r){return Error('Requiring unknown module "'+(e??r??"[unknown optional import]")+'".')}})('undefined'!=typeof globalThis?globalThis:'undefined'!=typeof global?global:'undefined'!=typeof window?window:this);
++!(function(e){try{e.$$require_external="undefined"==typeof expo?require:e=>{throw new Error(`Node.js standard library module ${e} is not available in this JavaScript environment`)}}catch{e.$$require_external=e=>{throw new Error(`Node.js standard library module ${e} is not available in this JavaScript environment`)}}})('undefined'!=typeof globalThis?globalThis:'undefined'!=typeof global?global:'undefined'!=typeof window?window:this);
++'undefined'!=typeof globalThis?globalThis:'undefined'!=typeof global?global:'undefined'!=typeof window&&window;
++!(function(e){
++/**
++   * @license
++   * web-streams-polyfill v4.1.0
++   * Copyright 2024 Mattias Buelens, Diwank Singh Tomer and other contributors.
++   * This code is released under the MIT license.
++   * SPDX-License-Identifier: MIT
++   */
++function r(e,r){if(!(e instanceof r))throw new TypeError("Cannot call a class as a function")}function t(e,r){for(var t=0;t<r.length;t++){var o=r[t];o.enumerable=o.enumerable||!1,o.configurable=!0,"value"in o&&(o.writable=!0),Object.defineProperty(e,n(o.key),o)}}function o(e,r,o){return r&&t(e.prototype,r),o&&t(e,o),Object.defineProperty(e,"prototype",{writable:!1}),e}function n(e){var r=i(e,"string");return"symbol"==typeof r?r:r+""}function i(e,r){if("object"!=typeof e||!e)return e;var t=e[Symbol.toPrimitive];if(void 0!==t){var o=t.call(e,r||"default");if("object"!=typeof o)return o;throw new TypeError("@@toPrimitive must return a primitive value.")}return("string"===r?String:Number)(e)}!(function(){"use strict";function t(){}function n(e){return"object"==typeof e&&null!==e||"function"==typeof e}var i=t;function a(e,r){try{Object.defineProperty(e,"name",{value:r,configurable:!0})}catch(e){}}var l=Promise,s=Promise.resolve.bind(l),u=Promise.prototype.then,d=Promise.reject.bind(l),c=s;function f(e){return new l(e)}function h(e){return f(r=>r(e))}function b(e){return d(e)}function v(e,r,t){return u.call(e,r,t)}function _(e,r,t){v(v(e,r,t),void 0,i)}function p(e,r){_(e,r)}function m(e,r){_(e,void 0,r)}function y(e,r,t){return v(e,r,t)}function g(e){v(e,void 0,i)}var w=e=>{if("function"==typeof queueMicrotask)w=queueMicrotask;else{var r=h(void 0);w=e=>v(r,e)}return w(e)};function S(e,r,t){if("function"!=typeof e)throw new TypeError("Argument is not a function");return Function.prototype.apply.call(e,r,t)}function T(e,r,t){try{return h(S(e,r,t))}catch(e){return b(e)}}var R=o(function e(){r(this,e),this._cursor=0,this._size=0,this._front={_elements:[],_next:void 0},this._back=this._front,this._cursor=0,this._size=0},[{key:"length",get:function(){return this._size}},{key:"push",value:function(e){var r=this._back,t=r;16383===r._elements.length&&(t={_elements:[],_next:void 0}),r._elements.push(e),t!==r&&(this._back=t,r._next=t),++this._size}},{key:"shift",value:function(){var e=this._front,r=e,t=this._cursor,o=t+1,n=e._elements,i=n[t];return 16384===o&&(r=e._next,o=0),--this._size,this._cursor=o,e!==r&&(this._front=r),n[t]=void 0,i}},{key:"forEach",value:function(e){for(var r=this._cursor,t=this._front,o=t._elements;!(r===o.length&&void 0===t._next||r===o.length&&(t=t._next,o=t._elements,r=0,0===o.length));)e(o[r]),++r}},{key:"peek",value:function(){var e=this._front,r=this._cursor;return e._elements[r]}}]),P=Symbol("[[AbortSteps]]"),k=Symbol("[[ErrorSteps]]"),q=Symbol("[[CancelSteps]]"),C=Symbol("[[PullSteps]]"),E=Symbol("[[ReleaseSteps]]");function j(e,r){e._ownerReadableStream=r,r._reader=e,"readable"===r._state?z(e):"closed"===r._state?(function(e){z(e),I(e)})(e):B(e,r._storedError)}function O(e,r){return $t(e._ownerReadableStream,r)}function W(e){var r=e._ownerReadableStream;"readable"===r._state?F(e,new TypeError("Reader was released and can no longer be used to monitor the stream's closedness")):(function(e){B(e,new TypeError("Reader was released and can no longer be used to monitor the stream's closedness"))})(e),r._readableStreamController[E](),r._reader=void 0,e._ownerReadableStream=void 0}function A(e){return new TypeError("Cannot "+e+" a stream using a released reader")}function z(e){e._closedPromise=f((r,t)=>{e._closedPromise_resolve=r,e._closedPromise_reject=t})}function B(e,r){z(e),F(e,r)}function F(e,r){void 0!==e._closedPromise_reject&&(g(e._closedPromise),e._closedPromise_reject(r),e._closedPromise_resolve=void 0,e._closedPromise_reject=void 0)}function I(e){void 0!==e._closedPromise_resolve&&(e._closedPromise_resolve(void 0),e._closedPromise_resolve=void 0,e._closedPromise_reject=void 0)}var L=Number.isFinite||function(e){return"number"==typeof e&&isFinite(e)},$=Math.trunc||function(e){return e<0?Math.ceil(e):Math.floor(e)};function M(e,r){if(void 0!==e&&"object"!=typeof(t=e)&&"function"!=typeof t)throw new TypeError(`${r} is not an object.`);var t}function D(e,r){if("function"!=typeof e)throw new TypeError(`${r} is not a function.`)}function x(e,r){if(!(function(e){return"object"==typeof e&&null!==e||"function"==typeof e})(e))throw new TypeError(`${r} is not an object.`)}function N(e,r,t){if(void 0===e)throw new TypeError(`Parameter ${r} is required in '${t}'.`)}function Q(e,r,t){if(void 0===e)throw new TypeError(`${r} is required in '${t}'.`)}function Y(e){return Number(e)}function H(e){return 0===e?0:e}function V(e,r){var t=Number.MAX_SAFE_INTEGER,o=Number(e);if(o=H(o),!L(o))throw new TypeError(`${r} is not a finite number`);if(o=(function(e){return H($(e))})(o),o<0||o>t)throw new TypeError(`${r} is outside the accepted range of 0 to ${t}, inclusive`);return L(o)&&0!==o?o:0}function U(e,r){if(!It(e))throw new TypeError(`${r} is not a ReadableStream.`)}function G(e){return new oe(e)}function X(e,r){e._reader._readRequests.push(r)}function J(e,r,t){var o=e._reader._readRequests.shift();t?o._closeSteps():o._chunkSteps(r)}function K(e){return e._reader._readRequests.length}function Z(e){var r=e._reader;return void 0!==r&&!!ne(r)}var ee,re,te,oe=o(function e(t){if(r(this,e),N(t,1,"ReadableStreamDefaultReader"),U(t,"First parameter"),Lt(t))throw new TypeError("This stream has already been locked for exclusive reading by another reader");j(this,t),this._readRequests=new R},[{key:"closed",get:function(){return ne(this)?this._closedPromise:b(le("closed"))}},{key:"cancel",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;return ne(this)?void 0===this._ownerReadableStream?b(A("cancel")):O(this,e):b(le("cancel"))}},{key:"read",value:function(){if(!ne(this))return b(le("read"));if(void 0===this._ownerReadableStream)return b(A("read from"));var e,r,t=f((t,o)=>{e=t,r=o});return ie(this,{_chunkSteps:r=>e({value:r,done:!1}),_closeSteps:()=>e({value:void 0,done:!0}),_errorSteps:e=>r(e)}),t}},{key:"releaseLock",value:function(){if(!ne(this))throw le("releaseLock");void 0!==this._ownerReadableStream&&(function(e){W(e),ae(e,new TypeError("Reader was released"))})(this)}}]);function ne(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_readRequests")&&e instanceof oe}function ie(e,r){var t=e._ownerReadableStream;t._disturbed=!0,"closed"===t._state?r._closeSteps():"errored"===t._state?r._errorSteps(t._storedError):t._readableStreamController[C](r)}function ae(e,r){var t=e._readRequests;e._readRequests=new R,t.forEach(e=>{e._errorSteps(r)})}function le(e){return new TypeError(`ReadableStreamDefaultReader.prototype.${e} can only be used on a ReadableStreamDefaultReader`)}function se(e){return e.slice()}function ue(e,r,t,o,n){new Uint8Array(e).set(new Uint8Array(t,o,n),r)}Object.defineProperties(oe.prototype,{cancel:{enumerable:!0},read:{enumerable:!0},releaseLock:{enumerable:!0},closed:{enumerable:!0}}),a(oe.prototype.cancel,"cancel"),a(oe.prototype.read,"read"),a(oe.prototype.releaseLock,"releaseLock"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(oe.prototype,Symbol.toStringTag,{value:"ReadableStreamDefaultReader",configurable:!0});var de=e=>(de="function"==typeof e.transfer?e=>e.transfer():"function"==typeof structuredClone?e=>structuredClone(e,{transfer:[e]}):e=>e,de(e)),ce=e=>(ce="boolean"==typeof e.detached?e=>e.detached:e=>0===e.byteLength,ce(e));function fe(e,r,t){if(e.slice)return e.slice(r,t);var o=t-r,n=new ArrayBuffer(o);return ue(n,0,e,r,o),n}function he(e,r){var t=e[r];if(null!=t){if("function"!=typeof t)throw new TypeError(`${String(r)} is not a function`);return t}}function be(e){try{var r=e.done,t=e.value;return v(c(t),e=>({done:r,value:e}))}catch(e){return b(e)}}var ve=null!==(te=null!==(ee=Symbol.asyncIterator)&&void 0!==ee?ee:null===(re=Symbol.for)||void 0===re?void 0:re.call(Symbol,"Symbol.asyncIterator"))&&void 0!==te?te:"@@asyncIterator";function _e(e){var r=arguments.length>2?arguments[2]:void 0;if(void 0===r)if("async"===(arguments.length>1&&void 0!==arguments[1]?arguments[1]:"sync")){if(void 0===(r=he(e,ve)))return(function(e){var r={next(){var r;try{r=pe(e)}catch(e){return b(e)}return be(r)},return(r){var t;try{var o=he(e.iterator,"return");if(void 0===o)return h({done:!0,value:r});t=S(o,e.iterator,[r])}catch(e){return b(e)}return n(t)?be(t):b(new TypeError("The iterator.return() method must return an object"))}};return{iterator:r,nextMethod:r.next,done:!1}})(_e(e,"sync",he(e,Symbol.iterator)))}else r=he(e,Symbol.iterator);if(void 0===r)throw new TypeError("The object is not iterable");var t=S(r,e,[]);if(!n(t))throw new TypeError("The iterator method must return an object");return{iterator:t,nextMethod:t.next,done:!1}}function pe(e){var r=S(e.nextMethod,e.iterator,[]);if(!n(r))throw new TypeError("The iterator.next() method must return an object");return r}var me=o(function e(t,o){r(this,e),this._ongoingPromise=void 0,this._isFinished=!1,this._reader=t,this._preventCancel=o},[{key:"next",value:function(){var e=()=>this._nextSteps();return this._ongoingPromise=this._ongoingPromise?y(this._ongoingPromise,e,e):e(),this._ongoingPromise}},{key:"return",value:function(e){var r=()=>this._returnSteps(e);return this._ongoingPromise=this._ongoingPromise?y(this._ongoingPromise,r,r):r(),this._ongoingPromise}},{key:"_nextSteps",value:function(){if(this._isFinished)return Promise.resolve({value:void 0,done:!0});var e,r,t=this._reader,o=f((t,o)=>{e=t,r=o});return ie(t,{_chunkSteps:r=>{this._ongoingPromise=void 0,w(()=>e({value:r,done:!1}))},_closeSteps:()=>{this._ongoingPromise=void 0,this._isFinished=!0,W(t),e({value:void 0,done:!0})},_errorSteps:e=>{this._ongoingPromise=void 0,this._isFinished=!0,W(t),r(e)}}),o}},{key:"_returnSteps",value:function(e){if(this._isFinished)return Promise.resolve({value:e,done:!0});this._isFinished=!0;var r=this._reader;if(!this._preventCancel){var t=O(r,e);return W(r),y(t,()=>({value:e,done:!0}))}return W(r),h({value:e,done:!0})}}]),ye={next(){return ge(this)?this._asyncIteratorImpl.next():b(we("next"))},return(e){return ge(this)?this._asyncIteratorImpl.return(e):b(we("return"))},[ve](){return this}};function ge(e){if(!n(e))return!1;if(!Object.prototype.hasOwnProperty.call(e,"_asyncIteratorImpl"))return!1;try{return e._asyncIteratorImpl instanceof me}catch(e){return!1}}function we(e){return new TypeError(`ReadableStreamAsyncIterator.${e} can only be used on a ReadableSteamAsyncIterator`)}Object.defineProperty(ye,ve,{enumerable:!1});var Se=Number.isNaN||function(e){return e!=e};function Te(e){var r=fe(e.buffer,e.byteOffset,e.byteOffset+e.byteLength);return new Uint8Array(r)}function Re(e){var r=e._queue.shift();return e._queueTotalSize-=r.size,e._queueTotalSize<0&&(e._queueTotalSize=0),r.value}function Pe(e,r,t){if("number"!=typeof(o=t)||Se(o)||o<0||t===1/0)throw new RangeError("Size must be a finite, non-NaN, non-negative number.");var o;e._queue.push({value:r,size:t}),e._queueTotalSize+=t}function ke(e){e._queue=new R,e._queueTotalSize=0}function qe(e){return e===DataView}var Ce=o(function e(){throw r(this,e),new TypeError("Illegal constructor")},[{key:"view",get:function(){if(!Oe(this))throw or("view");return this._view}},{key:"respond",value:function(e){if(!Oe(this))throw or("respond");if(N(e,1,"respond"),e=V(e,"First parameter"),void 0===this._associatedReadableByteStreamController)throw new TypeError("This BYOB request has been invalidated");if(ce(this._view.buffer))throw new TypeError("The BYOB request's buffer has been detached and so cannot be used as a response");er(this._associatedReadableByteStreamController,e)}},{key:"respondWithNewView",value:function(e){if(!Oe(this))throw or("respondWithNewView");if(N(e,1,"respondWithNewView"),!ArrayBuffer.isView(e))throw new TypeError("You can only respond with array buffer views");if(void 0===this._associatedReadableByteStreamController)throw new TypeError("This BYOB request has been invalidated");if(ce(e.buffer))throw new TypeError("The given view's buffer has been detached and so cannot be used as a response");rr(this._associatedReadableByteStreamController,e)}}]);Object.defineProperties(Ce.prototype,{respond:{enumerable:!0},respondWithNewView:{enumerable:!0},view:{enumerable:!0}}),a(Ce.prototype.respond,"respond"),a(Ce.prototype.respondWithNewView,"respondWithNewView"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(Ce.prototype,Symbol.toStringTag,{value:"ReadableStreamBYOBRequest",configurable:!0});var Ee=o(function e(){throw r(this,e),new TypeError("Illegal constructor")},[{key:"byobRequest",get:function(){if(!je(this))throw nr("byobRequest");return Ke(this)}},{key:"desiredSize",get:function(){if(!je(this))throw nr("desiredSize");return Ze(this)}},{key:"close",value:function(){if(!je(this))throw nr("close");if(this._closeRequested)throw new TypeError("The stream has already been closed; do not close it again!");var e=this._controlledReadableByteStream._state;if("readable"!==e)throw new TypeError(`The stream (in ${e} state) is not in the readable state and cannot be closed`);Ue(this)}},{key:"enqueue",value:function(e){if(!je(this))throw nr("enqueue");if(N(e,1,"enqueue"),!ArrayBuffer.isView(e))throw new TypeError("chunk must be an array buffer view");if(0===e.byteLength)throw new TypeError("chunk must have non-zero byteLength");if(0===e.buffer.byteLength)throw new TypeError("chunk's buffer must have non-zero byteLength");if(this._closeRequested)throw new TypeError("stream is closed or draining");var r=this._controlledReadableByteStream._state;if("readable"!==r)throw new TypeError(`The stream (in ${r} state) is not in the readable state and cannot be enqueued to`);Ge(this,e)}},{key:"error",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;if(!je(this))throw nr("error");Xe(this,e)}},{key:q,value:function(e){Ae(this),ke(this);var r=this._cancelAlgorithm(e);return Ve(this),r}},{key:C,value:function(e){var r=this._controlledReadableByteStream;if(this._queueTotalSize>0)Je(this,e);else{var t=this._autoAllocateChunkSize;if(void 0!==t){var o;try{o=new ArrayBuffer(t)}catch(r){return void e._errorSteps(r)}var n={buffer:o,bufferByteLength:t,byteOffset:0,byteLength:t,bytesFilled:0,minimumFill:1,elementSize:1,viewConstructor:Uint8Array,readerType:"default"};this._pendingPullIntos.push(n)}X(r,e),We(this)}}},{key:E,value:function(){if(this._pendingPullIntos.length>0){var e=this._pendingPullIntos.peek();e.readerType="none",this._pendingPullIntos=new R,this._pendingPullIntos.push(e)}}}]);function je(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_controlledReadableByteStream")&&e instanceof Ee}function Oe(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_associatedReadableByteStreamController")&&e instanceof Ce}function We(e){var r=(function(e){var r=e._controlledReadableByteStream;return"readable"===r._state&&(!e._closeRequested&&(!!e._started&&(!!(Z(r)&&K(r)>0)||(!!(ur(r)&&sr(r)>0)||Ze(e)>0))))})(e);r&&(e._pulling?e._pullAgain=!0:(e._pulling=!0,_(e._pullAlgorithm(),()=>(e._pulling=!1,e._pullAgain&&(e._pullAgain=!1,We(e)),null),r=>(Xe(e,r),null))))}function Ae(e){Ne(e),e._pendingPullIntos=new R}function ze(e,r){var t=!1;"closed"===e._state&&(t=!0);var o=Fe(r);"default"===r.readerType?J(e,o,t):(function(e,r,t){var o=e._reader._readIntoRequests.shift();t?o._closeSteps(r):o._chunkSteps(r)})(e,o,t)}function Be(e,r){for(var t=0;t<r.length;++t)ze(e,r[t])}function Fe(e){var r=e.bytesFilled,t=e.elementSize;return new e.viewConstructor(e.buffer,e.byteOffset,r/t)}function Ie(e,r,t,o){e._queue.push({buffer:r,byteOffset:t,byteLength:o}),e._queueTotalSize+=o}function Le(e,r,t,o){var n;try{n=fe(r,t,t+o)}catch(r){throw Xe(e,r),r}Ie(e,n,0,o)}function $e(e,r){r.bytesFilled>0&&Le(e,r.buffer,r.byteOffset,r.bytesFilled),He(e)}function Me(e,r){var t=Math.min(e._queueTotalSize,r.byteLength-r.bytesFilled),o=r.bytesFilled+t,n=t,i=!1,a=o-o%r.elementSize;a>=r.minimumFill&&(n=a-r.bytesFilled,i=!0);for(var l=e._queue;n>0;){var s=l.peek(),u=Math.min(n,s.byteLength),d=r.byteOffset+r.bytesFilled;ue(r.buffer,d,s.buffer,s.byteOffset,u),s.byteLength===u?l.shift():(s.byteOffset+=u,s.byteLength-=u),e._queueTotalSize-=u,De(e,u,r),n-=u}return i}function De(e,r,t){t.bytesFilled+=r}function xe(e){0===e._queueTotalSize&&e._closeRequested?(Ve(e),Mt(e._controlledReadableByteStream)):We(e)}function Ne(e){null!==e._byobRequest&&(e._byobRequest._associatedReadableByteStreamController=void 0,e._byobRequest._view=null,e._byobRequest=null)}function Qe(e){for(var r=[];e._pendingPullIntos.length>0&&0!==e._queueTotalSize;){var t=e._pendingPullIntos.peek();Me(e,t)&&(He(e),r.push(t))}return r}function Ye(e,r){var t=e._pendingPullIntos.peek();Ne(e),"closed"===e._controlledReadableByteStream._state?(function(e,r){"none"===r.readerType&&He(e);var t=e._controlledReadableByteStream;if(ur(t)){for(var o=[],n=0;n<sr(t);++n)o.push(He(e));Be(t,o)}})(e,t):(function(e,r,t){if(De(0,r,t),"none"!==t.readerType){if(!(t.bytesFilled<t.minimumFill)){He(e);var o=t.bytesFilled%t.elementSize;if(o>0){var n=t.byteOffset+t.bytesFilled;Le(e,t.buffer,n-o,o)}t.bytesFilled-=o;var i=Qe(e);ze(e._controlledReadableByteStream,t),Be(e._controlledReadableByteStream,i)}}else{$e(e,t);var a=Qe(e);Be(e._controlledReadableByteStream,a)}})(e,r,t),We(e)}function He(e){return e._pendingPullIntos.shift()}function Ve(e){e._pullAlgorithm=void 0,e._cancelAlgorithm=void 0}function Ue(e){var r=e._controlledReadableByteStream;if(!e._closeRequested&&"readable"===r._state)if(e._queueTotalSize>0)e._closeRequested=!0;else{if(e._pendingPullIntos.length>0){var t=e._pendingPullIntos.peek();if(t.bytesFilled%t.elementSize!=0){var o=new TypeError("Insufficient bytes to fill elements in the given buffer");throw Xe(e,o),o}}Ve(e),Mt(r)}}function Ge(e,r){var t=e._controlledReadableByteStream;if(!e._closeRequested&&"readable"===t._state){var o=r.buffer,n=r.byteOffset,i=r.byteLength;if(ce(o))throw new TypeError("chunk's buffer is detached and so cannot be enqueued");var a=de(o);if(e._pendingPullIntos.length>0){var l=e._pendingPullIntos.peek();if(ce(l.buffer))throw new TypeError("The BYOB request's buffer has been detached and so cannot be filled with an enqueued chunk");Ne(e),l.buffer=de(l.buffer),"none"===l.readerType&&$e(e,l)}if(Z(t))(function(e){for(var r=e._controlledReadableByteStream._reader;r._readRequests.length>0;){if(0===e._queueTotalSize)return;Je(e,r._readRequests.shift())}})(e),0===K(t)?Ie(e,a,n,i):(e._pendingPullIntos.length>0&&He(e),J(t,new Uint8Array(a,n,i),!1));else if(ur(t)){Ie(e,a,n,i);var s=Qe(e);Be(e._controlledReadableByteStream,s)}else Ie(e,a,n,i);We(e)}}function Xe(e,r){var t=e._controlledReadableByteStream;"readable"===t._state&&(Ae(e),ke(e),Ve(e),Dt(t,r))}function Je(e,r){var t=e._queue.shift();e._queueTotalSize-=t.byteLength,xe(e);var o=new Uint8Array(t.buffer,t.byteOffset,t.byteLength);r._chunkSteps(o)}function Ke(e){if(null===e._byobRequest&&e._pendingPullIntos.length>0){var r=e._pendingPullIntos.peek(),t=new Uint8Array(r.buffer,r.byteOffset+r.bytesFilled,r.byteLength-r.bytesFilled),o=Object.create(Ce.prototype);!(function(e,r,t){e._associatedReadableByteStreamController=r,e._view=t})(o,e,t),e._byobRequest=o}return e._byobRequest}function Ze(e){var r=e._controlledReadableByteStream._state;return"errored"===r?null:"closed"===r?0:e._strategyHWM-e._queueTotalSize}function er(e,r){var t=e._pendingPullIntos.peek();if("closed"===e._controlledReadableByteStream._state){if(0!==r)throw new TypeError("bytesWritten must be 0 when calling respond() on a closed stream")}else{if(0===r)throw new TypeError("bytesWritten must be greater than 0 when calling respond() on a readable stream");if(t.bytesFilled+r>t.byteLength)throw new RangeError("bytesWritten out of range")}t.buffer=de(t.buffer),Ye(e,r)}function rr(e,r){var t=e._pendingPullIntos.peek();if("closed"===e._controlledReadableByteStream._state){if(0!==r.byteLength)throw new TypeError("The view's length must be 0 when calling respondWithNewView() on a closed stream")}else if(0===r.byteLength)throw new TypeError("The view's length must be greater than 0 when calling respondWithNewView() on a readable stream");if(t.byteOffset+t.bytesFilled!==r.byteOffset)throw new RangeError("The region specified by view does not match byobRequest");if(t.bufferByteLength!==r.buffer.byteLength)throw new RangeError("The buffer of view has different capacity than byobRequest");if(t.bytesFilled+r.byteLength>t.byteLength)throw new RangeError("The region specified by view is larger than byobRequest");var o=r.byteLength;t.buffer=de(r.buffer),Ye(e,o)}function tr(e,r,t,o,n,i,a){r._controlledReadableByteStream=e,r._pullAgain=!1,r._pulling=!1,r._byobRequest=null,r._queue=r._queueTotalSize=void 0,ke(r),r._closeRequested=!1,r._started=!1,r._strategyHWM=i,r._pullAlgorithm=o,r._cancelAlgorithm=n,r._autoAllocateChunkSize=a,r._pendingPullIntos=new R,e._readableStreamController=r,_(h(t()),()=>(r._started=!0,We(r),null),e=>(Xe(r,e),null))}function or(e){return new TypeError(`ReadableStreamBYOBRequest.prototype.${e} can only be used on a ReadableStreamBYOBRequest`)}function nr(e){return new TypeError(`ReadableByteStreamController.prototype.${e} can only be used on a ReadableByteStreamController`)}function ir(e,r){if("byob"!=(e=`${e}`))throw new TypeError(`${r} '${e}' is not a valid enumeration value for ReadableStreamReaderMode`);return e}function ar(e){return new dr(e)}function lr(e,r){e._reader._readIntoRequests.push(r)}function sr(e){return e._reader._readIntoRequests.length}function ur(e){var r=e._reader;return void 0!==r&&!!cr(r)}Object.defineProperties(Ee.prototype,{close:{enumerable:!0},enqueue:{enumerable:!0},error:{enumerable:!0},byobRequest:{enumerable:!0},desiredSize:{enumerable:!0}}),a(Ee.prototype.close,"close"),a(Ee.prototype.enqueue,"enqueue"),a(Ee.prototype.error,"error"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(Ee.prototype,Symbol.toStringTag,{value:"ReadableByteStreamController",configurable:!0});var dr=o(function e(t){if(r(this,e),N(t,1,"ReadableStreamBYOBReader"),U(t,"First parameter"),Lt(t))throw new TypeError("This stream has already been locked for exclusive reading by another reader");if(!je(t._readableStreamController))throw new TypeError("Cannot construct a ReadableStreamBYOBReader for a stream not constructed with a byte source");j(this,t),this._readIntoRequests=new R},[{key:"closed",get:function(){return cr(this)?this._closedPromise:b(br("closed"))}},{key:"cancel",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;return cr(this)?void 0===this._ownerReadableStream?b(A("cancel")):O(this,e):b(br("cancel"))}},{key:"read",value:function(e){var r,t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};if(!cr(this))return b(br("read"));if(!ArrayBuffer.isView(e))return b(new TypeError("view must be an array buffer view"));if(0===e.byteLength)return b(new TypeError("view must have non-zero byteLength"));if(0===e.buffer.byteLength)return b(new TypeError("view's buffer must have non-zero byteLength"));if(ce(e.buffer))return b(new TypeError("view's buffer has been detached"));try{r=(function(e,r){var t;return M(e,r),{min:V(null!==(t=null==e?void 0:e.min)&&void 0!==t?t:1,`${r} has member 'min' that`)}})(t,"options")}catch(e){return b(e)}var o,n,i=r.min;if(0===i)return b(new TypeError("options.min must be greater than 0"));if((function(e){return qe(e.constructor)})(e)){if(i>e.byteLength)return b(new RangeError("options.min must be less than or equal to view's byteLength"))}else if(i>e.length)return b(new RangeError("options.min must be less than or equal to view's length"));if(void 0===this._ownerReadableStream)return b(A("read from"));var a=f((e,r)=>{o=e,n=r});return fr(this,e,i,{_chunkSteps:e=>o({value:e,done:!1}),_closeSteps:e=>o({value:e,done:!0}),_errorSteps:e=>n(e)}),a}},{key:"releaseLock",value:function(){if(!cr(this))throw br("releaseLock");void 0!==this._ownerReadableStream&&(function(e){W(e),hr(e,new TypeError("Reader was released"))})(this)}}]);function cr(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_readIntoRequests")&&e instanceof dr}function fr(e,r,t,o){var n=e._ownerReadableStream;n._disturbed=!0,"errored"===n._state?o._errorSteps(n._storedError):(function(e,r,t,o){var n,i=e._controlledReadableByteStream,a=r.constructor,l=(function(e){return qe(e)?1:e.BYTES_PER_ELEMENT})(a),s=r.byteOffset,u=r.byteLength,d=t*l;try{n=de(r.buffer)}catch(e){return void o._errorSteps(e)}var c={buffer:n,bufferByteLength:n.byteLength,byteOffset:s,byteLength:u,bytesFilled:0,minimumFill:d,elementSize:l,viewConstructor:a,readerType:"byob"};if(e._pendingPullIntos.length>0)return e._pendingPullIntos.push(c),void lr(i,o);if("closed"!==i._state){if(e._queueTotalSize>0){if(Me(e,c)){var f=Fe(c);return xe(e),void o._chunkSteps(f)}if(e._closeRequested){var h=new TypeError("Insufficient bytes to fill elements in the given buffer");return Xe(e,h),void o._errorSteps(h)}}e._pendingPullIntos.push(c),lr(i,o),We(e)}else{var b=new a(c.buffer,c.byteOffset,0);o._closeSteps(b)}})(n._readableStreamController,r,t,o)}function hr(e,r){var t=e._readIntoRequests;e._readIntoRequests=new R,t.forEach(e=>{e._errorSteps(r)})}function br(e){return new TypeError(`ReadableStreamBYOBReader.prototype.${e} can only be used on a ReadableStreamBYOBReader`)}function vr(e,r){var t=e.highWaterMark;if(void 0===t)return r;if(Se(t)||t<0)throw new RangeError("Invalid highWaterMark");return t}function _r(e){return e.size||(()=>1)}function pr(e,r){M(e,r);var t=null==e?void 0:e.highWaterMark,o=null==e?void 0:e.size;return{highWaterMark:void 0===t?void 0:Y(t),size:void 0===o?void 0:mr(o,`${r} has member 'size' that`)}}function mr(e,r){return D(e,r),r=>Y(e(r))}function yr(e,r,t){return D(e,t),t=>T(e,r,[t])}function gr(e,r,t){return D(e,t),()=>T(e,r,[])}function wr(e,r,t){return D(e,t),t=>S(e,r,[t])}function Sr(e,r,t){return D(e,t),(t,o)=>T(e,r,[t,o])}function Tr(e,r){if(!qr(e))throw new TypeError(`${r} is not a WritableStream.`)}Object.defineProperties(dr.prototype,{cancel:{enumerable:!0},read:{enumerable:!0},releaseLock:{enumerable:!0},closed:{enumerable:!0}}),a(dr.prototype.cancel,"cancel"),a(dr.prototype.read,"read"),a(dr.prototype.releaseLock,"releaseLock"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(dr.prototype,Symbol.toStringTag,{value:"ReadableStreamBYOBReader",configurable:!0});var Rr=o(function e(){var t=arguments.length>0&&void 0!==arguments[0]?arguments[0]:{},o=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};r(this,e),void 0===t?t=null:x(t,"First parameter");var n=pr(o,"Second parameter"),i=(function(e,r){M(e,r);var t=null==e?void 0:e.abort,o=null==e?void 0:e.close,n=null==e?void 0:e.start,i=null==e?void 0:e.type,a=null==e?void 0:e.write;return{abort:void 0===t?void 0:yr(t,e,`${r} has member 'abort' that`),close:void 0===o?void 0:gr(o,e,`${r} has member 'close' that`),start:void 0===n?void 0:wr(n,e,`${r} has member 'start' that`),write:void 0===a?void 0:Sr(a,e,`${r} has member 'write' that`),type:i}})(t,"First parameter");if(kr(this),void 0!==i.type)throw new RangeError("Invalid type is specified");var a=_r(n);!(function(e,r,t,o){var n,i,a,l,s=Object.create(Qr.prototype);n=void 0!==r.start?()=>r.start(s):()=>{},i=void 0!==r.write?e=>r.write(e,s):()=>h(void 0),a=void 0!==r.close?()=>r.close():()=>h(void 0),l=void 0!==r.abort?e=>r.abort(e):()=>h(void 0),Hr(e,s,n,i,a,l,t,o)})(this,i,vr(n,1),a)},[{key:"locked",get:function(){if(!qr(this))throw Zr("locked");return Cr(this)}},{key:"abort",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;return qr(this)?Cr(this)?b(new TypeError("Cannot abort a stream that already has a writer")):Er(this,e):b(Zr("abort"))}},{key:"close",value:function(){return qr(this)?Cr(this)?b(new TypeError("Cannot close a stream that already has a writer")):zr(this)?b(new TypeError("Cannot close an already-closing stream")):jr(this):b(Zr("close"))}},{key:"getWriter",value:function(){if(!qr(this))throw Zr("getWriter");return Pr(this)}}]);function Pr(e){return new Ir(e)}function kr(e){e._state="writable",e._storedError=void 0,e._writer=void 0,e._writableStreamController=void 0,e._writeRequests=new R,e._inFlightWriteRequest=void 0,e._closeRequest=void 0,e._inFlightCloseRequest=void 0,e._pendingAbortRequest=void 0,e._backpressure=!1}function qr(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_writableStreamController")&&e instanceof Rr}function Cr(e){return void 0!==e._writer}function Er(e,r){var t;if("closed"===e._state||"errored"===e._state)return h(void 0);e._writableStreamController._abortReason=r,null===(t=e._writableStreamController._abortController)||void 0===t||t.abort(r);var o=e._state;if("closed"===o||"errored"===o)return h(void 0);if(void 0!==e._pendingAbortRequest)return e._pendingAbortRequest._promise;var n=!1;"erroring"===o&&(n=!0,r=void 0);var i=f((t,o)=>{e._pendingAbortRequest={_promise:void 0,_resolve:t,_reject:o,_reason:r,_wasAlreadyErroring:n}});return e._pendingAbortRequest._promise=i,n||Wr(e,r),i}function jr(e){var r=e._state;if("closed"===r||"errored"===r)return b(new TypeError(`The stream (in ${r} state) is not in the writable state and cannot be closed`));var t,o=f((r,t)=>{var o={_resolve:r,_reject:t};e._closeRequest=o}),n=e._writer;return void 0!==n&&e._backpressure&&"writable"===r&&ct(n),Pe(t=e._writableStreamController,Nr,0),Gr(t),o}function Or(e,r){"writable"!==e._state?Ar(e):Wr(e,r)}function Wr(e,r){var t=e._writableStreamController;e._state="erroring",e._storedError=r;var o=e._writer;void 0!==o&&Mr(o,r),!(function(e){return void 0!==e._inFlightWriteRequest||void 0!==e._inFlightCloseRequest})(e)&&t._started&&Ar(e)}function Ar(e){e._state="errored",e._writableStreamController[k]();var r=e._storedError;if(e._writeRequests.forEach(e=>{e._reject(r)}),e._writeRequests=new R,void 0!==e._pendingAbortRequest){var t=e._pendingAbortRequest;if(e._pendingAbortRequest=void 0,t._wasAlreadyErroring)return t._reject(r),void Br(e);_(e._writableStreamController[P](t._reason),()=>(t._resolve(),Br(e),null),r=>(t._reject(r),Br(e),null))}else Br(e)}function zr(e){return void 0!==e._closeRequest||void 0!==e._inFlightCloseRequest}function Br(e){void 0!==e._closeRequest&&(e._closeRequest._reject(e._storedError),e._closeRequest=void 0);var r=e._writer;void 0!==r&&it(r,e._storedError)}function Fr(e,r){var t=e._writer;void 0!==t&&r!==e._backpressure&&(r?(function(e){lt(e)})(t):ct(t)),e._backpressure=r}Object.defineProperties(Rr.prototype,{abort:{enumerable:!0},close:{enumerable:!0},getWriter:{enumerable:!0},locked:{enumerable:!0}}),a(Rr.prototype.abort,"abort"),a(Rr.prototype.close,"close"),a(Rr.prototype.getWriter,"getWriter"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(Rr.prototype,Symbol.toStringTag,{value:"WritableStream",configurable:!0});var Ir=o(function e(t){if(r(this,e),N(t,1,"WritableStreamDefaultWriter"),Tr(t,"First parameter"),Cr(t))throw new TypeError("This stream has already been locked for exclusive writing by another writer");this._ownerWritableStream=t,t._writer=this;var o=t._state;if("writable"===o)!zr(t)&&t._backpressure?lt(this):ut(this),ot(this);else if("erroring"===o)st(this,t._storedError),ot(this);else if("closed"===o)ut(this),ot(this),at(this);else{var n=t._storedError;st(this,n),nt(this,n)}},[{key:"closed",get:function(){return Lr(this)?this._closedPromise:b(rt("closed"))}},{key:"desiredSize",get:function(){if(!Lr(this))throw rt("desiredSize");if(void 0===this._ownerWritableStream)throw tt("desiredSize");return(function(e){var r=e._ownerWritableStream,t=r._state;return"errored"===t||"erroring"===t?null:"closed"===t?0:Ur(r._writableStreamController)})(this)}},{key:"ready",get:function(){return Lr(this)?this._readyPromise:b(rt("ready"))}},{key:"abort",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;return Lr(this)?void 0===this._ownerWritableStream?b(tt("abort")):(function(e,r){return Er(e._ownerWritableStream,r)})(this,e):b(rt("abort"))}},{key:"close",value:function(){if(!Lr(this))return b(rt("close"));var e=this._ownerWritableStream;return void 0===e?b(tt("close")):zr(e)?b(new TypeError("Cannot close an already-closing stream")):$r(this)}},{key:"releaseLock",value:function(){if(!Lr(this))throw rt("releaseLock");void 0!==this._ownerWritableStream&&Dr(this)}},{key:"write",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;return Lr(this)?void 0===this._ownerWritableStream?b(tt("write to")):xr(this,e):b(rt("write"))}}]);function Lr(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_ownerWritableStream")&&e instanceof Ir}function $r(e){return jr(e._ownerWritableStream)}function Mr(e,r){"pending"===e._readyPromiseState?dt(e,r):(function(e,r){st(e,r)})(e,r)}function Dr(e){var r=e._ownerWritableStream,t=new TypeError("Writer was released and can no longer be used to monitor the stream's closedness");Mr(e,t),(function(e,r){"pending"===e._closedPromiseState?it(e,r):(function(e,r){nt(e,r)})(e,r)})(e,t),r._writer=void 0,e._ownerWritableStream=void 0}function xr(e,r){var t=e._ownerWritableStream,o=t._writableStreamController,n=(function(e,r){if(void 0===e._strategySizeAlgorithm)return 1;try{return e._strategySizeAlgorithm(r)}catch(r){return Xr(e,r),1}})(o,r);if(t!==e._ownerWritableStream)return b(tt("write to"));var i=t._state;if("errored"===i)return b(t._storedError);if(zr(t)||"closed"===i)return b(new TypeError("The stream is closing or closed and cannot be written to"));if("erroring"===i)return b(t._storedError);var a=(function(e){return f((r,t)=>{var o={_resolve:r,_reject:t};e._writeRequests.push(o)})})(t);return(function(e,r,t){try{Pe(e,r,t)}catch(r){return void Xr(e,r)}var o=e._controlledWritableStream;zr(o)||"writable"!==o._state||Fr(o,Jr(e)),Gr(e)})(o,r,n),a}Object.defineProperties(Ir.prototype,{abort:{enumerable:!0},close:{enumerable:!0},releaseLock:{enumerable:!0},write:{enumerable:!0},closed:{enumerable:!0},desiredSize:{enumerable:!0},ready:{enumerable:!0}}),a(Ir.prototype.abort,"abort"),a(Ir.prototype.close,"close"),a(Ir.prototype.releaseLock,"releaseLock"),a(Ir.prototype.write,"write"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(Ir.prototype,Symbol.toStringTag,{value:"WritableStreamDefaultWriter",configurable:!0});var Nr={},Qr=o(function e(){throw r(this,e),new TypeError("Illegal constructor")},[{key:"abortReason",get:function(){if(!Yr(this))throw et("abortReason");return this._abortReason}},{key:"signal",get:function(){if(!Yr(this))throw et("signal");if(void 0===this._abortController)throw new TypeError("WritableStreamDefaultController.prototype.signal is not supported");return this._abortController.signal}},{key:"error",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;if(!Yr(this))throw et("error");"writable"===this._controlledWritableStream._state&&Kr(this,e)}},{key:P,value:function(e){var r=this._abortAlgorithm(e);return Vr(this),r}},{key:k,value:function(){ke(this)}}]);function Yr(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_controlledWritableStream")&&e instanceof Qr}function Hr(e,r,t,o,n,i,a,l){r._controlledWritableStream=e,e._writableStreamController=r,r._queue=void 0,r._queueTotalSize=void 0,ke(r),r._abortReason=void 0,r._abortController=(function(){if("function"==typeof AbortController)return new AbortController})(),r._started=!1,r._strategySizeAlgorithm=l,r._strategyHWM=a,r._writeAlgorithm=o,r._closeAlgorithm=n,r._abortAlgorithm=i;var s=Jr(r);Fr(e,s),_(h(t()),()=>(r._started=!0,Gr(r),null),t=>(r._started=!0,Or(e,t),null))}function Vr(e){e._writeAlgorithm=void 0,e._closeAlgorithm=void 0,e._abortAlgorithm=void 0,e._strategySizeAlgorithm=void 0}function Ur(e){return e._strategyHWM-e._queueTotalSize}function Gr(e){var r=e._controlledWritableStream;if(e._started&&void 0===r._inFlightWriteRequest)if("erroring"!==r._state){if(0!==e._queue.length){var t=e._queue.peek().value;t===Nr?(function(e){var r=e._controlledWritableStream;(function(e){e._inFlightCloseRequest=e._closeRequest,e._closeRequest=void 0})(r),Re(e);var t=e._closeAlgorithm();Vr(e),_(t,()=>((function(e){e._inFlightCloseRequest._resolve(void 0),e._inFlightCloseRequest=void 0,"erroring"===e._state&&(e._storedError=void 0,void 0!==e._pendingAbortRequest&&(e._pendingAbortRequest._resolve(),e._pendingAbortRequest=void 0)),e._state="closed";var r=e._writer;void 0!==r&&at(r)})(r),null),e=>((function(e,r){e._inFlightCloseRequest._reject(r),e._inFlightCloseRequest=void 0,void 0!==e._pendingAbortRequest&&(e._pendingAbortRequest._reject(r),e._pendingAbortRequest=void 0),Or(e,r)})(r,e),null))})(e):(function(e,r){var t=e._controlledWritableStream;!(function(e){e._inFlightWriteRequest=e._writeRequests.shift()})(t),_(e._writeAlgorithm(r),()=>{!(function(e){e._inFlightWriteRequest._resolve(void 0),e._inFlightWriteRequest=void 0})(t);var r=t._state;if(Re(e),!zr(t)&&"writable"===r){var o=Jr(e);Fr(t,o)}return Gr(e),null},r=>("writable"===t._state&&Vr(e),(function(e,r){e._inFlightWriteRequest._reject(r),e._inFlightWriteRequest=void 0,Or(e,r)})(t,r),null))})(e,t)}}else Ar(r)}function Xr(e,r){"writable"===e._controlledWritableStream._state&&Kr(e,r)}function Jr(e){return Ur(e)<=0}function Kr(e,r){var t=e._controlledWritableStream;Vr(e),Wr(t,r)}function Zr(e){return new TypeError(`WritableStream.prototype.${e} can only be used on a WritableStream`)}function et(e){return new TypeError(`WritableStreamDefaultController.prototype.${e} can only be used on a WritableStreamDefaultController`)}function rt(e){return new TypeError(`WritableStreamDefaultWriter.prototype.${e} can only be used on a WritableStreamDefaultWriter`)}function tt(e){return new TypeError("Cannot "+e+" a stream using a released writer")}function ot(e){e._closedPromise=f((r,t)=>{e._closedPromise_resolve=r,e._closedPromise_reject=t,e._closedPromiseState="pending"})}function nt(e,r){ot(e),it(e,r)}function it(e,r){void 0!==e._closedPromise_reject&&(g(e._closedPromise),e._closedPromise_reject(r),e._closedPromise_resolve=void 0,e._closedPromise_reject=void 0,e._closedPromiseState="rejected")}function at(e){void 0!==e._closedPromise_resolve&&(e._closedPromise_resolve(void 0),e._closedPromise_resolve=void 0,e._closedPromise_reject=void 0,e._closedPromiseState="resolved")}function lt(e){e._readyPromise=f((r,t)=>{e._readyPromise_resolve=r,e._readyPromise_reject=t}),e._readyPromiseState="pending"}function st(e,r){lt(e),dt(e,r)}function ut(e){lt(e),ct(e)}function dt(e,r){void 0!==e._readyPromise_reject&&(g(e._readyPromise),e._readyPromise_reject(r),e._readyPromise_resolve=void 0,e._readyPromise_reject=void 0,e._readyPromiseState="rejected")}function ct(e){void 0!==e._readyPromise_resolve&&(e._readyPromise_resolve(void 0),e._readyPromise_resolve=void 0,e._readyPromise_reject=void 0,e._readyPromiseState="fulfilled")}Object.defineProperties(Qr.prototype,{abortReason:{enumerable:!0},signal:{enumerable:!0},error:{enumerable:!0}}),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(Qr.prototype,Symbol.toStringTag,{value:"WritableStreamDefaultController",configurable:!0});var ft="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:void 0!==e?e:void 0,ht=(function(){var e=null==ft?void 0:ft.DOMException;return(function(e){if("function"!=typeof e&&"object"!=typeof e)return!1;if("DOMException"!==e.name)return!1;try{return new e,!0}catch(e){return!1}})(e)?e:void 0})()||(function(){var e=function(e,r){this.message=e||"",this.name=r||"Error",Error.captureStackTrace&&Error.captureStackTrace(this,this.constructor)};return a(e,"DOMException"),e.prototype=Object.create(Error.prototype),Object.defineProperty(e.prototype,"constructor",{value:e,writable:!0,configurable:!0}),e})();function bt(e,r,o,n,i,a){var l=G(e),s=Pr(r);e._disturbed=!0;var u=!1,d=h(void 0);return f((c,y)=>{var w,S,T,R;if(void 0!==a){if(w=()=>{var t=void 0!==a.reason?a.reason:new ht("Aborted","AbortError"),o=[];n||o.push(()=>"writable"===r._state?Er(r,t):h(void 0)),i||o.push(()=>"readable"===e._state?$t(e,t):h(void 0)),C(()=>Promise.all(o.map(e=>e())),!0,t)},a.aborted)return void w();a.addEventListener("abort",w)}if(q(e,l._closedPromise,e=>(n?E(!0,e):C(()=>Er(r,e),!0,e),null)),q(r,s._closedPromise,r=>(i?E(!0,r):C(()=>$t(e,r),!0,r),null)),S=e,T=l._closedPromise,R=()=>(o?E():C(()=>(function(e){var r=e._ownerWritableStream,t=r._state;return zr(r)||"closed"===t?h(void 0):"errored"===t?b(r._storedError):$r(e)})(s)),null),"closed"===S._state?R():p(T,R),zr(r)||"closed"===r._state){var P=new TypeError("the destination writable stream closed before all data could be piped to it");i?E(!0,P):C(()=>$t(e,P),!0,P)}function k(){var e=d;return v(d,()=>e!==d?k():void 0)}function q(e,r,t){"errored"===e._state?t(e._storedError):m(r,t)}function C(e,t,o){function n(){return _(e(),()=>j(t,o),e=>j(!0,e)),null}u||(u=!0,"writable"!==r._state||zr(r)?n():p(k(),n))}function E(e,t){u||(u=!0,"writable"!==r._state||zr(r)?j(e,t):p(k(),()=>j(e,t)))}function j(e,r){return Dr(s),W(l),void 0!==a&&a.removeEventListener("abort",w),e?y(r):c(void 0),null}g(f((e,r)=>{!(function o(n){n?e():v(u?h(!0):v(s._readyPromise,()=>f((e,r)=>{ie(l,{_chunkSteps:r=>{d=v(xr(s,r),void 0,t),e(!1)},_closeSteps:()=>e(!0),_errorSteps:r})})),o,r)})(!1)}))})}var vt=o(function e(){throw r(this,e),new TypeError("Illegal constructor")},[{key:"desiredSize",get:function(){if(!_t(this))throw kt("desiredSize");return Tt(this)}},{key:"close",value:function(){if(!_t(this))throw kt("close");if(!Rt(this))throw new TypeError("The stream is not in a state that permits close");gt(this)}},{key:"enqueue",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;if(!_t(this))throw kt("enqueue");if(!Rt(this))throw new TypeError("The stream is not in a state that permits enqueue");return wt(this,e)}},{key:"error",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;if(!_t(this))throw kt("error");St(this,e)}},{key:q,value:function(e){ke(this);var r=this._cancelAlgorithm(e);return yt(this),r}},{key:C,value:function(e){var r=this._controlledReadableStream;if(this._queue.length>0){var t=Re(this);this._closeRequested&&0===this._queue.length?(yt(this),Mt(r)):pt(this),e._chunkSteps(t)}else X(r,e),pt(this)}},{key:E,value:function(){}}]);function _t(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_controlledReadableStream")&&e instanceof vt}function pt(e){mt(e)&&(e._pulling?e._pullAgain=!0:(e._pulling=!0,_(e._pullAlgorithm(),()=>(e._pulling=!1,e._pullAgain&&(e._pullAgain=!1,pt(e)),null),r=>(St(e,r),null))))}function mt(e){var r=e._controlledReadableStream;return!!Rt(e)&&!!e._started&&(!!(Lt(r)&&K(r)>0)||Tt(e)>0)}function yt(e){e._pullAlgorithm=void 0,e._cancelAlgorithm=void 0,e._strategySizeAlgorithm=void 0}function gt(e){if(Rt(e)){var r=e._controlledReadableStream;e._closeRequested=!0,0===e._queue.length&&(yt(e),Mt(r))}}function wt(e,r){if(Rt(e)){var t=e._controlledReadableStream;if(Lt(t)&&K(t)>0)J(t,r,!1);else{var o;try{o=e._strategySizeAlgorithm(r)}catch(r){throw St(e,r),r}try{Pe(e,r,o)}catch(r){throw St(e,r),r}}pt(e)}}function St(e,r){var t=e._controlledReadableStream;"readable"===t._state&&(ke(e),yt(e),Dt(t,r))}function Tt(e){var r=e._controlledReadableStream._state;return"errored"===r?null:"closed"===r?0:e._strategyHWM-e._queueTotalSize}function Rt(e){var r=e._controlledReadableStream._state;return!e._closeRequested&&"readable"===r}function Pt(e,r,t,o,n,i,a){r._controlledReadableStream=e,r._queue=void 0,r._queueTotalSize=void 0,ke(r),r._started=!1,r._closeRequested=!1,r._pullAgain=!1,r._pulling=!1,r._strategySizeAlgorithm=a,r._strategyHWM=i,r._pullAlgorithm=o,r._cancelAlgorithm=n,e._readableStreamController=r,_(h(t()),()=>(r._started=!0,pt(r),null),e=>(St(r,e),null))}function kt(e){return new TypeError(`ReadableStreamDefaultController.prototype.${e} can only be used on a ReadableStreamDefaultController`)}function qt(e){return n(r=e)&&void 0!==r.getReader?(function(e){var r;return r=zt(t,function(){var t;try{t=e.read()}catch(t){return b(t)}return y(t,e=>{if(!n(e))throw new TypeError("The promise returned by the reader.read() method must fulfill with an object");if(e.done)gt(r._readableStreamController);else{var t=e.value;wt(r._readableStreamController,t)}})},function(r){try{return h(e.cancel(r))}catch(r){return b(r)}},0),r})(e.getReader()):(function(e){var r,o=_e(e,"async");return r=zt(t,function(){var e;try{e=pe(o)}catch(e){return b(e)}return y(h(e),e=>{if(!n(e))throw new TypeError("The promise returned by the iterator.next() method must fulfill with an object");if(e.done)gt(r._readableStreamController);else{var t=e.value;wt(r._readableStreamController,t)}})},function(e){var r,t=o.iterator;try{r=he(t,"return")}catch(e){return b(e)}return void 0===r?h(void 0):y(T(r,t,[e]),e=>{if(!n(e))throw new TypeError("The promise returned by the iterator.return() method must fulfill with an object")})},0),r})(e);var r}function Ct(e,r,t){return D(e,t),t=>T(e,r,[t])}function Et(e,r,t){return D(e,t),t=>T(e,r,[t])}function jt(e,r,t){return D(e,t),t=>S(e,r,[t])}function Ot(e,r){if("bytes"!=(e=`${e}`))throw new TypeError(`${r} '${e}' is not a valid enumeration value for ReadableStreamType`);return e}function Wt(e,r){M(e,r);var t=null==e?void 0:e.preventAbort,o=null==e?void 0:e.preventCancel,n=null==e?void 0:e.preventClose,i=null==e?void 0:e.signal;return void 0!==i&&(function(e,r){if(!(function(e){if("object"!=typeof e||null===e)return!1;try{return"boolean"==typeof e.aborted}catch(e){return!1}})(e))throw new TypeError(`${r} is not an AbortSignal.`)})(i,`${r} has member 'signal' that`),{preventAbort:Boolean(t),preventCancel:Boolean(o),preventClose:Boolean(n),signal:i}}Object.defineProperties(vt.prototype,{close:{enumerable:!0},enqueue:{enumerable:!0},error:{enumerable:!0},desiredSize:{enumerable:!0}}),a(vt.prototype.close,"close"),a(vt.prototype.enqueue,"enqueue"),a(vt.prototype.error,"error"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(vt.prototype,Symbol.toStringTag,{value:"ReadableStreamDefaultController",configurable:!0});var At=o(function e(){var t=arguments.length>0&&void 0!==arguments[0]?arguments[0]:{},o=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};r(this,e),void 0===t?t=null:x(t,"First parameter");var n=pr(o,"Second parameter"),i=(function(e,r){M(e,r);var t=e,o=null==t?void 0:t.autoAllocateChunkSize,n=null==t?void 0:t.cancel,i=null==t?void 0:t.pull,a=null==t?void 0:t.start,l=null==t?void 0:t.type;return{autoAllocateChunkSize:void 0===o?void 0:V(o,`${r} has member 'autoAllocateChunkSize' that`),cancel:void 0===n?void 0:Ct(n,t,`${r} has member 'cancel' that`),pull:void 0===i?void 0:Et(i,t,`${r} has member 'pull' that`),start:void 0===a?void 0:jt(a,t,`${r} has member 'start' that`),type:void 0===l?void 0:Ot(l,`${r} has member 'type' that`)}})(t,"First parameter");if(Ft(this),"bytes"===i.type){if(void 0!==n.size)throw new RangeError("The strategy for a byte stream cannot have a size function");!(function(e,r,t){var o,n,i,a=Object.create(Ee.prototype);o=void 0!==r.start?()=>r.start(a):()=>{},n=void 0!==r.pull?()=>r.pull(a):()=>h(void 0),i=void 0!==r.cancel?e=>r.cancel(e):()=>h(void 0);var l=r.autoAllocateChunkSize;if(0===l)throw new TypeError("autoAllocateChunkSize must be greater than 0");tr(e,a,o,n,i,t,l)})(this,i,vr(n,0))}else{var a=_r(n);!(function(e,r,t,o){var n,i,a,l=Object.create(vt.prototype);n=void 0!==r.start?()=>r.start(l):()=>{},i=void 0!==r.pull?()=>r.pull(l):()=>h(void 0),a=void 0!==r.cancel?e=>r.cancel(e):()=>h(void 0),Pt(e,l,n,i,a,t,o)})(this,i,vr(n,1),a)}},[{key:"locked",get:function(){if(!It(this))throw xt("locked");return Lt(this)}},{key:"cancel",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;return It(this)?Lt(this)?b(new TypeError("Cannot cancel a stream that already has a reader")):$t(this,e):b(xt("cancel"))}},{key:"getReader",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;if(!It(this))throw xt("getReader");return void 0===(function(e,r){M(e,r);var t=null==e?void 0:e.mode;return{mode:void 0===t?void 0:ir(t,`${r} has member 'mode' that`)}})(e,"First parameter").mode?G(this):ar(this)}},{key:"pipeThrough",value:function(e){var r=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};if(!It(this))throw xt("pipeThrough");N(e,1,"pipeThrough");var t=(function(e,r){M(e,r);var t=null==e?void 0:e.readable;Q(t,"readable","ReadableWritablePair"),U(t,`${r} has member 'readable' that`);var o=null==e?void 0:e.writable;return Q(o,"writable","ReadableWritablePair"),Tr(o,`${r} has member 'writable' that`),{readable:t,writable:o}})(e,"First parameter"),o=Wt(r,"Second parameter");if(Lt(this))throw new TypeError("ReadableStream.prototype.pipeThrough cannot be used on a locked ReadableStream");if(Cr(t.writable))throw new TypeError("ReadableStream.prototype.pipeThrough cannot be used on a locked WritableStream");return g(bt(this,t.writable,o.preventClose,o.preventAbort,o.preventCancel,o.signal)),t.readable}},{key:"pipeTo",value:function(e){var r,t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};if(!It(this))return b(xt("pipeTo"));if(void 0===e)return b("Parameter 1 is required in 'pipeTo'.");if(!qr(e))return b(new TypeError("ReadableStream.prototype.pipeTo's first argument must be a WritableStream"));try{r=Wt(t,"Second parameter")}catch(e){return b(e)}return Lt(this)?b(new TypeError("ReadableStream.prototype.pipeTo cannot be used on a locked ReadableStream")):Cr(e)?b(new TypeError("ReadableStream.prototype.pipeTo cannot be used on a locked WritableStream")):bt(this,e,r.preventClose,r.preventAbort,r.preventCancel,r.signal)}},{key:"tee",value:function(){if(!It(this))throw xt("tee");return se((function(e){return je(e._readableStreamController)?(function(e){var r,t,o,n,i,a=G(e),l=!1,s=!1,u=!1,d=!1,c=!1,b=f(e=>{i=e});function v(e){m(e._closedPromise,r=>(e!==a||(Xe(o._readableStreamController,r),Xe(n._readableStreamController,r),d&&c||i(void 0)),null))}function _(){cr(a)&&(W(a),v(a=G(e))),ie(a,{_chunkSteps:r=>{w(()=>{s=!1,u=!1;var t=r,a=r;if(!d&&!c)try{a=Te(r)}catch(r){return Xe(o._readableStreamController,r),Xe(n._readableStreamController,r),void i($t(e,r))}d||Ge(o._readableStreamController,t),c||Ge(n._readableStreamController,a),l=!1,s?y():u&&g()})},_closeSteps:()=>{l=!1,d||Ue(o._readableStreamController),c||Ue(n._readableStreamController),o._readableStreamController._pendingPullIntos.length>0&&er(o._readableStreamController,0),n._readableStreamController._pendingPullIntos.length>0&&er(n._readableStreamController,0),d&&c||i(void 0)},_errorSteps:()=>{l=!1}})}function p(r,t){ne(a)&&(W(a),v(a=ar(e)));var f=t?n:o,h=t?o:n;fr(a,r,1,{_chunkSteps:r=>{w(()=>{s=!1,u=!1;var o=t?c:d;if(t?d:c)o||rr(f._readableStreamController,r);else{var n;try{n=Te(r)}catch(r){return Xe(f._readableStreamController,r),Xe(h._readableStreamController,r),void i($t(e,r))}o||rr(f._readableStreamController,r),Ge(h._readableStreamController,n)}l=!1,s?y():u&&g()})},_closeSteps:e=>{l=!1;var r=t?c:d,o=t?d:c;r||Ue(f._readableStreamController),o||Ue(h._readableStreamController),void 0!==e&&(r||rr(f._readableStreamController,e),!o&&h._readableStreamController._pendingPullIntos.length>0&&er(h._readableStreamController,0)),r&&o||i(void 0)},_errorSteps:()=>{l=!1}})}function y(){if(l)return s=!0,h(void 0);l=!0;var e=Ke(o._readableStreamController);return null===e?_():p(e._view,!1),h(void 0)}function g(){if(l)return u=!0,h(void 0);l=!0;var e=Ke(n._readableStreamController);return null===e?_():p(e._view,!0),h(void 0)}function S(){}return o=Bt(S,y,function(o){if(d=!0,r=o,c){var n=se([r,t]),a=$t(e,n);i(a)}return b}),n=Bt(S,g,function(o){if(c=!0,t=o,d){var n=se([r,t]),a=$t(e,n);i(a)}return b}),v(a),[o,n]})(e):(function(e){var r,t,o,n,i,a=G(e),l=!1,s=!1,u=!1,d=!1,c=f(e=>{i=e});function b(){return l?(s=!0,h(void 0)):(l=!0,ie(a,{_chunkSteps:e=>{w(()=>{s=!1;var r=e,t=e;u||wt(o._readableStreamController,r),d||wt(n._readableStreamController,t),l=!1,s&&b()})},_closeSteps:()=>{l=!1,u||gt(o._readableStreamController),d||gt(n._readableStreamController),u&&d||i(void 0)},_errorSteps:()=>{l=!1}}),h(void 0))}function v(){}return o=zt(v,b,function(o){if(u=!0,r=o,d){var n=se([r,t]),a=$t(e,n);i(a)}return c}),n=zt(v,b,function(o){if(d=!0,t=o,u){var n=se([r,t]),a=$t(e,n);i(a)}return c}),m(a._closedPromise,e=>(St(o._readableStreamController,e),St(n._readableStreamController,e),u&&d||i(void 0),null)),[o,n]})(e)})(this))}},{key:"values",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;if(!It(this))throw xt("values");return(function(e,r){var t=G(e),o=new me(t,r),n=Object.create(ye);return n._asyncIteratorImpl=o,n})(this,(function(e){M(e,"First parameter");var r=null==e?void 0:e.preventCancel;return{preventCancel:Boolean(r)}})(e).preventCancel)}},{key:ve,value:function(e){return this.values(e)}}],[{key:"from",value:function(e){return qt(e)}}]);function zt(e,r,t){var o=arguments.length>3&&void 0!==arguments[3]?arguments[3]:1,n=arguments.length>4&&void 0!==arguments[4]?arguments[4]:()=>1,i=Object.create(At.prototype);return Ft(i),Pt(i,Object.create(vt.prototype),e,r,t,o,n),i}function Bt(e,r,t){var o=Object.create(At.prototype);return Ft(o),tr(o,Object.create(Ee.prototype),e,r,t,0,void 0),o}function Ft(e){e._state="readable",e._reader=void 0,e._storedError=void 0,e._disturbed=!1}function It(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_readableStreamController")&&e instanceof At}function Lt(e){return void 0!==e._reader}function $t(e,r){if(e._disturbed=!0,"closed"===e._state)return h(void 0);if("errored"===e._state)return b(e._storedError);Mt(e);var o=e._reader;if(void 0!==o&&cr(o)){var n=o._readIntoRequests;o._readIntoRequests=new R,n.forEach(e=>{e._closeSteps(void 0)})}return y(e._readableStreamController[q](r),t)}function Mt(e){e._state="closed";var r=e._reader;if(void 0!==r&&(I(r),ne(r))){var t=r._readRequests;r._readRequests=new R,t.forEach(e=>{e._closeSteps()})}}function Dt(e,r){e._state="errored",e._storedError=r;var t=e._reader;void 0!==t&&(F(t,r),ne(t)?ae(t,r):hr(t,r))}function xt(e){return new TypeError(`ReadableStream.prototype.${e} can only be used on a ReadableStream`)}function Nt(e,r){M(e,r);var t=null==e?void 0:e.highWaterMark;return Q(t,"highWaterMark","QueuingStrategyInit"),{highWaterMark:Y(t)}}Object.defineProperties(At,{from:{enumerable:!0}}),Object.defineProperties(At.prototype,{cancel:{enumerable:!0},getReader:{enumerable:!0},pipeThrough:{enumerable:!0},pipeTo:{enumerable:!0},tee:{enumerable:!0},values:{enumerable:!0},locked:{enumerable:!0}}),a(At.from,"from"),a(At.prototype.cancel,"cancel"),a(At.prototype.getReader,"getReader"),a(At.prototype.pipeThrough,"pipeThrough"),a(At.prototype.pipeTo,"pipeTo"),a(At.prototype.tee,"tee"),a(At.prototype.values,"values"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(At.prototype,Symbol.toStringTag,{value:"ReadableStream",configurable:!0}),Object.defineProperty(At.prototype,ve,{value:At.prototype.values,writable:!0,configurable:!0});var Qt=e=>e.byteLength;a(Qt,"size");var Yt=o(function e(t){r(this,e),N(t,1,"ByteLengthQueuingStrategy"),t=Nt(t,"First parameter"),this._byteLengthQueuingStrategyHighWaterMark=t.highWaterMark},[{key:"highWaterMark",get:function(){if(!Vt(this))throw Ht("highWaterMark");return this._byteLengthQueuingStrategyHighWaterMark}},{key:"size",get:function(){if(!Vt(this))throw Ht("size");return Qt}}]);function Ht(e){return new TypeError(`ByteLengthQueuingStrategy.prototype.${e} can only be used on a ByteLengthQueuingStrategy`)}function Vt(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_byteLengthQueuingStrategyHighWaterMark")&&e instanceof Yt}Object.defineProperties(Yt.prototype,{highWaterMark:{enumerable:!0},size:{enumerable:!0}}),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(Yt.prototype,Symbol.toStringTag,{value:"ByteLengthQueuingStrategy",configurable:!0});var Ut=()=>1;a(Ut,"size");var Gt=o(function e(t){r(this,e),N(t,1,"CountQueuingStrategy"),t=Nt(t,"First parameter"),this._countQueuingStrategyHighWaterMark=t.highWaterMark},[{key:"highWaterMark",get:function(){if(!Jt(this))throw Xt("highWaterMark");return this._countQueuingStrategyHighWaterMark}},{key:"size",get:function(){if(!Jt(this))throw Xt("size");return Ut}}]);function Xt(e){return new TypeError(`CountQueuingStrategy.prototype.${e} can only be used on a CountQueuingStrategy`)}function Jt(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_countQueuingStrategyHighWaterMark")&&e instanceof Gt}function Kt(e,r,t){return D(e,t),t=>T(e,r,[t])}function Zt(e,r,t){return D(e,t),t=>S(e,r,[t])}function eo(e,r,t){return D(e,t),(t,o)=>T(e,r,[t,o])}function ro(e,r,t){return D(e,t),t=>T(e,r,[t])}Object.defineProperties(Gt.prototype,{highWaterMark:{enumerable:!0},size:{enumerable:!0}}),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(Gt.prototype,Symbol.toStringTag,{value:"CountQueuingStrategy",configurable:!0});var to=o(function e(){var t=arguments.length>0&&void 0!==arguments[0]?arguments[0]:{},o=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{},n=arguments.length>2&&void 0!==arguments[2]?arguments[2]:{};r(this,e),void 0===t&&(t=null);var i=pr(o,"Second parameter"),a=pr(n,"Third parameter"),l=(function(e,r){M(e,r);var t=null==e?void 0:e.cancel,o=null==e?void 0:e.flush,n=null==e?void 0:e.readableType,i=null==e?void 0:e.start,a=null==e?void 0:e.transform,l=null==e?void 0:e.writableType;return{cancel:void 0===t?void 0:ro(t,e,`${r} has member 'cancel' that`),flush:void 0===o?void 0:Kt(o,e,`${r} has member 'flush' that`),readableType:n,start:void 0===i?void 0:Zt(i,e,`${r} has member 'start' that`),transform:void 0===a?void 0:eo(a,e,`${r} has member 'transform' that`),writableType:l}})(t,"First parameter");if(void 0!==l.readableType)throw new RangeError("Invalid readableType specified");if(void 0!==l.writableType)throw new RangeError("Invalid writableType specified");var s,u=vr(a,0),d=_r(a),c=vr(i,1),v=_r(i);!(function(e,r,t,o,n,i){function a(){return r}e._writable=(function(e,r,t,o){var n=arguments.length>4&&void 0!==arguments[4]?arguments[4]:1,i=arguments.length>5&&void 0!==arguments[5]?arguments[5]:()=>1,a=Object.create(Rr.prototype);return kr(a),Hr(a,Object.create(Qr.prototype),e,r,t,o,n,i),a})(a,function(r){return(function(e,r){var t=e._transformStreamController;return e._backpressure?y(e._backpressureChangePromise,()=>{var o=e._writable;if("erroring"===o._state)throw o._storedError;return ho(t,r)}):ho(t,r)})(e,r)},function(){return(function(e){var r=e._transformStreamController;if(void 0!==r._finishPromise)return r._finishPromise;var t=e._readable;r._finishPromise=f((e,t)=>{r._finishPromise_resolve=e,r._finishPromise_reject=t});var o=r._flushAlgorithm();return co(r),_(o,()=>("errored"===t._state?_o(r,t._storedError):(gt(t._readableStreamController),vo(r)),null),e=>(St(t._readableStreamController,e),_o(r,e),null)),r._finishPromise})(e)},function(r){return(function(e,r){var t=e._transformStreamController;if(void 0!==t._finishPromise)return t._finishPromise;var o=e._readable;t._finishPromise=f((e,r)=>{t._finishPromise_resolve=e,t._finishPromise_reject=r});var n=t._cancelAlgorithm(r);return co(t),_(n,()=>("errored"===o._state?_o(t,o._storedError):(St(o._readableStreamController,r),vo(t)),null),e=>(St(o._readableStreamController,e),_o(t,e),null)),t._finishPromise})(e,r)},t,o),e._readable=zt(a,function(){return(function(e){return lo(e,!1),e._backpressureChangePromise})(e)},function(r){return(function(e,r){var t=e._transformStreamController;if(void 0!==t._finishPromise)return t._finishPromise;var o=e._writable;t._finishPromise=f((e,r)=>{t._finishPromise_resolve=e,t._finishPromise_reject=r});var n=t._cancelAlgorithm(r);return co(t),_(n,()=>("errored"===o._state?_o(t,o._storedError):(Xr(o._writableStreamController,r),ao(e),vo(t)),null),r=>(Xr(o._writableStreamController,r),ao(e),_o(t,r),null)),t._finishPromise})(e,r)},n,i),e._backpressure=void 0,e._backpressureChangePromise=void 0,e._backpressureChangePromise_resolve=void 0,lo(e,!0),e._transformStreamController=void 0})(this,f(e=>{s=e}),c,v,u,d),(function(e,r){var t,o,n,i=Object.create(so.prototype);t=void 0!==r.transform?e=>r.transform(e,i):e=>{try{return fo(i,e),h(void 0)}catch(e){return b(e)}},o=void 0!==r.flush?()=>r.flush(i):()=>h(void 0),n=void 0!==r.cancel?e=>r.cancel(e):()=>h(void 0),(function(e,r,t,o,n){r._controlledTransformStream=e,e._transformStreamController=r,r._transformAlgorithm=t,r._flushAlgorithm=o,r._cancelAlgorithm=n,r._finishPromise=void 0,r._finishPromise_resolve=void 0,r._finishPromise_reject=void 0})(e,i,t,o,n)})(this,l),void 0!==l.start?s(l.start(this._transformStreamController)):s(void 0)},[{key:"readable",get:function(){if(!oo(this))throw po("readable");return this._readable}},{key:"writable",get:function(){if(!oo(this))throw po("writable");return this._writable}}]);function oo(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_transformStreamController")&&e instanceof to}function no(e,r){St(e._readable._readableStreamController,r),io(e,r)}function io(e,r){co(e._transformStreamController),Xr(e._writable._writableStreamController,r),ao(e)}function ao(e){e._backpressure&&lo(e,!1)}function lo(e,r){void 0!==e._backpressureChangePromise&&e._backpressureChangePromise_resolve(),e._backpressureChangePromise=f(r=>{e._backpressureChangePromise_resolve=r}),e._backpressure=r}Object.defineProperties(to.prototype,{readable:{enumerable:!0},writable:{enumerable:!0}}),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(to.prototype,Symbol.toStringTag,{value:"TransformStream",configurable:!0});var so=o(function e(){throw r(this,e),new TypeError("Illegal constructor")},[{key:"desiredSize",get:function(){if(!uo(this))throw bo("desiredSize");return Tt(this._controlledTransformStream._readable._readableStreamController)}},{key:"enqueue",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;if(!uo(this))throw bo("enqueue");fo(this,e)}},{key:"error",value:function(){var e,r=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;if(!uo(this))throw bo("error");e=r,no(this._controlledTransformStream,e)}},{key:"terminate",value:function(){if(!uo(this))throw bo("terminate");!(function(e){var r=e._controlledTransformStream;gt(r._readable._readableStreamController),io(r,new TypeError("TransformStream terminated"))})(this)}}]);function uo(e){return!!n(e)&&!!Object.prototype.hasOwnProperty.call(e,"_controlledTransformStream")&&e instanceof so}function co(e){e._transformAlgorithm=void 0,e._flushAlgorithm=void 0,e._cancelAlgorithm=void 0}function fo(e,r){var t=e._controlledTransformStream,o=t._readable._readableStreamController;if(!Rt(o))throw new TypeError("Readable side is not in a state that permits enqueue");try{wt(o,r)}catch(e){throw io(t,e),t._readable._storedError}var n=(function(e){return!mt(e)})(o);n!==t._backpressure&&lo(t,!0)}function ho(e,r){return y(e._transformAlgorithm(r),void 0,r=>{throw no(e._controlledTransformStream,r),r})}function bo(e){return new TypeError(`TransformStreamDefaultController.prototype.${e} can only be used on a TransformStreamDefaultController`)}function vo(e){void 0!==e._finishPromise_resolve&&(e._finishPromise_resolve(),e._finishPromise_resolve=void 0,e._finishPromise_reject=void 0)}function _o(e,r){void 0!==e._finishPromise_reject&&(g(e._finishPromise),e._finishPromise_reject(r),e._finishPromise_resolve=void 0,e._finishPromise_reject=void 0)}function po(e){return new TypeError(`TransformStream.prototype.${e} can only be used on a TransformStream`)}Object.defineProperties(so.prototype,{enqueue:{enumerable:!0},error:{enumerable:!0},terminate:{enumerable:!0},desiredSize:{enumerable:!0}}),a(so.prototype.enqueue,"enqueue"),a(so.prototype.error,"error"),a(so.prototype.terminate,"terminate"),"symbol"==typeof Symbol.toStringTag&&Object.defineProperty(so.prototype,Symbol.toStringTag,{value:"TransformStreamDefaultController",configurable:!0});var mo={ReadableStream:At,ReadableStreamDefaultController:vt,ReadableByteStreamController:Ee,ReadableStreamBYOBRequest:Ce,ReadableStreamDefaultReader:oe,ReadableStreamBYOBReader:dr,WritableStream:Rr,WritableStreamDefaultController:Qr,WritableStreamDefaultWriter:Ir,ByteLengthQueuingStrategy:Yt,CountQueuingStrategy:Gt,TransformStream:to,TransformStreamDefaultController:so};for(var yo in mo)Object.prototype.hasOwnProperty.call(mo,yo)&&Object.defineProperty(ft,yo,{value:mo[yo],writable:!0,configurable:!0})})()})('undefined'!=typeof globalThis?globalThis:'undefined'!=typeof global?global:'undefined'!=typeof window?window:this);
++__d(function(g,r,i,a,m,_e,_d){"use strict";var e=["timestamp"],t=["target"];function n(e){if(e&&e.__esModule)return e;var t={};return e&&Object.keys(e).forEach(function(n){var o=Object.getOwnPropertyDescriptor(e,n);Object.defineProperty(t,n,o.get?o:{enumerable:!0,get:function(){return e[n]}})}),t.default=e,t}var o,u=r(_d[0]),s=(o=u)&&o.__esModule?o:{default:o},d=n(r(_d[1])),c=n(r(_d[2])),f=r(_d[3]),l=n(r(_d[4])),_=n(r(_d[5]));Object.assign(globalThis,{...d,...c,...l,..._,React:_,__expoWidgetRender:function(t,n){var o=n.timestamp,u={...(0,s.default)(n,e)};return o&&(u.date=new Date(o)),(0,f.decorateInteractiveTargets)(globalThis.__expoWidgetLayout(t,u))},__expoWidgetHandlePress:function(e,n){var o=n.target,u=(0,s.default)(n,t);return(function e(t){var n=t?.props;if(n?.onButtonPress&&n?.target===o)return n.onButtonPress();for(var u of _.Children.toArray(n?.children)){var s=e(u);if(s)return s}})(globalThis.__expoWidgetRender(e,u))}})},0,[1,3,62,78,6,7]);
++__d(function(g,_r,_i,a,m,_e,d){var e=_r(d[0]);m.exports=function(r,t){if(null==r)return{};var o,n,l=e(r,t);if(Object.getOwnPropertySymbols){var p=Object.getOwnPropertySymbols(r);for(n=0;n<p.length;n++)o=p[n],-1===t.indexOf(o)&&{}.propertyIsEnumerable.call(r,o)&&(l[o]=r[o])}return l},m.exports.__esModule=!0,m.exports.default=m.exports},1,[2]);
++__d(function(g,_r,i,a,m,_e,d){m.exports=function(r,e){if(null==r)return{};var n={};for(var t in r)if({}.hasOwnProperty.call(r,t)){if(-1!==e.indexOf(t))continue;n[t]=r[t]}return n},m.exports.__esModule=!0,m.exports.default=m.exports},2,[]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0});var t=r(d[0]);Object.keys(t).forEach(function(n){'default'===n||Object.prototype.hasOwnProperty.call(e,n)||Object.defineProperty(e,n,{enumerable:!0,get:function(){return t[n]}})});var n=r(d[1]);Object.keys(n).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return n[t]}})});var c=r(d[2]);Object.keys(c).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return c[t]}})});var o=r(d[3]);Object.keys(o).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return o[t]}})});var u=r(d[4]);Object.keys(u).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return u[t]}})});var f=r(d[5]);Object.keys(f).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return f[t]}})});var l=r(d[6]);Object.keys(l).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return l[t]}})});var b=r(d[7]);Object.keys(b).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return b[t]}})});var p=r(d[8]);Object.keys(p).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return p[t]}})});var y=r(d[9]);Object.keys(y).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return y[t]}})});var O=r(d[10]);Object.keys(O).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return O[t]}})});var j=r(d[11]);Object.keys(j).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return j[t]}})});var s=r(d[12]);Object.keys(s).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return s[t]}})});var P=r(d[13]);Object.keys(P).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return P[t]}})});var h=r(d[14]);Object.keys(h).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return h[t]}})});var v=r(d[15]);Object.keys(v).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return v[t]}})});var k=r(d[16]);Object.keys(k).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return k[t]}})});var w=r(d[17]);Object.keys(w).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return w[t]}})});var E=r(d[18]);Object.keys(E).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return E[t]}})});var _=r(d[19]);Object.keys(_).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return _[t]}})});var M=r(d[20]);Object.keys(M).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return M[t]}})});var q=r(d[21]);Object.keys(q).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return q[t]}})});var x=r(d[22]);Object.keys(x).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return x[t]}})});var z=r(d[23]);Object.keys(z).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return z[t]}})});var A=r(d[24]);Object.keys(A).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return A[t]}})});var B=r(d[25]);Object.keys(B).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return B[t]}})});var C=r(d[26]);Object.keys(C).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return C[t]}})});var D=r(d[27]);Object.keys(D).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return D[t]}})});var F=r(d[28]);Object.keys(F).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return F[t]}})});var G=r(d[29]);Object.keys(G).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return G[t]}})});var H=r(d[30]);Object.keys(H).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return H[t]}})});var I=r(d[31]);Object.keys(I).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return I[t]}})});var J=r(d[32]);Object.keys(J).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return J[t]}})});var K=r(d[33]);Object.keys(K).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return K[t]}})});var L=r(d[34]);Object.keys(L).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return L[t]}})});var N=r(d[35]);Object.keys(N).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return N[t]}})});var Q=r(d[36]);Object.keys(Q).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return Q[t]}})});var R=r(d[37]);Object.keys(R).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return R[t]}})});var S=r(d[38]);Object.keys(S).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return S[t]}})});var T=r(d[39]);Object.keys(T).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return T[t]}})});var U=r(d[40]);Object.keys(U).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return U[t]}})});var V=r(d[41]);Object.keys(V).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return V[t]}})});var W=r(d[42]);Object.keys(W).forEach(function(t){'default'===t||Object.prototype.hasOwnProperty.call(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:function(){return W[t]}})})},3,[4,8,16,17,18,20,21,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,58,59,60,61]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.AccessoryWidgetBackground=function(c){return(0,t.jsx)(o,{...c})};var c=r(d[0]),t=r(d[1]),o=(0,c.requireNativeView)('ExpoUI','AccessoryWidgetBackgroundView')},4,[5,6]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.requireNativeModule=function(t){return{}},e.requireNativeView=function(t,u){return{[u]:t=>({type:u,props:t||{}})}[u]}},5,[]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"Fragment",{enumerable:!0,get:function(){return n.Fragment}}),Object.defineProperty(e,"_Fragment",{enumerable:!0,get:function(){return n.Fragment}}),Object.defineProperty(e,"_jsxFileName",{enumerable:!0,get:function(){return f}}),Object.defineProperty(e,"jsxProd",{enumerable:!0,get:function(){return u}}),Object.defineProperty(e,"jsx",{enumerable:!0,get:function(){return u}}),Object.defineProperty(e,"jsxs",{enumerable:!0,get:function(){return u}}),Object.defineProperty(e,"jsxDEV",{enumerable:!0,get:function(){return u}}),Object.defineProperty(e,"_jsx",{enumerable:!0,get:function(){return u}}),Object.defineProperty(e,"_jsxs",{enumerable:!0,get:function(){return u}}),Object.defineProperty(e,"_jsxDEV",{enumerable:!0,get:function(){return u}});var n=r(d[0]);function t(n,t,u){return'function'==typeof n?n(u):{type:n,key:t,props:u}}function u(n,u,f){var c,b=null;if(void 0!==f&&(b=''+f),o(u)&&(b=''+u.key),'key'in u)for(var j in c={},u)'key'!==j&&(c[j]=u[j]);else c=u;return t(n,b,c)}function o(n){return void 0!==n.key}var f='widget'},6,[7]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"Fragment",{enumerable:!0,get:function(){return t}}),Object.defineProperty(e,"Children",{enumerable:!0,get:function(){return n}}),Object.defineProperty(e,"isValidElement",{enumerable:!0,get:function(){return o}});var t='react.fragment',n={toArray:t=>null==t?[]:Array.isArray(t)?t:[t]},o=t=>Boolean(t)&&'object'==typeof t&&'type'in t},7,[]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),Object.defineProperty(_e,"BottomSheet",{enumerable:!0,get:function(){return l}});var t,n=r(d[0]),o=(t=n)&&t.__esModule?t:{default:t},s=r(d[1]),u=r(d[2]),f=r(d[3]),v=(0,s.requireNativeView)('ExpoUI','BottomSheetView');function c(t){var n=t.modifiers,s=(0,o.default)(t,e);return{modifiers:n,...n?(0,u.createViewModifierEventListener)(n):void 0,...s,onIsPresentedChange:e=>{var n=e.nativeEvent.isPresented;t?.onIsPresentedChange?.(n)}}}function l(e){return(0,f.jsx)(v,{...c(e)})}},8,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";Object.defineProperty(_e,'__esModule',{value:!0}),_e.createViewModifierEventListener=function(e){var t={};for(var v of e)v.eventListener&&(t[v.$type]=v.eventListener);return{onGlobalEvent:e=>{var v=e.nativeEvent;for(var o of Object.entries(v)){var f=(0,n.default)(o,2),u=f[0],s=f[1],l=t[u];l&&l(s)}}}};var e,t=r(d[0]),n=(e=t)&&e.__esModule?e:{default:e}},9,[10]);
++__d(function(g,_r,i,a,m,_e,d){var e=_r(d[0]),t=_r(d[1]),o=_r(d[2]),r=_r(d[3]);m.exports=function(n,s){return e(n)||t(n,s)||o(n,s)||r()},m.exports.__esModule=!0,m.exports.default=m.exports},10,[11,12,13,15]);
++__d(function(g,_r,i,a,m,e,d){m.exports=function(r){if(Array.isArray(r))return r},m.exports.__esModule=!0,m.exports.default=m.exports},11,[]);
++__d(function(g,_r,_i,_a,m,_e,d){m.exports=function(e,t){var r=null==e?null:"undefined"!=typeof Symbol&&e[Symbol.iterator]||e["@@iterator"];if(null!=r){var l,n,u,o,f=[],i=!0,a=!1;try{if(u=(r=r.call(e)).next,0===t){if(Object(r)!==r)return;i=!1}else for(;!(i=(l=u.call(r)).done)&&(f.push(l.value),f.length!==t);i=!0);}catch(e){a=!0,n=e}finally{try{if(!i&&null!=r.return&&(o=r.return(),Object(o)!==o))return}finally{if(a)throw n}}return f}},m.exports.__esModule=!0,m.exports.default=m.exports},12,[]);
++__d(function(g,_r,i,_a,m,e,d){var t=_r(d[0]);m.exports=function(r,o){if(r){if("string"==typeof r)return t(r,o);var n={}.toString.call(r).slice(8,-1);return"Object"===n&&r.constructor&&(n=r.constructor.name),"Map"===n||"Set"===n?Array.from(r):"Arguments"===n||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)?t(r,o):void 0}},m.exports.__esModule=!0,m.exports.default=m.exports},13,[14]);
++__d(function(g,_r,i,_a,m,_e,d){m.exports=function(e,r){(null==r||r>e.length)&&(r=e.length);for(var t=0,n=Array(r);t<r;t++)n[t]=e[t];return n},m.exports.__esModule=!0,m.exports.default=m.exports},14,[]);
++__d(function(g,r,i,a,m,e,d){m.exports=function(){throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")},m.exports.__esModule=!0,m.exports.default=m.exports},15,[]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["label","children","onPress","modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Button=function(t){var n=t.label,s=t.children,c=t.onPress,v=t.modifiers,_={...(0,o.default)(t,e),modifiers:v,...v?(0,l.createViewModifierEventListener)(v):void 0,onButtonPress:c};return(0,u.jsx)(f,{..._,label:n,children:s})};var t,n=r(d[0]),o=(t=n)&&t.__esModule?t:{default:t},s=r(d[1]),l=r(d[2]),u=r(d[3]),f=(0,s.requireNativeView)('ExpoUI','Button')},16,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["style","data","modifiers","referenceLines"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Chart=function(t){t.style;var n=t.data,f=t.modifiers,l=t.referenceLines,v=(0,s.default)(t,e);return(0,u.jsx)(c,{data:n,referenceLines:l,modifiers:f,...f?(0,o.createViewModifierEventListener)(f):void 0,...v})};var t,n=r(d[0]),s=(t=n)&&t.__esModule?t:{default:t},f=r(d[1]),o=r(d[2]),u=r(d[3]),c=(0,f.requireNativeView)('ExpoUI','ChartView')},17,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["selection","onSelectionChange","modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.ColorPicker=function(o){var n=o.selection,l=o.onSelectionChange,C=o.modifiers,_=(0,t.default)(o,e),h=(0,c.useCallback)(e=>{l?.(e.nativeEvent.value)},[l]);return(0,v.jsx)(f,{modifiers:C,...C?(0,u.createViewModifierEventListener)(C):void 0,selection:(0,s.processColor)(n||''),onSelectionChange:h,..._})};var o,n=r(d[0]),t=(o=n)&&o.__esModule?o:{default:o},l=r(d[1]),c=r(d[2]),s=r(d[3]),u=r(d[4]),v=r(d[5]),f=(0,l.requireNativeView)('ExpoUI','ColorPickerView')},18,[1,5,7,19,9,6]);
++__d(function(g,r,i,a,m,e,d){},19,[]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.ContentUnavailableView=function(e){return(0,l.jsx)(s,{...v(e)})};var t,n=r(d[0]),o=(t=n)&&t.__esModule?t:{default:t},u=r(d[1]),f=r(d[2]),l=r(d[3]),s=(0,u.requireNativeView)('ExpoUI','ContentUnavailableView');function v(t){var n=t.modifiers,u=(0,o.default)(t,e);return{modifiers:n,...n?(0,f.createViewModifierEventListener)(n):void 0,...u}}},20,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["onIsPresentedChange","modifiers","children"];Object.defineProperty(_e,'__esModule',{value:!0}),Object.defineProperty(_e,"ConfirmationDialog",{enumerable:!0,get:function(){return h}});var n,t=r(d[0]),o=(n=t)&&n.__esModule?n:{default:n},s=r(d[1]),c=r(d[2]),l=r(d[3]),u=r(d[4]),f=(0,s.requireNativeView)('ExpoUI','ConfirmationDialogView');function h(n){var t=n.onIsPresentedChange,s=n.modifiers,c=n.children,h=(0,o.default)(n,e);return(0,u.jsx)(f,{...s?(0,l.createViewModifierEventListener)(s):void 0,...h,onIsPresentedChange:e=>{t?.(e.nativeEvent.isPresented)},children:c})}h.Trigger=function(e){return(0,u.jsx)(c.Slot,{name:"trigger",children:e.children})},h.Actions=function(e){return(0,u.jsx)(c.Slot,{name:"actions",children:e.children})},h.Message=function(e){return(0,u.jsx)(c.Slot,{name:"message",children:e.children})}},21,[1,5,22,9,6]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.Slot=function(n){var u=n.name,c=n.children;return(0,t.jsx)(o,{name:u,children:c})};var n=r(d[0]),t=r(d[1]),o=(0,n.requireNativeView)('ExpoUI','SlotView')},22,[5,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["label","children","systemImage","modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.ControlGroup=function(l){var t=l.label,n=l.children,v=l.systemImage,_=l.modifiers,b=(0,o.default)(l,e),p='string'==typeof t;return(0,f.jsxs)(c,{label:p?t:void 0,systemImage:v,modifiers:_,..._?(0,u.createViewModifierEventListener)(_):void 0,...b,children:[p||null==t?null:(0,f.jsx)(s.Slot,{name:"label",children:t}),n]})};var l,t=r(d[0]),o=(l=t)&&l.__esModule?l:{default:l},n=r(d[1]),s=r(d[2]),u=r(d[3]),f=r(d[4]),c=(0,n.requireNativeView)('ExpoUI','ControlGroupView')},23,[1,5,22,9,6]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.Items=o,e.Trigger=l,e.Preview=s,Object.defineProperty(e,"ContextMenu",{enumerable:!0,get:function(){return f}});var n=r(d[0]),t=r(d[1]),u=r(d[2]),c=(0,n.requireNativeView)('ExpoUI','ContextMenu');function o(n){return(0,u.jsx)(t.Slot,{name:"items",children:n.children})}function l(n){return(0,u.jsx)(t.Slot,{name:"trigger",children:n.children})}function s(n){return(0,u.jsx)(t.Slot,{name:"preview",children:n.children})}function f(n){return(0,u.jsx)(c,{...n})}f.Trigger=l,f.Preview=s,f.Items=o},24,[5,22,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","onDateChange","selection","range"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.DatePicker=function(e){return(0,u.jsx)(f,{...c(e)})};var t,n=r(d[0]),o=(t=n)&&t.__esModule?t:{default:t},s=r(d[1]),v=r(d[2]),u=r(d[3]);function c(t){var n=t.modifiers,s=t.onDateChange,u=t.selection,c=t.range,f=(0,o.default)(t,e);return{modifiers:n,...n?(0,v.createViewModifierEventListener)(n):void 0,...f,selection:u?.toISOString(),range:c?{start:c.start?.toISOString(),end:c.end?.toISOString()}:void 0,onDateChange:s?e=>{var t=e.nativeEvent.date;s(new Date(t))}:void 0}}var f=(0,s.requireNativeView)('ExpoUI','DatePickerView')},25,[1,5,9,6]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.Divider=function(t){return(0,u.jsx)(n,{...t})};var t=r(d[0]),u=r(d[1]),n=(0,t.requireNativeView)('ExpoUI','DividerView')},26,[5,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["onIsExpandedChange","modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.DisclosureGroup=function(n){var o=n.onIsExpandedChange,t=n.modifiers,c=(0,s.default)(n,e);var p={modifiers:t,...t?(0,u.createViewModifierEventListener)(t):void 0,...c};return(0,f.jsx)(v,{...p,onIsExpandedChange:function(e){o?.(e.nativeEvent.isExpanded)}})};var n,o=r(d[0]),s=(n=o)&&n.__esModule?n:{default:n},t=r(d[1]),u=r(d[2]),f=r(d[3]),v=(0,t.requireNativeView)('ExpoUI','DisclosureGroupView')},27,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Form=function(e){return(0,s.jsx)(v,{...c(e)})};var t,o=r(d[0]),u=(t=o)&&t.__esModule?t:{default:t},n=r(d[1]),f=r(d[2]),s=r(d[3]),v=(0,n.requireNativeView)('ExpoUI','FormView');function c(t){var o=t.modifiers,n=(0,u.default)(t,e);return{modifiers:o,...o?(0,f.createViewModifierEventListener)(o):void 0,...n}}},28,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","children","currentValueLabel","minimumValueLabel","maximumValueLabel"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Gauge=function(l){var u=l.modifiers,t=l.children,f=l.currentValueLabel,x=l.minimumValueLabel,b=l.maximumValueLabel,h=(0,n.default)(l,e);return(0,s.jsxs)(V,{modifiers:u,...u?(0,o.createViewModifierEventListener)(u):void 0,...h,children:[t&&(0,s.jsx)(c.Slot,{name:"label",children:t}),f&&(0,s.jsx)(c.Slot,{name:"currentValue",children:f}),x&&(0,s.jsx)(c.Slot,{name:"minimumValue",children:x}),b&&(0,s.jsx)(c.Slot,{name:"maximumValue",children:b})]})};var l,u=r(d[0]),n=(l=u)&&l.__esModule?l:{default:l},t=r(d[1]),c=r(d[2]),o=r(d[3]),s=r(d[4]),V=(0,t.requireNativeView)('ExpoUI','GaugeView')},29,[1,5,22,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["matchContents","onLayoutContent","ignoreSafeArea","modifiers","layoutDirection"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Host=function(t){var o=t.matchContents,s=t.onLayoutContent,y=t.ignoreSafeArea,v=t.modifiers,C=t.layoutDirection,h=(0,n.default)(t,e);return(0,u.jsx)(l,{modifiers:v,...v?(0,f.createViewModifierEventListener)(v):void 0,matchContentsVertical:'object'==typeof o?o.vertical:o,matchContentsHorizontal:'object'==typeof o?o.horizontal:o,onLayoutContent:s,layoutDirection:C??(c.I18nManager.getConstants().isRTL?'rightToLeft':'leftToRight'),ignoreSafeArea:y,...h})};var t,o=r(d[0]),n=(t=o)&&t.__esModule?t:{default:t},s=r(d[1]),c=r(d[2]),f=r(d[3]),u=r(d[4]),l=(0,s.requireNativeView)('ExpoUI','HostView')},30,[1,5,19,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["onPress","modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Image=function(e){return(0,f.jsx)(l,{...v(e)})};var t,n=r(d[0]),o=(t=n)&&t.__esModule?t:{default:t},s=r(d[1]),u=r(d[2]),f=r(d[3]);function v(t){var n=t.onPress,s=t.modifiers,f=(0,o.default)(t,e);return{modifiers:s,...s?(0,u.createViewModifierEventListener)(s):void 0,...f,...n?{useTapGesture:!0,onTap:()=>n()}:null}}var l=(0,s.requireNativeView)('ExpoUI','ImageView')},31,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","icon"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Label=function(o){var n=o.modifiers,c=o.icon,v=(0,t.default)(o,e);return(0,u.jsx)(f,{modifiers:n,...n?(0,s.createViewModifierEventListener)(n):void 0,...v,children:c&&(0,u.jsx)(l.Slot,{name:"icon",children:c})})};var o,n=r(d[0]),t=(o=n)&&o.__esModule?o:{default:o},c=r(d[1]),l=r(d[2]),s=r(d[3]),u=r(d[4]),f=(0,c.requireNativeView)('ExpoUI','LabelView')},32,[1,5,22,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","label","children"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.LabeledContent=function(t){var l=t.modifiers,o=t.label,v=t.children,b=(0,n.default)(t,e),_='string'==typeof o;return(0,f.jsxs)(u,{modifiers:l,label:_?o:void 0,...l?(0,c.createViewModifierEventListener)(l):void 0,...b,children:[o&&!_&&(0,f.jsx)(s.Slot,{name:"label",children:o}),(0,f.jsx)(s.Slot,{name:"content",children:v})]})};var t,l=r(d[0]),n=(t=l)&&t.__esModule?t:{default:t},o=r(d[1]),s=r(d[2]),c=r(d[3]),f=r(d[4]),u=(0,o.requireNativeView)('ExpoUI','LabeledContentView')},33,[1,5,22,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.HStack=function(t){var o=t.modifiers,f=(0,u.default)(t,e);return(0,n.jsx)(c,{modifiers:o,...o?(0,s.createViewModifierEventListener)(o):void 0,...f})};var t,o=r(d[0]),u=(t=o)&&t.__esModule?t:{default:t},f=r(d[1]),s=r(d[2]),n=r(d[3]),c=(0,f.requireNativeView)('ExpoUI','HStackView')},34,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.VStack=function(t){var o=t.modifiers,f=(0,u.default)(t,e);return(0,n.jsx)(c,{modifiers:o,...o?(0,s.createViewModifierEventListener)(o):void 0,...f})};var t,o=r(d[0]),u=(t=o)&&t.__esModule?t:{default:t},f=r(d[1]),s=r(d[2]),n=r(d[3]),c=(0,f.requireNativeView)('ExpoUI','VStackView')},35,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.ZStack=function(t){var o=t.modifiers,f=(0,u.default)(t,e);return(0,n.jsx)(c,{modifiers:o,...o?(0,s.createViewModifierEventListener)(o):void 0,...f})};var t,o=r(d[0]),u=(t=o)&&t.__esModule?t:{default:t},f=r(d[1]),s=r(d[2]),n=r(d[3]),c=(0,f.requireNativeView)('ExpoUI','ZStackView')},36,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Group=function(o){var t=o.modifiers,f=(0,u.default)(o,e);return(0,n.jsx)(v,{modifiers:t,...t?(0,s.createViewModifierEventListener)(t):void 0,...f})};var o,t=r(d[0]),u=(o=t)&&o.__esModule?o:{default:o},f=r(d[1]),s=r(d[2]),n=r(d[3]),v=(0,f.requireNativeView)('ExpoUI','GroupView')},37,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"],t=["children"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.List=E,Object.defineProperty(_e,"ListForEach",{enumerable:!0,get:function(){return s.ListForEach}});var n,o=r(d[0]),c=(n=o)&&n.__esModule?n:{default:n},u=r(d[1]),s=r(d[2]),f=r(d[3]),l=r(d[4]),v=(0,u.requireNativeView)('ExpoUI','ListView');function h(t){var n=t.modifiers,o=(0,c.default)(t,e);return{modifiers:n,...n?(0,f.createViewModifierEventListener)(n):void 0,...o,onSelectionChange:e=>{var n=e.nativeEvent.selection;return t?.onSelectionChange?.(n)}}}function E(e){var n=e.children,o=(0,c.default)(e,t);return(0,l.jsx)(v,{...h(o),children:n})}E.ForEach=s.ListForEach},38,[1,5,39,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["children","onDelete","onMove"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.ListForEach=function(n){var t=n.children,v=n.onDelete,l=n.onMove,s=(0,o.default)(n,e);return(0,u.jsx)(c,{...s,onDelete:v?e=>{var n=e.nativeEvent;return v(n.indices)}:void 0,onMove:l?e=>{var n=e.nativeEvent;return l(n.sourceIndices,n.destination)}:void 0,children:t})};var n,t=r(d[0]),o=(n=t)&&n.__esModule?n:{default:n},v=r(d[1]),u=r(d[2]),c=(0,v.requireNativeView)('ExpoUI','ListForEachView')},39,[1,5,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["label","children","systemImage","onPrimaryAction"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Menu=function(n){var l=n.label,o=n.children,y=n.systemImage,f=n.onPrimaryAction,v=(0,t.default)(n,e),_='string'==typeof l;return(0,u.jsxs)(c,{label:_?l:void 0,systemImage:y,hasPrimaryAction:null!=f,onPrimaryAction:f,...v,children:[!_&&(0,u.jsx)(s.Slot,{name:"label",children:l}),o]})};var n,l=r(d[0]),t=(n=l)&&n.__esModule?n:{default:n},o=r(d[1]),s=r(d[2]),u=r(d[3]),c=(0,o.requireNativeView)('ExpoUI','MenuView')},40,[1,5,22,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","onSelectionChange"],n=["label","children"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Picker=function(e){var t=h(e),l=t.label,c=t.children,u=(0,o.default)(t,n);return'string'==typeof l?(0,f.jsx)(v,{...u,label:l,children:(0,f.jsx)(s.Slot,{name:"content",children:c})}):(0,f.jsxs)(v,{...u,children:[(0,f.jsx)(s.Slot,{name:"label",children:l}),(0,f.jsx)(s.Slot,{name:"content",children:c})]})};var t,l=r(d[0]),o=(t=l)&&t.__esModule?t:{default:t},c=r(d[1]),s=r(d[2]),u=r(d[3]),f=r(d[4]),v=(0,c.requireNativeView)('ExpoUI','PickerView');function h(n){var t=n.modifiers,l=n.onSelectionChange,c=(0,o.default)(n,e);return{modifiers:t,...t?(0,u.createViewModifierEventListener)(t):void 0,...c,onSelectionChange:l?e=>{var n=e.nativeEvent.selection;l(n)}:void 0}}},41,[1,5,22,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","timerInterval"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.ProgressView=function(t){var o=t.modifiers,u=t.timerInterval,f=(0,s.default)(t,e);return(0,v.jsx)(l,{modifiers:o,...o?(0,n.createViewModifierEventListener)(o):void 0,...f,timerInterval:u?{lower:u.lower.getTime(),upper:u.upper.getTime()}:void 0})};var t,o=r(d[0]),s=(t=o)&&t.__esModule?t:{default:t},u=r(d[1]),n=r(d[2]),v=r(d[3]),l=(0,u.requireNativeView)('ExpoUI','ProgressView')},42,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","header","footer","children","onIsExpandedChange"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Section=function(n){var o=n.modifiers,s=n.header,u=n.footer,v=n.children,x=n.onIsExpandedChange,E=(0,t.default)(n,e);return(0,f.jsxs)(h,{modifiers:o,...o?(0,l.createViewModifierEventListener)(o):void 0,...x&&{onIsExpandedChange:e=>x(e.nativeEvent.isExpanded)},...E,children:[s&&(0,f.jsx)(c.Slot,{name:"header",children:s}),u&&(0,f.jsx)(c.Slot,{name:"footer",children:u}),(0,f.jsx)(c.Slot,{name:"content",children:v})]})};var n,o=r(d[0]),t=(n=o)&&n.__esModule?n:{default:n},s=r(d[1]),c=r(d[2]),l=r(d[3]),f=r(d[4]),h=(0,s.requireNativeView)('ExpoUI','SectionView')},43,[1,5,22,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","getItemAsync","item"];function t(e){return e&&e.__esModule?e:{default:e}}Object.defineProperty(_e,'__esModule',{value:!0}),_e.ShareLink=function(t){var s=t.modifiers,v=t.getItemAsync,y=t.item,I=(0,u.default)(t,e),_=(0,c.useRef)(null),h=(0,c.useCallback)((0,n.default)(function*(){if(v&&_.current&&!y)try{var e=yield v();_.current.setItem(e)}catch(e){throw _.current.setItem(null),e}}),[v,y]);return(0,o.jsx)(l,{modifiers:s,...s?(0,f.createViewModifierEventListener)(s):void 0,...I,ref:_,item:y,onAsyncItemRequest:h})};var n=t(r(d[0])),u=t(r(d[1])),s=r(d[2]),c=r(d[3]),f=r(d[4]),o=r(d[5]),l=(0,s.requireNativeView)('ExpoUI','ShareLinkView')},44,[45,1,5,7,9,6]);
++__d(function(g,_r,_i,_a,m,_e,d){function n(n,t,e,o,r,u,i){try{var c=n[u](i),s=c.value}catch(n){return void e(n)}c.done?t(s):Promise.resolve(s).then(o,r)}m.exports=function(t){return function(){var e=this,o=arguments;return new Promise(function(r,u){var i=t.apply(e,o);function c(t){n(i,r,u,c,s,"next",t)}function s(t){n(i,r,u,c,s,"throw",t)}c(void 0)})}},m.exports.__esModule=!0,m.exports.default=m.exports},45,[]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["label","minimumValueLabel","maximumValueLabel","onValueChange","onEditingChanged"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Slider=function(e){var n=e.label,l=e.minimumValueLabel,u=e.maximumValueLabel;return(0,v.jsxs)(b,{...V(e),children:[n&&(0,v.jsx)(o.Slot,{name:"label",children:n}),l&&(0,v.jsx)(o.Slot,{name:"minimum",children:l}),u&&(0,v.jsx)(o.Slot,{name:"maximum",children:u})]})};var n,l=r(d[0]),u=(n=l)&&n.__esModule?n:{default:n},t=r(d[1]),o=r(d[2]),v=r(d[3]),b=(0,t.requireNativeView)('ExpoUI','SliderView');function V(n){n.label,n.minimumValueLabel,n.maximumValueLabel;var l=n.onValueChange,t=n.onEditingChanged;return{...(0,u.default)(n,e),onValueChanged:l?e=>{var n=e.nativeEvent.value;l(n)}:void 0,onEditingChanged:t?e=>{var n=e.nativeEvent.isEditing;t(n)}:void 0}}},46,[1,5,22,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Spacer=function(e){return(0,s.jsx)(c,{...v(e)})};var t,o=r(d[0]),u=(t=o)&&t.__esModule?t:{default:t},n=r(d[1]),f=r(d[2]),s=r(d[3]),c=(0,n.requireNativeView)('ExpoUI','SpacerView');function v(t){var o=t.modifiers,n=(0,u.default)(t,e);return{modifiers:o,...o?(0,f.createViewModifierEventListener)(o):void 0,...n}}},47,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Stepper=function(e){return(0,f.jsx)(s,{...l(e)})};var t,n=r(d[0]),u=(t=n)&&t.__esModule?t:{default:t},o=r(d[1]),v=r(d[2]),f=r(d[3]),s=(0,o.requireNativeView)('ExpoUI','StepperView');function l(t){var n=t.modifiers,o=(0,u.default)(t,e);return{modifiers:n,...n?(0,v.createViewModifierEventListener)(n):void 0,...o,onValueChange:e=>{var n=e.nativeEvent.value;t.onValueChange(n)}}}},48,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,_d){"use strict";var e=["children","modifiers","date","timerInterval","pauseTime"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Text=function t(n){var u=n.children,v=n.modifiers,p=n.date,c=n.timerInterval,y=n.pauseTime,x=(0,o.default)(n,e);if(null!=p||null!=c)return(0,l.jsx)(s,{modifiers:v,...v?(0,f.createViewModifierEventListener)(v):void 0,...x,date:p?p.getTime():void 0,timerInterval:c?{lower:c.lower.getTime(),upper:c.upper.getTime()}:void 0,pauseTime:y?y.getTime():void 0});if(null==u)return null;var j=d.Children.toArray(u);if(0===j.length)return null;if(j.every(e=>'string'==typeof e||'number'==typeof e)){var T=j.map(String).join('');return(0,l.jsx)(s,{text:T,modifiers:v,...v?(0,f.createViewModifierEventListener)(v):void 0,...x})}var h=[],w=0;for(var _ of j)'string'==typeof _||'number'==typeof _?h.push((0,l.jsx)(s,{text:String(_)},"text-"+w++)):d.isValidElement(_)&&_.type===t&&h.push(_);return(0,l.jsx)(s,{modifiers:v,...v?(0,f.createViewModifierEventListener)(v):void 0,...x,children:h})};var t,n=r(_d[0]),o=(t=n)&&t.__esModule?t:{default:t},u=r(_d[1]),d=(function(e){if(e&&e.__esModule)return e;var t={};return e&&Object.keys(e).forEach(function(n){var o=Object.getOwnPropertyDescriptor(e,n);Object.defineProperty(t,n,o.get?o:{enumerable:!0,get:function(){return e[n]}})}),t.default=e,t})(r(_d[2])),f=r(_d[3]),l=r(_d[4]),s=(0,u.requireNativeView)('ExpoUI','TextView')},49,[1,5,7,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["children","onIsOnChange","modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Toggle=function(n){var o=n.children,s=n.onIsOnChange,f=n.modifiers,c={...(0,t.default)(n,e),modifiers:f,...f?(0,l.createViewModifierEventListener)(f):void 0,onIsOnChange:e=>{var n=e.nativeEvent.isOn;s?.(n)}};return(0,u.jsx)(v,{...c,children:o})};var n,o=r(d[0]),t=(n=o)&&n.__esModule?n:{default:n},s=r(d[1]),l=r(d[2]),u=r(d[3]),v=(0,s.requireNativeView)('ExpoUI','ToggleView')},50,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.TextField=function(e){return(0,l.jsx)(s,{...c(e)})};var n,t=r(d[0]),o=(n=t)&&n.__esModule?n:{default:n},u=r(d[1]),v=r(d[2]),l=r(d[3]),s=(0,u.requireNativeView)('ExpoUI','TextFieldView');function c(n){var t=n.modifiers,u=(0,o.default)(n,e);return{modifiers:t,...t?(0,v.createViewModifierEventListener)(t):void 0,...u,onValueChange:n.onValueChange?e=>n.onValueChange?.(e.nativeEvent.value):void 0,onFocusChange:n.onFocusChange?e=>n.onFocusChange?.(e.nativeEvent.value):void 0,onSelectionChange:n.onSelectionChange?e=>n.onSelectionChange?.({start:e.nativeEvent.start,end:e.nativeEvent.end}):void 0}}},51,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.SecureField=function(e){return(0,l.jsx)(s,{...c(e)})};var n,o=r(d[0]),u=(n=o)&&n.__esModule?n:{default:n},t=r(d[1]),v=r(d[2]),l=r(d[3]),s=(0,t.requireNativeView)('ExpoUI','SecureFieldView');function c(n){var o=n.modifiers,t=(0,u.default)(n,e);return{modifiers:o,...o?(0,v.createViewModifierEventListener)(o):void 0,...t,onValueChange:n.onValueChange?e=>n.onValueChange?.(e.nativeEvent.value):void 0,onFocusChange:n.onFocusChange?e=>n.onFocusChange?.(e.nativeEvent.value):void 0}}},52,[1,5,9,6]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.Namespace=function(t){return(0,u.jsx)(c,{...t})};var t=r(d[0]),u=r(d[1]),c=(0,t.requireNativeView)('ExpoUI','NamespaceView')},53,[5,6]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.GlassEffectContainer=function(t){var f=t.modifiers?(0,n.createViewModifierEventListener)(t.modifiers):void 0;return(0,o.jsx)(s,{...t,...f})};var t=r(d[0]),n=r(d[1]),o=r(d[2]),s=(0,t.requireNativeView)('ExpoUI','GlassEffectContainerView')},54,[5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.ScrollView=function(o){var t=o.modifiers,u=(0,n.default)(o,e);return(0,l.jsx)(s,{modifiers:t,...t?(0,f.createViewModifierEventListener)(t):void 0,...u})};var o,t=r(d[0]),n=(o=t)&&o.__esModule?o:{default:o},u=r(d[1]),f=r(d[2]),l=r(d[3]),s=(0,u.requireNativeView)('ExpoUI','ScrollViewComponent')},55,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"],t=["modifiers"],o=["modifiers"],n=["modifiers"],f=["modifiers"],u=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Rectangle=function(t){var o=t.modifiers,n=(0,c.default)(t,e);return(0,V.jsx)(E,{...n,modifiers:o,...o?(0,w.createViewModifierEventListener)(o):void 0})},_e.RoundedRectangle=function(e){var o=e.modifiers,n=(0,c.default)(e,t);return(0,V.jsx)(x,{...n,modifiers:o,...o?(0,w.createViewModifierEventListener)(o):void 0})},_e.Ellipse=function(e){var t=e.modifiers,n=(0,c.default)(e,o);return(0,V.jsx)(j,{...n,modifiers:t,...t?(0,w.createViewModifierEventListener)(t):void 0})},_e.UnevenRoundedRectangle=function(e){var t=e.modifiers,o=(0,c.default)(e,n);return(0,V.jsx)(R,{...o,modifiers:t,...t?(0,w.createViewModifierEventListener)(t):void 0})},_e.Capsule=function(e){var t=e.modifiers,o=(0,c.default)(e,f);return(0,V.jsx)(M,{...o,modifiers:t,...t?(0,w.createViewModifierEventListener)(t):void 0})},_e.Circle=function(e){var t=e.modifiers,o=(0,c.default)(e,u);return(0,V.jsx)(U,{...o,modifiers:t,...t?(0,w.createViewModifierEventListener)(t):void 0})};var s,v=r(d[0]),c=(s=v)&&s.__esModule?s:{default:s},l=r(d[1]),w=r(d[2]),V=r(d[3]),p=r(d[4]);Object.keys(p).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return p[e]}})});var E=(0,l.requireNativeView)('ExpoUI','RectangleView');var x=(0,l.requireNativeView)('ExpoUI','RoundedRectangleView');var j=(0,l.requireNativeView)('ExpoUI','EllipseView');var R=(0,l.requireNativeView)('ExpoUI','UnevenRoundedRectangleView');var M=(0,l.requireNativeView)('ExpoUI','CapsuleView');var U=(0,l.requireNativeView)('ExpoUI','CircleView')},56,[1,5,9,6,57]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),Object.defineProperty(_e,"EdgeCornerStyle",{enumerable:!0,get:function(){return s}}),_e.ConcentricRectangle=function(t){var n=t.modifiers,o=(0,c.default)(t,e);return(0,f.jsx)(l,{...o,modifiers:n,...n?(0,u.createViewModifierEventListener)(n):void 0})};var t,n=r(d[0]),c=(t=n)&&t.__esModule?t:{default:t},o=r(d[1]),u=r(d[2]),f=r(d[3]),s={concentric:e=>({type:'concentric',minimumRadius:e}),fixed:e=>({type:'fixed',radius:e})},l=(0,o.requireNativeView)('ExpoUI','ConcentricRectangleView')},57,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["onIsPresentedChange","modifiers","children","isPresented"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Popover=f;var n,t=r(d[0]),o=(n=t)&&n.__esModule?n:{default:n},s=r(d[1]),c=r(d[2]),l=r(d[3]),u=r(d[4]),v=(0,s.requireNativeView)('ExpoUI','PopoverView');function f(n){var t=n.onIsPresentedChange,s=n.modifiers,c=n.children,f=n.isPresented,h=(0,o.default)(n,e);return(0,u.jsx)(v,{...s?(0,l.createViewModifierEventListener)(s):void 0,...h,isPresented:f,onIsPresentedChange:e=>{t?.(e.nativeEvent.isPresented)},children:c})}f.Trigger=function(e){return(0,u.jsx)(c.Slot,{name:"trigger",children:e.children})},f.Content=function(e){return(0,u.jsx)(c.Slot,{name:"popover",children:e.children})}},58,[1,5,22,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["modifiers","children"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Grid=f;var t,n=r(d[0]),o=(t=n)&&t.__esModule?t:{default:t},u=r(d[1]);r(d[2]);var c=r(d[3]),l=r(d[4]),s=(0,u.requireNativeView)('ExpoUI','GridView'),v=(0,u.requireNativeView)('ExpoUI','GridRowView');function f(t){var n=t.modifiers,u=t.children,v=(0,o.default)(t,e);return(0,l.jsx)(s,{modifiers:n,...n?(0,c.createViewModifierEventListener)(n):void 0,...v,children:u})}f.Row=e=>{var t=e.children;return(0,l.jsx)(v,{children:t})}},59,[1,5,7,9,6]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.RNHostView=function(t){return(0,n.createElement)(o,{...t,key:t.matchContents?'matchContents':'noMatchContents'})};var t=r(d[0]),n=r(d[1]),o=(0,t.requireNativeView)('ExpoUI','RNHostView')},60,[5,7]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["children","modifiers"];Object.defineProperty(_e,'__esModule',{value:!0}),_e.Link=function(n){var t=n.children,u=n.modifiers,l={...(0,o.default)(n,e),modifiers:u,...u?(0,f.createViewModifierEventListener)(u):void 0};return(0,s.jsx)(c,{...l,children:t})};var n,t=r(d[0]),o=(n=t)&&n.__esModule?n:{default:n},u=r(d[1]),f=r(d[2]),s=r(d[3]),c=(0,u.requireNativeView)('ExpoUI','LinkView')},61,[1,5,9,6]);
++__d(function(g,r,i,a,m,_e,d){"use strict";var e=["type"];function t(e){return e&&e.__esModule?e:{default:e}}Object.defineProperty(_e,'__esModule',{value:!0}),Object.defineProperty(_e,"listSectionSpacing",{enumerable:!0,get:function(){return k}}),Object.defineProperty(_e,"cornerRadius",{enumerable:!0,get:function(){return w}}),Object.defineProperty(_e,"shadow",{enumerable:!0,get:function(){return T}}),Object.defineProperty(_e,"matchedGeometryEffect",{enumerable:!0,get:function(){return A}}),Object.defineProperty(_e,"frame",{enumerable:!0,get:function(){return D}}),Object.defineProperty(_e,"containerRelativeFrame",{enumerable:!0,get:function(){return C}}),Object.defineProperty(_e,"padding",{enumerable:!0,get:function(){return R}}),Object.defineProperty(_e,"fixedSize",{enumerable:!0,get:function(){return L}}),Object.defineProperty(_e,"ignoreSafeArea",{enumerable:!0,get:function(){return z}}),Object.defineProperty(_e,"onTapGesture",{enumerable:!0,get:function(){return I}}),Object.defineProperty(_e,"onLongPressGesture",{enumerable:!0,get:function(){return B}}),Object.defineProperty(_e,"onAppear",{enumerable:!0,get:function(){return F}}),Object.defineProperty(_e,"onDisappear",{enumerable:!0,get:function(){return G}}),Object.defineProperty(_e,"refreshable",{enumerable:!0,get:function(){return W}}),Object.defineProperty(_e,"opacity",{enumerable:!0,get:function(){return _}}),Object.defineProperty(_e,"clipShape",{enumerable:!0,get:function(){return H}}),Object.defineProperty(_e,"border",{enumerable:!0,get:function(){return U}}),Object.defineProperty(_e,"scaleEffect",{enumerable:!0,get:function(){return K}}),Object.defineProperty(_e,"rotationEffect",{enumerable:!0,get:function(){return V}}),Object.defineProperty(_e,"rotation3DEffect",{enumerable:!0,get:function(){return q}}),Object.defineProperty(_e,"offset",{enumerable:!0,get:function(){return N}}),Object.defineProperty(_e,"foregroundColor",{enumerable:!0,get:function(){return X}}),Object.defineProperty(_e,"foregroundStyle",{enumerable:!0,get:function(){return Y}}),Object.defineProperty(_e,"bold",{enumerable:!0,get:function(){return Z}}),Object.defineProperty(_e,"italic",{enumerable:!0,get:function(){return $}}),Object.defineProperty(_e,"monospacedDigit",{enumerable:!0,get:function(){return J}}),Object.defineProperty(_e,"tint",{enumerable:!0,get:function(){return Q}}),Object.defineProperty(_e,"hidden",{enumerable:!0,get:function(){return ee}}),Object.defineProperty(_e,"disabled",{enumerable:!0,get:function(){return te}}),Object.defineProperty(_e,"zIndex",{enumerable:!0,get:function(){return re}}),Object.defineProperty(_e,"blur",{enumerable:!0,get:function(){return ne}}),Object.defineProperty(_e,"brightness",{enumerable:!0,get:function(){return ie}}),Object.defineProperty(_e,"contrast",{enumerable:!0,get:function(){return oe}}),Object.defineProperty(_e,"saturation",{enumerable:!0,get:function(){return ce}}),Object.defineProperty(_e,"hueRotation",{enumerable:!0,get:function(){return ae}}),Object.defineProperty(_e,"colorInvert",{enumerable:!0,get:function(){return ue}}),Object.defineProperty(_e,"grayscale",{enumerable:!0,get:function(){return fe}}),Object.defineProperty(_e,"buttonStyle",{enumerable:!0,get:function(){return le}}),Object.defineProperty(_e,"toggleStyle",{enumerable:!0,get:function(){return de}}),Object.defineProperty(_e,"controlSize",{enumerable:!0,get:function(){return be}}),Object.defineProperty(_e,"labelStyle",{enumerable:!0,get:function(){return pe}}),Object.defineProperty(_e,"labelsHidden",{enumerable:!0,get:function(){return ye}}),Object.defineProperty(_e,"textFieldStyle",{enumerable:!0,get:function(){return se}}),Object.defineProperty(_e,"scrollDismissesKeyboard",{enumerable:!0,get:function(){return ge}}),Object.defineProperty(_e,"scrollDisabled",{enumerable:!0,get:function(){return me}}),Object.defineProperty(_e,"defaultScrollAnchor",{enumerable:!0,get:function(){return Oe}}),Object.defineProperty(_e,"defaultScrollAnchorForRole",{enumerable:!0,get:function(){return je}}),Object.defineProperty(_e,"scrollTargetBehavior",{enumerable:!0,get:function(){return Pe}}),Object.defineProperty(_e,"scrollTargetLayout",{enumerable:!0,get:function(){return Me}}),Object.defineProperty(_e,"moveDisabled",{enumerable:!0,get:function(){return he}}),Object.defineProperty(_e,"deleteDisabled",{enumerable:!0,get:function(){return ve}}),Object.defineProperty(_e,"menuActionDismissBehavior",{enumerable:!0,get:function(){return Se}}),Object.defineProperty(_e,"accessibilityLabel",{enumerable:!0,get:function(){return Ee}}),Object.defineProperty(_e,"accessibilityHint",{enumerable:!0,get:function(){return xe}}),Object.defineProperty(_e,"accessibilityValue",{enumerable:!0,get:function(){return ke}}),Object.defineProperty(_e,"layoutPriority",{enumerable:!0,get:function(){return we}}),Object.defineProperty(_e,"mask",{enumerable:!0,get:function(){return Te}}),Object.defineProperty(_e,"overlay",{enumerable:!0,get:function(){return Ae}}),Object.defineProperty(_e,"backgroundOverlay",{enumerable:!0,get:function(){return De}}),Object.defineProperty(_e,"aspectRatio",{enumerable:!0,get:function(){return Ce}}),Object.defineProperty(_e,"clipped",{enumerable:!0,get:function(){return Re}}),Object.defineProperty(_e,"glassEffect",{enumerable:!0,get:function(){return Le}}),Object.defineProperty(_e,"glassEffectId",{enumerable:!0,get:function(){return ze}}),Object.defineProperty(_e,"scrollContentBackground",{enumerable:!0,get:function(){return Ie}}),Object.defineProperty(_e,"listRowBackground",{enumerable:!0,get:function(){return Be}}),Object.defineProperty(_e,"listRowSeparator",{enumerable:!0,get:function(){return Fe}}),Object.defineProperty(_e,"truncationMode",{enumerable:!0,get:function(){return Ge}}),Object.defineProperty(_e,"allowsTightening",{enumerable:!0,get:function(){return We}}),Object.defineProperty(_e,"kerning",{enumerable:!0,get:function(){return He}}),Object.defineProperty(_e,"textCase",{enumerable:!0,get:function(){return Ue}}),Object.defineProperty(_e,"underline",{enumerable:!0,get:function(){return Ke}}),Object.defineProperty(_e,"strikethrough",{enumerable:!0,get:function(){return Ve}}),Object.defineProperty(_e,"multilineTextAlignment",{enumerable:!0,get:function(){return qe}}),Object.defineProperty(_e,"textSelection",{enumerable:!0,get:function(){return Ne}}),Object.defineProperty(_e,"lineSpacing",{enumerable:!0,get:function(){return Xe}}),_e.lineLimit=function(e,t){if('object'==typeof e&&null!==e)return(0,u.createModifier)('lineLimit',{min:e.min,max:e.max});return(0,u.createModifier)('lineLimit',{limit:e,reservesSpace:t?.reservesSpace})},Object.defineProperty(_e,"headerProminence",{enumerable:!0,get:function(){return Ye}}),Object.defineProperty(_e,"listRowInsets",{enumerable:!0,get:function(){return Ze}}),Object.defineProperty(_e,"badgeProminence",{enumerable:!0,get:function(){return $e}}),Object.defineProperty(_e,"badge",{enumerable:!0,get:function(){return Je}}),Object.defineProperty(_e,"listSectionMargins",{enumerable:!0,get:function(){return Qe}}),Object.defineProperty(_e,"font",{enumerable:!0,get:function(){return et}}),Object.defineProperty(_e,"gridCellUnsizedAxes",{enumerable:!0,get:function(){return tt}}),Object.defineProperty(_e,"gridCellColumns",{enumerable:!0,get:function(){return rt}}),Object.defineProperty(_e,"gridColumnAlignment",{enumerable:!0,get:function(){return nt}}),Object.defineProperty(_e,"gridCellAnchor",{enumerable:!0,get:function(){return it}}),Object.defineProperty(_e,"submitLabel",{enumerable:!0,get:function(){return ot}}),Object.defineProperty(_e,"keyboardType",{enumerable:!0,get:function(){return ct}}),Object.defineProperty(_e,"autocorrectionDisabled",{enumerable:!0,get:function(){return at}}),Object.defineProperty(_e,"onSubmit",{enumerable:!0,get:function(){return ut}}),Object.defineProperty(_e,"textInputAutocapitalization",{enumerable:!0,get:function(){return ft}}),Object.defineProperty(_e,"textContentType",{enumerable:!0,get:function(){return lt}}),Object.defineProperty(_e,"contentTransition",{enumerable:!0,get:function(){return dt}}),Object.defineProperty(_e,"listStyle",{enumerable:!0,get:function(){return bt}}),Object.defineProperty(_e,"luminanceToAlpha",{enumerable:!0,get:function(){return pt}}),Object.defineProperty(_e,"resizable",{enumerable:!0,get:function(){return yt}}),Object.defineProperty(_e,"isModifier",{enumerable:!0,get:function(){return st}}),Object.defineProperty(_e,"filterModifiers",{enumerable:!0,get:function(){return gt}});var n=t(r(d[0])),o=t(r(d[1])),c=r(d[2]),u=r(d[3]);Object.keys(u).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return u[e]}})});var f=r(d[4]);Object.keys(f).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return f[e]}})});var l=r(d[5]);Object.keys(l).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return l[e]}})});var b=r(d[6]);Object.keys(b).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return b[e]}})});var p=r(d[7]);Object.keys(p).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return p[e]}})});var y=r(d[8]);Object.keys(y).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return y[e]}})});var s=r(d[9]);Object.keys(s).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return s[e]}})});var O=r(d[10]);Object.keys(O).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return O[e]}})});var j=r(d[11]);Object.keys(j).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return j[e]}})});var P=r(d[12]);Object.keys(P).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return P[e]}})});var M=r(d[13]);Object.keys(M).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return M[e]}})});var h=r(d[14]);Object.keys(h).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return h[e]}})});var v=r(d[15]);Object.keys(v).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return v[e]}})});var S=r(d[16]);Object.keys(S).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return S[e]}})});var E=r(d[17]);Object.keys(E).forEach(function(e){'default'===e||Object.prototype.hasOwnProperty.call(_e,e)||Object.defineProperty(_e,e,{enumerable:!0,get:function(){return E[e]}})});var x=(0,c.requireNativeModule)('ExpoUI'),k=e=>'number'==typeof e?(0,u.createModifier)('listSectionSpacing',{spacing:'custom',value:e}):(0,u.createModifier)('listSectionSpacing',{spacing:e}),w=e=>(0,u.createModifier)('cornerRadius',{radius:e}),T=e=>(0,u.createModifier)('shadow',e),A=(e,t)=>(0,u.createModifier)('matchedGeometryEffect',{id:e,namespaceId:t}),D=e=>(0,u.createModifier)('frame',e),C=e=>(0,u.createModifier)('containerRelativeFrame',e),R=e=>(0,u.createModifier)('padding',e),L=e=>(0,u.createModifier)('fixedSize',e),z=e=>(0,u.createModifier)('ignoreSafeArea',e),I=e=>(0,u.createModifierWithEventListener)('onTapGesture',e),B=(e,t)=>(0,u.createModifierWithEventListener)('onLongPressGesture',e,{minimumDuration:t??.5}),F=e=>(0,u.createModifierWithEventListener)('onAppear',e),G=e=>(0,u.createModifierWithEventListener)('onDisappear',e),W=e=>(0,u.createModifierWithEventListener)('refreshable',(function(){var t=(0,o.default)(function*(t){try{yield e()}finally{yield x.completeRefresh(t.id)}});return function(e){return t.apply(this,arguments)}})()),_=e=>(0,u.createModifier)('opacity',{value:e}),H=(e,t)=>(0,u.createModifier)('clipShape',{shape:e,cornerRadius:t}),U=e=>(0,u.createModifier)('border',e),K=e=>(0,u.createModifier)('scaleEffect','number'==typeof e?{x:e,y:e}:e),V=e=>(0,u.createModifier)('rotationEffect',{angle:e}),q=e=>(0,u.createModifier)('rotation3DEffect',{angle:e.angle,axisX:e.axis?.x??0,axisY:e.axis?.y??0,axisZ:e.axis?.z??0,perspective:e.perspective??1}),N=e=>(0,u.createModifier)('offset',e),X=e=>(0,u.createModifier)('foregroundColor',{color:e}),Y=t=>{if(null==t||'object'!=typeof t||!('type'in t))return(0,u.createModifier)('foregroundStyle',{styleType:'color',color:t});if('hierarchical'===t.type)return(0,u.createModifier)('foregroundStyle',{styleType:'hierarchical',hierarchicalStyle:t.style});var o=t.type,c=(0,n.default)(t,e);return(0,u.createModifier)('foregroundStyle',{styleType:o,...c})},Z=()=>(0,u.createModifier)('bold',{}),$=()=>(0,u.createModifier)('italic',{}),J=()=>(0,u.createModifier)('monospacedDigit',{}),Q=e=>(0,u.createModifier)('tint',{color:e}),ee=function(){var e=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,u.createModifier)('hidden',{hidden:e})},te=function(){var e=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,u.createModifier)('disabled',{disabled:e})},re=e=>(0,u.createModifier)('zIndex',{index:e}),ne=e=>(0,u.createModifier)('blur',{radius:e}),ie=e=>(0,u.createModifier)('brightness',{amount:e}),oe=e=>(0,u.createModifier)('contrast',{amount:e}),ce=e=>(0,u.createModifier)('saturation',{amount:e}),ae=e=>(0,u.createModifier)('hueRotation',{angle:e}),ue=function(){var e=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,u.createModifier)('colorInvert',{inverted:e})},fe=e=>(0,u.createModifier)('grayscale',{amount:e}),le=e=>(0,u.createModifier)('buttonStyle',{style:e}),de=e=>(0,u.createModifier)('toggleStyle',{style:e}),be=e=>(0,u.createModifier)('controlSize',{size:e}),pe=e=>(0,u.createModifier)('labelStyle',{style:e}),ye=()=>(0,u.createModifier)('labelsHidden',{}),se=e=>(0,u.createModifier)('textFieldStyle',{style:e}),ge=e=>(0,u.createModifier)('scrollDismissesKeyboard',{mode:e}),me=function(){var e=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,u.createModifier)('scrollDisabled',{disabled:e})},Oe=e=>(0,u.createModifier)('defaultScrollAnchor',{anchor:e}),je=(e,t)=>(0,u.createModifier)('defaultScrollAnchorForRole',{anchor:e,role:t}),Pe=e=>(0,u.createModifier)('scrollTargetBehavior',{behavior:e}),Me=()=>(0,u.createModifier)('scrollTargetLayout',{}),he=function(){var e=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,u.createModifier)('moveDisabled',{disabled:e})},ve=function(){var e=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,u.createModifier)('deleteDisabled',{disabled:e})},Se=e=>(0,u.createModifier)('menuActionDismissBehavior',{behavior:e}),Ee=e=>(0,u.createModifier)('accessibilityLabel',{label:e}),xe=e=>(0,u.createModifier)('accessibilityHint',{hint:e}),ke=e=>(0,u.createModifier)('accessibilityValue',{value:e}),we=e=>(0,u.createModifier)('layoutPriority',{priority:e}),Te=(e,t)=>(0,u.createModifier)('mask',{shape:e,cornerRadius:t}),Ae=e=>(0,u.createModifier)('overlay',e),De=e=>(0,u.createModifier)('backgroundOverlay',e),Ce=e=>(0,u.createModifier)('aspectRatio',e),Re=function(){var e=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,u.createModifier)('clipped',{clipped:e})},Le=e=>(0,u.createModifier)('glassEffect',e),ze=(e,t)=>(0,u.createModifier)('glassEffectId',{id:e,namespaceId:t}),Ie=e=>(0,u.createModifier)('scrollContentBackground',{visible:e}),Be=e=>(0,u.createModifier)('listRowBackground',{color:e}),Fe=(e,t)=>(0,u.createModifier)('listRowSeparator',{visibility:e,edges:t}),Ge=e=>(0,u.createModifier)('truncationMode',{mode:e}),We=e=>(0,u.createModifier)('allowsTightening',{value:e}),He=e=>(0,u.createModifier)('kerning',{value:e}),Ue=e=>(0,u.createModifier)('textCase',{value:e}),Ke=e=>(0,u.createModifier)('underline',e),Ve=e=>(0,u.createModifier)('strikethrough',e),qe=e=>(0,u.createModifier)('multilineTextAlignment',{alignment:e}),Ne=e=>(0,u.createModifier)('textSelection',{value:e}),Xe=e=>(0,u.createModifier)('lineSpacing',{value:e});var Ye=e=>(0,u.createModifier)('headerProminence',{prominence:e}),Ze=e=>(0,u.createModifier)('listRowInsets',e),$e=e=>(0,u.createModifier)('badgeProminence',{badgeType:e}),Je=e=>(0,u.createModifier)('badge',{value:e}),Qe=e=>(0,u.createModifier)('listSectionMargins',e),et=e=>(0,u.createModifier)('font',e),tt=e=>(0,u.createModifier)('gridCellUnsizedAxes',{axes:e}),rt=e=>(0,u.createModifier)('gridCellColumns',{count:e}),nt=e=>(0,u.createModifier)('gridColumnAlignment',{alignment:e}),it=e=>(0,u.createModifier)('gridCellAnchor',e),ot=e=>(0,u.createModifier)('submitLabel',{submitLabel:e}),ct=e=>(0,u.createModifier)('keyboardType',{keyboardType:e}),at=function(){var e=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,u.createModifier)('autocorrectionDisabled',{disabled:e})},ut=e=>(0,u.createModifierWithEventListener)('onSubmit',e),ft=e=>(0,u.createModifier)('textInputAutocapitalization',{autocapitalization:e}),lt=e=>(0,u.createModifier)('textContentType',{textContentType:e}),dt=(e,t)=>(0,u.createModifier)('contentTransition',{transitionType:e,countsDown:t?.countsDown}),bt=e=>(0,u.createModifier)('listStyle',{style:e}),pt=()=>(0,u.createModifier)('luminanceToAlpha',{}),yt=(e,t)=>(0,u.createModifier)('resizable',{...e,resizingMode:t}),st=e=>'object'==typeof e&&null!==e&&'string'==typeof e.$type,gt=e=>e.filter(st)},62,[1,45,5,63,9,64,66,67,68,69,70,71,72,73,74,75,76,77]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.createModifier=function(t){var n=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};return{$type:t,...n}},e.createModifierWithEventListener=function(t,n){var o=arguments.length>2&&void 0!==arguments[2]?arguments[2]:{};return{$type:t,...o,eventListener:n}}},63,[]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"Animation",{enumerable:!0,get:function(){return o}}),Object.defineProperty(e,"animation",{enumerable:!0,get:function(){return s}});var n=r(d[0]),t=r(d[1]),o={easeInOut:n=>u({type:'easeInOut',duration:n?.duration}),easeIn:n=>u({type:'easeIn',duration:n?.duration}),easeOut:n=>u({type:'easeOut',duration:n?.duration}),linear:n=>u({type:'linear',duration:n?.duration}),spring:n=>u({type:'spring',response:n?.response,dampingFraction:n?.dampingFraction,blendDuration:n?.blendDuration,duration:n?.duration,bounce:n?.bounce}),interpolatingSpring:n=>u({type:'interpolatingSpring',mass:n?.mass,stiffness:n?.stiffness,damping:n?.damping,initialVelocity:n?.initialVelocity,duration:n?.duration,bounce:n?.bounce}),default:u({type:'default'})};function u(n){var o=n;return{delay:n=>u(o={...o,delay:n}),repeat:n=>u(o={...o,...n}),[t.VALUE_SYMBOL]:()=>o}}var s=(o,u)=>(0,n.createModifier)('animation',{animation:o[t.VALUE_SYMBOL](),animatedValue:u})},64,[63,65]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"VALUE_SYMBOL",{enumerable:!0,get:function(){return t}});var t=Symbol('value')},65,[]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"containerShape",{enumerable:!0,get:function(){return n}});var t=r(d[0]),n=n=>(0,t.createModifier)('containerShape',n)},66,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"contentShape",{enumerable:!0,get:function(){return n}});var t=r(d[0]),n=n=>(0,t.createModifier)('contentShape',n)},67,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"shapes",{enumerable:!0,get:function(){return n}});var n={roundedRectangle:n=>({cornerRadius:n.cornerRadius,roundedCornerStyle:n.roundedCornerStyle,cornerSize:n.cornerSize,shape:'roundedRectangle'}),capsule:n=>({roundedCornerStyle:n?.roundedCornerStyle,shape:'capsule'}),rectangle:()=>({shape:'rectangle'}),ellipse:()=>({shape:'ellipse'}),circle:()=>({shape:'circle'})}},68,[]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"background",{enumerable:!0,get:function(){return n}});var t=r(d[0]),n=(n,o)=>(0,t.createModifier)('background',{color:n,...o})},69,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"tag",{enumerable:!0,get:function(){return n}});var t=r(d[0]),n=n=>(0,t.createModifier)('tag',{tag:n})},70,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"pickerStyle",{enumerable:!0,get:function(){return c}});var t=r(d[0]),c=c=>(0,t.createModifier)('pickerStyle',{style:c})},71,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"datePickerStyle",{enumerable:!0,get:function(){return c}});var t=r(d[0]),c=c=>(0,t.createModifier)('datePickerStyle',{style:c})},72,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"progressViewStyle",{enumerable:!0,get:function(){return n}});var t=r(d[0]),n=n=>(0,t.createModifier)('progressViewStyle',{style:n})},73,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"gaugeStyle",{enumerable:!0,get:function(){return u}});var t=r(d[0]),u=u=>(0,t.createModifier)('gaugeStyle',{style:u})},74,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"presentationDetents",{enumerable:!0,get:function(){return n}}),Object.defineProperty(e,"presentationDragIndicator",{enumerable:!0,get:function(){return o}}),Object.defineProperty(e,"presentationBackgroundInteraction",{enumerable:!0,get:function(){return c}}),Object.defineProperty(e,"interactiveDismissDisabled",{enumerable:!0,get:function(){return s}});var t=r(d[0]),n=(n,o)=>{var c={detents:n,selection:o?.selection},s=(o??{}).onSelectionChange;return s?(0,t.createModifierWithEventListener)('presentationDetents',t=>{s(t.detent)},c):(0,t.createModifier)('presentationDetents',c)},o=n=>(0,t.createModifier)('presentationDragIndicator',{visibility:n}),c=n=>'string'==typeof n?(0,t.createModifier)('presentationBackgroundInteraction',{interactionType:n}):(0,t.createModifier)('presentationBackgroundInteraction',{interactionType:'enabledUpThrough',detent:n.detent}),s=function(){var n=!(arguments.length>0&&void 0!==arguments[0])||arguments[0];return(0,t.createModifier)('interactiveDismissDisabled',{isDisabled:n})}},75,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),e.environment=function(t,o){if('string'==typeof t)return(0,n.createModifier)('environment',{key:t,value:o});return(0,n.createModifier)('environment',t)};var n=r(d[0])},76,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";Object.defineProperty(e,'__esModule',{value:!0}),Object.defineProperty(e,"widgetAccentedRenderingMode",{enumerable:!0,get:function(){return n}}),Object.defineProperty(e,"widgetURL",{enumerable:!0,get:function(){return c}});var t=r(d[0]),n=n=>(0,t.createModifier)('widgetAccentedRenderingMode',{renderingMode:n}),c=n=>(0,t.createModifier)('widgetURL',{url:n})},77,[63]);
++__d(function(g,r,i,a,m,e,d){"use strict";function t(c,u){if(Array.isArray(c))return c.map(n=>t(n,u));if(!n(c))return c;var s=c.props??{};return null==s.target&&u.typesToDecorate.includes(c.type)&&(s.target=o(u.nextTargetIndex.current,u.nearestParentKey),u.nextTargetIndex.current+=1),'children'in s&&(s.children=t(s.children,{nearestParentKey:c.key??u.nearestParentKey,nextTargetIndex:u.nextTargetIndex,typesToDecorate:u.typesToDecorate})),c}function n(t){return Boolean(t)&&'object'==typeof t&&'type'in t&&'props'in t}function o(t,n){var o=`__expo_widgets_target_${t}`;return n?`${o}_${n}`:o}Object.defineProperty(e,'__esModule',{value:!0}),e.decorateInteractiveTargets=function(n){return t(n,{nearestParentKey:null,nextTargetIndex:{current:0},typesToDecorate:['Button']})}},78,[]);
++__r(0);
+\ No newline at end of file
+diff --git a/node_modules/expo-widgets/ios/ExpoWidgets.podspec b/node_modules/expo-widgets/ios/ExpoWidgets.podspec
+index 1d2b971..e092830 100644
+--- a/node_modules/expo-widgets/ios/ExpoWidgets.podspec
++++ b/node_modules/expo-widgets/ios/ExpoWidgets.podspec
+@@ -34,20 +34,23 @@ Pod::Spec.new do |s|
+     :script => project_root_env_var + 'bash -l -c "$PODS_TARGET_SRCROOT/../scripts/xcode-build-bundle.sh"',
+     :execution_position => :before_compile,
+     # NOTE(@krystofwoldrich): Ideally we would specify `__dir__/**/*`, but Xcode doesn't support patterns
+-    :input_files  => ["#{__dir__}/../package.json"],
+-    :output_files  => ["#{__dir__}/../bundle/build/ExpoWidgets.bundle"],
++    # Use $(PODS_TARGET_SRCROOT) so paths stay valid after moving the repo (no stale absolute __dir__ from pod install).
++    :input_files  => ['$(PODS_TARGET_SRCROOT)/../package.json'],
++    :output_files  => ['$(PODS_TARGET_SRCROOT)/../bundle/build/ExpoWidgets.bundle'],
+   }
+   copy_bundle_script = {
+     :name => 'Prepare ExpoWidgets Resources',
+     :script => %Q{
+       echo "Preparing ExpoWidgets.bundle..."
+-      source="#{__dir__}/../bundle/build/ExpoWidgets.bundle"
+-      dest="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoWidgets.bundle"
++      source="${PODS_TARGET_SRCROOT}/../bundle/build/ExpoWidgets.bundle"
++      # expo/expo#43654 - JS runtime must land inside resource bundle embedded in .appex
++      dest="${TARGET_BUILD_DIR}/ExpoWidgets.bundle/ExpoWidgets.bundle"
+       echo "Copying ${source} to ${dest}"
+-      cp "${source}" "${dest}"
++      mkdir -p "$(dirname "${dest}")"
++      cp -R "${source}" "${dest}"
+     },
+     :execution_position => :before_compile,
+-    :input_files  => ["#{__dir__}/../bundle/build/ExpoWidgets.bundle"]
++    :input_files  => ['$(PODS_TARGET_SRCROOT)/../bundle/build/ExpoWidgets.bundle']
+   }
+   # :always_out_of_date is only available in CocoaPods 1.13.0 and later
+   if Gem::Version.new(Pod::VERSION) >= Gem::Version.new('1.13.0')
+diff --git a/node_modules/expo-widgets/ios/LiveActivity.swift b/node_modules/expo-widgets/ios/LiveActivity.swift
+index a603765..bda5e15 100644
+--- a/node_modules/expo-widgets/ios/LiveActivity.swift
++++ b/node_modules/expo-widgets/ios/LiveActivity.swift
+@@ -19,7 +19,7 @@ final class LiveActivity: SharedObject {
+       throw LiveActivityNotFoundException(id)
+     }
+ 
+-    let newState = LiveActivityAttributes.ContentState(name: name, props: props)
++    let newState = LiveActivityAttributes.ContentState(name: name, props: LiveActivityAvatarCache.enrichProps(props))
+     await activity.update(ActivityContent(state: newState, staleDate: nil))
+   }
+ 
+@@ -32,7 +32,7 @@ final class LiveActivity: SharedObject {
+ 
+     let content: ActivityContent<LiveActivityAttributes.ContentState>?
+     if let props {
+-      content = ActivityContent(state: LiveActivityAttributes.ContentState(name: name, props: props), staleDate: nil)
++      content = ActivityContent(state: LiveActivityAttributes.ContentState(name: name, props: LiveActivityAvatarCache.enrichProps(props)), staleDate: nil)
+     } else {
+       content = nil
+     }
+diff --git a/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
+new file mode 100644
+index 0000000..c94a5a7
+--- /dev/null
++++ b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
+@@ -0,0 +1,168 @@
++import Foundation
++import UIKit
++
++enum LiveActivityAvatarCache {
++  private static let keyPrefix = "__expo_widgets_live_activity_avatar_"
++  private static let maxAvatarBytes = 1_500_000
++  private static let inlineAvatarMaxPixel = CGFloat(96)
++  private static let inlineAvatarQuality = CGFloat(0.72)
++
++  static func enrichProps(_ props: String) -> String {
++    guard var root = parseProps(props) else {
++      return props
++    }
++
++    cacheImageField("driverAvatarUrl", into: "driverAvatarCacheKey", inlineInto: "driverAvatarInlineBase64", in: &root)
++    cacheImageField("vehicleMarkerUrl", into: "vehicleMarkerCacheKey", in: &root)
++    guard let data = try? JSONSerialization.data(withJSONObject: root),
++          let enriched = String(data: data, encoding: .utf8) else {
++      return props
++    }
++    return enriched
++  }
++
++  static func imageData(from propsJson: String) -> Data? {
++    guard let root = parseProps(propsJson) else {
++      return nil
++    }
++    if let inline = stringField("driverAvatarInlineBase64", root),
++       let data = Data(base64Encoded: inline) {
++      return data
++    }
++    if let key = stringField("driverAvatarCacheKey", root),
++       let data = WidgetsStorage.getData(forKey: key) {
++      return data
++    }
++    if let source = stringField("driverAvatarUrl", root) {
++      return WidgetsStorage.getData(forKey: cacheKey(for: source))
++    }
++    return nil
++  }
++
++  static func markerImageData(from propsJson: String) -> Data? {
++    guard let root = parseProps(propsJson) else {
++      return nil
++    }
++    if let key = stringField("vehicleMarkerCacheKey", root),
++       let data = WidgetsStorage.getData(forKey: key) {
++      return data
++    }
++    if let source = stringField("vehicleMarkerUrl", root) {
++      return WidgetsStorage.getData(forKey: cacheKey(for: source))
++    }
++    return nil
++  }
++
++  private static func parseProps(_ props: String) -> [String: Any]? {
++    guard let data = props.data(using: .utf8) else { return nil }
++    return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
++  }
++
++  private static func stringField(_ key: String, _ root: [String: Any]) -> String? {
++    guard let raw = root[key] as? String else { return nil }
++    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
++    return value.isEmpty ? nil : value
++  }
++
++  private static func cacheKey(for avatarURLString: String) -> String {
++    let encoded = Data(avatarURLString.utf8)
++      .base64EncodedString()
++      .replacingOccurrences(of: "/", with: "_")
++      .replacingOccurrences(of: "+", with: "-")
++      .replacingOccurrences(of: "=", with: "")
++    return keyPrefix + encoded
++  }
++
++  private static func cacheImageField(
++    _ sourceField: String,
++    into cacheField: String,
++    inlineInto inlineField: String? = nil,
++    in root: inout [String: Any]
++  ) {
++    guard let source = stringField(sourceField, root) else { return }
++    let key = cacheKey(for: source)
++    if WidgetsStorage.getData(forKey: key) == nil,
++       let data = imageData(fromSource: source),
++       data.count <= maxAvatarBytes {
++      WidgetsStorage.set(data, forKey: key)
++    }
++
++    guard let data = WidgetsStorage.getData(forKey: key) else {
++      return
++    }
++
++    root[cacheField] = key
++    if let inlineField, root[inlineField] == nil, let inlineData = compressedInlineImageData(from: data) {
++      root[inlineField] = inlineData.base64EncodedString()
++    }
++    if let fileURL = writeImageDataToSharedFile(data, forKey: key) {
++      root[sourceField] = fileURL.absoluteString
++    }
++  }
++
++  private static func writeImageDataToSharedFile(_ data: Data, forKey key: String) -> URL? {
++    guard let groupIdentifier = WidgetsStorage.appGroupIdentifier,
++          let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) else {
++      return nil
++    }
++
++    let directoryURL = containerURL.appendingPathComponent("LiveActivityImages", isDirectory: true)
++    try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
++
++    let fileURL = directoryURL.appendingPathComponent(key).appendingPathExtension("img")
++    if FileManager.default.fileExists(atPath: fileURL.path) {
++      return fileURL
++    }
++
++    do {
++      try data.write(to: fileURL, options: [.atomic])
++      return fileURL
++    } catch {
++      return nil
++    }
++  }
++
++  private static func imageData(fromSource source: String) -> Data? {
++    if source.lowercased().hasPrefix("http") {
++      return downloadAvatarData(from: source)
++    }
++    guard let url = URL(string: source) else { return nil }
++    return try? Data(contentsOf: url)
++  }
++
++  private static func downloadAvatarData(from avatarURLString: String) -> Data? {
++    guard let url = URL(string: avatarURLString) else { return nil }
++    let semaphore = DispatchSemaphore(value: 0)
++    var result: Data?
++
++    let task = URLSession.shared.dataTask(with: url) { data, response, _ in
++      defer { semaphore.signal() }
++      guard let http = response as? HTTPURLResponse,
++            (200...299).contains(http.statusCode),
++            let data else {
++        return
++      }
++      result = data
++    }
++    task.resume()
++
++    if semaphore.wait(timeout: .now() + 2.5) == .timedOut {
++      task.cancel()
++      return nil
++    }
++    return result
++  }
++
++  private static func compressedInlineImageData(from data: Data) -> Data? {
++    guard let sourceImage = UIImage(data: data) else { return nil }
++    let maxSide = max(sourceImage.size.width, sourceImage.size.height)
++    guard maxSide > 0 else { return nil }
++    let scale = min(1, inlineAvatarMaxPixel / maxSide)
++    let targetSize = CGSize(width: sourceImage.size.width * scale, height: sourceImage.size.height * scale)
++    let renderer = UIGraphicsImageRenderer(size: targetSize)
++    let image = renderer.image { _ in
++      sourceImage.draw(in: CGRect(origin: .zero, size: targetSize))
++    }
++    return image.jpegData(compressionQuality: inlineAvatarQuality)
++  }
++}
+diff --git a/node_modules/expo-widgets/ios/LiveActivityFactory.swift b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
+index caf1e05..5c0bf3d 100644
+--- a/node_modules/expo-widgets/ios/LiveActivityFactory.swift
++++ b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
+@@ -3,6 +3,8 @@ import ActivityKit
+ 
+ final class LiveActivityFactory: SharedObject {
+   let name: String
++  /** Kept so we can re-persist the Metro layout immediately before `Activity.request` (extension reads App Group). */
++  private let layout: String
+ 
+   static var pushNotificationsEnabled: Bool {
+     Bundle.main.object(forInfoDictionaryKey: pushNotificationsEnabledKey) as? Bool ?? false
+@@ -10,7 +12,13 @@ final class LiveActivityFactory: SharedObject {
+ 
+   init(name: String, layout: String) {
+     self.name = name
++    self.layout = layout
+     WidgetsStorage.set(layout, forKey: "__expo_widgets_live_activity_\(name)_layout")
++    // Filtre Console : ExpoWidgets | LiveActivity | native-app
++    print(
++      "[ExpoWidgets][LiveActivity][native-app] factory init name=\(name) layoutChars=\(layout.count) " +
++        "appGroup=\(WidgetsStorage.appGroupIdentifier ?? "nil") bundle=\(Bundle.main.bundleIdentifier ?? "?")"
++    )
+   }
+ 
+   func start(props: String, url: URL?) throws -> LiveActivity {
+@@ -19,22 +27,42 @@ final class LiveActivityFactory: SharedObject {
+       throw LiveActivitiesNotSupportedException()
+     }
+ 
++    // Widget extension evaluates `layout` from shared UserDefaults; write again right before the activity exists
++    // so the extension never renders with a missing/empty layout (black Dynamic Island).
++    WidgetsStorage.set(layout, forKey: "__expo_widgets_live_activity_\(name)_layout")
++
+     if let url {
+       WidgetsStorage.set(url.absoluteString, forKey: "__expo_widgets_live_activity_\(name)_url")
+     }
+ 
++    let enrichedProps = LiveActivityAvatarCache.enrichProps(props)
++    let layoutKey = "__expo_widgets_live_activity_\(name)_layout"
++    let readBack = WidgetsStorage.getString(forKey: layoutKey) ?? ""
++    let propsPreview = enrichedProps.count > 120 ? String(enrichedProps.prefix(120)) + "…" : enrichedProps
++    print(
++      "[ExpoWidgets][LiveActivity][native-app] Activity.request pending name=\(name) " +
++        "layoutChars=\(layout.count) readBackChars=\(readBack.count) readBackMatches=\(readBack == layout) " +
++        "propsChars=\(enrichedProps.count) propsPreview=\(propsPreview)"
++    )
++
+     do {
+-      let initialState = LiveActivityAttributes.ContentState(name: name, props: props)
++      let initialState = LiveActivityAttributes.ContentState(name: name, props: enrichedProps)
+       let activity = try Activity.request(
+         attributes: LiveActivityAttributes(),
+         content: .init(state: initialState, staleDate: nil),
+         pushType: LiveActivityFactory.pushNotificationsEnabled ? .token : nil
+       )
+ 
++      print(
++        "[ExpoWidgets][LiveActivity][native-app] Activity.request OK activityId=\(activity.id) pushType=\(LiveActivityFactory.pushNotificationsEnabled ? "token" : "nil")"
++      )
+       let instance = LiveActivity(id: activity.id, name: name)
+       instance.observePushTokenUpdates(for: activity, pushNotificationsEnabled: LiveActivityFactory.pushNotificationsEnabled)
+       return instance
+     } catch {
++      print(
++        "[ExpoWidgets][LiveActivity][native-app] Activity.request FAILED name=\(name) error=\(error.localizedDescription)"
++      )
+       throw StartLiveActivityException(error.localizedDescription)
+     }
+   }
+diff --git a/node_modules/expo-widgets/ios/Widgets/EntryView.swift b/node_modules/expo-widgets/ios/Widgets/EntryView.swift
+index 947fc2e..c7ebb7e 100644
+--- a/node_modules/expo-widgets/ios/Widgets/EntryView.swift
++++ b/node_modules/expo-widgets/ios/Widgets/EntryView.swift
+@@ -31,7 +31,7 @@ public struct WidgetsEntryView: View {
+     if let node {
+       if #available(iOS 17.0, *) {
+         WidgetsDynamicView(name: entry.name, kind: .widget, node: node, entryIndex: entry.entryIndex, environmentString: widgetEnvironmentString)
+-          .containerBackground(.clear, for: .widget)
++          .containerBackground(Self.extractContainerBackground(from: node), for: .widget)
+       } else {
+         WidgetsDynamicView(name: entry.name, kind: .widget, node: node, entryIndex: entry.entryIndex, environmentString: widgetEnvironmentString)
+       }
+@@ -39,4 +39,34 @@ public struct WidgetsEntryView: View {
+       EmptyView()
+     }
+   }
++
++  // expo/expo#43654 - containerBackground from root background modifier (iOS 17+)
++  private static func extractContainerBackground(from node: [String: Any]) -> Color {
++    guard
++      let props = node["props"] as? [String: Any],
++      let modifiers = props["modifiers"] as? [[String: Any]],
++      let bgModifier = modifiers.first(where: { ($0["$type"] as? String) == "background" }),
++      let hex = bgModifier["color"] as? String
++    else {
++      return Color.black
++    }
++    return Color(hex: hex) ?? Color.black
++  }
++}
++
++extension Color {
++  init?(hex: String) {
++    var hexString = hex.trimmingCharacters(in: .whitespacesAndNewlines)
++    if hexString.hasPrefix("#") {
++      hexString.removeFirst()
++    }
++    guard hexString.count == 6, let rgb = UInt64(hexString, radix: 16) else {
++      return nil
++    }
++    self.init(
++      red: Double((rgb >> 16) & 0xFF) / 255.0,
++      green: Double((rgb >> 8) & 0xFF) / 255.0,
++      blue: Double(rgb & 0xFF) / 255.0
++    )
++  }
+ }
+diff --git a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
+index 3e6ff0b..c00fc80 100644
+--- a/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
++++ b/node_modules/expo-widgets/ios/Widgets/LiveActivityBanner.swift
+@@ -1,6 +1,179 @@
+ import SwiftUI
++import UIKit
+ import WidgetKit
+ 
++private let kronoBannerAction = Color(red: 0.655, green: 0.545, blue: 0.98)
++private let kronoBannerChip = Color.white.opacity(0.12)
++private let kronoBannerTrack = Color.white.opacity(0.24)
++private let kronoBannerTrackDone = Color(red: 0.655, green: 0.545, blue: 0.98)
++
++@available(iOS 16.1, *)
++struct OrderTrackingBannerFallback: View {
++  let propsJson: String
++
++  private var p: (eta: String?, vehicle: String?, status: String?, plate: String?) {
++    ExpoWidgetsLiveActivityPropsFallback.parse(propsJson)
++  }
++
++  private var b: (phone: String?, avatar: String?, clock: String?, pending: Bool, progress: Double) {
++    ExpoWidgetsLiveActivityPropsFallback.parseBannerExtras(propsJson)
++  }
++
++  private var vehicleLine: String {
++    p.vehicle ?? "Livraison Krono"
++  }
++
++  private var driverInitials: String {
++    ExpoWidgetsLiveActivityPropsFallback.driverInitials(propsJson)
++  }
++
++  private var normalizedEta: String? {
++    guard let e = p.eta, !e.isEmpty else { return nil }
++    let t = e.trimmingCharacters(in: .whitespacesAndNewlines)
++    let lower = t.lowercased()
++    if t == "—" || t == "-" || t == "–" || ["eta", "n/a", "null", "undefined"].contains(lower) { return nil }
++    if let n = Int(t), String(n) == t { return "\(n) min" }
++    let parts = t.split(whereSeparator: { $0.isWhitespace })
++    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
++      return "\(n) min"
++    }
++    return nil
++  }
++
++  private var headline: String {
++    if b.pending {
++      return "Recherche livreur"
++    }
++    let status = p.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
++    if status.contains("terminee") || status.contains("terminée") { return "Livraison terminée" }
++    if status.contains("annulee") || status.contains("annulée") { return "Commande annulée" }
++    if status.contains("refusee") || status.contains("refusée") { return "Commande refusée" }
++    if status.contains("colis") || status.contains("livraison") {
++      return "Livraison dans \(normalizedEta ?? "1 min")"
++    }
++    return "Prise en charge dans \(normalizedEta ?? "1 min")"
++  }
++
++  var body: some View {
++    VStack(alignment: .leading, spacing: 12) {
++      Text("KRONO")
++        .font(.subheadline.weight(.bold))
++        .foregroundStyle(kronoBannerAction)
++
++      HStack(alignment: .center, spacing: 12) {
++        VStack(alignment: .leading, spacing: 3) {
++          Text(headline)
++            .font(.headline.weight(.bold))
++            .foregroundStyle(.white)
++            .lineLimit(1)
++            .minimumScaleFactor(0.78)
++          Text(vehicleLine)
++            .font(.caption.weight(.medium))
++            .foregroundStyle(kronoBannerAction)
++            .lineLimit(1)
++            .minimumScaleFactor(0.78)
++        }
++        avatarView
++      }
++
++      progressTrack
++    }
++    .padding(.horizontal, 16)
++    .padding(.vertical, 18)
++    .frame(minHeight: 122, alignment: .center)
++  }
++
++  @ViewBuilder
++  private var avatarView: some View {
++    ZStack {
++      if let data = LiveActivityAvatarCache.imageData(from: propsJson), let uiImage = UIImage(data: data) {
++        Image(uiImage: uiImage)
++          .resizable()
++          .scaledToFill()
++          .frame(width: 44, height: 44)
++          .clipShape(Circle())
++      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
++        AsyncImage(url: url) { phase in
++          switch phase {
++          case .success(let image):
++            image
++              .resizable()
++              .scaledToFill()
++              .frame(width: 44, height: 44)
++              .clipShape(Circle())
++          case .failure:
++            fallbackAvatar
++          default:
++            fallbackAvatar
++          }
++        }
++      } else {
++        fallbackAvatar
++      }
++    }
++    .frame(width: 44, height: 44)
++  }
++
++  private var fallbackAvatar: some View {
++    ZStack {
++      Circle()
++        .fill(.white)
++        .frame(width: 44, height: 44)
++      Circle()
++        .fill(kronoBannerChip)
++        .frame(width: 38, height: 38)
++      Text(driverInitials)
++        .font(.system(size: 15, weight: .bold))
++        .foregroundStyle(kronoBannerAction)
++        .lineLimit(1)
++    }
++  }
++
++  @ViewBuilder
++  private var progressTrack: some View {
++    GeometryReader { geo in
++      let trackWidth = max(CGFloat(220), geo.size.width)
++      let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
++      let markerWidth = CGFloat(50)
++      let markerHalf = markerWidth / 2
++      let markerCenter = min(max(markerHalf, traveled), trackWidth - markerHalf)
++      let destinationOffset = max(CGFloat(0), trackWidth - 7)
++      ZStack {
++        RoundedRectangle(cornerRadius: 4)
++          .fill(kronoBannerTrack)
++          .frame(height: 5)
++        HStack {
++          RoundedRectangle(cornerRadius: 4)
++            .fill(kronoBannerTrackDone)
++            .frame(width: traveled, height: 5)
++          Spacer(minLength: 0)
++        }
++        .frame(maxWidth: .infinity, alignment: .leading)
++        markerView
++          .offset(x: markerCenter - trackWidth / 2)
++        Circle()
++          .fill(kronoBannerTrackDone)
++          .frame(width: 14, height: 14)
++          .overlay(Circle().fill(Color.black.opacity(0.72)).frame(width: 6, height: 6))
++          .offset(x: destinationOffset - trackWidth / 2)
++      }
++    }
++    .frame(height: 38)
++  }
++
++  @ViewBuilder
++  private var markerView: some View {
++    if let data = LiveActivityAvatarCache.markerImageData(from: propsJson), let uiImage = UIImage(data: data) {
++      Image(uiImage: uiImage)
++        .resizable()
++        .scaledToFit()
++        .frame(width: 50, height: 33)
++    } else {
++      Color.clear.frame(width: 50, height: 33)
++    }
++  }
++}
++
+ @available(iOS 18.0, *)
+ struct LiveActivityBanner: View {
+   @Environment(\.activityFamily) var activityFamily
+@@ -8,12 +181,14 @@ struct LiveActivityBanner: View {
+   var nodes: [String: Any]?
+ 
+   var body: some View {
+-    if activityFamily == .small, let node = nodes?["bannerSmall"] as? [String: Any] {
++    if context.state.name == "OrderTrackingLive" {
++      OrderTrackingBannerFallback(propsJson: context.state.props)
++    } else if activityFamily == .small, let node = nodes?["bannerSmall"] as? [String: Any] {
+       WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
+     } else if let node = nodes?["banner"] as? [String: Any] {
+       WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
+     } else {
+-      EmptyView()
++      OrderTrackingBannerFallback(propsJson: context.state.props)
+     }
+   }
+ }
+diff --git a/node_modules/expo-widgets/ios/Widgets/Utils.swift b/node_modules/expo-widgets/ios/Widgets/Utils.swift
+index 1cd5ca9..21336ab 100644
+--- a/node_modules/expo-widgets/ios/Widgets/Utils.swift
++++ b/node_modules/expo-widgets/ios/Widgets/Utils.swift
+@@ -2,6 +2,13 @@ import SwiftUI
+ import WidgetKit
+ import Foundation
+ 
++private enum ExpoWidgetsLiveActivityDiagnostics {
++  static var didLogEmptyLayout = false
++  static var didLogNilContextNames = Set<String>()
++  static var didLogEmptyNodesNames = Set<String>()
++  static var didLogNonEmptyNodesNames = Set<String>()
++}
++
+ func parseTimeline(identifier: String, name: String, family: WidgetFamily) -> [WidgetsTimelineEntry] {
+   let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(name)_timeline") ?? []
+ 
+@@ -37,9 +44,22 @@ func evaluateLayout(
+ 
+ func getLiveActivityNodes(forName name: String, props: String = "{}", environment: [String: Any]) -> [String: Any] {
+   let layout = WidgetsStorage.getString(forKey: "__expo_widgets_live_activity_\(name)_layout") ?? ""
++  if layout.isEmpty, !ExpoWidgetsLiveActivityDiagnostics.didLogEmptyLayout {
++    ExpoWidgetsLiveActivityDiagnostics.didLogEmptyLayout = true
++    print(
++      "[ExpoWidgets] Live Activity layout string is empty for \"\(name)\" — Dynamic Island / lock screen will show no UI. " +
++        "Ensure the app process wrote to the App Group before ActivityKit started (Krono loads createLiveActivity on launch)."
++    )
++  }
+   let propsData = props.data(using: .utf8)
+   let propsDict = propsData.flatMap { try? JSONSerialization.jsonObject(with: $0, options: []) as? [String: Any] } ?? [:]
+   guard let context = createWidgetContext(layout: layout) else {
++    if ExpoWidgetsLiveActivityDiagnostics.didLogNilContextNames.insert(name).inserted {
++      print(
++        "[ExpoWidgets][LiveActivity][native-ext] createWidgetContext returned nil name=\(name) layoutChars=\(layout.count) " +
++          "bundle=\(Bundle.main.bundleIdentifier ?? "?") — îlot vide probable (pas de JSContext / bundle JS)."
++      )
++    }
+     return [:]
+   }
+ 
+@@ -47,15 +67,34 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
+   widgetEnvironment["timestamp"] = Int(Date.now.timeIntervalSince1970 * 1000)
+ 
+   let result = context.objectForKeyedSubscript("__expoWidgetRender")?.call(
+-    withArguments: [propsDict, environment]
++    withArguments: [propsDict, widgetEnvironment]
+   )
+-  return result?.toObject() as? [String: Any] ?? [:]
++  let nodes = result?.toObject() as? [String: Any] ?? [:]
++  if nodes.isEmpty {
++    if ExpoWidgetsLiveActivityDiagnostics.didLogEmptyNodesNames.insert(name).inserted {
++      print(
++        "[ExpoWidgets][LiveActivity][native-ext] __expoWidgetRender returned empty name=\(name) layoutChars=\(layout.count) " +
++          "— WidgetRenderer peut logguer « Archive was nil » / îlot noir."
++      )
++    }
++  } else if ExpoWidgetsLiveActivityDiagnostics.didLogNonEmptyNodesNames.insert(name).inserted {
++    let keys = nodes.keys.sorted().joined(separator: ",")
++    print(
++      "[ExpoWidgets][LiveActivity][native-ext] nodes OK name=\(name) keys=[\(keys)] (premier rendu avec layout non vide)"
++    )
++  }
++  return nodes
+ }
+ 
+ func getLiveActivityUrl(forName name: String) -> URL? {
+-  let data = WidgetsStorage.getData(forKey: "__expo_widgets_live_activity_\(name)_url")
+-  if let data, let url = String(data: data, encoding: .utf8) {
+-    return URL(string: url)
++  let key = "__expo_widgets_live_activity_\(name)_url"
++  if let s = WidgetsStorage.getString(forKey: key), let url = URL(string: s) {
++    return url
++  }
++  if let data = WidgetsStorage.getData(forKey: key),
++     let s = String(data: data, encoding: .utf8),
++     let url = URL(string: s) {
++    return url
+   }
+   return nil
+ }
+@@ -86,6 +125,166 @@ func getWidgetEnvironment(environment: EnvironmentValues) -> [String: Any] {
+   return env
+ }
+ 
++/// Parse `ActivityKit` `ContentState.props` JSON for native fallback when `__expoWidgetRender` returns `{}`.
++enum ExpoWidgetsLiveActivityPropsFallback {
++  private static func stringField(_ key: String, _ root: [String: Any]) -> String? {
++    if let v = root[key] as? String {
++      let t = v.trimmingCharacters(in: .whitespacesAndNewlines)
++      return t.isEmpty ? nil : t
++    }
++    if let v = root[key] as? Int { return String(v) }
++    if let v = root[key] as? Double {
++      if v.rounded() == v { return String(Int(v)) }
++      return String(v)
++    }
++    return nil
++  }
++
++  private static func doubleField(_ key: String, _ root: [String: Any]) -> Double? {
++    if let v = root[key] as? Double { return v }
++    if let v = root[key] as? Int { return Double(v) }
++    if let v = root[key] as? String { return Double(v.trimmingCharacters(in: .whitespacesAndNewlines)) }
++    return nil
++  }
++
++  private static func normalizedEta(_ value: String?) -> String? {
++    guard let value else { return nil }
++    let t = value.trimmingCharacters(in: .whitespacesAndNewlines)
++    let lower = t.lowercased()
++    if t.isEmpty || t == "—" || t == "-" || t == "–" || ["eta", "n/a", "null", "undefined"].contains(lower) { return nil }
++    if let n = Int(t), String(n) == t { return "\(n) min" }
++    let parts = t.split(whereSeparator: { $0.isWhitespace })
++    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
++      return "\(n) min"
++    }
++    return nil
++  }
++
++  private static func normalizedStatusText(_ value: String?) -> String {
++    (value ?? "")
++      .trimmingCharacters(in: .whitespacesAndNewlines)
++      .folding(options: .diacriticInsensitive, locale: nil)
++      .lowercased()
++  }
++
++  private static func compactFallbackLine(_ statusCode: String?) -> String {
++    switch normalizedStatusText(statusCode) {
++    case "accepted", "enroute":
++      return "1 min"
++    case "in_progress":
++      return "1 min"
++    case "picked_up", "delivering":
++      return "1 min"
++    case "completed":
++      return "Terminé"
++    case "cancelled":
++      return "Annulé"
++    case "declined":
++      return "Refusé"
++    default:
++      return "1 min"
++    }
++  }
++
++  static func shouldShowArrivedCompactVisual(_ propsJson: String) -> Bool {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return false
++    }
++    let statusCode = normalizedStatusText(stringField("statusCode", root))
++    if ["in_progress", "arrived", "at_pickup", "at_dropoff"].contains(statusCode) {
++      return true
++    }
++
++    let statusLabel = normalizedStatusText(stringField("statusLabel", root))
++    return statusLabel.contains("arriv")
++  }
++
++  /// Aligné sur `orderTrackingLiveActivity.tsx` : recherche -> texte, livraison -> ETA en minutes.
++  static func compactTrailingLine(_ propsJson: String) -> String {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return "—"
++    }
++    let pending = root["isPending"] as? Bool == true
++    if pending { return "Recherche livreurs" }
++    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
++    return compactFallbackLine(stringField("statusCode", root))
++  }
++
++  static func minimalLine(_ propsJson: String) -> String {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return "—"
++    }
++    if root["isPending"] as? Bool == true { return "Recherche" }
++    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
++    switch stringField("statusCode", root) {
++    case "accepted", "enroute":
++      return "1 min"
++    case "in_progress":
++      return "1 min"
++    case "picked_up", "delivering":
++      return "1 min"
++    case "completed":
++      return "OK"
++    default:
++      return "1 min"
++    }
++  }
++
++  static func driverInitials(_ propsJson: String) -> String {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return "K"
++    }
++    let raw =
++      stringField("driverInitials", root) ??
++      stringField("vehicleLabel", root) ??
++      "Krono"
++    let initials = raw
++      .split(whereSeparator: { $0.isWhitespace })
++      .compactMap { $0.first }
++      .prefix(2)
++      .map { String($0).uppercased() }
++      .joined()
++    return initials.isEmpty ? "K" : initials
++  }
++
++  static func parse(_ propsJson: String) -> (eta: String?, vehicle: String?, status: String?, plate: String?) {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return (nil, nil, nil, nil)
++    }
++    let pending = root["isPending"] as? Bool == true
++    let status = stringField("statusLabel", root) ?? (pending ? "Recherche chauffeur" : nil)
++    return (
++      stringField("etaLabel", root),
++      stringField("vehicleInfoLabel", root) ?? stringField("vehicleLabel", root),
++      status,
++      stringField("plateLabel", root)
++    )
++  }
++
++  /// Champs additionnels pour la bannière verrouillage (photo, téléphone, heure affichée).
++  static func parseBannerExtras(_ propsJson: String) -> (phone: String?, avatar: String?, clock: String?, pending: Bool, progress: Double) {
++    guard let data = propsJson.data(using: .utf8),
++          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
++      return (nil, nil, nil, false, 0.56)
++    }
++    let pending = root["isPending"] as? Bool == true
++    let rawProgress = doubleField("progress", root) ?? (pending ? 0.08 : 0.56)
++    let progress = min(1, max(0.04, rawProgress))
++    return (
++      stringField("driverPhone", root),
++      stringField("driverAvatarUrl", root),
++      stringField("bannerClockLabel", root),
++      pending,
++      progress
++    )
++  }
++}
++
+ func getLiveActivityEnvironment(environment: EnvironmentValues) -> [String: Any] {
+   var env: [String: Any] = [
+     "colorScheme": "\(environment.colorScheme)"
+diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
+index 68ff52a..6cd2258 100644
+--- a/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
++++ b/node_modules/expo-widgets/ios/Widgets/WidgetContext.swift
+@@ -1,7 +1,71 @@
+ import Foundation
+ import JavaScriptCore
+ 
++// Cache JSContext per layout string. expo/expo#44543 - avoid recreation on each island refresh.
++private var cachedWidgetContexts: [String: JSContext] = [:]
++
++/// Marker for `Bundle(for:)` — resources may live in the pod framework instead of `Bundle.main` in some embeds.
++private final class ExpoWidgetsResourceMarker {}
++
++/// Loads Metro output for the widget runtime (nested bundle, flat file, or framework bundle). expo/expo#43654
++private func loadExpoWidgetsJS() -> String? {
++  let bundles: [Bundle] = [Bundle.main, Bundle(for: ExpoWidgetsResourceMarker.self)]
++
++  for bundle in bundles {
++    guard let outerURL = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle") else {
++      continue
++    }
++
++    // 1) Resource bundle directory: inner `ExpoWidgets.bundle` file (Metro JS) copied by podspec script.
++    if let outer = Bundle(url: outerURL),
++       let innerURL = outer.url(forResource: "ExpoWidgets", withExtension: "bundle"),
++       let js = try? String(contentsOf: innerURL, encoding: .utf8),
++       !js.isEmpty {
++      return js
++    }
++
++    // 2) Same as (1) but file on disk only — not always exposed via `url(forResource:)` in every embed.
++    let manualInnerURL = outerURL.appendingPathComponent("ExpoWidgets.bundle")
++    var innerIsDir: ObjCBool = false
++    if FileManager.default.fileExists(atPath: manualInnerURL.path, isDirectory: &innerIsDir),
++       !innerIsDir.boolValue,
++       let js = try? String(contentsOf: manualInnerURL, encoding: .utf8),
++       !js.isEmpty {
++      return js
++    }
++
++    // 3) Flat file at bundle root (single-file `ExpoWidgets.bundle`).
++    var outerIsDir: ObjCBool = false
++    if FileManager.default.fileExists(atPath: outerURL.path, isDirectory: &outerIsDir),
++       !outerIsDir.boolValue,
++       let js = try? String(contentsOf: outerURL, encoding: .utf8),
++       !js.isEmpty {
++      return js
++    }
++  }
++
++  // 4) Optional embedded framework (some CocoaPods / linkage layouts).
++  let fwURL = Bundle.main.bundleURL.appendingPathComponent("Frameworks/ExpoWidgets.framework/ExpoWidgets.bundle")
++  var fwIsDir: ObjCBool = false
++  if FileManager.default.fileExists(atPath: fwURL.path, isDirectory: &fwIsDir),
++     !fwIsDir.boolValue,
++     let js = try? String(contentsOf: fwURL, encoding: .utf8),
++     !js.isEmpty {
++    return js
++  }
++
++  print(
++    "[ExpoWidgets][LiveActivity][native-ext] Missing ExpoWidgets.bundle " +
++      "(nested, flat, framework) bundle=\(Bundle.main.bundleIdentifier ?? "?")"
++  )
++  return nil
++}
++
+ func createWidgetContext(layout: String) -> JSContext? {
++  if !layout.isEmpty, let cached = cachedWidgetContexts[layout] {
++    return cached
++  }
++
+   guard let context = JSContext() else {
+     return nil
+   }
+@@ -12,18 +76,23 @@ func createWidgetContext(layout: String) -> JSContext? {
+     }
+   }
+ 
+-  // Inject ExpoUI bundle
+-  guard let bundleURL = Bundle.main.url(forResource: "ExpoWidgets", withExtension: "bundle"),
+-        let bundle = Bundle(url: bundleURL),
+-        let url = bundle.url(forResource: "ExpoWidgets", withExtension: "bundle"),
+-        let bundleJS = try? String(contentsOf: url, encoding: .utf8) else {
+-    print("[ExpoWidgets] Missing ExpoWidgets.bundle")
++  guard let bundleJS = loadExpoWidgetsJS() else {
+     return nil
+   }
+   context.evaluateScript(bundleJS)
+ 
+   // Inject layout
+   let layoutValue = context.evaluateScript("(\(layout))")
++  if layoutValue == nil || layoutValue!.isUndefined {
++    print(
++      "[ExpoWidgets][LiveActivity][native-ext] evaluateScript(layout) is nil/undefined layoutChars=\(layout.count) " +
++        "bundle=\(Bundle.main.bundleIdentifier ?? "?")"
++    )
++  }
+   context.setObject(layoutValue, forKeyedSubscript: "__expoWidgetLayout" as NSString)
++
++  if !layout.isEmpty {
++    cachedWidgetContexts[layout] = context
++  }
+   return context
+ }
+diff --git a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
+index 9eae718..9c0913e 100644
+--- a/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
++++ b/node_modules/expo-widgets/ios/Widgets/WidgetLiveActivity.swift
+@@ -2,6 +2,9 @@ import SwiftUI
+ import WidgetKit
+ import ExpoModulesCore
+ import ActivityKit
++import UIKit
++
++private let kronoLiveActivityAccent = Color(red: 0.655, green: 0.545, blue: 0.98)
+ 
+ struct LiveActivityAttributes: ActivityAttributes {
+   public struct ContentState: Codable, Hashable {
+@@ -12,83 +15,341 @@ struct LiveActivityAttributes: ActivityAttributes {
+ 
+ @available(iOS 16.1, *)
+ public struct WidgetLiveActivity: Widget {
+-  @Environment(\.self) var env
+-  
+   let widgetContext: AppContext = AppContext()
+-  
+-  var environment: [String: Any] {
+-    return getLiveActivityEnvironment(environment: env)
+-  }
+ 
+   public init() {}
+ 
+   public var body: some WidgetConfiguration {
+     ActivityConfiguration(for: LiveActivityAttributes.self) { context in
+-      LiveActivityBannerView(context: context, environment: environment)
++      LiveActivityBannerView(context: context)
+     } dynamicIsland: { context in
+       DynamicIsland {
+         DynamicIslandExpandedRegion(.center) {
+-          LiveActivitySectionView(context: context, environment: environment, sectionName: "expandedCenter")
++          LiveActivitySectionView(context: context, sectionName: "expandedCenter")
+         }
+         DynamicIslandExpandedRegion(.leading) {
+-          LiveActivitySectionView(context: context, environment: environment, sectionName: "expandedLeading")
++          LiveActivitySectionView(context: context, sectionName: "expandedLeading")
+         }
+         DynamicIslandExpandedRegion(.trailing) {
+-          LiveActivitySectionView(context: context, environment: environment, sectionName: "expandedTrailing")
++          LiveActivitySectionView(context: context, sectionName: "expandedTrailing")
+         }
+         DynamicIslandExpandedRegion(.bottom) {
+-          LiveActivitySectionView(context: context, environment: environment, sectionName: "expandedBottom")
++          LiveActivitySectionView(context: context, sectionName: "expandedBottom")
+         }
+       } compactLeading: {
+-        LiveActivitySectionView(context: context, environment: environment, sectionName: "compactLeading")
++        LiveActivitySectionView(context: context, sectionName: "compactLeading")
+       } compactTrailing: {
+-        LiveActivitySectionView(context: context, environment: environment, sectionName: "compactTrailing")
++        LiveActivitySectionView(context: context, sectionName: "compactTrailing")
+       } minimal: {
+-        LiveActivitySectionView(context: context, environment: environment, sectionName: "minimal")
++        LiveActivitySectionView(context: context, sectionName: "minimal")
+       }
+       .widgetURL(getLiveActivityUrl(forName: context.state.name))
++      .keylineTint(kronoLiveActivityAccent)
+     }
+     .supplementalActivityFamiliesIfAvailable()
+   }
+ }
+ 
++/// Si le pipeline JS → nœuds échoue, `EmptyView()` laisse l’îlot **noir** (WidgetRenderer n’a rien à archiver).
++/// Un fallback 100 % natif prouve que l’extension tourne et évite l’îlot vide en dégradé.
++@available(iOS 16.1, *)
++private struct LiveActivitySectionFallback: View {
++  let sectionName: String
++  let propsJson: String
++
++  private var p: (eta: String?, vehicle: String?, status: String?, plate: String?) {
++    ExpoWidgetsLiveActivityPropsFallback.parse(propsJson)
++  }
++
++  private var b: (phone: String?, avatar: String?, clock: String?, pending: Bool, progress: Double) {
++    ExpoWidgetsLiveActivityPropsFallback.parseBannerExtras(propsJson)
++  }
++
++  private var vehicleLine: String {
++    p.vehicle ?? "Livraison Krono"
++  }
++
++  private var driverInitials: String {
++    ExpoWidgetsLiveActivityPropsFallback.driverInitials(propsJson)
++  }
++
++  private var normalizedEta: String? {
++    guard let e = p.eta, !e.isEmpty else { return nil }
++    let t = e.trimmingCharacters(in: .whitespacesAndNewlines)
++    let lower = t.lowercased()
++    if t == "—" || t == "-" || t == "–" || ["eta", "n/a", "null", "undefined"].contains(lower) { return nil }
++    if let n = Int(t), String(n) == t { return "\(n) min" }
++    let parts = t.split(whereSeparator: { $0.isWhitespace })
++    if parts.count >= 2, parts[1].lowercased().hasPrefix("min"), let n = Int(parts[0]) {
++      return "\(n) min"
++    }
++    return nil
++  }
++
++  private var headline: String {
++    if b.pending {
++      return "Recherche livreur"
++    }
++    let status = p.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
++    if status.contains("terminee") || status.contains("terminée") { return "Livraison terminée" }
++    if status.contains("annulee") || status.contains("annulée") { return "Commande annulée" }
++    if status.contains("refusee") || status.contains("refusée") { return "Commande refusée" }
++    if status.contains("colis") || status.contains("livraison") {
++      return "Livraison dans \(normalizedEta ?? "1 min")"
++    }
++    return "Prise en charge dans \(normalizedEta ?? "1 min")"
++  }
++
++  var body: some View {
++    switch sectionName {
++    case "minimal":
++      Text(ExpoWidgetsLiveActivityPropsFallback.minimalLine(propsJson))
++        .font(.caption2.weight(.bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++        .lineLimit(1)
++        .minimumScaleFactor(0.62)
++    case "compactLeading":
++      Text("KRONO")
++        .font(.caption.weight(.bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++        .lineLimit(1)
++        .minimumScaleFactor(0.72)
++    case "compactTrailing":
++      if ExpoWidgetsLiveActivityPropsFallback.shouldShowArrivedCompactVisual(propsJson) {
++        HStack(spacing: 2) {
++          compactArrivedHand
++          compactAvatarView
++        }
++        .frame(width: 52, height: 30)
++        .fixedSize(horizontal: true, vertical: true)
++      } else {
++        Text(ExpoWidgetsLiveActivityPropsFallback.compactTrailingLine(propsJson))
++          .font(.caption.weight(.semibold))
++          .foregroundStyle(kronoLiveActivityAccent)
++          .lineLimit(1)
++          .minimumScaleFactor(0.75)
++      }
++    case "expandedCenter":
++      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
++    case "expandedLeading":
++      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
++    case "expandedTrailing":
++      Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
++    case "expandedBottom":
++      expandedTrackingBottom
++    default:
++      Text("KRONO")
++        .font(.caption.weight(.bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++    }
++  }
++
++  private var compactArrivedHand: some View {
++    ZStack {
++      Image(systemName: "hand.raised.fill")
++        .font(.system(size: 17, weight: .semibold))
++        .foregroundStyle(.white)
++      Image(systemName: "chevron.left")
++        .font(.system(size: 7, weight: .bold))
++        .foregroundStyle(.white)
++        .offset(x: -8, y: -5)
++      Image(systemName: "chevron.left")
++        .font(.system(size: 7, weight: .bold))
++        .foregroundStyle(.white)
++        .offset(x: -8, y: 5)
++      Image(systemName: "chevron.left")
++        .font(.system(size: 6, weight: .bold))
++        .foregroundStyle(.white)
++        .offset(x: -11)
++    }
++    .frame(width: 19, height: 22)
++    .fixedSize(horizontal: true, vertical: true)
++  }
++
++  @ViewBuilder
++  private var compactAvatarView: some View {
++    avatarView
++      .scaleEffect(30 / 36)
++    .frame(width: 30, height: 30)
++    .clipShape(Circle())
++    .fixedSize(horizontal: true, vertical: true)
++  }
++
++  private var compactFallbackAvatar: some View {
++    ZStack {
++      Circle()
++        .fill(.white)
++        .frame(width: 30, height: 30)
++      Circle()
++        .fill(Color.white.opacity(0.12))
++        .frame(width: 25, height: 25)
++      Text(driverInitials)
++        .font(.system(size: 11, weight: .bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++        .lineLimit(1)
++    }
++    .frame(width: 30, height: 30)
++    .clipShape(Circle())
++    .fixedSize(horizontal: true, vertical: true)
++  }
++
++  @ViewBuilder
++  private var avatarView: some View {
++    ZStack {
++      if let data = LiveActivityAvatarCache.imageData(from: propsJson), let uiImage = UIImage(data: data) {
++        Image(uiImage: uiImage)
++          .resizable()
++          .scaledToFill()
++          .frame(width: 36, height: 36)
++          .clipShape(Circle())
++      } else if let urlStr = b.avatar, let url = URL(string: urlStr) {
++        AsyncImage(url: url) { phase in
++          switch phase {
++          case .success(let image):
++            image
++              .resizable()
++              .scaledToFill()
++              .frame(width: 36, height: 36)
++              .clipShape(Circle())
++          case .failure:
++            fallbackAvatar
++          default:
++            fallbackAvatar
++          }
++        }
++      } else {
++        fallbackAvatar
++      }
++    }
++    .frame(width: 36, height: 36)
++  }
++
++  private var fallbackAvatar: some View {
++    ZStack {
++      Circle()
++        .fill(.white)
++        .frame(width: 36, height: 36)
++      Circle()
++        .fill(Color.white.opacity(0.12))
++        .frame(width: 31, height: 31)
++      Text(driverInitials)
++        .font(.system(size: 13, weight: .bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++        .lineLimit(1)
++    }
++  }
++
++  @ViewBuilder
++  private var expandedTrackingBottom: some View {
++    VStack(alignment: .leading, spacing: 8) {
++      Text("KRONO")
++        .font(.subheadline.weight(.bold))
++        .foregroundStyle(kronoLiveActivityAccent)
++        .lineLimit(1)
++      HStack(alignment: .center, spacing: 10) {
++        VStack(alignment: .leading, spacing: 2) {
++          Text(headline)
++            .font(.title3.weight(.bold))
++            .foregroundStyle(.white)
++            .lineLimit(1)
++            .minimumScaleFactor(0.76)
++          Text(vehicleLine)
++            .font(.caption.weight(.medium))
++            .foregroundStyle(kronoLiveActivityAccent)
++            .lineLimit(1)
++            .minimumScaleFactor(0.76)
++        }
++        avatarView
++      }
++
++      ZStack(alignment: .leading) {
++        let trackWidth = CGFloat(250)
++        let traveled = max(CGFloat(18), min(trackWidth, trackWidth * CGFloat(b.progress)))
++        let markerWidth = CGFloat(50)
++        let markerHalf = markerWidth / 2
++        let carOffset = min(max(CGFloat(0), traveled - markerHalf), trackWidth - markerWidth)
++        let destinationOffset = max(CGFloat(0), trackWidth - 14)
++
++        RoundedRectangle(cornerRadius: 4)
++          .fill(Color.white.opacity(0.24))
++          .frame(width: trackWidth, height: 5)
++        RoundedRectangle(cornerRadius: 4)
++          .fill(kronoLiveActivityAccent)
++          .frame(width: traveled, height: 5)
++        markerView
++          .offset(x: carOffset)
++        Circle()
++          .fill(kronoLiveActivityAccent)
++          .frame(width: 14, height: 14)
++          .overlay(Circle().fill(Color.black.opacity(0.72)).frame(width: 6, height: 6))
++          .offset(x: destinationOffset)
++      }
++    }
++    .padding(EdgeInsets(top: 2, leading: 12, bottom: 10, trailing: 12))
++  }
++
++  @ViewBuilder
++  private var markerView: some View {
++    if let data = LiveActivityAvatarCache.markerImageData(from: propsJson), let uiImage = UIImage(data: data) {
++      Image(uiImage: uiImage)
++        .resizable()
++        .scaledToFit()
++        .frame(width: 50, height: 33)
++    } else {
++      Color.clear.frame(width: 50, height: 33)
++    }
++  }
++}
++
+ @available(iOS 16.1, *)
+ private struct LiveActivitySectionView: View {
++  @Environment(\.self) private var env
++
+   let context: ActivityViewContext<LiveActivityAttributes>
+-  let environment: [String: Any]
+   let sectionName: String
+ 
+   var body: some View {
+-    let nodes = getLiveActivityNodes(
+-      forName: context.state.name,
+-      props: context.state.props,
+-      environment: environment
+-    )
+-    if let node = nodes[sectionName] as? [String: Any] {
+-      WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
++    if context.state.name == "OrderTrackingLive" {
++      LiveActivitySectionFallback(sectionName: sectionName, propsJson: context.state.props)
+     } else {
+-      EmptyView()
++      let environment = getLiveActivityEnvironment(environment: env)
++      let nodes = getLiveActivityNodes(
++        forName: context.state.name,
++        props: context.state.props,
++        environment: environment
++      )
++      if let node = nodes[sectionName] as? [String: Any] {
++        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
++      } else {
++        LiveActivitySectionFallback(sectionName: sectionName, propsJson: context.state.props)
++      }
+     }
+   }
+ }
+ 
+ @available(iOS 16.1, *)
+ private struct LiveActivityBannerView: View {
++  @Environment(\.self) private var env
++
+   var context: ActivityViewContext<LiveActivityAttributes>
+-  let environment: [String: Any]
+ 
+   var body: some View {
+-    let nodes = getLiveActivityNodes(
+-      forName: context.state.name,
+-      props: context.state.props,
+-      environment: environment
+-    )
+-    if #available(iOS 18.0, *) {
+-      LiveActivityBanner(context: context, nodes: nodes)
+-    } else if let node = nodes["banner"] as? [String: Any] {
+-      WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
++    if context.state.name == "OrderTrackingLive" {
++      OrderTrackingBannerFallback(propsJson: context.state.props)
+     } else {
+-      EmptyView()
++      let environment = getLiveActivityEnvironment(environment: env)
++      let nodes = getLiveActivityNodes(
++        forName: context.state.name,
++        props: context.state.props,
++        environment: environment
++      )
++      if #available(iOS 18.0, *) {
++        LiveActivityBanner(context: context, nodes: nodes)
++      } else if let node = nodes["banner"] as? [String: Any] {
++        WidgetsDynamicView(name: context.activityID, kind: .liveActivity, node: node)
++      } else {
++        OrderTrackingBannerFallback(propsJson: context.state.props)
++      }
+     }
+   }
+ }
+diff --git a/node_modules/expo-widgets/ios/WidgetsStorage.swift b/node_modules/expo-widgets/ios/WidgetsStorage.swift
+index 74c905a..9eb1c1d 100644
+--- a/node_modules/expo-widgets/ios/WidgetsStorage.swift
++++ b/node_modules/expo-widgets/ios/WidgetsStorage.swift
+@@ -1,31 +1,54 @@
+ enum WidgetsStorage {
+   static var appGroupIdentifier: String? = Bundle.main.object(forInfoDictionaryKey: "ExpoWidgetsAppGroupIdentifier") as? String
+   static let defaults = UserDefaults(suiteName: appGroupIdentifier)
++  private static var hasLoggedMissingSuite = false
+ 
+   static func set(_ value: [String: Any], forKey key: String) {
+-    guard let defaults else { return }
++    guard let defaults else {
++      logMissingSuiteIfNeeded()
++      return
++    }
+ 
+     defaults.set(value, forKey: key)
+   }
+ 
+   static func set(_ value: [[String: Any]], forKey key: String) {
+-    guard let defaults else { return }
++    guard let defaults else {
++      logMissingSuiteIfNeeded()
++      return
++    }
+ 
+     defaults.set(value, forKey: key)
+   }
+ 
+   static func set(_ value: String, forKey key: String) {
+-    guard let defaults else { return }
++    guard let defaults else {
++      logMissingSuiteIfNeeded()
++      return
++    }
+ 
+     defaults.set(value, forKey: key)
+   }
+ 
+   static func set(_ value: Data, forKey key: String) {
+-    guard let defaults else { return }
++    guard let defaults else {
++      logMissingSuiteIfNeeded()
++      return
++    }
+ 
+     defaults.set(value, forKey: key)
+   }
+ 
++  private static func logMissingSuiteIfNeeded() {
++    guard !hasLoggedMissingSuite else { return }
++    hasLoggedMissingSuite = true
++    print(
++      "[ExpoWidgets] WidgetsStorage: UserDefaults(suiteName:) is nil — App Group UserDefaults unavailable. " +
++        "Check ExpoWidgetsAppGroupIdentifier in Info.plist and com.apple.security.application-groups entitlements " +
++        "(bundle=\(Bundle.main.bundleIdentifier ?? "?"))."
++    )
++  }
++
+   static func getDictionary(forKey key: String) -> [String: Any]? {
+     guard let defaults else { return nil }
+ 
+diff --git a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
+index 7dd91dc..13b5a27 100755
+--- a/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
++++ b/node_modules/expo-widgets/scripts/xcode-build-bundle.sh
+@@ -4,15 +4,7 @@ set -eo pipefail
+ 
+ EXPO_WIDGETS_PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+ 
+-# For classic main project build phases integration, will be no-op to prevent duplicated bundle creation.
+-#
+-# `$PROJECT_DIR` is passed by Xcode as the directory to the xcodeproj file.
+-# in classic main project setup it is something like /path/to/app/ios
+-# in new style pod project setup it is something like /path/to/app/ios/Pods
+-PROJECT_DIR_BASENAME=$(basename $PROJECT_DIR)
+-if [ "x$PROJECT_DIR_BASENAME" != "xPods" ]; then
+-  exit 0
+-fi
++# expo/expo#43654 - do not exit when PROJECT_DIR is "ios" (expo run:ios); bundle would never build.
+ 
+ # If PROJECT_ROOT is not specified, fallback to use Xcode PROJECT_DIR
+ PROJECT_ROOT=${PROJECT_ROOT:-"$PROJECT_DIR/../.."}
