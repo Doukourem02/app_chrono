@@ -165,6 +165,18 @@ function etaLabelFromOrder(order: OrderRequest, status: OrderStatus): string {
   return minutes != null ? formatETA(Math.max(1, Math.round(minutes))) : rawDuration;
 }
 
+function fallbackEtaForPhase(order: OrderRequest, status: OrderStatus): string {
+  const phase = progressPhaseForStatus(status);
+  if (phase === "dropoff") {
+    const distance = pickupToDropoffDistance(order);
+    if (distance != null) {
+      const etaMinutes = calculateETAForVehicle(distance, liveActivityVehicleType(order.deliveryMethod));
+      return formatETA(Math.max(1, etaMinutes));
+    }
+  }
+  return etaLabelFromOrder(order, status);
+}
+
 function etaProgressCap(status: OrderStatus, etaLabel: string | undefined): number | null {
   const minutes = etaMinutesFromLabel(etaLabel);
   if (minutes == null) return null;
@@ -348,6 +360,17 @@ function progressFromDriverMovement(
     etaLabel: formatETA(Math.max(1, etaMinutes)),
     arrivedAtStop: remainingMeters <= ARRIVAL_RADIUS_METERS,
   };
+}
+
+function driverCoordsFromOrder(driver: OrderRequest["driver"] | undefined): Coordinates | null {
+  const record = driver as Record<string, unknown> | undefined;
+  if (!record) return null;
+  const rawLat = record.current_latitude ?? record.currentLatitude ?? record.latitude ?? record.lat;
+  const rawLng = record.current_longitude ?? record.currentLongitude ?? record.longitude ?? record.lng;
+  const latitude = typeof rawLat === "number" ? rawLat : Number(rawLat);
+  const longitude = typeof rawLng === "number" ? rawLng : Number(rawLng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
 }
 
 function liveStatusLabel(status: OrderStatus): string {
@@ -563,8 +586,9 @@ function propsFromOrder(
       ? [plate, name].filter(Boolean).join(" · ")
       : order.dropoff?.address?.slice(0, 42) || "Krono";
 
-  const movement = progressFromDriverMovement(order, status, driverCoords);
-  const etaLabel = movement.etaLabel || etaLabelFromOrder(order, status);
+  const effectiveDriverCoords = driverCoords ?? driverCoordsFromOrder(driver);
+  const movement = progressFromDriverMovement(order, status, effectiveDriverCoords);
+  const etaLabel = movement.etaLabel || fallbackEtaForPhase(order, status);
   const progress = progressWithEtaCap(status, movement.progress, etaLabel);
 
   return {

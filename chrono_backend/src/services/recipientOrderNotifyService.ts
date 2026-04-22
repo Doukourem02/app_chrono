@@ -57,8 +57,8 @@ export function copyForPublicTrackStatus(status: string): { title: string; body:
       };
     case 'enroute':
       return {
-        title: 'En route',
-        body: 'Le livreur est en route vers le point de collecte de colis.',
+        title: 'Vers la collecte',
+        body: 'Le livreur se dirige vers le point de collecte de colis.',
       };
     case 'in_progress':
       return {
@@ -73,7 +73,7 @@ export function copyForPublicTrackStatus(status: string): { title: string; body:
     case 'delivering':
       return {
         title: 'En livraison',
-        body: 'Le livreur est en route vers vous.',
+        body: 'Le livreur se dirige vers vous.',
       };
     case 'completed':
       return {

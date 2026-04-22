@@ -16,8 +16,8 @@ function copyForPayerStatus(status: string): { title: string; body: string } | n
       };
     case 'enroute':
       return {
-        title: 'En route',
-        body: 'Le livreur est en route vers le point de collecte de colis.',
+        title: 'Vers la collecte',
+        body: 'Le livreur se dirige vers le point de collecte de colis.',
       };
     case 'picked_up':
       return {
@@ -27,7 +27,7 @@ function copyForPayerStatus(status: string): { title: string; body: string } | n
     case 'delivering':
       return {
         title: 'En livraison',
-        body: 'Le livreur est en route vers le destinataire.',
+        body: 'Le livreur se dirige vers le destinataire.',
       };
     case 'completed':
       return {
@@ -51,12 +51,12 @@ function copyForRecipientStatus(status: string): { title: string; body: string }
     case 'accepted':
       return {
         title: 'Course acceptée',
-        body: 'Une livraison est en route vers vous.',
+        body: 'Une livraison arrive vers vous.',
       };
     case 'enroute':
       return {
-        title: 'En route',
-        body: 'Le livreur est en route vers le point de collecte.',
+        title: 'Vers la collecte',
+        body: 'Le livreur se dirige vers le point de collecte.',
       };
     case 'picked_up':
       return {
@@ -66,7 +66,7 @@ function copyForRecipientStatus(status: string): { title: string; body: string }
     case 'delivering':
       return {
         title: 'En livraison',
-        body: 'Le livreur est en route vers vous.',
+        body: 'Le livreur se dirige vers vous.',
       };
     case 'completed':
       return {

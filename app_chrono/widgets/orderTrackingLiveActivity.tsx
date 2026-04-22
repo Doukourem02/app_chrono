@@ -80,12 +80,12 @@ function compactFallbackLabel(statusCode: string | undefined): string {
   switch ((statusCode ?? "").trim()) {
     case "accepted":
     case "enroute":
-      return "En route";
+      return "1 min";
     case "in_progress":
-      return "Arrivé";
+      return "1 min";
     case "picked_up":
     case "delivering":
-      return "En route";
+      return "1 min";
     case "completed":
       return "Terminé";
     case "cancelled":
@@ -93,7 +93,7 @@ function compactFallbackLabel(statusCode: string | undefined): string {
     case "declined":
       return "Refusé";
     default:
-      return "Suivi";
+      return "1 min";
   }
 }
 
@@ -103,7 +103,6 @@ function compactTrailingLabel(
   isPending: boolean | undefined,
 ): string {
   if (isPending) return "Recherche livreurs";
-  if ((statusCode ?? "").trim() === "in_progress") return "Arrivé";
   return eta || compactFallbackLabel(statusCode);
 }
 
@@ -121,16 +120,16 @@ function minimalFallbackLabel(statusCode: string | undefined): string {
   switch ((statusCode ?? "").trim()) {
     case "accepted":
     case "enroute":
-      return "Suivi";
+      return "1 min";
     case "in_progress":
-      return "Prep";
+      return "1 min";
     case "picked_up":
     case "delivering":
-      return "Route";
+      return "1 min";
     case "completed":
       return "OK";
     default:
-      return "Suivi";
+      return "1 min";
   }
 }
 
@@ -141,9 +140,9 @@ function etaHeadline(statusCode: string | undefined, eta: string, isPending: boo
   if (status === "cancelled") return "Commande annulée";
   if (status === "declined") return "Commande refusée";
   if (status === "picked_up" || status === "delivering") {
-    return eta ? `Livraison dans ${eta}` : "En livraison";
+    return `Livraison dans ${eta || "1 min"}`;
   }
-  return eta ? `Prise en charge dans ${eta}` : "Vers la prise en charge";
+  return `Prise en charge dans ${eta || "1 min"}`;
 }
 
 function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActivityEnvironment) {

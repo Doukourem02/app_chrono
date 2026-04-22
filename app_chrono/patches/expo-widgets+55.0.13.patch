@@ -159,19 +159,22 @@ new file mode 100644
 index 0000000..f40afd7
 --- /dev/null
 +++ b/node_modules/expo-widgets/ios/LiveActivityAvatarCache.swift
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,168 @@
 +import Foundation
++import UIKit
 +
 +enum LiveActivityAvatarCache {
 +  private static let keyPrefix = "__expo_widgets_live_activity_avatar_"
 +  private static let maxAvatarBytes = 1_500_000
++  private static let inlineAvatarMaxPixel = CGFloat(96)
++  private static let inlineAvatarQuality = CGFloat(0.72)
 +
 +  static func enrichProps(_ props: String) -> String {
 +    guard var root = parseProps(props) else {
 +      return props
 +    }
 +
-+    cacheImageField("driverAvatarUrl", into: "driverAvatarCacheKey", in: &root)
++    cacheImageField("driverAvatarUrl", into: "driverAvatarCacheKey", inlineInto: "driverAvatarInlineBase64", in: &root)
 +    cacheImageField("vehicleMarkerUrl", into: "vehicleMarkerCacheKey", in: &root)
 +    guard let data = try? JSONSerialization.data(withJSONObject: root),
 +          let enriched = String(data: data, encoding: .utf8) else {
@@ -183,6 +186,10 @@ index 0000000..f40afd7
 +  static func imageData(from propsJson: String) -> Data? {
 +    guard let root = parseProps(propsJson) else {
 +      return nil
++    }
++    if let inline = stringField("driverAvatarInlineBase64", root),
++       let data = Data(base64Encoded: inline) {
++      return data
 +    }
 +    if let key = stringField("driverAvatarCacheKey", root),
 +       let data = WidgetsStorage.getData(forKey: key) {
@@ -228,7 +235,12 @@ index 0000000..f40afd7
 +    return keyPrefix + encoded
 +  }
 +
-+  private static func cacheImageField(_ sourceField: String, into cacheField: String, in root: inout [String: Any]) {
++  private static func cacheImageField(
++    _ sourceField: String,
++    into cacheField: String,
++    inlineInto inlineField: String? = nil,
++    in root: inout [String: Any]
++  ) {
 +    guard let source = stringField(sourceField, root) else { return }
 +    let key = cacheKey(for: source)
 +    if WidgetsStorage.getData(forKey: key) == nil,
@@ -242,6 +254,9 @@ index 0000000..f40afd7
 +    }
 +
 +    root[cacheField] = key
++    if let inlineField, root[inlineField] == nil, let inlineData = compressedInlineImageData(from: data) {
++      root[inlineField] = inlineData.base64EncodedString()
++    }
 +    if let fileURL = writeImageDataToSharedFile(data, forKey: key) {
 +      root[sourceField] = fileURL.absoluteString
 +    }
@@ -298,6 +313,19 @@ index 0000000..f40afd7
 +      return nil
 +    }
 +    return result
++  }
++
++  private static func compressedInlineImageData(from data: Data) -> Data? {
++    guard let sourceImage = UIImage(data: data) else { return nil }
++    let maxSide = max(sourceImage.size.width, sourceImage.size.height)
++    guard maxSide > 0 else { return nil }
++    let scale = min(1, inlineAvatarMaxPixel / maxSide)
++    let targetSize = CGSize(width: sourceImage.size.width * scale, height: sourceImage.size.height * scale)
++    let renderer = UIGraphicsImageRenderer(size: targetSize)
++    let image = renderer.image { _ in
++      sourceImage.draw(in: CGRect(origin: .zero, size: targetSize))
++    }
++    return image.jpegData(compressionQuality: inlineAvatarQuality)
 +  }
 +}
 diff --git a/node_modules/expo-widgets/ios/LiveActivityFactory.swift b/node_modules/expo-widgets/ios/LiveActivityFactory.swift
@@ -475,11 +503,9 @@ index 3e6ff0b..2571533 100644
 +    if status.contains("annulee") || status.contains("annulée") { return "Commande annulée" }
 +    if status.contains("refusee") || status.contains("refusée") { return "Commande refusée" }
 +    if status.contains("colis") || status.contains("livraison") {
-+      if let eta = normalizedEta { return "Livraison dans \(eta)" }
-+      return "En livraison"
++      return "Livraison dans \(normalizedEta ?? "1 min")"
 +    }
-+    if let eta = normalizedEta { return "Prise en charge dans \(eta)" }
-+    return "Vers la prise en charge"
++    return "Prise en charge dans \(normalizedEta ?? "1 min")"
 +  }
 +
 +  var body: some View {
@@ -752,11 +778,11 @@ index 1cd5ca9..f166353 100644
 +  private static func compactFallbackLine(_ statusCode: String?) -> String {
 +    switch normalizedStatusText(statusCode) {
 +    case "accepted", "enroute":
-+      return "En route"
++      return "1 min"
 +    case "in_progress":
-+      return "Arrivé"
++      return "1 min"
 +    case "picked_up", "delivering":
-+      return "En route"
++      return "1 min"
 +    case "completed":
 +      return "Terminé"
 +    case "cancelled":
@@ -764,7 +790,7 @@ index 1cd5ca9..f166353 100644
 +    case "declined":
 +      return "Refusé"
 +    default:
-+      return "Suivi"
++      return "1 min"
 +    }
 +  }
 +
@@ -782,7 +808,7 @@ index 1cd5ca9..f166353 100644
 +    return statusLabel.contains("arriv")
 +  }
 +
-+  /// Aligné sur `orderTrackingLiveActivity.tsx` : recherche -> texte, route -> ETA, arrivé -> visuel dédié.
++  /// Aligné sur `orderTrackingLiveActivity.tsx` : recherche -> texte, livraison -> ETA en minutes.
 +  static func compactTrailingLine(_ propsJson: String) -> String {
 +    guard let data = propsJson.data(using: .utf8),
 +          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -790,7 +816,6 @@ index 1cd5ca9..f166353 100644
 +    }
 +    let pending = root["isPending"] as? Bool == true
 +    if pending { return "Recherche livreurs" }
-+    if shouldShowArrivedCompactVisual(propsJson) { return "Arrivé" }
 +    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
 +    return compactFallbackLine(stringField("statusCode", root))
 +  }
@@ -803,14 +828,16 @@ index 1cd5ca9..f166353 100644
 +    if root["isPending"] as? Bool == true { return "Recherche" }
 +    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
 +    switch stringField("statusCode", root) {
++    case "accepted", "enroute":
++      return "1 min"
 +    case "in_progress":
-+      return "Prep"
++      return "1 min"
 +    case "picked_up", "delivering":
-+      return "Route"
++      return "1 min"
 +    case "completed":
 +      return "OK"
 +    default:
-+      return "Suivi"
++      return "1 min"
 +    }
 +  }
 +
@@ -1087,11 +1114,9 @@ index 9eae718..9db3b9f 100644
 +    if status.contains("annulee") || status.contains("annulée") { return "Commande annulée" }
 +    if status.contains("refusee") || status.contains("refusée") { return "Commande refusée" }
 +    if status.contains("colis") || status.contains("livraison") {
-+      if let eta = normalizedEta { return "Livraison dans \(eta)" }
-+      return "En livraison"
++      return "Livraison dans \(normalizedEta ?? "1 min")"
 +    }
-+    if let eta = normalizedEta { return "Prise en charge dans \(eta)" }
-+    return "Vers la prise en charge"
++    return "Prise en charge dans \(normalizedEta ?? "1 min")"
 +  }
 +
 +  var body: some View {

@@ -20,6 +20,9 @@ type OrderLiveActivityRow = {
   user_id: string;
   status: string | null;
   created_at: Date | string | null;
+  pickup?: unknown;
+  dropoff?: unknown;
+  delivery_method?: string | null;
   eta_minutes?: number | null;
   estimated_duration?: string | null;
   driver_id: string | null;
@@ -218,13 +221,69 @@ function vehicleTypeLabel(value: string | null | undefined): string {
   return value?.trim() || 'Voiture';
 }
 
+function liveActivityVehicleType(value: string | null | undefined): 'moto' | 'vehicule' | 'cargo' | null {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'moto' || normalized === 'vehicule' || normalized === 'cargo') return normalized;
+  if (normalized === 'vehicle' || normalized === 'voiture' || normalized === 'car') return 'vehicule';
+  return null;
+}
+
+function toNumber(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function coordinatesFromLocation(value: unknown): { latitude: number; longitude: number } | null {
+  const record = value as Record<string, unknown> | null | undefined;
+  const coords = (record?.coordinates || record) as Record<string, unknown> | null | undefined;
+  if (!coords) return null;
+  const latitude = toNumber(coords.latitude ?? coords.lat);
+  const longitude = toNumber(coords.longitude ?? coords.lng);
+  if (latitude == null || longitude == null) return null;
+  return { latitude, longitude };
+}
+
+function calculateDistanceMeters(
+  point1: { latitude: number; longitude: number },
+  point2: { latitude: number; longitude: number }
+): number {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+  const dLat = toRad(point2.latitude - point1.latitude);
+  const dLon = toRad(point2.longitude - point1.longitude);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(point1.latitude)) *
+      Math.cos(toRad(point2.latitude)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calculateETAForVehicle(distanceMeters: number, vehicleType: 'moto' | 'vehicule' | 'cargo' | null): number {
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return 1;
+  const speedKmh = vehicleType === 'moto' ? 35 : vehicleType === 'cargo' ? 25 : 30;
+  return Math.max(1, Math.ceil((distanceMeters / 1000 / speedKmh) * 60));
+}
+
+function pickupToDropoffEtaLabel(row: OrderLiveActivityRow): string {
+  const pickup = coordinatesFromLocation(row.pickup);
+  const dropoff = coordinatesFromLocation(row.dropoff);
+  if (!pickup || !dropoff) return '1 min';
+  const distance = calculateDistanceMeters(pickup, dropoff);
+  return `${calculateETAForVehicle(distance, liveActivityVehicleType(row.delivery_method))} min`;
+}
+
 function etaLabel(row: OrderLiveActivityRow, status: string): string {
   const normalized = normalizeStatus(status);
   if (normalized === 'pending') return '—';
+  if (normalized === 'picked_up' || normalized === 'delivering') {
+    return pickupToDropoffEtaLabel(row);
+  }
+  if (normalized === 'in_progress') {
+    return '1 min';
+  }
   if (
-    normalized === 'in_progress' ||
-    normalized === 'picked_up' ||
-    normalized === 'delivering' ||
     normalized === 'completed' ||
     normalized === 'cancelled' ||
     normalized === 'declined'
