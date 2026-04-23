@@ -5,6 +5,8 @@ import logger from '../utils/logger.js';
 import {
   clientStatusLabel,
   normalizeProductStatus,
+  progressFloorForStatus,
+  progressRangeForPhase,
   progressWithEtaCap,
   statusBaseProgress,
 } from '../utils/orderProductRules.js';
@@ -42,7 +44,16 @@ type OrderLiveActivityRow = {
   driver_vehicle_brand: string | null;
   driver_vehicle_model: string | null;
   driver_vehicle_color: string | null;
+  driver_current_latitude: number | string | null;
+  driver_current_longitude: number | string | null;
 };
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+type ProgressPhase = 'pickup' | 'dropoff';
 
 type OrderTrackingLiveProps = {
   etaLabel: string;
@@ -75,6 +86,22 @@ type LiveActivityNotifyResult = {
 
 const FINAL_STATUSES = new Set(['completed', 'cancelled', 'declined']);
 const LIVE_ACTIVITY_ONLY_STATUSES = new Set(['accepted', 'enroute', 'in_progress', 'picked_up', 'delivering']);
+const ARRIVAL_RADIUS_METERS = 45;
+const SAME_STOP_RADIUS_METERS = 80;
+const MIN_PROGRESS_DELTA_FOR_LOCATION_PUSH = 0.015;
+
+const phaseProgressByOrder = new Map<string, {
+  phase: ProgressPhase;
+  initialDistanceMeters: number;
+  lastProgress: number;
+}>();
+
+const phaseEtaByOrder = new Map<string, {
+  phase: ProgressPhase;
+  etaLabel: string;
+}>();
+
+const lastLocationPushAtByOrder = new Map<string, number>();
 
 let cachedProviderToken: { token: string; expiresAt: number } | null = null;
 
@@ -200,30 +227,63 @@ function calculateETAForVehicle(distanceMeters: number, vehicleType: 'moto' | 'v
   return Math.max(1, Math.ceil((distanceMeters / 1000 / speedKmh) * 60));
 }
 
-function pickupToDropoffEtaLabel(row: OrderLiveActivityRow): string {
-  const pickup = coordinatesFromLocation(row.pickup);
-  const dropoff = coordinatesFromLocation(row.dropoff);
-  if (!pickup || !dropoff) return '1 min';
-  const distance = calculateDistanceMeters(pickup, dropoff);
-  return `${calculateETAForVehicle(distance, liveActivityVehicleType(row.delivery_method))} min`;
+function clampProgress(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }
 
-function etaLabel(row: OrderLiveActivityRow, status: string): string {
+function driverCoordsFromRow(row: OrderLiveActivityRow): Coordinates | null {
+  const latitude = toNumber(row.driver_current_latitude);
+  const longitude = toNumber(row.driver_current_longitude);
+  if (latitude == null || longitude == null) return null;
+  return { latitude, longitude };
+}
+
+function progressPhaseForStatus(status: string): ProgressPhase | null {
   const normalized = normalizeStatus(status);
-  if (normalized === 'pending') return '—';
-  if (normalized === 'picked_up' || normalized === 'delivering') {
-    return pickupToDropoffEtaLabel(row);
+  if (normalized === 'accepted' || normalized === 'enroute' || normalized === 'in_progress') return 'pickup';
+  if (normalized === 'picked_up' || normalized === 'delivering') return 'dropoff';
+  return null;
+}
+
+function phaseTargetForRow(row: OrderLiveActivityRow, phase: ProgressPhase): Coordinates | null {
+  return coordinatesFromLocation(phase === 'pickup' ? row.pickup : row.dropoff);
+}
+
+function phaseProgressRangeSafe(phase: ProgressPhase): { start: number; end: number } {
+  return progressRangeForPhase(phase) ?? { start: 0.58, end: 0.96 };
+}
+
+function normalizedStopAddress(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function pickupToDropoffDistance(row: OrderLiveActivityRow): number | null {
+  const pickup = coordinatesFromLocation(row.pickup);
+  const dropoff = coordinatesFromLocation(row.dropoff);
+  if (!pickup || !dropoff) return null;
+  return calculateDistanceMeters(pickup, dropoff);
+}
+
+function isSamePickupDropoffStop(row: OrderLiveActivityRow): boolean {
+  const pickupRecord = row.pickup as Record<string, unknown> | null | undefined;
+  const dropoffRecord = row.dropoff as Record<string, unknown> | null | undefined;
+  const pickupAddress = normalizedStopAddress(pickupRecord?.address);
+  const dropoffAddress = normalizedStopAddress(dropoffRecord?.address);
+  if (pickupAddress && dropoffAddress && pickupAddress === dropoffAddress) {
+    return true;
   }
-  if (normalized === 'in_progress') {
-    return '1 min';
-  }
-  if (
-    normalized === 'completed' ||
-    normalized === 'cancelled' ||
-    normalized === 'declined'
-  ) {
-    return '';
-  }
+  const distance = pickupToDropoffDistance(row);
+  return distance != null && distance <= SAME_STOP_RADIUS_METERS;
+}
+
+function etaLabelFromOrder(row: OrderLiveActivityRow): string {
   if (typeof row.eta_minutes === 'number' && Number.isFinite(row.eta_minutes) && row.eta_minutes > 0) {
     return `${Math.max(1, Math.round(row.eta_minutes))} min`;
   }
@@ -231,6 +291,108 @@ function etaLabel(row: OrderLiveActivityRow, status: string): string {
   const minutes = raw.match(/^(\d+)\s*(?:min|mn|minutes?)?$/i);
   if (minutes) return `${minutes[1]} min`;
   return raw || '';
+}
+
+function progressFromDriverMovement(
+  row: OrderLiveActivityRow,
+  status: string,
+  driverCoords: Coordinates | null | undefined,
+): { progress: number; etaLabel?: string; arrivedAtStop?: boolean } {
+  const normalized = normalizeStatus(status);
+  const statusProgress = clampProgress(statusBaseProgress(normalized));
+  const phase = progressPhaseForStatus(normalized);
+  if (!phase) {
+    phaseProgressByOrder.delete(row.id);
+    phaseEtaByOrder.delete(row.id);
+    return { progress: statusProgress };
+  }
+
+  const existing = phaseProgressByOrder.get(row.id);
+  const existingEta = phaseEtaByOrder.get(row.id);
+
+  if (phase === 'dropoff' && isSamePickupDropoffStop(row)) {
+    const sameStopDistanceMeters = pickupToDropoffDistance(row) ?? 0;
+    const progress = Math.max(phaseProgressRangeSafe('dropoff').end, existing?.lastProgress ?? 0);
+    phaseEtaByOrder.delete(row.id);
+    phaseProgressByOrder.set(row.id, {
+      phase,
+      initialDistanceMeters: Math.max(sameStopDistanceMeters, ARRIVAL_RADIUS_METERS),
+      lastProgress: progress,
+    });
+    return { progress, arrivedAtStop: true };
+  }
+
+  if (!driverCoords) {
+    return {
+      progress: existing && existing.phase === phase ? Math.max(statusProgress, existing.lastProgress) : statusProgress,
+      etaLabel: existingEta && existingEta.phase === phase ? existingEta.etaLabel : undefined,
+    };
+  }
+
+  const target = phaseTargetForRow(row, phase);
+  if (!target) {
+    return {
+      progress: statusProgress,
+      etaLabel: existingEta && existingEta.phase === phase ? existingEta.etaLabel : undefined,
+    };
+  }
+
+  const remainingMeters = calculateDistanceMeters(driverCoords, target);
+  if (!Number.isFinite(remainingMeters)) {
+    return {
+      progress: statusProgress,
+      etaLabel: existingEta && existingEta.phase === phase ? existingEta.etaLabel : undefined,
+    };
+  }
+
+  const range = phaseProgressRangeSafe(phase);
+  const floor = Math.max(range.start, progressFloorForStatus(normalized));
+  const shouldResetPhase = !existing || existing.phase !== phase;
+  const previousInitial = shouldResetPhase ? 0 : existing.initialDistanceMeters;
+  const initialDistanceMeters = Math.max(remainingMeters, previousInitial, ARRIVAL_RADIUS_METERS);
+  const phaseRatio =
+    remainingMeters <= ARRIVAL_RADIUS_METERS
+      ? 1
+      : clampProgress(1 - remainingMeters / initialDistanceMeters);
+  const phaseProgress = range.start + phaseRatio * (range.end - range.start);
+  const cappedProgress =
+    remainingMeters <= ARRIVAL_RADIUS_METERS ? range.end : Math.min(range.end - 0.015, phaseProgress);
+  const lastProgress = shouldResetPhase ? floor : existing.lastProgress;
+  const progress = clampProgress(Math.max(floor, cappedProgress, lastProgress));
+
+  phaseProgressByOrder.set(row.id, {
+    phase,
+    initialDistanceMeters,
+    lastProgress: progress,
+  });
+
+  if (remainingMeters <= ARRIVAL_RADIUS_METERS) {
+    phaseEtaByOrder.delete(row.id);
+    return { progress, arrivedAtStop: true };
+  }
+
+  const etaLabel = `${calculateETAForVehicle(remainingMeters, liveActivityVehicleType(row.delivery_method))} min`;
+  phaseEtaByOrder.set(row.id, { phase, etaLabel });
+  return { progress, etaLabel, arrivedAtStop: false };
+}
+
+function fallbackEtaLabel(
+  row: OrderLiveActivityRow,
+  status: string,
+  fallback: Partial<OrderTrackingLiveProps>,
+): string {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'accepted' || normalized === 'enroute') {
+    return etaLabelFromOrder(row);
+  }
+  const phase = progressPhaseForStatus(normalized);
+  const cached = phase ? phaseEtaByOrder.get(row.id) : null;
+  if (cached && cached.phase === phase) return cached.etaLabel;
+  if (phase && typeof fallback.etaLabel === 'string' && fallback.etaLabel.trim()) {
+    return fallback.etaLabel.trim();
+  }
+  if (normalized === 'pending') return '—';
+  return '';
 }
 
 function clockLabel(value: Date | string | null): string {
@@ -288,22 +450,23 @@ function liveActivityImageUrl(...values: Array<string | null | undefined>): stri
 function mergeProps(
   base: Record<string, unknown> | null,
   row: OrderLiveActivityRow | null,
-  status: string
+  status: string,
+  driverCoordsOverride?: Coordinates | null,
 ): OrderTrackingLiveProps {
   const statusCode = normalizeStatus(status || row?.status || 'pending');
   const pending = statusCode === 'pending';
   const driver = row ? driverName(row) : '';
   const info = row ? vehicleInfoLabel(row) : '';
   const fallback = (base || {}) as Partial<OrderTrackingLiveProps>;
-  const eta =
-    row
-      ? etaLabel(row, statusCode)
-      : statusCode === 'accepted' || statusCode === 'enroute'
-        ? fallback.etaLabel || ''
-        : pending
-          ? '—'
-          : '';
-  const baseProgress = Math.max(progressFromStatus(statusCode), Number(fallback.progress || 0) || 0);
+  const movement = row
+    ? progressFromDriverMovement(row, statusCode, driverCoordsOverride ?? driverCoordsFromRow(row))
+    : { progress: progressFromStatus(statusCode) };
+  const eta = row ? (movement.etaLabel || fallbackEtaLabel(row, statusCode, fallback)) : statusCode === 'accepted' || statusCode === 'enroute'
+    ? fallback.etaLabel || ''
+    : pending
+      ? '—'
+      : '';
+  const baseProgress = Math.max(movement.progress ?? progressFromStatus(statusCode), Number(fallback.progress || 0) || 0);
 
   return {
     etaLabel: eta,
@@ -312,7 +475,7 @@ function mergeProps(
     plateLabel: row?.driver_vehicle_plate?.trim() || fallback.plateLabel || 'KRONO',
     isPending: pending,
     statusCode,
-    statusLabel: statusLabel(statusCode),
+    statusLabel: movement.arrivedAtStop ? 'Livreur arrivé' : statusLabel(statusCode),
     progress: progressWithEtaCap(statusCode, baseProgress, eta),
     driverAvatarUrl: liveActivityImageUrl(
       row?.driver_avatar_url,
@@ -339,7 +502,9 @@ async function loadOrder(orderId: string): Promise<OrderLiveActivityRow | null> 
        dp.vehicle_type as driver_vehicle_type,
        dp.vehicle_brand as driver_vehicle_brand,
        dp.vehicle_model as driver_vehicle_model,
-       dp.vehicle_color as driver_vehicle_color
+       dp.vehicle_color as driver_vehicle_color,
+       dp.current_latitude as driver_current_latitude,
+       dp.current_longitude as driver_current_longitude
      FROM orders o
      LEFT JOIN users d ON d.id = o.driver_id
      LEFT JOIN driver_profiles dp ON dp.user_id = o.driver_id
@@ -573,5 +738,66 @@ export async function notifyLiveActivitiesForOrderStatus(params: {
     const msg = error instanceof Error ? error.message : String(error);
     logger.warn('[live-activity-apns] notify:', msg);
     return empty;
+  }
+}
+
+export async function notifyLiveActivitiesForDriverLocation(params: {
+  orderId: string;
+  status: string;
+  payerUserId: string;
+  driverCoords: Coordinates;
+}): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+
+  const { orderId, status, payerUserId, driverCoords } = params;
+  const statusNorm = normalizeStatus(status);
+  if (!LIVE_ACTIVITY_ONLY_STATUSES.has(statusNorm)) return;
+
+  const now = Date.now();
+  const lastAt = lastLocationPushAtByOrder.get(orderId) ?? 0;
+  if (now - lastAt < 12000) return;
+  lastLocationPushAtByOrder.set(orderId, now);
+
+  try {
+    const tokens = await loadActiveTokens(orderId, payerUserId);
+    if (!tokens.length) return;
+
+    const row = await loadOrder(orderId);
+    if (!row) return;
+
+    for (const token of tokens) {
+      const fallback = (token.last_props || {}) as Partial<OrderTrackingLiveProps>;
+      const nextProps = mergeProps(token.last_props, row, statusNorm, driverCoords);
+      const previousProgress = Number(fallback.progress || 0) || 0;
+      const progressDelta = Math.abs((nextProps.progress ?? 0) - previousProgress);
+      const previousEta = typeof fallback.etaLabel === 'string' ? fallback.etaLabel : '';
+      const previousStatus = typeof fallback.statusCode === 'string' ? fallback.statusCode : '';
+      if (
+        previousStatus === nextProps.statusCode &&
+        previousEta === nextProps.etaLabel &&
+        progressDelta < MIN_PROGRESS_DELTA_FOR_LOCATION_PUSH
+      ) {
+        continue;
+      }
+
+      const result = await sendApnsLiveActivityPush(token.apns_push_token, 'update', nextProps);
+      const detail = result.reason || null;
+      if (result.ok) {
+        await markTokenPushed(token.id, nextProps, 'apns_update_location_ok', null);
+      } else {
+        await markTokenPushed(token.id, nextProps, `apns_update_location_failed_${result.statusCode}`, detail);
+        if (result.statusCode === 400 || result.statusCode === 410) {
+          await invalidateToken(token.id, `apns_invalid_${result.statusCode}`, detail);
+        }
+        logger.warn('[live-activity-apns] push position APNs échoué', {
+          orderIdPrefix: orderId.slice(0, 8),
+          status: statusNorm,
+          httpStatus: result.statusCode,
+          reason: detail,
+        });
+      }
+    }
+  } catch (error: unknown) {
+    logger.warn('[live-activity-apns] notify position:', error instanceof Error ? error.message : String(error));
   }
 }

@@ -62,6 +62,11 @@ type PhaseProgressState = {
   lastProgress: number;
 };
 
+type PhaseEtaState = {
+  phase: ProgressPhase;
+  etaLabel: string;
+};
+
 type LastLiveActivityUpdate = {
   orderId: string;
   statusCode?: string;
@@ -72,6 +77,7 @@ type LastLiveActivityUpdate = {
 };
 
 const phaseProgressByOrder = new Map<string, PhaseProgressState>();
+const phaseEtaByOrder = new Map<string, PhaseEtaState>();
 let lastLiveActivityUpdate: LastLiveActivityUpdate | null = null;
 
 const BIKER_MARKER_ASSET = Asset.fromModule(require("../assets/images/biker.png"));
@@ -152,15 +158,7 @@ function etaLabelFromOrder(order: OrderRequest, status: OrderStatus): string {
 }
 
 function fallbackEtaForPhase(order: OrderRequest, status: OrderStatus): string {
-  const phase = progressPhaseForStatus(status);
-  if (phase === "dropoff") {
-    const distance = pickupToDropoffDistance(order);
-    if (distance != null) {
-      const etaMinutes = calculateETAForVehicle(distance, liveActivityVehicleType(order.deliveryMethod));
-      return formatETA(Math.max(1, etaMinutes));
-    }
-  }
-  return etaLabelFromOrder(order, status);
+  return status === "accepted" || status === "enroute" ? etaLabelFromOrder(order, status) : "";
 }
 
 function progressWithEtaCap(status: OrderStatus, progress: number, etaLabel: string | undefined): number {
@@ -247,13 +245,16 @@ function progressFromDriverMovement(
   const phase = progressPhaseForStatus(status);
   if (!phase) {
     phaseProgressByOrder.delete(order.id);
+    phaseEtaByOrder.delete(order.id);
     return { progress: statusProgress };
   }
 
   const existing = phaseProgressByOrder.get(order.id);
+  const existingEta = phaseEtaByOrder.get(order.id);
   if (phase === "dropoff" && isSamePickupDropoffStop(order)) {
     const sameStopDistanceMeters = pickupToDropoffDistance(order) ?? 0;
     const progress = Math.max(phaseProgressRange("dropoff").end, existing?.lastProgress ?? 0);
+    phaseEtaByOrder.delete(order.id);
     phaseProgressByOrder.set(order.id, {
       phase,
       initialDistanceMeters: Math.max(sameStopDistanceMeters, ARRIVAL_RADIUS_METERS),
@@ -261,7 +262,6 @@ function progressFromDriverMovement(
     });
     return {
       progress,
-      etaLabel: "1 min",
       arrivedAtStop: true,
     };
   }
@@ -272,17 +272,33 @@ function progressFromDriverMovement(
         existing && existing.phase === phase
           ? Math.max(statusProgress, existing.lastProgress)
           : statusProgress,
+      etaLabel:
+        existingEta && existingEta.phase === phase
+          ? existingEta.etaLabel
+          : undefined,
     };
   }
 
   const target = phaseTargetForOrder(order, phase);
   if (!target) {
-    return { progress: statusProgress };
+    return {
+      progress: statusProgress,
+      etaLabel:
+        existingEta && existingEta.phase === phase
+          ? existingEta.etaLabel
+          : undefined,
+    };
   }
 
   const remainingMeters = calculateDistance(driverCoords, target);
   if (!Number.isFinite(remainingMeters)) {
-    return { progress: statusProgress };
+    return {
+      progress: statusProgress,
+      etaLabel:
+        existingEta && existingEta.phase === phase
+          ? existingEta.etaLabel
+          : undefined,
+    };
   }
 
   const range = phaseProgressRange(phase);
@@ -306,11 +322,21 @@ function progressFromDriverMovement(
     lastProgress: progress,
   });
 
+  if (remainingMeters <= ARRIVAL_RADIUS_METERS) {
+    phaseEtaByOrder.delete(order.id);
+    return {
+      progress,
+      arrivedAtStop: true,
+    };
+  }
+
   const etaMinutes = calculateETAForVehicle(remainingMeters, liveActivityVehicleType(order.deliveryMethod));
+  const etaLabel = formatETA(Math.max(1, etaMinutes));
+  phaseEtaByOrder.set(order.id, { phase, etaLabel });
   return {
     progress,
-    etaLabel: formatETA(Math.max(1, etaMinutes)),
-    arrivedAtStop: remainingMeters <= ARRIVAL_RADIUS_METERS,
+    etaLabel,
+    arrivedAtStop: false,
   };
 }
 

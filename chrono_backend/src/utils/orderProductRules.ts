@@ -234,12 +234,12 @@ export function clientHeadline(raw: unknown, etaRaw?: unknown): string {
       return 'Recherche livreur';
     case 'accepted':
     case 'enroute':
-      return `Prise en charge dans ${eta || '1 min'}`;
+      return eta ? `Prise en charge dans ${eta}` : 'Prise en charge';
     case 'in_progress':
       return eta ? `Prise en charge dans ${eta}` : 'Livreur arrivé';
     case 'picked_up':
     case 'delivering':
-      return `Livraison dans ${eta || '1 min'}`;
+      return eta ? `Livraison dans ${eta}` : 'Livraison en cours';
     case 'completed':
       return 'Livraison terminée';
     case 'cancelled':

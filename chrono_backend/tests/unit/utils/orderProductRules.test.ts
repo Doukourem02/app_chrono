@@ -20,7 +20,9 @@ describe('orderProductRules', () => {
   it('produit les libellés client sans termes vagues', () => {
     expect(clientHeadline('pending')).toBe('Recherche livreur');
     expect(clientHeadline('accepted', '4')).toBe('Prise en charge dans 4 min');
+    expect(clientHeadline('accepted')).toBe('Prise en charge');
     expect(clientHeadline('picked_up', '9 min')).toBe('Livraison dans 9 min');
+    expect(clientHeadline('picked_up')).toBe('Livraison en cours');
     expect(clientStatusLabel('in_progress')).toBe('Livreur arrivé');
     expect(clientStatusLabel('completed')).toBe('Livraison terminée');
   });

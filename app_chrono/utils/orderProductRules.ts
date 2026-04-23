@@ -246,12 +246,12 @@ export function clientHeadline(raw: unknown, etaRaw?: unknown): string {
       return "Recherche livreur";
     case "accepted":
     case "enroute":
-      return `Prise en charge dans ${eta || "1 min"}`;
+      return eta ? `Prise en charge dans ${eta}` : "Prise en charge";
     case "in_progress":
       return eta ? `Prise en charge dans ${eta}` : "Livreur arrivé";
     case "picked_up":
     case "delivering":
-      return `Livraison dans ${eta || "1 min"}`;
+      return eta ? `Livraison dans ${eta}` : "Livraison en cours";
     case "completed":
       return "Livraison terminée";
     case "cancelled":
@@ -272,7 +272,10 @@ export function compactStatusLabel(raw: unknown, etaRaw?: unknown, isPending?: b
   if (status === "completed") return "Terminé";
   if (status === "cancelled") return "Annulé";
   if (status === "declined") return "Refusé";
-  return "1 min";
+  if (status === "accepted" || status === "enroute") return "Collecte";
+  if (status === "in_progress") return "Arrivé";
+  if (status === "picked_up" || status === "delivering") return "Livraison";
+  return "Suivi";
 }
 
 export function minimalStatusLabel(raw: unknown, etaRaw?: unknown, isPending?: boolean): string {
@@ -283,7 +286,11 @@ export function minimalStatusLabel(raw: unknown, etaRaw?: unknown, isPending?: b
   if (status === "completed") return "OK";
   if (status === "cancelled") return "Annulé";
   if (status === "declined") return "Refusé";
-  return status === "pending" ? "Recherche" : "1 min";
+  if (status === "pending") return "Recherche";
+  if (status === "accepted" || status === "enroute") return "Collecte";
+  if (status === "in_progress") return "Arrivé";
+  if (status === "picked_up" || status === "delivering") return "Livraison";
+  return "Suivi";
 }
 
 export function shouldShowArrivedVisual(rawStatus: unknown, rawLabel?: unknown): boolean {

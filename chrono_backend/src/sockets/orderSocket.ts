@@ -11,6 +11,7 @@ import { realDriverStatuses, rehydrateDriverStatusFromDb } from '../controllers/
 import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
 import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
+import { notifyLiveActivitiesForDriverLocation } from '../services/liveActivityApnsService.js';
 import { autoLogDeliveryMileage } from '../controllers/fleetController.js';
 import logger from '../utils/logger.js';
 import { computeOrderPriceCfa } from '../services/priceCalculator.js';
@@ -1952,6 +1953,15 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             ts: data.ts || new Date().toISOString(),
           });
         }
+
+        void notifyLiveActivitiesForDriverLocation({
+          orderId,
+          status: order.status,
+          payerUserId: order.user.id,
+          driverCoords: { latitude: loc.lat, longitude: loc.lng },
+        }).catch((notifyErr: unknown) => {
+          if (DEBUG) logger.warn('notifyLiveActivitiesForDriverLocation error:', notifyErr instanceof Error ? notifyErr.message : String(notifyErr));
+        });
       } catch (err: any) {
         if (DEBUG) logger.warn('order:driver:location error:', err?.message);
       }

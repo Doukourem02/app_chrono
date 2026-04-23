@@ -78,3 +78,93 @@ Validation locale :
 - `chrono_backend` : `npm run test:unit -- --watchman=false --runTestsByPath tests/unit/utils/orderProductRules.test.ts`
 - racine : `git diff --check`
 - patch iOS : `patch-package --error-on-fail` sur `expo-widgets@55.0.13`
+
+---
+
+## Mini-checklist Krono 9/10 — ETA dynamiques Dynamic Island / Live Activity
+
+Objectif : faire en sorte que le Dynamic Island, la Live Activity et les surfaces liées affichent **le bon ETA dynamique de la phase active**, jamais un ETA statique ou un faux `1 min`.
+
+### Diagnostic actuel
+
+- [x] Le comportement attendu est clair :
+  - avant récupération du colis : ETA = **livreur -> point de collecte**
+  - après récupération du colis : ETA = **livreur -> destination**
+- [x] Le problème actuel est identifié :
+  - fallback statique `pickup -> dropoff` encore utilisé dans certains chemins
+  - fallback `1 min` encore utilisé quand l’ETA dynamique n’est pas disponible
+  - risque de réutiliser un ETA d’une phase précédente dans la phase suivante
+- [x] Les zones à corriger sont connues :
+  - `app_chrono/services/orderLiveActivity.ts`
+  - `chrono_backend/src/services/liveActivityApnsService.ts`
+  - `app_chrono/utils/orderProductRules.ts`
+  - éventuellement le rendu `app_chrono/widgets/orderTrackingLiveActivity.tsx` si le fallback visuel doit changer
+
+### Règle produit à appliquer
+
+- [x] `pending` : afficher `Recherche`, sans ETA.
+- [x] `accepted` / `enroute` / `in_progress` : afficher l’ETA dynamique **position livreur -> collecte**.
+- [x] `picked_up` / `delivering` : afficher l’ETA dynamique **position livreur -> destination**.
+- [x] `completed` / `cancelled` / `declined` : ne plus afficher d’ETA.
+- [x] Interdire tout ETA statique principal basé seulement sur `pickup -> dropoff`.
+- [x] Interdire le fallback visuel `1 min` quand aucune donnée de mouvement fiable n’existe.
+
+### Source unique ETA dynamique
+
+- [x] Créer ou extraire une fonction unique qui reçoit :
+  - `status`
+  - `driverCoords`
+  - `pickupCoords`
+  - `dropoffCoords`
+  - `deliveryMethod`
+- [x] Cette fonction doit retourner au minimum :
+  - `phase`
+  - `target`
+  - `etaLabel`
+  - `progress`
+- [x] La même logique doit alimenter :
+  - écran suivi client
+  - Dynamic Island côté app
+  - Live Activity APNs côté backend
+  - tracking public si ETA affiché
+
+### Hiérarchie de fallback
+
+- [x] Source 1 : position live du livreur.
+- [x] Source 2 : dernière position connue récente du livreur.
+- [x] Source 3 : statut sans minute si aucune position fiable n’existe.
+- [x] Ne jamais inventer `1 min` par défaut pour masquer une absence de données.
+- [x] Ne jamais conserver l’ETA pickup quand la commande est déjà passée en `picked_up`.
+
+### Progression
+
+- [x] La barre de progression doit suivre la même phase que l’ETA affiché.
+- [x] Avant collecte : progression relative vers le point de collecte.
+- [x] Après récupération : progression relative vers la destination.
+- [x] Si l’ETA réel monte ou descend avec le mouvement, la progression doit raconter la même histoire.
+
+### Ordre de codage recommandé
+
+- [x] Extraire la règle ETA dynamique dans un helper partagé.
+- [x] Brancher `orderLiveActivity.ts` sur ce helper.
+- [x] Brancher `liveActivityApnsService.ts` sur ce helper ou son équivalent backend strictement aligné.
+- [x] Retirer les fallbacks `pickup -> dropoff` et `1 min` qui servent encore de valeur principale.
+- [x] Ajuster le rendu compact/minimal pour qu’il n’affiche pas une minute fictive.
+- [x] Ajouter des tests ciblés sur les transitions `accepted -> picked_up -> delivering`.
+
+### Tests d’acceptation
+
+- [x] Commande non acceptée : Dynamic Island affiche `Recherche`.
+- [x] Livreur accepté : l’ETA affiché correspond à la distance réelle **livreur -> collecte**.
+- [x] Livreur au point de collecte : l’ETA baisse jusqu’à `arrivé` / `< 1 min`, pas un temps statique.
+- [x] Dès `picked_up` : l’ETA bascule immédiatement sur **livreur -> destination**.
+- [x] Si la navigation affiche `11 min`, le Dynamic Island ne doit pas afficher `1 min`.
+- [x] Si la map affiche `< 1 min`, le Dynamic Island ne doit pas afficher `5 min` statique.
+- [x] Aucune surface ne conserve un ETA d’une phase précédente après transition de statut.
+
+Validation locale :
+
+- `app_chrono` : `npx tsc --noEmit`
+- `chrono_backend` : `npm run build`
+- `chrono_backend` : `npm run test:unit -- --watchman=false --runTestsByPath tests/unit/utils/orderProductRules.test.ts`
+- racine : `git diff --check`
