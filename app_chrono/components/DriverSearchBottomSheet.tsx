@@ -174,6 +174,32 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     const vehicleTypeLabel = driver.vehicle_type
       ? DELIVERY_METHOD_LABELS[driver.vehicle_type as keyof typeof DELIVERY_METHOD_LABELS] || driver.vehicle_type
       : null;
+    const driverInitials = driverName
+      .split(/\s+/)
+      .map((part) => part.trim()[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || 'LK';
+    const identitySubtitle = [
+      'Livreur Krono',
+      vehicleTypeLabel || deliveryMethod || null,
+      vehiclePlate || null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    const parcelIconName =
+      order?.deliveryMethod === 'moto'
+        ? 'bicycle-outline'
+        : order?.deliveryMethod === 'cargo'
+          ? 'cube-outline'
+          : 'car-outline';
+    const openCall = () => {
+      if (!driverPhone) return;
+      Linking.openURL(`tel:${driverPhone}`).catch(() => {
+        logger.warn('Impossible d’ouvrir l’appel livreur');
+      });
+    };
 
     return (
       <View
@@ -190,127 +216,138 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.assignedCard}>
-        <View style={styles.driverHeader}>
-          <Text style={styles.driverHeaderTitle}>Livreur confirmé</Text>
-          {orderIdShort && (
-            <Text style={styles.orderIdBadge}>{orderIdShort}</Text>
-          )}
-        </View>
-        
-        <View style={styles.driverInfoContainer}>
-          <View style={styles.driverAvatarContainer}>
-            {driverAvatar && !avatarError ? (
-              <Image 
-                source={{ uri: driverAvatar }} 
-                style={styles.driverAvatar}
-                resizeMode="cover"
-                onError={() => setAvatarError(true)}
-              />
-            ) : (
-              <View style={styles.driverAvatarPlaceholder}>
-                <Ionicons name="person" size={32} color="#8B5CF6" />
+            <View style={styles.assignedTopRow}>
+              <View style={styles.assignedIdentityBlock}>
+                <View style={styles.driverAvatarContainer}>
+                  {driverAvatar && !avatarError ? (
+                    <Image
+                      source={{ uri: driverAvatar }}
+                      style={styles.driverAvatar}
+                      resizeMode="cover"
+                      onError={() => setAvatarError(true)}
+                    />
+                  ) : (
+                    <View style={styles.driverAvatarPlaceholder}>
+                      <Text style={styles.driverAvatarInitials}>{driverInitials}</Text>
+                    </View>
+                  )}
+                  {driverRating > 0 && typeof driverRating === 'number' && (
+                    <View style={styles.ratingBadge}>
+                      <Ionicons name="star" size={12} color="#FFFFFF" />
+                      <Text style={styles.ratingBadgeText}>{driverRating.toFixed(1)}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.driverDetails}>
+                  <Text style={styles.driverEyebrow}>Votre livreur</Text>
+                  <Text style={styles.driverName} numberOfLines={1}>{driverName}</Text>
+                  <Text style={styles.driverSubtitle} numberOfLines={1}>
+                    {identitySubtitle}
+                  </Text>
+                </View>
               </View>
-            )}
-            {driverRating > 0 && typeof driverRating === 'number' && (
-              <View style={styles.ratingBadge}>
-                <Ionicons name="star" size={12} color="#FFFFFF" />
-                <Text style={styles.ratingBadgeText}>{driverRating.toFixed(1)}</Text>
+
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  style={styles.headerActionButton}
+                  onPress={onDetails}
+                  activeOpacity={0.82}
+                >
+                  <Ionicons name="navigate-outline" size={18} color="#6D28D9" />
+                </TouchableOpacity>
+                {driverPhone ? (
+                  <TouchableOpacity
+                    style={[styles.headerActionButton, styles.headerActionButtonPrimary]}
+                    onPress={openCall}
+                    activeOpacity={0.82}
+                  >
+                    <Ionicons name="call" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : null}
               </View>
-            )}
-          </View>
-          
-          <View style={styles.driverDetails}>
-            <Text style={styles.driverName}>{driverName}</Text>
-            
-            {driverRating > 0 && typeof driverRating === 'number' && (
-              <View style={styles.ratingContainer}>
-                {[...Array(5)].map((_, i) => (
-                  <Ionicons
-                    key={i}
-                    name={i < Math.floor(driverRating) ? "star" : "star-outline"}
-                    size={16}
-                    color="#FBBF24"
-                  />
-                ))}
-                <Text style={styles.ratingText}>{driverRating.toFixed(1)}</Text>
+            </View>
+
+            <View style={styles.metaRibbon}>
+              <View style={styles.metaRibbonLeft}>
+                {orderIdShort ? <Text style={styles.orderIdBadge}>{orderIdShort}</Text> : null}
+                <View style={styles.statusChip}>
+                  <Ionicons name="sparkles" size={13} color="#6D28D9" />
+                  <Text style={styles.statusChipText}>{statusLabel}</Text>
+                </View>
               </View>
-            )}
-            
-            {driverPhone && (
-              <TouchableOpacity 
-                style={styles.phoneContainer}
-                onPress={() => driverPhone && Linking.openURL(`tel:${driverPhone}`)}
-                activeOpacity={0.7}
+              {priceFormatted ? <Text style={styles.priceText}>{priceFormatted}</Text> : null}
+            </View>
+
+            <View style={styles.routeShowcase}>
+              <View style={styles.routeColumn}>
+                {pickupAddr ? (
+                  <View style={styles.routeStepRow}>
+                    <View style={[styles.routeStepDot, styles.routeStepDotPickup]} />
+                    <View style={styles.routeStepTextWrap}>
+                      <Text style={styles.routeStepLabel}>Collecte</Text>
+                      <Text style={styles.routeStepValue} numberOfLines={2}>{pickupAddr}</Text>
+                    </View>
+                  </View>
+                ) : null}
+
+                {pickupAddr && dropoffAddr ? <View style={styles.routeConnector} /> : null}
+
+                {dropoffAddr ? (
+                  <View style={styles.routeStepRow}>
+                    <View style={[styles.routeStepDot, styles.routeStepDotDropoff]} />
+                    <View style={styles.routeStepTextWrap}>
+                      <Text style={styles.routeStepLabel}>Livraison</Text>
+                      <Text style={styles.routeStepValue} numberOfLines={2}>{dropoffAddr}</Text>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.parcelPanel}>
+                <View style={styles.parcelPanelBadge}>
+                  <Ionicons name={parcelIconName} size={14} color="#6D28D9" />
+                  <Text style={styles.parcelPanelBadgeText}>{deliveryMethod || 'Krono'}</Text>
+                </View>
+                <View style={styles.parcelArtwork}>
+                  <View style={styles.parcelArtworkBack} />
+                  <View style={styles.parcelArtworkFront}>
+                    <Ionicons name="cube" size={28} color="#6D28D9" />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.footerMetaRow}>
+              {(vehiclePlate || vehicleTypeLabel) ? (
+                <View style={styles.footerMetaChip}>
+                  <Ionicons name="card-outline" size={14} color="#6B7280" />
+                  <Text style={styles.footerMetaChipText}>
+                    {[vehiclePlate ? `Immat. ${vehiclePlate}` : null, vehicleTypeLabel || null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                </View>
+              ) : <View />}
+
+              {driverPhone ? (
+                <Text style={styles.phoneInlineText} numberOfLines={1}>{driverPhone}</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.driverActions}>
+              <TouchableOpacity
+                style={styles.actionButtonSecondary}
+                onPress={onDetails}
+                activeOpacity={0.85}
               >
-                <View style={styles.phoneIconWrap}>
-                  <Ionicons name="call" size={14} color="#FFFFFF" />
+                <View style={styles.actionButtonLeading}>
+                  <Ionicons name="navigate" size={18} color="#6D28D9" />
                 </View>
-                <Text style={styles.phoneText}>{driverPhone}</Text>
+                <Text style={styles.actionButtonSecondaryText}>Suivi en direct</Text>
+                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
               </TouchableOpacity>
-            )}
-
-            {(vehiclePlate || vehicleTypeLabel) && (
-              <View style={styles.vehiclePlateRow}>
-                <Ionicons name="card-outline" size={16} color="#6B7280" />
-                <Text style={styles.vehiclePlateText}>
-                  {[vehiclePlate ? `Immat. ${vehiclePlate}` : null, vehicleTypeLabel || null]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Infos commande */}
-        {(pickupAddr || dropoffAddr || statusLabel || deliveryMethod || priceFormatted) && (
-          <View style={styles.orderInfoSection}>
-            <View style={styles.statusChip}>
-              <Ionicons name="navigate-circle" size={14} color="#8B5CF6" />
-              <Text style={styles.statusChipText}>{statusLabel}</Text>
             </View>
-            {pickupAddr && (
-              <View style={styles.addressRow}>
-                <Ionicons name="location" size={14} color="#10B981" />
-                <Text style={styles.addressLabel}>De :</Text>
-                <Text style={styles.addressText} numberOfLines={1}>{pickupAddr}</Text>
-              </View>
-            )}
-            {dropoffAddr && (
-              <View style={styles.addressRow}>
-                <Ionicons name="flag" size={14} color="#EF4444" />
-                <Text style={styles.addressLabel}>À :</Text>
-                <Text style={styles.addressText} numberOfLines={1}>{dropoffAddr}</Text>
-              </View>
-            )}
-            <View style={styles.orderMetaRow}>
-              {deliveryMethod && (
-                <View style={styles.metaChip}>
-                  <Ionicons
-                    name={order?.deliveryMethod === 'moto' ? 'bicycle-outline' : order?.deliveryMethod === 'cargo' ? 'cube-outline' : 'car-outline'}
-                    size={12}
-                    color="#6B7280"
-                  />
-                  <Text style={styles.metaChipText}>{deliveryMethod}</Text>
-                </View>
-              )}
-              {priceFormatted && (
-                <Text style={styles.priceText}>{priceFormatted}</Text>
-              )}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.driverActions}>
-          <TouchableOpacity 
-            style={styles.actionButtonSecondary} 
-            onPress={onDetails}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="navigate" size={20} color="#FFFFFF" />
-            <Text style={styles.actionButtonSecondaryText}>Suivi en direct</Text>
-          </TouchableOpacity>
-        </View>
           </View>
         </ScrollView>
       </View>
@@ -399,22 +436,24 @@ const styles = StyleSheet.create({
     maxHeight: SCREEN_H * 0.76,
   },
   assignedScrollContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 4,
+    paddingHorizontal: 10,
+    paddingBottom: 6,
   },
   assignedCard: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 22,
+    borderWidth: 1,
+    borderColor: '#F1EDFF',
+    shadowColor: '#24104A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.11,
+    shadowRadius: 26,
     elevation: 16,
   },
   searchTitleRow: {
@@ -481,68 +520,56 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#4B5563',
   },
-  vehiclePlateRow: {
+  assignedTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 6,
-  },
-  vehiclePlateText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  driverHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    alignItems: 'flex-start',
+    marginBottom: 18,
   },
-  driverHeaderTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  assignedIdentityBlock: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 12,
   },
-  orderIdBadge: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#7C3AED',
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    letterSpacing: 0.5,
+  driverAvatarContainer: {
+    marginRight: 14,
+    position: 'relative',
   },
-  orderInfoSection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+  driverAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 3,
+    borderColor: '#A78BFA',
+  },
+  driverAvatarPlaceholder: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#A78BFA',
+  },
+  driverAvatarInitials: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#6D28D9',
   },
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(139, 92, 246, 0.12)',
+    backgroundColor: '#F5F3FF',
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 10,
-    marginBottom: 12,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
+    borderColor: '#DDD6FE',
+    marginBottom: 6,
   },
   statusChipText: {
     fontSize: 13,
@@ -550,84 +577,36 @@ const styles = StyleSheet.create({
     color: '#6D28D9',
     marginLeft: 6,
   },
-  addressRow: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    paddingVertical: 4,
-    paddingLeft: 2,
   },
-  addressLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#9CA3AF',
-    marginLeft: 8,
-    width: 26,
+  headerActionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    marginLeft: 10,
   },
-  addressText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1F2937',
-    fontWeight: '500',
+  headerActionButtonPrimary: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
   },
-  orderMetaRow: {
+  metaRibbon: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    marginBottom: 18,
   },
-  metaChip: {
+  metaRibbonLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  metaChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginLeft: 5,
-  },
-  priceText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#7C3AED',
-    letterSpacing: 0.3,
-  },
-  driverInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 8,
-    marginBottom: 20,
-  },
-  driverAvatarContainer: {
-    marginRight: 16,
-    position: 'relative',
-  },
-  driverAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 3,
-    borderColor: '#8B5CF6',
-  },
-  driverAvatarPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#8B5CF6',
+    flex: 1,
+    flexWrap: 'wrap',
   },
   ratingBadge: {
     position: 'absolute',
@@ -652,71 +631,217 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  driverName: {
-    fontSize: 22,
+  driverEyebrow: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
+    color: '#8B5CF6',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 3,
   },
-  ratingContainer: {
+  driverName: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  driverSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  orderIdBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7C3AED',
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    letterSpacing: 0.5,
+    marginRight: 8,
+    marginBottom: 6,
+  },
+  priceText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#7C3AED',
+    letterSpacing: 0.2,
+    marginLeft: 12,
+  },
+  routeShowcase: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: '#FCFCFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#EEE8FF',
+    padding: 16,
+  },
+  routeColumn: {
+    flex: 1,
+    paddingRight: 14,
+  },
+  routeStepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  routeStepDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 4,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  routeStepDotPickup: {
+    backgroundColor: '#6D28D9',
+  },
+  routeStepDotDropoff: {
+    backgroundColor: '#C4B5FD',
+  },
+  routeConnector: {
+    width: 2,
+    height: 30,
+    backgroundColor: '#DDD6FE',
+    marginLeft: 5,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  routeStepTextWrap: {
+    flex: 1,
+  },
+  routeStepLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 3,
+  },
+  routeStepValue: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  parcelPanel: {
+    width: 112,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  parcelPanelBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    marginBottom: 12,
+  },
+  parcelPanelBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6D28D9',
+    marginLeft: 5,
+  },
+  parcelArtwork: {
+    width: 94,
+    height: 94,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  parcelArtworkBack: {
+    position: 'absolute',
+    top: 12,
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    backgroundColor: '#DDD6FE',
+    transform: [{ rotate: '-10deg' }],
+  },
+  parcelArtworkFront: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 5,
+  },
+  footerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
     marginBottom: 8,
   },
-  ratingText: {
-    fontSize: 14,
+  footerMetaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  footerMetaChipText: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#6B7280',
     marginLeft: 6,
   },
-  phoneContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    alignSelf: 'flex-start',
-    backgroundColor: '#EDE9FE',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-  },
-  phoneIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#8B5CF6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  phoneText: {
-    fontSize: 14,
-    fontWeight: '600',
+  phoneInlineText: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '700',
     color: '#6D28D9',
+    marginLeft: 12,
   },
   driverActions: {
-    marginTop: 4,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    marginTop: 8,
   },
   actionButtonSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#8B5CF6',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    borderRadius: 18,
     shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
+  actionButtonLeading: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   actionButtonSecondaryText: {
+    flex: 1,
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginLeft: 10,
+    marginLeft: 12,
+    textAlign: 'center',
   },
 });
