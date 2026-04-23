@@ -12,12 +12,12 @@ import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
 
 const statusSteps: Array<{ key: string; label: string }> = [
-  { key: 'pending', label: 'Commande créée' },
-  { key: 'accepted', label: 'Livreur assigné' },
-  { key: 'enroute', label: 'Livreur en route pour récupérer le colis' },
-  { key: 'picked_up', label: 'Colis pris en charge' },
-  { key: 'delivering', label: 'En cours de livraison' },
-  { key: 'completed', label: 'Colis livré' },
+  { key: 'pending', label: 'Recherche livreur' },
+  { key: 'accepted', label: 'Prise en charge' },
+  { key: 'enroute', label: 'Prise en charge' },
+  { key: 'picked_up', label: 'Colis récupéré' },
+  { key: 'delivering', label: 'Livraison' },
+  { key: 'completed', label: 'Livraison terminée' },
 ]
 
 interface TrackerCardProps {
@@ -82,12 +82,12 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     string,
     { label: string; backgroundColor: string; color: string }
   > = {
-    pending: { label: 'En attente', backgroundColor: '#FEF3C7', color: '#D97706' },
-    accepted: { label: 'Livreur assigné', backgroundColor: '#E0E7FF', color: '#4338CA' },
-    enroute: { label: 'En route pour récupérer', backgroundColor: '#DBEAFE', color: '#1D4ED8' },
-    picked_up: { label: 'Colis pris en charge', backgroundColor: '#E0F2FE', color: '#0369A1' },
-    delivering: { label: 'En cours de livraison', backgroundColor: '#E9D5FF', color: '#7C3AED' },
-    completed: { label: 'Colis livré', backgroundColor: '#DCFCE7', color: '#166534' },
+    pending: { label: 'Recherche livreur', backgroundColor: '#FEF3C7', color: '#D97706' },
+    accepted: { label: 'Prise en charge', backgroundColor: '#E0E7FF', color: '#4338CA' },
+    enroute: { label: 'Prise en charge', backgroundColor: '#DBEAFE', color: '#1D4ED8' },
+    picked_up: { label: 'Colis récupéré', backgroundColor: '#E0F2FE', color: '#0369A1' },
+    delivering: { label: 'Livraison', backgroundColor: '#E9D5FF', color: '#7C3AED' },
+    completed: { label: 'Livraison terminée', backgroundColor: '#DCFCE7', color: '#166534' },
     cancelled: { label: 'Annulée', backgroundColor: '#FEE2E2', color: '#B91C1C' },
     declined: { label: 'Refusée', backgroundColor: '#FEE2E2', color: '#B91C1C' },
   }
@@ -477,4 +477,3 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     </AnimatedCard>
   )
 }
-

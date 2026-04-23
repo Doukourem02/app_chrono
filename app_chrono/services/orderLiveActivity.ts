@@ -8,6 +8,14 @@ import { logger } from "../utils/logger";
 import { reportLiveActivityIssue } from "../utils/sentry";
 import { calculateDistance, calculateETAForVehicle, formatETA } from "../utils/etaCalculator";
 import { DELIVERY_IN_PROGRESS_STATUSES, normalizeOrderStatus } from "../utils/orderStatusNormalize";
+import {
+  clientStatusLabel,
+  etaMinutesFromLabel as productEtaMinutesFromLabel,
+  progressFloorForStatus as productProgressFloorForStatus,
+  progressRangeForPhase as productProgressRangeForPhase,
+  progressWithEtaCap as productProgressWithEtaCap,
+  statusBaseProgress,
+} from "../utils/orderProductRules";
 import type { OrderTrackingLiveProps } from "../widgets/orderTrackingLiveActivity";
 import { userApiService } from "./userApiService";
 
@@ -32,7 +40,7 @@ const END_PROPS: OrderTrackingLiveProps = {
   plateLabel: "",
   isPending: false,
   statusCode: "completed",
-  statusLabel: "Terminee",
+  statusLabel: "Livraison terminée",
   progress: 1,
   driverAvatarUrl: "",
   driverInitials: "",
@@ -112,33 +120,11 @@ function clampProgress(value: number): number {
 }
 
 function progressFromStatus(status: OrderStatus): number {
-  switch (status) {
-    case "pending":
-      return 0.08;
-    case "accepted":
-      return 0.2;
-    case "enroute":
-      return 0.38;
-    case "in_progress":
-      return 0.52;
-    case "picked_up":
-      return 0.7;
-    case "delivering":
-      return 0.88;
-    case "completed":
-      return 1;
-    default:
-      return 0.12;
-  }
+  return statusBaseProgress(status);
 }
 
 function etaMinutesFromLabel(label: string | undefined): number | null {
-  const raw = (label ?? "").trim();
-  if (!raw || raw === "—" || raw === "-" || raw === "–") return null;
-  const match = raw.match(/(\d+(?:[.,]\d+)?)/);
-  if (!match) return null;
-  const minutes = Number(match[1].replace(",", "."));
-  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+  return productEtaMinutesFromLabel(label);
 }
 
 function etaLabelFromOrder(order: OrderRequest, status: OrderStatus): string {
@@ -177,26 +163,8 @@ function fallbackEtaForPhase(order: OrderRequest, status: OrderStatus): string {
   return etaLabelFromOrder(order, status);
 }
 
-function etaProgressCap(status: OrderStatus, etaLabel: string | undefined): number | null {
-  const minutes = etaMinutesFromLabel(etaLabel);
-  if (minutes == null) return null;
-
-  let cap = 0.96;
-  if (minutes >= 10) cap = 0.58;
-  else if (minutes >= 7) cap = 0.66;
-  else if (minutes >= 5) cap = 0.74;
-  else if (minutes >= 3) cap = 0.82;
-  else if (minutes >= 2) cap = 0.9;
-
-  const phase = progressPhaseForStatus(status);
-  if (phase === "pickup") return Math.min(cap, phaseProgressRange("pickup").end);
-  return cap;
-}
-
 function progressWithEtaCap(status: OrderStatus, progress: number, etaLabel: string | undefined): number {
-  if (status === "completed") return 1;
-  const cap = etaProgressCap(status, etaLabel);
-  return cap == null ? clampProgress(progress) : clampProgress(Math.min(progress, cap));
+  return productProgressWithEtaCap(status, progress, etaLabel);
 }
 
 function progressPhaseForStatus(status: OrderStatus): ProgressPhase | null {
@@ -228,27 +196,11 @@ function phaseTargetForOrder(order: OrderRequest, phase: ProgressPhase): Coordin
 }
 
 function phaseProgressRange(phase: ProgressPhase): { start: number; end: number } {
-  if (phase === "pickup") {
-    return { start: 0.14, end: 0.54 };
-  }
-  return { start: 0.58, end: 0.96 };
+  return productProgressRangeForPhase(phase) ?? { start: 0.58, end: 0.96 };
 }
 
 function statusFloorProgress(status: OrderStatus): number {
-  switch (status) {
-    case "accepted":
-      return 0.14;
-    case "enroute":
-      return 0.24;
-    case "in_progress":
-      return 0.34;
-    case "picked_up":
-      return 0.58;
-    case "delivering":
-      return 0.64;
-    default:
-      return progressFromStatus(status);
-  }
+  return productProgressFloorForStatus(status);
 }
 
 function liveActivityVehicleType(
@@ -373,31 +325,6 @@ function driverCoordsFromOrder(driver: OrderRequest["driver"] | undefined): Coor
   return { latitude, longitude };
 }
 
-function liveStatusLabel(status: OrderStatus): string {
-  switch (status) {
-    case "pending":
-      return "Recherche chauffeur";
-    case "accepted":
-      return "Livreur assigne";
-    case "enroute":
-      return "Vers le point de retrait";
-    case "in_progress":
-      return "Course en preparation";
-    case "picked_up":
-      return "Colis recupere";
-    case "delivering":
-      return "En livraison";
-    case "completed":
-      return "Livraison terminee";
-    case "cancelled":
-      return "Commande annulee";
-    case "declined":
-      return "Commande refusee";
-    default:
-      return "Suivi Krono";
-  }
-}
-
 function vehicleTypeLabel(value: string | undefined): string {
   const v = (value ?? "").trim().toLowerCase();
   if (v === "moto") return "Moto";
@@ -425,7 +352,7 @@ function driverVehiclePlate(driver: OrderRequest["driver"] | undefined): string 
   return readDriverString(driver, ["vehicle_plate", "vehiclePlate"]);
 }
 
-function liveActivityImageUrl(...values: Array<string | undefined>): string {
+function liveActivityImageUrl(...values: (string | undefined)[]): string {
   for (const value of values) {
     const url = value?.trim();
     if (!url) continue;
@@ -565,7 +492,7 @@ function propsFromOrder(
       plateLabel: order.dropoff?.address?.slice(0, 28) || "Krono",
       isPending: true,
       statusCode: status,
-      statusLabel: liveStatusLabel(status),
+      statusLabel: clientStatusLabel(status),
       progress: progressFromStatus(status),
       driverAvatarUrl: "",
       driverInitials: "",
@@ -598,7 +525,7 @@ function propsFromOrder(
     plateLabel: plate || "KRONO",
     isPending: false,
     statusCode: status,
-    statusLabel: movement.arrivedAtStop ? "Arrivé" : liveStatusLabel(status),
+    statusLabel: movement.arrivedAtStop ? "Livreur arrivé" : clientStatusLabel(status),
     progress,
     driverAvatarUrl: avatarRaw,
     driverInitials: driverInitials(driver),

@@ -815,7 +815,7 @@ index 1cd5ca9..21336ab 100644
 +      return "—"
 +    }
 +    let pending = root["isPending"] as? Bool == true
-+    if pending { return "Recherche livreurs" }
++    if pending { return "Recherche" }
 +    if let eta = normalizedEta(stringField("etaLabel", root)) { return eta }
 +    return compactFallbackLine(stringField("statusCode", root))
 +  }
@@ -865,7 +865,7 @@ index 1cd5ca9..21336ab 100644
 +      return (nil, nil, nil, nil)
 +    }
 +    let pending = root["isPending"] as? Bool == true
-+    let status = stringField("statusLabel", root) ?? (pending ? "Recherche chauffeur" : nil)
++    let status = stringField("statusLabel", root) ?? (pending ? "Recherche livreur" : nil)
 +    return (
 +      stringField("etaLabel", root),
 +      stringField("vehicleInfoLabel", root) ?? stringField("vehicleLabel", root),

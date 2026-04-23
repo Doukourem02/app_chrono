@@ -74,7 +74,7 @@ function mergeOrderDriver(
   return {
     ...existing,
     ...incoming,
-    avatar: incoming.avatar || incoming.avatar_url || incoming.profile_image_url || existing?.avatar,
+    avatar: incoming.avatar_url || incoming.profile_image_url || incoming.avatar || existing?.avatar_url || existing?.profile_image_url || existing?.avatar,
     avatar_url: incoming.avatar_url || incoming.profile_image_url || incoming.avatar || existing?.avatar_url || existing?.profile_image_url || existing?.avatar,
     profile_image_url: incoming.profile_image_url || incoming.avatar_url || incoming.avatar || existing?.profile_image_url || existing?.avatar_url || existing?.avatar,
   };

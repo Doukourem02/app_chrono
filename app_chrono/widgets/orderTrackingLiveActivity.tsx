@@ -2,6 +2,13 @@ import { Circle, HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack }
 import { clipShape, fixedSize, font, foregroundStyle, frame, offset, padding, scaleEffect } from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
+import {
+  clientHeadline,
+  compactStatusLabel,
+  minimalStatusLabel,
+  normalizeEtaLabel,
+  shouldShowArrivedVisual,
+} from "../utils/orderProductRules";
 
 /**
  * Présentations Apple :
@@ -63,95 +70,13 @@ export type OrderTrackingLiveProps = {
   vehicleMarkerUrl?: string;
 };
 
-function normalizeEtaLabel(etaRaw: string): string {
-  const t = (etaRaw ?? "").trim();
-  const lower = t.toLowerCase();
-  if (!t || t === "—" || t === "-" || t === "–" || ["eta", "n/a", "null", "undefined"].includes(lower)) return "";
-  const m = t.match(/^(\d+)\s*(?:min|mn|minutes?)?$/i);
-  if (m) return `${m[1]} min`;
-  return "";
-}
-
-function minimalEtaLabel(etaRaw: string): string {
-  return normalizeEtaLabel(etaRaw);
-}
-
-function compactFallbackLabel(statusCode: string | undefined): string {
-  switch ((statusCode ?? "").trim()) {
-    case "accepted":
-    case "enroute":
-      return "1 min";
-    case "in_progress":
-      return "1 min";
-    case "picked_up":
-    case "delivering":
-      return "1 min";
-    case "completed":
-      return "Terminé";
-    case "cancelled":
-      return "Annulé";
-    case "declined":
-      return "Refusé";
-    default:
-      return "1 min";
-  }
-}
-
-function compactTrailingLabel(
-  statusCode: string | undefined,
-  eta: string,
-  isPending: boolean | undefined,
-): string {
-  if (isPending) return "Recherche livreurs";
-  return eta || compactFallbackLabel(statusCode);
-}
-
-function shouldShowArrivedCompactVisual(statusCode: string | undefined, statusLabel: string | undefined): boolean {
-  const status = (statusCode ?? "").trim().toLowerCase();
-  if (status === "in_progress" || status === "arrived" || status === "at_pickup" || status === "at_dropoff") {
-    return true;
-  }
-
-  const label = (statusLabel ?? "").trim().toLowerCase();
-  return label.includes("arriv");
-}
-
-function minimalFallbackLabel(statusCode: string | undefined): string {
-  switch ((statusCode ?? "").trim()) {
-    case "accepted":
-    case "enroute":
-      return "1 min";
-    case "in_progress":
-      return "1 min";
-    case "picked_up":
-    case "delivering":
-      return "1 min";
-    case "completed":
-      return "OK";
-    default:
-      return "1 min";
-  }
-}
-
-function etaHeadline(statusCode: string | undefined, eta: string, isPending: boolean | undefined): string {
-  if (isPending) return "Recherche livreur";
-  const status = (statusCode ?? "").trim();
-  if (status === "completed") return "Livraison terminée";
-  if (status === "cancelled") return "Commande annulée";
-  if (status === "declined") return "Commande refusée";
-  if (status === "picked_up" || status === "delivering") {
-    return `Livraison dans ${eta || "1 min"}`;
-  }
-  return `Prise en charge dans ${eta || "1 min"}`;
-}
-
 function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActivityEnvironment) {
   "widget";
   const ON_DARK = palette(environment);
   const vehicleInfo = props.vehicleInfoLabel?.trim() || "Livraison Krono";
   const etaDisplay = (props.etaLabel ?? "").trim() || "—";
   const normalizedEta = normalizeEtaLabel(etaDisplay);
-  const compactTitle = compactTrailingLabel(props.statusCode, normalizedEta, props.isPending);
+  const compactTitle = compactStatusLabel(props.statusCode, normalizedEta, props.isPending);
   const simplified = environment.levelOfDetail === "simplified";
   const progress = Math.max(0.04, Math.min(1, props.progress ?? (props.isPending ? 0.08 : 0.56)));
   const markerWidth = 50;
@@ -164,7 +89,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
 
   const avatarUrl = (props.driverAvatarUrl ?? "").trim();
   const vehicleMarkerUrl = (props.vehicleMarkerUrl ?? "").trim();
-  const compactArrivedVisual = shouldShowArrivedCompactVisual(props.statusCode, props.statusLabel);
+  const compactArrivedVisual = shouldShowArrivedVisual(props.statusCode, props.statusLabel);
 
   const driverAvatar = (
     <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
@@ -206,14 +131,14 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   ) : (
     <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.accent)]}>{compactTitle}</Text>
   );
-  const minimalTitle = props.isPending ? "Recherche" : minimalEtaLabel(etaDisplay) || minimalFallbackLabel(props.statusCode);
+  const minimalTitle = minimalStatusLabel(props.statusCode, etaDisplay, props.isPending);
   const minimal = minimalTitle ? (
     <Text modifiers={[font({ weight: "bold", size: 13 }), foregroundStyle(ON_DARK.accent)]}>{minimalTitle}</Text>
   ) : (
     <Image systemName="car.fill" color={ON_DARK.accent} size={16} />
   );
 
-  const headline = etaHeadline(props.statusCode, normalizedEta, props.isPending);
+  const headline = props.isPending ? "Recherche livreur" : clientHeadline(props.statusCode, normalizedEta);
   const shortVehicleInfo = vehicleInfo.length > 31 ? `${vehicleInfo.slice(0, 28)}...` : vehicleInfo;
   const bannerTrackWidth = simplified ? 280 : 310;
   const bannerTraveledWidth = Math.max(16, Math.round(bannerTrackWidth * progress));

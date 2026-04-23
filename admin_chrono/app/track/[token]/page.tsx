@@ -5,21 +5,11 @@ import { useParams } from 'next/navigation'
 import { AlertTriangle, MapPin, UserRound } from 'lucide-react'
 import config from '@/lib/config'
 import PublicTrackMap from '@/components/track/PublicTrackMap'
+import { PUBLIC_TRACK_FLOW_STEPS, publicTrackStatusTitle } from '@/lib/orderProductRules'
 
 const API_URL = config.apiUrl
 
-const FLOW_STEPS: { status: string; title: string; body: string }[] = [
-  { status: 'pending', title: 'En attente', body: 'Recherche d’un livreur pour votre course.' },
-  { status: 'accepted', title: 'Course acceptée', body: 'Un livreur a accepté votre commande.' },
-  {
-    status: 'enroute',
-    title: 'En route',
-    body: 'Le livreur est en route vers le point de collecte de colis.',
-  },
-  { status: 'picked_up', title: 'Colis récupéré', body: 'Votre colis a été récupéré.' },
-  { status: 'delivering', title: 'En livraison', body: 'Le livreur est en route vers vous.' },
-  { status: 'completed', title: 'Livraison terminée', body: 'Votre commande est livrée.' },
-]
+const FLOW_STEPS = PUBLIC_TRACK_FLOW_STEPS
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -39,11 +29,18 @@ function driverInitials(name: string): string {
 type TrackData = {
   id: string
   status: string
+  phase?: string
+  statusLabel?: string
+  etaLabel?: string
+  progress?: number
   pickup: { address: string; coordinates: { latitude: number; longitude: number } | null }
   dropoff: { address: string; coordinates: { latitude: number; longitude: number } | null }
   driver: {
     id: string
-    name: string
+    name: string | null
+    avatarUrl?: string | null
+    vehiclePlate?: string | null
+    vehicleType?: string | null
     latitude: number | null
     longitude: number | null
     heading?: number | null
@@ -188,6 +185,7 @@ export default function TrackPage() {
 
   const status = data.status
   const isActive = !['completed', 'cancelled', 'declined'].includes(status)
+  const driverName = data.driver?.name || 'Votre livreur'
 
   const flowIndex = FLOW_STEPS.findIndex((s) => s.status === status)
   const currentStepIndex = flowIndex >= 0 ? flowIndex : 0
@@ -250,6 +248,19 @@ export default function TrackPage() {
                 <p className="mt-1 font-mono text-[11px] text-slate-500 sm:text-xs">
                   #{data.id.slice(0, 8).toUpperCase()}
                 </p>
+                {data.statusLabel && (
+                  <p className="mt-2 text-sm font-semibold leading-snug text-violet-700">
+                    {data.statusLabel}
+                  </p>
+                )}
+                {isActive && typeof data.progress === 'number' && (
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-violet-600 transition-[width] duration-500"
+                      style={{ width: `${Math.max(0, Math.min(100, data.progress * 100))}%` }}
+                    />
+                  </div>
+                )}
               </div>
               <span
                 className={`inline-flex shrink-0 items-center rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide shadow-md ring-1 ring-black/5 sm:text-xs ${
@@ -264,8 +275,7 @@ export default function TrackPage() {
                           : 'bg-slate-500 text-white'
                 }`}
               >
-                {FLOW_STEPS.find((s) => s.status === status)?.title ||
-                  (status === 'cancelled' ? 'Annulé' : status === 'declined' ? 'Refusé' : status)}
+                {publicTrackStatusTitle(status)}
               </span>
             </div>
           </header>
@@ -283,14 +293,28 @@ export default function TrackPage() {
                 />
                 <div className="relative flex items-center gap-4">
                   <div className="flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 text-lg font-bold text-white shadow-lg shadow-violet-500/30 ring-[3px] ring-white">
-                    {driverInitials(data.driver.name)}
+                    {data.driver.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={data.driver.avatarUrl}
+                        alt=""
+                        className="h-full w-full rounded-2xl object-cover"
+                      />
+                    ) : (
+                      driverInitials(driverName)
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-violet-600">
                       <UserRound className="h-3.5 w-3.5 shrink-0 stroke-[2.5]" aria-hidden />
-                      Livreur assigné
+                      Livreur confirmé
                     </p>
-                    <p className="mt-1 truncate text-lg font-bold text-slate-900">{data.driver.name}</p>
+                    <p className="mt-1 truncate text-lg font-bold text-slate-900">{driverName}</p>
+                    {(data.driver.vehiclePlate || data.driver.vehicleType) && (
+                      <p className="mt-0.5 truncate text-xs font-semibold text-violet-700">
+                        {[data.driver.vehiclePlate, data.driver.vehicleType].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
                     <p className="mt-1 text-xs leading-relaxed text-slate-500">
                       Dernière position affichée sur la carte (zone du haut de l’écran).
                     </p>

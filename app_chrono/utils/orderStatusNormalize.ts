@@ -1,4 +1,5 @@
 import type { OrderStatus } from "../store/useOrderStore";
+import { ORDER_PRODUCT_STATUSES, normalizeProductStatus } from "./orderProductRules";
 
 /** Statuts « livraison en cours » : aligné Live Activity + resync API + listes UI. */
 export const DELIVERY_IN_PROGRESS_STATUSES: OrderStatus[] = [
@@ -10,22 +11,14 @@ export const DELIVERY_IN_PROGRESS_STATUSES: OrderStatus[] = [
   "delivering",
 ];
 
-const ALL_KNOWN_STATUSES: OrderStatus[] = [
-  ...DELIVERY_IN_PROGRESS_STATUSES,
-  "completed",
-  "declined",
-  "cancelled",
-];
+const ALL_KNOWN_STATUSES = ORDER_PRODUCT_STATUSES;
 
 /**
  * Normalise les statuts API / socket (casse, espaces, tirets, alias) pour comparaison fiable.
  */
 export function normalizeOrderStatus(raw: unknown): OrderStatus | null {
-  if (raw == null) return null;
-  let s = String(raw).trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
-  if (s === "inprogress") s = "in_progress";
-  if (s === "pickedup") s = "picked_up";
-  return (ALL_KNOWN_STATUSES as string[]).includes(s) ? (s as OrderStatus) : null;
+  const normalized = normalizeProductStatus(raw);
+  return (ALL_KNOWN_STATUSES as string[]).includes(normalized ?? "") ? (normalized as OrderStatus) : null;
 }
 
 /** Livraison encore suivie côté client (store, resync, îlot). */

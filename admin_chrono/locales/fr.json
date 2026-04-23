@@ -98,12 +98,12 @@
       "clients": "CLIENTS",
       "status": {
         "completed": "Colis livré",
-        "pending": "En attente",
-        "accepted": "Livreur assigné",
+        "pending": "Recherche livreur",
+        "accepted": "Prise en charge",
         "cancelled": "Annulé",
-        "enroute": "En route pour récupérer",
-        "picked_up": "Colis pris en charge",
-        "delivering": "En cours de livraison"
+        "enroute": "Prise en charge",
+        "picked_up": "Colis récupéré",
+        "delivering": "Livraison"
       },
       "client": "Client",
       "driver": "Livreur",

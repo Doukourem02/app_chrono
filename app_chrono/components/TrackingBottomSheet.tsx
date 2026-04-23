@@ -68,7 +68,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
   // Helper pour obtenir l'avatar du livreur
   const getDriverAvatar = useCallback(() => {
-    return currentOrder?.driver?.avatar || currentOrder?.driver?.avatar_url || null;
+    return currentOrder?.driver?.avatar_url || currentOrder?.driver?.profile_image_url || currentOrder?.driver?.avatar || null;
   }, [currentOrder?.driver]);
 
   const loadOrderRating = useCallback(async () => {
@@ -166,11 +166,11 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
 
   const statusSteps = useMemo(() => [
-    { label: "Livreur assigné", key: "accepted" },
-    { label: "Livreur en route pour récupérer le colis", key: "enroute" },
-    { label: "Colis pris en charge", key: "picked_up" },
-    { label: "En cours de livraison", key: "delivering" },
-    { label: "Colis livré", key: "completed" },
+    { label: "Prise en charge", key: "accepted" },
+    { label: "Prise en charge", key: "enroute" },
+    { label: "Colis récupéré", key: "picked_up" },
+    { label: "Livraison", key: "delivering" },
+    { label: "Livraison terminée", key: "completed" },
   ], []);
 
   const getActiveIndexes = useCallback(() => {

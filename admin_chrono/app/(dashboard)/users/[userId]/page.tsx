@@ -624,11 +624,11 @@ export default function UserDetailsPage() {
           const statusLabel = order.status === 'completed' ? 'Colis livré'
             : order.status === 'cancelled' ? 'Annulé'
             : order.status === 'declined' ? 'Refusé'
-            : order.status === 'pending' ? 'En attente'
-            : order.status === 'accepted' ? 'Livreur assigné'
-            : order.status === 'enroute' ? 'Livreur en route pour récupérer le colis'
-            : order.status === 'picked_up' ? 'Colis pris en charge'
-            : order.status === 'delivering' ? 'En cours de livraison'
+            : order.status === 'pending' ? 'Recherche livreur'
+            : order.status === 'accepted' ? 'Prise en charge'
+            : order.status === 'enroute' ? 'Prise en charge'
+            : order.status === 'picked_up' ? 'Colis récupéré'
+            : order.status === 'delivering' ? 'Livraison'
             : order.status
           const displayDate = order.completedAt || order.cancelledAt || order.acceptedAt || order.createdAt
           rows.push([
@@ -1489,14 +1489,14 @@ export default function UserDetailsPage() {
                     {user.recentOrders.map((order: RecentOrder, index: number) => {
                       const getStatusLabel = (status: string) => {
                         const statusMap: Record<string, { label: string; color: string; bg: string }> = {
-                          completed: { label: 'Colis livré', color: '#059669', bg: '#D1FAE5' },
+                          completed: { label: 'Livraison terminée', color: '#059669', bg: '#D1FAE5' },
                           cancelled: { label: 'Annulé', color: '#DC2626', bg: '#FEE2E2' },
                           declined: { label: 'Refusé', color: '#DC2626', bg: '#FEE2E2' },
-                          pending: { label: 'En attente', color: '#D97706', bg: '#FEF3C7' },
-                          accepted: { label: 'Livreur assigné', color: '#2563EB', bg: '#DBEAFE' },
-                          enroute: { label: 'En route pour récupérer', color: '#7C3AED', bg: '#E9D5FF' },
-                          picked_up: { label: 'Colis pris en charge', color: '#7C3AED', bg: '#E9D5FF' },
-                          delivering: { label: 'En cours de livraison', color: '#7C3AED', bg: '#E9D5FF' },
+                          pending: { label: 'Recherche livreur', color: '#D97706', bg: '#FEF3C7' },
+                          accepted: { label: 'Prise en charge', color: '#2563EB', bg: '#DBEAFE' },
+                          enroute: { label: 'Prise en charge', color: '#7C3AED', bg: '#E9D5FF' },
+                          picked_up: { label: 'Colis récupéré', color: '#7C3AED', bg: '#E9D5FF' },
+                          delivering: { label: 'Livraison', color: '#7C3AED', bg: '#E9D5FF' },
                         }
                         return statusMap[status] || { label: status, color: '#6B7280', bg: '#F3F4F6' }
                       }
@@ -1791,4 +1791,3 @@ export default function UserDetailsPage() {
     </div>
   )
 }
-

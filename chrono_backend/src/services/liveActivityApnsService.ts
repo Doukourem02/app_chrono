@@ -2,6 +2,12 @@ import http2 from 'node:http2';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import {
+  clientStatusLabel,
+  normalizeProductStatus,
+  progressWithEtaCap,
+  statusBaseProgress,
+} from '../utils/orderProductRules.js';
 
 const LIVE_ACTIVITY_NAME = 'OrderTrackingLive';
 
@@ -130,87 +136,15 @@ function providerToken(): string {
 }
 
 function normalizeStatus(status: string): string {
-  return status.trim().toLowerCase();
+  return normalizeProductStatus(status) ?? status.trim().toLowerCase();
 }
 
 function progressFromStatus(status: string): number {
-  switch (normalizeStatus(status)) {
-    case 'pending':
-      return 0.08;
-    case 'accepted':
-      return 0.2;
-    case 'enroute':
-      return 0.38;
-    case 'in_progress':
-      return 0.52;
-    case 'picked_up':
-      return 0.7;
-    case 'delivering':
-      return 0.88;
-    case 'completed':
-      return 1;
-    default:
-      return 0.12;
-  }
-}
-
-function etaMinutesFromLabel(label: string | undefined): number | null {
-  const raw = (label || '').trim();
-  if (!raw || raw === '—' || raw === '-' || raw === '–') return null;
-  const match = raw.match(/(\d+(?:[.,]\d+)?)/);
-  if (!match) return null;
-  const minutes = Number(match[1].replace(',', '.'));
-  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
-}
-
-function etaProgressCap(status: string, eta: string | undefined): number | null {
-  const minutes = etaMinutesFromLabel(eta);
-  if (minutes == null) return null;
-
-  let cap = 0.96;
-  if (minutes >= 10) cap = 0.58;
-  else if (minutes >= 7) cap = 0.66;
-  else if (minutes >= 5) cap = 0.74;
-  else if (minutes >= 3) cap = 0.82;
-  else if (minutes >= 2) cap = 0.9;
-
-  const normalized = normalizeStatus(status);
-  if (normalized === 'accepted' || normalized === 'enroute' || normalized === 'in_progress') {
-    return Math.min(cap, 0.54);
-  }
-  return cap;
-}
-
-function progressWithEtaCap(status: string, progress: number, eta: string | undefined): number {
-  if (normalizeStatus(status) === 'completed') return 1;
-  const cap = etaProgressCap(status, eta);
-  const normalized = Math.min(1, Math.max(0, Number(progress) || 0));
-  return cap == null ? normalized : Math.min(normalized, cap);
+  return statusBaseProgress(status);
 }
 
 function statusLabel(status: string): string {
-  switch (normalizeStatus(status)) {
-    case 'pending':
-      return 'Recherche chauffeur';
-    case 'accepted':
-      return 'Livreur assigne';
-    case 'enroute':
-      return 'Vers le point de retrait';
-    case 'in_progress':
-      return 'Course en preparation';
-    case 'picked_up':
-      return 'Colis recupere';
-    case 'delivering':
-      return 'En livraison';
-    case 'completed':
-      return 'Livraison terminee';
-    case 'cancelled':
-      return 'Commande annulee';
-    case 'declined':
-      return 'Commande refusee';
-    default:
-      return 'Suivi Krono';
-  }
+  return clientStatusLabel(status);
 }
 
 function vehicleTypeLabel(value: string | null | undefined): string {

@@ -41,7 +41,7 @@ export function useNotifications() {
       if (st === 'accepted') {
         addNotification({
           type: 'order',
-          title: 'Livreur assigné',
+          title: 'Prise en charge',
           message: `Un livreur a accepté la commande${order.shipmentNumber || order.shipment_number ? ` (${order.shipmentNumber || order.shipment_number})` : ''}`,
           link: `/orders?orderId=${order.id}`,
           metadata: { orderId: order.id, status: order.status },
@@ -131,4 +131,3 @@ export function useNotifications() {
     }
   }, [messageUnreadCount])
 }
-

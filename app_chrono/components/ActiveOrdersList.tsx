@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } 
 import { Ionicons } from '@expo/vector-icons';
 import { useOrderStore } from '../store/useOrderStore';
 import { formatDeliveryId } from '../utils/formatDeliveryId';
+import { clientStatusLabel } from '../utils/orderProductRules';
 
 interface ActiveOrdersListProps {
   onOrderSelect?: (orderId: string) => void;
@@ -31,26 +32,7 @@ const getStatusColor = (status: string): string => {
 };
 
 const getStatusLabel = (status: string): string => {
-  switch (status) {
-    case 'pending':
-      return 'En attente';
-    case 'accepted':
-      return 'Livreur assigné';
-    case 'enroute':
-      return 'Livreur en route pour récupérer le colis';
-    case 'picked_up':
-      return 'Colis pris en charge';
-    case 'delivering':
-      return 'En cours de livraison';
-    case 'completed':
-      return 'Colis livré';
-    case 'cancelled':
-      return 'Annulée';
-    case 'declined':
-      return 'Refusée';
-    default:
-      return status;
-  }
+  return clientStatusLabel(status);
 };
 
 const formatPrice = (price?: number): string => {
@@ -126,7 +108,7 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ onOrderSelec
               <View style={styles.driverInfo}>
                 <Ionicons name="person-circle-outline" size={16} color="#6B7280" />
                 <Text style={styles.driverText}>
-                  {order.driver.name || 'Livreur assigné'}
+                  {order.driver.name || 'Livreur confirmé'}
                 </Text>
               </View>
             )}
@@ -259,4 +241,3 @@ const styles = StyleSheet.create({
 });
 
 export default ActiveOrdersList;
-

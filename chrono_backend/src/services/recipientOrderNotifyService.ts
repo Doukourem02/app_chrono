@@ -4,6 +4,7 @@ import { lookupClientUserIdByPhone } from '../utils/resolveRecipientUserIdByPhon
 import { notifyOrderStatusPushes } from './expoPushService.js';
 import { notifyLiveActivitiesForOrderStatus } from './liveActivityApnsService.js';
 import { isTwilioSmsConfigured, sendTransactionalSMSTwilio } from './twilioSmsService.js';
+import { publicTrackCopy } from '../utils/orderProductRules.js';
 import {
   isTrackWebPushConfigured,
   sendTrackWebPushForSubscriptions,
@@ -48,46 +49,7 @@ async function claimOrderStatusNotification(orderId: string, statusNorm: string)
  * Textes alignés sur les push app pour SMS / Web Push sur le lien de suivi.
  */
 export function copyForPublicTrackStatus(status: string): { title: string; body: string } | null {
-  const s = (status || '').toLowerCase();
-  switch (s) {
-    case 'accepted':
-      return {
-        title: 'Course acceptée',
-        body: 'Un livreur a accepté votre commande.',
-      };
-    case 'enroute':
-      return {
-        title: 'Vers la collecte',
-        body: 'Le livreur se dirige vers le point de collecte de colis.',
-      };
-    case 'in_progress':
-      return {
-        title: 'Course en cours',
-        body: 'Votre livreur poursuit la course.',
-      };
-    case 'picked_up':
-      return {
-        title: 'Colis récupéré',
-        body: 'Votre colis a été récupéré.',
-      };
-    case 'delivering':
-      return {
-        title: 'En livraison',
-        body: 'Le livreur se dirige vers vous.',
-      };
-    case 'completed':
-      return {
-        title: 'Livraison terminée',
-        body: 'Votre commande est livrée.',
-      };
-    case 'cancelled':
-      return {
-        title: 'Commande annulée',
-        body: 'Votre commande a été annulée.',
-      };
-    default:
-      return null;
-  }
+  return publicTrackCopy(status);
 }
 
 export function extractRecipientPhoneFromOrder(order: {

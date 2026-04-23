@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import { payerPushCopy, recipientPushCopy } from '../utils/orderProductRules.js';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
@@ -7,80 +8,12 @@ type AppPushRole = 'client' | 'driver';
 
 /** Statuts notifiés au client qui a passé la commande. */
 function copyForPayerStatus(status: string): { title: string; body: string } | null {
-  const s = (status || '').toLowerCase();
-  switch (s) {
-    case 'accepted':
-      return {
-        title: 'Course acceptée',
-        body: 'Un livreur a accepté votre commande.',
-      };
-    case 'enroute':
-      return {
-        title: 'Vers la collecte',
-        body: 'Le livreur se dirige vers le point de collecte de colis.',
-      };
-    case 'picked_up':
-      return {
-        title: 'Colis récupéré',
-        body: 'Le livreur a récupéré le colis.',
-      };
-    case 'delivering':
-      return {
-        title: 'En livraison',
-        body: 'Le livreur se dirige vers le destinataire.',
-      };
-    case 'completed':
-      return {
-        title: 'Livraison terminée',
-        body: 'Votre commande est livrée.',
-      };
-    case 'cancelled':
-      return {
-        title: 'Commande annulée',
-        body: 'Votre commande a été annulée.',
-      };
-    default:
-      return null;
-  }
+  return payerPushCopy(status);
 }
 
 /** Statuts notifiés au destinataire inscrit (compte client distinct du payeur). */
 function copyForRecipientStatus(status: string): { title: string; body: string } | null {
-  const s = (status || '').toLowerCase();
-  switch (s) {
-    case 'accepted':
-      return {
-        title: 'Course acceptée',
-        body: 'Une livraison arrive vers vous.',
-      };
-    case 'enroute':
-      return {
-        title: 'Vers la collecte',
-        body: 'Le livreur se dirige vers le point de collecte.',
-      };
-    case 'picked_up':
-      return {
-        title: 'Colis récupéré',
-        body: 'Votre colis a été récupéré.',
-      };
-    case 'delivering':
-      return {
-        title: 'En livraison',
-        body: 'Le livreur se dirige vers vous.',
-      };
-    case 'completed':
-      return {
-        title: 'Livraison terminée',
-        body: 'Votre colis a été livré.',
-      };
-    case 'cancelled':
-      return {
-        title: 'Commande annulée',
-        body: 'Votre commande a été annulée.',
-      };
-    default:
-      return null;
-  }
+  return recipientPushCopy(status);
 }
 
 function truncateBody(text: string, max = 140): string {

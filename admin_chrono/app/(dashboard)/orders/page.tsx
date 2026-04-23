@@ -32,32 +32,32 @@ const statusConfig: Record<
   { label: string; backgroundColor: string; color: string }
 > = {
   pending: {
-    label: "Pending",
+    label: "Recherche livreur",
     backgroundColor: "#FFEDD5",
     color: "#EA580C",
   },
   accepted: {
-    label: "Livreur assigné",
+    label: "Prise en charge",
     backgroundColor: "#DBEAFE",
     color: "#2563EB",
   },
   enroute: {
-    label: "En route pour récupérer",
+    label: "Prise en charge",
     backgroundColor: "#DBEAFE",
     color: "#2563EB",
   },
   picked_up: {
-    label: "Colis pris en charge",
+    label: "Colis récupéré",
     backgroundColor: "#F3E8FF",
     color: "#9333EA",
   },
   delivering: {
-    label: "En cours de livraison",
+    label: "Livraison",
     backgroundColor: "#E9D5FF",
     color: "#7C3AED",
   },
   completed: {
-    label: "Colis livré",
+    label: "Livraison terminée",
     backgroundColor: "#D1FAE5",
     color: "#16A34A",
   },

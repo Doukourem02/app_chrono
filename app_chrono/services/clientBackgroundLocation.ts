@@ -10,6 +10,7 @@ import { Platform } from "react-native";
 import { useAuthStore } from "../store/useAuthStore";
 import type { OrderRequest, OrderStatus } from "../store/useOrderStore";
 import { logger } from "../utils/logger";
+import { normalizeEtaLabel } from "../utils/orderProductRules";
 import { userApiService } from "./userApiService";
 import { syncClientOrdersFromApi } from "./userAppResync";
 
@@ -30,14 +31,6 @@ const DELIVERY_STATUSES = new Set<OrderStatus>(["picked_up", "delivering"]);
 
 function cleanText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizeEtaLabel(value: unknown): string {
-  const raw = cleanText(value);
-  if (!raw) return "";
-  const numberMatch = raw.match(/\d+/);
-  if (!numberMatch) return "";
-  return `${numberMatch[0]} min`;
 }
 
 function capitalized(value: unknown): string {
@@ -74,7 +67,7 @@ function buildAndroidTrackingNotification(order?: OrderRequest | null): AndroidT
   }
 
   if (status && PICKUP_STATUSES.has(status)) {
-    const lead = eta ? `Prise en charge dans ${eta}` : "Prise en charge en cours";
+    const lead = `Prise en charge dans ${eta || "1 min"}`;
     return {
       title: "Krono — prise en charge",
       body: [lead, vehicle].filter(Boolean).join(" · "),
@@ -83,9 +76,9 @@ function buildAndroidTrackingNotification(order?: OrderRequest | null): AndroidT
   }
 
   if (status && DELIVERY_STATUSES.has(status)) {
-    const lead = eta ? `Livraison dans ${eta}` : "Livraison en cours";
+    const lead = `Livraison dans ${eta || "1 min"}`;
     return {
-      title: "Krono — livraison en cours",
+      title: "Krono — livraison",
       body: [lead, vehicle].filter(Boolean).join(" · "),
       signature: JSON.stringify({ status, orderId: order?.id || "", eta, vehicle }),
     };

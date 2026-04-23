@@ -7,6 +7,66 @@ import {
   saveTrackPushSubscription,
 } from '../services/trackWebPushService.js';
 import logger from '../utils/logger.js';
+import {
+  clientHeadline,
+  normalizeProductStatus,
+  orderStatusDefinition,
+  progressWithEtaCap,
+  statusBaseProgress,
+} from '../utils/orderProductRules.js';
+
+type PublicCoordinates = { latitude: number; longitude: number };
+
+function toPublicCoordinates(value: unknown): PublicCoordinates | null {
+  const record = value as Record<string, unknown> | null | undefined;
+  const coords = (record?.coordinates || record) as Record<string, unknown> | null | undefined;
+  if (!coords) return null;
+  const latitude = typeof coords.latitude === 'number' ? coords.latitude : Number(coords.latitude ?? coords.lat);
+  const longitude = typeof coords.longitude === 'number' ? coords.longitude : Number(coords.longitude ?? coords.lng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
+}
+
+function calculateDistanceMeters(a: PublicCoordinates, b: PublicCoordinates): number {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const rLat1 = toRad(a.latitude);
+  const rLat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function etaLabelForTrack(
+  status: string,
+  driver: PublicCoordinates | null,
+  pickup: unknown,
+  dropoff: unknown,
+  deliveryMethod: string | null
+): string {
+  const normalized = normalizeProductStatus(status) ?? status;
+  if (normalized === 'pending') return '';
+  if (normalized === 'in_progress') return '1 min';
+  if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'declined') return '';
+
+  const etaMode = orderStatusDefinition(normalized).etaMode;
+  const target =
+    etaMode === 'pickup'
+      ? toPublicCoordinates(pickup)
+      : etaMode === 'dropoff'
+        ? toPublicCoordinates(dropoff)
+        : null;
+  if (!driver || !target) return '';
+
+  const distanceMeters = calculateDistanceMeters(driver, target);
+  const method = (deliveryMethod || '').trim().toLowerCase();
+  const speedKmh = method === 'moto' ? 35 : method === 'cargo' ? 25 : 30;
+  const minutes = Math.max(1, Math.ceil((distanceMeters / 1000 / speedKmh) * 60));
+  return `${minutes} min`;
+}
 
 /**
  * Suivi public d'une commande par token (sans authentification)
@@ -35,6 +95,10 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
         o.delivery_qr_scanned_at,
         d.first_name as driver_first_name,
         d.last_name as driver_last_name,
+        d.avatar_url as driver_avatar_url,
+        dp.profile_image_url as driver_profile_image_url,
+        dp.vehicle_plate as driver_vehicle_plate,
+        dp.vehicle_type as driver_vehicle_type,
         dp.current_latitude as driver_lat,
         dp.current_longitude as driver_lng,
         dp.heading_degrees as driver_heading
@@ -69,6 +133,25 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
     }
 
     const status = row.status;
+    const normalizedStatus = normalizeProductStatus(status) ?? status;
+    const driverCoordinates =
+      row.driver_lat != null && row.driver_lng != null
+        ? { latitude: Number(row.driver_lat), longitude: Number(row.driver_lng) }
+        : null;
+    const safeDriverCoordinates =
+      driverCoordinates &&
+      Number.isFinite(driverCoordinates.latitude) &&
+      Number.isFinite(driverCoordinates.longitude)
+        ? driverCoordinates
+        : null;
+    const etaLabel = etaLabelForTrack(
+      normalizedStatus,
+      safeDriverCoordinates,
+      pickup,
+      dropoff,
+      row.delivery_method
+    );
+    const progress = progressWithEtaCap(normalizedStatus, statusBaseProgress(normalizedStatus), etaLabel);
     const qrNotScanned = !row.delivery_qr_scanned_at;
     // Afficher le QR tant qu'il n'a pas été scanné (même si completed - livreur a cliqué trop tôt)
     const showQRCode =
@@ -90,7 +173,13 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
       success: true,
       data: {
         id: row.id,
-        status,
+        status: normalizedStatus,
+        phase: orderStatusDefinition(normalizedStatus).phase,
+        statusLabel: etaLabel
+          ? clientHeadline(normalizedStatus, etaLabel)
+          : orderStatusDefinition(normalizedStatus).recipientLabel,
+        etaLabel,
+        progress,
         pickup: {
           address: pickup?.address || '',
           coordinates: pickup?.coordinates || null,
@@ -103,8 +192,11 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
           ? {
               id: row.driver_id,
               name: driverName,
-              latitude: row.driver_lat != null ? Number(row.driver_lat) : null,
-              longitude: row.driver_lng != null ? Number(row.driver_lng) : null,
+              avatarUrl: row.driver_avatar_url || row.driver_profile_image_url || null,
+              vehiclePlate: row.driver_vehicle_plate || null,
+              vehicleType: row.driver_vehicle_type || null,
+              latitude: safeDriverCoordinates?.latitude ?? null,
+              longitude: safeDriverCoordinates?.longitude ?? null,
               heading: (() => {
                 const h = row.driver_heading;
                 if (h == null || h === '') return null;

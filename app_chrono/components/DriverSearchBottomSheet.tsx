@@ -3,6 +3,7 @@ import {StyleSheet,View,Text,TouchableOpacity,Animated,Image,Linking,Dimensions,
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logger } from '../utils/logger';
+import { clientStatusLabel } from '../utils/orderProductRules';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -41,11 +42,12 @@ interface DriverSearchBottomSheetProps {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  accepted: 'Livreur assigné',
-  enroute: 'Livreur en route pour récupérer le colis',
-  picked_up: 'Colis pris en charge',
-  delivering: 'En cours de livraison',
-  completed: 'Livré',
+  accepted: clientStatusLabel('accepted'),
+  enroute: clientStatusLabel('enroute'),
+  in_progress: clientStatusLabel('in_progress'),
+  picked_up: clientStatusLabel('picked_up'),
+  delivering: clientStatusLabel('delivering'),
+  completed: clientStatusLabel('completed'),
 };
 
 const DELIVERY_METHOD_LABELS: Record<string, string> = {
@@ -162,7 +164,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     const driverRating = driver.rating || 0;
     const driverPhone = driver.phone;
 
-    const statusLabel = order?.status ? STATUS_LABELS[order.status] || order.status : 'Livreur assigné';
+    const statusLabel = order?.status ? STATUS_LABELS[order.status] || order.status : 'Prise en charge';
     const pickupAddr = order?.pickup?.address;
     const dropoffAddr = order?.dropoff?.address;
     const deliveryMethod = order?.deliveryMethod ? DELIVERY_METHOD_LABELS[order.deliveryMethod] : null;
@@ -189,7 +191,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
         >
           <View style={styles.assignedCard}>
         <View style={styles.driverHeader}>
-          <Text style={styles.driverHeaderTitle}>Livreur assigné</Text>
+          <Text style={styles.driverHeaderTitle}>Livreur confirmé</Text>
           {orderIdShort && (
             <Text style={styles.orderIdBadge}>{orderIdShort}</Text>
           )}
@@ -718,4 +720,3 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 });
-

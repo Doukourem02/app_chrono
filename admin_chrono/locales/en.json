@@ -101,7 +101,7 @@
         "pending": "Pending",
         "accepted": "Driver assigned",
         "cancelled": "Cancelled",
-        "enroute": "En route to pick up",
+        "enroute": "Pickup in progress",
         "picked_up": "Package picked up",
         "delivering": "In delivery"
       },

@@ -39,9 +39,9 @@ export default function SummaryPage() {
 
   const getStatusText = () => {
     switch (currentShipment.status) {
-      case 'pending': return 'En attente';
+      case 'pending': return 'Recherche';
       case 'confirmed': return 'Confirmée';
-      case 'in_progress': return 'En cours';
+      case 'in_progress': return 'Livreur arrivé';
       case 'delivered': return 'Livrée';
       default: return 'Inconnu';
     }

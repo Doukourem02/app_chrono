@@ -164,17 +164,17 @@ export default function OrderHistoryPage() {
   const getStatusLabelShort = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'En attente';
+        return 'Recherche';
       case 'accepted':
-        return 'Assigné';
+        return 'Prise en charge';
       case 'enroute':
-        return 'En route';
+        return 'Prise en charge';
       case 'picked_up':
-        return 'Pris en charge';
+        return 'Colis récupéré';
       case 'delivering':
-        return 'En livraison';
+        return 'Livraison';
       case 'completed':
-        return 'Colis livré';
+        return 'Livraison terminée';
       case 'cancelled':
         return 'Annulée';
       case 'declined':
