@@ -152,6 +152,36 @@
       }
     }
   },
+  "tracking": {
+    "title": "Ongoing Delivery",
+    "description": "Map: all drivers currently on a delivery. Click an order to view its live route; click it again or stop tracking to return to fleet view. Clicking another order switches the tracking focus.",
+    "activeTracking": "Active tracking",
+    "stopTracking": "Stop tracking",
+    "empty": "No ongoing delivery",
+    "loading": "Loading ongoing deliveries...",
+    "trackerId": "Tracker ID",
+    "pickup": "Pickup",
+    "destination": "Destination",
+    "pickupUnknown": "Unknown pickup address",
+    "destinationUnknown": "Unknown destination address",
+    "driverUnassigned": "No driver assigned",
+    "contactUnavailable": "Contact unavailable",
+    "timeline": {
+      "completed": "Completed",
+      "inProgress": "In progress",
+      "upcoming": "Upcoming"
+    },
+    "status": {
+      "pending": "Searching driver",
+      "accepted": "Assigned",
+      "enroute": "Pickup in progress",
+      "picked_up": "Package picked up",
+      "delivering": "Out for delivery",
+      "completed": "Delivered",
+      "cancelled": "Cancelled",
+      "declined": "Declined"
+    }
+  },
   "settings": {
     "title": "Settings",
     "subtitle": "Manage application settings",

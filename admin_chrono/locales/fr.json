@@ -152,6 +152,36 @@
       }
     }
   },
+  "tracking": {
+    "title": "Livraison en cours",
+    "description": "Carte : tous les livreurs en course. Cliquez une commande pour son trajet en direct ; recliquez dessus ou arrêtez le suivi pour revenir à la vue flotte. Cliquer une autre commande change le suivi.",
+    "activeTracking": "Suivi actif",
+    "stopTracking": "Arrêter le suivi",
+    "empty": "Aucune livraison en cours",
+    "loading": "Chargement des livraisons en cours...",
+    "trackerId": "Tracker ID",
+    "pickup": "Point de départ",
+    "destination": "Destination",
+    "pickupUnknown": "Adresse pickup inconnue",
+    "destinationUnknown": "Adresse destination inconnue",
+    "driverUnassigned": "Livreur non assigné",
+    "contactUnavailable": "Contact indisponible",
+    "timeline": {
+      "completed": "Terminé",
+      "inProgress": "En cours",
+      "upcoming": "À venir"
+    },
+    "status": {
+      "pending": "Recherche livreur",
+      "accepted": "Prise en charge",
+      "enroute": "Prise en charge",
+      "picked_up": "Colis récupéré",
+      "delivering": "Livraison",
+      "completed": "Livraison terminée",
+      "cancelled": "Annulée",
+      "declined": "Refusée"
+    }
+  },
   "settings": {
     "title": "Paramètres",
     "subtitle": "Gérez les paramètres de l'application",

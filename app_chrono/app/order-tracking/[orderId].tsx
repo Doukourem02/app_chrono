@@ -390,7 +390,7 @@ export default function OrderTrackingPage() {
     const status = currentOrder?.status;
     const pickup = currentOrder?.pickup?.coordinates;
     const dropoff = currentOrder?.dropoff?.coordinates;
-    const hasDriver = orderDriverCoords && (status === 'accepted' || status === 'enroute' || status === 'picked_up' || status === 'delivering');
+    const hasDriver = orderDriverCoords && (status === 'accepted' || status === 'enroute' || status === 'in_progress' || status === 'picked_up' || status === 'delivering');
 
     if (!hasDriver || !pickup || !dropoff || !mapRef.current?.fitToCoordinates) return;
 

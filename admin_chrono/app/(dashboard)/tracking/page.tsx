@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import DeliveryCard from '@/components/tracking/DeliveryCard'
 import MapboxTrackingMap from '@/components/tracking/MapboxTrackingMap'
 import { useRealTimeTracking } from '@/hooks/useRealTimeTracking'
+import { useTranslation } from '@/hooks/useTranslation'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { logger } from '@/utils/logger'
@@ -49,6 +50,7 @@ interface Delivery {
 }
 
 export default function TrackingPage() {
+  const t = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null)
   const [adminLocation, setAdminLocation] = useState<{ lat: number; lng: number }>(DEFAULT_CENTER)
@@ -361,7 +363,7 @@ export default function TrackingPage() {
           <Search size={20} style={searchIconStyle} />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder={`${t('common.search')}...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={searchInputStyle}
@@ -380,10 +382,9 @@ export default function TrackingPage() {
         </div>
 
         <div style={{ marginBottom: '4px' }}>
-          <h2 style={{ ...titleStyle, marginBottom: '6px' }}>Ongoing Delivery</h2>
+          <h2 style={{ ...titleStyle, marginBottom: '6px' }}>{t('tracking.title')}</h2>
           <p style={{ fontSize: '12px', color: themeColors.textSecondary, lineHeight: 1.4, margin: 0 }}>
-            Carte : tous les livreurs en course. Cliquez une commande pour son trajet en direct ; recliquez dessus ou
-            arrêtez le suivi pour revenir à la vue flotte. Cliquer une autre commande change le suivi.
+            {t('tracking.description')}
           </p>
         </div>
 
@@ -402,7 +403,7 @@ export default function TrackingPage() {
           >
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '11px', fontWeight: 600, color: themeColors.textSecondary, marginBottom: '2px' }}>
-                Suivi actif
+                {t('tracking.activeTracking')}
               </div>
               <div
                 style={{
@@ -443,7 +444,7 @@ export default function TrackingPage() {
               }}
             >
               <X size={16} />
-              Arrêter le suivi
+              {t('tracking.stopTracking')}
             </button>
           </div>
         )}
@@ -457,7 +458,7 @@ export default function TrackingPage() {
             </div>
           ) : filteredDeliveries.length === 0 ? (
             <div style={emptyStateStyle}>
-              <p>Aucune livraison en cours</p>
+              <p>{t('tracking.empty')}</p>
             </div>
           ) : (
             filteredDeliveries.map((delivery: Delivery, index: number) => (

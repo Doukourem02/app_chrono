@@ -166,15 +166,13 @@ index 0000000..c94a5a7
 +enum LiveActivityAvatarCache {
 +  private static let keyPrefix = "__expo_widgets_live_activity_avatar_"
 +  private static let maxAvatarBytes = 1_500_000
-+  private static let inlineAvatarMaxPixel = CGFloat(96)
-+  private static let inlineAvatarQuality = CGFloat(0.72)
 +
 +  static func enrichProps(_ props: String) -> String {
 +    guard var root = parseProps(props) else {
 +      return props
 +    }
 +
-+    cacheImageField("driverAvatarUrl", into: "driverAvatarCacheKey", inlineInto: "driverAvatarInlineBase64", in: &root)
++    cacheImageField("driverAvatarUrl", into: "driverAvatarCacheKey", in: &root)
 +    cacheImageField("vehicleMarkerUrl", into: "vehicleMarkerCacheKey", in: &root)
 +    guard let data = try? JSONSerialization.data(withJSONObject: root),
 +          let enriched = String(data: data, encoding: .utf8) else {
@@ -186,10 +184,6 @@ index 0000000..c94a5a7
 +  static func imageData(from propsJson: String) -> Data? {
 +    guard let root = parseProps(propsJson) else {
 +      return nil
-+    }
-+    if let inline = stringField("driverAvatarInlineBase64", root),
-+       let data = Data(base64Encoded: inline) {
-+      return data
 +    }
 +    if let key = stringField("driverAvatarCacheKey", root),
 +       let data = WidgetsStorage.getData(forKey: key) {
@@ -238,7 +232,6 @@ index 0000000..c94a5a7
 +  private static func cacheImageField(
 +    _ sourceField: String,
 +    into cacheField: String,
-+    inlineInto inlineField: String? = nil,
 +    in root: inout [String: Any]
 +  ) {
 +    guard let source = stringField(sourceField, root) else { return }
@@ -254,9 +247,6 @@ index 0000000..c94a5a7
 +    }
 +
 +    root[cacheField] = key
-+    if let inlineField, root[inlineField] == nil, let inlineData = compressedInlineImageData(from: data) {
-+      root[inlineField] = inlineData.base64EncodedString()
-+    }
 +    if let fileURL = writeImageDataToSharedFile(data, forKey: key) {
 +      root[sourceField] = fileURL.absoluteString
 +    }
@@ -313,19 +303,6 @@ index 0000000..c94a5a7
 +      return nil
 +    }
 +    return result
-+  }
-+
-+  private static func compressedInlineImageData(from data: Data) -> Data? {
-+    guard let sourceImage = UIImage(data: data) else { return nil }
-+    let maxSide = max(sourceImage.size.width, sourceImage.size.height)
-+    guard maxSide > 0 else { return nil }
-+    let scale = min(1, inlineAvatarMaxPixel / maxSide)
-+    let targetSize = CGSize(width: sourceImage.size.width * scale, height: sourceImage.size.height * scale)
-+    let renderer = UIGraphicsImageRenderer(size: targetSize)
-+    let image = renderer.image { _ in
-+      sourceImage.draw(in: CGRect(origin: .zero, size: targetSize))
-+    }
-+    return image.jpegData(compressionQuality: inlineAvatarQuality)
 +  }
 +}
 diff --git a/node_modules/expo-widgets/ios/LiveActivityFactory.swift b/node_modules/expo-widgets/ios/LiveActivityFactory.swift

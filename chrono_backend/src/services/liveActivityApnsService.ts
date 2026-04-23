@@ -2,6 +2,7 @@ import http2 from 'node:http2';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import { getDirections } from '../utils/mapboxService.js';
 import {
   clientStatusLabel,
   normalizeProductStatus,
@@ -89,6 +90,7 @@ const LIVE_ACTIVITY_ONLY_STATUSES = new Set(['accepted', 'enroute', 'in_progress
 const ARRIVAL_RADIUS_METERS = 45;
 const SAME_STOP_RADIUS_METERS = 80;
 const MIN_PROGRESS_DELTA_FOR_LOCATION_PUSH = 0.015;
+const ROUTE_ETA_CACHE_TTL_MS = 15_000;
 
 const phaseProgressByOrder = new Map<string, {
   phase: ProgressPhase;
@@ -99,6 +101,14 @@ const phaseProgressByOrder = new Map<string, {
 const phaseEtaByOrder = new Map<string, {
   phase: ProgressPhase;
   etaLabel: string;
+}>();
+
+const routeEtaByOrder = new Map<string, {
+  phase: ProgressPhase;
+  etaLabel: string;
+  originKey: string;
+  targetKey: string;
+  expiresAt: number;
 }>();
 
 const lastLocationPushAtByOrder = new Map<string, number>();
@@ -271,6 +281,16 @@ function pickupToDropoffDistance(row: OrderLiveActivityRow): number | null {
   return calculateDistanceMeters(pickup, dropoff);
 }
 
+function coordsCacheKey(coords: Coordinates): string {
+  return `${coords.latitude.toFixed(5)},${coords.longitude.toFixed(5)}`;
+}
+
+function routeEtaLabelFromSeconds(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
+  if (seconds < 60) return '< 1 min';
+  return `${Math.max(1, Math.round(seconds / 60))} min`;
+}
+
 function isSamePickupDropoffStop(row: OrderLiveActivityRow): boolean {
   const pickupRecord = row.pickup as Record<string, unknown> | null | undefined;
   const dropoffRecord = row.dropoff as Record<string, unknown> | null | undefined;
@@ -395,6 +415,58 @@ function fallbackEtaLabel(
   return '';
 }
 
+async function resolveRouteEtaLabel(
+  row: OrderLiveActivityRow,
+  status: string,
+  driverCoords: Coordinates | null | undefined,
+): Promise<string | undefined> {
+  const phase = progressPhaseForStatus(status);
+  if (!phase || !driverCoords) return undefined;
+  const target = phaseTargetForRow(row, phase);
+  if (!target) return undefined;
+
+  const remainingMeters = calculateDistanceMeters(driverCoords, target);
+  if (!Number.isFinite(remainingMeters) || remainingMeters <= ARRIVAL_RADIUS_METERS) {
+    routeEtaByOrder.delete(row.id);
+    return undefined;
+  }
+
+  const originKey = coordsCacheKey(driverCoords);
+  const targetKey = coordsCacheKey(target);
+  const cached = routeEtaByOrder.get(row.id);
+  const now = Date.now();
+  if (
+    cached &&
+    cached.phase === phase &&
+    cached.originKey === originKey &&
+    cached.targetKey === targetKey &&
+    cached.expiresAt > now
+  ) {
+    return cached.etaLabel;
+  }
+
+  try {
+    const directions = await getDirections(
+      { lat: driverCoords.latitude, lng: driverCoords.longitude },
+      { lat: target.latitude, lng: target.longitude },
+    );
+    const durationSeconds = directions ? (directions.durationTypical ?? directions.duration) : 0;
+    const etaLabel = routeEtaLabelFromSeconds(durationSeconds);
+    if (!etaLabel) return undefined;
+    routeEtaByOrder.set(row.id, {
+      phase,
+      etaLabel,
+      originKey,
+      targetKey,
+      expiresAt: now + ROUTE_ETA_CACHE_TTL_MS,
+    });
+    return etaLabel;
+  } catch (error: unknown) {
+    logger.warn('[live-activity-apns] ETA route Mapbox indisponible', error instanceof Error ? error.message : String(error));
+    return undefined;
+  }
+}
+
 function clockLabel(value: Date | string | null): string {
   if (!value) return '—';
   const d = value instanceof Date ? value : new Date(value);
@@ -447,12 +519,12 @@ function liveActivityImageUrl(...values: Array<string | null | undefined>): stri
   return '';
 }
 
-function mergeProps(
+async function mergeProps(
   base: Record<string, unknown> | null,
   row: OrderLiveActivityRow | null,
   status: string,
   driverCoordsOverride?: Coordinates | null,
-): OrderTrackingLiveProps {
+): Promise<OrderTrackingLiveProps> {
   const statusCode = normalizeStatus(status || row?.status || 'pending');
   const pending = statusCode === 'pending';
   const driver = row ? driverName(row) : '';
@@ -461,7 +533,10 @@ function mergeProps(
   const movement = row
     ? progressFromDriverMovement(row, statusCode, driverCoordsOverride ?? driverCoordsFromRow(row))
     : { progress: progressFromStatus(statusCode) };
-  const eta = row ? (movement.etaLabel || fallbackEtaLabel(row, statusCode, fallback)) : statusCode === 'accepted' || statusCode === 'enroute'
+  const routeEtaLabel = row
+    ? await resolveRouteEtaLabel(row, statusCode, driverCoordsOverride ?? driverCoordsFromRow(row))
+    : undefined;
+  const eta = row ? (routeEtaLabel || movement.etaLabel || fallbackEtaLabel(row, statusCode, fallback)) : statusCode === 'accepted' || statusCode === 'enroute'
     ? fallback.etaLabel || ''
     : pending
       ? '—'
@@ -704,7 +779,7 @@ export async function notifyLiveActivitiesForOrderStatus(params: {
     }
 
     for (const token of tokens) {
-      const props = mergeProps(token.last_props, row, statusNorm);
+      const props = await mergeProps(token.last_props, row, statusNorm);
       const result = await sendApnsLiveActivityPush(token.apns_push_token, event, props);
       const detail = result.reason || null;
 
@@ -767,7 +842,7 @@ export async function notifyLiveActivitiesForDriverLocation(params: {
 
     for (const token of tokens) {
       const fallback = (token.last_props || {}) as Partial<OrderTrackingLiveProps>;
-      const nextProps = mergeProps(token.last_props, row, statusNorm, driverCoords);
+      const nextProps = await mergeProps(token.last_props, row, statusNorm, driverCoords);
       const previousProgress = Number(fallback.progress || 0) || 0;
       const progressDelta = Math.abs((nextProps.progress ?? 0) - previousProgress);
       const previousEta = typeof fallback.etaLabel === 'string' ? fallback.etaLabel : '';

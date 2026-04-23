@@ -7,6 +7,7 @@ import { apiFetch } from "../utils/apiFetch";
 import { logger } from "../utils/logger";
 import { reportLiveActivityIssue } from "../utils/sentry";
 import { calculateDistance, calculateETAForVehicle, formatETA } from "../utils/etaCalculator";
+import { fetchMapboxDirections } from "../utils/mapboxDirections";
 import { DELIVERY_IN_PROGRESS_STATUSES, normalizeOrderStatus } from "../utils/orderStatusNormalize";
 import {
   clientStatusLabel,
@@ -31,8 +32,10 @@ const LIVE_ACTIVITY_PRE_START_YIELD_MS = 72;
 const MIN_LIVE_ACTIVITY_GPS_UPDATE_MS = 6000;
 const MIN_PROGRESS_DELTA_FOR_FAST_UPDATE = 0.03;
 const MIN_PROGRESS_DELTA_FOR_UPDATE = 0.015;
+const LIVE_ACTIVITY_SOFT_PAYLOAD_CHAR_LIMIT = 3500;
 const ARRIVAL_RADIUS_METERS = 45;
 const SAME_STOP_RADIUS_METERS = 80;
+const ROUTE_ETA_CACHE_TTL_MS = 15_000;
 
 const END_PROPS: OrderTrackingLiveProps = {
   etaLabel: "—",
@@ -67,6 +70,12 @@ type PhaseEtaState = {
   etaLabel: string;
 };
 
+type RouteEtaState = PhaseEtaState & {
+  originKey: string;
+  targetKey: string;
+  expiresAt: number;
+};
+
 type LastLiveActivityUpdate = {
   orderId: string;
   statusCode?: string;
@@ -78,6 +87,7 @@ type LastLiveActivityUpdate = {
 
 const phaseProgressByOrder = new Map<string, PhaseProgressState>();
 const phaseEtaByOrder = new Map<string, PhaseEtaState>();
+const routeEtaByOrder = new Map<string, RouteEtaState>();
 let lastLiveActivityUpdate: LastLiveActivityUpdate | null = null;
 
 const BIKER_MARKER_ASSET = Asset.fromModule(require("../assets/images/biker.png"));
@@ -223,6 +233,73 @@ function normalizedStopAddress(value: string | undefined): string {
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+function coordsCacheKey(coords: Coordinates): string {
+  return `${coords.latitude.toFixed(5)},${coords.longitude.toFixed(5)}`;
+}
+
+function routeEtaLabelFromSeconds(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "";
+  if (seconds < 60) return "< 1 min";
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `${minutes} min`;
+}
+
+async function resolveRouteEtaLabel(
+  order: OrderRequest,
+  status: OrderStatus,
+  driverCoords: Coordinates | null | undefined,
+): Promise<string | undefined> {
+  const phase = progressPhaseForStatus(status);
+  if (!phase || !driverCoords) return undefined;
+  const target = phaseTargetForOrder(order, phase);
+  if (!target) return undefined;
+
+  const remainingMeters = calculateDistance(driverCoords, target);
+  if (!Number.isFinite(remainingMeters) || remainingMeters <= ARRIVAL_RADIUS_METERS) {
+    routeEtaByOrder.delete(order.id);
+    return undefined;
+  }
+
+  const originKey = coordsCacheKey(driverCoords);
+  const targetKey = coordsCacheKey(target);
+  const cached = routeEtaByOrder.get(order.id);
+  const now = Date.now();
+  if (
+    cached &&
+    cached.phase === phase &&
+    cached.originKey === originKey &&
+    cached.targetKey === targetKey &&
+    cached.expiresAt > now
+  ) {
+    return cached.etaLabel;
+  }
+
+  const token = config.mapboxAccessToken;
+  if (!token || token.startsWith("<")) return undefined;
+
+  try {
+    const directions = await fetchMapboxDirections(
+      { lat: driverCoords.latitude, lng: driverCoords.longitude },
+      { lat: target.latitude, lng: target.longitude },
+      token,
+    );
+    const durationSeconds = directions ? (directions.durationTypical ?? directions.duration) : 0;
+    const etaLabel = routeEtaLabelFromSeconds(durationSeconds);
+    if (!etaLabel) return undefined;
+    routeEtaByOrder.set(order.id, {
+      phase,
+      etaLabel,
+      originKey,
+      targetKey,
+      expiresAt: now + ROUTE_ETA_CACHE_TTL_MS,
+    });
+    return etaLabel;
+  } catch (error) {
+    logger.warn("[orderLiveActivity] ETA route Mapbox indisponible", "orderLiveActivity", error);
+    return undefined;
+  }
 }
 
 function isSamePickupDropoffStop(order: OrderRequest): boolean {
@@ -504,13 +581,69 @@ function getFactory(): LiveActivityFactory<OrderTrackingLiveProps> {
   return factory;
 }
 
-function propsFromOrder(
+function trimLiveActivityText(value: string | undefined, maxLength: number): string {
+  const text = value?.trim() ?? "";
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+  if (maxLength <= 1) return text.slice(0, maxLength);
+  return `${text.slice(0, maxLength - 1)}…`;
+}
+
+function liveActivityPayloadChars(props: OrderTrackingLiveProps): number {
+  try {
+    return JSON.stringify(props).length;
+  } catch {
+    return 0;
+  }
+}
+
+function sanitizeLiveActivityProps(props: OrderTrackingLiveProps): OrderTrackingLiveProps {
+  const normalized: OrderTrackingLiveProps = {
+    etaLabel: trimLiveActivityText(props.etaLabel, 24) || "—",
+    vehicleLabel: trimLiveActivityText(props.vehicleLabel, 40),
+    vehicleInfoLabel: trimLiveActivityText(props.vehicleInfoLabel, 72),
+    plateLabel: trimLiveActivityText(props.plateLabel, 24),
+    isPending: props.isPending,
+    statusCode: trimLiveActivityText(props.statusCode, 32),
+    statusLabel: trimLiveActivityText(props.statusLabel, 48),
+    progress: props.progress,
+    driverAvatarUrl: trimLiveActivityText(props.driverAvatarUrl, 512),
+    driverInitials: trimLiveActivityText(props.driverInitials, 4),
+    driverPhone: trimLiveActivityText(props.driverPhone, 24),
+    bannerClockLabel: trimLiveActivityText(props.bannerClockLabel, 8),
+    vehicleMarkerUrl: trimLiveActivityText(props.vehicleMarkerUrl, 512),
+  };
+
+  if (liveActivityPayloadChars(normalized) <= LIVE_ACTIVITY_SOFT_PAYLOAD_CHAR_LIMIT) {
+    return normalized;
+  }
+
+  const reducedWithoutAvatar: OrderTrackingLiveProps = {
+    ...normalized,
+    driverAvatarUrl: "",
+  };
+  if (liveActivityPayloadChars(reducedWithoutAvatar) <= LIVE_ACTIVITY_SOFT_PAYLOAD_CHAR_LIMIT) {
+    return reducedWithoutAvatar;
+  }
+
+  return {
+    ...reducedWithoutAvatar,
+    vehicleInfoLabel: trimLiveActivityText(reducedWithoutAvatar.vehicleInfoLabel, 40),
+    vehicleLabel: trimLiveActivityText(reducedWithoutAvatar.vehicleLabel, 28),
+    statusLabel: trimLiveActivityText(reducedWithoutAvatar.statusLabel, 28),
+    vehicleMarkerUrl: "",
+  };
+}
+
+async function propsFromOrder(
   order: OrderRequest,
   driverCoords?: Coordinates | null,
-): OrderTrackingLiveProps {
+): Promise<OrderTrackingLiveProps> {
   const status = normalizeOrderStatus(order.status) ?? (order.status as OrderStatus);
   if (status === "pending") {
     phaseProgressByOrder.delete(order.id);
+    phaseEtaByOrder.delete(order.id);
+    routeEtaByOrder.delete(order.id);
     return {
       etaLabel: "—",
       vehicleLabel: "Recherche livreur",
@@ -541,7 +674,8 @@ function propsFromOrder(
 
   const effectiveDriverCoords = driverCoords ?? driverCoordsFromOrder(driver);
   const movement = progressFromDriverMovement(order, status, effectiveDriverCoords);
-  const etaLabel = movement.etaLabel || fallbackEtaForPhase(order, status);
+  const routeEtaLabel = await resolveRouteEtaLabel(order, status, effectiveDriverCoords);
+  const etaLabel = routeEtaLabel || movement.etaLabel || fallbackEtaForPhase(order, status);
   const progress = progressWithEtaCap(status, movement.progress, etaLabel);
 
   return {
@@ -569,6 +703,25 @@ function isStaleLiveActivityNativeError(message: string): boolean {
     m.includes("cannot find live activity") ||
     m.includes("find live activity with id")
   );
+}
+
+function isActivityKitPayloadTooLargeError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("payload maximum size exceeded") ||
+    m.includes("payload too large") ||
+    (m.includes("payload") && m.includes("maximum") && m.includes("exceeded"))
+  );
+}
+
+function liveActivityIssueReason(message: string): string {
+  if (isActivityKitPayloadTooLargeError(message)) {
+    return "activitykit_payload_too_large";
+  }
+  if (isStaleLiveActivityNativeError(message)) {
+    return "activitykit_stale_activity_id";
+  }
+  return "activitykit_start_or_update_failed";
 }
 
 /**
@@ -798,7 +951,7 @@ async function syncOrderLiveActivityImpl(
     if (options.immediateEnd) {
       clearScheduledEnd();
       await endAllLiveActivities(
-        order ? propsFromOrder(order, options.driverCoords) : END_PROPS,
+        order ? await propsFromOrder(order, options.driverCoords) : END_PROPS,
         order?.id,
       );
       return;
@@ -808,16 +961,22 @@ async function syncOrderLiveActivityImpl(
   }
 
   clearScheduledEnd();
+  let propsDebug: { propsChars?: number; hasDriverAvatarUrl?: boolean } = {};
 
   try {
     await prepareLiveActivityAssets();
     const f = getFactory();
-    const props = propsFromOrder(order!, options.driverCoords);
+    const props = sanitizeLiveActivityProps(await propsFromOrder(order!, options.driverCoords));
+    propsDebug = {
+      propsChars: liveActivityPayloadChars(props),
+      hasDriverAvatarUrl: Boolean(props.driverAvatarUrl?.trim()),
+    };
     const url = `appchrono://order-tracking/${encodeURIComponent(order!.id)}`;
     laTrace("sync: entrée start/update", {
       orderId: order!.id,
       status: order!.status,
-      hasDriverAvatarUrl: Boolean(props.driverAvatarUrl?.trim()),
+      hasDriverAvatarUrl: propsDebug.hasDriverAvatarUrl,
+      propsChars: propsDebug.propsChars,
       appState: AppState.currentState,
     });
 
@@ -842,10 +1001,12 @@ async function syncOrderLiveActivityImpl(
             "orderLiveActivity",
             { orderId: order!.id, status: order!.status, errorMessage: updateMsg, error: e }
           );
-          reportLiveActivityIssue("activitykit_start_or_update_failed", {
+          reportLiveActivityIssue(liveActivityIssueReason(updateMsg), {
             orderId: order!.id,
             status: order!.status,
             errorMessage: updateMsg,
+            propsChars: propsDebug.propsChars,
+            hasDriverAvatarUrl: propsDebug.hasDriverAvatarUrl,
           });
           return;
         }
@@ -915,10 +1076,12 @@ async function syncOrderLiveActivityImpl(
       "orderLiveActivity",
       { orderId: order?.id, status: order?.status, errorMessage: msg, error: e }
     );
-    reportLiveActivityIssue("activitykit_start_or_update_failed", {
+    reportLiveActivityIssue(liveActivityIssueReason(msg), {
       orderId: order?.id ?? null,
       status: order?.status ?? null,
       errorMessage: msg,
+      propsChars: propsDebug.propsChars,
+      hasDriverAvatarUrl: propsDebug.hasDriverAvatarUrl,
     });
   }
 }

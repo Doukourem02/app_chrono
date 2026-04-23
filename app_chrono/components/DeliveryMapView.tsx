@@ -121,8 +121,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   const previousDriverCoordsRef = useRef<Coordinates | null>(null);
 
   const destination = useMemo(() => {
-    return (orderStatus === 'accepted' || orderStatus === 'pending') ? pickup
-      : (orderStatus === 'enroute' || orderStatus === 'picked_up') ? dropoff
+    return (orderStatus === 'accepted' || orderStatus === 'pending' || orderStatus === 'enroute' || orderStatus === 'in_progress') ? pickup
+      : (orderStatus === 'picked_up' || orderStatus === 'delivering') ? dropoff
       : null;
   }, [orderStatus, pickup, dropoff]);
 
@@ -142,15 +142,15 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   }, [animatedDriverPosition]);
 
   const driverToPickupRoute = useAnimatedRoute({
-    origin: (orderStatus === 'accepted' || orderStatus === 'pending') && orderDriverCoords ? orderDriverCoords : null,
-    destination: (orderStatus === 'accepted' || orderStatus === 'pending') && pickup ? pickup : null,
-    enabled: !!(orderStatus === 'accepted' || orderStatus === 'pending') && !!orderDriverCoords && !!pickup,
+    origin: (orderStatus === 'accepted' || orderStatus === 'pending' || orderStatus === 'enroute' || orderStatus === 'in_progress') && orderDriverCoords ? orderDriverCoords : null,
+    destination: (orderStatus === 'accepted' || orderStatus === 'pending' || orderStatus === 'enroute' || orderStatus === 'in_progress') && pickup ? pickup : null,
+    enabled: !!(orderStatus === 'accepted' || orderStatus === 'pending' || orderStatus === 'enroute' || orderStatus === 'in_progress') && !!orderDriverCoords && !!pickup,
   });
 
   const driverToDropoffRoute = useAnimatedRoute({
-    origin: (orderStatus === 'enroute' || orderStatus === 'picked_up') && orderDriverCoords ? orderDriverCoords : null,
-    destination: (orderStatus === 'enroute' || orderStatus === 'picked_up') && dropoff ? dropoff : null,
-    enabled: !!(orderStatus === 'enroute' || orderStatus === 'picked_up') && !!orderDriverCoords && !!dropoff,
+    origin: (orderStatus === 'picked_up' || orderStatus === 'delivering') && orderDriverCoords ? orderDriverCoords : null,
+    destination: (orderStatus === 'picked_up' || orderStatus === 'delivering') && dropoff ? dropoff : null,
+    enabled: !!(orderStatus === 'picked_up' || orderStatus === 'delivering') && !!orderDriverCoords && !!dropoff,
   });
 
   const weatherData = useWeather({
@@ -162,7 +162,10 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
 
   const realTimeETA = useMemo(() => {
     if (!animatedDriverPosition || !destination) return null;
-    const activeRoute = (orderStatus === 'accepted' || orderStatus === 'pending') ? driverToPickupRoute : driverToDropoffRoute;
+    const activeRoute =
+      orderStatus === 'picked_up' || orderStatus === 'delivering'
+        ? driverToDropoffRoute
+        : driverToPickupRoute;
     const trafficData = activeRoute?.trafficData || null;
     return calculateFullETA(
       animatedDriverPosition,
@@ -379,7 +382,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
               {realTimeETA && (() => {
                 const rawIsArrived = realTimeETA.formattedETA.toLowerCase().includes('arrivé')
                 const isAtDropoff = orderStatus === 'picked_up' || orderStatus === 'delivering'
-                const isGoingToPickup = orderStatus === 'accepted' || orderStatus === 'pending'
+                const isGoingToPickup = orderStatus === 'accepted' || orderStatus === 'pending' || orderStatus === 'enroute' || orderStatus === 'in_progress'
                 // Ne jamais afficher "Arrivé" quand le livreur vient d'être assigné (accepted)
                 const isArrived = rawIsArrived && !isGoingToPickup
                 const badgeUnit = isArrived && isAtDropoff ? 'Livrer à signer' : isArrived ? 'Arrivé' : 'min'
@@ -391,7 +394,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             </View>
           </MarkerView>
 
-          {(orderStatus === 'accepted' || orderStatus === 'pending') && animatedDriverPosition && pickup && driverToPickupRoute.animatedCoordinates.length > 0 && (
+          {(orderStatus === 'accepted' || orderStatus === 'pending' || orderStatus === 'enroute' || orderStatus === 'in_progress') && animatedDriverPosition && pickup && driverToPickupRoute.animatedCoordinates.length > 0 && (
             <ShapeSource
               id="route-driver-pickup"
               shape={coordsToLineGeoJSON([animatedDriverPosition, ...driverToPickupRoute.animatedCoordinates.slice(1)])}
@@ -402,7 +405,7 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
             </ShapeSource>
           )}
 
-          {(orderStatus === 'enroute' || orderStatus === 'picked_up') && animatedDriverPosition && dropoff && driverToDropoffRoute.animatedCoordinates.length > 0 && (
+          {(orderStatus === 'picked_up' || orderStatus === 'delivering') && animatedDriverPosition && dropoff && driverToDropoffRoute.animatedCoordinates.length > 0 && (
             <ShapeSource
               id="route-driver-dropoff"
               shape={coordsToLineGeoJSON([animatedDriverPosition, ...driverToDropoffRoute.animatedCoordinates.slice(1)])}

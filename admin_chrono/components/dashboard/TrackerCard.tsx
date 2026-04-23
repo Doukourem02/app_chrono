@@ -6,19 +6,12 @@ import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import MapboxMiniMap from '@/components/dashboard/MapboxMiniMap'
 import { AnimatedCard } from '@/components/animations'
+import { useTranslation } from '@/hooks/useTranslation'
 import type { Delivery } from '@/hooks/types'
+import { useLanguageStore } from '@/stores/languageStore'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
-
-const statusSteps: Array<{ key: string; label: string }> = [
-  { key: 'pending', label: 'Recherche livreur' },
-  { key: 'accepted', label: 'Prise en charge' },
-  { key: 'enroute', label: 'Prise en charge' },
-  { key: 'picked_up', label: 'Colis récupéré' },
-  { key: 'delivering', label: 'Livraison' },
-  { key: 'completed', label: 'Livraison terminée' },
-]
 
 interface TrackerCardProps {
   deliveries?: Delivery[]
@@ -26,7 +19,17 @@ interface TrackerCardProps {
 }
 
 export default function TrackerCard({ deliveries: providedDeliveries, isLoading: providedLoading }: TrackerCardProps = {}) {
+  const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
   const useProvidedDeliveries = Array.isArray(providedDeliveries)
+  const statusSteps: Array<{ key: string; label: string }> = [
+    { key: 'pending', label: t('tracking.status.pending') },
+    { key: 'accepted', label: t('tracking.status.accepted') },
+    { key: 'enroute', label: t('tracking.status.enroute') },
+    { key: 'picked_up', label: t('tracking.status.picked_up') },
+    { key: 'delivering', label: t('tracking.status.delivering') },
+    { key: 'completed', label: t('tracking.status.completed') },
+  ]
 
   // Récupérer les livraisons en cours (même source que la page Tracking)
   const { data: deliveriesResponse, isLoading: queryLoading } = useQuery({
@@ -74,22 +77,22 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   }, [deliveries])
 
   const trackerId = activeDelivery?.id
-  const pickupAddress = activeDelivery?.pickup?.address || 'Adresse pickup inconnue'
-  const dropoffAddress = activeDelivery?.dropoff?.address || 'Adresse destination inconnue'
+  const pickupAddress = activeDelivery?.pickup?.address || t('tracking.pickupUnknown')
+  const dropoffAddress = activeDelivery?.dropoff?.address || t('tracking.destinationUnknown')
   const driver = activeDelivery?.driver
 
   const statusStyles: Record<
     string,
     { label: string; backgroundColor: string; color: string }
   > = {
-    pending: { label: 'Recherche livreur', backgroundColor: '#FEF3C7', color: '#D97706' },
-    accepted: { label: 'Prise en charge', backgroundColor: '#E0E7FF', color: '#4338CA' },
-    enroute: { label: 'Prise en charge', backgroundColor: '#DBEAFE', color: '#1D4ED8' },
-    picked_up: { label: 'Colis récupéré', backgroundColor: '#E0F2FE', color: '#0369A1' },
-    delivering: { label: 'Livraison', backgroundColor: '#E9D5FF', color: '#7C3AED' },
-    completed: { label: 'Livraison terminée', backgroundColor: '#DCFCE7', color: '#166534' },
-    cancelled: { label: 'Annulée', backgroundColor: '#FEE2E2', color: '#B91C1C' },
-    declined: { label: 'Refusée', backgroundColor: '#FEE2E2', color: '#B91C1C' },
+    pending: { label: t('tracking.status.pending'), backgroundColor: '#FEF3C7', color: '#D97706' },
+    accepted: { label: t('tracking.status.accepted'), backgroundColor: '#E0E7FF', color: '#4338CA' },
+    enroute: { label: t('tracking.status.enroute'), backgroundColor: '#DBEAFE', color: '#1D4ED8' },
+    picked_up: { label: t('tracking.status.picked_up'), backgroundColor: '#E0F2FE', color: '#0369A1' },
+    delivering: { label: t('tracking.status.delivering'), backgroundColor: '#E9D5FF', color: '#7C3AED' },
+    completed: { label: t('tracking.status.completed'), backgroundColor: '#DCFCE7', color: '#166534' },
+    cancelled: { label: t('tracking.status.cancelled'), backgroundColor: '#FEE2E2', color: '#B91C1C' },
+    declined: { label: t('tracking.status.declined'), backgroundColor: '#FEE2E2', color: '#B91C1C' },
   }
 
   const statusMeta =
@@ -110,7 +113,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     if (!value) return '—'
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return '—'
-    return new Intl.DateTimeFormat('fr-FR', {
+    return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -140,10 +143,10 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
       index === 0
         ? formatDateTime(activeDelivery?.createdAt || null)
         : index < currentStepIndex
-          ? 'Terminé'
+          ? t('tracking.timeline.completed')
           : index === currentStepIndex
-            ? 'En cours'
-            : 'À venir',
+            ? t('tracking.timeline.inProgress')
+            : t('tracking.timeline.upcoming'),
   }))
 
   // Fonction pour obtenir le nom d'affichage du driver
@@ -154,7 +157,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     if (driver?.email) {
       return driver.email
     }
-    return 'Driver non assigné'
+    return t('tracking.driverUnassigned')
   }
 
   // Fonction pour obtenir l'initiale du driver
@@ -365,7 +368,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
         color: themeColors.textSecondary,
       }}
     >
-      {isLoading ? 'Chargement des livraisons en cours...' : 'Aucune livraison en cours'}
+      {isLoading ? t('tracking.loading') : t('tracking.empty')}
     </div>
   )
 
@@ -380,7 +383,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
       {activeDelivery ? (
         <>
           <div style={sectionStyle}>
-            <h3 style={trackerHeaderStyle}>Tracker ID</h3>
+            <h3 style={trackerHeaderStyle}>{t('tracking.trackerId')}</h3>
             <div style={trackerRowStyle}>
               <p style={trackerIdStyle}>
                 {trackerId ? formatDeliveryId(trackerId, activeDelivery?.createdAt) : '—'}
@@ -395,7 +398,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
                 <MapPin size={16} />
               </div>
               <div style={infoContentStyle}>
-                <p style={infoTitleStyle}>Point de départ</p>
+                <p style={infoTitleStyle}>{t('tracking.pickup')}</p>
                 <p style={infoTextStyle}>{pickupAddress}</p>
               </div>
             </div>
@@ -404,7 +407,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
                 <Navigation size={16} />
               </div>
               <div style={infoContentStyle}>
-                <p style={infoTitleStyle}>Destination</p>
+                <p style={infoTitleStyle}>{t('tracking.destination')}</p>
                 <p style={infoTextStyle}>{dropoffAddress}</p>
               </div>
             </div>
@@ -433,7 +436,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
               <div>
                 <p style={driverNameStyle}>{getDisplayName()}</p>
                 <p style={driverRoleStyle}>
-                  {driver?.phone ? `+${driver.phone}` : 'Contact indisponible'}
+                  {driver?.phone ? `+${driver.phone}` : t('tracking.contactUnavailable')}
                 </p>
               </div>
             </div>

@@ -167,7 +167,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
   const statusSteps = useMemo(() => [
     { label: "Prise en charge", key: "accepted" },
-    { label: "Prise en charge", key: "enroute" },
+    { label: "Livreur arrivé", key: "in_progress" },
     { label: "Colis récupéré", key: "picked_up" },
     { label: "Livraison", key: "delivering" },
     { label: "Livraison terminée", key: "completed" },
@@ -176,8 +176,9 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const getActiveIndexes = useCallback(() => {
     switch (status) {
       case 'accepted':
-        return [0];
       case 'enroute':
+        return [0];
+      case 'in_progress':
         return [0, 1];
       case 'picked_up':
       case 'delivering':
