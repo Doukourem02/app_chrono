@@ -9,6 +9,7 @@ import { AnimatedCard } from '@/components/animations'
 import { useTranslation } from '@/hooks/useTranslation'
 import type { Delivery } from '@/hooks/types'
 import { useLanguageStore } from '@/stores/languageStore'
+import { useThemeStore } from '@/stores/themeStore'
 import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
@@ -21,6 +22,8 @@ interface TrackerCardProps {
 export default function TrackerCard({ deliveries: providedDeliveries, isLoading: providedLoading }: TrackerCardProps = {}) {
   const t = useTranslation()
   const language = useLanguageStore((state) => state.language)
+  const theme = useThemeStore((state) => state.theme)
+  const isDarkMode = theme === 'dark'
   const useProvidedDeliveries = Array.isArray(providedDeliveries)
   const statusSteps: Array<{ key: string; label: string }> = [
     { key: 'pending', label: t('tracking.status.pending') },
@@ -241,13 +244,13 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     width: '12px',
     height: '12px',
     borderRadius: '50%',
-    backgroundColor: active ? '#2563EB' : '#D1D5DB',
+    backgroundColor: active ? themeColors.bluePrimary : themeColors.grayMedium,
   })
 
   const timelineLineStyle: React.CSSProperties = {
     width: '2px',
     height: '24px',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: themeColors.cardBorder,
     marginTop: '4px',
   }
 
@@ -271,7 +274,8 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px',
-    backgroundColor: '#FEF9C3',
+    backgroundColor: isDarkMode ? 'rgba(167, 139, 250, 0.12)' : '#FEF9C3',
+    border: `1px solid ${isDarkMode ? 'rgba(167, 139, 250, 0.22)' : '#FDE68A'}`,
     borderRadius: '12px',
   }
 
@@ -284,7 +288,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   const avatarStyle: React.CSSProperties = {
     width: '48px',
     height: '48px',
-    backgroundColor: '#9333EA',
+    backgroundColor: isDarkMode ? themeColors.purplePrimary : '#9333EA',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
@@ -326,15 +330,16 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     gap: '12px',
     padding: '10px 12px',
     borderRadius: '12px',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.72)' : '#F9FAFB',
+    border: `1px solid ${isDarkMode ? themeColors.cardBorder : '#E5E7EB'}`,
     marginBottom: '8px',
   }
 
   const infoIconStyle: React.CSSProperties = {
     padding: '8px',
     borderRadius: '10px',
-    backgroundColor: '#EEF2FF',
-    color: '#4C1D95',
+    backgroundColor: isDarkMode ? 'rgba(167, 139, 250, 0.18)' : '#EEF2FF',
+    color: isDarkMode ? themeColors.purpleLight : '#4C1D95',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -363,7 +368,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
         ...sectionStyle,
         padding: '16px',
         borderRadius: '12px',
-        backgroundColor: '#F3F4F6',
+        backgroundColor: themeColors.grayLight,
         textAlign: 'center',
         color: themeColors.textSecondary,
       }}
@@ -451,26 +456,26 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
                 }}
                 onMouseEnter={(e) => {
                   if (driverPhone) {
-                    e.currentTarget.style.backgroundColor = '#FEF3C7'
+                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(167, 139, 250, 0.12)' : '#FEF3C7'
                   }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent'
                 }}
               >
-                <Phone size={20} style={{ color: '#4B5563' }} />
+                <Phone size={20} style={{ color: themeColors.textSecondary }} />
               </button>
               <button
                 style={actionButtonStyle}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FEF3C7'
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(167, 139, 250, 0.12)' : '#FEF3C7'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent'
                 }}
               >
-                <MessageSquare size={20} style={{ color: '#4B5563' }} />
-              </button>
+                <MessageSquare size={20} style={{ color: themeColors.textSecondary }} />
+                </button>
             </div>
           </div>
         </>
