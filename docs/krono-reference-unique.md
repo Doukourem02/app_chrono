@@ -1,13 +1,13 @@
 # Krono — référence unique projet
 
 Ce fichier est la **mémoire courte du projet** et le **contrat produit Krono**.
-Il ne sert pas à suivre les tâches à faire : les actions restent dans `docs/checklist-fonctionnalites-app.md`.
+Il sert de **référence unique Krono** pour les décisions produit, les règles durables, les cartes de fichiers et les points de vigilance validés.
 
 Ce document répond à une question : **qu'est-ce que Krono doit faire, afficher, notifier, calculer et protéger à chaque étape d'une livraison ?**
 
 Règle :
 
-- Si c'est une tâche à exécuter, elle va dans la checklist.
+- Si c'est une tâche à exécuter, elle doit être traitée puis résumée ici seulement si elle change une règle durable.
 - Si c'est une décision produit, une carte de fichiers ou une règle à retenir, elle reste ici.
 - Si le code contredit ce document, le comportement produit attendu est celui décrit ici.
 - Si une décision n'est pas tranchée, elle doit apparaître dans la section "Décisions encore ouvertes".
@@ -387,7 +387,6 @@ Elle doit donner confiance, rester utile sans être lourde, et créer une impres
 
 ## 16. Documents vivants
 
-Il ne doit rester que deux fichiers principaux dans `docs/` :
+Il doit rester un fichier principal de référence dans `docs/` :
 
-- `docs/checklist-fonctionnalites-app.md` : actions à exécuter, priorisées.
 - `docs/krono-reference-unique.md` : référence projet, contrat produit, décisions, cartes de fichiers.

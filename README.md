@@ -605,7 +605,7 @@ npx expo run:android
 
 ### Guides de configuration
 
-- **Actions à exécuter** (priorités, Live Activity, Android ongoing, prod, app mature) : `docs/checklist-fonctionnalites-app.md`
+- **Référence projet** (priorités validées, Live Activity, Android ongoing, prod, app mature) : `docs/krono-reference-unique.md`
 - **Référence projet** (carte fichiers, décisions produit, push, prod, pricing, paiements / QR, PSP) : `docs/krono-reference-unique.md`
 - **Variables** : fichiers `.env.example` à la racine de chaque package (`chrono_backend`, `admin_chrono`, `app_chrono`, `driver_chrono`)
 
@@ -626,7 +626,7 @@ npx expo run:android
 ```
 PROJET_CHRONO/
 ├── docs/
-│   ├── checklist-fonctionnalites-app.md # Actions à exécuter, priorisées
+│   ├── krono-reference-unique.md      # Référence projet, contrat produit, décisions
 │   └── krono-reference-unique.md        # Référence projet + carte de fichiers
 ├── admin_chrono/docs/
 │   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers
