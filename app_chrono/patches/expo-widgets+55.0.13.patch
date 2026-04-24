@@ -1012,12 +1012,12 @@ index 9eae718..9c0913e 100644
 +        .minimumScaleFactor(0.72)
 +    case "compactTrailing":
 +      if ExpoWidgetsLiveActivityPropsFallback.shouldShowArrivedCompactVisual(propsJson) {
-+        HStack(spacing: 2) {
-+          compactArrivedHand
-+          compactAvatarView
-+        }
-+        .frame(width: 52, height: 30)
-+        .fixedSize(horizontal: true, vertical: true)
++        Text("Arrivé")
++          .font(.caption2.weight(.bold))
++          .foregroundStyle(kronoLiveActivityAccent)
++          .lineLimit(1)
++          .minimumScaleFactor(0.72)
++          .fixedSize(horizontal: true, vertical: true)
 +      } else {
 +        Text(ExpoWidgetsLiveActivityPropsFallback.compactTrailingLine(propsJson))
 +          .font(.caption.weight(.semibold))
