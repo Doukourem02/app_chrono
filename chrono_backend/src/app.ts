@@ -33,6 +33,23 @@ import logger from './utils/logger.js';
 
 const app: Express = express();
 
+function isLocalOrLanHost(hostHeader: string | undefined): boolean {
+  if (!hostHeader) return false;
+  const host = hostHeader.split(':')[0]?.toLowerCase() ?? '';
+  if (!host) return false;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+  if (host.startsWith('192.168.')) return true;
+  if (host.startsWith('10.')) return true;
+
+  const match172 = host.match(/^172\.(\d{1,3})\./);
+  if (match172) {
+    const secondOctet = Number(match172[1]);
+    if (secondOctet >= 16 && secondOctet <= 31) return true;
+  }
+
+  return false;
+}
+
 // Toujours activer : Render / nginx envoient X-Forwarded-For ; sans ça express-rate-limit lève
 // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR. Les variables NODE_ENV/RENDER ne sont pas fiables sur tous les hébergeurs.
 app.set('trust proxy', 1);
@@ -47,6 +64,12 @@ if (
   app.use((req, res, next) => {
     // Sondes Render (HTTP interne :10000) — pas de redirect, sinon health check timeout
     if (req.path.startsWith('/health')) {
+      return next();
+    }
+
+    // En dev local/LAN, un redirect vers https://192.168.x.x:4000 casse souvent les fetch mobile
+    // faute de TLS local. On ne force donc pas HTTPS sur localhost / réseau privé.
+    if (isLocalOrLanHost(req.headers.host)) {
       return next();
     }
 

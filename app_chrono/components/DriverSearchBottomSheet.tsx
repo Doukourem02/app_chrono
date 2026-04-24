@@ -254,7 +254,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
                   onPress={onDetails}
                   activeOpacity={0.82}
                 >
-                  <Ionicons name="navigate-outline" size={18} color="#6D28D9" />
+                  <Ionicons name="navigate-outline" size={18} color="#374151" />
                 </TouchableOpacity>
                 {driverPhone ? (
                   <TouchableOpacity
@@ -270,11 +270,11 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
 
             <View style={styles.metaRibbon}>
               <View style={styles.metaRibbonLeft}>
-                {orderIdShort ? <Text style={styles.orderIdBadge}>{orderIdShort}</Text> : null}
                 <View style={styles.statusChip}>
                   <Ionicons name="sparkles" size={13} color="#6D28D9" />
                   <Text style={styles.statusChipText}>{statusLabel}</Text>
                 </View>
+                {orderIdShort ? <Text style={styles.orderIdBadge}>{orderIdShort}</Text> : null}
               </View>
               {priceFormatted ? <Text style={styles.priceText}>{priceFormatted}</Text> : null}
             </View>
@@ -319,20 +319,25 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
             </View>
 
             <View style={styles.footerMetaRow}>
-              {(vehiclePlate || vehicleTypeLabel) ? (
-                <View style={styles.footerMetaChip}>
-                  <Ionicons name="card-outline" size={14} color="#6B7280" />
-                  <Text style={styles.footerMetaChipText}>
-                    {[vehiclePlate ? `Immat. ${vehiclePlate}` : null, vehicleTypeLabel || null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-                </View>
-              ) : <View />}
+              <View style={styles.footerMetaGroup}>
+                {(vehiclePlate || vehicleTypeLabel) ? (
+                  <View style={styles.footerMetaChip}>
+                    <Ionicons name="card-outline" size={14} color="#6B7280" />
+                    <Text style={styles.footerMetaChipText}>
+                      {[vehiclePlate ? `Immat. ${vehiclePlate}` : null, vehicleTypeLabel || null]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
+                  </View>
+                ) : null}
 
-              {driverPhone ? (
-                <Text style={styles.phoneInlineText} numberOfLines={1}>{driverPhone}</Text>
-              ) : null}
+                {driverPhone ? (
+                  <View style={styles.footerMetaChip}>
+                    <Ionicons name="call-outline" size={14} color="#6B7280" />
+                    <Text style={styles.footerMetaChipText} numberOfLines={1}>{driverPhone}</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
 
             <View style={styles.driverActions}>
@@ -433,28 +438,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   assignedScroll: {
-    maxHeight: SCREEN_H * 0.76,
+    maxHeight: SCREEN_H * 0.68,
   },
   assignedScrollContent: {
-    paddingHorizontal: 10,
-    paddingBottom: 6,
+    paddingHorizontal: 8,
+    paddingBottom: 4,
   },
   assignedCard: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 22,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 18,
     borderWidth: 1,
-    borderColor: '#F1EDFF',
-    shadowColor: '#24104A',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.11,
-    shadowRadius: 26,
-    elevation: 16,
+    borderColor: '#ECE8F7',
+    shadowColor: '#160F29',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.07,
+    shadowRadius: 18,
+    elevation: 10,
   },
   searchTitleRow: {
     flexDirection: 'row',
@@ -524,38 +529,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 18,
+    marginBottom: 12,
   },
   assignedIdentityBlock: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 12,
+    paddingRight: 10,
   },
   driverAvatarContainer: {
-    marginRight: 14,
+    marginRight: 12,
     position: 'relative',
   },
   driverAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#F3F4F6',
-    borderWidth: 3,
-    borderColor: '#A78BFA',
+    borderWidth: 2,
+    borderColor: '#B9A6F8',
   },
   driverAvatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#F5F3FF',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#F7F5FF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#A78BFA',
+    borderWidth: 2,
+    borderColor: '#B9A6F8',
   },
   driverAvatarInitials: {
-    fontSize: 24,
+    fontSize: 19,
     fontWeight: '800',
     color: '#6D28D9',
   },
@@ -563,34 +568,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#F5F3FF',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    backgroundColor: '#F7F5FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: '#E4DBFF',
+    marginRight: 8,
     marginBottom: 6,
   },
   statusChipText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#6D28D9',
-    marginLeft: 6,
+    marginLeft: 5,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerActionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F3FF',
+    backgroundColor: '#FAFAFC',
     borderWidth: 1,
-    borderColor: '#E9D5FF',
-    marginLeft: 10,
+    borderColor: '#E5E7EB',
+    marginLeft: 8,
   },
   headerActionButtonPrimary: {
     backgroundColor: '#8B5CF6',
@@ -600,7 +606,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 14,
   },
   metaRibbonLeft: {
     flexDirection: 'row',
@@ -610,11 +616,11 @@ const styles = StyleSheet.create({
   },
   ratingBadge: {
     position: 'absolute',
-    bottom: -4,
-    right: -4,
+    bottom: -3,
+    right: -2,
     backgroundColor: '#8B5CF6',
-    borderRadius: 12,
-    paddingHorizontal: 6,
+    borderRadius: 11,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
@@ -632,66 +638,65 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   driverEyebrow: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#8B5CF6',
+    color: '#7C3AED',
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 3,
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   driverName: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '800',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   driverSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
     color: '#6B7280',
   },
   orderIdBadge: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#7C3AED',
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: 12,
+    color: '#6B7280',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    letterSpacing: 0.5,
-    marginRight: 8,
+    letterSpacing: 0.4,
     marginBottom: 6,
   },
   priceText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#7C3AED',
-    letterSpacing: 0.2,
-    marginLeft: 12,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: 0.1,
+    marginLeft: 10,
   },
   routeShowcase: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    backgroundColor: '#FCFCFF',
-    borderRadius: 24,
+    backgroundColor: '#FEFEFF',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#EEE8FF',
-    padding: 16,
+    borderColor: '#ECE8F7',
+    padding: 14,
   },
   routeColumn: {
     flex: 1,
-    paddingRight: 14,
+    paddingRight: 10,
   },
   routeStepRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   routeStepDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     marginTop: 4,
-    marginRight: 12,
+    marginRight: 10,
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
@@ -699,93 +704,95 @@ const styles = StyleSheet.create({
     backgroundColor: '#6D28D9',
   },
   routeStepDotDropoff: {
-    backgroundColor: '#C4B5FD',
+    backgroundColor: '#CFC4F9',
   },
   routeConnector: {
     width: 2,
-    height: 30,
-    backgroundColor: '#DDD6FE',
-    marginLeft: 5,
-    marginTop: 6,
+    height: 22,
+    backgroundColor: '#DED7F5',
+    marginLeft: 4,
+    marginTop: 4,
     marginBottom: 6,
   },
   routeStepTextWrap: {
     flex: 1,
   },
   routeStepLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#9CA3AF',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 3,
+    letterSpacing: 0.35,
+    marginBottom: 2,
   },
   routeStepValue: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#1F2937',
     fontWeight: '700',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   parcelPanel: {
-    width: 112,
+    width: 88,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   parcelPanelBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F3FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: '#F8F6FF',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
-    marginBottom: 12,
+    borderColor: '#E6DEFF',
+    marginBottom: 10,
   },
   parcelPanelBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#6D28D9',
-    marginLeft: 5,
+    marginLeft: 4,
   },
   parcelArtwork: {
-    width: 94,
-    height: 94,
+    width: 70,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   parcelArtworkBack: {
     position: 'absolute',
-    top: 12,
-    width: 58,
-    height: 58,
-    borderRadius: 16,
-    backgroundColor: '#DDD6FE',
+    top: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#E8E0FF',
     transform: [{ rotate: '-10deg' }],
   },
   parcelArtworkFront: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#F3E8FF',
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    backgroundColor: '#F8F5FF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: '#E6DEFF',
     shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   footerMetaRow: {
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  footerMetaGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 14,
-    marginBottom: 8,
+    flexWrap: 'wrap',
   },
   footerMetaChip: {
     flexDirection: 'row',
@@ -796,42 +803,37 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 6,
   },
   footerMetaChipText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#6B7280',
     marginLeft: 6,
   },
-  phoneInlineText: {
-    flexShrink: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6D28D9',
-    marginLeft: 12,
-  },
   driverActions: {
-    marginTop: 8,
+    marginTop: 4,
   },
   actionButtonSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#8B5CF6',
-    paddingVertical: 15,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 18,
+    borderRadius: 17,
     shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 4,
   },
   actionButtonLeading: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -841,7 +843,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginLeft: 12,
+    marginLeft: 10,
     textAlign: 'center',
   },
 });

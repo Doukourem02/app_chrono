@@ -4,9 +4,11 @@
  */
 
 import { useAuthStore } from '../store/useAuthStore';
+import configModule from '../config';
+import { apiFetch, parseApiErrorBody, transportOrErrorMessage } from '../utils/apiFetch';
 import { logger } from '../utils/logger';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? 'http://localhost:4000' : 'https://votre-api.com');
+const API_BASE_URL = configModule.apiUrl;
 
 export type PaymentMethodType = 'orange_money' | 'wave' | 'mtn_money' | 'cash' | 'deferred';
 export type PaymentStatus = 'pending' | 'paid' | 'refused' | 'delayed' | 'refunded' | 'cancelled';
@@ -174,29 +176,40 @@ class PaymentApiService {
     message?: string;
   }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/payments/methods`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/payments/methods`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         return {
           success: false,
-          message: data.message || 'Erreur lors de la récupération des méthodes de paiement',
+          message: parseApiErrorBody(
+            data,
+            response.status,
+            'Erreur lors de la récupération des méthodes de paiement'
+          ),
         };
       }
 
       return {
         success: true,
-        data: data.data || [],
+        data: data?.data || [],
       };
     } catch (error) {
-      logger.error('❌ Erreur getPaymentMethods:', undefined, error);
+      logger.error(
+        `❌ Erreur getPaymentMethods (${API_BASE_URL}/api/payments/methods):`,
+        undefined,
+        error
+      );
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Erreur de connexion',
+        message: transportOrErrorMessage(
+          error,
+          'Erreur lors de la récupération des méthodes de paiement'
+        ),
       };
     }
   }
@@ -517,4 +530,3 @@ class PaymentApiService {
 
 export const paymentApi = new PaymentApiService();
 export default paymentApi;
-
