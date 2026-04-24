@@ -187,6 +187,24 @@ function activeTrackingEtaForPhase(
   };
 }
 
+function sameStopLiveActivityStatusCode(status: OrderStatus, order: OrderRequest): OrderStatus {
+  if (!isSamePickupDropoffStop(order)) return status;
+  if (status === "picked_up" || status === "delivering") return "in_progress";
+  return status;
+}
+
+function sameStopLiveActivityStatusLabel(status: OrderStatus, order: OrderRequest): string | null {
+  if (!isSamePickupDropoffStop(order)) return null;
+  if (status === "picked_up" || status === "delivering") return "Livreur arrivé";
+  return null;
+}
+
+function sameStopLiveActivityEtaLabel(status: OrderStatus, order: OrderRequest): string | null {
+  if (!isSamePickupDropoffStop(order)) return null;
+  if (status === "picked_up" || status === "delivering" || status === "completed") return "";
+  return null;
+}
+
 function progressWithEtaCap(status: OrderStatus, progress: number, etaLabel: string | undefined): number {
   return productProgressWithEtaCap(status, progress, etaLabel);
 }
@@ -694,9 +712,12 @@ async function propsFromOrder(
   const movement = progressFromDriverMovement(order, status, effectiveDriverCoords);
   const sharedTrackingEta = activeTrackingEtaForPhase(order, status);
   const routeEtaLabel = sharedTrackingEta ? undefined : await resolveRouteEtaLabel(order, status, effectiveDriverCoords);
-  const etaLabel = sharedTrackingEta
+  const sameStopEtaLabel = sameStopLiveActivityEtaLabel(status, order);
+  const widgetStatusCode = sameStopLiveActivityStatusCode(status, order);
+  const widgetStatusLabel = sameStopLiveActivityStatusLabel(status, order);
+  const etaLabel = sameStopEtaLabel ?? (sharedTrackingEta
     ? (sharedTrackingEta.etaLabel ?? "")
-    : routeEtaLabel || movement.etaLabel || fallbackEtaForPhase(order, status);
+    : routeEtaLabel || movement.etaLabel || fallbackEtaForPhase(order, status));
   const progress = progressWithEtaCap(status, movement.progress, etaLabel);
 
   return {
@@ -705,8 +726,8 @@ async function propsFromOrder(
     vehicleInfoLabel: vehicleInfoLabel(order),
     plateLabel: plate || "KRONO",
     isPending: false,
-    statusCode: status,
-    statusLabel: movement.arrivedAtStop ? "Livreur arrivé" : clientStatusLabel(status),
+    statusCode: widgetStatusCode,
+    statusLabel: widgetStatusLabel || (movement.arrivedAtStop ? "Livreur arrivé" : clientStatusLabel(status)),
     progress,
     driverAvatarUrl: avatarRaw,
     driverInitials: driverInitials(driver),

@@ -404,6 +404,9 @@ function fallbackEtaLabel(
   fallback: Partial<OrderTrackingLiveProps>,
 ): string {
   const normalized = normalizeStatus(status);
+  if (isSamePickupDropoffStop(row) && (normalized === 'picked_up' || normalized === 'delivering' || normalized === 'completed')) {
+    return '';
+  }
   if (normalized === 'accepted' || normalized === 'enroute') {
     return etaLabelFromOrder(row);
   }
@@ -415,6 +418,27 @@ function fallbackEtaLabel(
   }
   if (normalized === 'pending') return '—';
   return '';
+}
+
+function sameStopLiveActivityStatusCode(row: OrderLiveActivityRow | null, status: string): string {
+  const normalized = normalizeStatus(status);
+  if (!row || !isSamePickupDropoffStop(row)) return normalized;
+  if (normalized === 'picked_up' || normalized === 'delivering') return 'in_progress';
+  return normalized;
+}
+
+function sameStopLiveActivityStatusLabel(row: OrderLiveActivityRow | null, status: string): string | null {
+  const normalized = normalizeStatus(status);
+  if (!row || !isSamePickupDropoffStop(row)) return null;
+  if (normalized === 'picked_up' || normalized === 'delivering') return 'Livreur arrivé';
+  return null;
+}
+
+function sameStopLiveActivityEtaLabel(row: OrderLiveActivityRow | null, status: string): string | null {
+  const normalized = normalizeStatus(status);
+  if (!row || !isSamePickupDropoffStop(row)) return null;
+  if (normalized === 'picked_up' || normalized === 'delivering' || normalized === 'completed') return '';
+  return null;
 }
 
 async function resolveRouteEtaLabel(
@@ -538,11 +562,14 @@ async function mergeProps(
   const routeEtaLabel = row
     ? await resolveRouteEtaLabel(row, statusCode, driverCoordsOverride ?? driverCoordsFromRow(row))
     : undefined;
-  const eta = row ? (routeEtaLabel || movement.etaLabel || fallbackEtaLabel(row, statusCode, fallback)) : statusCode === 'accepted' || statusCode === 'enroute'
+  const sameStopEta = sameStopLiveActivityEtaLabel(row, statusCode);
+  const widgetStatusCode = sameStopLiveActivityStatusCode(row, statusCode);
+  const widgetStatusLabel = sameStopLiveActivityStatusLabel(row, statusCode);
+  const eta = sameStopEta ?? (row ? (routeEtaLabel || movement.etaLabel || fallbackEtaLabel(row, statusCode, fallback)) : statusCode === 'accepted' || statusCode === 'enroute'
     ? fallback.etaLabel || ''
     : pending
       ? '—'
-      : '';
+      : '');
   const baseProgress = Math.max(movement.progress ?? progressFromStatus(statusCode), Number(fallback.progress || 0) || 0);
 
   return {
@@ -551,8 +578,8 @@ async function mergeProps(
     vehicleInfoLabel: pending ? fallback.vehicleInfoLabel || 'Recherche livreur' : info || fallback.vehicleInfoLabel || 'Livraison Krono',
     plateLabel: row?.driver_vehicle_plate?.trim() || fallback.plateLabel || 'KRONO',
     isPending: pending,
-    statusCode,
-    statusLabel: movement.arrivedAtStop ? 'Livreur arrivé' : statusLabel(statusCode),
+    statusCode: widgetStatusCode,
+    statusLabel: widgetStatusLabel || (movement.arrivedAtStop ? 'Livreur arrivé' : statusLabel(statusCode)),
     progress: progressWithEtaCap(statusCode, baseProgress, eta),
     driverAvatarUrl: liveActivityImageUrl(
       row?.driver_avatar_url,
