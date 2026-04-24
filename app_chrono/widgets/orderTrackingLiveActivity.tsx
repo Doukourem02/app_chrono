@@ -90,15 +90,21 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const avatarUrl = (props.driverAvatarUrl ?? "").trim();
   const vehicleMarkerUrl = (props.vehicleMarkerUrl ?? "").trim();
   const compactArrivedVisual = shouldShowArrivedVisual(props.statusCode, props.statusLabel);
+  const driverInitials = (props.driverInitials ?? "").trim() || "K";
 
   const driverAvatar = (
     <ZStack modifiers={[frame({ width: 44, height: 44 })]}>
       <Circle modifiers={[frame({ width: 44, height: 44 }), foregroundStyle("#FFFFFF")]} />
-      <Circle modifiers={[frame({ width: 38, height: 38 }), foregroundStyle(ON_DARK.bannerChip)]} />
-      <Image systemName="person.crop.circle.fill" color="#8E8E93" size={28} />
       {avatarUrl ? (
         <Image uiImage={avatarUrl} modifiers={[frame({ width: 44, height: 44 }), clipShape("circle")]} />
-      ) : null}
+      ) : (
+        <ZStack>
+          <Circle modifiers={[frame({ width: 38, height: 38 }), foregroundStyle(ON_DARK.bannerChip)]} />
+          <Text modifiers={[font({ weight: "bold", size: 15 }), foregroundStyle(ON_DARK.bannerAction)]}>
+            {driverInitials}
+          </Text>
+        </ZStack>
+      )}
     </ZStack>
   );
   const compactDriverAvatar = (
@@ -111,10 +117,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
 
   const compactArrivedHand = (
     <ZStack modifiers={[frame({ width: 19, height: 22 }), fixedSize({ horizontal: true, vertical: true })]}>
-      <Image systemName="hand.raised.fill" color={ON_DARK.title} size={17} modifiers={[offset({ x: 0 })]} />
-      <Image systemName="chevron.left" color={ON_DARK.title} size={7} modifiers={[offset({ x: -8, y: -5 })]} />
-      <Image systemName="chevron.left" color={ON_DARK.title} size={7} modifiers={[offset({ x: -8, y: 5 })]} />
-      <Image systemName="chevron.left" color={ON_DARK.title} size={6} modifiers={[offset({ x: -11 })]} />
+      <Image systemName="mappin.and.ellipse" color={ON_DARK.title} size={17} modifiers={[offset({ x: 0 })]} />
     </ZStack>
   );
 

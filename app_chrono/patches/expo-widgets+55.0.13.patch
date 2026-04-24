@@ -893,7 +893,7 @@ index 9eae718..9c0913e 100644
  
  struct LiveActivityAttributes: ActivityAttributes {
    public struct ContentState: Codable, Hashable {
-@@ -12,83 +15,341 @@ struct LiveActivityAttributes: ActivityAttributes {
+@@ -12,83 +15,329 @@ struct LiveActivityAttributes: ActivityAttributes {
  
  @available(iOS 16.1, *)
  public struct WidgetLiveActivity: Widget {
@@ -1042,21 +1042,9 @@ index 9eae718..9c0913e 100644
 +
 +  private var compactArrivedHand: some View {
 +    ZStack {
-+      Image(systemName: "hand.raised.fill")
++      Image(systemName: "mappin.and.ellipse")
 +        .font(.system(size: 17, weight: .semibold))
 +        .foregroundStyle(.white)
-+      Image(systemName: "chevron.left")
-+        .font(.system(size: 7, weight: .bold))
-+        .foregroundStyle(.white)
-+        .offset(x: -8, y: -5)
-+      Image(systemName: "chevron.left")
-+        .font(.system(size: 7, weight: .bold))
-+        .foregroundStyle(.white)
-+        .offset(x: -8, y: 5)
-+      Image(systemName: "chevron.left")
-+        .font(.system(size: 6, weight: .bold))
-+        .foregroundStyle(.white)
-+        .offset(x: -11)
 +    }
 +    .frame(width: 19, height: 22)
 +    .fixedSize(horizontal: true, vertical: true)
