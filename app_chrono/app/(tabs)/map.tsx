@@ -1270,6 +1270,7 @@ export default function MapPage() {
 
       {/* Carte */}
       <DeliveryMapView
+        trackingOrderId={currentOrder?.id ?? null}
         mapStyle={mapStyle}
         mapRef={mapRef}
         region={region}

@@ -18,6 +18,7 @@ import {
   statusBaseProgress,
 } from "../utils/orderProductRules";
 import type { OrderTrackingLiveProps } from "../widgets/orderTrackingLiveActivity";
+import { getFreshActiveTrackingEta } from "../store/useTrackingEtaStore";
 import { userApiService } from "./userApiService";
 
 /** Préfixe unique pour Console / Xcode : filtrer sur `ExpoWidgets`, `LiveActivity`, `OrderTrackingLive`, `orderLiveActivity`. */
@@ -169,6 +170,21 @@ function etaLabelFromOrder(order: OrderRequest, status: OrderStatus): string {
 
 function fallbackEtaForPhase(order: OrderRequest, status: OrderStatus): string {
   return status === "accepted" || status === "enroute" ? etaLabelFromOrder(order, status) : "";
+}
+
+function activeTrackingEtaForPhase(
+  order: OrderRequest,
+  status: OrderStatus,
+): { found: true; etaLabel: string | null } | null {
+  if (!appIsActiveForLiveActivity()) return null;
+  const phase = progressPhaseForStatus(status);
+  if (!phase) return null;
+  const activeTrackingEta = getFreshActiveTrackingEta(order.id, phase);
+  if (!activeTrackingEta) return null;
+  return {
+    found: true,
+    etaLabel: activeTrackingEta.etaLabel,
+  };
 }
 
 function progressWithEtaCap(status: OrderStatus, progress: number, etaLabel: string | undefined): number {
@@ -323,6 +339,7 @@ function progressFromDriverMovement(
   if (!phase) {
     phaseProgressByOrder.delete(order.id);
     phaseEtaByOrder.delete(order.id);
+    routeEtaByOrder.delete(order.id);
     return { progress: statusProgress };
   }
 
@@ -332,6 +349,7 @@ function progressFromDriverMovement(
     const sameStopDistanceMeters = pickupToDropoffDistance(order) ?? 0;
     const progress = Math.max(phaseProgressRange("dropoff").end, existing?.lastProgress ?? 0);
     phaseEtaByOrder.delete(order.id);
+    routeEtaByOrder.delete(order.id);
     phaseProgressByOrder.set(order.id, {
       phase,
       initialDistanceMeters: Math.max(sameStopDistanceMeters, ARRIVAL_RADIUS_METERS),
@@ -674,8 +692,11 @@ async function propsFromOrder(
 
   const effectiveDriverCoords = driverCoords ?? driverCoordsFromOrder(driver);
   const movement = progressFromDriverMovement(order, status, effectiveDriverCoords);
-  const routeEtaLabel = await resolveRouteEtaLabel(order, status, effectiveDriverCoords);
-  const etaLabel = routeEtaLabel || movement.etaLabel || fallbackEtaForPhase(order, status);
+  const sharedTrackingEta = activeTrackingEtaForPhase(order, status);
+  const routeEtaLabel = sharedTrackingEta ? undefined : await resolveRouteEtaLabel(order, status, effectiveDriverCoords);
+  const etaLabel = sharedTrackingEta
+    ? (sharedTrackingEta.etaLabel ?? "")
+    : routeEtaLabel || movement.etaLabel || fallbackEtaForPhase(order, status);
   const progress = progressWithEtaCap(status, movement.progress, etaLabel);
 
   return {
@@ -752,6 +773,7 @@ function shouldSkipLiveActivityUpdate(orderId: string, props: OrderTrackingLiveP
 
   if (!sameStatus) return false;
   if (!sameStatusLabel) return false;
+  if (!sameEta) return false;
   if (sameEta && progressDelta < MIN_PROGRESS_DELTA_FOR_UPDATE) return true;
   return elapsedMs < MIN_LIVE_ACTIVITY_GPS_UPDATE_MS && progressDelta < MIN_PROGRESS_DELTA_FOR_FAST_UPDATE;
 }
@@ -948,6 +970,13 @@ async function syncOrderLiveActivityImpl(
 
   if (!shouldTrack) {
     if (order?.id) phaseProgressByOrder.delete(order.id);
+    if (order?.id) phaseEtaByOrder.delete(order.id);
+    if (order?.id) routeEtaByOrder.delete(order.id);
+    if (order && (order.status === "completed" || order.status === "cancelled" || order.status === "declined")) {
+      clearScheduledEnd();
+      await endAllLiveActivities(await propsFromOrder(order, options.driverCoords), order.id);
+      return;
+    }
     if (options.immediateEnd) {
       clearScheduledEnd();
       await endAllLiveActivities(

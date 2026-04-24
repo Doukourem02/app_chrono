@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { AppState, Platform } from "react-native";
 import { shouldSyncLiveActivityForOrder, syncOrderLiveActivity } from "../services/orderLiveActivity";
 import type { OrderRequest } from "../store/useOrderStore";
 import { useOrderStore } from "../store/useOrderStore";
+import { useTrackingEtaStore } from "../store/useTrackingEtaStore";
 
 function pickTrackedOrder(
   orders: OrderRequest[],
@@ -22,16 +23,27 @@ function pickTrackedOrder(
 export function useOrderLiveActivitySync() {
   const activeOrders = useOrderStore((s) => s.activeOrders);
   const selectedOrderId = useOrderStore((s) => s.selectedOrderId);
+  const etaByOrder = useTrackingEtaStore((s) => s.etaByOrder);
   const trackedDriverCoords = useOrderStore((s) => {
     const order = pickTrackedOrder(s.activeOrders, s.selectedOrderId);
     return order ? s.driverCoords.get(order.id) ?? null : null;
   });
+  const trackedOrder = useMemo(
+    () => pickTrackedOrder(activeOrders, selectedOrderId),
+    [activeOrders, selectedOrderId]
+  );
+  const trackedActiveTrackingEta = trackedOrder ? etaByOrder[trackedOrder.id] ?? null : null;
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
-    const order = pickTrackedOrder(activeOrders, selectedOrderId);
-    void syncOrderLiveActivity(order, { driverCoords: trackedDriverCoords });
-  }, [activeOrders, selectedOrderId, trackedDriverCoords]);
+    void syncOrderLiveActivity(trackedOrder, { driverCoords: trackedDriverCoords });
+  }, [
+    trackedOrder,
+    trackedDriverCoords,
+    trackedActiveTrackingEta?.phase,
+    trackedActiveTrackingEta?.etaLabel,
+    trackedActiveTrackingEta?.computedAt,
+  ]);
 
   /** Au retour premier plan : une tentative ratée ou une activité fermée peut être relancée. */
   useEffect(() => {

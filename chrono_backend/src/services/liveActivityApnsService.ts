@@ -324,6 +324,7 @@ function progressFromDriverMovement(
   if (!phase) {
     phaseProgressByOrder.delete(row.id);
     phaseEtaByOrder.delete(row.id);
+    routeEtaByOrder.delete(row.id);
     return { progress: statusProgress };
   }
 
@@ -334,6 +335,7 @@ function progressFromDriverMovement(
     const sameStopDistanceMeters = pickupToDropoffDistance(row) ?? 0;
     const progress = Math.max(phaseProgressRangeSafe('dropoff').end, existing?.lastProgress ?? 0);
     phaseEtaByOrder.delete(row.id);
+    routeEtaByOrder.delete(row.id);
     phaseProgressByOrder.set(row.id, {
       phase,
       initialDistanceMeters: Math.max(sameStopDistanceMeters, ARRIVAL_RADIUS_METERS),

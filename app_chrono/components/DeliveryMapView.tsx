@@ -14,6 +14,7 @@ import { useWeather } from '../hooks/useWeather';
 import { ETABadge } from './ETABadge';
 import { OnlineDriverMarker } from './OnlineDriverMarker';
 import { ensureMapboxAccessToken } from '../mapboxInit';
+import { useTrackingEtaStore, type ActiveTrackingEtaPhase } from '../store/useTrackingEtaStore';
 
 type Coordinates = {
   latitude: number;
@@ -55,6 +56,7 @@ function coordsToLineGeoJSON(coords: Coordinates[]): GeoJSON.LineString {
 }
 
 interface DeliveryMapViewProps {
+  trackingOrderId?: string | null;
   mapRef: React.RefObject<MapRefHandle | null>;
   region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null;
   cameraAnimationDuration?: number;
@@ -85,6 +87,7 @@ interface DeliveryMapViewProps {
 }
 
 export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
+  trackingOrderId = null,
   mapRef,
   region,
   cameraAnimationDuration = 0,
@@ -110,6 +113,8 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
   mapStyle = 'light',
 }) => {
   ensureMapboxAccessToken();
+  const setActiveTrackingEta = useTrackingEtaStore((s) => s.setActiveTrackingEta);
+  const clearActiveTrackingEta = useTrackingEtaStore((s) => s.clearActiveTrackingEta);
   const cameraRef = useRef<Camera>(null);
   const pickup = toCoords(pickupCoords);
   const dropoff = toCoords(dropoffCoords);
@@ -175,6 +180,53 @@ export const DeliveryMapView: React.FC<DeliveryMapViewProps> = ({
       weatherData.adjustment || null
     );
   }, [animatedDriverPosition, destination, orderStatus, selectedMethod, driverToPickupRoute, driverToDropoffRoute, weatherData.adjustment]);
+
+  useEffect(() => {
+    if (!trackingOrderId) return;
+
+    const isGoingToPickup =
+      orderStatus === 'accepted' ||
+      orderStatus === 'pending' ||
+      orderStatus === 'enroute' ||
+      orderStatus === 'in_progress';
+    const isGoingToDropoff = orderStatus === 'picked_up' || orderStatus === 'delivering';
+    const phase: ActiveTrackingEtaPhase | null = isGoingToPickup ? 'pickup' : isGoingToDropoff ? 'dropoff' : null;
+
+    if (!phase || !realTimeETA) {
+      clearActiveTrackingEta(trackingOrderId);
+      return;
+    }
+
+    const rawIsArrived = realTimeETA.formattedETA.toLowerCase().includes('arrivé');
+    const etaLabel =
+      isGoingToPickup && realTimeETA.etaMinutes < 1
+        ? '1 min'
+        : rawIsArrived
+          ? null
+          : `${Math.max(1, Math.ceil(realTimeETA.etaMinutes))} min`;
+
+    setActiveTrackingEta({
+      orderId: trackingOrderId,
+      phase,
+      etaLabel,
+      targetKind: phase,
+      computedAt: Date.now(),
+    });
+  }, [
+    trackingOrderId,
+    orderStatus,
+    realTimeETA,
+    setActiveTrackingEta,
+    clearActiveTrackingEta,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (trackingOrderId) {
+        clearActiveTrackingEta(trackingOrderId);
+      }
+    };
+  }, [trackingOrderId, clearActiveTrackingEta]);
 
   useEffect(() => {
     const outerId = outerPulse.addListener(({ value }) => setOuterRadius(120 + value * 220));

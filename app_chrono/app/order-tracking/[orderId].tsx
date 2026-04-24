@@ -644,6 +644,7 @@ export default function OrderTrackingPage() {
       </TouchableOpacity>
 
       <DeliveryMapView
+        trackingOrderId={currentOrder?.id ?? null}
         mapRef={mapRef}
         region={mapRegion}
         pickupCoords={currentOrder?.pickup?.coordinates || null}
