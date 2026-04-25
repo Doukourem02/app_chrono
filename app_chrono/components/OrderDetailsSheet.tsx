@@ -622,6 +622,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
             )}
           </View>
 
+
           {/* Confirm button */}
           <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
             <View style={styles.confirmButtonContent}>

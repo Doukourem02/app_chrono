@@ -17,9 +17,9 @@ export const DELIVERY_GRID: Record<DeliveryMethod, { base: number; perKm: number
  * (même logique que DeliveryMethodBottomSheet côté app).
  */
 const SPEED_FLAT_BY_METHOD: Record<string, Partial<Record<DeliveryMethod, number>>> = {
-  express: { moto: 300 },
-  standard: { moto: 250 },
-  scheduled: { moto: 280 },
+  express: { moto: 400 },
+  standard: { moto: 350 },
+  scheduled: { moto: 380 },
   pickup_service: { vehicule: 700 },
   full_service: { vehicule: 1000 },
 };

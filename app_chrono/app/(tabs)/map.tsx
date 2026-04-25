@@ -23,6 +23,7 @@ import { useMapUI } from "../../hooks/useMapUI";
 import { useMapNewOrder } from "../../hooks/useMapNewOrder";
 import { locationService } from "../../services/locationService";
 import {calculatePrice,estimateDurationMinutes,formatDurationLabel,getDistanceInKm,} from "../../services/orderApi";
+import { useDynamicPrice } from "../../hooks/useDynamicPrice";
 import { userApiService } from "../../services/userApiService";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useLocationStore } from "../../store/useLocationStore";
@@ -960,16 +961,22 @@ export default function MapPage() {
     }, 300);
   }, [collapseDeliveryMethodSheet, expandBottomSheet]);
 
+  const {
+    price: dynamicPrice,
+  } = useDynamicPrice(
+    pickupCoords,
+    dropoffCoords,
+    selectedMethod,
+    deliverySpeedOptionId,
+    routeSnapshot,
+  );
+
   const getPriceAndTime = useCallback(() => {
     if (!pickupCoords || !dropoffCoords || !selectedMethod) {
       return { price: 0, estimatedTime: "0 min." };
     }
     const airKm = getDistanceInKm(pickupCoords, dropoffCoords);
     const distance = routeSnapshot?.distanceKm ?? airKm;
-    const price = calculatePrice(
-      distance,
-      selectedMethod as "moto" | "vehicule" | "cargo"
-    );
     const minutes = routeSnapshot
       ? Math.max(0, Math.round(routeSnapshot.durationSeconds / 60))
       : estimateDurationMinutes(
@@ -977,8 +984,12 @@ export default function MapPage() {
           selectedMethod as "moto" | "vehicule" | "cargo"
         );
     const estimatedTime = formatDurationLabel(minutes) || `${minutes} min.`;
+    // Utilise le prix dynamique serveur si disponible, sinon calcul local
+    const price = dynamicPrice > 0
+      ? dynamicPrice
+      : calculatePrice(distance, selectedMethod as "moto" | "vehicule" | "cargo");
     return { price, estimatedTime };
-  }, [pickupCoords, dropoffCoords, selectedMethod, routeSnapshot]);
+  }, [pickupCoords, dropoffCoords, selectedMethod, routeSnapshot, dynamicPrice]);
 
   const orderRouteSummary = useMemo(() => {
     if (!pickupCoords || !dropoffCoords || !selectedMethod) return null;

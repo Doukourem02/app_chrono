@@ -84,6 +84,11 @@ function roundMoney(n: number): number {
   return Math.max(0, Math.round(n));
 }
 
+/** Arrondi psychologique au multiple de 25 FCFA le plus proche. */
+function roundToNearest25(n: number): number {
+  return Math.max(0, Math.round(n / 25) * 25);
+}
+
 export async function computeDynamicDeliveryPrice(
   input: DynamicPricingInput
 ): Promise<DynamicPricingBreakdown> {
@@ -119,7 +124,7 @@ export async function computeDynamicDeliveryPrice(
   const contextFactorRaw = weatherFactor * surgeFactor * hourFactor * trafficFactor;
   const contextFactorApplied = Math.min(MAX_CONTEXT_FACTOR, Math.max(1, contextFactorRaw));
 
-  const totalCfa = roundMoney(subtotalBeforeContextCfa * contextFactorApplied);
+  const totalCfa = roundToNearest25(subtotalBeforeContextCfa * contextFactorApplied);
 
   const labels: string[] = [];
   if (weatherFactor > 1.02) labels.push('météo');
