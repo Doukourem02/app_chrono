@@ -44,40 +44,43 @@ export interface MobileMoneyConfig {
   };
 }
 
-const config: MobileMoneyConfig = {
-  orangeMoney: process.env.ORANGE_MONEY_API_KEY
-    ? {
-        apiKey: process.env.ORANGE_MONEY_API_KEY,
-        apiSecret: process.env.ORANGE_MONEY_API_SECRET || '',
-        merchantId: process.env.ORANGE_MONEY_MERCHANT_ID || '',
-        apiUrl:
-          process.env.ORANGE_MONEY_API_URL ||
-          'https://api.orange.com/orange-money-webpay',
-      }
-    : undefined,
-  wave: process.env.WAVE_API_KEY
-    ? {
-        apiKey: process.env.WAVE_API_KEY,
-        apiSecret: process.env.WAVE_API_SECRET || '',
-        merchantId: process.env.WAVE_MERCHANT_ID || '',
-        apiUrl: process.env.WAVE_API_URL || 'https://api.wave.com/v',
-      }
-    : undefined,
-  mtnMoney: process.env.MTN_MONEY_API_KEY
-    ? {
-        apiKey: process.env.MTN_MONEY_API_KEY,
-        apiSecret: process.env.MTN_MONEY_API_SECRET || '',
-        merchantId: process.env.MTN_MONEY_MERCHANT_ID || '',
-        apiUrl: process.env.MTN_MONEY_API_URL || 'https://api.mtn.com/mobilemoney',
-      }
-    : undefined,
-};
+function getConfig(): MobileMoneyConfig {
+  return {
+    orangeMoney: process.env.ORANGE_MONEY_API_KEY
+      ? {
+          apiKey: process.env.ORANGE_MONEY_API_KEY,
+          apiSecret: process.env.ORANGE_MONEY_API_SECRET || '',
+          merchantId: process.env.ORANGE_MONEY_MERCHANT_ID || '',
+          apiUrl:
+            process.env.ORANGE_MONEY_API_URL ||
+            'https://api.orange.com/orange-money-webpay',
+        }
+      : undefined,
+    wave: process.env.WAVE_API_KEY
+      ? {
+          apiKey: process.env.WAVE_API_KEY,
+          apiSecret: process.env.WAVE_API_SECRET || '',
+          merchantId: process.env.WAVE_MERCHANT_ID || '',
+          apiUrl: process.env.WAVE_API_URL || 'https://api.wave.com/v',
+        }
+      : undefined,
+    mtnMoney: process.env.MTN_MONEY_API_KEY
+      ? {
+          apiKey: process.env.MTN_MONEY_API_KEY,
+          apiSecret: process.env.MTN_MONEY_API_SECRET || '',
+          merchantId: process.env.MTN_MONEY_MERCHANT_ID || '',
+          apiUrl: process.env.MTN_MONEY_API_URL || 'https://api.mtn.com/mobilemoney',
+        }
+      : undefined,
+  };
+}
 
 async function initiateOrangeMoneyPayment(
   params: MobileMoneyPaymentParams
 ): Promise<MobileMoneyPaymentResponse> {
   const { phoneNumber, amount, orderId, description } = params;
 
+  const config = getConfig();
   if (!config.orangeMoney) {
     return {
       success: false,
@@ -123,6 +126,7 @@ async function initiateWavePayment(
 ): Promise<MobileMoneyPaymentResponse> {
   const { phoneNumber, amount, orderId, description } = params;
 
+  const config = getConfig();
   if (!config.wave) {
     return {
       success: false,
@@ -168,6 +172,7 @@ async function initiateMtnMoneyPayment(
 ): Promise<MobileMoneyPaymentResponse> {
   const { phoneNumber, amount, orderId } = params;
 
+  const config = getConfig();
   if (!config.mtnMoney) {
     return {
       success: false,

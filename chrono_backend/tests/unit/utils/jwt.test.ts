@@ -103,17 +103,11 @@ describe('JWT Utils', () => {
     });
 
     it('should throw error for expired token', () => {
-      // Créer un token expiré en utilisant iat et exp dans le payload
-      const now = Math.floor(Date.now() / 1000);
+      // Signer avec le même secret que le module (chargé depuis setup.ts avant beforeEach)
       const expiredToken = jwt.sign(
-        { 
-          id: 'user-123', 
-          role: 'client', 
-          type: 'access',
-          iat: now - 120, // Émis il y a 120 secondes
-          exp: now - 60   // Expiré il y a 60 secondes
-        },
-        process.env.JWT_SECRET!
+        { id: 'user-123', role: 'client', type: 'access' },
+        ORIGINAL_ENV.JWT_SECRET!,
+        { expiresIn: '-1s' }
       );
 
       expect(() => verifyAccessToken(expiredToken)).toThrow('Token expiré');

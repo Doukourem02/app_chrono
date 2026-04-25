@@ -43,17 +43,17 @@ describe('paymentController', () => {
       params: {},
       query: {},
       user: { id: 'test-user-id' },
-    };
+    } as unknown as Partial<Request>;
 
     mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
+      status: jest.fn().mockReturnThis() as any,
+      json: jest.fn().mockReturnThis() as any,
     };
   });
 
   describe('createPaymentMethod', () => {
     it('should create a payment method successfully', async () => {
-      const mockQuery = jest.fn()
+      const mockQuery = (jest.fn() as any)
         .mockResolvedValueOnce({ rows: [] }) // For isDefault update
         .mockResolvedValueOnce({
           rows: [{
@@ -138,8 +138,8 @@ describe('paymentController', () => {
         deliveryMethod: 'moto',
       };
 
-      (priceCalculator.validatePriceParams as jest.Mock) = jest.fn().mockReturnValue(mockValidation);
-      (priceCalculator.calculateDeliveryPrice as jest.Mock) = jest.fn().mockReturnValue(mockCalculation);
+      (priceCalculator.validatePriceParams as any).mockReturnValue(mockValidation);
+      (priceCalculator.calculateDeliveryPrice as any).mockReturnValue(mockCalculation);
 
       mockRequest.body = {
         distance: 5,
@@ -169,7 +169,7 @@ describe('paymentController', () => {
         error: 'Distance must be greater than 0',
       };
 
-      (priceCalculator.validatePriceParams as jest.Mock) = jest.fn().mockReturnValue(mockValidation);
+      (priceCalculator.validatePriceParams as any).mockReturnValue(mockValidation);
 
       mockRequest.body = {
         distance: -5,
@@ -201,7 +201,7 @@ describe('paymentController', () => {
         distance: 5,
       };
 
-      (pool as any).query = jest.fn()
+      (pool as any).query = (jest.fn() as any)
         .mockResolvedValueOnce({ rows: [mockOrder] }) // Order query
         .mockResolvedValueOnce({ rows: [] }) // Payment method query
         .mockResolvedValueOnce({ rows: [{ id: 'txn-123' }] }) // Transaction insert
@@ -233,7 +233,7 @@ describe('paymentController', () => {
     });
 
     it('should return 404 if order not found', async () => {
-      (pool as any).query = jest.fn().mockResolvedValueOnce({ rows: [] });
+      (pool as any).query = (jest.fn() as any).mockResolvedValueOnce({ rows: [] });
 
       mockRequest.body = {
         orderId: 'non-existent-order',
@@ -257,7 +257,7 @@ describe('paymentController', () => {
 
   describe('getPaymentMethods', () => {
     it('should return user payment methods', async () => {
-      const mockQuery = jest.fn().mockResolvedValue({
+      const mockQuery = (jest.fn() as any).mockResolvedValue({
         rows: [
           {
             id: 'pm-1',

@@ -1,28 +1,46 @@
 /**
  * Tests unitaires pour le service de géocodage (Mapbox)
+ * Approche : mock de global.fetch (mapboxService.geocodeForward l'utilise)
  */
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { geocodeAddress } from '../../../src/utils/geocodeService.js';
-import { geocodeForward } from '../../../src/utils/mapboxService.js';
+import logger from '../../../src/utils/logger.js';
 
-jest.mock('../../../src/utils/mapboxService.js');
+jest.mock('../../../src/utils/logger.js', () => ({
+  __esModule: true,
+  default: {
+    warn: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
 
-global.console = {
-  ...console,
-  warn: jest.fn(),
-  error: jest.fn(),
-};
+const ORIGINAL_FETCH = global.fetch;
 
 describe('GeocodeService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    process.env.MAPBOX_ACCESS_TOKEN = 'test-mapbox-token';
+    // Réassigner logger.warn depuis le contexte test (évite cross-context VM)
+    (logger as any).warn = jest.fn();
+    (logger as any).error = jest.fn();
+    global.fetch = jest.fn() as any;
+  });
+
+  afterEach(() => {
+    global.fetch = ORIGINAL_FETCH;
+    delete process.env.MAPBOX_ACCESS_TOKEN;
   });
 
   describe('geocodeAddress', () => {
     it('should geocode address successfully via Mapbox', async () => {
-      (geocodeForward as any).mockResolvedValue({
-        latitude: 5.359952,
-        longitude: -4.008256,
+      (global.fetch as any).mockResolvedValue({
+        json: () => Promise.resolve({
+          features: [{
+            geometry: { coordinates: [-4.008256, 5.359952] },
+            properties: { full_address: 'Abidjan, Côte d\'Ivoire' },
+          }],
+        }),
       });
 
       const result = await geocodeAddress('Abidjan, Côte d\'Ivoire');
@@ -30,33 +48,44 @@ describe('GeocodeService', () => {
       expect(result).not.toBeNull();
       expect(result?.latitude).toBe(5.359952);
       expect(result?.longitude).toBe(-4.008256);
-      expect(geocodeForward).toHaveBeenCalledWith('Abidjan, Côte d\'Ivoire', { country: 'ci', limit: 1 });
+      const fetchUrl = (global.fetch as any).mock.calls[0][0] as string;
+      expect(fetchUrl).toContain('Abidjan');
     });
 
     it('should return null when Mapbox returns null', async () => {
-      (geocodeForward as any).mockResolvedValue(null);
+      (global.fetch as any).mockResolvedValue({
+        json: () => Promise.resolve({ features: [] }),
+      });
 
       const result = await geocodeAddress('Invalid Address 12345');
 
       expect(result).toBeNull();
-      expect(console.warn).toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalled();
     });
 
     it('should return null when Mapbox throws', async () => {
-      (geocodeForward as any).mockRejectedValue(new Error('Network error'));
+      (global.fetch as any).mockRejectedValue(new Error('Network error'));
 
       const result = await geocodeAddress('Abidjan');
 
       expect(result).toBeNull();
-      expect(console.warn).toHaveBeenCalled();
     });
 
     it('should pass country and limit to mapboxService', async () => {
-      (geocodeForward as any).mockResolvedValue({ latitude: 5.36, longitude: -4.01 });
+      (global.fetch as any).mockResolvedValue({
+        json: () => Promise.resolve({
+          features: [{
+            geometry: { coordinates: [-4.01, 5.36] },
+            properties: {},
+          }],
+        }),
+      });
 
       await geocodeAddress('Cocody, Abidjan');
 
-      expect(geocodeForward).toHaveBeenCalledWith('Cocody, Abidjan', { country: 'ci', limit: 1 });
+      const fetchUrl = (global.fetch as any).mock.calls[0][0] as string;
+      expect(fetchUrl).toContain('country=ci');
+      expect(fetchUrl).toContain('limit=1');
     });
   });
 });

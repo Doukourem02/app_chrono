@@ -1121,7 +1121,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
       queryParams.push(statusesToFilter);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY created_at DESC LIMIT 2000';
 
     logger.info('📝 [getAdminOrdersByStatus] Requête SQL:', { query, params: queryParams });
 
@@ -1431,7 +1431,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
     }
 
     // Récupérer tous les utilisateurs avec leurs informations
-    const query = `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url FROM users ORDER BY created_at DESC`;
+    const query = `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url FROM users ORDER BY created_at DESC LIMIT 2000`;
 
     logger.info('📝 [getAdminUsers] Requête SQL:', { query });
 

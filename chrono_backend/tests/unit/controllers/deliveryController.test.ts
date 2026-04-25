@@ -29,8 +29,8 @@ describe('deliveryController', () => {
 
     // Mock Socket.IO
     mockSocketIO = {
-      emit: jest.fn(),
-      to: jest.fn().mockReturnThis(),
+      emit: jest.fn() as any,
+      to: jest.fn().mockReturnThis() as any,
     };
 
     // Mock Request
@@ -40,20 +40,20 @@ describe('deliveryController', () => {
       query: {},
       user: { id: 'test-user-id' },
       app: {
-        get: jest.fn().mockReturnValue(mockSocketIO),
-      },
-    };
+        get: jest.fn().mockReturnValue(mockSocketIO) as any,
+      } as any,
+    } as unknown as Partial<Request>;
 
     // Mock Response
     mockResponse = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
+      status: jest.fn().mockReturnThis() as any,
+      json: jest.fn().mockReturnThis() as any,
     };
   });
 
   describe('createDelivery', () => {
     it('should create a delivery successfully', async () => {
-      const mockQuery = jest.fn().mockResolvedValue({
+      const mockQuery = (jest.fn() as any).mockResolvedValue({
         rows: [{
           id: 'delivery-123',
           user_id: 'test-user-id',
@@ -87,7 +87,7 @@ describe('deliveryController', () => {
     });
 
     it('should handle database errors', async () => {
-      const mockQuery = jest.fn().mockRejectedValue(new Error('Database error'));
+      const mockQuery = (jest.fn() as any).mockRejectedValue(new Error('Database error'));
       (pool as any).query = mockQuery;
 
       mockRequest.body = {
@@ -109,7 +109,7 @@ describe('deliveryController', () => {
 
   describe('getUserDeliveries', () => {
     it('should return user deliveries from database', async () => {
-      const mockQuery = jest.fn()
+      const mockQuery = (jest.fn() as any)
         .mockResolvedValueOnce({
           rows: [{
             id: 'order-1',
@@ -160,7 +160,7 @@ describe('deliveryController', () => {
 
       // Mock database unavailable
       process.env.DATABASE_URL = '';
-      const mockQuery = jest.fn().mockRejectedValue(new Error('Database unavailable'));
+      const mockQuery = (jest.fn() as any).mockRejectedValue(new Error('Database unavailable'));
       (pool as any).query = mockQuery;
 
       mockRequest.params = { userId: 'test-user-id' };
@@ -189,7 +189,7 @@ describe('deliveryController', () => {
       activeOrders.set('order-123', {
         id: 'order-123',
         user: { id: 'test-user-id' },
-        driverId: 'driver-123',
+        driverId: 'test-user-id',
         status: 'accepted',
         pickup: { address: 'Pickup' },
         dropoff: { address: 'Dropoff' },
@@ -204,7 +204,7 @@ describe('deliveryController', () => {
     });
 
     it('should update delivery status successfully', async () => {
-      const mockQuery = jest.fn().mockResolvedValue({ rows: [] });
+      const mockQuery = (jest.fn() as any).mockResolvedValue({ rows: [] });
       (pool as any).query = mockQuery;
 
       mockRequest.params = { orderId: 'order-123' };
@@ -275,7 +275,7 @@ describe('deliveryController', () => {
     });
 
     it('should cancel order successfully', async () => {
-      const mockQuery = jest.fn().mockResolvedValue({ rows: [] });
+      const mockQuery = (jest.fn() as any).mockResolvedValue({ rows: [] });
       (pool as any).query = mockQuery;
 
       mockRequest.params = { orderId: 'order-123' };

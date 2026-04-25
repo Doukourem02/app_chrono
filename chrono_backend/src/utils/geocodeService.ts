@@ -13,11 +13,16 @@ interface GeocodeResult {
  * Géocode une adresse en coordonnées GPS (Mapbox)
  */
 export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
-  const mapboxResult = await geocodeForward(address, { country: 'ci', limit: 1 });
-  if (mapboxResult) {
-    return { latitude: mapboxResult.latitude, longitude: mapboxResult.longitude };
+  try {
+    const mapboxResult = await geocodeForward(address, { country: 'ci', limit: 1 });
+    if (mapboxResult) {
+      return { latitude: mapboxResult.latitude, longitude: mapboxResult.longitude };
+    }
+    logger.warn(`[geocodeService] Geocoding failed for address "${address}"`);
+    return null;
+  } catch (error) {
+    logger.warn(`[geocodeService] Error geocoding address "${address}"`, error);
+    return null;
   }
-  logger.warn(`[geocodeService] Geocoding failed for address "${address}"`);
-  return null;
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,7 +11,15 @@ import { showUserFriendlyError } from '../../utils/errorFormatter';
 export default function VerificationScreen() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
   const { setUser, setProfile, setTokensAndWait } = useDriverStore();
   const { email, phoneNumber, otpMethod, setIsNewUser } = useTempDriverStore();
 
@@ -120,6 +128,28 @@ export default function VerificationScreen() {
     }
   };
 
+  const handleResend = async () => {
+    if (resendCooldown > 0 || isResending) return;
+    setIsResending(true);
+    try {
+      const response = await fetch(`${config.apiUrl}/api/auth-simple/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumber, otpMethod: otpMethod || 'sms', role: 'driver' }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Erreur lors du renvoi du code');
+      }
+      setResendCooldown(60);
+      Alert.alert('Code envoyé', 'Un nouveau code vous a été envoyé.');
+    } catch (error: any) {
+      Alert.alert('Erreur', error?.message || 'Impossible de renvoyer le code. Réessayez.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleGoBack = () => {
     router.back();
   };
@@ -170,8 +200,10 @@ export default function VerificationScreen() {
 
         <View style={styles.resendContainer}>
           <Text style={styles.resendText}>Vous n&apos;avez pas reçu le code ? </Text>
-          <TouchableOpacity>
-            <Text style={styles.resendLink}>Renvoyer</Text>
+          <TouchableOpacity onPress={handleResend} disabled={resendCooldown > 0 || isResending}>
+            <Text style={[styles.resendLink, (resendCooldown > 0 || isResending) && { opacity: 0.4 }]}>
+              {isResending ? 'Envoi...' : resendCooldown > 0 ? `Renvoyer (${resendCooldown}s)` : 'Renvoyer'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

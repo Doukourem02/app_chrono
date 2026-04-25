@@ -3,36 +3,37 @@
  */
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { MessageService } from '../../../src/services/messageService.js';
+import pool from '../../../src/config/db.js';
+import logger from '../../../src/utils/logger.js';
 
-// Mock de la base de données
-const mockPoolQuery = jest.fn() as any;
+// Mock de la base de données (jest.fn() inline pour éviter les problèmes de hoisting ESM)
 jest.mock('../../../src/config/db.js', () => ({
   __esModule: true,
   default: {
-    query: mockPoolQuery,
+    query: jest.fn(),
   },
 }));
 
 // Mock logger
-const mockLogger = {
-  info: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-};
 jest.mock('../../../src/utils/logger.js', () => ({
   __esModule: true,
-  default: mockLogger,
+  default: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+  },
 }));
 
 describe('MessageService', () => {
   let messageService: MessageService;
 
   beforeEach(() => {
+    // Réassigner jest.fn() du contexte test (évite cross-context VM modules)
+    (pool as any).query = jest.fn();
+    (logger as any).info = jest.fn();
+    (logger as any).error = jest.fn();
+    (logger as any).warn = jest.fn();
     jest.clearAllMocks();
-    mockPoolQuery.mockClear();
-    mockLogger.info.mockClear();
-    mockLogger.error.mockClear();
-    mockLogger.warn.mockClear();
     messageService = new MessageService();
   });
 
@@ -62,7 +63,7 @@ describe('MessageService', () => {
         p2_avatar_url: null,
       };
 
-      mockPoolQuery.mockResolvedValue({
+      (pool.query as any).mockResolvedValue({
         rows: [mockConversation],
       });
 
@@ -70,14 +71,14 @@ describe('MessageService', () => {
 
       expect(result).not.toBeNull();
       expect(result?.id).toBe('conv-123');
-      expect(mockPoolQuery).toHaveBeenCalledWith(
+      expect(pool.query).toHaveBeenCalledWith(
         expect.stringContaining('WHERE c.id = $1'),
         ['conv-123']
       );
     });
 
     it('should return null when conversation not found', async () => {
-      mockPoolQuery.mockResolvedValue({
+      (pool.query as any).mockResolvedValue({
         rows: [],
       });
 
@@ -87,7 +88,7 @@ describe('MessageService', () => {
     });
 
     it('should handle database errors', async () => {
-      mockPoolQuery.mockRejectedValue(new Error('DB Error'));
+      (pool.query as any).mockRejectedValue(new Error('DB Error'));
 
       await expect(
         messageService.getConversationById('conv-123')
@@ -107,64 +108,64 @@ describe('MessageService', () => {
         },
       ];
 
-      mockPoolQuery.mockResolvedValue({
+      (pool.query as any).mockResolvedValue({
         rows: mockConversations,
       });
 
       const result = await messageService.getUserConversations('user-1');
 
       expect(result).toBeInstanceOf(Array);
-      expect(mockPoolQuery).toHaveBeenCalled();
+      expect(pool.query).toHaveBeenCalled();
     });
 
     it('should filter by conversation type', async () => {
-      mockPoolQuery.mockResolvedValue({
+      (pool.query as any).mockResolvedValue({
         rows: [],
       });
 
       await messageService.getUserConversations('user-1', 'order');
 
-      const queryCall = mockPoolQuery.mock.calls[0][0];
+      const queryCall = (pool.query as any).mock.calls[0][0];
       expect(queryCall).toContain("AND c.type = $2");
     });
 
     it('should return empty array on connection error', async () => {
       const connectionError = new Error('ENOTFOUND db.example.com');
-      mockPoolQuery.mockRejectedValue(connectionError);
+      (pool.query as any).mockRejectedValue(connectionError);
 
       const result = await messageService.getUserConversations('user-1');
 
       expect(result).toEqual([]);
-      expect(mockLogger.warn).toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalled();
     });
   });
 
   describe('getAllConversations', () => {
     it('should return all conversations', async () => {
-      mockPoolQuery.mockResolvedValue({
+      (pool.query as any).mockResolvedValue({
         rows: [],
       });
 
       const result = await messageService.getAllConversations();
 
       expect(result).toBeInstanceOf(Array);
-      expect(mockPoolQuery).toHaveBeenCalled();
+      expect(pool.query).toHaveBeenCalled();
     });
 
     it('should filter by type when provided', async () => {
-      mockPoolQuery.mockResolvedValue({
+      (pool.query as any).mockResolvedValue({
         rows: [],
       });
 
       await messageService.getAllConversations('support');
 
-      const queryCall = mockPoolQuery.mock.calls[0][0];
+      const queryCall = (pool.query as any).mock.calls[0][0];
       expect(queryCall).toContain("AND c.type = $1");
     });
 
     it('should return empty array on connection error', async () => {
       const connectionError = new Error('ECONNREFUSED');
-      mockPoolQuery.mockRejectedValue(connectionError);
+      (pool.query as any).mockRejectedValue(connectionError);
 
       const result = await messageService.getAllConversations();
 
@@ -175,7 +176,7 @@ describe('MessageService', () => {
   describe('createOrderConversation', () => {
     it('should create new order conversation', async () => {
       // Mock: no existing conversation
-      mockPoolQuery
+      (pool.query as any)
         .mockResolvedValueOnce({ rows: [] } as any) // Check existing
         .mockResolvedValueOnce({
           rows: [{
@@ -195,12 +196,12 @@ describe('MessageService', () => {
 
       expect(result).not.toBeNull();
       expect(result.id).toBe('conv-new');
-      expect(mockPoolQuery).toHaveBeenCalledTimes(2);
+      expect(pool.query).toHaveBeenCalledTimes(2);
     });
 
     it('should return existing conversation if already exists', async () => {
       // Mock: existing conversation found
-      mockPoolQuery
+      (pool.query as any)
         .mockResolvedValueOnce({
           rows: [{ id: 'conv-existing' }],
         } as any) // Check existing
@@ -221,13 +222,13 @@ describe('MessageService', () => {
       expect(result).not.toBeNull();
       expect(result.id).toBe('conv-existing');
       // Should not insert new conversation
-      expect(mockPoolQuery.mock.calls.filter(
+      expect((pool.query as any).mock.calls.filter(
         (call: any[]) => call[0].includes('INSERT')
       ).length).toBe(0);
     });
 
     it('should handle database errors', async () => {
-      mockPoolQuery.mockRejectedValue(new Error('DB Error'));
+      (pool.query as any).mockRejectedValue(new Error('DB Error'));
 
       await expect(
         messageService.createOrderConversation('order-123', 'user-1', 'driver-1')
@@ -237,7 +238,7 @@ describe('MessageService', () => {
 
   describe('findAvailableAdmin', () => {
     it('should return admin ID when available', async () => {
-      mockPoolQuery.mockResolvedValue({
+      (pool.query as any).mockResolvedValue({
         rows: [{ id: 'admin-123' }],
       });
 
@@ -247,7 +248,7 @@ describe('MessageService', () => {
     });
 
     it('should return null when no admin available', async () => {
-      mockPoolQuery.mockResolvedValue({
+      (pool.query as any).mockResolvedValue({
         rows: [],
       });
 
@@ -257,18 +258,18 @@ describe('MessageService', () => {
     });
 
     it('should handle database errors gracefully', async () => {
-      mockPoolQuery.mockRejectedValue(new Error('DB Error'));
+      (pool.query as any).mockRejectedValue(new Error('DB Error'));
 
       const result = await messageService.findAvailableAdmin();
 
       expect(result).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalled();
+      expect(logger.error).toHaveBeenCalled();
     });
   });
 
   describe('createSupportConversation', () => {
     it('should create new support conversation', async () => {
-      mockPoolQuery
+      (pool.query as any)
         .mockResolvedValueOnce({ rows: [] } as any) // Check existing
         .mockResolvedValueOnce({
           rows: [{
@@ -290,7 +291,7 @@ describe('MessageService', () => {
     });
 
     it('should return existing conversation if already exists', async () => {
-      mockPoolQuery
+      (pool.query as any)
         .mockResolvedValueOnce({
           rows: [{ id: 'conv-existing' }],
         } as any)
@@ -311,7 +312,7 @@ describe('MessageService', () => {
     });
 
     it('should handle database errors', async () => {
-      mockPoolQuery.mockRejectedValue(new Error('DB Error'));
+      (pool.query as any).mockRejectedValue(new Error('DB Error'));
 
       await expect(
         messageService.createSupportConversation('admin-1', 'user-1', 'support')
@@ -319,4 +320,3 @@ describe('MessageService', () => {
     });
   });
 });
-
