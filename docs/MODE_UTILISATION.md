@@ -63,6 +63,90 @@ Cette section explique les mots qui peuvent apparaître dans les écrans. Les te
 
 ---
 
+## Comment Krono calcule le prix d'une livraison
+
+Le prix affiché au client au moment de commander est calculé **automatiquement** par le système, en temps réel. Il n'est jamais saisi à la main par l'équipe.
+
+---
+
+### Les grilles de base
+
+Chaque livraison commence par un **forfait fixe** (coût de départ) auquel s'ajoute un **tarif par kilomètre** parcouru.
+
+| Type de véhicule | Forfait de départ | Tarif par km |
+|---|---|---|
+| **Moto** | 350 – 400 FCFA | 200 FCFA / km |
+| **Voiture** | 700 – 1 000 FCFA | 300 FCFA / km |
+| **Cargo** | 1 200 FCFA | 450 FCFA / km |
+
+Le forfait varie selon le **mode de livraison** choisi par le client (Express, Standard, Programmée). La voiture a deux niveaux selon le service demandé.
+
+**Exemple — Moto Express, 5 km :**
+> 400 FCFA (forfait) + 5 × 200 FCFA (distance) = **1 400 FCFA**
+
+**Exemple — Voiture standard, 8 km :**
+> 700 FCFA (forfait) + 8 × 300 FCFA (distance) = **3 100 FCFA**
+
+---
+
+### Les ajustements automatiques de contexte
+
+En plus du prix de base, le système applique des **ajustements automatiques** selon la situation du moment. Ces ajustements ne sont **jamais visibles comme une ligne séparée** sur l'écran du client : ils sont déjà inclus dans le prix affiché.
+
+| Situation | Ajustement |
+|---|---|
+| **Heure de pointe** (7h–9h ou 17h–20h) | + 6 % |
+| **Nuit** (22h–5h) | + 4 % |
+| **Forte demande** (beaucoup de commandes, peu de livreurs disponibles) | Variable, selon l'activité en temps réel |
+| **Trafic chargé** (trajet réel plus long que prévu) | Jusqu'à + 22 % |
+| **Mauvais temps** (pluie forte, orage) | Variable, selon les données météo |
+
+Ces ajustements se **combinent** entre eux. Par exemple, une livraison en heure de pointe sous la pluie avec du trafic sera plus élevée qu'une livraison en journée calme.
+
+**Le prix ne peut jamais dépasser 1,85 fois le prix de base**, quelle que soit la situation. C'est un plafond de protection pour le client.
+
+---
+
+### L'arrondi final
+
+Le prix calculé est toujours **arrondi au multiple de 25 FCFA le plus proche**. Cela évite les prix inégaux comme 1 413 ou 1 387 FCFA, et donne des montants propres à payer en espèces ou en mobile money.
+
+**Exemples d'arrondis :**
+
+| Calculé | Affiché |
+|---|---|
+| 1 411 FCFA | **1 400 FCFA** |
+| 1 438 FCFA | **1 425 FCFA** |
+| 1 462 FCFA | **1 475 FCFA** |
+
+---
+
+### Simulations concrètes — Moto, 5 km
+
+| Situation | Prix affiché |
+|---|---|
+| Journée normale | **1 400 FCFA** |
+| Heure de pointe | **1 475 FCFA** |
+| Forte demande (×1.3) | **1 825 FCFA** |
+| Trafic + heure de pointe | **1 725 FCFA** |
+| Tout combiné (plafonné) | **2 600 FCFA** |
+
+---
+
+### Ce que le client voit
+
+Le client voit **un seul prix** dans l'application, déjà calculé avec tous les ajustements inclus. Il n'y a pas de surprise après la commande : le montant affiché avant de valider est le montant final qui sera prélevé.
+
+---
+
+### Ce que Krono ne fait pas
+
+- Le prix **n'est pas négocié** avec le livreur : le livreur ne voit pas le détail du calcul.
+- Il n'y a **pas de prix différent selon le quartier** (aucune zone tarifaire pour l'instant) : seule la distance compte.
+- Il n'y a **pas de minimum de commande** pour l'instant : même une courte livraison est acceptée au prix calculé.
+
+---
+
 ## Application client (sur téléphone)
 
 ### Première utilisation
@@ -109,6 +193,18 @@ Cette section explique les mots qui peuvent apparaître dans les écrans. Les te
 - Indications sur vos **commandes réalisées**, le **reste à payer** (montant encore dû), et vos **points de fidélité** (règles affichées dans l’application).
 - **Codes promo** : si l’équipe vous communique un code, l’endroit pour le saisir peut être prévu dans l’application (selon les mises à jour du service).
 - **Support** : en cas de problème sur une commande, un paiement, une adresse ou un compte, utilisez l’écran d’aide/support ou la conversation prévue dans l’application.
+
+### Litiges et réclamations (client)
+
+- Depuis l’écran **Historique des transactions**, chaque transaction peut faire l’objet d’une **réclamation** directement dans l’application.
+- Le client choisit le **type de litige** (remboursement demandé, problème de paiement, problème de service, autre), rédige une description, et peut joindre des pièces si nécessaire.
+- Une fois soumis, le litige est visible et traitable par l’équipe depuis l’espace administration.
+
+### Rappel pour noter le livreur
+
+- Après une livraison, si le client n’a pas encore donné son avis, l’application peut envoyer un **rappel** pour noter le livreur.
+- Le client peut accepter de noter ou **désactiver ce rappel** directement depuis la notification ou l’écran de notation.
+- Le système évite d’envoyer plusieurs rappels trop rapprochés pour ne pas être intrusif.
 
 ---
 
@@ -171,17 +267,37 @@ Si une règle n’est pas respectée, l’application affiche un **message clair
 - Consignes **sécurité** ou **type de véhicule** peuvent être rappelées par l’application (ex. avant de rouler).
 - Si un bandeau indique que les **mises à jour en direct sont limitées**, gardez l’application ouverte et vérifiez votre connexion ; les informations peuvent se resynchroniser après quelques instants.
 
+### Demande entrante — comment ça se passe
+
+- Quand une course est disponible et correspond à votre zone, une **alerte s’affiche** avec les informations essentielles : adresses de collecte et de livraison, distance, gain estimé, consignes particulières.
+- Vous avez un **délai limité** (généralement entre 10 et 30 secondes) pour **accepter ou refuser**. Si vous ne répondez pas, la demande passe à un autre livreur disponible.
+- Une fois acceptée, la course apparaît dans votre liste de courses actives.
+
 ### Revenus
 
 - Historique des gains par période (jour, semaine, mois, ou vue large), avec le détail des courses terminées.
+- Un **graphique** montre l’évolution des gains jour par jour sur la période choisie.
 - Pour les livreurs **partenaires**, un **solde commission** peut apparaître. Si le solde est trop faible ou épuisé, il peut être nécessaire de **recharger** avant de recevoir de nouvelles courses.
 - Les livreurs **internes** n’ont généralement pas la même logique de commission prépayée que les partenaires.
 
+### Commission (livreurs partenaires uniquement)
+
+- Les livreurs partenaires fonctionnent avec un **compte prépayé** : une somme minimum doit être disponible pour pouvoir recevoir des courses.
+- À chaque livraison terminée, une **part est déduite** automatiquement de ce solde (commission Krono).
+- Si le solde tombe trop bas, le compte peut **ne plus recevoir de nouvelles demandes** jusqu’à une recharge.
+- La recharge se fait depuis l’application ou via l’équipe Krono.
+- L’historique montre chaque mouvement : **recharge**, **déduction** (après livraison), **remboursement** éventuel.
+
 ### Profil livreur
 
-- Statistiques (nombre de livraisons, gains, **note moyenne** expliquée dans l’application).
+- Statistiques : nombre de livraisons, gains cumulés, **note moyenne**, taux d’acceptation des courses.
 - Les **partenaires** ont en plus un accès aux **gains / commission** (compte prépayé, recharges, mouvements).
-- **Classement et badges** : selon les réglages, l’application peut afficher un classement de la semaine/du mois et des badges comme première livraison, livraisons cumulées, excellence ou livreur du mois. Ces éléments servent au suivi de performance et à la motivation.
+- **Classement et badges** : l’application affiche un classement de la semaine/du mois et des badges obtenus :
+  - Première livraison
+  - 10, 50, 100, 500 livraisons cumulées
+  - Excellence (note élevée sur une période)
+  - Livreur du mois
+  Ces éléments servent au suivi de performance et à la motivation.
 - **Véhicule** : gardez les informations du véhicule à jour. Même si plusieurs types peuvent exister dans le projet, la flotte ouverte peut être limitée à la moto selon la période.
 - **Support livreur** : utilisez l’aide/support pour signaler un problème de compte, de course, de paiement, de navigation ou de QR code.
 
@@ -199,7 +315,19 @@ Réservé à **l’équipe Krono** (connexion sécurisée).
 - **Finances** : d’un côté les **transactions clients**, de l’autre les **commissions livreurs** (deux vues liées au menu Finances).
 - **Utilisateurs et livreurs** : fiches détaillées (pour un client, on peut notamment voir l’historique des **paiements différés** : payé, restant, détail des opérations).
 - **Performance / classement** : suivi motivant pour les équipes (classements par période, zone, etc.).
-- **Maintenance** : suivi des véhicules, réparations, documents, budget (selon ce que l’équipe renseigne).
+- **Rapports avancés** : en plus des statistiques générales, des rapports détaillés sont disponibles sur plusieurs angles :
+  - **Livraisons** : volume, distance moyenne, durée, taux d’annulation, par zone ou par période
+  - **Revenus** : répartition par livreur, par client, par méthode de paiement
+  - **Clients** : activité, segmentation, fidélité
+  - **Livreurs** : performance, note, taux d’acceptation
+  - **Paiements** : transactions réussies, échouées, litiges, retards paiement différé
+  Tous ces rapports peuvent être **exportés** (tableur, CSV) pour un traitement externe.
+- **Maintenance** : suivi complet des véhicules de la flotte :
+  - Historique des entretiens (date, type, coût)
+  - Logs de carburant (date, montant, quantité)
+  - Documents par véhicule (licence, assurance, contrôle technique) avec **dates d’expiration** et alertes automatiques si un document arrive à échéance
+  - Kilométrage logué après chaque livraison
+  - Budget par véhicule
 - **Planning** : organisation des livraisons **professionnelles**, **B2B** ou **prises par téléphone** ; lors de la création d’une course, l’équipe peut choisir le **mode de paiement** (espèces, mobile money, **paiement différé** pour un client entreprise, etc.).
 - **Saisie admin / téléphone / hors ligne** : l’équipe peut créer une commande pour un client qui appelle. Dans ce cas, il faut soigner l’adresse, le téléphone, les notes pour le livreur et, si besoin, préciser une zone approximative.
 - **Zones de collecte approximatives** : utiles quand le point exact n’est pas encore connu. Elles doivent rester assez claires pour que le livreur sache qui appeler ou où se rapprocher.
@@ -213,6 +341,56 @@ Réservé à **l’équipe Krono** (connexion sécurisée).
 
 ---
 
+## Comment Krono informe les destinataires sans compte
+
+Quand le destinataire d'un colis **n'a pas de compte Krono**, il peut quand même être informé de l'avancement de sa livraison :
+
+- **SMS ou WhatsApp** : un message peut lui être envoyé automatiquement avec les informations clés (livreur en route, livraison imminente, etc.), selon ce que l'équipe a activé.
+- **Lien de suivi public** : un lien unique est généré pour chaque commande. Ce lien s'ouvre dans un navigateur web, **sans aucune installation** d'application. Le destinataire voit l'adresse de livraison, le statut en cours et le temps estimé.
+- **Notifications depuis le navigateur** : si le destinataire accepte les notifications sur la page de suivi, il peut recevoir des alertes directement sur son téléphone ou ordinateur, même sans compte Krono.
+
+---
+
+## Prévision de la demande (pour les livreurs)
+
+Le système analyse les livraisons passées (sur les 30 derniers jours) pour prévoir où et quand la demande sera la plus forte :
+
+- **Heures de pointe** par zone et par jour de la semaine
+- **Zones chaudes** : zones où les commandes s'accumulent à un moment donné
+- **Recommandations** : si un livreur cherche où se positionner pour avoir plus de courses, le système peut lui suggérer les zones les plus actives du moment
+
+Ces informations sont accessibles dans l'application livreur et dans l'espace admin.
+
+---
+
+## Optimisation des livraisons multiples
+
+Quand un livreur doit effectuer **plusieurs livraisons à la suite**, le système peut calculer automatiquement l'**ordre de passage le plus rapide** :
+
+- Il prend en compte la position du livreur, les points de collecte et les points de livraison.
+- La règle fondamentale est respectée : **on collecte un colis avant de le livrer** (jamais l'inverse).
+- Les livraisons prioritaires sont traitées en premier.
+- Le résultat est une liste ordonnée pickup → dropoff pour chaque commande, optimisée pour minimiser le trajet total.
+
+---
+
+## Notifications automatiques envoyées par Krono
+
+En dehors des alertes déclenchées par les actions de l'utilisateur (commande acceptée, colis récupéré, etc.), Krono peut envoyer des **notifications programmées** pour informer ou encourager :
+
+**Côté client :**
+- Rappel pour passer une nouvelle commande si le client n'a pas commandé depuis un moment
+- Rappel pour noter le livreur après une livraison
+
+**Côté livreur :**
+- Alerte quand des commandes attendent dans une zone proche
+- Encouragement à se mettre en ligne quand la demande est forte dans sa zone
+- Rappel si le livreur est hors ligne depuis un certain temps alors que des courses sont disponibles
+
+Ces notifications respectent une **fenêtre horaire** (par exemple uniquement entre 10h et 20h) et un **délai minimum entre deux messages** pour ne pas être intrusif.
+
+---
+
 ## Petits problèmes fréquents et bons réflexes
 
 - **Adresse introuvable ou imprécise** : complétez avec un repère, un numéro de téléphone, une note et, si nécessaire, une zone approximative.
@@ -222,6 +400,9 @@ Réservé à **l’équipe Krono** (connexion sécurisée).
 - **QR code expiré ou invalide** : le client doit rouvrir l’écran du QR code ; le livreur doit scanner le QR correspondant à la bonne commande.
 - **Commande B2B ou par téléphone avec GPS incomplet** : le livreur doit appeler le client ou l’équipe avant de perdre du temps sur la route.
 - **Litige après livraison** : ouvrir une réclamation avec le numéro de commande, les messages, les photos du colis si disponibles et le détail du paiement.
+- **Livreur partenaire qui ne reçoit plus de courses** : vérifier le solde commission — s'il est insuffisant, une recharge est nécessaire avant de pouvoir accepter de nouvelles demandes.
+- **Destinataire qui n'a pas reçu le lien de suivi** : vérifier que son numéro de téléphone est bien renseigné dans la commande ; le lien peut être renvoyé depuis l'espace admin.
+- **Document véhicule expiré** : l'espace admin affiche une alerte sur les documents arrivant à échéance ; pensez à les renouveler avant expiration pour éviter un blocage.
 
 ---
 

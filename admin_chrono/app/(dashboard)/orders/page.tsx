@@ -9,7 +9,7 @@ import { formatDeliveryId } from "@/utils/formatDeliveryId";
 import { logger } from "@/utils/logger";
 import { themeColors } from "@/utils/theme";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 const parseDateToISO = (value?: string) => {
@@ -82,8 +82,11 @@ interface Order {
   departure: string;
   destination: string;
   status: string;
+  clientName?: string | null;
+  driverName?: string | null;
+  price?: number | null;
   is_phone_order?: boolean;
-  is_b2b_order?: boolean; // Indicateur pour les commandes B2B créées depuis le planning
+  is_b2b_order?: boolean;
 }
 
 export default function OrdersPage() {
@@ -574,6 +577,45 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
+                      Client
+                    </th>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "12px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: themeColors.textSecondary,
+                        textTransform: "uppercase",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
+                      }}
+                    >
+                      Livreur
+                    </th>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "12px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: themeColors.textSecondary,
+                        textTransform: "uppercase",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
+                      }}
+                    >
+                      Prix
+                    </th>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "12px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: themeColors.textSecondary,
+                        textTransform: "uppercase",
+                        borderBottom: `1px solid ${themeColors.cardBorder}`,
+                      }}
+                    >
                       Status
                     </th>
                     <th
@@ -743,6 +785,63 @@ export default function OrdersPage() {
                               ? `${order.destination.substring(0, 30)}...`
                               : order.destination}
                           </span>
+                        </td>
+                        <td style={{ padding: "12px" }}>
+                          {order.clientName ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <User size={13} style={{ color: themeColors.textSecondary, flexShrink: 0 }} />
+                              <span style={{ fontSize: "13px", color: themeColors.textPrimary, fontWeight: 500 }}>
+                                {order.clientName}
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "13px", color: themeColors.textSecondary }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "12px" }}>
+                          {order.driverName ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <User size={13} style={{ color: themeColors.purplePrimary, flexShrink: 0 }} />
+                              <span style={{ fontSize: "13px", color: themeColors.textPrimary, fontWeight: 500 }}>
+                                {order.driverName}
+                              </span>
+                            </div>
+                          ) : (
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: "6px",
+                                fontSize: "11px",
+                                fontWeight: 500,
+                                backgroundColor: themeColors.grayLight,
+                                color: themeColors.textSecondary,
+                              }}
+                            >
+                              Non assigné
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: "12px" }}>
+                          {order.price != null ? (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "3px",
+                                padding: "3px 10px",
+                                borderRadius: "8px",
+                                fontSize: "13px",
+                                fontWeight: 700,
+                                backgroundColor: `${themeColors.purplePrimary}15`,
+                                color: themeColors.purplePrimary,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {order.price.toLocaleString("fr-FR")} FCFA
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: "13px", color: themeColors.textSecondary }}>—</span>
+                          )}
                         </td>
                         <td style={{ padding: "12px" }}>
                           <span

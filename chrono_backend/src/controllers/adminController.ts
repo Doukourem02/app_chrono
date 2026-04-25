@@ -1113,15 +1113,22 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
 
     const statusesToFilter = status && statusMap[status] ? statusMap[status] : [];
 
-    let query = 'SELECT * FROM orders';
+    let query = `SELECT o.*,
+      d.first_name as driver_first_name,
+      d.last_name as driver_last_name,
+      u.first_name as client_first_name,
+      u.last_name as client_last_name
+    FROM orders o
+    LEFT JOIN users d ON o.driver_id = d.id
+    LEFT JOIN users u ON o.user_id = u.id`;
     const queryParams: any[] = [];
 
     if (statusesToFilter.length > 0) {
-      query += ` WHERE status = ANY($1)`;
+      query += ` WHERE o.status = ANY($1)`;
       queryParams.push(statusesToFilter);
     }
 
-    query += ' ORDER BY created_at DESC LIMIT 2000';
+    query += ' ORDER BY o.created_at DESC LIMIT 2000';
 
     logger.info('📝 [getAdminOrdersByStatus] Requête SQL:', { query, params: queryParams });
 
@@ -1234,6 +1241,11 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
         destination: dropoff?.address || dropoff?.formatted_address || dropoff?.name || dropoff?.street || 'Adresse inconnue',
         status: order.status,
         delivery_qr_scanned_at: order.delivery_qr_scanned_at,
+        clientName: [order.client_first_name, order.client_last_name].filter(Boolean).join(' ') || null,
+        driverName: [order.driver_first_name, order.driver_last_name].filter(Boolean).join(' ') || null,
+        price: order.price_cfa ?? order.price ?? null,
+        is_phone_order: order.is_phone_order ?? false,
+        is_b2b_order: order.is_b2b_order ?? false,
       };
     });
 

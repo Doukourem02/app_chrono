@@ -1,6 +1,7 @@
 'use client'
 
 import { Phone, MessageSquare, MapPin, Navigation } from 'lucide-react'
+import Image from 'next/image'
 import React, { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
@@ -163,10 +164,14 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     return t('tracking.driverUnassigned')
   }
 
-  // Fonction pour obtenir l'initiale du driver
+  // Fonction pour obtenir les initiales du driver (max 2 lettres)
   const getInitial = () => {
     if (driver?.full_name && driver.full_name.trim()) {
-      return driver.full_name.charAt(0).toUpperCase()
+      const parts = driver.full_name.trim().split(/\s+/)
+      if (parts.length >= 2) {
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+      }
+      return parts[0].charAt(0).toUpperCase()
     }
     if (driver?.email) {
       return driver.email.charAt(0).toUpperCase()
@@ -378,6 +383,8 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   )
 
   const driverPhone = driver?.phone
+    ? driver.phone.startsWith('+') ? driver.phone : `+${driver.phone}`
+    : undefined
 
   return (
     <AnimatedCard index={0} delay={150} style={cardStyle}>
@@ -437,11 +444,21 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
 
           <div style={{ ...driverInfoStyle, flexShrink: 0 }}>
             <div style={driverLeftStyle}>
-              <div style={avatarStyle}>{getInitial()}</div>
+              {driver?.avatar_url ? (
+                <Image
+                  src={driver.avatar_url}
+                  alt={getDisplayName()}
+                  width={48}
+                  height={48}
+                  style={{ ...avatarStyle, objectFit: 'cover' }}
+                />
+              ) : (
+                <div style={avatarStyle}>{getInitial()}</div>
+              )}
               <div>
                 <p style={driverNameStyle}>{getDisplayName()}</p>
                 <p style={driverRoleStyle}>
-                  {driver?.phone ? `+${driver.phone}` : t('tracking.contactUnavailable')}
+                  {driverPhone ?? t('tracking.contactUnavailable')}
                 </p>
               </div>
             </div>

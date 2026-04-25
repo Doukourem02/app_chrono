@@ -101,7 +101,7 @@
         "pending": "Recherche livreur",
         "accepted": "Prise en charge",
         "cancelled": "Annulé",
-        "enroute": "Prise en charge",
+        "enroute": "En route vers le colis",
         "picked_up": "Colis récupéré",
         "delivering": "Livraison"
       },
