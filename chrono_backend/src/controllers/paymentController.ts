@@ -773,3 +773,97 @@ export const getDeferredDebts = async (req: RequestWithUser, res: Response): Pro
     res.status(500).json({ success: false, message: 'Erreur serveur' });
   }
 };
+
+export const repayDeferred = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+
+    const { transactionId, paymentMethod, phoneNumber } = req.body as {
+      transactionId: string;
+      paymentMethod: 'orange_money' | 'wave';
+      phoneNumber: string;
+    };
+
+    if (!transactionId || !paymentMethod || !phoneNumber) {
+      res.status(400).json({ success: false, message: 'transactionId, paymentMethod et phoneNumber sont requis' });
+      return;
+    }
+
+    // Vérifier que la transaction appartient au client et est bien en attente
+    const txResult = await (pool as any).query(
+      `SELECT t.*, o.id as order_id_check
+       FROM transactions t
+       LEFT JOIN orders o ON t.order_id = o.id
+       WHERE t.id = $1
+         AND t.user_id = $2
+         AND t.payment_method_type = 'deferred'
+         AND t.status IN ('delayed', 'pending')`,
+      [transactionId, userId]
+    );
+
+    if (txResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Dette introuvable ou déjà remboursée' });
+      return;
+    }
+
+    const transaction = txResult.rows[0];
+    const amount = parseFloat(transaction.amount || '0');
+
+    // Initier le paiement Mobile Money
+    const paymentResult = await initiateMobileMoneyPayment({
+      provider: paymentMethod,
+      phoneNumber,
+      amount,
+      orderId: transaction.order_id,
+      description: `Remboursement dette différée - Commande ${transaction.order_id?.slice(0, 8)}`,
+    });
+
+    if (!paymentResult.success) {
+      res.status(400).json({
+        success: false,
+        message: paymentResult.error || 'Échec du paiement Mobile Money',
+      });
+      return;
+    }
+
+    // Marquer la transaction comme payée
+    await (pool as any).query(
+      `UPDATE transactions
+       SET status = 'paid',
+           updated_at = NOW()
+       WHERE id = $1`,
+      [transactionId]
+    );
+
+    // Mettre à jour le statut de paiement de la commande si toutes les dettes sont soldées
+    const remainingDebts = await (pool as any).query(
+      `SELECT COUNT(*) as count
+       FROM transactions
+       WHERE order_id = $1
+         AND payment_method_type = 'deferred'
+         AND status IN ('delayed', 'pending')`,
+      [transaction.order_id]
+    );
+
+    if (parseInt(remainingDebts.rows[0].count) === 0) {
+      await (pool as any).query(
+        `UPDATE orders SET payment_status = 'paid', updated_at = NOW() WHERE id = $1`,
+        [transaction.order_id]
+      );
+    }
+
+    logger.info(`[repayDeferred] Dette ${transactionId} remboursée par ${maskUserId(userId)} via ${paymentMethod}`);
+
+    res.json({
+      success: true,
+      message: 'Dette remboursée avec succès. Le paiement différé est à nouveau disponible.',
+    });
+  } catch (error: any) {
+    logger.error('Erreur remboursement dette différée:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+};

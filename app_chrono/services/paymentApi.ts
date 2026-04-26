@@ -526,6 +526,32 @@ class PaymentApiService {
       };
     }
   }
+
+  async repayDeferred(transactionId: string, paymentMethod: 'orange_money' | 'wave', phoneNumber: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/payments/deferred/repay`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({ transactionId, paymentMethod, phoneNumber }),
+      });
+
+      const data = await response.json();
+
+      return {
+        success: data.success,
+        message: data.message,
+      };
+    } catch (error) {
+      logger.error('❌ Erreur repayDeferred:', undefined, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur de connexion',
+      };
+    }
+  }
 }
 
 export const paymentApi = new PaymentApiService();

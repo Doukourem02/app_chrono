@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import {ActivityIndicator,Alert,ScrollView,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
+import {ActivityIndicator,Alert,Modal,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,} from "react-native";
 import { DeferredPaymentInfo, paymentApi } from "../../services/paymentApi";
 import { logger } from "../../utils/logger";
 
@@ -21,11 +21,15 @@ interface Debt {
 }
 
 export default function DebtsPage() {
-  const [deferredInfo, setDeferredInfo] = useState<DeferredPaymentInfo | null>(
-    null
-  );
+  const [deferredInfo, setDeferredInfo] = useState<DeferredPaymentInfo | null>(null);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // État du modal de remboursement
+  const [repayModal, setRepayModal] = useState<{ visible: boolean; debt: Debt | null }>({ visible: false, debt: null });
+  const [repayMethod, setRepayMethod] = useState<'orange_money' | 'wave'>('orange_money');
+  const [repayPhone, setRepayPhone] = useState('');
+  const [isRepaying, setIsRepaying] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -59,6 +63,38 @@ export default function DebtsPage() {
 
   const handleRefresh = async () => {
     await loadData();
+  };
+
+  const openRepayModal = (debt: Debt) => {
+    setRepayPhone('');
+    setRepayMethod('orange_money');
+    setRepayModal({ visible: true, debt });
+  };
+
+  const handleRepay = async () => {
+    if (!repayModal.debt) return;
+    if (!repayPhone.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone Mobile Money');
+      return;
+    }
+
+    setIsRepaying(true);
+    try {
+      const result = await paymentApi.repayDeferred(repayModal.debt.id, repayMethod, repayPhone.trim());
+      if (result.success) {
+        setRepayModal({ visible: false, debt: null });
+        Alert.alert('Succès', 'Dette remboursée. Le paiement différé est à nouveau disponible.', [
+          { text: 'OK', onPress: loadData },
+        ]);
+      } else {
+        Alert.alert('Erreur', result.message || 'Le paiement a échoué. Veuillez réessayer.');
+      }
+    } catch (error) {
+      logger.error('Erreur remboursement dette:', undefined, error);
+      Alert.alert('Erreur', 'Une erreur est survenue. Veuillez réessayer.');
+    } finally {
+      setIsRepaying(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -289,25 +325,7 @@ export default function DebtsPage() {
                   </View>
                   <TouchableOpacity
                     style={styles.payButton}
-                    onPress={() => {
-                      Alert.alert(
-                        "Régler la dette",
-                        `Voulez-vous régler la dette de ${debt.amount.toLocaleString()} FCFA ?`,
-                        [
-                          { text: "Annuler", style: "cancel" },
-                          {
-                            text: "Régler",
-                            onPress: () => {
-                              // TODO: Implémenter le paiement de la dette
-                              Alert.alert(
-                                "Info",
-                                "Fonctionnalité de paiement à venir"
-                              );
-                            },
-                          },
-                        ]
-                      );
-                    }}
+                    onPress={() => openRepayModal(debt)}
                   >
                     <Text style={styles.payButtonText}>Régler</Text>
                   </TouchableOpacity>
@@ -317,6 +335,72 @@ export default function DebtsPage() {
           )}
         </View>
       </ScrollView>
+
+      {/* Modal de remboursement */}
+      <Modal visible={repayModal.visible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Régler la dette</Text>
+            <Text style={styles.modalAmount}>
+              {repayModal.debt?.amount.toLocaleString()} FCFA
+            </Text>
+
+            {/* Choix de la méthode */}
+            <Text style={styles.modalLabel}>Mode de paiement</Text>
+            <View style={styles.methodRow}>
+              <TouchableOpacity
+                style={[styles.methodBtn, repayMethod === 'orange_money' && styles.methodBtnActive]}
+                onPress={() => setRepayMethod('orange_money')}
+              >
+                <Text style={[styles.methodBtnText, repayMethod === 'orange_money' && styles.methodBtnTextActive]}>
+                  Orange Money
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.methodBtn, repayMethod === 'wave' && styles.methodBtnActive]}
+                onPress={() => setRepayMethod('wave')}
+              >
+                <Text style={[styles.methodBtnText, repayMethod === 'wave' && styles.methodBtnTextActive]}>
+                  Wave
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Numéro de téléphone */}
+            <Text style={styles.modalLabel}>Numéro de téléphone</Text>
+            <TextInput
+              style={styles.phoneInput}
+              value={repayPhone}
+              onChangeText={setRepayPhone}
+              placeholder="Ex: 622 00 00 00"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="phone-pad"
+            />
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setRepayModal({ visible: false, debt: null })}
+                disabled={isRepaying}
+              >
+                <Text style={styles.cancelBtnText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, isRepaying && styles.confirmBtnDisabled]}
+                onPress={handleRepay}
+                disabled={isRepaying}
+              >
+                {isRepaying ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmBtnText}>Confirmer</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -528,5 +612,102 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  modalAmount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#8B5CF6',
+    marginBottom: 24,
+  },
+  modalLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  methodRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  methodBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  methodBtnActive: {
+    borderColor: '#8B5CF6',
+    backgroundColor: '#F5F3FF',
+  },
+  methodBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  methodBtnTextActive: {
+    color: '#8B5CF6',
+  },
+  phoneInput: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+  },
+  confirmBtnDisabled: {
+    backgroundColor: '#C4B5FD',
+  },
+  confirmBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
