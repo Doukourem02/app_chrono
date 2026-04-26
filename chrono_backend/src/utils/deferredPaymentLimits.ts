@@ -83,6 +83,7 @@ export async function calculateAnnualCreditUsed(
        WHERE user_id = $1
          AND payment_method_type = 'deferred'
          AND payer_type = 'client'
+         AND status IN ('delayed', 'paid')
          AND created_at >= $2
          AND created_at <= $3`,
       [userId, startOfYear, endOfYear]
@@ -126,6 +127,7 @@ export async function calculateMonthlyCreditUsed(
        WHERE user_id = $1
          AND payment_method_type = 'deferred'
          AND payer_type = 'client'
+         AND status IN ('delayed', 'paid')
          AND created_at >= $2
          AND created_at <= $3`,
       [userId, startOfMonth, endOfMonth]
@@ -168,6 +170,7 @@ export async function getDeferredPaymentUsageCount(
        WHERE user_id = $1
          AND payment_method_type = 'deferred'
          AND payer_type = 'client'
+         AND status IN ('delayed', 'paid')
          AND created_at >= $2
          AND created_at <= $3`,
       [userId, startOfMonth, endOfMonth]
@@ -197,7 +200,8 @@ export async function getLastDeferredPaymentDate(
        FROM transactions
        WHERE user_id = $1
          AND payment_method_type = 'deferred'
-         AND payer_type = 'client'`,
+         AND payer_type = 'client'
+         AND status IN ('delayed', 'paid')`,
       [userId]
     );
 
