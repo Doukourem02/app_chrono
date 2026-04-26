@@ -249,6 +249,12 @@ export default function ProfilePage() {
       color: "#F59E0B",
     },
     {
+      icon: "wallet-outline",
+      title: "Mes dettes",
+      onPress: () => router.push("/profile/debts"),
+      color: "#EF4444",
+    },
+    {
       icon: "gift-outline",
       title: "Récompenses",
       onPress: () => {
