@@ -50,13 +50,13 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
       })
       return result
     },
-    refetchInterval: false,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
     refetchIntervalInBackground: false,
-    retry: false,
+    retry: 1,
     enabled: !useProvidedDeliveries,
   })
 

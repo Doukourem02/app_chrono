@@ -83,24 +83,22 @@ export default function TrackingPage() {
     )
   }, [])
 
-  // Recharger les données quand on revient sur la page Tracking
+  // Charger les données au montage initial puis sur chaque retour sur la page
   useEffect(() => {
-    // Si c'est la première fois qu'on charge la page, marquer comme chargé
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true
-      return
+      // Forcer un chargement initial après un court délai pour laisser le socket s'initialiser
+      const timer = setTimeout(() => {
+        reloadData()
+      }, 800)
+      return () => clearTimeout(timer)
     }
 
     // Si on revient sur la page Tracking (pathname change vers /tracking)
     if (pathname === '/tracking') {
-      if (process.env.NODE_ENV === 'development') {
-        logger.debug('[TrackingPage] Retour sur la page Tracking, rechargement des données...')
-      }
-      // Recharger les données après un court délai pour s'assurer que le composant est monté
       const timer = setTimeout(() => {
         reloadData()
       }, 500)
-      
       return () => clearTimeout(timer)
     }
   }, [pathname, reloadData])
