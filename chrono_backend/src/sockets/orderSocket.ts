@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/db.js';
 import {recordOrderAssignment,saveDeliveryProofRecord,saveOrder, generateAndSaveTrackingToken, updateOrderStatus as updateOrderStatusDB,getActiveOrdersByDriver,getPendingOfferOrdersForDriver,} from '../config/orderStorage.js';
 import qrCodeService from '../services/qrCodeService.js';
-import { createTransactionAndInvoiceForOrder } from '../utils/createTransactionForOrder.js';
+import { createTransactionAndInvoiceForOrder, cancelDeferredTransactionForOrder } from '../utils/createTransactionForOrder.js';
 import { canUseDeferredPayment } from '../utils/deferredPaymentLimits.js';
 import { maskOrderId, maskUserId } from '../utils/maskSensitiveData.js';
 import { broadcastDriverStatusToAdmins, broadcastOrderUpdateToAdmins } from './adminSocket.js';
@@ -1098,6 +1098,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             order.status = 'cancelled';
             order.cancelledAt = new Date();
             await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt });
+            await cancelDeferredTransactionForOrder(order.id);
             logger.debug(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB (aucun livreur dans la zone)`);
           } catch (dbError: any) {
             logger.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message);
@@ -1172,6 +1173,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               order.status = 'cancelled';
               order.cancelledAt = new Date();
               await updateOrderStatusDB(order.id, 'cancelled', { cancelled_at: order.cancelledAt });
+              await cancelDeferredTransactionForOrder(order.id);
               logger.debug(`Commande ${maskOrderId(order.id)} annulée automatiquement en DB`);
             } catch (dbError: any) {
               logger.warn(`Échec annulation DB pour ${maskOrderId(order.id)}:`, dbError.message);
@@ -1609,6 +1611,10 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           });
           dbSavedStatus = true;
           if (DEBUG) logger.debug(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
+
+          if (status === 'cancelled') {
+            await cancelDeferredTransactionForOrder(orderId);
+          }
 
           // Si le livreur marque "picked_up" et que c'est un paiement en espèces par le client,
           // marquer automatiquement le paiement comme payé

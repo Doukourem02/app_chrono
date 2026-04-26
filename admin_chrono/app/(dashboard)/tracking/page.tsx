@@ -130,20 +130,8 @@ export default function TrackingPage() {
   // Utiliser les vraies données du suivi en temps réel
   // Filtrer les commandes terminées ou annulées
   const filteredDeliveries = useMemo(() => {
-    // Log pour déboguer les changements
-    if (process.env.NODE_ENV === 'development') {
-      logger.debug('[TrackingPage] filteredDeliveries recalculé:', {
-        ongoingDeliveriesLength: ongoingDeliveries.length,
-        timestamp: new Date().toISOString(),
-        stack: new Error().stack?.split('\n').slice(2, 5).join('\n')
-      })
-    }
-    
-    const deliveries = ongoingDeliveries.length > 0 ? ongoingDeliveries : []
+    const deliveries = ongoingDeliveries
     if (!deliveries || deliveries.length === 0) {
-      if (process.env.NODE_ENV === 'development') {
-        logger.warn('[TrackingPage] Aucune livraison disponible')
-      }
       return []
     }
     
@@ -200,27 +188,29 @@ export default function TrackingPage() {
       return diffInMinutes <= 5
     }
     
-    logger.debug(' [TrackingPage] DEBUG - Analyse des drivers:', {
-      totalInMap: allDrivers.length,
-      drivers: allDrivers.map((d) => {
-        const updatedAt = d.updated_at ? new Date(d.updated_at) : null
-        const now = new Date()
-        const diffInMinutes = updatedAt ? (now.getTime() - updatedAt.getTime()) / (1000 * 60) : null
-        const isActive = isDriverReallyActive(d)
-        
-        return {
-          userId: d.userId?.substring(0, 8) || 'unknown',
-          is_online: d.is_online,
-          is_online_type: typeof d.is_online,
-          is_online_strict: d.is_online === true,
-          hasLat: !!d.current_latitude,
-          hasLng: !!d.current_longitude,
-          updated_at: d.updated_at,
-          diffInMinutes: diffInMinutes !== null ? `${diffInMinutes.toFixed(1)} min` : 'N/A',
-          isReallyActive: isActive,
-        }
-      }),
-    })
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug(' [TrackingPage] DEBUG - Analyse des drivers:', {
+        totalInMap: allDrivers.length,
+        drivers: allDrivers.map((d) => {
+          const updatedAt = d.updated_at ? new Date(d.updated_at) : null
+          const now = new Date()
+          const diffInMinutes = updatedAt ? (now.getTime() - updatedAt.getTime()) / (1000 * 60) : null
+          const isActive = isDriverReallyActive(d)
+
+          return {
+            userId: d.userId?.substring(0, 8) || 'unknown',
+            is_online: d.is_online,
+            is_online_type: typeof d.is_online,
+            is_online_strict: d.is_online === true,
+            hasLat: !!d.current_latitude,
+            hasLng: !!d.current_longitude,
+            updated_at: d.updated_at,
+            diffInMinutes: diffInMinutes !== null ? `${diffInMinutes.toFixed(1)} min` : 'N/A',
+            isReallyActive: isActive,
+          }
+        }),
+      })
+    }
     
     // Filtrer uniquement les drivers qui sont en ligne, ont des coordonnées ET sont actifs
     const filteredDrivers = allDrivers.filter((driver) => {
@@ -249,12 +239,6 @@ export default function TrackingPage() {
       }
       
       return shouldDisplay
-    })
-    
-    logger.debug('[TrackingPage] Drivers après filtrage:', {
-      total: allDrivers.length,
-      filtered: filteredDrivers.length,
-      willBeDisplayed: filteredDrivers.map((d) => d.userId?.substring(0, 8) || 'unknown'),
     })
     
     return filteredDrivers

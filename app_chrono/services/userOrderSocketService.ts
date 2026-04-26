@@ -72,6 +72,8 @@ class UserOrderSocketService {
   private reconnectRecoveryCount = 0;
   /** Fallback transport: si WS échoue en boucle, forcer polling-only. */
   private forcedPollingMode = false;
+  /** Timestamp du dernier connect réussi (ms epoch) — pour calculer la durée de session dans les erreurs. */
+  private connectedAt: number | null = null;
 
   private isAuthRelatedSocketError(message: string | undefined): boolean {
     const m = (message || '').toLowerCase();
@@ -234,11 +236,19 @@ class UserOrderSocketService {
       });
     });
 
-    const socketDiag = () => ({
-      clientTransportMode: __DEV__ ? 'dev_ws_then_polling' : 'prod_polling_only',
-      transportsConfigured: this.buildSocketTransports().join(','),
-      iosBuild: Constants.nativeBuildVersion ?? 'unknown',
-    });
+    const socketDiag = () => {
+      const currentToken = useAuthStore.getState().accessToken;
+      const tokenExp = currentToken ? readJwtExpEpochSeconds(currentToken) : null;
+      const tokenTtlSec = typeof tokenExp === 'number' ? tokenExp - Math.floor(Date.now() / 1000) : null;
+      const sessionAgeSec = this.connectedAt !== null ? Math.round((Date.now() - this.connectedAt) / 1000) : null;
+      return {
+        clientTransportMode: __DEV__ ? 'dev_ws_then_polling' : 'prod_polling_only',
+        transportsConfigured: this.buildSocketTransports().join(','),
+        iosBuild: Constants.nativeBuildVersion ?? 'unknown',
+        tokenTtlSec,
+        sessionAgeSec,
+      };
+    };
 
     this.socket.io.on('reconnect_error', (error: Error & { type?: string; description?: unknown }) => {
       reportSocketIssue('client_orders_reconnect_error', {
@@ -247,6 +257,7 @@ class UserOrderSocketService {
         type: String(error.type ?? ''),
         description: String(error.description ?? ''),
         transport: this.socket?.io?.engine?.transport?.name ?? 'unknown',
+        retries: this.retryCount,
         ...socketDiag(),
       });
     });
@@ -847,6 +858,7 @@ class UserOrderSocketService {
       useRealtimeDegradedStore.getState().setSocketDegraded(false);
       logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
       this.isConnected = true;
+      this.connectedAt = Date.now();
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
       this.reconnectRecoveryCount = 0;
       // Si on a réussi à se reconnecter en polling-only, on reste stable dans ce mode.

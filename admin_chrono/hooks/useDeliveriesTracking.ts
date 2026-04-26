@@ -143,19 +143,24 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
   }, [isSocketConnected, loadDeliveriesFromAPI, updateDelivery, removeDelivery])
 
   // Polling de secours pour sync statut completed (si socket n'a pas transmis)
+  // On utilise une ref pour lire le dernier état sans redémarrer l'intervalle à chaque update
+  const deliveriesForPollRef = useRef<Delivery[]>([])
   useEffect(() => {
-    const hasActiveDeliveries = ongoingDeliveries.some(
-      (d) => d.status === 'delivering' || d.status === 'picked_up'
-    )
-    if (!hasActiveDeliveries) return
+    deliveriesForPollRef.current = ongoingDeliveries
+  }, [ongoingDeliveries])
 
+  useEffect(() => {
     const interval = setInterval(() => {
+      const hasActiveDeliveries = deliveriesForPollRef.current.some(
+        (d) => d.status === 'delivering' || d.status === 'picked_up'
+      )
+      if (!hasActiveDeliveries) return
       debug('[useDeliveriesTracking] Polling de secours pour sync statut')
-      loadDeliveriesFromAPI()
-    }, 15_000)
+      void loadDeliveriesFromAPI()
+    }, 30_000)
 
     return () => clearInterval(interval)
-  }, [ongoingDeliveries, loadDeliveriesFromAPI])
+  }, [loadDeliveriesFromAPI])
 
   return {
     ongoingDeliveries,

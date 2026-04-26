@@ -8,6 +8,7 @@ import { deductCommissionAfterDelivery } from '../services/commissionService.js'
 import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
 import { autoLogDeliveryMileage } from './fleetController.js';
 import logger from '../utils/logger.js';
+import { cancelDeferredTransactionForOrder } from '../utils/createTransactionForOrder.js';
 
 interface RequestWithApp extends Request {
   app: any;
@@ -461,6 +462,7 @@ export const cancelOrder = async (
       'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
       ['cancelled', orderId]
     );
+    await cancelDeferredTransactionForOrder(orderId);
 
     const io = req.app.get('io');
     if (dbOrder.driver_id) {
@@ -502,6 +504,7 @@ export const cancelOrder = async (
         'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
         ['cancelled', orderId]
       );
+      await cancelDeferredTransactionForOrder(orderId);
     } catch (err: any) {
       logger.warn('Warning: failed to persist cancellation to DB', err.message || err);
     }

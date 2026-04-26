@@ -269,10 +269,10 @@ export default function DebtsPage() {
                 <View style={styles.debtHeader}>
                   <View style={styles.debtAmountContainer}>
                     <Text style={styles.debtAmount}>
-                      {debt.amount.toLocaleString()} FCFA
+                      {debt.amount?.toLocaleString() ?? '0'} FCFA
                     </Text>
                     <Text style={styles.debtOrderId}>
-                      Commande #{debt.orderId.slice(0, 8)}
+                      Commande #{debt.orderId?.slice(0, 8) ?? '—'}
                     </Text>
                   </View>
                   <View
@@ -320,7 +320,7 @@ export default function DebtsPage() {
                       color="#6B7280"
                     />
                     <Text style={styles.debtDateText}>
-                      Échéance: {formatDate(debt.deadline)}
+                      Échéance: {debt.deadline ? formatDate(debt.deadline) : '—'}
                     </Text>
                   </View>
                   <TouchableOpacity

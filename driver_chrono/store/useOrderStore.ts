@@ -130,6 +130,7 @@ export interface OrderRequest {
   placedByAdmin?: boolean;
   isB2BOrder?: boolean;
   driverNotes?: string;
+  payment_method_type?: 'orange_money' | 'wave' | 'cash' | 'deferred';
 }
 
 interface OrderStore {

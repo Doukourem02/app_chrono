@@ -45,6 +45,7 @@ interface OrderRequest {
   /** Champ « Notes (optionnel) » côté admin. */
   operatorCourseNotes?: string;
   driverNotes?: string; // Notes spéciales pour le livreur
+  payment_method_type?: 'orange_money' | 'wave' | 'cash' | 'deferred';
 }
 
 interface OrderRequestPopupProps {
@@ -358,6 +359,28 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
             );
           })()}
 
+          {order.payment_method_type && (
+            <View style={[
+              styles.serviceModeBanner,
+              order.payment_method_type === 'deferred' ? styles.paymentDeferredBanner : styles.paymentBanner,
+            ]}>
+              <Text style={[
+                styles.serviceModeLabel,
+                order.payment_method_type === 'deferred' ? styles.paymentDeferredLabel : styles.paymentLabel,
+              ]}>Mode de paiement</Text>
+              <Text style={[
+                styles.serviceModeValue,
+                order.payment_method_type === 'deferred' ? styles.paymentDeferredValue : styles.paymentValue,
+              ]}>
+                {order.payment_method_type === 'deferred' ? '⏳ Paiement différé'
+                  : order.payment_method_type === 'orange_money' ? '🟠 Orange Money'
+                  : order.payment_method_type === 'wave' ? '🔵 Wave'
+                  : order.payment_method_type === 'cash' ? '💵 Espèces'
+                  : order.payment_method_type}
+              </Text>
+            </View>
+          )}
+
           {(() => {
             const instr = parseClientOrderInstructions(
               order.dropoff?.details as Record<string, unknown> | undefined
@@ -625,6 +648,26 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#4C1D95',
+  },
+  paymentBanner: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  paymentDeferredBanner: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  paymentLabel: {
+    color: '#166534',
+  },
+  paymentDeferredLabel: {
+    color: '#92400E',
+  },
+  paymentValue: {
+    color: '#15803D',
+  },
+  paymentDeferredValue: {
+    color: '#B45309',
   },
   preAcceptHints: {
     marginBottom: 16,

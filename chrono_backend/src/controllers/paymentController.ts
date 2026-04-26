@@ -752,8 +752,12 @@ export const getDeferredDebts = async (req: RequestWithUser, res: Response): Pro
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         orderStatus: row.order_status,
-        pickupAddress: row.pickup_address,
-        dropoffAddress: row.dropoff_address,
+        pickupAddress: typeof row.pickup_address === 'object' && row.pickup_address !== null
+          ? (row.pickup_address as { address?: string }).address ?? ''
+          : (row.pickup_address as string | undefined) ?? '',
+        dropoffAddress: typeof row.dropoff_address === 'object' && row.dropoff_address !== null
+          ? (row.dropoff_address as { address?: string }).address ?? ''
+          : (row.dropoff_address as string | undefined) ?? '',
         deadline: deadline.toISOString(),
         isOverdue,
         daysUntilDeadline: isOverdue ? -Math.abs(daysUntilDeadline) : daysUntilDeadline,

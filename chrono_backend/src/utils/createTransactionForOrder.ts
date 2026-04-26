@@ -223,3 +223,19 @@ export async function createTransactionAndInvoiceForOrder(
     return { transactionId: null, invoiceId: null };
   }
 }
+
+export async function cancelDeferredTransactionForOrder(orderId: string): Promise<void> {
+  try {
+    await (pool as any).query(
+      `UPDATE transactions
+       SET status = 'cancelled', updated_at = NOW()
+       WHERE order_id = $1
+         AND payment_method_type = 'deferred'
+         AND status IN ('delayed', 'pending')`,
+      [orderId]
+    );
+    logger.info(`Transactions différées annulées pour commande ${maskOrderId(orderId)}`);
+  } catch (error: any) {
+    logger.error(`Erreur annulation transactions différées pour ${maskOrderId(orderId)}:`, error);
+  }
+}
