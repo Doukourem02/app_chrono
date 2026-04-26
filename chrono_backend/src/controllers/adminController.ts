@@ -882,9 +882,9 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
       return;
     }
 
-    // Récupérer les commandes en cours (pending, accepted, enroute, picked_up)
-    const query = `SELECT * FROM orders 
-                   WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')
+    // Récupérer les commandes en cours
+    const query = `SELECT * FROM orders
+                   WHERE status IN ('pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering')
                    ORDER BY created_at DESC`;
 
     logger.info('📝 [getAdminOngoingDeliveries] Requête SQL:', { query });

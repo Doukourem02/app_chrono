@@ -58,9 +58,9 @@ const STATUS_DEFINITIONS: Record<OrderProductStatus, OrderStatusDefinition> = {
   enroute: {
     status: "enroute",
     phase: "pickup",
-    clientLabel: "Prise en charge",
+    clientLabel: "Livreur en route",
     driverLabel: "Aller au point de collecte",
-    recipientLabel: "Prise en charge",
+    recipientLabel: "Livreur en route",
     notify: "operational",
     etaMode: "pickup",
     baseProgress: 0.38,

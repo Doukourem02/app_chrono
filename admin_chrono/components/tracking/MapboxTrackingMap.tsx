@@ -213,6 +213,7 @@ export default function MapboxTrackingMap({
   /** Dernière position connue du livreur sélectionné (évite de redéclencher l’effet marqueurs à chaque tick GPS). */
   const currentVehiclePositionRef = useRef<{ lat: number; lng: number } | null>(null)
   const [fullRoutePath, setFullRoutePath] = useState<Array<{ lat: number; lng: number }>>([])
+  const [mapReady, setMapReady] = useState(false)
   const previousDeliveryIdRef = useRef<string | null>(null)
   const [currentZoom, setCurrentZoom] = useState<number>(OVERVIEW_ZOOM)
   const [searchExpanded, setSearchExpanded] = useState(false)
@@ -826,6 +827,7 @@ export default function MapboxTrackingMap({
       map.on('style.load', onStyleData)
       map.once('load', () => {
         if (didCancel) return
+        setMapReady(true)
         try {
           const containerEl = map.getContainer()
           if (containerEl && document.body.contains(containerEl)) {
@@ -851,6 +853,9 @@ export default function MapboxTrackingMap({
 
       mapRef.current = map
       cleanup = () => {
+        setMapReady(false)
+        routeEndpointMarkersRef.current.forEach((m) => { try { m.remove() } catch { /* ignore */ } })
+        routeEndpointMarkersRef.current = []
         ro.disconnect()
         map.off('style.load', onStyleData)
         try {
@@ -965,7 +970,7 @@ export default function MapboxTrackingMap({
         map.off('load', drawRoute)
       }
     }
-  }, [fullRoutePath])
+  }, [fullRoutePath, mapReady])
 
   // Marqueurs pickup / dropoff uniquement (ne pas recréer à chaque mouvement livreur).
   useEffect(() => {
@@ -998,7 +1003,7 @@ export default function MapboxTrackingMap({
 
     addEndpoint(routePathFallback[0], '#10B981', 10)
     addEndpoint(routePathFallback[1], '#C4B5FD', 10)
-  }, [selectedDelivery, routePathFallback])
+  }, [selectedDelivery, routePathFallback, mapReady])
 
   // Livreurs (autres) + marqueur livreur de la livraison sélectionnée — recalcul quand la flotte ou la sélection change, pas à chaque interpolation.
   useEffect(() => {

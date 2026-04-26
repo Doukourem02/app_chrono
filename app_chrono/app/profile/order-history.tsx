@@ -168,7 +168,7 @@ export default function OrderHistoryPage() {
       case 'accepted':
         return 'Prise en charge';
       case 'enroute':
-        return 'Prise en charge';
+        return 'Livreur en route';
       case 'picked_up':
         return 'Colis récupéré';
       case 'delivering':
