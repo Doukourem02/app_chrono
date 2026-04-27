@@ -89,13 +89,15 @@ export default function FinancePage() {
     })
   }
 
-  const getStatusBadgeStyle = (status: string): React.CSSProperties => {
+  const getStatusBadgeStyle = (status: string, forceCancel = false): React.CSSProperties => {
     const baseStyle: React.CSSProperties = {
       padding: '4px 12px',
       borderRadius: '12px',
       fontSize: '12px',
       fontWeight: 600,
     }
+
+    if (forceCancel) return { ...baseStyle, backgroundColor: '#FEE2E2', color: '#991B1B' }
 
     switch (status) {
       case 'paid':
@@ -106,6 +108,8 @@ export default function FinancePage() {
         return { ...baseStyle, backgroundColor: '#FEE2E2', color: '#991B1B' }
       case 'delayed':
         return { ...baseStyle, backgroundColor: '#E0E7FF', color: '#3730A3' }
+      case 'cancelled':
+        return { ...baseStyle, backgroundColor: '#FEE2E2', color: '#991B1B' }
       default:
         return { ...baseStyle, backgroundColor: '#F3F4F6', color: '#374151' }
     }
@@ -602,7 +606,7 @@ export default function FinancePage() {
               <div style={kpiValueStyle}>
                 {currentQr.scanned} / {currentQr.total}
               </div>
-              <div style={kpiLabelStyle}>Livraisons confirmées (QR)</div>
+              <div style={kpiLabelStyle}>Livraisons confirmées</div>
             </div>
           </div>
         </div>
@@ -859,8 +863,8 @@ export default function FinancePage() {
                       </td>
                       <td style={tdStyle}>{getMethodLabel(tx.payment_method_type || '')}</td>
                       <td style={tdStyle}>
-                        <span style={getStatusBadgeStyle(tx.status || '')}>
-                          {getStatusLabel(tx.status || '')}
+                        <span style={getStatusBadgeStyle(tx.status || '', viewMode === 'cancelled')}>
+                          {viewMode === 'cancelled' ? 'Annulé' : getStatusLabel(tx.status || '')}
                         </span>
                       </td>
                       <td style={tdStyle}>{formatDate(tx.created_at || '')}</td>

@@ -1619,15 +1619,17 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       return;
     }
 
-    // Revenus totaux par période
+    // Revenus totaux par période — basé sur les transactions payées (pas uniquement les commandes "completed")
     const revenueQuery = `
-      SELECT 
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE completed_at >= $1 AND completed_at <= $2), 0) as today,
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE completed_at >= $3 AND completed_at <= $2), 0) as week,
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE completed_at >= $4 AND completed_at <= $2), 0) as month,
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE completed_at >= $5 AND completed_at <= $2), 0) as year
-      FROM orders
-      WHERE status = 'completed'
+      SELECT
+        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $1 AND t.created_at <= $2), 0) as today,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $3 AND t.created_at <= $2), 0) as week,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $4 AND t.created_at <= $2), 0) as month,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $5 AND t.created_at <= $2), 0) as year
+      FROM transactions t
+      LEFT JOIN orders o ON t.order_id = o.id
+      WHERE t.status = 'paid'
+        AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
     `;
 
     const revenueResult = await (pool as any).query(revenueQuery, [
@@ -1645,9 +1647,9 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         COUNT(*) as count,
         COALESCE(SUM(t.amount), 0) as total
       FROM transactions t
-      INNER JOIN orders o ON t.order_id = o.id
+      LEFT JOIN orders o ON t.order_id = o.id
       WHERE t.created_at >= $1
-        AND o.status NOT IN ('cancelled', 'declined')
+        AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
         AND t.status NOT IN ('cancelled', 'refunded')
       GROUP BY t.payment_method_type
     `;
@@ -1670,9 +1672,9 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         t.payment_method_type,
         COUNT(*) as count
       FROM transactions t
-      INNER JOIN orders o ON t.order_id = o.id
+      LEFT JOIN orders o ON t.order_id = o.id
       WHERE t.created_at >= $1
-        AND o.status NOT IN ('cancelled', 'declined')
+        AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
         AND t.status NOT IN ('cancelled', 'refunded')
       GROUP BY t.status, t.payment_method_type
     `;

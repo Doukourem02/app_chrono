@@ -578,12 +578,12 @@ export default function AnalyticsPage() {
       {/* Données par zone */}
       {performance && (
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: themeColors.textPrimary }}>Performance par zone</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: themeColors.textPrimary }}>Performance par commune</h2>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.grayLight }}>
-                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold', color: themeColors.textPrimary }}>Zone</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold', color: themeColors.textPrimary }}>Commune</th>
                   <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Livraisons</th>
                   <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Revenus</th>
                 </tr>
@@ -615,7 +615,7 @@ export default function AnalyticsPage() {
                 <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textTertiary }} />
                 <input
                   type="text"
-                  placeholder="Rechercher..."
+                  placeholder="Rechercher par livreur, client..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{
@@ -680,9 +680,13 @@ export default function AnalyticsPage() {
                     .filter((rating) => {
                       if (!searchQuery) return true
                       const query = searchQuery.toLowerCase()
+                      const driverName = `${rating.driver_first_name || ''} ${rating.driver_last_name || ''}`.trim().toLowerCase()
+                      const clientName = `${rating.user_first_name || ''} ${rating.user_last_name || ''}`.trim().toLowerCase()
                       return (
-                        rating.user_email?.toLowerCase().includes(query) ||
+                        driverName.includes(query) ||
+                        clientName.includes(query) ||
                         rating.driver_email?.toLowerCase().includes(query) ||
+                        rating.user_email?.toLowerCase().includes(query) ||
                         rating.order_id?.toLowerCase().includes(query) ||
                         rating.comment?.toLowerCase().includes(query)
                       )

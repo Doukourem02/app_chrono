@@ -284,60 +284,83 @@ export const getPerformanceData = async (req: Request, res: Response): Promise<v
 
     // Détecter la colonne pickup (pickup_address ou pickup JSON)
     const pickupColumnsInfo = await safeQuery(
-      `SELECT column_name FROM information_schema.columns 
-       WHERE table_schema = 'public' AND table_name = 'orders' 
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
       [['pickup_address', 'pickup']]
     );
     const pickupColumnSet = new Set(pickupColumnsInfo.rows.map((row: any) => row.column_name));
     const hasPickupAddress = pickupColumnSet.has('pickup_address');
     const hasPickupJson = pickupColumnSet.has('pickup');
-    
-    // Construire la condition de zone selon le type de colonne
-    let zoneCondition = '';
-    if (hasPickupAddress) {
-      // pickup_address peut être text ou jsonb → cast en text pour LIKE
-      zoneCondition = `
-        CASE 
-          WHEN pickup_address::text LIKE '%Cocody%' THEN 'Cocody'
-          WHEN pickup_address::text LIKE '%Marcory%' THEN 'Marcory'
-          WHEN pickup_address::text LIKE '%Yopougon%' THEN 'Yopougon'
-          WHEN pickup_address::text LIKE '%Abobo%' THEN 'Abobo'
-          WHEN pickup_address::text LIKE '%Plateau%' THEN 'Plateau'
-          WHEN pickup_address::text LIKE '%Adjamé%' THEN 'Adjamé'
-          ELSE 'Autre'
-        END
-      `;
-    } else if (hasPickupJson) {
-      // Si pickup est un JSON, extraire l'adresse
-      zoneCondition = `
-        CASE 
-          WHEN pickup::text LIKE '%Cocody%' OR (pickup->>'address')::text LIKE '%Cocody%' OR (pickup->>'formatted_address')::text LIKE '%Cocody%' THEN 'Cocody'
-          WHEN pickup::text LIKE '%Marcory%' OR (pickup->>'address')::text LIKE '%Marcory%' OR (pickup->>'formatted_address')::text LIKE '%Marcory%' THEN 'Marcory'
-          WHEN pickup::text LIKE '%Yopougon%' OR (pickup->>'address')::text LIKE '%Yopougon%' OR (pickup->>'formatted_address')::text LIKE '%Yopougon%' THEN 'Yopougon'
-          WHEN pickup::text LIKE '%Abobo%' OR (pickup->>'address')::text LIKE '%Abobo%' OR (pickup->>'formatted_address')::text LIKE '%Abobo%' THEN 'Abobo'
-          WHEN pickup::text LIKE '%Plateau%' OR (pickup->>'address')::text LIKE '%Plateau%' OR (pickup->>'formatted_address')::text LIKE '%Plateau%' THEN 'Plateau'
-          WHEN pickup::text LIKE '%Adjamé%' OR (pickup->>'address')::text LIKE '%Adjamé%' OR (pickup->>'formatted_address')::text LIKE '%Adjamé%' THEN 'Adjamé'
-          ELSE 'Autre'
-        END
-      `;
-    } else {
-      // Fallback si aucune colonne n'est trouvée
-      zoneCondition = `'Autre'`;
+    const pickupColumnName = hasPickupAddress ? 'pickup_address' : hasPickupJson ? 'pickup' : null;
+
+    // Centres des communes d'Abidjan pour le matching par coordonnées GPS
+    const ABIDJAN_COMMUNES = [
+      { name: 'Abobo', lat: 5.416, lng: -4.015 },
+      { name: 'Adjamé', lat: 5.358, lng: -4.027 },
+      { name: 'Attécoubé', lat: 5.358, lng: -4.048 },
+      { name: 'Cocody', lat: 5.358, lng: -3.989 },
+      { name: 'Koumassi', lat: 5.292, lng: -3.958 },
+      { name: 'Marcory', lat: 5.278, lng: -3.993 },
+      { name: 'Plateau', lat: 5.319, lng: -4.020 },
+      { name: 'Port-Bouët', lat: 5.238, lng: -3.957 },
+      { name: 'Treichville', lat: 5.304, lng: -4.008 },
+      { name: 'Yopougon', lat: 5.339, lng: -4.084 },
+      { name: 'Bingerville', lat: 5.358, lng: -3.888 },
+      { name: 'Anyama', lat: 5.488, lng: -4.052 },
+      { name: 'Songon', lat: 5.318, lng: -4.178 },
+    ];
+
+    function findNearestCommune(lat: number, lng: number): string {
+      let nearest = 'Autre';
+      let minDist = Infinity;
+      for (const c of ABIDJAN_COMMUNES) {
+        const d = Math.pow(lat - c.lat, 2) + Math.pow(lng - c.lng, 2);
+        if (d < minDist) { minDist = d; nearest = c.name; }
+      }
+      return nearest;
     }
 
-    // Données par zone
-    const zoneDataResult = await safeQuery(
-      `SELECT 
-        ${zoneCondition} as zone,
-        COUNT(*) FILTER (WHERE status = 'completed') as completed,
-        COALESCE(SUM(${priceColumn || '0'}) FILTER (WHERE status = 'completed'), 0) as revenue
-       FROM orders
-       WHERE created_at >= $1
-       GROUP BY zone
-       ORDER BY completed DESC`,
-      [startDate]
-    );
+    // Données par commune (basé sur coordonnées GPS du point de retrait)
+    let zoneDataResult: { rows: Array<{ zone: string; completed: number; revenue: number }> } = { rows: [] };
+
+    if (pickupColumnName) {
+      const ordersForZone = await safeQuery(
+        `SELECT
+          status,
+          COALESCE(${priceColumn || '0'}::numeric, 0) as price,
+          ${pickupColumnName} as pickup_data
+         FROM orders
+         WHERE created_at >= $1`,
+        [startDate]
+      );
+
+      const communeMap: Record<string, { completed: number; revenue: number }> = {};
+
+      for (const row of ordersForZone.rows) {
+        let commune = 'Autre';
+        try {
+          const pickup = typeof row.pickup_data === 'string'
+            ? JSON.parse(row.pickup_data)
+            : row.pickup_data;
+          const lat = pickup?.coordinates?.latitude ?? pickup?.coordinates?.lat ?? pickup?.lat;
+          const lng = pickup?.coordinates?.longitude ?? pickup?.coordinates?.lng ?? pickup?.lng;
+          if (lat != null && lng != null) {
+            commune = findNearestCommune(Number(lat), Number(lng));
+          }
+        } catch { /* pas de coords, reste 'Autre' */ }
+
+        if (!communeMap[commune]) communeMap[commune] = { completed: 0, revenue: 0 };
+        if (row.status === 'completed') {
+          communeMap[commune].completed++;
+          communeMap[commune].revenue += parseFloat(row.price || '0');
+        }
+      }
+
+      zoneDataResult.rows = Object.entries(communeMap)
+        .map(([zone, data]) => ({ zone, completed: data.completed, revenue: data.revenue }))
+        .sort((a, b) => b.completed - a.completed);
+    }
 
     // Évolution des ratings dans le temps
     let ratingTrend: Array<{ date: string; average: number; count: number }> = [];

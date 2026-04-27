@@ -204,12 +204,21 @@ export default function DashboardPage() {
     transition: 'background-color 0.2s',
   }
 
+  // Wrapper flex-row : sous-grille gauche+milieu indépendante du panneau droit
+  const mainWrapperStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'flex-start',
+  }
+
+  // Sous-grille gauche + milieu : 2 colonnes seulement, pas liée au panneau droit
   const mainGridStyle: React.CSSProperties = {
+    flex: 1,
     display: 'grid',
     gap: '12px',
-    gridTemplateColumns: 'auto 1fr 380px',
-    gridTemplateRows: 'auto 1fr',
-    alignItems: 'stretch',
+    gridTemplateColumns: '240px 1fr',
+    gridTemplateRows: 'auto auto',
+    minWidth: 0,
   }
 
   const leftColumnStyle: React.CSSProperties = {
@@ -218,30 +227,28 @@ export default function DashboardPage() {
     gap: '12px',
     minWidth: '240px',
     maxWidth: '240px',
-    gridRow: '1 / 2',
   }
 
   const middleColumnTopStyle: React.CSSProperties = {
-    gridRow: '1 / 2',
     minWidth: 0,
-    height: '100%',
     display: 'flex',
     flexDirection: 'column',
   }
 
   const middleColumnBottomStyle: React.CSSProperties = {
     gridColumn: '1 / 3',
-    gridRow: '2 / 3',
     minWidth: 0,
   }
 
+  // Panneau droit : indépendant, ne pousse plus la grille gauche+milieu
   const rightColumnStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     gap: '6px',
     width: '380px',
-    gridRow: '1 / 3',
-    height: '100%',
+    minWidth: '380px',
+    maxWidth: '380px',
+    flexShrink: 0,
   }
 
   return (
@@ -335,58 +342,61 @@ export default function DashboardPage() {
           />
       </div>
 
-      <div style={mainGridStyle}>
-        {/* Colonne gauche : 3 cartes KPI empilées */}
-        <div style={leftColumnStyle}>
-          <KPICard
-            title={t('dashboard.kpis.onDelivery.title')}
-          value={ongoingDeliveriesLoading ? '...' : liveOnDeliveryCount}
-          change={stats?.onDeliveryChange || 0}
-          subtitle={
-            ongoingDeliveriesLoading
-              ? t('dashboard.kpis.onDelivery.updating')
-              : liveOnDeliveryCount === 1
-                ? `1 ${t('dashboard.kpis.onDelivery.subtitle')}`
-                : `${liveOnDeliveryCount} ${t('dashboard.kpis.onDelivery.subtitle')}`
-          }
-            icon={Truck}
-            iconColor="text-blue-600"
-          isLoading={ongoingDeliveriesLoading}
-            index={0}
-          />
-          <KPICard
-            title={t('dashboard.kpis.successDeliveries.title')}
-            value={statsLoading ? '...' : stats?.successDeliveries || 0}
-            change={stats?.successDeliveriesChange || 0}
-            subtitle={t('dashboard.kpis.successDeliveries.subtitle')}
-            icon={ShieldCheck}
-            iconColor="text-green-600"
-            isLoading={statsLoading}
-            index={1}
-          />
-          <KPICard
-            title={t('dashboard.kpis.revenue.title')}
-            value={statsLoading ? '...' : formatRevenue(stats?.revenue || 0)}
-            change={stats?.revenueChange || 0}
-            subtitle={t('dashboard.kpis.revenue.subtitle')}
-            icon={DollarSign}
-            iconColor="text-purple-600"
-            isLoading={statsLoading}
-            index={2}
-          />
+      <div style={mainWrapperStyle}>
+        {/* Sous-grille gauche + milieu : taille indépendante du panneau droit */}
+        <div style={mainGridStyle}>
+          {/* Colonne gauche : 3 cartes KPI empilées */}
+          <div style={leftColumnStyle}>
+            <KPICard
+              title={t('dashboard.kpis.onDelivery.title')}
+              value={ongoingDeliveriesLoading ? '...' : liveOnDeliveryCount}
+              change={stats?.onDeliveryChange || 0}
+              subtitle={
+                ongoingDeliveriesLoading
+                  ? t('dashboard.kpis.onDelivery.updating')
+                  : liveOnDeliveryCount === 1
+                    ? `1 ${t('dashboard.kpis.onDelivery.subtitle')}`
+                    : `${liveOnDeliveryCount} ${t('dashboard.kpis.onDelivery.subtitle')}`
+              }
+              icon={Truck}
+              iconColor="text-blue-600"
+              isLoading={ongoingDeliveriesLoading}
+              index={0}
+            />
+            <KPICard
+              title={t('dashboard.kpis.successDeliveries.title')}
+              value={statsLoading ? '...' : stats?.successDeliveries || 0}
+              change={stats?.successDeliveriesChange || 0}
+              subtitle={t('dashboard.kpis.successDeliveries.subtitle')}
+              icon={ShieldCheck}
+              iconColor="text-green-600"
+              isLoading={statsLoading}
+              index={1}
+            />
+            <KPICard
+              title={t('dashboard.kpis.revenue.title')}
+              value={statsLoading ? '...' : formatRevenue(stats?.revenue || 0)}
+              change={stats?.revenueChange || 0}
+              subtitle={t('dashboard.kpis.revenue.subtitle')}
+              icon={DollarSign}
+              iconColor="text-purple-600"
+              isLoading={statsLoading}
+              index={2}
+            />
+          </div>
+
+          {/* Colonne du milieu : Delivery Analytics */}
+          <div style={middleColumnTopStyle}>
+            <DeliveryAnalytics />
+          </div>
+
+          {/* Activity Data : s'étend sous les KPI et Analytics */}
+          <div style={middleColumnBottomStyle}>
+            <ActivityTable />
+          </div>
         </div>
 
-        {/* Colonne du milieu : Delivery Analytics */}
-        <div style={middleColumnTopStyle}>
-          <DeliveryAnalytics />
-        </div>
-
-        {/* Activity Data : Rectangle qui s'étend sous les KPI et Analytics */}
-        <div style={middleColumnBottomStyle}>
-          <ActivityTable />
-        </div>
-
-        {/* Colonne droite : Tracker + Quick Message */}
+        {/* Panneau droit : Tracker + Quick Message — indépendant de la sous-grille */}
         <div style={rightColumnStyle}>
           <TrackerCard deliveries={ongoingDeliveries} isLoading={ongoingDeliveriesLoading} />
           <QuickMessage />
