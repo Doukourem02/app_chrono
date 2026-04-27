@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/db.js';
+import { supabaseAdmin } from '../config/supabase.js';
 import { saveOrder, generateAndSaveTrackingToken } from '../config/orderStorage.js';
 import qrCodeService from '../services/qrCodeService.js';
 import { broadcastOrderUpdateToAdmins } from '../sockets/adminSocket.js';
@@ -873,29 +874,52 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
   try {
     logger.info('🚀 [getAdminOngoingDeliveries] DÉBUT');
 
-    if (!process.env.DATABASE_URL) {
-      logger.warn('DATABASE_URL non configuré pour getAdminOngoingDeliveries');
-      res.json({
-        success: true,
-        data: [],
-      });
-      return;
+    // Statuts valides pour les livraisons en cours
+    const ongoingStatuses = ['pending', 'accepted', 'enroute', 'picked_up'];
+
+    let rows: any[] = [];
+    let usedFallback = false;
+
+    // Tentative via pool PostgreSQL direct
+    if (process.env.DATABASE_URL) {
+      const query = `SELECT * FROM orders
+                     WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')
+                     ORDER BY created_at DESC`;
+
+      logger.info('📝 [getAdminOngoingDeliveries] Requête SQL pool:', { query });
+
+      try {
+        const result = await (pool as any).query(query);
+        rows = result.rows || [];
+        logger.info(`[getAdminOngoingDeliveries] Pool: ${rows.length} lignes récupérées`);
+      } catch (queryError: any) {
+        logger.error('[getAdminOngoingDeliveries] Erreur pool SQL:', queryError);
+        // Ne pas throw : tenter le fallback Supabase
+      }
+    } else {
+      logger.warn('DATABASE_URL non configuré, tentative via Supabase');
     }
 
-    // Récupérer les commandes en cours
-    const query = `SELECT * FROM orders
-                   WHERE status IN ('pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering')
-                   ORDER BY created_at DESC`;
+    // Fallback Supabase si pool indisponible ou retourne 0 résultat
+    if (rows.length === 0 && supabaseAdmin) {
+      logger.info('[getAdminOngoingDeliveries] Fallback Supabase (pool vide ou indisponible)');
+      usedFallback = true;
+      try {
+        const { data: supabaseRows, error: supabaseError } = await supabaseAdmin
+          .from('orders')
+          .select('*')
+          .in('status', ongoingStatuses)
+          .order('created_at', { ascending: false });
 
-    logger.info('📝 [getAdminOngoingDeliveries] Requête SQL:', { query });
-
-    let result;
-    try {
-      result = await (pool as any).query(query);
-      logger.info(`[getAdminOngoingDeliveries] Requête réussie: ${result.rows.length} lignes récupérées`);
-    } catch (queryError: any) {
-      logger.error('[getAdminOngoingDeliveries] Erreur lors de la requête SQL:', queryError);
-      throw queryError;
+        if (supabaseError) {
+          logger.error('[getAdminOngoingDeliveries] Erreur Supabase fallback:', supabaseError.message);
+        } else {
+          rows = supabaseRows || [];
+          logger.info(`[getAdminOngoingDeliveries] Supabase fallback: ${rows.length} lignes récupérées`);
+        }
+      } catch (supabaseErr: any) {
+        logger.error('[getAdminOngoingDeliveries] Exception Supabase fallback:', supabaseErr);
+      }
     }
 
     // Helper pour parser JSON
@@ -911,29 +935,38 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
       return field;
     };
 
-    // Récupérer les informations des clients et drivers en une seule requête
-    const userIds = [...new Set(result.rows.map((o: any) => o.user_id).filter(Boolean))];
-    const driverIds = [...new Set(result.rows.map((o: any) => o.driver_id).filter(Boolean))];
+    // Récupérer les informations des clients et drivers
+    const userIds = [...new Set(rows.map((o: any) => o.user_id).filter(Boolean))];
+    const driverIds = [...new Set(rows.map((o: any) => o.driver_id).filter(Boolean))];
 
     let usersMap = new Map();
     let driversMap = new Map();
 
     if (userIds.length > 0) {
       try {
-        const usersResult = await (pool as any).query(
-          `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
-          [userIds]
-        );
-        usersResult.rows.forEach((user: any) => {
-          // Construire full_name à partir de first_name et last_name
-          const full_name = (user.first_name && user.last_name)
-            ? `${user.first_name} ${user.last_name}`
-            : (user.first_name || user.last_name || null);
-          usersMap.set(user.id, {
-            ...user,
-            full_name,
+        if (!usedFallback) {
+          const usersResult = await (pool as any).query(
+            `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
+            [userIds]
+          );
+          usersResult.rows.forEach((user: any) => {
+            const full_name = (user.first_name && user.last_name)
+              ? `${user.first_name} ${user.last_name}`
+              : (user.first_name || user.last_name || null);
+            usersMap.set(user.id, { ...user, full_name });
           });
-        });
+        } else if (supabaseAdmin) {
+          const { data: supabaseUsers } = await supabaseAdmin
+            .from('users')
+            .select('id, email, phone, first_name, last_name, avatar_url, role')
+            .in('id', userIds);
+          (supabaseUsers || []).forEach((user: any) => {
+            const full_name = (user.first_name && user.last_name)
+              ? `${user.first_name} ${user.last_name}`
+              : (user.first_name || user.last_name || null);
+            usersMap.set(user.id, { ...user, full_name });
+          });
+        }
       } catch (usersError) {
         logger.warn('Erreur lors de la récupération des utilisateurs:', usersError);
       }
@@ -941,26 +974,35 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
 
     if (driverIds.length > 0) {
       try {
-        const driversResult = await (pool as any).query(
-          `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
-          [driverIds]
-        );
-        driversResult.rows.forEach((driver: any) => {
-          // Construire full_name à partir de first_name et last_name
-          const full_name = (driver.first_name && driver.last_name)
-            ? `${driver.first_name} ${driver.last_name}`
-            : (driver.first_name || driver.last_name || null);
-          driversMap.set(driver.id, {
-            ...driver,
-            full_name,
+        if (!usedFallback) {
+          const driversResult = await (pool as any).query(
+            `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
+            [driverIds]
+          );
+          driversResult.rows.forEach((driver: any) => {
+            const full_name = (driver.first_name && driver.last_name)
+              ? `${driver.first_name} ${driver.last_name}`
+              : (driver.first_name || driver.last_name || null);
+            driversMap.set(driver.id, { ...driver, full_name });
           });
-        });
+        } else if (supabaseAdmin) {
+          const { data: supabaseDrivers } = await supabaseAdmin
+            .from('users')
+            .select('id, email, phone, first_name, last_name, avatar_url, role')
+            .in('id', driverIds);
+          (supabaseDrivers || []).forEach((driver: any) => {
+            const full_name = (driver.first_name && driver.last_name)
+              ? `${driver.first_name} ${driver.last_name}`
+              : (driver.first_name || driver.last_name || null);
+            driversMap.set(driver.id, { ...driver, full_name });
+          });
+        }
       } catch (driversError) {
         logger.warn('Erreur lors de la récupération des drivers:', driversError);
       }
     }
 
-    const formatted = result.rows.map((order: any) => {
+    const formatted = rows.map((order: any) => {
       const pickup = parseJsonField(order.pickup_address || order.pickup);
       const dropoff = parseJsonField(order.dropoff_address || order.dropoff);
 

@@ -151,10 +151,6 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const hasActiveDeliveries = deliveriesForPollRef.current.some(
-        (d) => d.status === 'delivering' || d.status === 'picked_up'
-      )
-      if (!hasActiveDeliveries) return
       debug('[useDeliveriesTracking] Polling de secours pour sync statut')
       void loadDeliveriesFromAPI()
     }, 30_000)
