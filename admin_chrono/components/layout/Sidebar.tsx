@@ -128,6 +128,7 @@ export default function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ full_name?: string; phone?: string; first_name?: string | null; last_name?: string | null } | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; transform?: string } | null>(null);
@@ -283,6 +284,16 @@ export default function Sidebar() {
   const logoSize = 50
   const collapsedIconOffset = Math.max((collapsedWidth - iconSlotSize) / 2, 0)
 
+  const closeProfileMenu = useCallback(() => {
+    setShowProfileMenu(false);
+    setMenuPosition(null);
+    isOpeningMenuRef.current = false;
+    menuJustOpenedRef.current = false;
+    if (!sidebarRef.current?.matches(':hover')) {
+      setIsExpanded(false);
+    }
+  }, [setShowProfileMenu, setMenuPosition, setIsExpanded]);
+
   useEffect(() => {
     if (!showProfileMenu || !menuPosition) return;
 
@@ -316,8 +327,7 @@ export default function Sidebar() {
       // Ne fermer le menu que si le clic est vraiment en dehors du bouton ET du menu
       if (!isClickInsideButton && !isClickInsideMenu) {
         logger.debug('[Sidebar] Closing profile menu - click outside');
-        setShowProfileMenu(false);
-        setMenuPosition(null);
+        closeProfileMenu();
       } else {
         logger.debug('[Sidebar] Click is inside button or menu - keeping menu open');
       }
@@ -335,7 +345,7 @@ export default function Sidebar() {
       clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showProfileMenu, menuPosition]);
+  }, [showProfileMenu, menuPosition, closeProfileMenu]);
 
   // Mettre à jour la position du menu quand le sidebar se redimensionne
   // Utiliser un debounce pour éviter les recalculs trop fréquents
@@ -744,9 +754,10 @@ export default function Sidebar() {
 
   return (
     <div
+      ref={sidebarRef}
       style={sidebarStyle}
       onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
+      onMouseLeave={() => { if (!showProfileMenu) setIsExpanded(false) }}
     >
       <div style={logoContainerStyle}>
         <div
@@ -1025,10 +1036,7 @@ export default function Sidebar() {
               
               // Si le menu est déjà ouvert, le fermer
               if (showProfileMenu) {
-                setShowProfileMenu(false);
-                setMenuPosition(null);
-                isOpeningMenuRef.current = false;
-                menuJustOpenedRef.current = false;
+                closeProfileMenu();
                 return;
               }
               
@@ -1181,7 +1189,7 @@ export default function Sidebar() {
               <Link
                 href="/profile"
                 style={profileMenuItemStyle}
-                onClick={() => setShowProfileMenu(false)}
+                onClick={() => closeProfileMenu()}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#F9FAFB';
                 }}
@@ -1194,7 +1202,7 @@ export default function Sidebar() {
               <Link
                 href="/settings"
                 style={profileMenuItemStyle}
-                onClick={() => setShowProfileMenu(false)}
+                onClick={() => closeProfileMenu()}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#F9FAFB';
                 }}
