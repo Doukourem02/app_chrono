@@ -208,7 +208,7 @@ export default function DashboardPage() {
   const mainWrapperStyle: React.CSSProperties = {
     display: 'flex',
     gap: '12px',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
   }
 
   // Sous-grille gauche + milieu : 2 colonnes seulement, pas liée au panneau droit
@@ -217,7 +217,7 @@ export default function DashboardPage() {
     display: 'grid',
     gap: '12px',
     gridTemplateColumns: '240px 1fr',
-    gridTemplateRows: 'auto auto',
+    gridTemplateRows: 'auto 1fr',
     minWidth: 0,
   }
 

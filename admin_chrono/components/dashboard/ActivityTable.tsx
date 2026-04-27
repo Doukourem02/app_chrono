@@ -10,6 +10,7 @@ import { formatDeliveryId } from '@/utils/formatDeliveryId'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
 import { useThemeStore } from '@/stores/themeStore'
+import { useTranslation } from '@/hooks/useTranslation'
 
 const statusConfig: Record<string, { label: string; backgroundColor: string; color: string }> = {
   pending: {
@@ -73,6 +74,7 @@ type LocalDateFilter = 'thisWeek' | 'thisMonth' | 'thisYear'
 
 export default function ActivityTable() {
   const router = useRouter()
+  const t = useTranslation()
   const theme = useThemeStore((state) => state.theme)
   const isDarkMode = theme === 'dark'
   const [localDateFilter, setLocalDateFilter] = useState<LocalDateFilter>('thisMonth')
@@ -346,7 +348,7 @@ export default function ActivityTable() {
             e.currentTarget.style.color = themeColors.textPrimary
           }}
         >
-          Données d&apos;activité
+          {t('dashboard.activityTable.title')}
         </h2>
         <div style={controlsStyle}>
           <select 
@@ -354,9 +356,9 @@ export default function ActivityTable() {
             value={localDateFilter}
             onChange={(e) => handleFilterChange(e.target.value)}
           >
-            <option value="thisWeek">Cette semaine</option>
-            <option value="thisMonth">Ce mois</option>
-            <option value="thisYear">Cette année</option>
+            <option value="thisWeek">{t('dashboard.activityTable.thisWeek')}</option>
+            <option value="thisMonth">{t('dashboard.activityTable.thisMonth')}</option>
+            <option value="thisYear">{t('dashboard.activityTable.thisYear')}</option>
           </select>
           <button
             style={filterButtonStyle}
@@ -375,27 +377,27 @@ export default function ActivityTable() {
 
       {isLoading ? (
         <div style={{ paddingTop: '48px', paddingBottom: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ color: themeColors.textSecondary }}>Chargement des activités...</div>
+          <div style={{ color: themeColors.textSecondary }}>{t('dashboard.activityTable.loading')}</div>
         </div>
       ) : isError ? (
         <div style={{ paddingTop: '48px', paddingBottom: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-          <div style={{ color: themeColors.redPrimary, fontSize: '14px', fontWeight: 500 }}>Erreur lors du chargement des activités</div>
-          <div style={{ color: themeColors.textSecondary, fontSize: '12px' }}>Vérifiez votre connexion et réessayez</div>
+          <div style={{ color: themeColors.redPrimary, fontSize: '14px', fontWeight: 500 }}>{t('dashboard.activityTable.error')}</div>
+          <div style={{ color: themeColors.textSecondary, fontSize: '12px' }}>{t('dashboard.activityTable.errorHint')}</div>
         </div>
       ) : paginatedData.length === 0 ? (
         <div style={{ paddingTop: '48px', paddingBottom: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ color: themeColors.textSecondary }}>Aucune activité récente</div>
+          <div style={{ color: themeColors.textSecondary }}>{t('dashboard.activityTable.empty')}</div>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
             <thead>
               <tr>
-                <th style={thStyle}>ID de livraison</th>
-                <th style={thStyle}>Date</th>
-                <th style={thStyle}>Départ</th>
-                <th style={thStyle}>Destination</th>
-                <th style={thStyle}>Statut</th>
+                <th style={thStyle}>{t('dashboard.activityTable.colDeliveryId')}</th>
+                <th style={thStyle}>{t('dashboard.activityTable.colDate')}</th>
+                <th style={thStyle}>{t('dashboard.activityTable.colDeparture')}</th>
+                <th style={thStyle}>{t('dashboard.activityTable.colDestination')}</th>
+                <th style={thStyle}>{t('dashboard.activityTable.colStatus')}</th>
               </tr>
             </thead>
             <tbody>
@@ -448,7 +450,7 @@ export default function ActivityTable() {
                     </td>
                     <td style={tdStyle}>
                       <span style={getStatusBadgeStyle(statusKey, status)}>
-                        {status.label}
+                        {t(`tracking.status.${statusKey}`) || status.label}
                       </span>
                     </td>
                   </tr>
@@ -462,7 +464,10 @@ export default function ActivityTable() {
       {!isLoading && displayData.length > 0 && (
         <div style={paginationStyle}>
           <p style={paginationTextStyle}>
-            Affichage de {((currentPage - 1) * itemsPerPage) + 1} à {Math.min(currentPage * itemsPerPage, displayData.length)} sur {displayData.length} entrées
+            {t('dashboard.activityTable.showingOf')
+              .replace('{from}', String(((currentPage - 1) * itemsPerPage) + 1))
+              .replace('{to}', String(Math.min(currentPage * itemsPerPage, displayData.length)))
+              .replace('{total}', String(displayData.length))}
           </p>
           <div style={paginationButtonsStyle}>
             <button

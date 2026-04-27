@@ -12,8 +12,10 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 export default function QuickMessage() {
+  const t = useTranslation()
   const router = useRouter()
   const { user } = useAuthStore()
   const { conversations, setConversations } = useAdminMessageStore()
@@ -379,16 +381,16 @@ export default function QuickMessage() {
   return (
     <AnimatedCard index={0} delay={200} style={cardStyle}>
       <div style={headerStyle}>
-        <h2 style={titleStyle}>Quick Message</h2>
+        <h2 style={titleStyle}>{t('quickMessage.title')}</h2>
         <span style={onlineBadgeStyle}>
-          {onlineCount} Online
+          {t('quickMessage.onlineCount').replace('{count}', String(onlineCount))}
         </span>
       </div>
 
       <div style={contactsListStyle}>
         {contacts.length === 0 ? (
           <div style={{ padding: '20px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>
-            Aucune conversation
+            {t('quickMessage.empty') || 'Aucune conversation'}
           </div>
         ) : (
           contacts.map((contact) => (
@@ -416,12 +418,12 @@ export default function QuickMessage() {
                   <p style={contactNameStyle} title={contact.name}>{contact.name}</p>
                   {contact.unreadCount > 0 && (
                   <span style={unreadBadgeStyle}>
-                      {contact.unreadCount} new message{contact.unreadCount > 1 ? 's' : ''}
+                      {contact.unreadCount} {contact.unreadCount > 1 ? t('quickMessage.newMessages') : t('quickMessage.newMessage')}
                   </span>
                 )}
               </div>
               <p style={contactStatusStyle}>
-                {contact.status === 'online' ? 'Online' : 'Offline'} {contact.lastSeen}
+                {contact.status === 'online' ? t('quickMessage.online') : t('quickMessage.offline')} {contact.lastSeen}
               </p>
             </div>
           </div>

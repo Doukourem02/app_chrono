@@ -150,6 +150,28 @@
         "title": "Revenus",
         "subtitle": "Depuis la semaine dernière"
       }
+    },
+    "deliveryAnalytics": {
+      "title": "Analyses de livraison",
+      "packageDelivered": "Livraisons réussies",
+      "reported": "Signalées",
+      "noData": "Aucune donnée disponible"
+    },
+    "activityTable": {
+      "title": "Données d'activité",
+      "thisWeek": "Cette semaine",
+      "thisMonth": "Ce mois",
+      "thisYear": "Cette année",
+      "colDeliveryId": "ID de livraison",
+      "colDate": "Date",
+      "colDeparture": "Départ",
+      "colDestination": "Destination",
+      "colStatus": "Statut",
+      "loading": "Chargement des activités...",
+      "error": "Erreur lors du chargement",
+      "errorHint": "Vérifiez votre connexion et réessayez",
+      "empty": "Aucune activité récente",
+      "showingOf": "Affichage de {from} à {to} sur {total} entrées"
     }
   },
   "tracking": {
@@ -360,5 +382,14 @@
         "maintenanceCost": "Coût entretien"
       }
     }
+  },
+  "quickMessage": {
+    "title": "Messages rapides",
+    "online": "En ligne",
+    "offline": "Hors ligne",
+    "onlineCount": "{count} en ligne",
+    "empty": "Aucune conversation",
+    "newMessage": "nouveau message",
+    "newMessages": "nouveaux messages"
   }
 }

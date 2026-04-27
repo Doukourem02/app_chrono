@@ -150,6 +150,28 @@
         "title": "Revenue",
         "subtitle": "Since last week"
       }
+    },
+    "deliveryAnalytics": {
+      "title": "Delivery Analytics",
+      "packageDelivered": "Package Delivered",
+      "reported": "Reported",
+      "noData": "No data available"
+    },
+    "activityTable": {
+      "title": "Activity Data",
+      "thisWeek": "This week",
+      "thisMonth": "This month",
+      "thisYear": "This year",
+      "colDeliveryId": "Delivery ID",
+      "colDate": "Date",
+      "colDeparture": "Departure",
+      "colDestination": "Destination",
+      "colStatus": "Status",
+      "loading": "Loading activities...",
+      "error": "Error loading activities",
+      "errorHint": "Check your connection and try again",
+      "empty": "No recent activity",
+      "showingOf": "Showing {from} to {to} of {total} entries"
     }
   },
   "tracking": {
@@ -360,5 +382,14 @@
         "maintenanceCost": "Maintenance cost"
       }
     }
+  },
+  "quickMessage": {
+    "title": "Quick Message",
+    "online": "Online",
+    "offline": "Offline",
+    "onlineCount": "{count} Online",
+    "empty": "No conversations",
+    "newMessage": "new message",
+    "newMessages": "new messages"
   }
 }

@@ -9,8 +9,10 @@ import { SkeletonLoader } from '@/components/animations'
 import { useDateFilter } from '@/contexts/DateFilterContext'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 export default function DeliveryAnalytics() {
+  const t = useTranslation()
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   
@@ -142,15 +144,15 @@ export default function DeliveryAnalytics() {
   return (
     <AnimatedCard index={0} delay={100} style={cardStyle}>
       <div style={headerStyle}>
-        <h2 style={titleStyle}>Delivery Analytics</h2>
+        <h2 style={titleStyle}>{t('dashboard.deliveryAnalytics.title')}</h2>
         <div style={legendContainerStyle}>
           <div style={legendItemStyle}>
             <div style={{ ...legendDotStyle, backgroundColor: '#2563EB' }}></div>
-            <span style={legendTextStyle}>Package Delivered</span>
+            <span style={legendTextStyle}>{t('dashboard.deliveryAnalytics.packageDelivered')}</span>
           </div>
           <div style={legendItemStyle}>
             <div style={{ ...legendDotStyle, backgroundColor: '#93C5FD' }}></div>
-            <span style={legendTextStyle}>Reported</span>
+            <span style={legendTextStyle}>{t('dashboard.deliveryAnalytics.reported')}</span>
           </div>
         </div>
       </div>
@@ -188,33 +190,33 @@ export default function DeliveryAnalytics() {
               }}
               formatter={(value: number, name: string) => {
                 if (name === 'packageDelivered') {
-                  return [value.toLocaleString(), 'Package Delivered']
+                  return [value.toLocaleString(), t('dashboard.deliveryAnalytics.packageDelivered')]
                 }
-                return [value, 'Reported']
+                return [value, t('dashboard.deliveryAnalytics.reported')]
               }}
             />
             <Legend 
               wrapperStyle={{ paddingTop: '20px' }}
               iconType="circle"
             />
-            <Bar 
-              dataKey="packageDelivered" 
-              fill="#2563eb" 
+            <Bar
+              dataKey="packageDelivered"
+              fill="#2563eb"
               radius={[8, 8, 0, 0]}
-              name="Package Delivered"
+              name={t('dashboard.deliveryAnalytics.packageDelivered')}
             />
-            <Bar 
-              dataKey="reported" 
-              fill="#93c5fd" 
+            <Bar
+              dataKey="reported"
+              fill="#93c5fd"
               radius={[8, 8, 0, 0]}
-              name="Reported"
+              name={t('dashboard.deliveryAnalytics.reported')}
             />
           </BarChart>
         </ResponsiveContainer>
         </div>
       ) : (
         <div style={loadingContainerStyle}>
-          <div style={loadingTextStyle}>Aucune donnée disponible</div>
+          <div style={loadingTextStyle}>{t('dashboard.deliveryAnalytics.noData')}</div>
         </div>
       )}
     </AnimatedCard>
