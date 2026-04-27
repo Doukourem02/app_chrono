@@ -1,5 +1,5 @@
 import { Circle, HStack, Image, RoundedRectangle, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
-import { clipShape, fixedSize, font, foregroundStyle, frame, offset, padding, scaleEffect } from "@expo/ui/swift-ui/modifiers";
+import { background, clipShape, fixedSize, font, foregroundStyle, frame, offset, padding, scaleEffect } from "@expo/ui/swift-ui/modifiers";
 import { createLiveActivity } from "expo-widgets";
 import type { LiveActivityEnvironment } from "expo-widgets/build/Widgets.types";
 import {
@@ -153,7 +153,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   const expandedTrailing = <Spacer minLength={0} />;
 
   const banner = (
-    <VStack spacing={12} modifiers={[padding({ horizontal: 16, vertical: 18 }), frame({ minHeight: 122 })]}>
+    <VStack spacing={12} modifiers={[padding({ horizontal: 16, vertical: 18 }), frame({ minHeight: 122 }), background("#1C1C1E")]}>
       <Text modifiers={[font({ weight: "bold", size: 14 }), foregroundStyle(ON_DARK.brand), frame({ maxWidth: bannerTrackWidth, alignment: "leading" })]}>
         KRONO
       </Text>
@@ -189,7 +189,7 @@ function OrderTrackingLive(props: OrderTrackingLiveProps, environment: LiveActiv
   );
 
   const expandedBottom = (
-    <VStack spacing={9} modifiers={[padding({ horizontal: 12, top: 0, bottom: 10 })]}>
+    <VStack spacing={9} modifiers={[padding({ horizontal: 12, top: 0, bottom: 10 }), background("#1C1C1E")]}>
       <Text modifiers={[font({ weight: "bold", size: simplified ? 13 : 14 }), foregroundStyle(ON_DARK.brand), frame({ maxWidth: trackWidth, alignment: "leading" })]}>
         KRONO
       </Text>

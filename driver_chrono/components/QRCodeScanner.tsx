@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Modal, Platform, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import Constants from 'expo-constants';
 import { logger } from '../utils/logger';
 import { getQRScanErrorAlert } from '../utils/qrScanUserMessage';
-
-const isSimulator = Platform.OS === 'ios' && !Constants.isDevice;
 
 interface QRCodeScannerProps {
   onScan: (data: string) => void;
@@ -23,8 +20,6 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showManualEntry, setShowManualEntry] = useState(false);
-  const [manualQRInput, setManualQRInput] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -104,59 +99,10 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           >
             <Text style={styles.permissionButtonText}>Ouvrir les réglages</Text>
           </TouchableOpacity>
-          {/* Saisie manuelle quand caméra indisponible (simulateur ou permission refusée) */}
-          {(isSimulator || __DEV__) && (
-            <TouchableOpacity
-              style={styles.manualEntryButtonPermission}
-              onPress={() => setShowManualEntry(true)}
-            >
-              <Ionicons name="create-outline" size={18} color="#6366F1" />
-              <Text style={styles.manualEntryText}>Saisie manuelle (test)</Text>
-            </TouchableOpacity>
-          )}
         </View>
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
-        <Modal visible={showManualEntry} transparent animationType="fade">
-          <View style={styles.manualOverlay}>
-            <View style={styles.manualContainer}>
-              <Text style={styles.manualTitle}>Saisie manuelle (mode test)</Text>
-              <Text style={styles.manualHint}>
-                Collez le JSON du QR code (depuis la base ou un test)
-              </Text>
-              <TextInput
-                style={styles.manualInput}
-                placeholder='{"orderId":"...","orderNumber":"...",...}'
-                placeholderTextColor="#9CA3AF"
-                value={manualQRInput}
-                onChangeText={setManualQRInput}
-                multiline
-                numberOfLines={4}
-              />
-              <View style={styles.manualActions}>
-                <TouchableOpacity style={styles.manualCancel} onPress={() => { setShowManualEntry(false); setManualQRInput(''); }}>
-                  <Text style={styles.manualCancelText}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.manualSubmit}
-                  onPress={() => {
-                    const trimmed = manualQRInput.trim();
-                    if (trimmed) {
-                      setShowManualEntry(false);
-                      setManualQRInput('');
-                      onScan(trimmed);
-                    } else {
-                      Alert.alert('Erreur', 'Veuillez coller le contenu du QR code');
-                    }
-                  }}
-                >
-                  <Text style={styles.manualSubmitText}>Valider</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </View>
     );
   }
@@ -203,62 +149,10 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         </Text>
       </View>
 
-      {/* Saisie manuelle (simulateur / appareil sans caméra) */}
-      {(isSimulator || __DEV__) && (
-        <TouchableOpacity
-          style={styles.manualEntryButton}
-          onPress={() => setShowManualEntry(true)}
-        >
-          <Ionicons name="create-outline" size={18} color="#6366F1" />
-          <Text style={styles.manualEntryText}>Saisie manuelle (test)</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Bouton fermer */}
       <TouchableOpacity style={styles.closeButton} onPress={onClose}>
         <Ionicons name="close" size={24} color="#fff" />
       </TouchableOpacity>
-
-      {/* Modal saisie manuelle */}
-      <Modal visible={showManualEntry} transparent animationType="fade">
-        <View style={styles.manualOverlay}>
-          <View style={styles.manualContainer}>
-            <Text style={styles.manualTitle}>Saisie manuelle (mode test)</Text>
-            <Text style={styles.manualHint}>
-              Collez le JSON du QR code (depuis la base ou un test)
-            </Text>
-            <TextInput
-              style={styles.manualInput}
-              placeholder='{"orderId":"...","orderNumber":"...",...}'
-              placeholderTextColor="#9CA3AF"
-              value={manualQRInput}
-              onChangeText={setManualQRInput}
-              multiline
-              numberOfLines={4}
-            />
-            <View style={styles.manualActions}>
-              <TouchableOpacity style={styles.manualCancel} onPress={() => { setShowManualEntry(false); setManualQRInput(''); }}>
-                <Text style={styles.manualCancelText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.manualSubmit}
-                onPress={() => {
-                  const trimmed = manualQRInput.trim();
-                  if (trimmed) {
-                    setShowManualEntry(false);
-                    setManualQRInput('');
-                    onScan(trimmed);
-                  } else {
-                    Alert.alert('Erreur', 'Veuillez coller le contenu du QR code');
-                  }
-                }}
-              >
-                <Text style={styles.manualSubmitText}>Valider</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -378,17 +272,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  manualEntryButtonPermission: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 20,
-    backgroundColor: 'rgba(99, 102, 241, 0.2)',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-  },
   loadingOverlay: {
     position: 'absolute',
     top: 0,
@@ -419,86 +302,5 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginTop: 15,
-  },
-  manualEntryButton: {
-    position: 'absolute',
-    bottom: 50,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-  },
-  manualEntryText: {
-    color: '#6366F1',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  manualOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  manualContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-  },
-  manualTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  manualHint: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 12,
-  },
-  manualInput: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    color: '#1F2937',
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  manualActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  manualCancel: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-  },
-  manualCancelText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  manualSubmit: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-  },
-  manualSubmitText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
   },
 });

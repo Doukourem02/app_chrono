@@ -3,5 +3,12 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
+  },
+  "typescript.preferences.excludeLibraries": true,
+  "typescript.tsserver.watchOptions": {
+    "excludeDirectories": ["**/node_modules"]
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true
   }
 }
