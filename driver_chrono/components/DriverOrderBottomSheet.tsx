@@ -103,9 +103,8 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   const handleScanQRCode = async (qrCodeData: string) => {
     try {
       const result = await qrCodeService.scanQRCode(qrCodeData, location || undefined);
-      
+
       if (result.success && result.isValid && result.data) {
-        // Extraire uniquement les champs nécessaires pour le composant QRCodeScanResult
         const { orderId, ...scanData } = result.data;
         setScanResult(scanData);
         setShowQRScanner(false);
@@ -116,10 +115,27 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
         ]);
       }
     } catch (error: any) {
-      const { title, message } = getQRScanErrorAlert(
-        'SCAN_UNKNOWN',
-        error?.message
-      );
+      const { title, message } = getQRScanErrorAlert('SCAN_UNKNOWN', error?.message);
+      Alert.alert(title, message);
+    }
+  };
+
+  // Handler pour la saisie manuelle du code (caméra inutilisable)
+  const handleManualEntry = async (code: string) => {
+    const orderId = currentOrder?.id;
+    if (!orderId) return;
+    try {
+      const result = await qrCodeService.manualVerify(orderId, code, location || undefined);
+      if (result.success && result.isValid && result.data) {
+        const { orderId: _id, ...scanData } = result.data;
+        setScanResult(scanData);
+        setShowQRScanner(false);
+      } else {
+        const { title, message } = getQRScanErrorAlert(result.code, result.error);
+        Alert.alert(title, message);
+      }
+    } catch (error: any) {
+      const { title, message } = getQRScanErrorAlert('SCAN_UNKNOWN', error?.message);
       Alert.alert(title, message);
     }
   };
@@ -789,6 +805,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
       <QRCodeScanner
         visible={showQRScanner}
         onScan={handleScanQRCode}
+        onManualEntry={handleManualEntry}
         onClose={() => setShowQRScanner(false)}
       />
 

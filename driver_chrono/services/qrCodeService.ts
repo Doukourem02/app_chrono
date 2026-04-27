@@ -152,6 +152,66 @@ class QRCodeService {
   }
 
   /**
+   * Valide un code de vérification saisi manuellement (caméra inutilisable)
+   */
+  async manualVerify(
+    orderId: string,
+    code: string,
+    location?: { latitude: number; longitude: number }
+  ): Promise<QRCodeScanResult> {
+    try {
+      const token = this.getAccessToken();
+      if (!token) {
+        return { success: false, isValid: false, code: 'AUTH_REQUIRED', error: 'Session expirée. Reconnectez-vous.' };
+      }
+
+      let scanLocation = location;
+      if (!scanLocation) {
+        try {
+          const currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          scanLocation = { latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude };
+        } catch { /* continuer sans localisation */ }
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/qr-codes/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId, code, location: scanLocation }),
+      });
+
+      const raw = await response.text();
+      let result: { success?: boolean; message?: string; error?: string; code?: string; data?: QRCodeScanResult['data'] } = {};
+      try { result = raw ? JSON.parse(raw) : {}; } catch {
+        return { success: false, isValid: false, code: 'SCAN_BAD_RESPONSE', error: 'Réponse serveur illisible.' };
+      }
+
+      if (!response.ok) {
+        return {
+          success: false,
+          isValid: false,
+          code: result.code || 'SCAN_INVALID',
+          error: result.message || result.error || 'Code invalide',
+        };
+      }
+
+      if (result.success && result.data) {
+        return { success: true, isValid: true, data: result.data };
+      }
+
+      return { success: false, isValid: false, code: result.code || 'SCAN_INVALID', error: result.message || 'Réponse invalide' };
+    } catch (error: any) {
+      const msg = String(error?.message || '');
+      const isNetwork = msg.includes('Network request failed') || msg.includes('Failed to fetch');
+      return {
+        success: false,
+        isValid: false,
+        code: isNetwork ? 'SCAN_NETWORK' : 'SCAN_UNKNOWN',
+        error: isNetwork ? 'Pas de connexion réseau.' : msg || 'Erreur de connexion',
+      };
+    }
+  }
+
+  /**
    * Récupère le QR code d'une commande (pour affichage)
    */
   async getOrderQRCode(orderId: string): Promise<{ qrCodeImage: string } | null> {

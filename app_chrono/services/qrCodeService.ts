@@ -6,6 +6,7 @@ const API_BASE_URL = config.apiUrl;
 
 export interface QRCodeData {
   qrCodeImage: string;
+  verificationCode?: string;
   qrCodeData?: {
     orderId: string;
     orderNumber: string;
@@ -49,6 +50,7 @@ class QRCodeService {
       if (result.success && result.data) {
         return {
           qrCodeImage: result.data.qrCodeImage,
+          verificationCode: result.data.verificationCode,
           qrCodeData: result.data.qrCodeData,
         };
       }
@@ -84,6 +86,7 @@ class QRCodeService {
       if (result.success && result.data) {
         return {
           qrCodeImage: result.data.qrCodeImage,
+          verificationCode: result.data.verificationCode,
           qrCodeData: result.data.qrCodeData,
         };
       }

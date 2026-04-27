@@ -9,6 +9,7 @@ interface QRCodeDisplayProps {
   qrCodeImage: string | null;
   orderNumber?: string;
   expiresAt?: string;
+  verificationCode?: string;
   /** Données complètes du QR (pour copie test en simulateur) */
   fullQrCodeData?: Record<string, unknown>;
   onClose: () => void;
@@ -19,6 +20,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
   qrCodeImage,
   orderNumber,
   expiresAt,
+  verificationCode,
   fullQrCodeData,
   onClose,
 }) => {
@@ -107,6 +109,14 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
               <View style={styles.qrCodePlaceholder}>
                 <Ionicons name="qr-code-outline" size={64} color="#9CA3AF" />
                 <Text style={styles.placeholderText}>QR code en cours de génération...</Text>
+              </View>
+            )}
+
+            {verificationCode && (
+              <View style={styles.verificationContainer}>
+                <Text style={styles.verificationLabel}>Code de secours (caméra inutilisable)</Text>
+                <Text style={styles.verificationCode}>{verificationCode}</Text>
+                <Text style={styles.verificationHint}>Dictez ce code au livreur s&apos;il ne peut pas scanner</Text>
               </View>
             )}
 
@@ -241,6 +251,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6366F1',
     flex: 1,
+  },
+  verificationContainer: {
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    width: '100%',
+  },
+  verificationLabel: {
+    fontSize: 11,
+    color: '#92400E',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  verificationCode: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#D97706',
+    letterSpacing: 8,
+  },
+  verificationHint: {
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 4,
+    textAlign: 'center',
   },
   expiryContainer: {
     flexDirection: 'row',

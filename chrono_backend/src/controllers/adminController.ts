@@ -1695,6 +1695,20 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     // Retirer les paiements différés en 'pending' du compteur 'pending' général
     paymentStatus.pending = Math.max(0, (paymentStatus.pending || 0) - deferredPendingCount);
 
+    // Commandes avec QR scanné (paiements complétés via livraison)
+    const qrScannedQuery = `
+      SELECT
+        COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL) as qr_scanned,
+        COUNT(*) as total
+      FROM orders
+      WHERE created_at >= $1
+    `;
+    const qrScannedResult = await (pool as any).query(qrScannedQuery, [startOfMonth.toISOString()]);
+    const qrScanned = {
+      scanned: parseInt(qrScannedResult.rows[0]?.qr_scanned || '0'),
+      total: parseInt(qrScannedResult.rows[0]?.total || '0'),
+    };
+
     // Taux de conversion
     const totalTransactions = paymentStatus.pending + paymentStatus.paid + paymentStatus.refused + paymentStatus.delayed;
     const conversionRate = totalTransactions > 0
@@ -1756,6 +1770,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         },
         transactionsByMethod,
         paymentStatus,
+        qrScanned,
         conversionRate: Math.round(conversionRate * 10) / 10,
         revenueByDriver: revenueByDriverResult.rows.map((r: any) => ({
           driverId: r.driver_id,

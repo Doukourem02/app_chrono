@@ -93,7 +93,7 @@ export class QRCodeService {
     recipientName: string,
     recipientPhone: string,
     creatorName: string
-  ): Promise<{ qrCodeData: QRCodeData; qrCodeImage: string }> {
+  ): Promise<{ qrCodeData: QRCodeData; qrCodeImage: string; verificationCode: string }> {
     try {
       const timestamp = new Date().toISOString();
       const expiresAt = new Date(Date.now() + QR_CODE_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
@@ -122,12 +122,16 @@ export class QRCodeService {
         margin: 2,
       });
 
-      // Sauvegarder le QR code dans la base de données
+      // Générer un code de vérification à 6 chiffres pour saisie manuelle
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Sauvegarder le QR code et le code de vérification dans la base de données
       await pool.query(
-        `UPDATE orders 
-         SET delivery_qr_code = $1 
-         WHERE id = $2`,
-        [JSON.stringify(completeQRCodeData), orderId]
+        `UPDATE orders
+         SET delivery_qr_code = $1,
+             delivery_verification_code = $2
+         WHERE id = $3`,
+        [JSON.stringify(completeQRCodeData), verificationCode, orderId]
       );
 
       logger.info(`QR code généré pour la commande ${orderId}`);
@@ -135,6 +139,7 @@ export class QRCodeService {
       return {
         qrCodeData: completeQRCodeData,
         qrCodeImage,
+        verificationCode,
       };
     } catch (error: any) {
       logger.error('Erreur lors de la génération du QR code:', error);
@@ -378,10 +383,10 @@ export class QRCodeService {
   /**
    * Récupère le QR code d'une commande
    */
-  async getOrderQRCode(orderId: string): Promise<{ qrCodeData: QRCodeData; qrCodeImage: string } | null> {
+  async getOrderQRCode(orderId: string): Promise<{ qrCodeData: QRCodeData; qrCodeImage: string; verificationCode?: string } | null> {
     try {
       const result = await pool.query(
-        `SELECT delivery_qr_code FROM orders WHERE id = $1`,
+        `SELECT delivery_qr_code, delivery_verification_code FROM orders WHERE id = $1`,
         [orderId]
       );
 
@@ -402,10 +407,102 @@ export class QRCodeService {
       return {
         qrCodeData,
         qrCodeImage,
+        verificationCode: result.rows[0].delivery_verification_code ?? undefined,
       };
     } catch (error: any) {
       logger.error('Erreur lors de la récupération du QR code:', error);
       return null;
+    }
+  }
+
+  /**
+   * Valide un code de vérification saisi manuellement par le livreur
+   */
+  async manualVerifyCode(
+    orderId: string,
+    driverId: string,
+    code: string,
+    location?: { latitude: number; longitude: number },
+    deviceInfo?: { platform?: string; model?: string }
+  ): Promise<QRCodeScanResult> {
+    try {
+      const orderResult = await pool.query(
+        `SELECT id, status, driver_id, user_id, delivery_verification_code,
+                delivery_qr_code
+         FROM orders WHERE id = $1`,
+        [orderId]
+      );
+
+      if (orderResult.rows.length === 0) {
+        return { success: false, isValid: false, code: 'ORDER_NOT_FOUND', error: 'Commande introuvable.' };
+      }
+
+      const order = orderResult.rows[0];
+
+      if (order.driver_id !== driverId) {
+        return { success: false, isValid: false, code: 'DRIVER_NOT_ASSIGNED', error: 'Vous n\'êtes pas le livreur assigné à cette commande.' };
+      }
+
+      const st = String(order.status || '').toLowerCase();
+      if (!['picked_up', 'delivering'].includes(st)) {
+        return { success: false, isValid: false, code: 'ORDER_STATUS_INVALID', error: `Le code ne peut être validé qu'après le ramassage du colis. Statut actuel : ${st}.` };
+      }
+
+      if (!order.delivery_verification_code) {
+        return { success: false, isValid: false, code: 'QR_MALFORMED', error: 'Aucun code de vérification généré pour cette commande. Le client doit afficher son QR code au moins une fois.' };
+      }
+
+      if (String(order.delivery_verification_code).trim() !== String(code).trim()) {
+        return { success: false, isValid: false, code: 'QR_SIGNATURE_INVALID', error: 'Code incorrect. Vérifiez le code affiché sur l\'écran du client.' };
+      }
+
+      // Vérifier si déjà complété via QR ou saisie manuelle
+      const existingScan = await pool.query(
+        `SELECT id FROM qr_code_scans WHERE order_id = $1 AND scanned_by = $2 AND is_valid = true`,
+        [orderId, driverId]
+      );
+      if (existingScan.rows.length > 0) {
+        return { success: false, isValid: false, code: 'QR_ALREADY_SCANNED', error: 'Cette livraison a déjà été confirmée.' };
+      }
+
+      await this.recordValidScan(orderId, driverId, location, deviceInfo);
+
+      await pool.query(
+        `UPDATE orders
+         SET delivery_qr_scanned_at = NOW(),
+             delivery_qr_scanned_by = $1,
+             status = 'completed',
+             completed_at = COALESCE(completed_at, NOW()),
+             updated_at = NOW()
+         WHERE id = $2`,
+        [driverId, orderId]
+      );
+
+      logger.info(`Code manuel validé pour la commande ${orderId} par ${driverId}`);
+
+      let recipientName = 'Destinataire';
+      let recipientPhone = '';
+      let creatorName = '';
+      let orderNumber = orderId.substring(0, 8).toUpperCase();
+
+      if (order.delivery_qr_code) {
+        try {
+          const qrData: QRCodeData = JSON.parse(order.delivery_qr_code);
+          recipientName = qrData.recipientName ?? recipientName;
+          recipientPhone = qrData.recipientPhone ?? recipientPhone;
+          creatorName = qrData.creatorName ?? creatorName;
+          orderNumber = qrData.orderNumber ?? orderNumber;
+        } catch { /* ignore */ }
+      }
+
+      return {
+        success: true,
+        isValid: true,
+        data: { recipientName, recipientPhone, creatorName, orderNumber, orderId },
+      };
+    } catch (error: any) {
+      logger.error('Erreur lors de la vérification manuelle du code:', error);
+      return { success: false, isValid: false, code: 'SCAN_SERVER_ERROR', error: 'Erreur serveur. Réessayez dans un instant.' };
     }
   }
 

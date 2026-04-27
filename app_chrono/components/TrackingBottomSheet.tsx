@@ -51,6 +51,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<{
     qrCodeImage: string;
+    verificationCode?: string;
     qrCodeData?: { expiresAt: string; orderNumber: string; [k: string]: unknown };
   } | null>(null);
 
@@ -141,6 +142,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
       if (!cancelled && data) {
         setQrCodeData({
           qrCodeImage: data.qrCodeImage,
+          verificationCode: data.verificationCode,
           qrCodeData: data.qrCodeData
             ? { ...data.qrCodeData, expiresAt: data.qrCodeData.expiresAt, orderNumber: data.qrCodeData.orderNumber }
             : undefined,
@@ -718,6 +720,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         qrCodeImage={qrCodeData?.qrCodeImage || null}
         orderNumber={qrCodeData?.qrCodeData?.orderNumber}
         expiresAt={qrCodeData?.qrCodeData?.expiresAt}
+        verificationCode={qrCodeData?.verificationCode}
         fullQrCodeData={qrCodeData?.qrCodeData}
         onClose={() => {
           setShowQRCode(false);

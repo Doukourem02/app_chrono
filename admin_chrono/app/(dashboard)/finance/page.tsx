@@ -528,7 +528,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={kpiValueStyle}>
-                {(stats?.paymentStatus.paid || 0) + (stats?.paymentStatus.delayed || 0)} / {Object.values(stats?.paymentStatus || {}).reduce((a: number, b: number) => a + b, 0)}
+                {stats?.qrScanned?.scanned || 0} / {stats?.qrScanned?.total || 0}
               </div>
               <div style={kpiLabelStyle}>Paiements complétés</div>
             </div>
@@ -541,7 +541,7 @@ export default function FinancePage() {
               <Clock size={20} color="#6366F1" />
             </div>
             <div>
-              <div style={kpiValueStyle}>{stats?.paymentStatus.pending || 0}</div>
+              <div style={kpiValueStyle}>{(stats?.qrScanned?.total || 0) - (stats?.qrScanned?.scanned || 0)}</div>
               <div style={kpiLabelStyle}>En attente</div>
             </div>
           </div>
