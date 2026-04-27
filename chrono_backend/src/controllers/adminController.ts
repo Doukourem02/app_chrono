@@ -2895,9 +2895,11 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
           t.created_at,
           o.id as order_id_full
         FROM transactions t
-        LEFT JOIN orders o ON t.order_id = o.id
-        WHERE t.user_id = $1 
+        INNER JOIN orders o ON t.order_id = o.id
+        WHERE t.user_id = $1
           AND (t.is_partial = true OR t.payment_method_type = 'deferred' OR t.remaining_amount > 0)
+          AND t.status NOT IN ('cancelled', 'refunded')
+          AND o.status = 'completed'
         ORDER BY t.created_at DESC
       `;
 
@@ -3549,7 +3551,8 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
         LEFT JOIN users d ON o.driver_id = d.id
         WHERE u.role = 'client'
           AND (t.is_partial = true OR t.payment_method_type = 'deferred' OR t.remaining_amount > 0)
-          AND t.status != 'paid'
+          AND t.status NOT IN ('paid', 'cancelled', 'refunded')
+          AND o.status = 'completed'
         GROUP BY u.id, u.first_name, u.last_name, u.email, u.phone
         HAVING COALESCE(SUM(t.remaining_amount) FILTER (WHERE t.remaining_amount > 0), 0) > 0
         ORDER BY MAX(o.created_at) DESC
@@ -4010,6 +4013,14 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
       'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
       ['cancelled', orderId]
     );
+
+    // Annuler les transactions différées associées (évite qu'elles restent en 'delayed')
+    try {
+      const { cancelDeferredTransactionForOrder } = await import('../utils/createTransactionForOrder.js');
+      await cancelDeferredTransactionForOrder(orderId);
+    } catch (cancelTxError: any) {
+      logger.warn('[cancelAdminOrder] Erreur annulation transactions différées:', cancelTxError.message);
+    }
 
     logger.info(`[cancelAdminOrder] Commande ${orderId} annulée avec succès par l'admin`);
 

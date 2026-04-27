@@ -10,6 +10,7 @@ import { setupOrderSocket } from './sockets/orderSocket.js';
 import { setupAdminSocket } from './sockets/adminSocket.js';
 import { setupMessageSocket } from './sockets/messageSocket.js';
 import logger from './utils/logger.js';
+import { runDeferredDebtReminderJob } from './jobs/deferredDebtReminderJob.js';
 import { initializeRedis, closeRedis, pubClient, subClient } from './config/redis.js';
 import { createClient } from '@supabase/supabase-js';
 import pool from './config/db.js';
@@ -231,6 +232,13 @@ server.listen(PORT, HOST, () => {
   if (process.env.SENTRY_DSN) {
     logger.info('Monitoring Sentry actif');
   }
+
+  // Job quotidien : rappel bienveillant aux clients ayant une dette différée ≥ 7 jours
+  const REMINDER_INTERVAL_MS = 24 * 60 * 60 * 1000; // toutes les 24h
+  setTimeout(() => {
+    void runDeferredDebtReminderJob();
+    setInterval(() => void runDeferredDebtReminderJob(), REMINDER_INTERVAL_MS);
+  }, 60_000); // démarre 1 minute après le boot pour laisser la DB s'initialiser
 });
 
 // Nettoyage propre à l'arrêt du serveur

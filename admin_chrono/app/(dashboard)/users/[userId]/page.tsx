@@ -216,6 +216,11 @@ interface UserDetails {
   [key: string]: unknown
 }
 
+function displayEmail(email?: string | null): string {
+  if (!email || email.endsWith('@otp.chrono.local')) return 'N/A'
+  return email
+}
+
 export default function UserDetailsPage() {
   const router = useRouter()
   const params = useParams()
@@ -493,7 +498,7 @@ export default function UserDetailsPage() {
 
     const userName = (user.first_name && user.last_name)
       ? `${user.first_name} ${user.last_name}`
-      : user.email || 'Utilisateur'
+      : (displayEmail(user.email) !== 'N/A' ? user.email : null) || 'Utilisateur'
 
     if (isClient) {
       // Export pour client
@@ -501,7 +506,7 @@ export default function UserDetailsPage() {
       const rows: (string | number)[][] = [
         ['Nom', user.last_name || 'N/A'],
         ['Prénom', user.first_name || 'N/A'],
-        ['Email', user.email || 'N/A'],
+        ['Email', displayEmail(user.email)],
         ['Téléphone', user.phone || 'N/A'],
         ['Date d\'inscription', user.createdAt ? formatDate(user.createdAt) : 'N/A'],
         ['', ''],
@@ -565,7 +570,7 @@ export default function UserDetailsPage() {
       const rows: (string | number)[][] = [
         ['Nom', user.last_name || 'N/A'],
         ['Prénom', user.first_name || 'N/A'],
-        ['Email', user.email || 'N/A'],
+        ['Email', displayEmail(user.email)],
         ['Téléphone', user.phone || 'N/A'],
         ['Date d\'inscription', user.createdAt ? formatDate(user.createdAt) : 'N/A'],
         ['', ''],
@@ -600,7 +605,7 @@ export default function UserDetailsPage() {
         user.pendingPaymentOrders.forEach((order) => {
           const clientName = (order.client.firstName && order.client.lastName)
             ? `${order.client.firstName} ${order.client.lastName}`
-            : order.client.email || 'N/A'
+            : (displayEmail(order.client.email) !== 'N/A' ? order.client.email : null) || 'N/A'
           rows.push([
             order.orderId ? order.orderId.slice(0, 8) + '...' : 'N/A',
             clientName,
@@ -620,7 +625,7 @@ export default function UserDetailsPage() {
         user.recentOrders.forEach((order) => {
           const clientName = (order.client.firstName && order.client.lastName)
             ? `${order.client.firstName} ${order.client.lastName}`
-            : order.client.email || 'N/A'
+            : (displayEmail(order.client.email) !== 'N/A' ? order.client.email : null) || 'N/A'
           const statusLabel = order.status === 'completed' ? 'Colis livré'
             : order.status === 'cancelled' ? 'Annulé'
             : order.status === 'declined' ? 'Refusé'
@@ -654,7 +659,7 @@ export default function UserDetailsPage() {
       const rows: (string | number)[][] = [
         ['Nom', user.last_name || 'N/A'],
         ['Prénom', user.first_name || 'N/A'],
-        ['Email', user.email || 'N/A'],
+        ['Email', displayEmail(user.email)],
         ['Téléphone', user.phone || 'N/A'],
         ['Rôle', user.role === 'super_admin' ? 'Super Administrateur' : 'Administrateur'],
         ['Date d\'inscription', user.createdAt ? formatDate(user.createdAt) : 'N/A'],
@@ -668,7 +673,7 @@ export default function UserDetailsPage() {
         user.monitoring.clientsWithPartialPayments.forEach((client: ClientWithPartialPayment) => {
           const clientName = (client.firstName && client.lastName)
             ? `${client.firstName} ${client.lastName}`
-            : client.email || 'N/A'
+            : (displayEmail(client.email) !== 'N/A' ? client.email : null) || 'N/A'
           rows.push([
             clientName,
             formatCurrency(client.totalRemaining),
@@ -758,14 +763,14 @@ export default function UserDetailsPage() {
             ) : (
               (user.first_name && user.last_name)
                 ? `${(user.first_name[0] || '').toUpperCase()}${(user.last_name[0] || '').toUpperCase()}`
-                : (user.email?.[0] || 'U').toUpperCase()
+                : 'U'
             )}
           </div>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
               {(user.first_name && user.last_name)
                 ? `${user.first_name} ${user.last_name}`
-                : user.email || 'Utilisateur'}
+                : (displayEmail(user.email) !== 'N/A' ? user.email : null) || 'Utilisateur'}
             </h2>
           </div>
           {isDriver && user.profile && (
@@ -824,13 +829,15 @@ export default function UserDetailsPage() {
                 </div>
               </div>
             )}
-            <div style={infoItemStyle}>
-              <Mail size={16} style={{ color: '#6B7280' }} />
-              <div>
-                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Email</div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{user.email}</div>
+            {user.email && !user.email.endsWith('@otp.chrono.local') && (
+              <div style={infoItemStyle}>
+                <Mail size={16} style={{ color: '#6B7280' }} />
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Email</div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{user.email}</div>
+                </div>
               </div>
-            </div>
+            )}
             {user.phone && (
               <div style={infoItemStyle}>
                 <Phone size={16} style={{ color: '#6B7280' }} />
@@ -1092,7 +1099,7 @@ export default function UserDetailsPage() {
                             <div>
                               {(client.firstName && client.lastName)
                                 ? `${client.firstName} ${client.lastName}`
-                                : client.email || 'N/A'}
+                                : (displayEmail(client.email) !== 'N/A' ? client.email : null) || 'N/A'}
                             </div>
                             {client.phone && (
                               <div style={{ fontSize: '12px', color: '#6B7280' }}>
@@ -1354,7 +1361,7 @@ export default function UserDetailsPage() {
                           <div>
                             {(order.client.firstName && order.client.lastName)
                               ? `${order.client.firstName} ${order.client.lastName}`
-                              : order.client.email || 'N/A'}
+                              : (displayEmail(order.client.email) !== 'N/A' ? order.client.email : null) || 'N/A'}
                           </div>
                           {order.client.phone && (
                             <div style={{ fontSize: '12px', color: '#6B7280' }}>
@@ -1541,7 +1548,7 @@ export default function UserDetailsPage() {
                           <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
                             {(order.client.firstName && order.client.lastName)
                               ? `${order.client.firstName} ${order.client.lastName}`
-                              : order.client.email || 'N/A'}
+                              : (displayEmail(order.client.email) !== 'N/A' ? order.client.email : null) || 'N/A'}
                           </td>
                           <td style={{ padding: '12px', fontSize: '14px', fontWeight: 600, color: '#111827' }}>
                             {formatCurrency(order.price)}

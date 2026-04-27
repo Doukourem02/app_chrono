@@ -720,11 +720,12 @@ export const getDeferredDebts = async (req: RequestWithUser, res: Response): Pro
         o.status as order_status,
         o.created_at as order_created_at
       FROM transactions t
-      LEFT JOIN orders o ON t.order_id = o.id
+      INNER JOIN orders o ON t.order_id = o.id
       WHERE t.user_id = $1
         AND t.payment_method_type = 'deferred'
         AND t.payer_type = 'client'
         AND t.status IN ('delayed', 'pending')
+        AND o.status = 'completed'
       ORDER BY t.created_at DESC`,
       [userId]
     );

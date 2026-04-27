@@ -78,14 +78,16 @@ export async function calculateAnnualCreditUsed(
     const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
 
     const result = await (pool as any).query(
-      `SELECT COALESCE(SUM(amount), 0) as total
-       FROM transactions
-       WHERE user_id = $1
-         AND payment_method_type = 'deferred'
-         AND payer_type = 'client'
-         AND status IN ('delayed', 'paid')
-         AND created_at >= $2
-         AND created_at <= $3`,
+      `SELECT COALESCE(SUM(t.amount), 0) as total
+       FROM transactions t
+       INNER JOIN orders o ON t.order_id = o.id
+       WHERE t.user_id = $1
+         AND t.payment_method_type = 'deferred'
+         AND t.payer_type = 'client'
+         AND t.status IN ('delayed', 'paid')
+         AND t.created_at >= $2
+         AND t.created_at <= $3
+         AND o.status = 'completed'`,
       [userId, startOfYear, endOfYear]
     );
 
@@ -122,14 +124,16 @@ export async function calculateMonthlyCreditUsed(
     );
 
     const result = await (pool as any).query(
-      `SELECT COALESCE(SUM(amount), 0) as total
-       FROM transactions
-       WHERE user_id = $1
-         AND payment_method_type = 'deferred'
-         AND payer_type = 'client'
-         AND status IN ('delayed', 'paid')
-         AND created_at >= $2
-         AND created_at <= $3`,
+      `SELECT COALESCE(SUM(t.amount), 0) as total
+       FROM transactions t
+       INNER JOIN orders o ON t.order_id = o.id
+       WHERE t.user_id = $1
+         AND t.payment_method_type = 'deferred'
+         AND t.payer_type = 'client'
+         AND t.status IN ('delayed', 'paid')
+         AND t.created_at >= $2
+         AND t.created_at <= $3
+         AND o.status = 'completed'`,
       [userId, startOfMonth, endOfMonth]
     );
 
@@ -166,13 +170,15 @@ export async function getDeferredPaymentUsageCount(
 
     const result = await (pool as any).query(
       `SELECT COUNT(*) as count
-       FROM transactions
-       WHERE user_id = $1
-         AND payment_method_type = 'deferred'
-         AND payer_type = 'client'
-         AND status IN ('delayed', 'paid')
-         AND created_at >= $2
-         AND created_at <= $3`,
+       FROM transactions t
+       INNER JOIN orders o ON t.order_id = o.id
+       WHERE t.user_id = $1
+         AND t.payment_method_type = 'deferred'
+         AND t.payer_type = 'client'
+         AND t.status IN ('delayed', 'paid')
+         AND t.created_at >= $2
+         AND t.created_at <= $3
+         AND o.status = 'completed'`,
       [userId, startOfMonth, endOfMonth]
     );
 
@@ -196,12 +202,14 @@ export async function getLastDeferredPaymentDate(
 ): Promise<Date | null> {
   try {
     const result = await (pool as any).query(
-      `SELECT MAX(created_at) as last_date
-       FROM transactions
-       WHERE user_id = $1
-         AND payment_method_type = 'deferred'
-         AND payer_type = 'client'
-         AND status IN ('delayed', 'paid')`,
+      `SELECT MAX(t.created_at) as last_date
+       FROM transactions t
+       INNER JOIN orders o ON t.order_id = o.id
+       WHERE t.user_id = $1
+         AND t.payment_method_type = 'deferred'
+         AND t.payer_type = 'client'
+         AND t.status IN ('delayed', 'paid')
+         AND o.status = 'completed'`,
       [userId]
     );
 
@@ -242,16 +250,18 @@ export async function checkLatePayments(
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const result = await (pool as any).query(
-      `SELECT 
-         COUNT(*) FILTER (WHERE created_at >= $1) as count_30_days,
-         COUNT(*) FILTER (WHERE created_at >= $2) as count_90_days,
+      `SELECT
+         COUNT(*) FILTER (WHERE t.created_at >= $1) as count_30_days,
+         COUNT(*) FILTER (WHERE t.created_at >= $2) as count_90_days,
          COUNT(*) as total_count
-       FROM transactions
-       WHERE user_id = $3
-         AND payment_method_type = 'deferred'
-         AND payer_type = 'client'
-         AND status = 'delayed'
-         AND created_at <= $4`,
+       FROM transactions t
+       INNER JOIN orders o ON t.order_id = o.id
+       WHERE t.user_id = $3
+         AND t.payment_method_type = 'deferred'
+         AND t.payer_type = 'client'
+         AND t.status = 'delayed'
+         AND t.created_at <= $4
+         AND o.status = 'completed'`,
       [thirtyDaysAgo, ninetyDaysAgo, userId, sevenDaysAgo]
     );
 
@@ -266,13 +276,15 @@ export async function checkLatePayments(
     let blockEndDate: Date | undefined;
     if (isBlocked) {
       const lastLatePaymentResult = await (pool as any).query(
-        `SELECT MAX(created_at) as last_late_date
-         FROM transactions
-         WHERE user_id = $1
-           AND payment_method_type = 'deferred'
-           AND payer_type = 'client'
-           AND status = 'delayed'
-           AND created_at <= $2`,
+        `SELECT MAX(t.created_at) as last_late_date
+         FROM transactions t
+         INNER JOIN orders o ON t.order_id = o.id
+         WHERE t.user_id = $1
+           AND t.payment_method_type = 'deferred'
+           AND t.payer_type = 'client'
+           AND t.status = 'delayed'
+           AND t.created_at <= $2
+           AND o.status = 'completed'`,
         [userId, sevenDaysAgo]
       );
 

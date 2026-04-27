@@ -129,6 +129,7 @@ export default function MapPage() {
     }
   }, [user?.id, loadPaymentMethods]);
 
+
   useEffect(() => {
     locationService.startWatching();
     
@@ -1226,7 +1227,7 @@ export default function MapPage() {
   return (
     <View style={styles.container}>
       {/* Bouton Retour */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.backButton}
         onPress={() => router.push("/(tabs)")}
       >
