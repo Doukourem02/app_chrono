@@ -1638,15 +1638,18 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       startOfYear.toISOString(),
     ]);
 
-    // Transactions par méthode de paiement
+    // Transactions par méthode de paiement (hors commandes annulées/refusées)
     const transactionsByMethodQuery = `
-      SELECT 
-        payment_method_type,
+      SELECT
+        t.payment_method_type,
         COUNT(*) as count,
-        COALESCE(SUM(amount), 0) as total
-      FROM transactions
-      WHERE created_at >= $1
-      GROUP BY payment_method_type
+        COALESCE(SUM(t.amount), 0) as total
+      FROM transactions t
+      INNER JOIN orders o ON t.order_id = o.id
+      WHERE t.created_at >= $1
+        AND o.status NOT IN ('cancelled', 'declined')
+        AND t.status NOT IN ('cancelled', 'refunded')
+      GROUP BY t.payment_method_type
     `;
 
     const transactionsByMethodResult = await (pool as any).query(transactionsByMethodQuery, [
@@ -1660,16 +1663,18 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       }
     });
 
-    // Statut des paiements
-    // Compter les paiements différés séparément pour les statistiques
+    // Statut des paiements (hors commandes annulées/refusées)
     const paymentStatusQuery = `
-      SELECT 
-        status,
-        payment_method_type,
+      SELECT
+        t.status,
+        t.payment_method_type,
         COUNT(*) as count
-      FROM transactions
-      WHERE created_at >= $1
-      GROUP BY status, payment_method_type
+      FROM transactions t
+      INNER JOIN orders o ON t.order_id = o.id
+      WHERE t.created_at >= $1
+        AND o.status NOT IN ('cancelled', 'declined')
+        AND t.status NOT IN ('cancelled', 'refunded')
+      GROUP BY t.status, t.payment_method_type
     `;
 
     const paymentStatusResult = await (pool as any).query(paymentStatusQuery, [
@@ -1699,7 +1704,8 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     const qrScannedQuery = `
       SELECT
         COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL) as qr_scanned,
-        COUNT(*) as total
+        COUNT(*) FILTER (WHERE status NOT IN ('cancelled', 'declined')) as total,
+        COUNT(*) FILTER (WHERE status IN ('cancelled', 'declined')) as cancelled
       FROM orders
       WHERE created_at >= $1
     `;
@@ -1707,6 +1713,34 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     const qrScanned = {
       scanned: parseInt(qrScannedResult.rows[0]?.qr_scanned || '0'),
       total: parseInt(qrScannedResult.rows[0]?.total || '0'),
+      cancelled: parseInt(qrScannedResult.rows[0]?.cancelled || '0'),
+    };
+
+    // Valeur des commandes annulées (opportunités manquées)
+    const cancelledStatsQuery = `
+      SELECT
+        COUNT(*) as cancelled_count,
+        COALESCE(SUM(${priceColumn}), 0) as cancelled_value
+      FROM orders
+      WHERE status IN ('cancelled', 'declined')
+        AND created_at >= $1
+    `;
+    const cancelledStatsResult = await (pool as any).query(cancelledStatsQuery, [startOfMonth.toISOString()]);
+
+    const cancelledDeferredQuery = `
+      SELECT COALESCE(SUM(t.amount), 0) as deferred_cancelled_amount
+      FROM transactions t
+      INNER JOIN orders o ON t.order_id = o.id
+      WHERE o.status IN ('cancelled', 'declined')
+        AND t.payment_method_type = 'deferred'
+        AND t.created_at >= $1
+    `;
+    const cancelledDeferredResult = await (pool as any).query(cancelledDeferredQuery, [startOfMonth.toISOString()]);
+
+    const cancelledStats = {
+      count: parseInt(cancelledStatsResult.rows[0]?.cancelled_count || '0'),
+      totalValue: parseFloat(cancelledStatsResult.rows[0]?.cancelled_value || '0'),
+      deferredAmount: parseFloat(cancelledDeferredResult.rows[0]?.deferred_cancelled_amount || '0'),
     };
 
     // Taux de conversion
@@ -1771,6 +1805,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         transactionsByMethod,
         paymentStatus,
         qrScanned,
+        cancelledStats,
         conversionRate: Math.round(conversionRate * 10) / 10,
         revenueByDriver: revenueByDriverResult.rows.map((r: any) => ({
           driverId: r.driver_id,

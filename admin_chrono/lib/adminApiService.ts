@@ -909,7 +909,8 @@ class AdminApiService {
       totalRevenue: { today: number; week: number; month: number; year: number }
       transactionsByMethod: Record<string, number>
       paymentStatus: Record<string, number>
-      qrScanned: { scanned: number; total: number }
+      qrScanned: { scanned: number; total: number; cancelled: number }
+      cancelledStats: { count: number; totalValue: number; deferredAmount: number }
       conversionRate: number
       revenueByDriver: Array<{ driverId: string; deliveries: number; revenue: number }>
       revenueByDeliveryType: Record<string, number>
@@ -925,7 +926,8 @@ class AdminApiService {
             totalRevenue: { today: 0, week: 0, month: 0, year: 0 },
             transactionsByMethod: { orange_money: 0, wave: 0, cash: 0, deferred: 0 },
             paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
-            qrScanned: { scanned: 0, total: 0 },
+            qrScanned: { scanned: 0, total: 0, cancelled: 0 },
+            cancelledStats: { count: 0, totalValue: 0, deferredAmount: 0 },
             conversionRate: 0,
             revenueByDriver: [],
             revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },
@@ -941,7 +943,8 @@ class AdminApiService {
             totalRevenue: { today: number; week: number; month: number; year: number }
             transactionsByMethod: Record<string, number>
             paymentStatus: Record<string, number>
-            qrScanned: { scanned: number; total: number }
+            qrScanned: { scanned: number; total: number; cancelled: number }
+            cancelledStats: { count: number; totalValue: number; deferredAmount: number }
             conversionRate: number
             revenueByDriver: Array<{ driverId: string; deliveries: number; revenue: number }>
             revenueByDeliveryType: Record<string, number>
@@ -954,7 +957,8 @@ class AdminApiService {
           totalRevenue: { today: 0, week: 0, month: 0, year: 0 },
           transactionsByMethod: { orange_money: 0, wave: 0, cash: 0, deferred: 0 },
           paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
-          qrScanned: { scanned: 0, total: 0 },
+          qrScanned: { scanned: 0, total: 0, cancelled: 0 },
+          cancelledStats: { count: 0, totalValue: 0, deferredAmount: 0 },
           conversionRate: 0,
           revenueByDriver: [],
           revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },
@@ -968,7 +972,8 @@ class AdminApiService {
           totalRevenue: { today: 0, week: 0, month: 0, year: 0 },
           transactionsByMethod: { orange_money: 0, wave: 0, cash: 0, deferred: 0 },
           paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
-          qrScanned: { scanned: 0, total: 0 },
+          qrScanned: { scanned: 0, total: 0, cancelled: 0 },
+          cancelledStats: { count: 0, totalValue: 0, deferredAmount: 0 },
           conversionRate: 0,
           revenueByDriver: [],
           revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },

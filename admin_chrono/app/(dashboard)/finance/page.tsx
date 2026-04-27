@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { Wallet, TrendingUp, CreditCard, Clock, Download, RefreshCw } from 'lucide-react'
+import { Wallet, TrendingUp, CreditCard, Clock, Download, RefreshCw, XCircle } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { exportData } from '@/utils/exportUtils'
 import { themeColors } from '@/utils/theme'
@@ -485,7 +485,15 @@ export default function FinancePage() {
         ))}
       </div>
 
-      {/* KPIs */}
+      {/* Section : Données actives */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: themeColors.textPrimary, whiteSpace: 'nowrap' }}>
+          Données actives
+        </span>
+        <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }} />
+      </div>
+
+      {/* KPIs principaux — commandes complétées uniquement */}
       <div style={kpiGridStyle}>
         <div style={kpiCardStyle}>
           <div style={kpiCardHeaderStyle}>
@@ -504,7 +512,7 @@ export default function FinancePage() {
                     : stats?.totalRevenue.year || 0
                 )}
               </div>
-              <div style={kpiLabelStyle}>Revenus totaux</div>
+              <div style={kpiLabelStyle}>Revenus encaissés</div>
             </div>
           </div>
         </div>
@@ -530,7 +538,7 @@ export default function FinancePage() {
               <div style={kpiValueStyle}>
                 {stats?.qrScanned?.scanned || 0} / {stats?.qrScanned?.total || 0}
               </div>
-              <div style={kpiLabelStyle}>Paiements complétés</div>
+              <div style={kpiLabelStyle}>Livraisons confirmées (QR)</div>
             </div>
           </div>
         </div>
@@ -542,7 +550,56 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={kpiValueStyle}>{(stats?.qrScanned?.total || 0) - (stats?.qrScanned?.scanned || 0)}</div>
-              <div style={kpiLabelStyle}>En attente</div>
+              <div style={kpiLabelStyle}>Paiements en attente</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section : Commandes annulées */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', marginTop: '8px' }}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>
+          Commandes annulées
+        </span>
+        <div style={{ flex: 1, height: '1px', backgroundColor: '#FCA5A5' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+        <div style={{ ...kpiCardStyle, border: '1px dashed #FCA5A5', backgroundColor: '#FFF5F5' }}>
+          <div style={kpiCardHeaderStyle}>
+            <div style={{ ...kpiIconStyle, backgroundColor: '#FEE2E2' }}>
+              <XCircle size={20} color="#EF4444" />
+            </div>
+            <div>
+              <div style={{ ...kpiValueStyle, color: '#EF4444' }}>{stats?.cancelledStats?.count ?? stats?.qrScanned?.cancelled ?? 0}</div>
+              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Commandes annulées / refusées</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ ...kpiCardStyle, border: '1px dashed #FCA5A5', backgroundColor: '#FFF5F5' }}>
+          <div style={kpiCardHeaderStyle}>
+            <div style={{ ...kpiIconStyle, backgroundColor: '#FEE2E2' }}>
+              <Wallet size={20} color="#EF4444" />
+            </div>
+            <div>
+              <div style={{ ...kpiValueStyle, color: '#EF4444' }}>
+                {formatCurrency(stats?.cancelledStats?.totalValue || 0)}
+              </div>
+              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Valeur non encaissée</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ ...kpiCardStyle, border: '1px dashed #FCA5A5', backgroundColor: '#FFF5F5' }}>
+          <div style={kpiCardHeaderStyle}>
+            <div style={{ ...kpiIconStyle, backgroundColor: '#FEE2E2' }}>
+              <CreditCard size={20} color="#EF4444" />
+            </div>
+            <div>
+              <div style={{ ...kpiValueStyle, color: '#EF4444' }}>
+                {formatCurrency(stats?.cancelledStats?.deferredAmount || 0)}
+              </div>
+              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Différés annulés</div>
             </div>
           </div>
         </div>
