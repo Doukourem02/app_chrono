@@ -426,9 +426,25 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
           </div>
 
           <div style={{ ...sectionStyle, marginBottom: '12px', flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <div style={timelineStyle}>
+            <style>{`
+              @keyframes krono-step-in {
+                from { opacity: 0; transform: translateY(10px); }
+                to   { opacity: 1; transform: translateY(0);    }
+              }
+            `}</style>
+            <div
+              key={`timeline-${activeDelivery?.id ?? 'none'}-${activeDelivery?.status ?? 'none'}`}
+              style={timelineStyle}
+            >
               {timelineItems.map((item, index) => (
-                <div key={item.key} style={timelineItemStyle}>
+                <div
+                  key={item.key}
+                  style={{
+                    ...timelineItemStyle,
+                    animation: 'krono-step-in 0.38s ease-out both',
+                    animationDelay: `${index * 80}ms`,
+                  }}
+                >
                   <div style={timelineDotContainerStyle}>
                     <div style={timelineDotStyle(item.active)}></div>
                     {index < timelineItems.length - 1 && <div style={timelineLineStyle}></div>}

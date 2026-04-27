@@ -200,9 +200,13 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         color: new Animated.Value(initialActive ? 1 : 0),
         scale: new Animated.Value(1),
         opacity: new Animated.Value(initialActive ? 1 : 0.5),
+        entranceY: new Animated.Value(20),
+        entranceOpacity: new Animated.Value(0),
       };
     })
   ).current;
+
+  const prevExpandedRef = useRef(false);
 
   useEffect(() => {
     const currentActiveIndexes = getActiveIndexes();
@@ -259,6 +263,35 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
     Animated.stagger(STAGGER_MS, animations).start();
   }, [status, currentOrder?.status, statusSteps, getActiveIndexes, stepAnimations]);
+
+  useEffect(() => {
+    if (isExpanded && !prevExpandedRef.current) {
+      stepAnimations.forEach((anim) => {
+        anim.entranceY.setValue(20);
+        anim.entranceOpacity.setValue(0);
+      });
+
+      const entranceAnimations = stepAnimations.map((anim) =>
+        Animated.parallel([
+          Animated.timing(anim.entranceY, {
+            toValue: 0,
+            duration: 380,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.cubic),
+          }),
+          Animated.timing(anim.entranceOpacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.quad),
+          }),
+        ])
+      );
+
+      Animated.stagger(90, entranceAnimations).start();
+    }
+    prevExpandedRef.current = isExpanded;
+  }, [isExpanded, stepAnimations]);
 
   return (
     <Animated.View
@@ -379,7 +412,16 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                   });
 
                   return (
-                    <View key={step.key} style={styles.stepContainer}>
+                    <Animated.View
+                      key={step.key}
+                      style={[
+                        styles.stepContainer,
+                        {
+                          transform: [{ translateY: anim.entranceY }],
+                          opacity: anim.entranceOpacity,
+                        },
+                      ]}
+                    >
                       {index !== 0 && (
                         <Animated.View
                           style={[
@@ -401,7 +443,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                       <Animated.Text
                         style={[
                           styles.stepText,
-                          { 
+                          {
                             color: textColor,
                             opacity: anim.opacity,
                           },
@@ -409,7 +451,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                       >
                         {step.label}
                       </Animated.Text>
-                    </View>
+                    </Animated.View>
                   );
                 })}
               </View>
