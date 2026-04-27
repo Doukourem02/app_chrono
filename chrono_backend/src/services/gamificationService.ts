@@ -21,7 +21,17 @@ export interface LeaderboardEntry {
   score: number;
   rank: number;
   deliveries: number;
+  totalOrders: number;
+  successRate: number;
   rating: number;
+}
+
+export interface PerformanceKPIs {
+  totalCompleted: number;
+  totalOrders: number;
+  successRate: number;
+  avgRating: number;
+  activeDrivers: number;
 }
 
 /**
@@ -147,35 +157,86 @@ export async function getLeaderboard(
     }
 
     const result = await pool.query(
-      `SELECT 
+      `SELECT
         d.user_id as driver_id,
         u.first_name || ' ' || u.last_name as driver_name,
-        COUNT(*) FILTER (WHERE o.status = 'completed') as deliveries,
+        COUNT(o.id) FILTER (WHERE o.status = 'completed') as deliveries,
+        COUNT(o.id) FILTER (WHERE o.status NOT IN ('pending', 'searching')) as total_orders,
         AVG(r.rating) as rating,
-        COUNT(*) FILTER (WHERE o.status = 'completed') * COALESCE(AVG(r.rating), 4.0) as score
+        COUNT(o.id) FILTER (WHERE o.status = 'completed') * COALESCE(AVG(r.rating), 4.0) as score
       FROM driver_profiles d
       JOIN users u ON u.id = d.user_id
       LEFT JOIN orders o ON o.driver_id = d.user_id ${dateFilter} ${zoneFilter}
       LEFT JOIN ratings r ON r.order_id = o.id
-      WHERE d.is_online = true
       GROUP BY d.user_id, u.first_name, u.last_name
-      HAVING COUNT(*) FILTER (WHERE o.status = 'completed') > 0
+      HAVING COUNT(o.id) FILTER (WHERE o.status = 'completed') > 0
       ORDER BY score DESC
       LIMIT 50`,
       []
     );
 
-    return result.rows.map((row, index) => ({
-      driverId: row.driver_id,
-      driverName: row.driver_name || 'Livreur',
-      score: parseFloat(row.score || '0'),
-      rank: index + 1,
-      deliveries: parseInt(row.deliveries || '0'),
-      rating: parseFloat(row.rating || '0'),
-    }));
+    return result.rows.map((row, index) => {
+      const deliveries = parseInt(row.deliveries || '0');
+      const totalOrders = parseInt(row.total_orders || '0');
+      return {
+        driverId: row.driver_id,
+        driverName: row.driver_name || 'Livreur',
+        score: parseFloat(row.score || '0'),
+        rank: index + 1,
+        deliveries,
+        totalOrders,
+        successRate: totalOrders > 0 ? Math.round((deliveries / totalOrders) * 100) : 100,
+        rating: parseFloat(row.rating || '0'),
+      };
+    });
   } catch (error: any) {
     logger.error('Error getting leaderboard:', error);
     return [];
+  }
+}
+
+/**
+ * Récupère les KPIs globaux de performance pour la période
+ */
+export async function getPerformanceKPIs(
+  period: 'week' | 'month' | 'all' = 'week'
+): Promise<PerformanceKPIs> {
+  try {
+    let dateFilter = '';
+    if (period === 'week') {
+      dateFilter = "WHERE o.created_at >= CURRENT_DATE - INTERVAL '7 days'";
+    } else if (period === 'month') {
+      dateFilter = "WHERE o.created_at >= CURRENT_DATE - INTERVAL '30 days'";
+    } else {
+      dateFilter = 'WHERE TRUE';
+    }
+
+    const result = await pool.query(
+      `SELECT
+        COUNT(o.id) FILTER (WHERE o.status = 'completed') as total_completed,
+        COUNT(o.id) FILTER (WHERE o.status NOT IN ('pending', 'searching')) as total_orders,
+        COALESCE(AVG(r.rating), 0) as avg_rating,
+        COUNT(DISTINCT o.driver_id) FILTER (WHERE o.status = 'completed') as active_drivers
+      FROM orders o
+      LEFT JOIN ratings r ON r.order_id = o.id
+      ${dateFilter}`,
+      []
+    );
+
+    const row = result.rows[0];
+    const totalCompleted = parseInt(row.total_completed || '0');
+    const totalOrders = parseInt(row.total_orders || '0');
+
+    return {
+      totalCompleted,
+      totalOrders,
+      successRate: totalOrders > 0 ? Math.round((totalCompleted / totalOrders) * 100) : 0,
+      avgRating: parseFloat(parseFloat(row.avg_rating || '0').toFixed(1)),
+      activeDrivers: parseInt(row.active_drivers || '0'),
+    };
+  } catch (error: any) {
+    logger.error('Error getting performance KPIs:', error);
+    return { totalCompleted: 0, totalOrders: 0, successRate: 0, avgRating: 0, activeDrivers: 0 };
   }
 }
 

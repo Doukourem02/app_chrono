@@ -60,17 +60,9 @@ export default function FleetPage() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
+  // Scroll to top whenever the active tab changes
   useEffect(() => {
-    const id =
-      activeTab === 'overview' ? 'maintenance-tab-overview' : `maintenance-tab-${activeTab}`
-    const el = typeof document !== 'undefined' ? document.getElementById(id) : null
-    if (el) {
-      requestAnimationFrame(() => {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
-    } else if (activeTab === 'overview') {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [activeTab])
 
   // Récupérer les véhicules
@@ -223,69 +215,74 @@ export default function FleetPage() {
     transition: 'all 0.2s',
   }
 
+  const tabTitle: Record<string, string> = {
+    overview: t('sidebar.sections.maintenance.overview'),
+    vehicles: t('sidebar.sections.maintenance.vehicles') || 'Véhicules',
+    documents: t('sidebar.sections.maintenance.documents') || 'Documents',
+    repairs: t('sidebar.sections.maintenance.repairs') || 'Entretien',
+    budget: t('sidebar.sections.maintenance.budget') || 'Budget',
+  }
+
   return (
     <ScreenTransition>
       <div style={containerStyle}>
-        <div id="maintenance-tab-overview" style={{ scrollMarginTop: 88 }}>
-          {/* Header */}
-          <div style={headerRowStyle}>
-            <div>
-              <h1 style={titleStyle}>
-                {t('sidebar.sections.maintenance.title')}
-              </h1>
-              <p style={subtitleStyle}>
-                {t('sidebar.sections.maintenance.overview')}
-              </p>
-            </div>
-          </div>
-
-          {/* Statistiques globales avec KPICard */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <KPICard
-            title={t('maintenance.stats.totalVehicles')}
-            value={stats.total}
-            change={0}
-            subtitle="Total véhicules"
-            icon={CarFront}
-            iconColor="text-purple-600"
-            isLoading={isLoading}
-            index={0}
-          />
-          <KPICard
-            title={t('maintenance.stats.active')}
-            value={stats.active}
-            change={0}
-            subtitle="Véhicules actifs"
-            icon={TrendingUp}
-            iconColor="text-green-600"
-            isLoading={isLoading}
-            index={1}
-          />
-          <KPICard
-            title={t('maintenance.stats.maintenance')}
-            value={stats.maintenance}
-            change={0}
-            subtitle="En maintenance"
-            icon={Wrench}
-            iconColor="text-yellow-600"
-            isLoading={isLoading}
-            index={2}
-          />
-          <KPICard
-            title={t('maintenance.stats.avgOdometer')}
-            value={`${formatOdometer(stats.avgOdometer)} km`}
-            change={0}
-            subtitle="Kilométrage moyen"
-            icon={Gauge}
-            iconColor="text-blue-600"
-            isLoading={isLoading}
-            index={3}
-          />
+        {/* Header commun */}
+        <div style={headerRowStyle}>
+          <div>
+            <h1 style={titleStyle}>{t('sidebar.sections.maintenance.title')}</h1>
+            <p style={subtitleStyle}>{tabTitle[activeTab] || tabTitle.overview}</p>
           </div>
         </div>
 
-        {/* Documents (ancre pour ?tab=documents) */}
-        <div id="maintenance-tab-documents" style={{ scrollMarginTop: 88 }}>
+        {/* ── Vue d'ensemble ─────────────────────────────────────── */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <KPICard
+              title={t('maintenance.stats.totalVehicles')}
+              value={stats.total}
+              change={0}
+              subtitle="Total véhicules"
+              icon={CarFront}
+              iconColor="text-purple-600"
+              isLoading={isLoading}
+              index={0}
+            />
+            <KPICard
+              title={t('maintenance.stats.active')}
+              value={stats.active}
+              change={0}
+              subtitle="Véhicules actifs"
+              icon={TrendingUp}
+              iconColor="text-green-600"
+              isLoading={isLoading}
+              index={1}
+            />
+            <KPICard
+              title={t('maintenance.stats.maintenance')}
+              value={stats.maintenance}
+              change={0}
+              subtitle="En maintenance"
+              icon={Wrench}
+              iconColor="text-yellow-600"
+              isLoading={isLoading}
+              index={2}
+            />
+            <KPICard
+              title={t('maintenance.stats.avgOdometer')}
+              value={`${formatOdometer(stats.avgOdometer)} km`}
+              change={0}
+              subtitle="Kilométrage moyen"
+              icon={Gauge}
+              iconColor="text-blue-600"
+              isLoading={isLoading}
+              index={3}
+            />
+          </div>
+        )}
+
+        {/* ── Documents ──────────────────────────────────────────── */}
+        {activeTab === 'documents' && (
+          <div>
           {expiringDocuments.length > 0 ? (
             <AnimatedCard index={0} delay={0} style={{
               backgroundColor: '#FEF3C7',
@@ -343,10 +340,12 @@ export default function FleetPage() {
               Aucun document expirant dans les 30 prochains jours.
             </p>
           )}
-        </div>
+          </div>
+        )}
 
-        {/* Filtres et recherche */}
-        <div id="maintenance-tab-vehicles" style={{ scrollMarginTop: 88 }}>
+        {/* ── Véhicules ──────────────────────────────────────────── */}
+        {activeTab === 'vehicles' && (
+          <div>
         <div style={filtersContainerStyle}>
             {/* Recherche */}
             <div style={searchContainerStyle}>
@@ -655,10 +654,12 @@ export default function FleetPage() {
             </div>
           )}
         </AnimatedCard>
-        </div>
+          </div>
+        )}
 
-        <div id="maintenance-tab-repairs" style={{ scrollMarginTop: 88 }}>
-          <AnimatedCard index={1} delay={0} style={{
+        {/* ── Entretien ──────────────────────────────────────────── */}
+        {activeTab === 'repairs' && (
+          <AnimatedCard index={0} delay={0} style={{
             backgroundColor: themeColors.cardBg,
             borderRadius: '16px',
             padding: '24px',
@@ -668,13 +669,14 @@ export default function FleetPage() {
               Entretien & réparations
             </h2>
             <p style={{ fontSize: '14px', color: themeColors.textSecondary }}>
-              Vue dédiée à venir — les interventions sont pour l’instant listées au niveau de chaque véhicule.
+              Vue dédiée à venir — les interventions sont pour l&apos;instant listées au niveau de chaque véhicule.
             </p>
           </AnimatedCard>
-        </div>
+        )}
 
-        <div id="maintenance-tab-budget" style={{ scrollMarginTop: 88 }}>
-          <AnimatedCard index={2} delay={0} style={{
+        {/* ── Budget ─────────────────────────────────────────────── */}
+        {activeTab === 'budget' && (
+          <AnimatedCard index={0} delay={0} style={{
             backgroundColor: themeColors.cardBg,
             borderRadius: '16px',
             padding: '24px',
@@ -687,7 +689,7 @@ export default function FleetPage() {
               Synthèse budgétaire à venir.
             </p>
           </AnimatedCard>
-        </div>
+        )}
       </div>
     </ScreenTransition>
   )

@@ -3376,15 +3376,12 @@ export const getAdminDisputes = async (req: Request, res: Response): Promise<voi
     }
 
     let query = `
-      SELECT 
+      SELECT
         d.*,
-        t.amount,
-        t.payment_method_type,
         u.email as user_email,
         u.phone as user_phone,
         o.id as order_id_full
       FROM payment_disputes d
-      LEFT JOIN transactions t ON d.transaction_id = t.id
       LEFT JOIN users u ON d.user_id = u.id
       LEFT JOIN orders o ON d.order_id = o.id
       WHERE 1=1

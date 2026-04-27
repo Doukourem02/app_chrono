@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { checkAndUnlockBadges, getLeaderboard, calculateDriverScore } from '../services/gamificationService.js';
+import { checkAndUnlockBadges, getLeaderboard, calculateDriverScore, getPerformanceKPIs } from '../services/gamificationService.js';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 
@@ -55,9 +55,12 @@ export const getLeaderboardRanking = async (req: Request, res: Response): Promis
     const period = (req.query.period as 'week' | 'month' | 'all') || 'week';
     const zone = req.query.zone as string | undefined;
 
-    const leaderboard = await getLeaderboard(period, zone);
+    const [leaderboard, kpis] = await Promise.all([
+      getLeaderboard(period, zone),
+      getPerformanceKPIs(period),
+    ]);
 
-    res.json({ leaderboard });
+    res.json({ leaderboard, kpis });
   } catch (error: any) {
     logger.error('Error getting leaderboard:', error);
     res.status(500).json({ error: 'Erreur serveur' });
