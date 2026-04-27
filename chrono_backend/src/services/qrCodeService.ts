@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import QRCode from 'qrcode';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import { completeTransactionsForOrder } from '../utils/createTransactionForOrder.js';
 
 // Secret pour signer les QR codes (doit être dans les variables d'environnement)
 const QR_CODE_SECRET = process.env.QR_CODE_SECRET || 'change-me-in-production-minimum-32-characters-long-secret-key';
@@ -276,7 +277,7 @@ export class QRCodeService {
 
       // Mettre à jour la commande
       await pool.query(
-        `UPDATE orders 
+        `UPDATE orders
          SET delivery_qr_scanned_at = NOW(),
              delivery_qr_scanned_by = $1,
              status = 'completed',
@@ -285,6 +286,8 @@ export class QRCodeService {
          WHERE id = $2`,
         [scannedBy, qrCodeData.orderId]
       );
+
+      await completeTransactionsForOrder(qrCodeData.orderId);
 
       logger.info(`QR code scanné avec succès pour la commande ${qrCodeData.orderId} par ${scannedBy}`);
 
@@ -477,6 +480,8 @@ export class QRCodeService {
          WHERE id = $2`,
         [driverId, orderId]
       );
+
+      await completeTransactionsForOrder(orderId);
 
       logger.info(`Code manuel validé pour la commande ${orderId} par ${driverId}`);
 

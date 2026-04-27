@@ -775,9 +775,9 @@ export default function ReportsPage() {
                     <YAxis />
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
-                    <Bar dataKey="orange_money" stackId="a" fill="#F59E0B" name="Orange Money" />
-                    <Bar dataKey="wave" stackId="a" fill="#10B981" name="Wave" />
-                    <Bar dataKey="cash" stackId="a" fill="#6366F1" name="Espèces" />
+                    <Bar dataKey="orange_money" stackId="a" fill="#F97316" name="Orange Money" />
+                    <Bar dataKey="wave" stackId="a" fill="#38BDF8" name="Wave" />
+                    <Bar dataKey="cash" stackId="a" fill="#8B5CF6" name="Espèces" />
                     <Bar dataKey="deferred" stackId="a" fill="#EF4444" name="Différé" />
                   </BarChart>
                 </ResponsiveContainer>

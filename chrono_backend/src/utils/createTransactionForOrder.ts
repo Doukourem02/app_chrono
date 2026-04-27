@@ -230,12 +230,27 @@ export async function cancelDeferredTransactionForOrder(orderId: string): Promis
       `UPDATE transactions
        SET status = 'cancelled', updated_at = NOW()
        WHERE order_id = $1
-         AND payment_method_type = 'deferred'
          AND status IN ('delayed', 'pending')`,
       [orderId]
     );
-    logger.info(`Transactions différées annulées pour commande ${maskOrderId(orderId)}`);
+    logger.info(`Toutes les transactions annulées pour commande ${maskOrderId(orderId)}`);
   } catch (error: any) {
-    logger.error(`Erreur annulation transactions différées pour ${maskOrderId(orderId)}:`, error);
+    logger.error(`Erreur annulation transactions pour ${maskOrderId(orderId)}:`, error);
+  }
+}
+
+export async function completeTransactionsForOrder(orderId: string): Promise<void> {
+  try {
+    await (pool as any).query(
+      `UPDATE transactions
+       SET status = 'paid', updated_at = NOW()
+       WHERE order_id = $1
+         AND payment_method_type = 'cash'
+         AND status = 'pending'`,
+      [orderId]
+    );
+    logger.info(`Transactions cash marquées comme payées pour commande ${maskOrderId(orderId)}`);
+  } catch (error: any) {
+    logger.error(`Erreur complétion transactions pour ${maskOrderId(orderId)}:`, error);
   }
 }

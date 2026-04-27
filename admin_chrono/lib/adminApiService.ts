@@ -903,22 +903,28 @@ class AdminApiService {
   /**
    * Récupère les statistiques financières
    */
-  async getFinancialStats(): Promise<{
+  async getFinancialStats(params?: { startDate?: string; endDate?: string }): Promise<{
     success: boolean
     data?: {
       totalRevenue: { today: number; week: number; month: number; year: number }
       transactionsByMethod: Record<string, number>
       paymentStatus: Record<string, number>
-      qrScanned: { scanned: number; total: number; cancelled: number }
-      cancelledStats: { count: number; totalValue: number; deferredAmount: number }
+      qrScanned: Record<string, { scanned: number; total: number; cancelled: number }>
+      cancelledStats: Record<string, { count: number; totalValue: number; deferredAmount: number }>
       conversionRate: number
       revenueByDriver: Array<{ driverId: string; deliveries: number; revenue: number }>
       revenueByDeliveryType: Record<string, number>
     }
   }> {
+    const emptyPeriods = { today: { scanned: 0, total: 0, cancelled: 0 }, week: { scanned: 0, total: 0, cancelled: 0 }, month: { scanned: 0, total: 0, cancelled: 0 }, year: { scanned: 0, total: 0, cancelled: 0 } }
+    const emptyCancelled = { today: { count: 0, totalValue: 0, deferredAmount: 0 }, week: { count: 0, totalValue: 0, deferredAmount: 0 }, month: { count: 0, totalValue: 0, deferredAmount: 0 }, year: { count: 0, totalValue: 0, deferredAmount: 0 } }
     try {
-      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/financial-stats`)
-      
+      const queryParams = new URLSearchParams()
+      if (params?.startDate) queryParams.append('startDate', params.startDate)
+      if (params?.endDate) queryParams.append('endDate', params.endDate)
+      const url = `${API_BASE_URL}/api/admin/financial-stats${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await this.fetchWithAuth(url)
+
       if (!response.ok) {
         return {
           success: false,
@@ -926,8 +932,8 @@ class AdminApiService {
             totalRevenue: { today: 0, week: 0, month: 0, year: 0 },
             transactionsByMethod: { orange_money: 0, wave: 0, cash: 0, deferred: 0 },
             paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
-            qrScanned: { scanned: 0, total: 0, cancelled: 0 },
-            cancelledStats: { count: 0, totalValue: 0, deferredAmount: 0 },
+            qrScanned: emptyPeriods,
+            cancelledStats: emptyCancelled,
             conversionRate: 0,
             revenueByDriver: [],
             revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },
@@ -943,8 +949,8 @@ class AdminApiService {
             totalRevenue: { today: number; week: number; month: number; year: number }
             transactionsByMethod: Record<string, number>
             paymentStatus: Record<string, number>
-            qrScanned: { scanned: number; total: number; cancelled: number }
-            cancelledStats: { count: number; totalValue: number; deferredAmount: number }
+            qrScanned: Record<string, { scanned: number; total: number; cancelled: number }>
+            cancelledStats: Record<string, { count: number; totalValue: number; deferredAmount: number }>
             conversionRate: number
             revenueByDriver: Array<{ driverId: string; deliveries: number; revenue: number }>
             revenueByDeliveryType: Record<string, number>
@@ -957,8 +963,8 @@ class AdminApiService {
           totalRevenue: { today: 0, week: 0, month: 0, year: 0 },
           transactionsByMethod: { orange_money: 0, wave: 0, cash: 0, deferred: 0 },
           paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
-          qrScanned: { scanned: 0, total: 0, cancelled: 0 },
-          cancelledStats: { count: 0, totalValue: 0, deferredAmount: 0 },
+          qrScanned: emptyPeriods,
+          cancelledStats: emptyCancelled,
           conversionRate: 0,
           revenueByDriver: [],
           revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },
@@ -972,8 +978,8 @@ class AdminApiService {
           totalRevenue: { today: 0, week: 0, month: 0, year: 0 },
           transactionsByMethod: { orange_money: 0, wave: 0, cash: 0, deferred: 0 },
           paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
-          qrScanned: { scanned: 0, total: 0, cancelled: 0 },
-          cancelledStats: { count: 0, totalValue: 0, deferredAmount: 0 },
+          qrScanned: emptyPeriods,
+          cancelledStats: emptyCancelled,
           conversionRate: 0,
           revenueByDriver: [],
           revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },

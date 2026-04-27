@@ -9,7 +9,7 @@ import { exportData } from '@/utils/exportUtils'
 import { themeColors } from '@/utils/theme'
 import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,} from 'recharts'
 
-type Period = 'today' | 'week' | 'month' | 'year'
+type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
 
 interface Transaction {
   id: string
@@ -26,6 +26,9 @@ interface Transaction {
 
 export default function FinancePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('month')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [customApplied, setCustomApplied] = useState(false)
   const [viewMode, setViewMode] = useState<'active' | 'cancelled'>('active')
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -35,11 +38,19 @@ export default function FinancePage() {
   const itemsPerPage = 20
   const queryClient = useQueryClient()
 
+  const statsQueryKey = selectedPeriod === 'custom' && customApplied
+    ? ['financial-stats', 'custom', customStart, customEnd]
+    : ['financial-stats']
+
   const { data: financialStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['financial-stats'],
-    queryFn: () => adminApiService.getFinancialStats(),
-    refetchInterval: false, 
-    staleTime: Infinity, 
+    queryKey: statsQueryKey,
+    queryFn: () => adminApiService.getFinancialStats(
+      selectedPeriod === 'custom' && customApplied && customStart && customEnd
+        ? { startDate: customStart, endDate: customEnd }
+        : undefined
+    ),
+    refetchInterval: false,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -131,6 +142,15 @@ export default function FinancePage() {
   const stats = financialStats?.data
   const transactions = transactionsData?.data || []
   const pagination = transactionsData?.pagination
+
+  // Clé de période à utiliser pour lire qrScanned / cancelledStats
+  const periodKey = selectedPeriod === 'custom' ? 'custom' : selectedPeriod
+  const currentQr = stats?.qrScanned?.[periodKey] ?? { scanned: 0, total: 0, cancelled: 0 }
+  const currentCancelled = stats?.cancelledStats?.[periodKey] ?? { count: 0, totalValue: 0, deferredAmount: 0 }
+  const currentRevenue = selectedPeriod === 'today' ? stats?.totalRevenue.today
+    : selectedPeriod === 'week' ? stats?.totalRevenue.week
+    : selectedPeriod === 'year' ? stats?.totalRevenue.year
+    : stats?.totalRevenue.month
 
   // Données pour le graphique des revenus par période
   const revenueChartData = stats
@@ -475,17 +495,69 @@ export default function FinancePage() {
       </div>
 
       {/* Filtres de période */}
-      <div style={periodTabsStyle}>
+      <div style={{ ...periodTabsStyle, flexWrap: 'wrap', alignItems: 'center' }}>
         {periods.map((period) => (
           <button
             key={period.key}
             style={selectedPeriod === period.key ? periodTabActiveStyle : periodTabStyle}
-            onClick={() => setSelectedPeriod(period.key)}
+            onClick={() => { setSelectedPeriod(period.key); setCustomApplied(false) }}
           >
             {period.label}
           </button>
         ))}
+        <button
+          style={selectedPeriod === 'custom' ? periodTabActiveStyle : periodTabStyle}
+          onClick={() => setSelectedPeriod('custom')}
+        >
+          Personnaliser
+        </button>
       </div>
+
+      {/* Sélecteur de dates personnalisé */}
+      {selectedPeriod === 'custom' && (
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Date début</label>
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => { setCustomStart(e.target.value); setCustomApplied(false) }}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, fontSize: '14px', backgroundColor: themeColors.cardBg, color: themeColors.textPrimary }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Date fin</label>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => { setCustomEnd(e.target.value); setCustomApplied(false) }}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, fontSize: '14px', backgroundColor: themeColors.cardBg, color: themeColors.textPrimary }}
+            />
+          </div>
+          <button
+            disabled={!customStart || !customEnd}
+            onClick={() => {
+              if (customStart && customEnd) {
+                setCustomApplied(true)
+                queryClient.invalidateQueries({ queryKey: ['financial-stats', 'custom', customStart, customEnd] })
+              }
+            }}
+            style={{
+              marginTop: '18px',
+              padding: '8px 20px',
+              borderRadius: '8px',
+              backgroundColor: customStart && customEnd ? themeColors.purplePrimary : '#E5E7EB',
+              color: customStart && customEnd ? '#FFFFFF' : '#9CA3AF',
+              border: 'none',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: customStart && customEnd ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Appliquer
+          </button>
+        </div>
+      )}
 
       {/* Section : Données actives */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
@@ -503,17 +575,7 @@ export default function FinancePage() {
               <Wallet size={20} color="#8B5CF6" />
             </div>
             <div>
-              <div style={kpiValueStyle}>
-                {formatCurrency(
-                  selectedPeriod === 'today'
-                    ? stats?.totalRevenue.today || 0
-                    : selectedPeriod === 'week'
-                    ? stats?.totalRevenue.week || 0
-                    : selectedPeriod === 'month'
-                    ? stats?.totalRevenue.month || 0
-                    : stats?.totalRevenue.year || 0
-                )}
-              </div>
+              <div style={kpiValueStyle}>{formatCurrency(currentRevenue || 0)}</div>
               <div style={kpiLabelStyle}>Revenus encaissés</div>
             </div>
           </div>
@@ -538,7 +600,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={kpiValueStyle}>
-                {stats?.qrScanned?.scanned || 0} / {stats?.qrScanned?.total || 0}
+                {currentQr.scanned} / {currentQr.total}
               </div>
               <div style={kpiLabelStyle}>Livraisons confirmées (QR)</div>
             </div>
@@ -551,7 +613,7 @@ export default function FinancePage() {
               <Clock size={20} color="#6366F1" />
             </div>
             <div>
-              <div style={kpiValueStyle}>{(stats?.qrScanned?.total || 0) - (stats?.qrScanned?.scanned || 0)}</div>
+              <div style={kpiValueStyle}>{currentQr.total - currentQr.scanned}</div>
               <div style={kpiLabelStyle}>Paiements en attente</div>
             </div>
           </div>
@@ -572,7 +634,7 @@ export default function FinancePage() {
               <XCircle size={20} color="#EF4444" />
             </div>
             <div>
-              <div style={{ ...kpiValueStyle, color: '#EF4444' }}>{stats?.cancelledStats?.count ?? stats?.qrScanned?.cancelled ?? 0}</div>
+              <div style={{ ...kpiValueStyle, color: '#EF4444' }}>{currentCancelled.count}</div>
               <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Commandes annulées / refusées</div>
             </div>
           </div>
@@ -585,7 +647,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={{ ...kpiValueStyle, color: '#EF4444' }}>
-                {formatCurrency(stats?.cancelledStats?.totalValue || 0)}
+                {formatCurrency(currentCancelled.totalValue)}
               </div>
               <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Valeur non encaissée</div>
             </div>
@@ -599,7 +661,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={{ ...kpiValueStyle, color: '#EF4444' }}>
-                {formatCurrency(stats?.cancelledStats?.deferredAmount || 0)}
+                {formatCurrency(currentCancelled.deferredAmount)}
               </div>
               <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Différés annulés</div>
             </div>
