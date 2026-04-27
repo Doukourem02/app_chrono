@@ -3153,7 +3153,7 @@ export const getAdminRatings = async (req: Request, res: Response): Promise<void
     }
 
     if (minRating) {
-      query += ` AND r.rating >= $${paramIndex}`;
+      query += ` AND r.rating = $${paramIndex}`;
       params.push(minRating);
       paramIndex++;
     }
