@@ -26,6 +26,7 @@ interface Transaction {
 
 export default function FinancePage() {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('month')
+  const [viewMode, setViewMode] = useState<'active' | 'cancelled'>('active')
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [methodFilter, setMethodFilter] = useState<string>('all')
@@ -45,7 +46,7 @@ export default function FinancePage() {
   })
 
   const { data: transactionsData, isLoading: transactionsLoading } = useQuery({
-    queryKey: ['transactions', currentPage, statusFilter, methodFilter, searchQuery],
+    queryKey: ['transactions', currentPage, statusFilter, methodFilter, searchQuery, viewMode],
     queryFn: () =>
       adminApiService.getTransactions({
         page: currentPage,
@@ -53,6 +54,7 @@ export default function FinancePage() {
         status: statusFilter !== 'all' ? statusFilter : undefined,
         method: methodFilter !== 'all' ? methodFilter : undefined,
         search: searchQuery || undefined,
+        view: viewMode,
       }),
     refetchInterval: false, 
     staleTime: Infinity, 
@@ -664,6 +666,42 @@ export default function FinancePage() {
         </div>
       )}
 
+      {/* Onglets Actives / Annulées */}
+      <div style={{ display: 'flex', gap: '0', marginBottom: '16px', borderBottom: `2px solid ${themeColors.cardBorder}` }}>
+        <button
+          onClick={() => { setViewMode('active'); setCurrentPage(1); setStatusFilter('all') }}
+          style={{
+            padding: '10px 24px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            border: 'none',
+            backgroundColor: 'transparent',
+            color: viewMode === 'active' ? themeColors.purplePrimary : themeColors.textSecondary,
+            borderBottom: viewMode === 'active' ? `2px solid ${themeColors.purplePrimary}` : '2px solid transparent',
+            marginBottom: '-2px',
+          }}
+        >
+          Transactions actives
+        </button>
+        <button
+          onClick={() => { setViewMode('cancelled'); setCurrentPage(1); setStatusFilter('all') }}
+          style={{
+            padding: '10px 24px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            border: 'none',
+            backgroundColor: 'transparent',
+            color: viewMode === 'cancelled' ? '#EF4444' : themeColors.textSecondary,
+            borderBottom: viewMode === 'cancelled' ? '2px solid #EF4444' : '2px solid transparent',
+            marginBottom: '-2px',
+          }}
+        >
+          Annulées / Refusées
+        </button>
+      </div>
+
       {/* Filtres et recherche */}
       <div style={filtersStyle}>
         <input
@@ -676,20 +714,22 @@ export default function FinancePage() {
           }}
           style={filterInputStyle}
         />
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value)
-            setCurrentPage(1)
-          }}
-          style={filterSelectStyle}
-        >
-          <option value="all">Tous les statuts</option>
-          <option value="paid">Payé</option>
-          <option value="pending">En attente</option>
-          <option value="refused">Refusé</option>
-          <option value="delayed">Différé</option>
-        </select>
+        {viewMode === 'active' && (
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value)
+              setCurrentPage(1)
+            }}
+            style={filterSelectStyle}
+          >
+            <option value="all">Tous les statuts</option>
+            <option value="paid">Payé</option>
+            <option value="pending">En attente</option>
+            <option value="refused">Refusé</option>
+            <option value="delayed">Différé</option>
+          </select>
+        )}
         <select
           value={methodFilter}
           onChange={(e) => {
@@ -708,7 +748,9 @@ export default function FinancePage() {
 
       {/* Table des transactions */}
       <div style={tableCardStyle}>
-        <h3 style={{ ...chartTitleStyle, marginBottom: '16px' }}>Transactions</h3>
+        <h3 style={{ ...chartTitleStyle, marginBottom: '16px' }}>
+          {viewMode === 'active' ? 'Transactions actives' : 'Commandes annulées / refusées'}
+        </h3>
         {transactionsLoading ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
         ) : transactions.length === 0 ? (

@@ -1838,8 +1838,9 @@ export const getAdminTransactions = async (req: Request, res: Response): Promise
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
     const search = req.query.search as string | undefined;
+    const view = req.query.view as 'active' | 'cancelled' | undefined;
 
-    logger.info('🚀 [getAdminTransactions] DÉBUT', { page, limit, status, method });
+    logger.info('🚀 [getAdminTransactions] DÉBUT', { page, limit, status, method, view });
 
     if (!process.env.DATABASE_URL) {
       logger.warn('DATABASE_URL non configuré pour getAdminTransactions');
@@ -1906,9 +1907,15 @@ export const getAdminTransactions = async (req: Request, res: Response): Promise
         u.last_name ILIKE $${paramIndex} OR
         CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) ILIKE $${paramIndex}
       )`;
-      // Utiliser le même pattern pour tous les champs de recherche
       params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
       paramIndex += 7;
+    }
+
+    if (view === 'active') {
+      query += ` AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))`;
+      query += ` AND t.status NOT IN ('cancelled', 'refunded')`;
+    } else if (view === 'cancelled') {
+      query += ` AND (o.status IN ('cancelled', 'declined') OR t.status IN ('cancelled', 'refunded'))`;
     }
 
     const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as count FROM');

@@ -993,6 +993,7 @@ class AdminApiService {
     startDate?: string
     endDate?: string
     search?: string
+    view?: 'active' | 'cancelled'
   }): Promise<{
     success: boolean
     data?: unknown[]
@@ -1007,6 +1008,7 @@ class AdminApiService {
       if (params?.startDate) queryParams.append('startDate', params.startDate)
       if (params?.endDate) queryParams.append('endDate', params.endDate)
       if (params?.search) queryParams.append('search', params.search)
+      if (params?.view) queryParams.append('view', params.view)
 
       const url = `${API_BASE_URL}/api/admin/transactions${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
       const response = await this.fetchWithAuth(url)
