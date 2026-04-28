@@ -48,6 +48,15 @@ export interface QRCodeScanResult {
   code?: QRScanErrorCode;
 }
 
+type ManualVerificationOrder = {
+  id: string;
+  status: string | null;
+  driver_id: string | null;
+  user_id: string | null;
+  delivery_verification_code: string | null;
+  delivery_qr_code: string | null;
+};
+
 export class QRCodeService {
   /**
    * Génère la signature cryptographique d'un QR code
@@ -429,21 +438,115 @@ export class QRCodeService {
     deviceInfo?: { platform?: string; model?: string }
   ): Promise<QRCodeScanResult> {
     try {
-      const orderResult = await pool.query(
+      const normalizedCode = String(code || '').trim();
+      if (!/^\d{6}$/.test(normalizedCode)) {
+        return {
+          success: false,
+          isValid: false,
+          code: 'QR_SIGNATURE_INVALID',
+          error: 'Code incorrect. Entrez les 6 chiffres affichés sur l’écran du client.',
+        };
+      }
+
+      const selectedOrderResult = await pool.query<ManualVerificationOrder>(
         `SELECT id, status, driver_id, user_id, delivery_verification_code,
                 delivery_qr_code
          FROM orders WHERE id = $1`,
         [orderId]
       );
 
-      if (orderResult.rows.length === 0) {
-        return { success: false, isValid: false, code: 'ORDER_NOT_FOUND', error: 'Commande introuvable.' };
+      const selectedOrder = selectedOrderResult.rows[0] || null;
+      let order: ManualVerificationOrder | null = null;
+
+      if (
+        selectedOrder &&
+        selectedOrder.driver_id === driverId &&
+        String(selectedOrder.delivery_verification_code || '').trim() === normalizedCode
+      ) {
+        order = selectedOrder;
       }
 
-      const order = orderResult.rows[0];
+      if (!order) {
+        const codeOrderResult = await pool.query<ManualVerificationOrder>(
+          `SELECT id, status, driver_id, user_id, delivery_verification_code,
+                  delivery_qr_code
+           FROM orders
+           WHERE delivery_verification_code = $1
+             AND driver_id = $2
+             AND status IN ('picked_up', 'completed')
+           ORDER BY
+             CASE
+               WHEN status = 'picked_up' THEN 0
+               WHEN status = 'completed' THEN 1
+               ELSE 2
+             END,
+             updated_at DESC NULLS LAST,
+             created_at DESC NULLS LAST
+           LIMIT 2`,
+          [normalizedCode, driverId]
+        );
+
+        if (codeOrderResult.rows.length > 1) {
+          return {
+            success: false,
+            isValid: false,
+            code: 'QR_SIGNATURE_INVALID',
+            error: 'Ce code correspond à plusieurs commandes. Scannez le QR code pour confirmer la bonne livraison.',
+          };
+        }
+
+        order = codeOrderResult.rows[0] || null;
+      }
+
+      if (!order) {
+        if (!selectedOrder) {
+          return {
+            success: false,
+            isValid: false,
+            code: 'ORDER_NOT_FOUND',
+            error: 'Aucune commande assignée à votre compte ne correspond à ce code.',
+          };
+        }
+
+        if (selectedOrder.driver_id !== driverId) {
+          return {
+            success: false,
+            isValid: false,
+            code: 'DRIVER_NOT_ASSIGNED',
+            error: 'Vous n’êtes pas le livreur assigné à cette commande.',
+          };
+        }
+
+        if (!selectedOrder.delivery_verification_code) {
+          return {
+            success: false,
+            isValid: false,
+            code: 'QR_MALFORMED',
+            error: 'Aucun code de vérification généré pour cette commande. Le client doit afficher son QR code au moins une fois.',
+          };
+        }
+
+        return {
+          success: false,
+          isValid: false,
+          code: 'QR_SIGNATURE_INVALID',
+          error: 'Code incorrect. Vérifiez les 6 chiffres affichés sur l’écran du client.',
+        };
+      }
 
       if (order.driver_id !== driverId) {
-        return { success: false, isValid: false, code: 'DRIVER_NOT_ASSIGNED', error: 'Vous n\'êtes pas le livreur assigné à cette commande.' };
+        return { success: false, isValid: false, code: 'DRIVER_NOT_ASSIGNED', error: 'Vous n’êtes pas le livreur assigné à cette commande.' };
+      }
+
+      const resolvedOrderId = order.id;
+
+      // Vérifier si déjà complété via QR ou saisie manuelle
+      const existingScan = await pool.query(
+        `SELECT id FROM qr_code_scans WHERE order_id = $1 AND scanned_by = $2 AND is_valid = true`,
+        [resolvedOrderId, driverId]
+      );
+      if (existingScan.rows.length > 0) {
+        return { success: false, isValid: false, code: 'QR_ALREADY_SCANNED', error: 'Cette livraison a déjà été confirmée.' };
       }
 
       const st = String(order.status || '').toLowerCase();
@@ -455,20 +558,11 @@ export class QRCodeService {
         return { success: false, isValid: false, code: 'QR_MALFORMED', error: 'Aucun code de vérification généré pour cette commande. Le client doit afficher son QR code au moins une fois.' };
       }
 
-      if (String(order.delivery_verification_code).trim() !== String(code).trim()) {
+      if (String(order.delivery_verification_code).trim() !== normalizedCode) {
         return { success: false, isValid: false, code: 'QR_SIGNATURE_INVALID', error: 'Code incorrect. Vérifiez le code affiché sur l\'écran du client.' };
       }
 
-      // Vérifier si déjà complété via QR ou saisie manuelle
-      const existingScan = await pool.query(
-        `SELECT id FROM qr_code_scans WHERE order_id = $1 AND scanned_by = $2 AND is_valid = true`,
-        [orderId, driverId]
-      );
-      if (existingScan.rows.length > 0) {
-        return { success: false, isValid: false, code: 'QR_ALREADY_SCANNED', error: 'Cette livraison a déjà été confirmée.' };
-      }
-
-      await this.recordValidScan(orderId, driverId, location, deviceInfo);
+      await this.recordValidScan(resolvedOrderId, driverId, location, deviceInfo);
 
       await pool.query(
         `UPDATE orders
@@ -478,17 +572,17 @@ export class QRCodeService {
              completed_at = COALESCE(completed_at, NOW()),
              updated_at = NOW()
          WHERE id = $2`,
-        [driverId, orderId]
+        [driverId, resolvedOrderId]
       );
 
-      await completeTransactionsForOrder(orderId);
+      await completeTransactionsForOrder(resolvedOrderId);
 
-      logger.info(`Code manuel validé pour la commande ${orderId} par ${driverId}`);
+      logger.info(`Code manuel validé pour la commande ${resolvedOrderId} par ${driverId}`);
 
       let recipientName = 'Destinataire';
       let recipientPhone = '';
       let creatorName = '';
-      let orderNumber = orderId.substring(0, 8).toUpperCase();
+      let orderNumber = resolvedOrderId.substring(0, 8).toUpperCase();
 
       if (order.delivery_qr_code) {
         try {
@@ -503,7 +597,7 @@ export class QRCodeService {
       return {
         success: true,
         isValid: true,
-        data: { recipientName, recipientPhone, creatorName, orderNumber, orderId },
+        data: { recipientName, recipientPhone, creatorName, orderNumber, orderId: resolvedOrderId },
       };
     } catch (error: any) {
       logger.error('Erreur lors de la vérification manuelle du code:', error);
@@ -553,4 +647,3 @@ export class QRCodeService {
 }
 
 export default new QRCodeService();
-

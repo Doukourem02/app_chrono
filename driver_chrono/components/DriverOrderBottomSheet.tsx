@@ -120,7 +120,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     }
   };
 
-  // Handler pour la saisie manuelle du code (caméra inutilisable)
+  // Handler pour la saisie manuelle du code de secours
   const handleManualEntry = async (code: string) => {
     const orderId = currentOrder?.id;
     if (!orderId) return;

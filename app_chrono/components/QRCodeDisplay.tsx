@@ -114,7 +114,7 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
 
             {verificationCode && (
               <View style={styles.verificationContainer}>
-                <Text style={styles.verificationLabel}>Code de secours (caméra inutilisable)</Text>
+                <Text style={styles.verificationLabel}>Code de secours</Text>
                 <Text style={styles.verificationCode}>{verificationCode}</Text>
                 <Text style={styles.verificationHint}>Dictez ce code au livreur s&apos;il ne peut pas scanner</Text>
               </View>
@@ -323,4 +323,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

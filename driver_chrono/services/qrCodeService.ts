@@ -152,7 +152,7 @@ class QRCodeService {
   }
 
   /**
-   * Valide un code de vérification saisi manuellement (caméra inutilisable)
+   * Valide un code de vérification saisi manuellement
    */
   async manualVerify(
     orderId: string,
@@ -241,4 +241,3 @@ class QRCodeService {
 }
 
 export const qrCodeService = new QRCodeService();
-

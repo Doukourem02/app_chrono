@@ -302,7 +302,7 @@ export const manualVerifyQRCode = async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-    const result = await qrCodeService.manualVerifyCode(userId, orderId, code, location, deviceInfo);
+    const result = await qrCodeService.manualVerifyCode(orderId, userId, code, location, deviceInfo);
 
     if (!result.success || !result.isValid) {
       res.status(400).json({ success: false, message: result.error || 'Code invalide', code: result.code || 'SCAN_INVALID' });
@@ -312,7 +312,8 @@ export const manualVerifyQRCode = async (req: AuthenticatedRequest, res: Respons
     // Même notification socket que scanQRCode
     try {
       const io = (req as any).app?.get?.('io');
-      if (io && orderId) {
+      const resolvedOrderId = result.data?.orderId || orderId;
+      if (io && resolvedOrderId) {
         const orderRow = await pool.query(
           `SELECT
              o.user_id,
@@ -336,7 +337,7 @@ export const manualVerifyQRCode = async (req: AuthenticatedRequest, res: Respons
            LEFT JOIN users u ON u.id = o.driver_id
            LEFT JOIN driver_profiles dp ON dp.user_id = o.driver_id
            WHERE o.id = $1`,
-          [orderId]
+          [resolvedOrderId]
         );
         const row = orderRow.rows[0];
         if (row?.user_id) {
@@ -350,7 +351,7 @@ export const manualVerifyQRCode = async (req: AuthenticatedRequest, res: Respons
               null;
             io.to(userSocketId).emit('order:status:update', {
               order: {
-                id: orderId,
+                id: resolvedOrderId,
                 status: 'completed',
                 completed_at: row.completed_at,
                 delivery_qr_scanned_at: row.delivery_qr_scanned_at,
@@ -380,7 +381,7 @@ export const manualVerifyQRCode = async (req: AuthenticatedRequest, res: Respons
             });
           }
           void notifyAllForOrderStatus({
-            orderId,
+            orderId: resolvedOrderId,
             status: 'completed',
             payerUserId: row.user_id,
           }).catch((e: unknown) => {
