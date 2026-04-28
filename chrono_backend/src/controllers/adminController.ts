@@ -1717,25 +1717,26 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       ...(hasCustomRange ? { custom: { ...emptyQrPeriod } } : {}),
     };
     try {
+      // Utilise transactions (pas orders) car la date de transaction = date de paiement réel
       const qrScannedQuery = `
         SELECT
-          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $1) as scanned_today,
-          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $3) as scanned_week,
-          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $4) as scanned_month,
-          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $5) as scanned_year,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $1) as total_today,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $3) as total_week,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $4) as total_month,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $5) as total_year,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $1) as cancelled_today,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $3) as cancelled_week,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $4) as cancelled_month,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $5) as cancelled_year
+          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $1) as scanned_today,
+          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $3) as scanned_week,
+          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $4) as scanned_month,
+          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $5) as scanned_year,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $1) as total_today,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $3) as total_week,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $4) as total_month,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $5) as total_year,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $1) as cancelled_today,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $3) as cancelled_week,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $4) as cancelled_month,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $5) as cancelled_year
           ${hasCustomRange ? `,
-          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $6 AND completed_at <= $7) as scanned_custom,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $6 AND created_at <= $7) as total_custom,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $6 AND created_at <= $7) as cancelled_custom` : ''}
-        FROM orders
+          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $6 AND created_at <= $7) as scanned_custom,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $6 AND created_at <= $7) as total_custom,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $6 AND created_at <= $7) as cancelled_custom` : ''}
+        FROM transactions
         WHERE created_at >= $5
       `;
       const qrScannedResult = await (pool as any).query(qrScannedQuery, qrParams);

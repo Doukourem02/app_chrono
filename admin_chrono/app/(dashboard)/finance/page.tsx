@@ -642,7 +642,7 @@ export default function FinancePage() {
               <div style={kpiValueStyle}>
                 {currentQr.scanned} / {currentQr.total}
               </div>
-              <div style={kpiLabelStyle}>Livraisons confirmées</div>
+              <div style={kpiLabelStyle}>Paiements confirmés</div>
             </div>
           </div>
         </div>
