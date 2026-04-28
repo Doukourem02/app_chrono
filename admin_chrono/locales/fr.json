@@ -265,6 +265,200 @@
     },
     "comingSoon": "Bientôt disponible"
   },
+  "ordersPage": {
+    "title": "Rapport de livraison",
+    "tabs": {
+      "all": "Toutes les livraisons",
+      "onProgress": "Livraisons en cours",
+      "successful": "Livraisons réussies",
+      "onHold": "Livraisons en pause",
+      "canceled": "Livraisons annulées"
+    },
+    "kpi": {
+      "onProgress": "Livraisons en cours",
+      "successful": "Réussies",
+      "onHold": "En pause",
+      "canceled": "Annulées",
+      "order": "commande",
+      "orders": "commandes",
+      "vsPastMonth": "vs mois dernier"
+    },
+    "table": {
+      "deliveryId": "ID de livraison",
+      "date": "Date",
+      "departure": "Départ",
+      "destination": "Destination",
+      "client": "Client",
+      "driver": "Livreur",
+      "price": "Prix",
+      "status": "Statut",
+      "actions": "Actions",
+      "found": "{count} commande(s) trouvée(s)",
+      "empty": "Aucune commande trouvée",
+      "unassigned": "Non assigné",
+      "phoneOrder": "Téléphonique",
+      "phoneOrderTitle": "Commande téléphonique créée depuis le dashboard",
+      "b2bTitle": "Commande B2B créée depuis le planning",
+      "showing": "Affichage de {from} à {to} sur {total} entrées"
+    },
+    "actions": {
+      "cancel": "Annuler"
+    },
+    "alerts": {
+      "confirmCancel": "Êtes-vous sûr de vouloir annuler cette commande ?",
+      "cancelSuccess": "Commande annulée avec succès",
+      "cancelError": "Erreur lors de l'annulation de la commande",
+      "cancelImpossible": "Impossible d'annuler la commande",
+      "errorPrefix": "Erreur"
+    },
+    "status": {
+      "pending": "Recherche livreur",
+      "accepted": "Prise en charge",
+      "enroute": "Livreur en route",
+      "picked_up": "Colis récupéré",
+      "delivering": "Livraison",
+      "completed": "Livraison terminée",
+      "declined": "Refusée",
+      "cancelled": "Annulée"
+    },
+    "detail": {
+      "title": "Détail de la commande",
+      "loading": "Chargement...",
+      "notFound": "Commande introuvable",
+      "pickup": "Prise en charge",
+      "delivery": "Livraison",
+      "driver": "Livreur",
+      "client": "Client",
+      "qrProof": "Preuve de livraison (QR code)",
+      "qrScanned": "QR code scanné",
+      "by": "par",
+      "viewScanHistory": "Voir l'historique des scans",
+      "qrNotScanned": "QR code non scanné — pas de preuve de remise physique enregistrée",
+      "scanHistory": "Historique des scans",
+      "noScan": "Aucun scan enregistré",
+      "valid": "Valide",
+      "invalid": "Invalide",
+      "price": "Prix",
+      "cancelOrder": "Annuler la commande"
+    }
+  },
+  "financePage": {
+    "title": "Finance",
+    "refresh": "Actualiser",
+    "export": "Exporter",
+    "periods": {
+      "today": "Aujourd'hui",
+      "week": "Cette semaine",
+      "month": "Ce mois",
+      "year": "Cette année",
+      "custom": "Personnaliser"
+    },
+    "custom": {
+      "start": "Date début",
+      "end": "Date fin",
+      "apply": "Appliquer"
+    },
+    "sections": {
+      "active": "Données actives",
+      "cancelled": "Commandes annulées"
+    },
+    "kpi": {
+      "revenue": "Revenus encaissés",
+      "conversion": "Taux de conversion",
+      "confirmed": "Paiements confirmés",
+      "pending": "Paiements en attente",
+      "cancelledOrders": "Commandes annulées",
+      "uncollectedValue": "Valeur non encaissée",
+      "cancelledDeferred": "Différés annulés"
+    },
+    "charts": {
+      "revenueByPeriod": "Revenus par période",
+      "paymentSplit": "Répartition par méthode de paiement",
+      "topDrivers": "Top 5 livreurs par revenus"
+    },
+    "tabs": {
+      "active": "Transactions actives",
+      "cancelled": "Annulées"
+    },
+    "filters": {
+      "search": "Rechercher par ID transaction, commande, nom, prénom, email...",
+      "allStatuses": "Tous les statuts",
+      "allMethods": "Toutes les méthodes"
+    },
+    "table": {
+      "activeTitle": "Transactions actives",
+      "cancelledTitle": "Commandes annulées",
+      "empty": "Aucune transaction trouvée",
+      "loading": "Chargement...",
+      "transactionId": "ID Transaction",
+      "order": "Commande",
+      "client": "Client",
+      "amount": "Montant",
+      "method": "Méthode",
+      "status": "Statut",
+      "date": "Date",
+      "showing": "Affichage de {from} à {to} sur {total}",
+      "previous": "Précédent",
+      "next": "Suivant"
+    },
+    "alerts": {
+      "noExport": "Aucune transaction à exporter"
+    }
+  },
+  "reportsPage": {
+    "title": "Rapports",
+    "export": "Exporter (PDF/Excel)",
+    "filters": {
+      "title": "Filtres de période",
+      "period": "Période",
+      "start": "Date début",
+      "end": "Date fin",
+      "status": "Statut",
+      "deliveryType": "Type de livraison"
+    },
+    "types": {
+      "deliveries": "Livraisons",
+      "revenues": "Revenus",
+      "clients": "Clients",
+      "drivers": "Livreurs",
+      "payments": "Paiements"
+    },
+    "periods": {
+      "today": "Aujourd'hui",
+      "week": "Cette semaine",
+      "month": "Ce mois",
+      "year": "Cette année",
+      "custom": "Personnalisé"
+    },
+    "common": {
+      "all": "Tous",
+      "emptyExport": "Aucune donnée à exporter"
+    },
+    "deliveries": {
+      "title": "Rapport des Livraisons ({count} résultats)",
+      "empty": "Aucune livraison trouvée pour cette période",
+      "headers": {
+        "id": "ID",
+        "date": "Date",
+        "status": "Statut",
+        "client": "Client",
+        "driver": "Livreur",
+        "amount": "Montant"
+      }
+    },
+    "payments": {
+      "title": "Rapport des Paiements",
+      "details": "Détails ({count} entrées)",
+      "empty": "Aucun paiement trouvé pour cette période",
+      "headers": {
+        "date": "Date",
+        "method": "Méthode",
+        "status": "Statut",
+        "count": "Nombre",
+        "total": "Montant total"
+      }
+    }
+  },
   "maintenance": {
     "stats": {
       "totalVehicles": "Total véhicules",

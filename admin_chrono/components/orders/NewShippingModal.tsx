@@ -9,6 +9,7 @@ import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { logger } from '@/utils/logger'
 import { getPhoneValidationError } from '@/utils/phoneValidation'
 import { ABIDJAN_APPROXIMATE_PICKUP_ZONE_OPTIONS } from '@/lib/abidjanApproximatePickupZones'
+import { useLanguageStore } from '@/stores/languageStore'
 
 interface UserData {
   id: string
@@ -30,6 +31,8 @@ export default function NewShippingModal({
   onClose,
 }: NewShippingModalProps) {
   const router = useRouter()
+  const language = useLanguageStore((state) => state.language)
+  const locale = language === 'fr' ? 'fr-FR' : 'en-US'
   const [step, setStep] = useState<'client' | 'pickup' | 'dropoff' | 'details'>('client')
   const [users, setUsers] = useState<UserData[]>([])
   const [filteredUsers, setFilteredUsers] = useState<UserData[]>([])
@@ -577,9 +580,9 @@ export default function NewShippingModal({
 
               {distance !== null && price !== null && (
                 <div style={{ padding: '12px', backgroundColor: '#F3E8FF', borderRadius: '8px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Estimation</div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{language === 'fr' ? 'Estimation' : 'Estimate'}</div>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                    Distance: {distance} km • Prix: {price.toLocaleString('fr-FR')} FCFA
+                    {language === 'fr' ? 'Distance' : 'Distance'}: {distance} km • {language === 'fr' ? 'Prix' : 'Price'}: {price.toLocaleString(locale)} FCFA
                   </div>
                 </div>
               )}
@@ -630,17 +633,17 @@ export default function NewShippingModal({
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
                   <DollarSign size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280' }} />
-                  Méthode de paiement
+                  {language === 'fr' ? 'Méthode de paiement' : 'Payment method'}
                 </label>
                 <select
                   style={inputStyle}
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
                 >
-                  <option value="cash">Espèces</option>
+                  <option value="cash">{language === 'fr' ? 'Espèces' : 'Cash'}</option>
                   <option value="orange_money">Orange Money</option>
                   <option value="wave">Wave</option>
-                  <option value="deferred">Différé</option>
+                  <option value="deferred">{language === 'fr' ? 'Différé' : 'Deferred'}</option>
                 </select>
               </div>
 
@@ -847,4 +850,3 @@ export default function NewShippingModal({
     </div>
   )
 }
-

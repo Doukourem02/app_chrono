@@ -4,6 +4,7 @@ import React from 'react'
 import { Truck, Package, CheckSquare, User } from 'lucide-react'
 import { AnimatedCard } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface StatusKPICardProps {
   type: 'onProgress' | 'successful' | 'onHold' | 'canceled'
@@ -13,26 +14,27 @@ interface StatusKPICardProps {
 }
 
 export default function StatusKPICard({ type, count, change = 0, index = 0 }: StatusKPICardProps) {
+  const t = useTranslation()
   const config = {
     onProgress: {
       icon: Truck,
       color: '#8B5CF6',
-      label: 'On Progress Delivery',
+      label: t('ordersPage.kpi.onProgress'),
     },
     successful: {
       icon: CheckSquare,
       color: '#10B981',
-      label: 'Successful',
+      label: t('ordersPage.kpi.successful'),
     },
     onHold: {
       icon: User,
       color: '#EF4444',
-      label: 'On Hold Delivery',
+      label: t('ordersPage.kpi.onHold'),
     },
     canceled: {
       icon: Package,
       color: '#F59E0B',
-      label: 'Canceled Delivery',
+      label: t('ordersPage.kpi.canceled'),
     },
   }
 
@@ -92,9 +94,9 @@ export default function StatusKPICard({ type, count, change = 0, index = 0 }: St
   }
 
   const formatChange = (changeValue: number): string => {
-    if (changeValue === 0) return '0% vs past month'
+    if (changeValue === 0) return `0% ${t('ordersPage.kpi.vsPastMonth')}`
     const sign = changeValue > 0 ? '+' : ''
-    return `${sign}${changeValue}% vs past month`
+    return `${sign}${changeValue}% ${t('ordersPage.kpi.vsPastMonth')}`
   }
 
   return (
@@ -108,10 +110,9 @@ export default function StatusKPICard({ type, count, change = 0, index = 0 }: St
         </div>
       </div>
       <div style={{ marginTop: 'auto' }}>
-        <div style={valueStyle}>{count} {count === 1 ? 'Order' : 'Orders'}</div>
+        <div style={valueStyle}>{count} {count === 1 ? t('ordersPage.kpi.order') : t('ordersPage.kpi.orders')}</div>
         <div style={comparisonStyle}>{formatChange(change)}</div>
       </div>
     </AnimatedCard>
   )
 }
-

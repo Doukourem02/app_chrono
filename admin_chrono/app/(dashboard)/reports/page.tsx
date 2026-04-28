@@ -7,6 +7,8 @@ import { Download, TrendingUp, Users, Truck, CreditCard, LucideIcon } from 'luci
 import { ScreenTransition } from '@/components/animations'
 import { exportData } from '@/utils/exportUtils'
 import { themeColors } from '@/utils/theme'
+import { useLanguageStore } from '@/stores/languageStore'
+import { useTranslation } from '@/hooks/useTranslation'
 import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer,LineChart,Line,} from 'recharts'
 
 type ReportType = 'deliveries' | 'revenues' | 'clients' | 'drivers' | 'payments'
@@ -16,6 +18,7 @@ interface Delivery {
   id: string
   created_at?: string
   status?: string
+  effective_status?: string
   user_id?: string
   driver_id?: string
   price?: number | string
@@ -76,6 +79,9 @@ interface PaymentChartData {
 }
 
 export default function ReportsPage() {
+  const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
+  const locale = language === 'fr' ? 'fr-FR' : 'en-US'
   const [reportType, setReportType] = useState<ReportType>('deliveries')
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('month')
   const [startDate, setStartDate] = useState<string>('')
@@ -197,16 +203,69 @@ export default function ReportsPage() {
     deliveriesLoading || revenuesLoading || clientsLoading || driversLoading || paymentsLoading
 
   const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} FCFA`
+    return `${amount.toLocaleString(locale, { maximumFractionDigits: 0 })} FCFA`
   }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('fr-FR', {
+    return date.toLocaleDateString(locale, {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
     })
+  }
+
+  const getPaymentMethodLabel = (method: string) => {
+    const labels: Record<string, string> = {
+      orange_money: 'Orange Money',
+      wave: 'Wave',
+      cash: language === 'fr' ? 'Espèces' : 'Cash',
+      deferred: language === 'fr' ? 'Différé' : 'Deferred',
+    }
+    return labels[method] || method || 'N/A'
+  }
+
+  const getPaymentStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      paid: language === 'fr' ? 'Payé' : 'Paid',
+      delayed: language === 'fr' ? 'Différé' : 'Deferred',
+      refused: language === 'fr' ? 'Refusé' : 'Refused',
+      cancelled: language === 'fr' ? 'Annulé' : 'Cancelled',
+      refunded: language === 'fr' ? 'Remboursé' : 'Refunded',
+      pending: language === 'fr' ? "En cours aujourd'hui" : 'In progress today',
+    }
+    return labels[status] || status || 'N/A'
+  }
+
+  const getDeliveryStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: language === 'fr' ? "En cours aujourd'hui" : 'In progress today',
+      accepted: language === 'fr' ? 'Prise en charge' : 'Assigned',
+      enroute: language === 'fr' ? 'En route' : 'En route',
+      picked_up: language === 'fr' ? 'Récupérée' : 'Picked up',
+      completed: language === 'fr' ? 'Terminée' : 'Completed',
+      cancelled: language === 'fr' ? 'Annulée' : 'Cancelled',
+      declined: language === 'fr' ? 'Annulée' : 'Cancelled',
+    }
+    return labels[status] || status || 'N/A'
+  }
+
+  const getDriverDisplayName = (order: Delivery) => {
+    const clean = (value?: string) => {
+      const text = value?.trim()
+      if (!text || text.toLowerCase() === 'undefined' || text.toLowerCase() === 'null') return ''
+      return text
+    }
+    const firstName = clean(order.driver_first_name)
+    const lastName = clean(order.driver_last_name)
+    const email = clean(order.driver_email)
+
+    if (firstName && lastName) return `${firstName} ${lastName}`
+    if (firstName) return firstName
+    if (lastName) return lastName
+    if (email) return email
+    if (order.driver_id) return `${order.driver_id.slice(0, 8)}...`
+    return language === 'fr' ? 'Non assigné' : 'Not assigned'
   }
 
   const handleExport = () => {
@@ -214,25 +273,23 @@ export default function ReportsPage() {
       case 'deliveries': {
         const deliveries: Delivery[] = (deliveriesData?.data as Delivery[]) || []
         if (deliveries.length === 0) {
-          alert('Aucune donnée à exporter')
+          alert(t('reportsPage.common.emptyExport'))
           return
         }
 
         exportData(
           {
-            title: `Rapport des Livraisons - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
-            headers: ['ID', 'Date', 'Statut', 'Client', 'Driver ID', 'Montant (FCFA)'],
+            title: `${t('reportsPage.types.deliveries')} - ${periodPresets.find((p) => p.key === periodPreset)?.label || t('reportsPage.periods.custom')}`,
+            headers: ['ID', t('reportsPage.deliveries.headers.date'), t('reportsPage.deliveries.headers.status'), t('reportsPage.deliveries.headers.client'), t('reportsPage.deliveries.headers.driver'), `${t('reportsPage.deliveries.headers.amount')} (FCFA)`],
             rows: deliveries.map((order: Delivery) => {
               const clientName = (order.user_first_name && order.user_last_name)
                 ? `${order.user_first_name} ${order.user_last_name}`
                 : order.user_email || order.user_id?.slice(0, 8) + '...' || 'N/A'
-              const driverName = (order.driver_first_name && order.driver_last_name)
-                ? `${order.driver_first_name} ${order.driver_last_name}`
-                : order.driver_email || order.driver_id?.slice(0, 8) + '...' || 'N/A'
+              const driverName = getDriverDisplayName(order)
               return [
                 order.id.slice(0, 8) + '...',
                 formatDate(order.created_at || ''),
-                order.status || 'N/A',
+                getDeliveryStatusLabel(order.effective_status || order.status || ''),
                 clientName,
                 driverName,
                 typeof order.price === 'number'
@@ -251,14 +308,14 @@ export default function ReportsPage() {
       case 'revenues': {
         const revenues: Revenue[] = (revenuesData?.data as Revenue[]) || []
         if (revenues.length === 0) {
-          alert('Aucune donnée à exporter')
+          alert(t('reportsPage.common.emptyExport'))
           return
         }
 
         exportData(
           {
-            title: `Rapport des Revenus - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
-            headers: ['Date', 'Type de livraison', 'Nombre de livraisons', 'Revenus (FCFA)'],
+            title: `${t('reportsPage.types.revenues')} - ${periodPresets.find((p) => p.key === periodPreset)?.label || t('reportsPage.periods.custom')}`,
+            headers: [t('reportsPage.deliveries.headers.date'), t('reportsPage.filters.deliveryType'), language === 'fr' ? 'Nombre de livraisons' : 'Delivery count', `${t('reportsPage.types.revenues')} (FCFA)`],
             rows: revenues.map((r: Revenue) => [
               formatDate(r.date || ''),
               r.delivery_method || 'N/A',
@@ -274,14 +331,14 @@ export default function ReportsPage() {
       case 'clients': {
         const clients: Client[] = (clientsData?.data as Client[]) || []
         if (clients.length === 0) {
-          alert('Aucune donnée à exporter')
+          alert(t('reportsPage.common.emptyExport'))
           return
         }
 
         exportData(
           {
-            title: `Rapport des Clients - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
-            headers: ['Nom et Prénom', 'Téléphone', "Date d'inscription", 'Commandes totales', 'Commandes complétées'],
+            title: `${t('reportsPage.types.clients')} - ${periodPresets.find((p) => p.key === periodPreset)?.label || t('reportsPage.periods.custom')}`,
+            headers: [language === 'fr' ? 'Nom et Prénom' : 'Full name', language === 'fr' ? 'Téléphone' : 'Phone', language === 'fr' ? "Date d'inscription" : 'Registration date', language === 'fr' ? 'Commandes totales' : 'Total orders', language === 'fr' ? 'Commandes complétées' : 'Completed orders'],
             rows: clients.map((client: Client) => {
               const clientName = (client.first_name && client.last_name)
                 ? `${client.first_name} ${client.last_name}`
@@ -303,14 +360,14 @@ export default function ReportsPage() {
       case 'drivers': {
         const drivers: Driver[] = (driversData?.data as Driver[]) || []
         if (drivers.length === 0) {
-          alert('Aucune donnée à exporter')
+          alert(t('reportsPage.common.emptyExport'))
           return
         }
 
         exportData(
           {
-            title: `Rapport des Drivers - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
-            headers: ['Nom et Prénom', 'Email', 'Téléphone', "Date d'inscription", 'Livraisons totales', 'Livraisons complétées', 'Revenus totaux (FCFA)', 'Rating moyen'],
+            title: `${t('reportsPage.types.drivers')} - ${periodPresets.find((p) => p.key === periodPreset)?.label || t('reportsPage.periods.custom')}`,
+            headers: [language === 'fr' ? 'Nom et Prénom' : 'Full name', 'Email', language === 'fr' ? 'Téléphone' : 'Phone', language === 'fr' ? "Date d'inscription" : 'Registration date', language === 'fr' ? 'Livraisons totales' : 'Total deliveries', language === 'fr' ? 'Livraisons complétées' : 'Completed deliveries', language === 'fr' ? 'Revenus totaux (FCFA)' : 'Total revenue (FCFA)', language === 'fr' ? 'Note moyenne' : 'Average rating'],
             rows: drivers.map((driver: Driver) => {
               const driverName = (driver.first_name && driver.last_name)
                 ? `${driver.first_name} ${driver.last_name}`
@@ -339,18 +396,18 @@ export default function ReportsPage() {
       case 'payments': {
         const payments: Payment[] = (paymentsData?.data as Payment[]) || []
         if (payments.length === 0) {
-          alert('Aucune donnée à exporter')
+          alert(t('reportsPage.common.emptyExport'))
           return
         }
 
         exportData(
           {
-            title: `Rapport des Paiements - ${periodPresets.find((p) => p.key === periodPreset)?.label || 'Période personnalisée'}`,
-            headers: ['Date', 'Méthode de paiement', 'Statut', 'Nombre', 'Montant total (FCFA)'],
+            title: `${t('reportsPage.types.payments')} - ${periodPresets.find((p) => p.key === periodPreset)?.label || t('reportsPage.periods.custom')}`,
+            headers: [t('reportsPage.payments.headers.date'), t('reportsPage.payments.headers.method'), t('reportsPage.payments.headers.status'), t('reportsPage.payments.headers.count'), `${t('reportsPage.payments.headers.total')} (FCFA)`],
             rows: payments.map((p: Payment) => [
               formatDate(p.date || ''),
-              p.payment_method_type || 'N/A',
-              p.status || 'N/A',
+              getPaymentMethodLabel(p.payment_method_type || ''),
+              getPaymentStatusLabel(p.status || ''),
               p.count || 0,
               typeof p.total_amount === 'number'
                 ? p.total_amount
@@ -363,23 +420,23 @@ export default function ReportsPage() {
       }
 
       default:
-        alert('Type de rapport non supporté pour l\'export')
+        alert(language === 'fr' ? 'Type de rapport non supporté pour l\'export' : 'Report type not supported for export')
     }
   }
 
   const reportTypes: { key: ReportType; label: string; icon: LucideIcon }[] = [
-    { key: 'deliveries', label: 'Livraisons', icon: Truck },
-    { key: 'revenues', label: 'Revenus', icon: TrendingUp },
-    { key: 'clients', label: 'Clients', icon: Users },
-    { key: 'drivers', label: 'Drivers', icon: Truck },
-    { key: 'payments', label: 'Paiements', icon: CreditCard },
+    { key: 'deliveries', label: t('reportsPage.types.deliveries'), icon: Truck },
+    { key: 'revenues', label: t('reportsPage.types.revenues'), icon: TrendingUp },
+    { key: 'clients', label: t('reportsPage.types.clients'), icon: Users },
+    { key: 'drivers', label: t('reportsPage.types.drivers'), icon: Truck },
+    { key: 'payments', label: t('reportsPage.types.payments'), icon: CreditCard },
   ]
 
   const periodPresets: { key: PeriodPreset; label: string }[] = [
-    { key: 'today', label: "Aujourd'hui" },
-    { key: 'week', label: 'Cette semaine' },
-    { key: 'month', label: 'Ce mois' },
-    { key: 'year', label: 'Cette année' },
+    { key: 'today', label: t('reportsPage.periods.today') },
+    { key: 'week', label: t('reportsPage.periods.week') },
+    { key: 'month', label: t('reportsPage.periods.month') },
+    { key: 'year', label: t('reportsPage.periods.year') },
     { key: 'custom', label: 'Personnalisé' },
   ]
 
@@ -522,22 +579,22 @@ export default function ReportsPage() {
         return (
           <div style={cardStyle}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
-              Rapport des Livraisons ({deliveries.length} résultats)
+              {t('reportsPage.deliveries.title', { count: deliveries.length })}
             </h3>
             {deliveries.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-                Aucune livraison trouvée pour cette période
+                {t('reportsPage.deliveries.empty')}
               </div>
             ) : (
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th style={thStyle}>ID</th>
-                    <th style={thStyle}>Date</th>
-                    <th style={thStyle}>Statut</th>
-                    <th style={thStyle}>Client</th>
-                    <th style={thStyle}>Driver</th>
-                    <th style={thStyle}>Montant</th>
+                    <th style={thStyle}>{t('reportsPage.deliveries.headers.id')}</th>
+                    <th style={thStyle}>{t('reportsPage.deliveries.headers.date')}</th>
+                    <th style={thStyle}>{t('reportsPage.deliveries.headers.status')}</th>
+                    <th style={thStyle}>{t('reportsPage.deliveries.headers.client')}</th>
+                    <th style={thStyle}>{t('reportsPage.deliveries.headers.driver')}</th>
+                    <th style={thStyle}>{t('reportsPage.deliveries.headers.amount')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -545,14 +602,12 @@ export default function ReportsPage() {
                     const clientName = (order.user_first_name && order.user_last_name)
                       ? `${order.user_first_name} ${order.user_last_name}`
                       : order.user_email || order.user_id?.slice(0, 8) + '...' || 'N/A'
-                    const driverName = (order.driver_first_name && order.driver_last_name)
-                      ? `${order.driver_first_name} ${order.driver_last_name}`
-                      : order.driver_email || order.driver_id?.slice(0, 8) + '...' || 'N/A'
+                    const driverName = getDriverDisplayName(order)
                     return (
                       <tr key={order.id}>
                         <td style={tdStyle}>{order.id.slice(0, 8)}...</td>
                         <td style={tdStyle}>{formatDate(order.created_at || '')}</td>
-                        <td style={tdStyle}>{order.status || 'N/A'}</td>
+                        <td style={tdStyle}>{getDeliveryStatusLabel(order.effective_status || order.status || '')}</td>
                         <td style={tdStyle}>{clientName}</td>
                         <td style={tdStyle}>{driverName}</td>
                         <td style={tdStyle}>
@@ -585,7 +640,7 @@ export default function ReportsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={cardStyle}>
               <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
-                Rapport des Revenus
+                {language === 'fr' ? 'Rapport des Revenus' : 'Revenue Report'}
               </h3>
               {revenueChartData.length > 0 && (
                 <ResponsiveContainer width="100%" height={300}>
@@ -595,27 +650,27 @@ export default function ReportsPage() {
                     <YAxis />
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
-                    <Line type="monotone" dataKey="revenue" stroke={themeColors.purplePrimary} name="Revenus" />
+                    <Line type="monotone" dataKey="revenue" stroke={themeColors.purplePrimary} name={t('reportsPage.types.revenues')} />
                   </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
             <div style={cardStyle}>
               <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
-                Détails ({revenues.length} jours)
+                {language === 'fr' ? `Détails (${revenues.length} jours)` : `Details (${revenues.length} days)`}
               </h3>
               {revenues.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-                  Aucun revenu trouvé pour cette période
+                  {language === 'fr' ? 'Aucun revenu trouvé pour cette période' : 'No revenue found for this period'}
                 </div>
               ) : (
                 <table style={tableStyle}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>Date</th>
-                      <th style={thStyle}>Type</th>
-                      <th style={thStyle}>Livraisons</th>
-                      <th style={thStyle}>Revenus</th>
+                      <th style={thStyle}>{t('reportsPage.deliveries.headers.date')}</th>
+                      <th style={thStyle}>{language === 'fr' ? 'Type' : 'Type'}</th>
+                      <th style={thStyle}>{t('reportsPage.types.deliveries')}</th>
+                      <th style={thStyle}>{t('reportsPage.types.revenues')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -643,21 +698,21 @@ export default function ReportsPage() {
         return (
           <div style={cardStyle}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
-              Rapport des Clients ({clients.length} clients)
+              {language === 'fr' ? `Rapport des Clients (${clients.length} clients)` : `Client Report (${clients.length} clients)`}
             </h3>
             {clients.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-                Aucun client trouvé pour cette période
+                {language === 'fr' ? 'Aucun client trouvé pour cette période' : 'No clients found for this period'}
               </div>
             ) : (
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th style={thStyle}>Nom et Prénom</th>
-                    <th style={thStyle}>Téléphone</th>
-                    <th style={thStyle}>Date d&apos;inscription</th>
-                    <th style={thStyle}>Commandes totales</th>
-                    <th style={thStyle}>Commandes complétées</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Nom et Prénom' : 'Full name'}</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Téléphone' : 'Phone'}</th>
+                    <th style={thStyle}>{language === 'fr' ? "Date d'inscription" : 'Registration date'}</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Commandes totales' : 'Total orders'}</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Commandes complétées' : 'Completed orders'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -686,24 +741,24 @@ export default function ReportsPage() {
         return (
           <div style={cardStyle}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
-              Rapport des Drivers ({drivers.length} drivers)
+              {language === 'fr' ? `Rapport des Livreurs (${drivers.length} livreurs)` : `Driver Report (${drivers.length} drivers)`}
             </h3>
             {drivers.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-                Aucun driver trouvé pour cette période
+                {language === 'fr' ? 'Aucun livreur trouvé pour cette période' : 'No drivers found for this period'}
               </div>
             ) : (
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th style={thStyle}>Nom et Prénom</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Nom et Prénom' : 'Full name'}</th>
                     <th style={thStyle}>Email</th>
-                    <th style={thStyle}>Téléphone</th>
-                    <th style={thStyle}>Date d&apos;inscription</th>
-                    <th style={thStyle}>Livraisons totales</th>
-                    <th style={thStyle}>Livraisons complétées</th>
-                    <th style={thStyle}>Revenus totaux</th>
-                    <th style={thStyle}>Rating moyen</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Téléphone' : 'Phone'}</th>
+                    <th style={thStyle}>{language === 'fr' ? "Date d'inscription" : 'Registration date'}</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Livraisons totales' : 'Total deliveries'}</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Livraisons complétées' : 'Completed deliveries'}</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Revenus totaux' : 'Total revenue'}</th>
+                    <th style={thStyle}>{language === 'fr' ? 'Note moyenne' : 'Average rating'}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -765,7 +820,7 @@ export default function ReportsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={cardStyle}>
               <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
-                Rapport des Paiements
+                {t('reportsPage.payments.title')}
               </h3>
               {paymentChartData.length > 0 && (
                 <ResponsiveContainer width="100%" height={300}>
@@ -777,37 +832,37 @@ export default function ReportsPage() {
                     <Legend />
                     <Bar dataKey="orange_money" stackId="a" fill="#F97316" name="Orange Money" />
                     <Bar dataKey="wave" stackId="a" fill="#38BDF8" name="Wave" />
-                    <Bar dataKey="cash" stackId="a" fill="#8B5CF6" name="Espèces" />
-                    <Bar dataKey="deferred" stackId="a" fill="#EF4444" name="Différé" />
+                    <Bar dataKey="cash" stackId="a" fill="#8B5CF6" name={getPaymentMethodLabel('cash')} />
+                    <Bar dataKey="deferred" stackId="a" fill="#EF4444" name={getPaymentMethodLabel('deferred')} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
             <div style={cardStyle}>
               <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
-                Détails ({payments.length} entrées)
+                {t('reportsPage.payments.details', { count: payments.length })}
               </h3>
               {payments.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-                  Aucun paiement trouvé pour cette période
+                  {t('reportsPage.payments.empty')}
                 </div>
               ) : (
                 <table style={tableStyle}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>Date</th>
-                      <th style={thStyle}>Méthode</th>
-                      <th style={thStyle}>Statut</th>
-                      <th style={thStyle}>Nombre</th>
-                      <th style={thStyle}>Montant total</th>
+                      <th style={thStyle}>{t('reportsPage.payments.headers.date')}</th>
+                      <th style={thStyle}>{t('reportsPage.payments.headers.method')}</th>
+                      <th style={thStyle}>{t('reportsPage.payments.headers.status')}</th>
+                      <th style={thStyle}>{t('reportsPage.payments.headers.count')}</th>
+                      <th style={thStyle}>{t('reportsPage.payments.headers.total')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {payments.map((p: Payment, idx: number) => (
                       <tr key={idx}>
                         <td style={tdStyle}>{formatDate(p.date || '')}</td>
-                        <td style={tdStyle}>{p.payment_method_type || 'N/A'}</td>
-                        <td style={tdStyle}>{p.status || 'N/A'}</td>
+                        <td style={tdStyle}>{getPaymentMethodLabel(p.payment_method_type || '')}</td>
+                        <td style={tdStyle}>{getPaymentStatusLabel(p.status || '')}</td>
                         <td style={tdStyle}>{p.count || 0}</td>
                         <td style={tdStyle}>
                           {formatCurrency(
@@ -834,7 +889,7 @@ export default function ReportsPage() {
     <ScreenTransition direction="fade" duration={0.3}>
       <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Rapports</h1>
+        <h1 style={titleStyle}>{t('reportsPage.title')}</h1>
         <button
           onClick={handleExport}
           style={{
@@ -853,7 +908,7 @@ export default function ReportsPage() {
           }}
         >
           <Download size={16} />
-          Exporter (PDF/Excel)
+          {t('reportsPage.export')}
         </button>
       </div>
 
@@ -877,12 +932,12 @@ export default function ReportsPage() {
       {/* Filtres */}
       <div style={filtersCardStyle}>
         <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: themeColors.textPrimary }}>
-          Filtres de période
+          {t('reportsPage.filters.title')}
         </h3>
         <div style={filtersGridStyle}>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: themeColors.textPrimary }}>
-              Période
+              {t('reportsPage.filters.period')}
             </label>
             <select
               value={periodPreset}
@@ -898,7 +953,7 @@ export default function ReportsPage() {
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: themeColors.textPrimary }}>
-              Date début
+              {t('reportsPage.filters.start')}
             </label>
             <input
               type="date"
@@ -912,7 +967,7 @@ export default function ReportsPage() {
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: themeColors.textPrimary }}>
-              Date fin
+              {t('reportsPage.filters.end')}
             </label>
             <input
               type="date"
@@ -927,20 +982,20 @@ export default function ReportsPage() {
           {(reportType === 'deliveries' || reportType === 'revenues') && (
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500, color: themeColors.textPrimary }}>
-                {reportType === 'deliveries' ? 'Statut' : 'Type de livraison'}
+                {reportType === 'deliveries' ? t('reportsPage.filters.status') : t('reportsPage.filters.deliveryType')}
               </label>
               <select
                 value={additionalFilter}
                 onChange={(e) => setAdditionalFilter(e.target.value)}
                 style={selectStyle}
               >
-                <option value="">Tous</option>
+                <option value="">{t('reportsPage.common.all')}</option>
                 {reportType === 'deliveries' ? (
                   <>
-                    <option value="pending">En attente</option>
-                    <option value="accepted">Accepté</option>
-                    <option value="completed">Complété</option>
-                    <option value="cancelled">Annulé</option>
+                    <option value="pending">{getDeliveryStatusLabel('pending')}</option>
+                    <option value="accepted">{getDeliveryStatusLabel('accepted')}</option>
+                    <option value="completed">{getDeliveryStatusLabel('completed')}</option>
+                    <option value="cancelled">{getDeliveryStatusLabel('cancelled')}</option>
                   </>
                 ) : (
                   <>

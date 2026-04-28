@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react'
 import { X, MapPin, User, Package, QrCode, History, CheckCircle } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { themeColors } from '@/utils/theme'
+import { useLanguageStore } from '@/stores/languageStore'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface OrderDetailData {
   id: string
@@ -51,11 +53,11 @@ const statusConfig: Record<string, { label: string; backgroundColor: string; col
   declined: { label: 'Refusé', backgroundColor: '#FEE2E2', color: '#DC2626' },
 }
 
-const formatDateTime = (isoString?: string | null) => {
+const formatDateTime = (isoString?: string | null, locale = 'fr-FR') => {
   if (!isoString) return '—'
   const d = new Date(isoString)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('fr-FR', {
+  return d.toLocaleString(locale, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -70,6 +72,9 @@ export default function OrderDetailModal({
   orderId,
   onOrderCancelled,
 }: OrderDetailModalProps) {
+  const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
+  const locale = language === 'fr' ? 'fr-FR' : 'en-US'
   const [order, setOrder] = useState<OrderDetailData | null>(null)
   const [qrScans, setQrScans] = useState<QRScanRecord[]>([])
   const [showScanHistory, setShowScanHistory] = useState(false)
@@ -106,14 +111,14 @@ export default function OrderDetailModal({
   }
 
   const handleCancelOrder = () => {
-    if (!orderId || !confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) return
+    if (!orderId || !confirm(t('ordersPage.alerts.confirmCancel'))) return
     adminApiService.cancelOrder(orderId, 'admin_cancelled').then((res) => {
       if (res.success) {
         onOrderCancelled?.()
         onClose()
-        alert('Commande annulée avec succès')
+        alert(t('ordersPage.alerts.cancelSuccess'))
       } else {
-        alert(res.message || 'Erreur lors de l\'annulation')
+        alert(res.message || t('ordersPage.alerts.cancelError'))
       }
     })
   }
@@ -121,6 +126,7 @@ export default function OrderDetailModal({
   if (!isOpen) return null
 
   const status = order ? statusConfig[order.status] || { label: order.status, backgroundColor: themeColors.grayLight, color: themeColors.textSecondary } : null
+  const statusLabel = order ? t(`ordersPage.status.${order.status}`) : ''
   const canCancel = order && ['pending', 'accepted', 'enroute', 'picked_up', 'delivering'].includes(order.status)
 
   return (
@@ -159,7 +165,7 @@ export default function OrderDetailModal({
           }}
         >
           <h2 style={{ fontSize: 18, fontWeight: 700, color: themeColors.textPrimary, margin: 0 }}>
-            Détail de la commande
+            {t('ordersPage.detail.title')}
           </h2>
           <button
             onClick={onClose}
@@ -178,11 +184,11 @@ export default function OrderDetailModal({
         <div style={{ padding: 24 }}>
           {isLoading ? (
             <div style={{ textAlign: 'center', padding: 48, color: themeColors.textSecondary }}>
-              Chargement...
+              {t('ordersPage.detail.loading')}
             </div>
           ) : !order ? (
             <div style={{ textAlign: 'center', padding: 48, color: themeColors.textSecondary }}>
-              Commande introuvable
+              {t('ordersPage.detail.notFound')}
             </div>
           ) : (
             <>
@@ -201,7 +207,7 @@ export default function OrderDetailModal({
                     color: status?.color || themeColors.textSecondary,
                   }}
                 >
-                  {status?.label || order.status}
+                  {statusLabel || status?.label || order.status}
                 </span>
               </div>
 
@@ -209,14 +215,14 @@ export default function OrderDetailModal({
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <MapPin size={18} color={themeColors.purplePrimary} style={{ marginTop: 2 }} />
                   <div>
-                    <div style={{ fontSize: 11, color: themeColors.textSecondary, textTransform: 'uppercase', marginBottom: 4 }}>Prise en charge</div>
+                    <div style={{ fontSize: 11, color: themeColors.textSecondary, textTransform: 'uppercase', marginBottom: 4 }}>{t('ordersPage.detail.pickup')}</div>
                     <div style={{ fontSize: 14, color: themeColors.textPrimary }}>{order.departure}</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <Package size={18} color={themeColors.purplePrimary} style={{ marginTop: 2 }} />
                   <div>
-                    <div style={{ fontSize: 11, color: themeColors.textSecondary, textTransform: 'uppercase', marginBottom: 4 }}>Livraison</div>
+                    <div style={{ fontSize: 11, color: themeColors.textSecondary, textTransform: 'uppercase', marginBottom: 4 }}>{t('ordersPage.detail.delivery')}</div>
                     <div style={{ fontSize: 14, color: themeColors.textPrimary }}>{order.destination}</div>
                   </div>
                 </div>
@@ -224,7 +230,7 @@ export default function OrderDetailModal({
 
               {order.driver && (
                 <div style={{ marginTop: 20, padding: 16, backgroundColor: themeColors.grayLight, borderRadius: 12 }}>
-                  <div style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>Livreur</div>
+                  <div style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>{t('ordersPage.detail.driver')}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <User size={16} color={themeColors.purplePrimary} />
                     <span style={{ fontWeight: 600, color: themeColors.textPrimary }}>{order.driver.name}</span>
@@ -237,7 +243,7 @@ export default function OrderDetailModal({
 
               {order.client && (
                 <div style={{ marginTop: 12, padding: 16, backgroundColor: themeColors.grayLight, borderRadius: 12 }}>
-                  <div style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>Client</div>
+                  <div style={{ fontSize: 12, color: themeColors.textSecondary, marginBottom: 8 }}>{t('ordersPage.detail.client')}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <User size={16} color={themeColors.purplePrimary} />
                     <span style={{ fontWeight: 600, color: themeColors.textPrimary }}>{order.client.name}</span>
@@ -261,19 +267,19 @@ export default function OrderDetailModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                   <QrCode size={20} color={order.delivery_qr_scanned_at ? '#16A34A' : '#CA8A04'} />
                   <span style={{ fontSize: 14, fontWeight: 600, color: themeColors.textPrimary }}>
-                    Preuve de livraison (QR code)
+                    {t('ordersPage.detail.qrProof')}
                   </span>
                 </div>
                 {order.delivery_qr_scanned_at ? (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <CheckCircle size={16} color="#16A34A" />
-                      <span style={{ fontSize: 13, color: '#16A34A', fontWeight: 500 }}>QR code scanné</span>
+                      <span style={{ fontSize: 13, color: '#16A34A', fontWeight: 500 }}>{t('ordersPage.detail.qrScanned')}</span>
                     </div>
                     <div style={{ fontSize: 13, color: themeColors.textSecondary }}>
-                      Le {formatDateTime(order.delivery_qr_scanned_at)}
+                      {formatDateTime(order.delivery_qr_scanned_at, locale)}
                       {order.delivery_qr_scanned_by && (
-                        <> par <strong>{order.delivery_qr_scanned_by.name}</strong></>
+                        <> {t('ordersPage.detail.by')} <strong>{order.delivery_qr_scanned_by.name}</strong></>
                       )}
                     </div>
                     <button
@@ -294,23 +300,23 @@ export default function OrderDetailModal({
                       }}
                     >
                       <History size={14} />
-                      Voir l&apos;historique des scans
+                      {t('ordersPage.detail.viewScanHistory')}
                     </button>
                   </div>
                 ) : (
                   <div style={{ fontSize: 13, color: '#92400E' }}>
-                    QR code non scanné — pas de preuve de remise physique enregistrée
+                    {t('ordersPage.detail.qrNotScanned')}
                   </div>
                 )}
               </div>
 
               {showScanHistory && (
                 <div style={{ marginTop: 16, padding: 16, backgroundColor: themeColors.grayLight, borderRadius: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Historique des scans</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{t('ordersPage.detail.scanHistory')}</div>
                   {isLoadingScans ? (
-                    <div style={{ fontSize: 13, color: themeColors.textSecondary }}>Chargement...</div>
+                    <div style={{ fontSize: 13, color: themeColors.textSecondary }}>{t('ordersPage.detail.loading')}</div>
                   ) : qrScans.length === 0 ? (
-                    <div style={{ fontSize: 13, color: themeColors.textSecondary }}>Aucun scan enregistré</div>
+                    <div style={{ fontSize: 13, color: themeColors.textSecondary }}>{t('ordersPage.detail.noScan')}</div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {qrScans.map((scan) => (
@@ -324,10 +330,10 @@ export default function OrderDetailModal({
                           }}
                         >
                           <div style={{ fontWeight: 500 }}>
-                            {scan.isValid ? '✓ Valide' : '✗ Invalide'} — {scan.scannedBy.name}
+                            {scan.isValid ? `✓ ${t('ordersPage.detail.valid')}` : `✗ ${t('ordersPage.detail.invalid')}`} — {scan.scannedBy.name}
                           </div>
                           <div style={{ color: themeColors.textSecondary, marginTop: 4 }}>
-                            {formatDateTime(scan.scannedAt)}
+                            {formatDateTime(scan.scannedAt, locale)}
                             {scan.validationError && (
                               <span style={{ color: '#DC2626', marginLeft: 8 }}>{scan.validationError}</span>
                             )}
@@ -341,7 +347,7 @@ export default function OrderDetailModal({
 
               {order.price != null && (
                 <div style={{ marginTop: 16, fontSize: 14, color: themeColors.textSecondary }}>
-                  Prix : <strong style={{ color: themeColors.textPrimary }}>{order.price} FCFA</strong>
+                  {t('ordersPage.detail.price')} : <strong style={{ color: themeColors.textPrimary }}>{order.price} FCFA</strong>
                 </div>
               )}
 
@@ -360,7 +366,7 @@ export default function OrderDetailModal({
                       cursor: 'pointer',
                     }}
                   >
-                    Annuler la commande
+                    {t('ordersPage.detail.cancelOrder')}
                   </button>
                 </div>
               )}

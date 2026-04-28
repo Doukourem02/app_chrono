@@ -265,6 +265,200 @@
     },
     "comingSoon": "Coming soon"
   },
+  "ordersPage": {
+    "title": "Delivery Report",
+    "tabs": {
+      "all": "All deliveries",
+      "onProgress": "Deliveries in progress",
+      "successful": "Successful deliveries",
+      "onHold": "Deliveries on hold",
+      "canceled": "Cancelled deliveries"
+    },
+    "kpi": {
+      "onProgress": "Deliveries in progress",
+      "successful": "Successful",
+      "onHold": "On hold",
+      "canceled": "Cancelled",
+      "order": "order",
+      "orders": "orders",
+      "vsPastMonth": "vs past month"
+    },
+    "table": {
+      "deliveryId": "Delivery ID",
+      "date": "Date",
+      "departure": "Departure",
+      "destination": "Destination",
+      "client": "Client",
+      "driver": "Driver",
+      "price": "Price",
+      "status": "Status",
+      "actions": "Actions",
+      "found": "{count} order(s) found",
+      "empty": "No orders found",
+      "unassigned": "Not assigned",
+      "phoneOrder": "Phone order",
+      "phoneOrderTitle": "Phone order created from the dashboard",
+      "b2bTitle": "B2B order created from planning",
+      "showing": "Showing {from} to {to} of {total} entries"
+    },
+    "actions": {
+      "cancel": "Cancel"
+    },
+    "alerts": {
+      "confirmCancel": "Are you sure you want to cancel this order?",
+      "cancelSuccess": "Order cancelled successfully",
+      "cancelError": "Error while cancelling the order",
+      "cancelImpossible": "Unable to cancel the order",
+      "errorPrefix": "Error"
+    },
+    "status": {
+      "pending": "Searching driver",
+      "accepted": "Assigned",
+      "enroute": "Driver en route",
+      "picked_up": "Package picked up",
+      "delivering": "In delivery",
+      "completed": "Delivery completed",
+      "declined": "Declined",
+      "cancelled": "Cancelled"
+    },
+    "detail": {
+      "title": "Order details",
+      "loading": "Loading...",
+      "notFound": "Order not found",
+      "pickup": "Pickup",
+      "delivery": "Delivery",
+      "driver": "Driver",
+      "client": "Client",
+      "qrProof": "Delivery proof (QR code)",
+      "qrScanned": "QR code scanned",
+      "by": "by",
+      "viewScanHistory": "View scan history",
+      "qrNotScanned": "QR code not scanned — no physical handoff proof recorded",
+      "scanHistory": "Scan history",
+      "noScan": "No scan recorded",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "price": "Price",
+      "cancelOrder": "Cancel order"
+    }
+  },
+  "financePage": {
+    "title": "Finance",
+    "refresh": "Refresh",
+    "export": "Export",
+    "periods": {
+      "today": "Today",
+      "week": "This week",
+      "month": "This month",
+      "year": "This year",
+      "custom": "Custom"
+    },
+    "custom": {
+      "start": "Start date",
+      "end": "End date",
+      "apply": "Apply"
+    },
+    "sections": {
+      "active": "Active data",
+      "cancelled": "Cancelled orders"
+    },
+    "kpi": {
+      "revenue": "Collected revenue",
+      "conversion": "Conversion rate",
+      "confirmed": "Confirmed payments",
+      "pending": "Pending payments",
+      "cancelledOrders": "Cancelled orders",
+      "uncollectedValue": "Uncollected value",
+      "cancelledDeferred": "Cancelled deferred payments"
+    },
+    "charts": {
+      "revenueByPeriod": "Revenue by period",
+      "paymentSplit": "Payment method split",
+      "topDrivers": "Top 5 drivers by revenue"
+    },
+    "tabs": {
+      "active": "Active transactions",
+      "cancelled": "Cancelled"
+    },
+    "filters": {
+      "search": "Search by transaction ID, order, first name, last name, email...",
+      "allStatuses": "All statuses",
+      "allMethods": "All methods"
+    },
+    "table": {
+      "activeTitle": "Active transactions",
+      "cancelledTitle": "Cancelled orders",
+      "empty": "No transactions found",
+      "loading": "Loading...",
+      "transactionId": "Transaction ID",
+      "order": "Order",
+      "client": "Client",
+      "amount": "Amount",
+      "method": "Method",
+      "status": "Status",
+      "date": "Date",
+      "showing": "Showing {from} to {to} of {total}",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "alerts": {
+      "noExport": "No transactions to export"
+    }
+  },
+  "reportsPage": {
+    "title": "Reports",
+    "export": "Export (PDF/Excel)",
+    "filters": {
+      "title": "Period filters",
+      "period": "Period",
+      "start": "Start date",
+      "end": "End date",
+      "status": "Status",
+      "deliveryType": "Delivery type"
+    },
+    "types": {
+      "deliveries": "Deliveries",
+      "revenues": "Revenue",
+      "clients": "Clients",
+      "drivers": "Drivers",
+      "payments": "Payments"
+    },
+    "periods": {
+      "today": "Today",
+      "week": "This week",
+      "month": "This month",
+      "year": "This year",
+      "custom": "Custom"
+    },
+    "common": {
+      "all": "All",
+      "emptyExport": "No data to export"
+    },
+    "deliveries": {
+      "title": "Delivery Report ({count} results)",
+      "empty": "No deliveries found for this period",
+      "headers": {
+        "id": "ID",
+        "date": "Date",
+        "status": "Status",
+        "client": "Client",
+        "driver": "Driver",
+        "amount": "Amount"
+      }
+    },
+    "payments": {
+      "title": "Payment Report",
+      "details": "Details ({count} entries)",
+      "empty": "No payments found for this period",
+      "headers": {
+        "date": "Date",
+        "method": "Method",
+        "status": "Status",
+        "count": "Count",
+        "total": "Total amount"
+      }
+    }
+  },
   "maintenance": {
     "stats": {
       "totalVehicles": "Total vehicles",

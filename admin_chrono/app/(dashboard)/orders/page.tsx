@@ -8,6 +8,7 @@ import { adminSocketService } from "@/lib/adminSocketService";
 import { formatDeliveryId } from "@/utils/formatDeliveryId";
 import { logger } from "@/utils/logger";
 import { themeColors } from "@/utils/theme";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -29,45 +30,37 @@ const parseDateToISO = (value?: string) => {
 
 const statusConfig: Record<
   string,
-  { label: string; backgroundColor: string; color: string }
+  { backgroundColor: string; color: string }
 > = {
   pending: {
-    label: "Recherche livreur",
     backgroundColor: "#FFEDD5",
     color: "#EA580C",
   },
   accepted: {
-    label: "Prise en charge",
     backgroundColor: "#DBEAFE",
     color: "#2563EB",
   },
   enroute: {
-    label: "Prise en charge",
     backgroundColor: "#DBEAFE",
     color: "#2563EB",
   },
   picked_up: {
-    label: "Colis récupéré",
     backgroundColor: "#F3E8FF",
     color: "#9333EA",
   },
   delivering: {
-    label: "Livraison",
     backgroundColor: "#E9D5FF",
     color: "#7C3AED",
   },
   completed: {
-    label: "Livraison terminée",
     backgroundColor: "#D1FAE5",
     color: "#16A34A",
   },
   declined: {
-    label: "Declined",
     backgroundColor: "#FEE2E2",
     color: "#DC2626",
   },
   cancelled: {
-    label: "Cancelled",
     backgroundColor: "#FEE2E2",
     color: "#B91C1C",
   },
@@ -91,6 +84,7 @@ interface Order {
 
 export default function OrdersPage() {
   const searchParams = useSearchParams();
+  const t = useTranslation();
 
   // Initialiser activeTab en fonction du paramètre URL
   const getInitialTab = (): TabType => {
@@ -126,7 +120,7 @@ export default function OrdersPage() {
 
   // Fonction pour annuler une commande
   const handleCancelOrder = async (orderId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir annuler cette commande ?")) {
+    if (!confirm(t("ordersPage.alerts.confirmCancel"))) {
       return;
     }
 
@@ -138,15 +132,15 @@ export default function OrdersPage() {
       if (result.success) {
         // Rafraîchir la liste des commandes
         queryClient.invalidateQueries({ queryKey: ["orders", activeTab] });
-        alert("Commande annulée avec succès");
+        alert(t("ordersPage.alerts.cancelSuccess"));
       } else {
         alert(
-          `Erreur: ${result.message || "Impossible d'annuler la commande"}`
+          `${t("ordersPage.alerts.errorPrefix")}: ${result.message || t("ordersPage.alerts.cancelImpossible")}`
         );
       }
     } catch (error) {
       logger.error("[OrdersPage] Error cancelling order:", error);
-      alert("Erreur lors de l'annulation de la commande");
+      alert(t("ordersPage.alerts.cancelError"));
     }
   };
 
@@ -410,11 +404,11 @@ export default function OrdersPage() {
   };
 
   const tabs: { key: TabType; label: string }[] = [
-    { key: "all", label: "All delivery" },
-    { key: "onProgress", label: "On Progress Delivery" },
-    { key: "successful", label: "Successfull" },
-    { key: "onHold", label: "On hold delivery" },
-    { key: "canceled", label: "Canceled Delivery" },
+    { key: "all", label: t("ordersPage.tabs.all") },
+    { key: "onProgress", label: t("ordersPage.tabs.onProgress") },
+    { key: "successful", label: t("ordersPage.tabs.successful") },
+    { key: "onHold", label: t("ordersPage.tabs.onHold") },
+    { key: "canceled", label: t("ordersPage.tabs.canceled") },
   ];
 
   return (
@@ -443,7 +437,7 @@ export default function OrdersPage() {
           />
         </div>
 
-        <h1 style={titleStyle}>Rapport de livraison</h1>
+        <h1 style={titleStyle}>{t("ordersPage.title")}</h1>
 
         <div style={tabsContainerStyle}>
           {tabs.map((tab) => (
@@ -486,7 +480,7 @@ export default function OrdersPage() {
           <div
             style={{ padding: "48px", textAlign: "center", color: themeColors.textSecondary }}
           >
-            Aucune commande trouvée
+            {t("ordersPage.table.empty")}
           </div>
         ) : (
           <div
@@ -507,7 +501,7 @@ export default function OrdersPage() {
               }}
             >
               <p style={{ color: themeColors.textSecondary, fontSize: "14px" }}>
-                {orders.length} commande(s) trouvée(s)
+                {t("ordersPage.table.found", { count: orders.length })}
               </p>
             </div>
             <div style={{ overflowX: "auto" }}>
@@ -525,7 +519,7 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Delivery ID
+                      {t("ordersPage.table.deliveryId")}
                     </th>
                     <th
                       style={{
@@ -538,7 +532,7 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Date
+                      {t("ordersPage.table.date")}
                     </th>
                     <th
                       style={{
@@ -551,7 +545,7 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Departure
+                      {t("ordersPage.table.departure")}
                     </th>
                     <th
                       style={{
@@ -564,7 +558,7 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Destination
+                      {t("ordersPage.table.destination")}
                     </th>
                     <th
                       style={{
@@ -577,7 +571,7 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Client
+                      {t("ordersPage.table.client")}
                     </th>
                     <th
                       style={{
@@ -590,7 +584,7 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Livreur
+                      {t("ordersPage.table.driver")}
                     </th>
                     <th
                       style={{
@@ -603,7 +597,7 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Prix
+                      {t("ordersPage.table.price")}
                     </th>
                     <th
                       style={{
@@ -616,7 +610,7 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Status
+                      {t("ordersPage.table.status")}
                     </th>
                     <th
                       style={{
@@ -629,17 +623,17 @@ export default function OrdersPage() {
                         borderBottom: `1px solid ${themeColors.cardBorder}`,
                       }}
                     >
-                      Actions
+                      {t("ordersPage.table.actions")}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedOrders.map((order: Order, idx: number) => {
                     const status = statusConfig[order.status] || {
-                      label: order.status,
                       backgroundColor: themeColors.grayLight,
                       color: themeColors.textSecondary,
                     };
+                    const statusLabel = t(`ordersPage.status.${order.status}`) || order.status;
 
                     // Vérifier si cette commande doit être mise en évidence
                     // Comparer par ID exact d'abord, puis par les 4 derniers caractères si pas de match exact
@@ -738,7 +732,7 @@ export default function OrdersPage() {
                                   color: '#4338CA',
                                   textTransform: 'uppercase',
                                 }}
-                                title="Commande B2B créée depuis le planning"
+                                title={t("ordersPage.table.b2bTitle")}
                               >
                                 B2B
                               </span>
@@ -754,9 +748,9 @@ export default function OrdersPage() {
                                   color: '#92400E',
                                   textTransform: 'uppercase',
                                 }}
-                                title="Commande téléphonique créée depuis le dashboard"
+                                title={t("ordersPage.table.phoneOrderTitle")}
                               >
-                                Téléphonique
+                                {t("ordersPage.table.phoneOrder")}
                               </span>
                             )}
                           </div>
@@ -817,7 +811,7 @@ export default function OrdersPage() {
                                 color: themeColors.textSecondary,
                               }}
                             >
-                              Non assigné
+                              {t("ordersPage.table.unassigned")}
                             </span>
                           )}
                         </td>
@@ -857,7 +851,7 @@ export default function OrdersPage() {
                               fontWeight: 600,
                             }}
                           >
-                            {status.label}
+                            {statusLabel}
                           </span>
                         </td>
                         <td style={{ padding: "12px" }}>
@@ -893,7 +887,7 @@ export default function OrdersPage() {
                                   "#EF4444";
                               }}
                             >
-                              Annuler
+                              {t("ordersPage.actions.cancel")}
                             </button>
                           )}
                         </td>
@@ -915,9 +909,11 @@ export default function OrdersPage() {
                 }}
               >
                 <p style={{ color: themeColors.textSecondary, fontSize: "14px" }}>
-                  Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                  {Math.min(currentPage * itemsPerPage, orders.length)} of{" "}
-                  {orders.length} entries
+                  {t("ordersPage.table.showing", {
+                    from: (currentPage - 1) * itemsPerPage + 1,
+                    to: Math.min(currentPage * itemsPerPage, orders.length),
+                    total: orders.length,
+                  })}
                 </p>
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "8px" }}

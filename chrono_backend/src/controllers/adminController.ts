@@ -13,6 +13,18 @@ import logger from '../utils/logger.js';
 import { resolveApproximatePickupZone } from '../utils/abidjanApproximatePickupZones.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const stalePendingOrderCondition = `(o.status = 'pending' AND o.created_at < CURRENT_DATE)`;
+const inactiveOrderCondition = `(o.status IN ('cancelled', 'declined') OR ${stalePendingOrderCondition})`;
+const activeOrderCondition = `(o.id IS NULL OR (o.status NOT IN ('cancelled', 'declined') AND NOT ${stalePendingOrderCondition}))`;
+const orderLossDateExpression = `CASE WHEN ${stalePendingOrderCondition} THEN o.created_at ELSE COALESCE(o.cancelled_at, o.created_at) END`;
+const effectiveOrderStatusExpression = `CASE WHEN ${stalePendingOrderCondition} THEN 'cancelled' ELSE o.status END`;
+const effectivePaymentStatusExpression = `CASE
+  WHEN ${inactiveOrderCondition} OR t.status IN ('cancelled', 'refunded') THEN 'cancelled'
+  WHEN t.payment_method_type = 'deferred' AND t.status IN ('pending', 'delayed') THEN 'delayed'
+  WHEN t.payment_method_type = 'cash' AND t.status = 'pending' AND (o.status = 'completed' OR t.created_at < CURRENT_DATE) THEN 'paid'
+  WHEN t.status = 'pending' AND t.created_at < CURRENT_DATE THEN 'cancelled'
+  ELSE t.status
+END`;
 
 const normalizeDate = (date: Date, endOfDay = false): Date => {
   const normalized = new Date(date);
@@ -1634,7 +1646,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       FROM transactions t
       LEFT JOIN orders o ON t.order_id = o.id
       WHERE t.status = 'paid'
-        AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
+        AND ${activeOrderCondition}
     `;
 
     const revenueParams = [
@@ -1663,7 +1675,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         FROM transactions t
         LEFT JOIN orders o ON t.order_id = o.id
         WHERE t.created_at >= $1
-          AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
+          AND ${activeOrderCondition}
           AND t.status NOT IN ('cancelled', 'refunded')
         GROUP BY t.payment_method_type
       `, [startOfMonth.toISOString()]);
@@ -1684,7 +1696,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         FROM transactions t
         LEFT JOIN orders o ON t.order_id = o.id
         WHERE t.created_at >= $1
-          AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
+          AND ${activeOrderCondition}
           AND t.status NOT IN ('cancelled', 'refunded')
         GROUP BY t.status, t.payment_method_type
       `, [startOfMonth.toISOString()]);
@@ -1720,24 +1732,26 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       // Utilise transactions (pas orders) car la date de transaction = date de paiement réel
       const qrScannedQuery = `
         SELECT
-          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $1) as scanned_today,
-          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $3) as scanned_week,
-          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $4) as scanned_month,
-          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $5) as scanned_year,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $1) as total_today,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $3) as total_week,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $4) as total_month,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $5) as total_year,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $1) as cancelled_today,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $3) as cancelled_week,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $4) as cancelled_month,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $5) as cancelled_year
+          COUNT(*) FILTER (WHERE t.status = 'paid' AND t.created_at >= $1) as scanned_today,
+          COUNT(*) FILTER (WHERE t.status = 'paid' AND t.created_at >= $3) as scanned_week,
+          COUNT(*) FILTER (WHERE t.status = 'paid' AND t.created_at >= $4) as scanned_month,
+          COUNT(*) FILTER (WHERE t.status = 'paid' AND t.created_at >= $5) as scanned_year,
+          COUNT(*) FILTER (WHERE t.status NOT IN ('cancelled','refunded') AND t.created_at >= $1) as total_today,
+          COUNT(*) FILTER (WHERE t.status NOT IN ('cancelled','refunded') AND t.created_at >= $3) as total_week,
+          COUNT(*) FILTER (WHERE t.status NOT IN ('cancelled','refunded') AND t.created_at >= $4) as total_month,
+          COUNT(*) FILTER (WHERE t.status NOT IN ('cancelled','refunded') AND t.created_at >= $5) as total_year,
+          COUNT(*) FILTER (WHERE t.status IN ('cancelled','refunded') AND t.created_at >= $1) as cancelled_today,
+          COUNT(*) FILTER (WHERE t.status IN ('cancelled','refunded') AND t.created_at >= $3) as cancelled_week,
+          COUNT(*) FILTER (WHERE t.status IN ('cancelled','refunded') AND t.created_at >= $4) as cancelled_month,
+          COUNT(*) FILTER (WHERE t.status IN ('cancelled','refunded') AND t.created_at >= $5) as cancelled_year
           ${hasCustomRange ? `,
-          COUNT(*) FILTER (WHERE status = 'paid' AND created_at >= $6 AND created_at <= $7) as scanned_custom,
-          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','refunded') AND created_at >= $6 AND created_at <= $7) as total_custom,
-          COUNT(*) FILTER (WHERE status IN ('cancelled','refunded') AND created_at >= $6 AND created_at <= $7) as cancelled_custom` : ''}
-        FROM transactions
-        WHERE created_at >= $5
+          COUNT(*) FILTER (WHERE t.status = 'paid' AND t.created_at >= $6 AND t.created_at <= $7) as scanned_custom,
+          COUNT(*) FILTER (WHERE t.status NOT IN ('cancelled','refunded') AND t.created_at >= $6 AND t.created_at <= $7) as total_custom,
+          COUNT(*) FILTER (WHERE t.status IN ('cancelled','refunded') AND t.created_at >= $6 AND t.created_at <= $7) as cancelled_custom` : ''}
+        FROM transactions t
+        LEFT JOIN orders o ON t.order_id = o.id
+        WHERE t.created_at >= $5
+          AND ${activeOrderCondition}
       `;
       const qrScannedResult = await (pool as any).query(qrScannedQuery, qrParams);
       const qr = qrScannedResult.rows[0] || {};
@@ -1765,34 +1779,44 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     try {
       const cancelledStatsQuery = `
         SELECT
-          COUNT(*) FILTER (WHERE created_at >= $1) as count_today,
-          COUNT(*) FILTER (WHERE created_at >= $3) as count_week,
-          COUNT(*) FILTER (WHERE created_at >= $4) as count_month,
-          COUNT(*) FILTER (WHERE created_at >= $5) as count_year,
-          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $1), 0) as value_today,
-          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $3), 0) as value_week,
-          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $4), 0) as value_month,
-          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $5), 0) as value_year
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $1) as count_today,
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $3) as count_week,
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $4) as count_month,
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $5) as count_year,
+          COALESCE(SUM(o.${priceColumn}) FILTER (WHERE ${orderLossDateExpression} >= $1), 0) as value_today,
+          COALESCE(SUM(o.${priceColumn}) FILTER (WHERE ${orderLossDateExpression} >= $3), 0) as value_week,
+          COALESCE(SUM(o.${priceColumn}) FILTER (WHERE ${orderLossDateExpression} >= $4), 0) as value_month,
+          COALESCE(SUM(o.${priceColumn}) FILTER (WHERE ${orderLossDateExpression} >= $5), 0) as value_year
           ${hasCustomRange ? `,
-          COUNT(*) FILTER (WHERE created_at >= $6 AND created_at <= $7) as count_custom,
-          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $6 AND created_at <= $7), 0) as value_custom` : ''}
-        FROM orders
-        WHERE status IN ('cancelled', 'declined')
-          AND created_at >= $5
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $6 AND ${orderLossDateExpression} <= $7) as count_custom,
+          COALESCE(SUM(o.${priceColumn}) FILTER (WHERE ${orderLossDateExpression} >= $6 AND ${orderLossDateExpression} <= $7), 0) as value_custom` : ''}
+        FROM orders o
+        WHERE ${inactiveOrderCondition}
+          AND ${orderLossDateExpression} >= $5
       `;
       const cancelledDeferredQuery = `
         SELECT
-          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $1), 0) as deferred_today,
-          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $3), 0) as deferred_week,
-          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $4), 0) as deferred_month,
-          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $5), 0) as deferred_year
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $1), 0) as deferred_today,
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $3), 0) as deferred_week,
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $4), 0) as deferred_month,
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $5), 0) as deferred_year
           ${hasCustomRange ? `,
-          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $6 AND t.created_at <= $7), 0) as deferred_custom` : ''}
-        FROM transactions t
-        INNER JOIN orders o ON t.order_id = o.id
-        WHERE o.status IN ('cancelled', 'declined')
-          AND t.payment_method_type = 'deferred'
-          AND t.created_at >= $5
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $6 AND loss_date <= $7), 0) as deferred_custom` : ''}
+        FROM (
+          SELECT
+            o.id,
+            ${orderLossDateExpression} as loss_date,
+            CASE
+              WHEN o.payment_method_type = 'deferred' THEN COALESCE(o.${priceColumn}, 0)
+              ELSE COALESCE(SUM(t.amount) FILTER (WHERE t.payment_method_type = 'deferred'), 0)
+            END as deferred_amount
+          FROM orders o
+          LEFT JOIN transactions t ON t.order_id = o.id
+          WHERE ${inactiveOrderCondition}
+            AND (o.payment_method_type = 'deferred' OR t.payment_method_type = 'deferred')
+            AND ${orderLossDateExpression} >= $5
+          GROUP BY o.id, o.status, o.created_at, o.cancelled_at, o.payment_method_type, o.${priceColumn}
+        ) deferred_losses
       `;
       const [cancelledStatsResult, cancelledDeferredResult] = await Promise.all([
         (pool as any).query(cancelledStatsQuery, qrParams),
@@ -1973,10 +1997,10 @@ export const getAdminTransactions = async (req: Request, res: Response): Promise
     }
 
     if (view === 'active') {
-      query += ` AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))`;
+      query += ` AND ${activeOrderCondition}`;
       query += ` AND t.status NOT IN ('cancelled', 'refunded')`;
     } else if (view === 'cancelled') {
-      query += ` AND (o.status IN ('cancelled', 'declined') OR t.status IN ('cancelled', 'refunded'))`;
+      query += ` AND (${inactiveOrderCondition} OR t.status IN ('cancelled', 'refunded'))`;
     }
 
     const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as count FROM');
@@ -2028,6 +2052,7 @@ export const getAdminReportDeliveries = async (req: Request, res: Response): Pro
     let query = `
       SELECT 
         o.*,
+        ${effectiveOrderStatusExpression} as effective_status,
         u.first_name as user_first_name,
         u.last_name as user_last_name,
         u.email as user_email,
@@ -2057,9 +2082,17 @@ export const getAdminReportDeliveries = async (req: Request, res: Response): Pro
     }
 
     if (status && status !== 'all') {
-      query += ` AND o.status = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
+      if (status === 'cancelled') {
+        query += ` AND ${inactiveOrderCondition}`;
+      } else if (status === 'pending') {
+        query += ` AND o.status = $${paramIndex} AND NOT ${stalePendingOrderCondition}`;
+        params.push(status);
+        paramIndex++;
+      } else {
+        query += ` AND o.status = $${paramIndex}`;
+        params.push(status);
+        paramIndex++;
+      }
     }
 
     if (driverId) {
@@ -2341,14 +2374,22 @@ export const getAdminReportPayments = async (req: Request, res: Response): Promi
     }
 
     let query = `
-      SELECT 
-        DATE_TRUNC('day', t.created_at) as date,
-        t.payment_method_type,
-        t.status,
+      SELECT
+        normalized.date,
+        normalized.payment_method_type,
+        normalized.status,
         COUNT(*) as count,
-        COALESCE(SUM(t.amount), 0) as total_amount
-      FROM transactions t
-      WHERE 1=1
+        COALESCE(SUM(normalized.amount), 0) as total_amount
+      FROM (
+        SELECT
+          DATE_TRUNC('day', t.created_at) as date,
+          t.payment_method_type,
+          ${effectivePaymentStatusExpression} as status,
+          t.amount,
+          t.created_at
+        FROM transactions t
+        LEFT JOIN orders o ON t.order_id = o.id
+        WHERE 1=1
     `;
     const params: any[] = [];
     let paramIndex = 1;
@@ -2365,7 +2406,11 @@ export const getAdminReportPayments = async (req: Request, res: Response): Promi
       paramIndex++;
     }
 
-    query += ` GROUP BY DATE_TRUNC('day', t.created_at), t.payment_method_type, t.status ORDER BY date DESC`;
+    query += `
+      ) normalized
+      GROUP BY normalized.date, normalized.payment_method_type, normalized.status
+      ORDER BY normalized.date DESC
+    `;
 
     const result = await (pool as any).query(query, params);
 
@@ -4780,4 +4825,3 @@ export const getAdminDriverCommissionTransactions = async (req: Request, res: Re
     });
   }
 };
-

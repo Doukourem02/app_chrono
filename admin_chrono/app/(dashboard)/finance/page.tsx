@@ -7,6 +7,8 @@ import { Wallet, TrendingUp, CreditCard, Clock, Download, RefreshCw, XCircle } f
 import { ScreenTransition } from '@/components/animations'
 import { exportData } from '@/utils/exportUtils'
 import { themeColors } from '@/utils/theme'
+import { useLanguageStore } from '@/stores/languageStore'
+import { useTranslation } from '@/hooks/useTranslation'
 import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,} from 'recharts'
 
 type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
@@ -25,6 +27,9 @@ interface Transaction {
 }
 
 export default function FinancePage() {
+  const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
+  const locale = language === 'fr' ? 'fr-FR' : 'en-US'
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('month')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
@@ -110,12 +115,12 @@ export default function FinancePage() {
   })
 
   const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} FCFA`
+    return `${amount.toLocaleString(locale, { maximumFractionDigits: 0 })} FCFA`
   }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('fr-FR', {
+    return date.toLocaleDateString(locale, {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -154,28 +159,28 @@ export default function FinancePage() {
     const labels: Record<string, string> = {
       orange_money: 'Orange Money',
       wave: 'Wave',
-      cash: 'Espèces',
-      deferred: 'Différé',
+      cash: language === 'fr' ? 'Espèces' : 'Cash',
+      deferred: language === 'fr' ? 'Différé' : 'Deferred',
     }
     return labels[method] || method
   }
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      paid: 'Payé',
-      pending: 'En attente',
-      refused: 'Refusé',
-      delayed: 'Différé',
-      cancelled: 'Annulé',
+      paid: language === 'fr' ? 'Payé' : 'Paid',
+      pending: language === 'fr' ? 'En attente' : 'Pending',
+      refused: language === 'fr' ? 'Refusé' : 'Refused',
+      delayed: language === 'fr' ? 'Différé' : 'Deferred',
+      cancelled: language === 'fr' ? 'Annulé' : 'Cancelled',
     }
     return labels[status] || status
   }
 
   const periods: { key: Period; label: string }[] = [
-    { key: 'today', label: "Aujourd'hui" },
-    { key: 'week', label: 'Cette semaine' },
-    { key: 'month', label: 'Ce mois' },
-    { key: 'year', label: 'Cette année' },
+    { key: 'today', label: t('financePage.periods.today') },
+    { key: 'week', label: t('financePage.periods.week') },
+    { key: 'month', label: t('financePage.periods.month') },
+    { key: 'year', label: t('financePage.periods.year') },
   ]
 
   const stats = financialStats?.data
@@ -195,10 +200,10 @@ export default function FinancePage() {
   // Données pour le graphique des revenus par période
   const revenueChartData = stats
     ? [
-        { period: "Aujourd'hui", revenue: stats.totalRevenue.today },
-        { period: 'Semaine', revenue: stats.totalRevenue.week },
-        { period: 'Mois', revenue: stats.totalRevenue.month },
-        { period: 'Année', revenue: stats.totalRevenue.year },
+        { period: t('financePage.periods.today'), revenue: stats.totalRevenue.today },
+        { period: t('financePage.periods.week'), revenue: stats.totalRevenue.week },
+        { period: t('financePage.periods.month'), revenue: stats.totalRevenue.month },
+        { period: t('financePage.periods.year'), revenue: stats.totalRevenue.year },
       ]
     : []
 
@@ -426,7 +431,7 @@ export default function FinancePage() {
     return (
       <div style={containerStyle}>
         <div style={{ textAlign: 'center', padding: '40px' }}>
-          <div>Chargement...</div>
+          <div>{t('financePage.table.loading')}</div>
         </div>
       </div>
     )
@@ -436,7 +441,7 @@ export default function FinancePage() {
     <ScreenTransition direction="fade" duration={0.3}>
       <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Finance</h1>
+        <h1 style={titleStyle}>{t('financePage.title')}</h1>
         <div style={{ display: 'flex', flexDirection: 'row', gap: '12px' }}>
           <button
             onClick={async () => {
@@ -471,27 +476,27 @@ export default function FinancePage() {
                 transform: isRefreshing ? undefined : 'none',
               }} 
             />
-            Actualiser
+            {t('financePage.refresh')}
           </button>
           <button
             onClick={() => {
               const transactions: Transaction[] = (transactionsData?.data as Transaction[]) || []
               if (transactions.length === 0) {
-                alert('Aucune transaction à exporter')
+                alert(t('financePage.alerts.noExport'))
                 return
               }
 
               exportData({
-                title: `Rapport Financier - ${periods.find((p) => p.key === selectedPeriod)?.label || 'Période'}`,
+                title: `${t('financePage.title')} - ${periods.find((p) => p.key === selectedPeriod)?.label || t('financePage.periods.custom')}`,
                 headers: [
-                  'ID Transaction',
-                  'ID Commande',
-                  'Nom et Prénom Client',
-                  'Téléphone Client',
-                  'Montant (FCFA)',
-                  'Méthode de paiement',
-                  'Statut',
-                  'Date',
+                  t('financePage.table.transactionId'),
+                  t('financePage.table.order'),
+                  t('financePage.table.client'),
+                  language === 'fr' ? 'Téléphone Client' : 'Client phone',
+                  `${t('financePage.table.amount')} (FCFA)`,
+                  t('financePage.table.method'),
+                  t('financePage.table.status'),
+                  t('financePage.table.date'),
                 ],
                 rows: transactions.map((tx: Transaction) => {
                   const clientName = (tx.user_first_name && tx.user_last_name)
@@ -529,7 +534,7 @@ export default function FinancePage() {
             }}
           >
             <Download size={16} />
-            Exporter
+            {t('financePage.export')}
           </button>
         </div>
       </div>
@@ -549,7 +554,7 @@ export default function FinancePage() {
           style={selectedPeriod === 'custom' ? periodTabActiveStyle : periodTabStyle}
           onClick={() => { setSelectedPeriod('custom'); setCurrentPage(1) }}
         >
-          Personnaliser
+          {t('financePage.periods.custom')}
         </button>
       </div>
 
@@ -557,7 +562,7 @@ export default function FinancePage() {
       {selectedPeriod === 'custom' && (
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Date début</label>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('financePage.custom.start')}</label>
             <input
               type="date"
               value={customStart}
@@ -566,7 +571,7 @@ export default function FinancePage() {
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Date fin</label>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('financePage.custom.end')}</label>
             <input
               type="date"
               value={customEnd}
@@ -594,7 +599,7 @@ export default function FinancePage() {
               cursor: customStart && customEnd ? 'pointer' : 'not-allowed',
             }}
           >
-            Appliquer
+            {t('financePage.custom.apply')}
           </button>
         </div>
       )}
@@ -602,7 +607,7 @@ export default function FinancePage() {
       {/* Section : Données actives */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
         <span style={{ fontSize: '13px', fontWeight: 700, color: themeColors.textPrimary, whiteSpace: 'nowrap' }}>
-          Données actives
+          {t('financePage.sections.active')}
         </span>
         <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }} />
       </div>
@@ -616,7 +621,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={kpiValueStyle}>{formatCurrency(currentRevenue || 0)}</div>
-              <div style={kpiLabelStyle}>Revenus encaissés</div>
+              <div style={kpiLabelStyle}>{t('financePage.kpi.revenue')}</div>
             </div>
           </div>
         </div>
@@ -628,7 +633,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={kpiValueStyle}>{stats?.conversionRate.toFixed(1) || 0}%</div>
-              <div style={kpiLabelStyle}>Taux de conversion</div>
+              <div style={kpiLabelStyle}>{t('financePage.kpi.conversion')}</div>
             </div>
           </div>
         </div>
@@ -642,7 +647,7 @@ export default function FinancePage() {
               <div style={kpiValueStyle}>
                 {currentQr.scanned} / {currentQr.total}
               </div>
-              <div style={kpiLabelStyle}>Paiements confirmés</div>
+              <div style={kpiLabelStyle}>{t('financePage.kpi.confirmed')}</div>
             </div>
           </div>
         </div>
@@ -654,7 +659,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={kpiValueStyle}>{currentQr.total - currentQr.scanned}</div>
-              <div style={kpiLabelStyle}>Paiements en attente</div>
+              <div style={kpiLabelStyle}>{t('financePage.kpi.pending')}</div>
             </div>
           </div>
         </div>
@@ -663,7 +668,7 @@ export default function FinancePage() {
       {/* Section : Commandes annulées */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', marginTop: '8px' }}>
         <span style={{ fontSize: '13px', fontWeight: 700, color: '#EF4444', whiteSpace: 'nowrap' }}>
-          Commandes annulées
+          {t('financePage.sections.cancelled')}
         </span>
         <div style={{ flex: 1, height: '1px', backgroundColor: '#FCA5A5' }} />
       </div>
@@ -675,7 +680,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={{ ...kpiValueStyle, color: '#EF4444' }}>{currentCancelled.count}</div>
-              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Commandes annulées</div>
+              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>{t('financePage.kpi.cancelledOrders')}</div>
             </div>
           </div>
         </div>
@@ -689,7 +694,7 @@ export default function FinancePage() {
               <div style={{ ...kpiValueStyle, color: '#EF4444' }}>
                 {formatCurrency(currentCancelled.totalValue)}
               </div>
-              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Valeur non encaissée</div>
+              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>{t('financePage.kpi.uncollectedValue')}</div>
             </div>
           </div>
         </div>
@@ -703,7 +708,7 @@ export default function FinancePage() {
               <div style={{ ...kpiValueStyle, color: '#EF4444' }}>
                 {formatCurrency(currentCancelled.deferredAmount)}
               </div>
-              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Différés annulés</div>
+              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>{t('financePage.kpi.cancelledDeferred')}</div>
             </div>
           </div>
         </div>
@@ -712,7 +717,7 @@ export default function FinancePage() {
       {/* Graphiques */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
         <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>Revenus par période</h3>
+          <h3 style={chartTitleStyle}>{t('financePage.charts.revenueByPeriod')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={revenueChartData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -725,7 +730,7 @@ export default function FinancePage() {
         </div>
 
         <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>Répartition par méthode de paiement</h3>
+          <h3 style={chartTitleStyle}>{t('financePage.charts.paymentSplit')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -755,7 +760,7 @@ export default function FinancePage() {
       {/* Top 5 Drivers */}
       {topDriversData.length > 0 && (
         <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>Top 5 Drivers par revenus</h3>
+          <h3 style={chartTitleStyle}>{t('financePage.charts.topDrivers')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={topDriversData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" />
@@ -784,7 +789,7 @@ export default function FinancePage() {
             marginBottom: '-2px',
           }}
         >
-          Transactions actives
+          {t('financePage.tabs.active')}
         </button>
         <button
           onClick={() => { setViewMode('cancelled'); setCurrentPage(1); setStatusFilter('all') }}
@@ -800,7 +805,7 @@ export default function FinancePage() {
             marginBottom: '-2px',
           }}
         >
-          Annulées
+          {t('financePage.tabs.cancelled')}
         </button>
       </div>
 
@@ -808,7 +813,7 @@ export default function FinancePage() {
       <div style={filtersStyle}>
         <input
           type="text"
-          placeholder="Rechercher par ID transaction, commande, nom, prénom, email..."
+          placeholder={t('financePage.filters.search')}
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value)
@@ -825,11 +830,11 @@ export default function FinancePage() {
             }}
             style={filterSelectStyle}
           >
-            <option value="all">Tous les statuts</option>
-            <option value="paid">Payé</option>
-            <option value="pending">En attente</option>
-            <option value="refused">Refusé</option>
-            <option value="delayed">Différé</option>
+            <option value="all">{t('financePage.filters.allStatuses')}</option>
+            <option value="paid">{getStatusLabel('paid')}</option>
+            <option value="pending">{getStatusLabel('pending')}</option>
+            <option value="refused">{getStatusLabel('refused')}</option>
+            <option value="delayed">{getStatusLabel('delayed')}</option>
           </select>
         )}
         <select
@@ -840,37 +845,37 @@ export default function FinancePage() {
           }}
           style={filterSelectStyle}
         >
-          <option value="all">Toutes les méthodes</option>
+          <option value="all">{t('financePage.filters.allMethods')}</option>
           <option value="orange_money">Orange Money</option>
           <option value="wave">Wave</option>
-          <option value="cash">Espèces</option>
-          <option value="deferred">Différé</option>
+          <option value="cash">{getMethodLabel('cash')}</option>
+          <option value="deferred">{getMethodLabel('deferred')}</option>
         </select>
       </div>
 
       {/* Table des transactions */}
       <div style={tableCardStyle}>
         <h3 style={{ ...chartTitleStyle, marginBottom: '16px' }}>
-          {viewMode === 'active' ? 'Transactions actives' : 'Commandes annulées'}
+          {viewMode === 'active' ? t('financePage.table.activeTitle') : t('financePage.table.cancelledTitle')}
         </h3>
         {transactionsLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
+          <div style={{ textAlign: 'center', padding: '40px' }}>{t('financePage.table.loading')}</div>
         ) : transactions.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-            Aucune transaction trouvée
+            {t('financePage.table.empty')}
           </div>
         ) : (
           <>
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>ID Transaction</th>
-                  <th style={thStyle}>Commande</th>
-                  <th style={thStyle}>Client</th>
-                  <th style={thStyle}>Montant</th>
-                  <th style={thStyle}>Méthode</th>
-                  <th style={thStyle}>Statut</th>
-                  <th style={thStyle}>Date</th>
+                  <th style={thStyle}>{t('financePage.table.transactionId')}</th>
+                  <th style={thStyle}>{t('financePage.table.order')}</th>
+                  <th style={thStyle}>{t('financePage.table.client')}</th>
+                  <th style={thStyle}>{t('financePage.table.amount')}</th>
+                  <th style={thStyle}>{t('financePage.table.method')}</th>
+                  <th style={thStyle}>{t('financePage.table.status')}</th>
+                  <th style={thStyle}>{t('financePage.table.date')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -900,7 +905,7 @@ export default function FinancePage() {
                       <td style={tdStyle}>{getMethodLabel(tx.payment_method_type || '')}</td>
                       <td style={tdStyle}>
                         <span style={getStatusBadgeStyle(tx.status || '', viewMode === 'cancelled')}>
-                          {viewMode === 'cancelled' ? 'Annulé' : getStatusLabel(tx.status || '')}
+                          {viewMode === 'cancelled' ? getStatusLabel('cancelled') : getStatusLabel(tx.status || '')}
                         </span>
                       </td>
                       <td style={tdStyle}>{formatDate(tx.created_at || '')}</td>
@@ -914,8 +919,11 @@ export default function FinancePage() {
             {pagination && pagination.totalPages > 1 && (
               <div style={paginationStyle}>
                 <div style={{ fontSize: '14px', color: themeColors.textSecondary }}>
-                  Affichage {((currentPage - 1) * itemsPerPage + 1)} à{' '}
-                  {Math.min(currentPage * itemsPerPage, pagination.total)} sur {pagination.total}
+                  {t('financePage.table.showing', {
+                    from: (currentPage - 1) * itemsPerPage + 1,
+                    to: Math.min(currentPage * itemsPerPage, pagination.total),
+                    total: pagination.total,
+                  })}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                   <button
@@ -925,7 +933,7 @@ export default function FinancePage() {
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                   >
-                    Précédent
+                    {t('financePage.table.previous')}
                   </button>
                   {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
                     .filter(
@@ -960,7 +968,7 @@ export default function FinancePage() {
                     onClick={() => setCurrentPage((p) => Math.min(pagination.totalPages, p + 1))}
                     disabled={currentPage === pagination.totalPages}
                   >
-                    Suivant
+                    {t('financePage.table.next')}
                   </button>
                 </div>
               </div>
