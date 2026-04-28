@@ -1719,10 +1719,10 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     try {
       const qrScannedQuery = `
         SELECT
-          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $1) as scanned_today,
-          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $3) as scanned_week,
-          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $4) as scanned_month,
-          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $5) as scanned_year,
+          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $1) as scanned_today,
+          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $3) as scanned_week,
+          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $4) as scanned_month,
+          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $5) as scanned_year,
           COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $1) as total_today,
           COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $3) as total_week,
           COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $4) as total_month,
@@ -1732,7 +1732,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
           COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $4) as cancelled_month,
           COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $5) as cancelled_year
           ${hasCustomRange ? `,
-          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $6 AND created_at <= $7) as scanned_custom,
+          COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= $6 AND completed_at <= $7) as scanned_custom,
           COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $6 AND created_at <= $7) as total_custom,
           COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $6 AND created_at <= $7) as cancelled_custom` : ''}
         FROM orders
