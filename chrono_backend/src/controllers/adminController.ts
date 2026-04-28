@@ -1593,10 +1593,14 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
+    const customStart = req.query.startDate as string | undefined;
+    const customEnd = req.query.endDate as string | undefined;
+    const hasCustomRange = !!(customStart && customEnd);
+
     // Vérifier quelle colonne de prix existe
     const priceColumnsInfo = await (pool as any).query(
-      `SELECT column_name FROM information_schema.columns 
-       WHERE table_schema = 'public' AND table_name = 'orders' 
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
       [['price_cfa', 'price']]
     );
@@ -1619,26 +1623,30 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       return;
     }
 
-    // Revenus totaux par période — basé sur les transactions payées (pas uniquement les commandes "completed")
+    // Revenus totaux par période — basé sur les transactions payées
     const revenueQuery = `
       SELECT
         COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $1 AND t.created_at <= $2), 0) as today,
         COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $3 AND t.created_at <= $2), 0) as week,
         COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $4 AND t.created_at <= $2), 0) as month,
         COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $5 AND t.created_at <= $2), 0) as year
+        ${hasCustomRange ? `,COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $6 AND t.created_at <= $7), 0) as custom` : ''}
       FROM transactions t
       LEFT JOIN orders o ON t.order_id = o.id
       WHERE t.status = 'paid'
         AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
     `;
 
-    const revenueResult = await (pool as any).query(revenueQuery, [
+    const revenueParams = [
       startOfToday.toISOString(),
       now.toISOString(),
       startOfWeek.toISOString(),
       startOfMonth.toISOString(),
       startOfYear.toISOString(),
-    ]);
+      ...(hasCustomRange ? [customStart!, customEnd!] : []),
+    ];
+
+    const revenueResult = await (pool as any).query(revenueQuery, revenueParams);
 
     // Transactions par méthode de paiement (hors commandes annulées/refusées)
     const transactionsByMethodQuery = `
@@ -1701,12 +1709,6 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     paymentStatus.delayed = (paymentStatus.delayed || 0) + deferredPendingCount;
     // Retirer les paiements différés en 'pending' du compteur 'pending' général
     paymentStatus.pending = Math.max(0, (paymentStatus.pending || 0) - deferredPendingCount);
-
-    // Commandes avec QR scanné (paiements complétés via livraison)
-    // Paramètres de plage personnalisée (optionnels)
-    const customStart = req.query.startDate as string | undefined;
-    const customEnd = req.query.endDate as string | undefined;
-    const hasCustomRange = !!(customStart && customEnd);
 
     // QR scannés et commandes annulées — toutes les périodes en une seule requête
     const qrScannedQuery = `
@@ -1860,6 +1862,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
           week: parseFloat(row.week || '0'),
           month: parseFloat(row.month || '0'),
           year: parseFloat(row.year || '0'),
+          ...(hasCustomRange ? { custom: parseFloat(row.custom || '0') } : {}),
         },
         transactionsByMethod,
         paymentStatus,

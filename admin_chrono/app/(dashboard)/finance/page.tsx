@@ -38,6 +38,41 @@ export default function FinancePage() {
   const itemsPerPage = 20
   const queryClient = useQueryClient()
 
+  const getPeriodDates = (): { startDate: string; endDate: string } | undefined => {
+    if (selectedPeriod === 'custom') {
+      if (!customApplied || !customStart || !customEnd) return undefined
+      return { startDate: customStart, endDate: customEnd }
+    }
+    const endDate = new Date().toISOString()
+    let startDate: string
+    const now = new Date()
+    switch (selectedPeriod) {
+      case 'today': {
+        const s = new Date(now); s.setHours(0, 0, 0, 0)
+        startDate = s.toISOString()
+        break
+      }
+      case 'week': {
+        const s = new Date(now); s.setDate(now.getDate() - 7); s.setHours(0, 0, 0, 0)
+        startDate = s.toISOString()
+        break
+      }
+      case 'month': {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+        break
+      }
+      case 'year': {
+        startDate = new Date(now.getFullYear(), 0, 1).toISOString()
+        break
+      }
+      default:
+        return undefined
+    }
+    return { startDate, endDate }
+  }
+
+  const periodDates = getPeriodDates()
+
   const statsQueryKey = selectedPeriod === 'custom' && customApplied
     ? ['financial-stats', 'custom', customStart, customEnd]
     : ['financial-stats']
@@ -57,7 +92,7 @@ export default function FinancePage() {
   })
 
   const { data: transactionsData, isLoading: transactionsLoading } = useQuery({
-    queryKey: ['transactions', currentPage, statusFilter, methodFilter, searchQuery, viewMode],
+    queryKey: ['transactions', currentPage, statusFilter, methodFilter, searchQuery, viewMode, selectedPeriod, customStart, customEnd, customApplied],
     queryFn: () =>
       adminApiService.getTransactions({
         page: currentPage,
@@ -66,9 +101,11 @@ export default function FinancePage() {
         method: methodFilter !== 'all' ? methodFilter : undefined,
         search: searchQuery || undefined,
         view: viewMode,
+        startDate: periodDates?.startDate,
+        endDate: periodDates?.endDate,
       }),
-    refetchInterval: false, 
-    staleTime: Infinity, 
+    refetchInterval: false,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -154,6 +191,7 @@ export default function FinancePage() {
   const currentRevenue = selectedPeriod === 'today' ? stats?.totalRevenue.today
     : selectedPeriod === 'week' ? stats?.totalRevenue.week
     : selectedPeriod === 'year' ? stats?.totalRevenue.year
+    : selectedPeriod === 'custom' ? stats?.totalRevenue.custom
     : stats?.totalRevenue.month
 
   // Données pour le graphique des revenus par période
@@ -504,14 +542,14 @@ export default function FinancePage() {
           <button
             key={period.key}
             style={selectedPeriod === period.key ? periodTabActiveStyle : periodTabStyle}
-            onClick={() => { setSelectedPeriod(period.key); setCustomApplied(false) }}
+            onClick={() => { setSelectedPeriod(period.key); setCustomApplied(false); setCurrentPage(1) }}
           >
             {period.label}
           </button>
         ))}
         <button
           style={selectedPeriod === 'custom' ? periodTabActiveStyle : periodTabStyle}
-          onClick={() => setSelectedPeriod('custom')}
+          onClick={() => { setSelectedPeriod('custom'); setCurrentPage(1) }}
         >
           Personnaliser
         </button>

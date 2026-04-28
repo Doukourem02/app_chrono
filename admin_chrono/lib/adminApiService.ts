@@ -906,7 +906,7 @@ class AdminApiService {
   async getFinancialStats(params?: { startDate?: string; endDate?: string }): Promise<{
     success: boolean
     data?: {
-      totalRevenue: { today: number; week: number; month: number; year: number }
+      totalRevenue: { today: number; week: number; month: number; year: number; custom?: number }
       transactionsByMethod: Record<string, number>
       paymentStatus: Record<string, number>
       qrScanned: Record<string, { scanned: number; total: number; cancelled: number }>
@@ -946,7 +946,7 @@ class AdminApiService {
         return {
           success: result.success || false,
           data: result.data as {
-            totalRevenue: { today: number; week: number; month: number; year: number }
+            totalRevenue: { today: number; week: number; month: number; year: number; custom?: number }
             transactionsByMethod: Record<string, number>
             paymentStatus: Record<string, number>
             qrScanned: Record<string, { scanned: number; total: number; cancelled: number }>
