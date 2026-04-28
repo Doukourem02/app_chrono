@@ -1646,163 +1646,172 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       ...(hasCustomRange ? [customStart!, customEnd!] : []),
     ];
 
-    const revenueResult = await (pool as any).query(revenueQuery, revenueParams);
+    let revenueResult: any = { rows: [{}] };
+    try {
+      revenueResult = await (pool as any).query(revenueQuery, revenueParams);
+    } catch (err: any) {
+      logger.error('[financial-stats] Erreur revenueQuery:', err.message);
+    }
 
     // Transactions par méthode de paiement (hors commandes annulées/refusées)
-    const transactionsByMethodQuery = `
-      SELECT
-        t.payment_method_type,
-        COUNT(*) as count,
-        COALESCE(SUM(t.amount), 0) as total
-      FROM transactions t
-      LEFT JOIN orders o ON t.order_id = o.id
-      WHERE t.created_at >= $1
-        AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
-        AND t.status NOT IN ('cancelled', 'refunded')
-      GROUP BY t.payment_method_type
-    `;
-
-    const transactionsByMethodResult = await (pool as any).query(transactionsByMethodQuery, [
-      startOfMonth.toISOString(),
-    ]);
-
     const transactionsByMethod: Record<string, number> = { orange_money: 0, wave: 0, cash: 0, deferred: 0 };
-    transactionsByMethodResult.rows.forEach((row: any) => {
-      if (row.payment_method_type) {
-        transactionsByMethod[row.payment_method_type] = parseFloat(row.total || '0');
-      }
-    });
-
-    // Statut des paiements (hors commandes annulées/refusées)
-    const paymentStatusQuery = `
-      SELECT
-        t.status,
-        t.payment_method_type,
-        COUNT(*) as count
-      FROM transactions t
-      LEFT JOIN orders o ON t.order_id = o.id
-      WHERE t.created_at >= $1
-        AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
-        AND t.status NOT IN ('cancelled', 'refunded')
-      GROUP BY t.status, t.payment_method_type
-    `;
-
-    const paymentStatusResult = await (pool as any).query(paymentStatusQuery, [
-      startOfMonth.toISOString(),
-    ]);
-
-    const paymentStatus: Record<string, number> = { pending: 0, paid: 0, refused: 0, delayed: 0 };
-    let deferredPendingCount = 0; // Compter les paiements différés en 'pending'
-    
-    paymentStatusResult.rows.forEach((row: any) => {
-      if (row.status) {
-        // Si c'est un paiement différé avec statut 'pending', le compter comme 'delayed'
-        if (row.payment_method_type === 'deferred' && row.status === 'pending') {
-          deferredPendingCount += parseInt(row.count || '0');
-        } else {
-          paymentStatus[row.status] = (paymentStatus[row.status] || 0) + parseInt(row.count || '0');
+    try {
+      const transactionsByMethodResult = await (pool as any).query(`
+        SELECT
+          t.payment_method_type,
+          COALESCE(SUM(t.amount), 0) as total
+        FROM transactions t
+        LEFT JOIN orders o ON t.order_id = o.id
+        WHERE t.created_at >= $1
+          AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
+          AND t.status NOT IN ('cancelled', 'refunded')
+        GROUP BY t.payment_method_type
+      `, [startOfMonth.toISOString()]);
+      transactionsByMethodResult.rows.forEach((row: any) => {
+        if (row.payment_method_type) {
+          transactionsByMethod[row.payment_method_type] = parseFloat(row.total || '0');
         }
-      }
-    });
-    
-    // Ajouter les paiements différés en 'pending' aux 'delayed'
-    paymentStatus.delayed = (paymentStatus.delayed || 0) + deferredPendingCount;
-    // Retirer les paiements différés en 'pending' du compteur 'pending' général
-    paymentStatus.pending = Math.max(0, (paymentStatus.pending || 0) - deferredPendingCount);
+      });
+    } catch (err: any) {
+      logger.error('[financial-stats] Erreur transactionsByMethodQuery:', err.message);
+    }
+
+    // Statut des paiements
+    const paymentStatus: Record<string, number> = { pending: 0, paid: 0, refused: 0, delayed: 0 };
+    try {
+      const paymentStatusResult = await (pool as any).query(`
+        SELECT t.status, t.payment_method_type, COUNT(*) as count
+        FROM transactions t
+        LEFT JOIN orders o ON t.order_id = o.id
+        WHERE t.created_at >= $1
+          AND (o.id IS NULL OR o.status NOT IN ('cancelled', 'declined'))
+          AND t.status NOT IN ('cancelled', 'refunded')
+        GROUP BY t.status, t.payment_method_type
+      `, [startOfMonth.toISOString()]);
+      let deferredPendingCount = 0;
+      paymentStatusResult.rows.forEach((row: any) => {
+        if (row.status) {
+          if (row.payment_method_type === 'deferred' && row.status === 'pending') {
+            deferredPendingCount += parseInt(row.count || '0');
+          } else {
+            paymentStatus[row.status] = (paymentStatus[row.status] || 0) + parseInt(row.count || '0');
+          }
+        }
+      });
+      paymentStatus.delayed = (paymentStatus.delayed || 0) + deferredPendingCount;
+      paymentStatus.pending = Math.max(0, (paymentStatus.pending || 0) - deferredPendingCount);
+    } catch (err: any) {
+      logger.error('[financial-stats] Erreur paymentStatusQuery:', err.message);
+    }
 
     // QR scannés et commandes annulées — toutes les périodes en une seule requête
-    const qrScannedQuery = `
-      SELECT
-        COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $1) as scanned_today,
-        COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $3) as scanned_week,
-        COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $4) as scanned_month,
-        COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $5) as scanned_year,
-        COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $1) as total_today,
-        COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $3) as total_week,
-        COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $4) as total_month,
-        COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $5) as total_year,
-        COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $1) as cancelled_today,
-        COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $3) as cancelled_week,
-        COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $4) as cancelled_month,
-        COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $5) as cancelled_year
-        ${hasCustomRange ? `,
-        COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $6 AND created_at <= $7) as scanned_custom,
-        COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $6 AND created_at <= $7) as total_custom,
-        COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $6 AND created_at <= $7) as cancelled_custom` : ''}
-      FROM orders
-      WHERE created_at >= $5
-    `;
     const qrParams: string[] = [
       startOfToday.toISOString(), now.toISOString(),
       startOfWeek.toISOString(), startOfMonth.toISOString(), startOfYear.toISOString(),
       ...(hasCustomRange ? [customStart!, customEnd!] : []),
     ];
-    const qrScannedResult = await (pool as any).query(qrScannedQuery, qrParams);
-    const qr = qrScannedResult.rows[0] || {};
-
-    const makeQrPeriod = (suffix: string) => ({
-      scanned: parseInt(qr[`scanned_${suffix}`] || '0'),
-      total: parseInt(qr[`total_${suffix}`] || '0'),
-      cancelled: parseInt(qr[`cancelled_${suffix}`] || '0'),
-    });
-    const qrScanned = {
-      today: makeQrPeriod('today'),
-      week: makeQrPeriod('week'),
-      month: makeQrPeriod('month'),
-      year: makeQrPeriod('year'),
-      ...(hasCustomRange ? { custom: makeQrPeriod('custom') } : {}),
+    const emptyQrPeriod = { scanned: 0, total: 0, cancelled: 0 };
+    let qrScanned: Record<string, { scanned: number; total: number; cancelled: number }> = {
+      today: { ...emptyQrPeriod }, week: { ...emptyQrPeriod },
+      month: { ...emptyQrPeriod }, year: { ...emptyQrPeriod },
+      ...(hasCustomRange ? { custom: { ...emptyQrPeriod } } : {}),
     };
+    try {
+      const qrScannedQuery = `
+        SELECT
+          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $1) as scanned_today,
+          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $3) as scanned_week,
+          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $4) as scanned_month,
+          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $5) as scanned_year,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $1) as total_today,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $3) as total_week,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $4) as total_month,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $5) as total_year,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $1) as cancelled_today,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $3) as cancelled_week,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $4) as cancelled_month,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $5) as cancelled_year
+          ${hasCustomRange ? `,
+          COUNT(*) FILTER (WHERE delivery_qr_scanned_at IS NOT NULL AND created_at >= $6 AND created_at <= $7) as scanned_custom,
+          COUNT(*) FILTER (WHERE status NOT IN ('cancelled','declined') AND created_at >= $6 AND created_at <= $7) as total_custom,
+          COUNT(*) FILTER (WHERE status IN ('cancelled','declined') AND created_at >= $6 AND created_at <= $7) as cancelled_custom` : ''}
+        FROM orders
+        WHERE created_at >= $5
+      `;
+      const qrScannedResult = await (pool as any).query(qrScannedQuery, qrParams);
+      const qr = qrScannedResult.rows[0] || {};
+      const makeQrPeriod = (suffix: string) => ({
+        scanned: parseInt(qr[`scanned_${suffix}`] || '0'),
+        total: parseInt(qr[`total_${suffix}`] || '0'),
+        cancelled: parseInt(qr[`cancelled_${suffix}`] || '0'),
+      });
+      qrScanned = {
+        today: makeQrPeriod('today'), week: makeQrPeriod('week'),
+        month: makeQrPeriod('month'), year: makeQrPeriod('year'),
+        ...(hasCustomRange ? { custom: makeQrPeriod('custom') } : {}),
+      };
+    } catch (err: any) {
+      logger.error('[financial-stats] Erreur qrScannedQuery:', err.message);
+    }
 
-    // Valeur des commandes annulées — toutes les périodes
-    const cancelledStatsQuery = `
-      SELECT
-        COUNT(*) FILTER (WHERE created_at >= $1) as count_today,
-        COUNT(*) FILTER (WHERE created_at >= $3) as count_week,
-        COUNT(*) FILTER (WHERE created_at >= $4) as count_month,
-        COUNT(*) FILTER (WHERE created_at >= $5) as count_year,
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $1), 0) as value_today,
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $3), 0) as value_week,
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $4), 0) as value_month,
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $5), 0) as value_year
-        ${hasCustomRange ? `,
-        COUNT(*) FILTER (WHERE created_at >= $6 AND created_at <= $7) as count_custom,
-        COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $6 AND created_at <= $7), 0) as value_custom` : ''}
-      FROM orders
-      WHERE status IN ('cancelled', 'declined')
-        AND created_at >= $5
-    `;
-    const cancelledStatsResult = await (pool as any).query(cancelledStatsQuery, qrParams);
-
-    const cancelledDeferredQuery = `
-      SELECT
-        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $1), 0) as deferred_today,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $3), 0) as deferred_week,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $4), 0) as deferred_month,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $5), 0) as deferred_year
-        ${hasCustomRange ? `,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $6 AND t.created_at <= $7), 0) as deferred_custom` : ''}
-      FROM transactions t
-      INNER JOIN orders o ON t.order_id = o.id
-      WHERE o.status IN ('cancelled', 'declined')
-        AND t.payment_method_type = 'deferred'
-        AND t.created_at >= $5
-    `;
-    const cancelledDeferredResult = await (pool as any).query(cancelledDeferredQuery, qrParams);
-    const cs = cancelledStatsResult.rows[0] || {};
-    const cd = cancelledDeferredResult.rows[0] || {};
-
-    const makeCancelledPeriod = (suffix: string) => ({
-      count: parseInt(cs[`count_${suffix}`] || '0'),
-      totalValue: parseFloat(cs[`value_${suffix}`] || '0'),
-      deferredAmount: parseFloat(cd[`deferred_${suffix}`] || '0'),
-    });
-    const cancelledStats = {
-      today: makeCancelledPeriod('today'),
-      week: makeCancelledPeriod('week'),
-      month: makeCancelledPeriod('month'),
-      year: makeCancelledPeriod('year'),
-      ...(hasCustomRange ? { custom: makeCancelledPeriod('custom') } : {}),
+    // Commandes annulées
+    const emptyCancelledPeriod = { count: 0, totalValue: 0, deferredAmount: 0 };
+    let cancelledStats: Record<string, { count: number; totalValue: number; deferredAmount: number }> = {
+      today: { ...emptyCancelledPeriod }, week: { ...emptyCancelledPeriod },
+      month: { ...emptyCancelledPeriod }, year: { ...emptyCancelledPeriod },
+      ...(hasCustomRange ? { custom: { ...emptyCancelledPeriod } } : {}),
     };
+    try {
+      const cancelledStatsQuery = `
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= $1) as count_today,
+          COUNT(*) FILTER (WHERE created_at >= $3) as count_week,
+          COUNT(*) FILTER (WHERE created_at >= $4) as count_month,
+          COUNT(*) FILTER (WHERE created_at >= $5) as count_year,
+          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $1), 0) as value_today,
+          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $3), 0) as value_week,
+          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $4), 0) as value_month,
+          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $5), 0) as value_year
+          ${hasCustomRange ? `,
+          COUNT(*) FILTER (WHERE created_at >= $6 AND created_at <= $7) as count_custom,
+          COALESCE(SUM(${priceColumn}) FILTER (WHERE created_at >= $6 AND created_at <= $7), 0) as value_custom` : ''}
+        FROM orders
+        WHERE status IN ('cancelled', 'declined')
+          AND created_at >= $5
+      `;
+      const cancelledDeferredQuery = `
+        SELECT
+          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $1), 0) as deferred_today,
+          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $3), 0) as deferred_week,
+          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $4), 0) as deferred_month,
+          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $5), 0) as deferred_year
+          ${hasCustomRange ? `,
+          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= $6 AND t.created_at <= $7), 0) as deferred_custom` : ''}
+        FROM transactions t
+        INNER JOIN orders o ON t.order_id = o.id
+        WHERE o.status IN ('cancelled', 'declined')
+          AND t.payment_method_type = 'deferred'
+          AND t.created_at >= $5
+      `;
+      const [cancelledStatsResult, cancelledDeferredResult] = await Promise.all([
+        (pool as any).query(cancelledStatsQuery, qrParams),
+        (pool as any).query(cancelledDeferredQuery, qrParams),
+      ]);
+      const cs = cancelledStatsResult.rows[0] || {};
+      const cd = cancelledDeferredResult.rows[0] || {};
+      const makeCancelledPeriod = (suffix: string) => ({
+        count: parseInt(cs[`count_${suffix}`] || '0'),
+        totalValue: parseFloat(cs[`value_${suffix}`] || '0'),
+        deferredAmount: parseFloat(cd[`deferred_${suffix}`] || '0'),
+      });
+      cancelledStats = {
+        today: makeCancelledPeriod('today'), week: makeCancelledPeriod('week'),
+        month: makeCancelledPeriod('month'), year: makeCancelledPeriod('year'),
+        ...(hasCustomRange ? { custom: makeCancelledPeriod('custom') } : {}),
+      };
+    } catch (err: any) {
+      logger.error('[financial-stats] Erreur cancelledStats:', err.message);
+    }
 
     // Taux de conversion
     const totalTransactions = paymentStatus.pending + paymentStatus.paid + paymentStatus.refused + paymentStatus.delayed;
@@ -1811,46 +1820,35 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       : 0;
 
     // Revenus par driver (top 10)
-    const revenueByDriverQuery = `
-      SELECT 
-        o.driver_id,
-        COUNT(*) as deliveries,
-        COALESCE(SUM(${priceColumn}), 0) as revenue
-      FROM orders o
-      WHERE o.status = 'completed' 
-        AND o.completed_at >= $1
-        AND o.driver_id IS NOT NULL
-      GROUP BY o.driver_id
-      ORDER BY revenue DESC
-      LIMIT 10
-    `;
-
-    const revenueByDriverResult = await (pool as any).query(revenueByDriverQuery, [
-      startOfMonth.toISOString(),
-    ]);
+    let revenueByDriverRows: any[] = [];
+    try {
+      const revenueByDriverResult = await (pool as any).query(`
+        SELECT o.driver_id, COUNT(*) as deliveries, COALESCE(SUM(${priceColumn}), 0) as revenue
+        FROM orders o
+        WHERE o.status = 'completed' AND o.completed_at >= $1 AND o.driver_id IS NOT NULL
+        GROUP BY o.driver_id ORDER BY revenue DESC LIMIT 10
+      `, [startOfMonth.toISOString()]);
+      revenueByDriverRows = revenueByDriverResult.rows;
+    } catch (err: any) {
+      logger.error('[financial-stats] Erreur revenueByDriverQuery:', err.message);
+    }
 
     // Revenus par type de livraison
-    const revenueByDeliveryTypeQuery = `
-      SELECT 
-        delivery_method,
-        COUNT(*) as deliveries,
-        COALESCE(SUM(${priceColumn}), 0) as revenue
-      FROM orders
-      WHERE status = 'completed' 
-        AND completed_at >= $1
-      GROUP BY delivery_method
-    `;
-
-    const revenueByDeliveryTypeResult = await (pool as any).query(revenueByDeliveryTypeQuery, [
-      startOfMonth.toISOString(),
-    ]);
-
     const revenueByDeliveryType: Record<string, number> = { moto: 0, vehicule: 0, cargo: 0 };
-    revenueByDeliveryTypeResult.rows.forEach((row: any) => {
-      if (row.delivery_method) {
-        revenueByDeliveryType[row.delivery_method] = parseFloat(row.revenue || '0');
-      }
-    });
+    try {
+      const revenueByDeliveryTypeResult = await (pool as any).query(`
+        SELECT delivery_method, COALESCE(SUM(${priceColumn}), 0) as revenue
+        FROM orders WHERE status = 'completed' AND completed_at >= $1
+        GROUP BY delivery_method
+      `, [startOfMonth.toISOString()]);
+      revenueByDeliveryTypeResult.rows.forEach((row: any) => {
+        if (row.delivery_method) {
+          revenueByDeliveryType[row.delivery_method] = parseFloat(row.revenue || '0');
+        }
+      });
+    } catch (err: any) {
+      logger.error('[financial-stats] Erreur revenueByDeliveryTypeQuery:', err.message);
+    }
 
     const row = revenueResult.rows[0] || {};
 
@@ -1869,7 +1867,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         qrScanned,
         cancelledStats,
         conversionRate: Math.round(conversionRate * 10) / 10,
-        revenueByDriver: revenueByDriverResult.rows.map((r: any) => ({
+        revenueByDriver: revenueByDriverRows.map((r: any) => ({
           driverId: r.driver_id,
           deliveries: parseInt(r.deliveries || '0'),
           revenue: parseFloat(r.revenue || '0'),

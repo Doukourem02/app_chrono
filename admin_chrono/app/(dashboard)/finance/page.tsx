@@ -85,9 +85,8 @@ export default function FinancePage() {
         : undefined
     ),
     refetchInterval: false,
-    staleTime: Infinity,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
     refetchOnReconnect: false,
   })
 
@@ -105,9 +104,8 @@ export default function FinancePage() {
         endDate: periodDates?.endDate,
       }),
     refetchInterval: false,
-    staleTime: Infinity,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
     refetchOnReconnect: false,
   })
 
@@ -677,7 +675,7 @@ export default function FinancePage() {
             </div>
             <div>
               <div style={{ ...kpiValueStyle, color: '#EF4444' }}>{currentCancelled.count}</div>
-              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Commandes annulées / refusées</div>
+              <div style={{ ...kpiLabelStyle, color: '#9CA3AF' }}>Commandes annulées</div>
             </div>
           </div>
         </div>
@@ -802,7 +800,7 @@ export default function FinancePage() {
             marginBottom: '-2px',
           }}
         >
-          Annulées / Refusées
+          Annulées
         </button>
       </div>
 
@@ -853,7 +851,7 @@ export default function FinancePage() {
       {/* Table des transactions */}
       <div style={tableCardStyle}>
         <h3 style={{ ...chartTitleStyle, marginBottom: '16px' }}>
-          {viewMode === 'active' ? 'Transactions actives' : 'Commandes annulées / refusées'}
+          {viewMode === 'active' ? 'Transactions actives' : 'Commandes annulées'}
         </h3>
         {transactionsLoading ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
