@@ -752,7 +752,7 @@ export default function AnalyticsPage() {
                           </td>
                           <td style={{ padding: '12px', maxWidth: '300px' }}>
                             <div style={{ fontSize: '13px', color: themeColors.textPrimary }}>
-                              {rating.comment || <span style={{ color: themeColors.textTertiary, fontStyle: 'italic' }}>Aucun commentaire</span>}
+                              {rating.comment || <span style={{ color: themeColors.textTertiary, fontStyle: 'italic' }}>{t('ratings.noComment')}</span>}
                             </div>
                           </td>
                           <td style={{ padding: '12px', fontSize: '12px', color: themeColors.textSecondary }}>
@@ -761,7 +761,7 @@ export default function AnalyticsPage() {
                           <td style={{ padding: '12px', textAlign: 'center' }}>
                             <button
                               onClick={() => {
-                                if (confirm('Êtes-vous sûr de vouloir supprimer cette évaluation ?')) {
+                                if (confirm(t('ratings.confirmDelete'))) {
                                   deleteRatingMutation.mutate(rating.id)
                                 }
                               }}

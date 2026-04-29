@@ -608,6 +608,12 @@
       "resolved": "Resolved",
       "rejected": "Rejected"
     },
+    "types": {
+      "refund_request": "Refund request",
+      "payment_issue": "Payment issue",
+      "service_issue": "Service issue",
+      "other": "Other"
+    },
     "table": {
       "type": "Type",
       "client": "Client",
@@ -763,6 +769,8 @@
       "order": "Order",
       "amount": "Amount",
       "balanceAfter": "Balance after",
+      "balanceBefore": "Balance before",
+      "orderId": "Order ID",
       "actions": "Actions"
     }
   },

@@ -13,6 +13,7 @@ import ChatArea from '@/components/message/ChatArea'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
 import { useTranslation } from '@/hooks/useTranslation'
+import { useLanguageStore } from '@/stores/languageStore'
 
 interface Dispute {
   id: string
@@ -34,6 +35,7 @@ type TabType = 'disputes' | 'support-messages'
 export default function DisputesPage() {
   const { user } = useAuthStore()
   const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
   const [activeTab, setActiveTab] = useState<TabType>('disputes')
   
   // État pour les disputes
@@ -102,7 +104,7 @@ export default function DisputesPage() {
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
-    return date.toLocaleDateString('fr-FR', {
+    return date.toLocaleDateString(language === 'en' ? 'en-US' : 'fr-FR', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -112,13 +114,7 @@ export default function DisputesPage() {
   }
 
   const getDisputeTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      refund_request: 'Demande de remboursement',
-      payment_issue: 'Problème de paiement',
-      service_issue: 'Problème de service',
-      other: 'Autre',
-    }
-    return labels[type] || type
+    return t(`disputes.types.${type}`) || type
   }
 
   const getStatusBadgeStyle = (status: string): React.CSSProperties => {
