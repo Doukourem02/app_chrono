@@ -1608,6 +1608,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     const customStart = req.query.startDate as string | undefined;
     const customEnd = req.query.endDate as string | undefined;
     const hasCustomRange = !!(customStart && customEnd);
+    const financialStatsWarnings: string[] = [];
 
     // Vérifier quelles colonnes order existent : certaines bases prod n'ont pas encore
     // toutes les colonnes paiement, mais les stats doivent rester calculables.
@@ -1685,6 +1686,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       revenueResult = await (pool as any).query(revenueQuery, revenueParams);
     } catch (err: any) {
       logger.error('[financial-stats] Erreur revenueQuery:', err.message);
+      financialStatsWarnings.push('revenue');
     }
 
     // Transactions par méthode de paiement (hors commandes annulées/refusées)
@@ -1708,6 +1710,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       });
     } catch (err: any) {
       logger.error('[financial-stats] Erreur transactionsByMethodQuery:', err.message);
+      financialStatsWarnings.push('transactionsByMethod');
     }
 
     // Statut des paiements
@@ -1736,6 +1739,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       paymentStatus.pending = Math.max(0, (paymentStatus.pending || 0) - deferredPendingCount);
     } catch (err: any) {
       logger.error('[financial-stats] Erreur paymentStatusQuery:', err.message);
+      financialStatsWarnings.push('paymentStatus');
     }
 
     // QR scannés et commandes annulées — toutes les périodes en une seule requête
@@ -1789,6 +1793,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       };
     } catch (err: any) {
       logger.error('[financial-stats] Erreur qrScannedQuery:', err.message);
+      financialStatsWarnings.push('qrScanned');
     }
 
     // Commandes annulées
@@ -1858,6 +1863,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       };
     } catch (err: any) {
       logger.error('[financial-stats] Erreur cancelledStats:', err.message);
+      financialStatsWarnings.push('cancelledStats');
     }
 
     // Taux de conversion
@@ -1913,6 +1919,10 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         paymentStatus,
         qrScanned,
         cancelledStats,
+        diagnostics: {
+          hasWarnings: financialStatsWarnings.length > 0,
+          warnings: financialStatsWarnings,
+        },
         conversionRate: Math.round(conversionRate * 10) / 10,
         revenueByDriver: revenueByDriverRows.map((r: any) => ({
           driverId: r.driver_id,

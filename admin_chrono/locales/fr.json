@@ -403,7 +403,8 @@
       "next": "Suivant"
     },
     "alerts": {
-      "noExport": "Aucune transaction à exporter"
+      "noExport": "Aucune transaction à exporter",
+      "inventoryWarning": "Inventaire finance incomplet : les compteurs QR/annulations peuvent être indisponibles. Rafraîchissez après le redémarrage du backend."
     }
   },
   "reportsPage": {

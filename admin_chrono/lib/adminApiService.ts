@@ -911,6 +911,7 @@ class AdminApiService {
       paymentStatus: Record<string, number>
       qrScanned: Record<string, { scanned: number; total: number; cancelled: number }>
       cancelledStats: Record<string, { count: number; totalValue: number; deferredAmount: number }>
+      diagnostics?: { hasWarnings: boolean; warnings: string[] }
       conversionRate: number
       revenueByDriver: Array<{ driverId: string; deliveries: number; revenue: number }>
       revenueByDeliveryType: Record<string, number>
@@ -934,6 +935,7 @@ class AdminApiService {
             paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
             qrScanned: emptyPeriods,
             cancelledStats: emptyCancelled,
+            diagnostics: { hasWarnings: true, warnings: ['financialStatsRequest'] },
             conversionRate: 0,
             revenueByDriver: [],
             revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },
@@ -951,6 +953,7 @@ class AdminApiService {
             paymentStatus: Record<string, number>
             qrScanned: Record<string, { scanned: number; total: number; cancelled: number }>
             cancelledStats: Record<string, { count: number; totalValue: number; deferredAmount: number }>
+            diagnostics?: { hasWarnings: boolean; warnings: string[] }
             conversionRate: number
             revenueByDriver: Array<{ driverId: string; deliveries: number; revenue: number }>
             revenueByDeliveryType: Record<string, number>
@@ -965,6 +968,7 @@ class AdminApiService {
           paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
           qrScanned: emptyPeriods,
           cancelledStats: emptyCancelled,
+          diagnostics: { hasWarnings: true, warnings: ['financialStatsPayload'] },
           conversionRate: 0,
           revenueByDriver: [],
           revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },
@@ -980,6 +984,7 @@ class AdminApiService {
           paymentStatus: { pending: 0, paid: 0, refused: 0, delayed: 0 },
           qrScanned: emptyPeriods,
           cancelledStats: emptyCancelled,
+          diagnostics: { hasWarnings: true, warnings: ['financialStatsNetwork'] },
           conversionRate: 0,
           revenueByDriver: [],
           revenueByDeliveryType: { moto: 0, vehicule: 0, cargo: 0 },

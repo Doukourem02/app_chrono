@@ -403,7 +403,8 @@
       "next": "Next"
     },
     "alerts": {
-      "noExport": "No transactions to export"
+      "noExport": "No transactions to export",
+      "inventoryWarning": "Incomplete finance inventory: QR/cancellation counters may be unavailable. Refresh after the backend restart."
     }
   },
   "reportsPage": {

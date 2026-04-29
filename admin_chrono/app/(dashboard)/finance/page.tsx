@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
-import { Wallet, TrendingUp, CreditCard, Clock, Download, RefreshCw, XCircle } from 'lucide-react'
+import { Wallet, TrendingUp, CreditCard, Clock, Download, RefreshCw, XCircle, AlertTriangle } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { exportData } from '@/utils/exportUtils'
 import { themeColors } from '@/utils/theme'
@@ -196,6 +196,13 @@ export default function FinancePage() {
     : selectedPeriod === 'year' ? stats?.totalRevenue.year
     : selectedPeriod === 'custom' ? stats?.totalRevenue.custom
     : stats?.totalRevenue.month
+  const financeWarnings = stats?.diagnostics?.warnings ?? []
+  const hasFinanceWarnings = stats?.diagnostics?.hasWarnings || financeWarnings.length > 0
+  const suspiciousZeroInventory = !hasFinanceWarnings
+    && (currentRevenue || 0) > 0
+    && currentQr.total === 0
+    && currentCancelled.count === 0
+    && transactions.length > 0
 
   // Données pour le graphique des revenus par période
   const revenueChartData = stats
@@ -601,6 +608,25 @@ export default function FinancePage() {
           >
             {t('financePage.custom.apply')}
           </button>
+        </div>
+      )}
+
+      {(hasFinanceWarnings || suspiciousZeroInventory) && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 14px',
+          marginBottom: '16px',
+          border: '1px solid #FCD34D',
+          borderRadius: '8px',
+          backgroundColor: '#FFFBEB',
+          color: '#92400E',
+          fontSize: '13px',
+          fontWeight: 600,
+        }}>
+          <AlertTriangle size={18} />
+          <span>{t('financePage.alerts.inventoryWarning')}</span>
         </div>
       )}
 
