@@ -1743,9 +1743,11 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     }
 
     // QR scannés et commandes annulées — toutes les périodes en une seule requête
-    const qrParams: string[] = [
-      startOfToday.toISOString(), now.toISOString(),
-      startOfWeek.toISOString(), startOfMonth.toISOString(), startOfYear.toISOString(),
+    const periodParams: string[] = [
+      startOfToday.toISOString(),
+      startOfWeek.toISOString(),
+      startOfMonth.toISOString(),
+      startOfYear.toISOString(),
       ...(hasCustomRange ? [customStart!, customEnd!] : []),
     ];
     const emptyQrPeriod = { scanned: 0, total: 0, cancelled: 0 };
@@ -1760,26 +1762,26 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       const qrScannedQuery = `
         SELECT
           COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $1) as scanned_today,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $3) as scanned_week,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $4) as scanned_month,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $5) as scanned_year,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $2) as scanned_week,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $3) as scanned_month,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $4) as scanned_year,
           COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $1) as total_today,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $3) as total_week,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $4) as total_month,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $5) as total_year,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $2) as total_week,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $3) as total_month,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $4) as total_year,
           COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $1) as cancelled_today,
-          COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $3) as cancelled_week,
-          COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $4) as cancelled_month,
-          COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $5) as cancelled_year
+          COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $2) as cancelled_week,
+          COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $3) as cancelled_month,
+          COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $4) as cancelled_year
           ${hasCustomRange ? `,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $6 AND o.created_at <= $7) as scanned_custom,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $6 AND o.created_at <= $7) as total_custom,
-          COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $6 AND ${orderLossDateExpression} <= $7) as cancelled_custom` : ''}
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $5 AND o.created_at <= $6) as scanned_custom,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $5 AND o.created_at <= $6) as total_custom,
+          COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $5 AND ${orderLossDateExpression} <= $6) as cancelled_custom` : ''}
         FROM orders o
         WHERE (o.delivery_qr_code IS NOT NULL OR o.delivery_verification_code IS NOT NULL)
-          AND (o.created_at >= $5 OR ${orderLossDateExpression} >= $5)
+          AND (o.created_at >= $4 OR ${orderLossDateExpression} >= $4)
       `;
-      const qrScannedResult = await (pool as any).query(qrScannedQuery, qrParams);
+      const qrScannedResult = await (pool as any).query(qrScannedQuery, periodParams);
       const qr = qrScannedResult.rows[0] || {};
       const makeQrPeriod = (suffix: string) => ({
         scanned: parseInt(qr[`scanned_${suffix}`] || '0'),
@@ -1807,28 +1809,28 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       const cancelledStatsQuery = `
         SELECT
           COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $1) as count_today,
-          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $3) as count_week,
-          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $4) as count_month,
-          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $5) as count_year,
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $2) as count_week,
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $3) as count_month,
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $4) as count_year,
           COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $1), 0) as value_today,
-          COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $3), 0) as value_week,
-          COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $4), 0) as value_month,
-          COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $5), 0) as value_year
+          COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $2), 0) as value_week,
+          COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $3), 0) as value_month,
+          COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $4), 0) as value_year
           ${hasCustomRange ? `,
-          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $6 AND ${orderLossDateExpression} <= $7) as count_custom,
-          COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $6 AND ${orderLossDateExpression} <= $7), 0) as value_custom` : ''}
+          COUNT(*) FILTER (WHERE ${orderLossDateExpression} >= $5 AND ${orderLossDateExpression} <= $6) as count_custom,
+          COALESCE(SUM(${orderPriceExpression}) FILTER (WHERE ${orderLossDateExpression} >= $5 AND ${orderLossDateExpression} <= $6), 0) as value_custom` : ''}
         FROM orders o
         WHERE ${inactiveOrderCondition}
-          AND ${orderLossDateExpression} >= $5
+          AND ${orderLossDateExpression} >= $4
       `;
       const cancelledDeferredQuery = `
         SELECT
           COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $1), 0) as deferred_today,
-          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $3), 0) as deferred_week,
-          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $4), 0) as deferred_month,
-          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $5), 0) as deferred_year
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $2), 0) as deferred_week,
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $3), 0) as deferred_month,
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $4), 0) as deferred_year
           ${hasCustomRange ? `,
-          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $6 AND loss_date <= $7), 0) as deferred_custom` : ''}
+          COALESCE(SUM(deferred_amount) FILTER (WHERE loss_date >= $5 AND loss_date <= $6), 0) as deferred_custom` : ''}
         FROM (
           SELECT
             o.id,
@@ -1841,13 +1843,13 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
           LEFT JOIN transactions t ON t.order_id = o.id
           WHERE ${inactiveOrderCondition}
             AND (${deferredOrderCondition} OR t.payment_method_type = 'deferred')
-            AND ${orderLossDateExpression} >= $5
+            AND ${orderLossDateExpression} >= $4
           GROUP BY ${deferredGroupByColumns}
         ) deferred_losses
       `;
       const [cancelledStatsResult, cancelledDeferredResult] = await Promise.all([
-        (pool as any).query(cancelledStatsQuery, qrParams),
-        (pool as any).query(cancelledDeferredQuery, qrParams),
+        (pool as any).query(cancelledStatsQuery, periodParams),
+        (pool as any).query(cancelledDeferredQuery, periodParams),
       ]);
       const cs = cancelledStatsResult.rows[0] || {};
       const cd = cancelledDeferredResult.rows[0] || {};
