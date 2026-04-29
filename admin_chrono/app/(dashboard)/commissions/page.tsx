@@ -9,6 +9,8 @@ import { ScreenTransition } from '@/components/animations'
 import type { Driver } from '@/types'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
+import { useLanguageStore } from '@/stores/languageStore'
 
 interface CommissionTransaction {
   id: string
@@ -25,6 +27,8 @@ interface CommissionTransaction {
 
 export default function CommissionsPage() {
   const router = useRouter()
+  const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'recharge' | 'deduction' | 'refund'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('month')
@@ -149,7 +153,7 @@ export default function CommissionsPage() {
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('fr-FR', {
+    return new Date(date).toLocaleDateString(language === 'en' ? 'en-US' : 'fr-FR', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -160,7 +164,16 @@ export default function CommissionsPage() {
 
   const handleExport = () => {
     const csv = [
-      ['Date', 'Livreur', 'Email', 'Type', 'Montant', 'Solde avant', 'Solde après', 'Commande ID'].join(','),
+      [
+        t('commissions.table.date'),
+        t('commissions.table.driver'),
+        'Email',
+        t('commissions.table.type'),
+        t('commissions.table.amount'),
+        t('commissions.table.balanceBefore'),
+        t('commissions.table.balanceAfter'),
+        t('commissions.table.orderId'),
+      ].join(','),
       ...filteredTransactions.map((tx) =>
         [
           formatDate(tx.created_at),
@@ -206,7 +219,7 @@ export default function CommissionsPage() {
               <ArrowLeft size={20} color={themeColors.textPrimary} />
             </button>
             <h1 style={{ fontSize: '24px', fontWeight: 700, color: themeColors.textPrimary, margin: 0 }}>
-              Commissions
+              {t('commissions.title')}
             </h1>
           </div>
 
@@ -214,33 +227,33 @@ export default function CommissionsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
             <div style={{ padding: '16px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
               <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>
-                Commissions prélevées (mois)
+                {t('commissions.stats.deductions')}
               </div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: '#EF4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <TrendingDown size={16} />
                 {formatCurrency(stats.totalDeductions)}
               </div>
               <div style={{ fontSize: '11px', color: themeColors.textSecondary, marginTop: '4px' }}>
-                {stats.deductionCount} prélèvements
+                {t('commissions.stats.deductionCount', { count: stats.deductionCount })}
               </div>
             </div>
 
             <div style={{ padding: '16px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
               <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>
-                Recharges totales (mois)
+                {t('commissions.stats.recharges')}
               </div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <TrendingUp size={16} />
                 {formatCurrency(stats.totalRecharges)}
               </div>
               <div style={{ fontSize: '11px', color: themeColors.textSecondary, marginTop: '4px' }}>
-                {stats.rechargeCount} recharges
+                {t('commissions.stats.rechargeCount', { count: stats.rechargeCount })}
               </div>
             </div>
 
             <div style={{ padding: '16px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
               <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>
-                Solde net (mois)
+                {t('commissions.stats.net')}
               </div>
               <div style={{ fontSize: '20px', fontWeight: 700, color: stats.netCommission >= 0 ? '#10B981' : '#EF4444' }}>
                 {formatCurrency(stats.netCommission)}
@@ -256,7 +269,7 @@ export default function CommissionsPage() {
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textTertiary }} />
               <input
                 type="text"
-                placeholder="Rechercher (livreur, email, commande...)"
+                placeholder={t('commissions.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -284,10 +297,10 @@ export default function CommissionsPage() {
                 cursor: 'pointer',
               }}
             >
-              <option value="all">Tous les types</option>
-              <option value="recharge">Recharges</option>
-              <option value="deduction">Prélèvements</option>
-              <option value="refund">Remboursements</option>
+              <option value="all">{t('commissions.filters.allTypes')}</option>
+              <option value="recharge">{t('commissions.types.rechargePlural')}</option>
+              <option value="deduction">{t('commissions.types.deductionPlural')}</option>
+              <option value="refund">{t('commissions.types.refundPlural')}</option>
             </select>
 
             <select
@@ -303,10 +316,10 @@ export default function CommissionsPage() {
                 cursor: 'pointer',
               }}
             >
-              <option value="all">Toutes les dates</option>
-              <option value="today">Aujourd&apos;hui</option>
-              <option value="week">7 derniers jours</option>
-              <option value="month">Ce mois</option>
+              <option value="all">{t('commissions.filters.allDates')}</option>
+              <option value="today">{t('header.dateFilter.today')}</option>
+              <option value="week">{t('commissions.filters.last7Days')}</option>
+              <option value="month">{t('header.dateFilter.thisMonth')}</option>
             </select>
 
             <button
@@ -326,7 +339,7 @@ export default function CommissionsPage() {
               }}
             >
               <Download size={16} />
-              Exporter CSV
+              {t('commissions.exportCsv')}
             </button>
           </div>
         </div>
@@ -335,7 +348,7 @@ export default function CommissionsPage() {
         <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
           {filteredTransactions.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-              Aucune transaction trouvée
+              {t('commissions.empty')}
             </div>
           ) : (
             <div style={{ backgroundColor: themeColors.cardBg, borderRadius: '12px', overflow: 'hidden' }}>
@@ -343,25 +356,25 @@ export default function CommissionsPage() {
                 <thead>
                   <tr style={{ backgroundColor: themeColors.grayLight, borderBottom: `1px solid ${themeColors.cardBorder}` }}>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
-                      Date
+                      {t('commissions.table.date')}
                     </th>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
-                      Livreur
+                      {t('commissions.table.driver')}
                     </th>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
-                      Type
+                      {t('commissions.table.type')}
                     </th>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
-                      Commande
+                      {t('commissions.table.order')}
                     </th>
                     <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
-                      Montant
+                      {t('commissions.table.amount')}
                     </th>
                     <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
-                      Solde après
+                      {t('commissions.table.balanceAfter')}
                     </th>
                     <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>
-                      Actions
+                      {t('commissions.table.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -398,7 +411,7 @@ export default function CommissionsPage() {
                                 : '#92400E',
                           }}
                         >
-                          {tx.type === 'recharge' ? 'Recharge' : tx.type === 'deduction' ? 'Prélèvement' : 'Remboursement'}
+                          {tx.type === 'recharge' ? t('commissions.types.recharge') : tx.type === 'deduction' ? t('commissions.types.deduction') : t('commissions.types.refund')}
                         </span>
                       </td>
                       <td style={{ padding: '12px', fontSize: '14px', color: themeColors.textPrimary }}>
@@ -455,7 +468,7 @@ export default function CommissionsPage() {
                             fontWeight: 600,
                           }}
                         >
-                          Voir livreur
+                          {t('commissions.viewDriver')}
                         </button>
                       </td>
                     </tr>
@@ -469,4 +482,3 @@ export default function CommissionsPage() {
     </ScreenTransition>
   )
 }
-

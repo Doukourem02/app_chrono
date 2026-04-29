@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Trophy, Star, Package, CheckCircle, TrendingUp, Users } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 const supabase = typeof window !== 'undefined'
   ? createClient(
@@ -35,6 +36,7 @@ interface PerformanceKPIs {
 const MEDAL_COLORS = ['#F59E0B', '#9CA3AF', '#CD7F32']
 
 export default function GamificationPage() {
+  const t = useTranslation()
   const [period, setPeriod] = useState<'week' | 'month' | 'all'>('week')
   const [zone, setZone] = useState<string>('')
 
@@ -61,12 +63,17 @@ export default function GamificationPage() {
   const kpis: PerformanceKPIs = data?.kpis || { totalCompleted: 0, totalOrders: 0, successRate: 0, avgRating: 0, activeDrivers: 0 }
   const top3 = leaderboard.slice(0, 3)
 
-  const periodLabel = period === 'week' ? 'cette semaine' : period === 'month' ? 'ce mois' : 'de tout le temps'
+  const periodLabel =
+    period === 'week'
+      ? t('performance.period.thisWeek')
+      : period === 'month'
+        ? t('performance.period.thisMonth')
+        : t('performance.period.allTime')
 
   return (
     <div style={{ padding: '24px' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px', color: themeColors.textPrimary }}>
-        Performance
+        {t('performance.title')}
       </h1>
 
       {/* Filtres */}
@@ -82,13 +89,13 @@ export default function GamificationPage() {
             color: themeColors.textPrimary,
           }}
         >
-          <option value="week">Cette semaine</option>
-          <option value="month">Ce mois</option>
-          <option value="all">Tout le temps</option>
+          <option value="week">{t('performance.period.thisWeek')}</option>
+          <option value="month">{t('performance.period.thisMonth')}</option>
+          <option value="all">{t('performance.period.allTime')}</option>
         </select>
         <input
           type="text"
-          placeholder="Filtrer par zone..."
+          placeholder={t('performance.zonePlaceholder')}
           value={zone}
           onChange={(e) => setZone(e.target.value)}
           style={{
@@ -108,7 +115,7 @@ export default function GamificationPage() {
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <Package style={{ width: '18px', height: '18px', color: '#3B82F6' }} />
-            <span style={{ fontSize: '13px', color: themeColors.textSecondary }}>Livraisons complétées</span>
+            <span style={{ fontSize: '13px', color: themeColors.textSecondary }}>{t('performance.kpis.completedDeliveries')}</span>
           </div>
           <div style={{ fontSize: '28px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {isLoading ? '...' : kpis.totalCompleted}
@@ -119,29 +126,29 @@ export default function GamificationPage() {
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <CheckCircle style={{ width: '18px', height: '18px', color: '#10B981' }} />
-            <span style={{ fontSize: '13px', color: themeColors.textSecondary }}>Taux de réussite</span>
+            <span style={{ fontSize: '13px', color: themeColors.textSecondary }}>{t('performance.kpis.successRate')}</span>
           </div>
           <div style={{ fontSize: '28px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {isLoading ? '...' : `${kpis.successRate}%`}
           </div>
-          <div style={{ fontSize: '12px', color: themeColors.textTertiary, marginTop: '4px' }}>{kpis.totalOrders} commandes assignées</div>
+          <div style={{ fontSize: '12px', color: themeColors.textTertiary, marginTop: '4px' }}>{t('performance.kpis.assignedOrders', { count: kpis.totalOrders })}</div>
         </div>
 
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <Star style={{ width: '18px', height: '18px', color: '#FBBF24' }} />
-            <span style={{ fontSize: '13px', color: themeColors.textSecondary }}>Note moyenne</span>
+            <span style={{ fontSize: '13px', color: themeColors.textSecondary }}>{t('performance.kpis.averageRating')}</span>
           </div>
           <div style={{ fontSize: '28px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {isLoading ? '...' : kpis.avgRating > 0 ? `${kpis.avgRating}/5` : 'N/A'}
           </div>
-          <div style={{ fontSize: '12px', color: themeColors.textTertiary, marginTop: '4px' }}>évaluations clients</div>
+          <div style={{ fontSize: '12px', color: themeColors.textTertiary, marginTop: '4px' }}>{t('performance.kpis.clientRatings')}</div>
         </div>
 
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <Users style={{ width: '18px', height: '18px', color: '#8B5CF6' }} />
-            <span style={{ fontSize: '13px', color: themeColors.textSecondary }}>Livreurs actifs</span>
+            <span style={{ fontSize: '13px', color: themeColors.textSecondary }}>{t('performance.kpis.activeDrivers')}</span>
           </div>
           <div style={{ fontSize: '28px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {isLoading ? '...' : kpis.activeDrivers}
@@ -155,7 +162,7 @@ export default function GamificationPage() {
         <div style={{ marginBottom: '32px', padding: '24px', backgroundColor: themeColors.cardBg, borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '24px', color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Trophy style={{ width: '18px', height: '18px', color: '#F59E0B' }} />
-            Top 3 livreurs
+            {t('performance.topDrivers')}
           </h2>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: '24px' }}>
             {/* 2ème place à gauche */}
@@ -165,7 +172,7 @@ export default function GamificationPage() {
                   🥈
                 </div>
                 <div style={{ fontWeight: 600, fontSize: '14px', color: themeColors.textPrimary }}>{top3[1].driverName}</div>
-                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginTop: '2px' }}>{top3[1].deliveries} livraisons</div>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginTop: '2px' }}>{t('performance.deliveries', { count: top3[1].deliveries })}</div>
                 <div style={{ fontSize: '12px', color: MEDAL_COLORS[1], fontWeight: 600, marginTop: '2px' }}>Score: {Math.round(top3[1].score)}</div>
                 <div style={{ marginTop: '8px', height: '60px', backgroundColor: MEDAL_COLORS[1], borderRadius: '6px 6px 0 0', opacity: 0.8 }} />
               </div>
@@ -177,7 +184,7 @@ export default function GamificationPage() {
                   🥇
                 </div>
                 <div style={{ fontWeight: 700, fontSize: '15px', color: themeColors.textPrimary }}>{top3[0].driverName}</div>
-                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginTop: '2px' }}>{top3[0].deliveries} livraisons</div>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginTop: '2px' }}>{t('performance.deliveries', { count: top3[0].deliveries })}</div>
                 <div style={{ fontSize: '13px', color: MEDAL_COLORS[0], fontWeight: 700, marginTop: '2px' }}>Score: {Math.round(top3[0].score)}</div>
                 <div style={{ marginTop: '8px', height: '90px', backgroundColor: MEDAL_COLORS[0], borderRadius: '6px 6px 0 0', opacity: 0.8 }} />
               </div>
@@ -189,7 +196,7 @@ export default function GamificationPage() {
                   🥉
                 </div>
                 <div style={{ fontWeight: 600, fontSize: '14px', color: themeColors.textPrimary }}>{top3[2].driverName}</div>
-                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginTop: '2px' }}>{top3[2].deliveries} livraisons</div>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginTop: '2px' }}>{t('performance.deliveries', { count: top3[2].deliveries })}</div>
                 <div style={{ fontSize: '12px', color: MEDAL_COLORS[2], fontWeight: 600, marginTop: '2px' }}>Score: {Math.round(top3[2].score)}</div>
                 <div style={{ marginTop: '8px', height: '40px', backgroundColor: MEDAL_COLORS[2], borderRadius: '6px 6px 0 0', opacity: 0.8 }} />
               </div>
@@ -202,20 +209,20 @@ export default function GamificationPage() {
       <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
         <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: themeColors.textPrimary }}>
           <TrendingUp style={{ width: '18px', height: '18px', color: themeColors.purplePrimary }} />
-          Classement complet
+          {t('performance.fullRanking')}
         </h2>
 
         {isLoading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: themeColors.textSecondary }}>Chargement...</div>
+          <div style={{ padding: '40px', textAlign: 'center', color: themeColors.textSecondary }}>{t('common.loading')}</div>
         ) : leaderboard.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: themeColors.textSecondary }}>
-            <p style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 600, color: themeColors.textPrimary }}>Aucun livreur dans le classement</p>
+            <p style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 600, color: themeColors.textPrimary }}>{t('performance.empty')}</p>
             <p style={{ fontSize: '14px', color: themeColors.textTertiary }}>
               {period === 'week'
-                ? 'Aucune livraison complétée cette semaine'
+                ? t('performance.emptyWeek')
                 : period === 'month'
-                ? 'Aucune livraison complétée ce mois'
-                : 'Aucune livraison complétée'}
+                ? t('performance.emptyMonth')
+                : t('performance.emptyAll')}
             </p>
           </div>
         ) : (
@@ -223,12 +230,12 @@ export default function GamificationPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.grayLight }}>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Rang</th>
-                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Livreur</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('performance.table.rank')}</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('performance.table.driver')}</th>
                   <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Score</th>
-                  <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Livraisons</th>
-                  <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Taux réussite</th>
-                  <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Note</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('performance.table.deliveries')}</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('performance.table.successRate')}</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('performance.table.rating')}</th>
                 </tr>
               </thead>
               <tbody>

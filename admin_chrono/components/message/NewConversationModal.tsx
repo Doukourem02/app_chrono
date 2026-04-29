@@ -7,6 +7,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { adminMessageService } from '@/services/adminMessageService'
 import { Conversation } from '@/services/adminMessageService'
 import { logger } from '@/utils/logger'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface UserData {
   id: string
@@ -29,6 +30,7 @@ export default function NewConversationModal({
   onClose,
   onConversationCreated,
 }: NewConversationModalProps) {
+  const t = useTranslation()
   const [conversationType, setConversationType] = useState<'support' | 'admin'>('support')
   const [users, setUsers] = useState<UserData[]>([])
   const [filteredUsers, setFilteredUsers] = useState<UserData[]>([])
@@ -87,11 +89,11 @@ export default function NewConversationModal({
         onClose()
         setSearchQuery('')
       } else {
-        alert('Impossible de créer la conversation')
+        alert(t('messages.createError'))
       }
     } catch (error) {
       logger.error('Error creating conversation:', error)
-      alert('Une erreur est survenue lors de la création de la conversation')
+      alert(t('messages.createErrorGeneric'))
     } finally {
       setIsCreating(false)
     }
@@ -212,7 +214,7 @@ export default function NewConversationModal({
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
-          <h2 style={titleStyle}>Nouvelle conversation</h2>
+          <h2 style={titleStyle}>{t('messages.newConversation')}</h2>
           <button
             style={closeButtonStyle}
             onClick={onClose}
@@ -236,7 +238,7 @@ export default function NewConversationModal({
             }}
           >
             <User size={18} />
-            Support client
+            {t('messages.supportClient')}
           </button>
           <button
             style={typeButtonStyle(conversationType === 'admin')}
@@ -246,7 +248,7 @@ export default function NewConversationModal({
             }}
           >
             <Truck size={18} />
-            Message livreur
+            {t('messages.driverMessage')}
           </button>
         </div>
 
@@ -263,7 +265,7 @@ export default function NewConversationModal({
           />
           <input
             type="text"
-            placeholder={`Rechercher un ${conversationType === 'support' ? 'client' : 'livreur'}...`}
+            placeholder={conversationType === 'support' ? t('messages.searchClient') : t('messages.searchDriver')}
             style={searchInputStyle}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -273,11 +275,11 @@ export default function NewConversationModal({
         <div style={userListStyle}>
           {isLoading ? (
             <div style={{ padding: '20px', textAlign: 'center', color: '#6B7280' }}>
-              Chargement...
+              {t('common.loading')}
             </div>
           ) : filteredUsers.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: '#6B7280' }}>
-              Aucun {conversationType === 'support' ? 'client' : 'livreur'} trouvé
+              {conversationType === 'support' ? t('messages.noClientFound') : t('messages.noDriverFound')}
             </div>
           ) : (
             filteredUsers.map((user) => (
@@ -351,4 +353,3 @@ export default function NewConversationModal({
     </div>
   )
 }
-

@@ -3,11 +3,13 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, Coins } from 'lucide-react'
+import { useTranslation } from '@/hooks/useTranslation'
 
 type TabType = 'transactions' | 'commissions'
 
 export default function FinancesPage() {
   const router = useRouter()
+  const t = useTranslation()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabType>('transactions')
 
@@ -41,7 +43,7 @@ export default function FinancesPage() {
       {/* Header avec onglets */}
       <div style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '16px 24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827', marginBottom: '16px' }}>
-          Finances
+          {t('sidebar.sections.finances.title')}
         </h1>
 
         {/* Onglets */}
@@ -65,7 +67,7 @@ export default function FinancesPage() {
             }}
           >
             <CreditCard size={16} />
-            Transactions Clients
+            {t('sidebar.sections.finances.clientTransactions')}
           </button>
           <button
             onClick={() => handleTabChange('commissions')}
@@ -86,14 +88,14 @@ export default function FinancesPage() {
             }}
           >
             <Coins size={16} />
-            Commissions Livreurs
+            {t('sidebar.sections.finances.driverCommissions')}
           </button>
         </div>
       </div>
 
       {/* Contenu - redirection automatique */}
       <div style={{ flex: 1, overflow: 'auto', padding: '24px', textAlign: 'center', color: '#6B7280' }}>
-        Redirection en cours...
+        {t('common.loading')}
       </div>
     </div>
   )

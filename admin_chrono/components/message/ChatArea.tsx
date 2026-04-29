@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Send } from 'lucide-react'
 import { Conversation, Message } from '@/services/adminMessageService'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface ChatAreaProps {
   conversation: Conversation | null
@@ -22,6 +23,7 @@ export default function ChatArea({
   isLoading = false,
   currentUserId,
 }: ChatAreaProps) {
+  const t = useTranslation()
   const [messageText, setMessageText] = useState('')
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -226,10 +228,10 @@ export default function ChatArea({
       <div style={chatAreaStyle}>
         <div style={emptyStateStyle}>
           <p style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
-            Aucune conversation sélectionnée
+            {t('messages.noConversationSelected')}
           </p>
           <p style={{ fontSize: '14px' }}>
-            Sélectionnez une conversation pour commencer à discuter
+            {t('messages.selectConversationHint')}
           </p>
         </div>
       </div>
@@ -238,16 +240,16 @@ export default function ChatArea({
 
   const getConversationTypeLabel = (): string => {
     if (participantPair) {
-      return 'Toutes les conversations'
+      return t('messages.allConversations')
     }
     if (!conversation) return ''
     switch (conversation.type) {
       case 'order':
-        return 'Commande'
+        return t('messages.order')
       case 'support':
         return 'Support'
       case 'admin':
-        return 'Livreur'
+        return t('messages.driver')
       default:
         return ''
     }
@@ -258,10 +260,10 @@ export default function ChatArea({
       <div style={chatAreaStyle}>
         <div style={emptyStateStyle}>
           <p style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
-            Aucune conversation sélectionnée
+            {t('messages.noConversationSelected')}
           </p>
           <p style={{ fontSize: '14px' }}>
-            Sélectionnez une conversation pour commencer à discuter
+            {t('messages.selectConversationHint')}
           </p>
         </div>
       </div>
@@ -280,18 +282,18 @@ export default function ChatArea({
       <div style={messagesContainerStyle}>
         {isLoading && messages.length === 0 ? (
           <div style={{ textAlign: 'center', color: themeColors.textSecondary, padding: '20px' }}>
-            Chargement des messages...
+            {t('messages.loadingMessages')}
           </div>
         ) : messages.length === 0 ? (
           <div style={{ textAlign: 'center', color: themeColors.textSecondary, padding: '20px' }}>
-            Aucun message. Commencez la conversation !
+            {t('messages.noMessages')}
           </div>
         ) : (
           messages.map((message, index) => {
             const isFromCurrentUser = isMessageFromCurrentUser(message)
             const senderName = message.sender 
               ? `${message.sender.first_name || ''} ${message.sender.last_name || ''}`.trim() || message.sender.email
-              : 'Utilisateur'
+              : t('messages.user')
             
             // Afficher le nom seulement si c'est le premier message ou si l'expéditeur a changé
             const prevMessage = index > 0 ? messages[index - 1] : null
@@ -331,7 +333,7 @@ export default function ChatArea({
           value={messageText}
           onChange={(e) => setMessageText(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Tapez votre message..."
+          placeholder={t('messages.messagePlaceholder')}
           rows={3}
           style={messageInputStyle}
           disabled={isSending}
@@ -352,10 +354,9 @@ export default function ChatArea({
           }}
         >
           <Send size={16} />
-          Envoyer
+          {t('messages.send')}
         </button>
       </div>
     </div>
   )
 }
-

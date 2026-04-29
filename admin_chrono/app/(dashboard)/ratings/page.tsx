@@ -6,6 +6,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { Star, Search, Trash2 } from 'lucide-react'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface Rating {
   id: string
@@ -25,6 +26,7 @@ interface Rating {
 }
 
 export default function RatingsPage() {
+  const t = useTranslation()
   const [currentPage, setCurrentPage] = useState(1)
   const [driverFilter, setDriverFilter] = useState<string>('')
   const [clientFilter, setClientFilter] = useState<string>('')
@@ -205,19 +207,19 @@ export default function RatingsPage() {
     <ScreenTransition direction="fade" duration={0.3}>
       <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Évaluations</h1>
+        <h1 style={titleStyle}>{t('ratings.title')}</h1>
       </div>
 
       {/* Statistiques */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
         <div style={cardStyle}>
-          <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Note moyenne</div>
+          <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>{t('ratings.averageRating')}</div>
           <div style={{ fontSize: '32px', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
             {averageRating.toFixed(1)} ⭐
           </div>
         </div>
         <div style={cardStyle}>
-          <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Total évaluations</div>
+          <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>{t('ratings.totalRatings')}</div>
           <div style={{ fontSize: '32px', fontWeight: 700, color: '#111827' }}>{totalRatings}</div>
         </div>
       </div>
@@ -226,7 +228,7 @@ export default function RatingsPage() {
       {ratingDistribution.length > 0 && (
         <div style={cardStyle}>
           <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: '#111827' }}>
-            Distribution des notes
+            {t('ratings.distribution')}
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {ratingDistribution.map((dist) => (
@@ -258,7 +260,7 @@ export default function RatingsPage() {
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }} />
           <input
             type="text"
-            placeholder="Rechercher par ID commande..."
+            placeholder={t('ratings.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ ...inputStyle, paddingLeft: '40px' }}
@@ -266,7 +268,7 @@ export default function RatingsPage() {
         </div>
         <input
           type="text"
-          placeholder="ID Driver"
+          placeholder={t('ratings.driverId')}
           value={driverFilter}
           onChange={(e) => {
             setDriverFilter(e.target.value)
@@ -276,7 +278,7 @@ export default function RatingsPage() {
         />
         <input
           type="text"
-          placeholder="ID Client"
+          placeholder={t('ratings.clientId')}
           value={clientFilter}
           onChange={(e) => {
             setClientFilter(e.target.value)
@@ -292,19 +294,19 @@ export default function RatingsPage() {
           }}
           style={selectStyle}
         >
-          <option value="">Toutes les notes</option>
-          <option value="5">5 étoiles</option>
-          <option value="4">4+ étoiles</option>
-          <option value="3">3+ étoiles</option>
-          <option value="2">2+ étoiles</option>
-          <option value="1">1+ étoiles</option>
+          <option value="">{t('ratings.allRatings')}</option>
+          <option value="5">{t('ratings.stars', { count: 5 })}</option>
+          <option value="4">{t('ratings.starsPlus', { count: 4 })}</option>
+          <option value="3">{t('ratings.starsPlus', { count: 3 })}</option>
+          <option value="2">{t('ratings.starsPlus', { count: 2 })}</option>
+          <option value="1">{t('ratings.starsPlus', { count: 1 })}</option>
         </select>
       </div>
 
       {/* Table */}
       <div style={cardStyle}>
         <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: '#111827' }}>
-          Liste des évaluations
+          {t('ratings.listTitle')}
         </h3>
         {isLoading ? (
           <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -316,20 +318,20 @@ export default function RatingsPage() {
           </div>
         ) : ratings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
-            Aucune évaluation trouvée
+            {t('ratings.empty')}
           </div>
         ) : (
           <>
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Note</th>
-                  <th style={thStyle}>Client</th>
-                  <th style={thStyle}>Driver</th>
-                  <th style={thStyle}>Commande</th>
-                  <th style={thStyle}>Commentaire</th>
+                  <th style={thStyle}>{t('ratings.table.rating')}</th>
+                  <th style={thStyle}>{t('ratings.table.client')}</th>
+                  <th style={thStyle}>{t('ratings.table.driver')}</th>
+                  <th style={thStyle}>{t('ratings.table.order')}</th>
+                  <th style={thStyle}>{t('ratings.table.comment')}</th>
                   <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Actions</th>
+                  <th style={thStyle}>{t('ratings.table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,14 +385,14 @@ export default function RatingsPage() {
                       </td>
                       <td style={tdStyle}>
                         <div style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {rating.comment || 'Aucun commentaire'}
+                          {rating.comment || t('ratings.noComment')}
                         </div>
                       </td>
                       <td style={tdStyle}>{formatDate(rating.created_at)}</td>
                       <td style={tdStyle}>
                         <button
                           onClick={() => {
-                            if (confirm('Êtes-vous sûr de vouloir supprimer cette évaluation ?')) {
+                            if (confirm(t('ratings.confirmDelete'))) {
                               deleteMutation.mutate(rating.id)
                             }
                           }}
@@ -471,4 +473,3 @@ export default function RatingsPage() {
     </ScreenTransition>
   )
 }
-

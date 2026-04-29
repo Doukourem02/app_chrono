@@ -4,6 +4,7 @@ import React from 'react'
 import { Search, User, Truck, Package, MessageSquare, Plus } from 'lucide-react'
 import { Conversation } from '@/services/adminMessageService'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface ConversationListProps {
   conversations: Conversation[]
@@ -32,6 +33,7 @@ export default function ConversationList({
   currentUserId,
   onNewConversation,
 }: ConversationListProps) {
+  const t = useTranslation()
   const getParticipantName = (conversation: Conversation): string => {
     if (!currentUserId) return 'Utilisateur'
     
@@ -369,7 +371,7 @@ export default function ConversationList({
         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textSecondary }} />
         <input
           type="text"
-          placeholder="Rechercher une conversation..."
+          placeholder={t('messages.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           style={searchInputStyle}
@@ -382,13 +384,13 @@ export default function ConversationList({
             onClick={() => onFilterChange('all')}
             style={filterButtonStyle(filterType === 'all')}
           >
-            Toutes
+            {t('messages.filters.all')}
           </button>
           <button
             onClick={() => onFilterChange('order')}
             style={filterButtonStyle(filterType === 'order')}
           >
-            Commandes
+            {t('messages.filters.orders')}
           </button>
           <button
             onClick={() => onFilterChange('support')}
@@ -431,7 +433,7 @@ export default function ConversationList({
           }}
         >
           <Plus size={18} />
-          Nouvelle conversation
+          {t('messages.newConversation')}
         </button>
       )}
 
@@ -440,13 +442,13 @@ export default function ConversationList({
           <div style={{ padding: '20px', textAlign: 'center', color: themeColors.textSecondary, fontSize: '14px' }}>
             {searchQuery ? (
               <>
-                <div style={{ marginBottom: '8px' }}>Aucune conversation trouvée</div>
+                <div style={{ marginBottom: '8px' }}>{t('messages.emptySearch')}</div>
                 <div style={{ fontSize: '12px', color: themeColors.textTertiary }}>
-                  Essayez de modifier votre recherche
+                  {t('messages.trySearch')}
                 </div>
               </>
             ) : (
-              'Aucune conversation'
+              t('messages.empty')
             )}
           </div>
         ) : (
@@ -546,7 +548,7 @@ export default function ConversationList({
                       </div>
                       {conv.type === 'order' && conv.order_id && (
                         <div style={{ fontSize: '11px', color: themeColors.textTertiary, marginBottom: '4px' }}>
-                          Commande #{conv.order_id.slice(0, 8)}
+                          {t('messages.order')} #{conv.order_id.slice(0, 8)}
                         </div>
                       )}
                       {lastMessage && (
@@ -586,4 +588,3 @@ export default function ConversationList({
     </div>
   )
 }
-

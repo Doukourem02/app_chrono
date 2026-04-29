@@ -19,6 +19,7 @@ import NewShippingModal from '@/components/orders/NewShippingModal'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
 import { useTranslation } from '@/hooks/useTranslation'
+import { useLanguageStore } from '@/stores/languageStore'
 
 export default function DashboardPage() {
   const queryClient = useQueryClient()
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const { startDate, endDate } = dateRange
   const [isNewShippingModalOpen, setIsNewShippingModalOpen] = useState(false)
   const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
 
   // Rafraîchir les livraisons en cours dès qu'un statut change (sync temps réel)
   useEffect(() => {
@@ -256,7 +258,7 @@ export default function DashboardPage() {
       <div style={pageContainerStyle}>
       <div style={headerRowStyle}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h1 style={titleStyle}>Dashboard</h1>
+          <h1 style={titleStyle}>{t('dashboard.title')}</h1>
         </div>
         <div style={actionsContainerStyle}>
           <AnimatedButton
@@ -266,7 +268,7 @@ export default function DashboardPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Calendar size={16} style={{ color: themeColors.textSecondary }} />
-              {new Date().toLocaleDateString('fr-FR', {
+              {new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'fr-FR', {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric',
@@ -278,7 +280,7 @@ export default function DashboardPage() {
             variant="primary"
             style={newShippingButtonStyle}
           >
-            + Nouvelle livraison
+            {t('dashboard.newDelivery')}
           </AnimatedButton>
         </div>
       </div>

@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabase'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
 import { exportToPDF, exportToExcel } from '@/utils/exportUtils'
+import { useTranslation } from '@/hooks/useTranslation'
+import { useLanguageStore } from '@/stores/languageStore'
 
 interface ZoneData {
   zone: string
@@ -31,6 +33,9 @@ interface ExportOrder {
 }
 
 export default function AnalyticsPage() {
+  const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
+  const dateLocale = language === 'en' ? 'en-US' : 'fr-FR'
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [days, setDays] = useState(7)
   const [exportFormat, setExportFormat] = useState<'json' | 'csv' | 'pdf' | 'excel'>('json')
@@ -154,7 +159,17 @@ export default function AnalyticsPage() {
         const orders: ExportOrder[] = data.data || []
         
         // Préparer les données pour l'export
-        const headers = ['ID', 'ID Livraison', 'Numéro Commande', 'Statut', 'Prix', 'Créé le', 'Complété le', 'Client', 'Livreur']
+        const headers = [
+          'ID',
+          t('analytics.export.deliveryId'),
+          t('analytics.export.orderNumber'),
+          t('ordersPage.table.status'),
+          t('ordersPage.table.price'),
+          t('analytics.export.createdAt'),
+          t('analytics.export.completedAt'),
+          t('ordersPage.table.client'),
+          t('ordersPage.table.driver'),
+        ]
         const rows = orders.map((order: ExportOrder) => [
           order.id || '',
           order.delivery_id || '',
@@ -168,7 +183,7 @@ export default function AnalyticsPage() {
         ])
         
         const exportData = {
-          title: `Analytics - ${days} derniers jours`,
+          title: t('analytics.export.fileTitle', { days }),
           headers,
           rows,
           filename: `analytics-${days}j-${Date.now()}.${exportFormat === 'pdf' ? 'pdf' : 'xlsx'}`,
@@ -271,7 +286,7 @@ export default function AnalyticsPage() {
     <div style={{ padding: '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: themeColors.textPrimary }}>
-          Analytics Avancés
+          {t('analytics.title')}
         </h1>
       </div>
 
@@ -291,7 +306,7 @@ export default function AnalyticsPage() {
             transition: 'all 0.2s',
           }}
         >
-          Vue d&apos;ensemble
+          {t('analytics.tabs.overview')}
         </button>
         <button
           onClick={() => setActiveTab('ratings')}
@@ -307,7 +322,7 @@ export default function AnalyticsPage() {
             transition: 'all 0.2s',
           }}
         >
-          Évaluations
+          {t('analytics.tabs.ratings')}
         </button>
       </div>
 
@@ -320,7 +335,7 @@ export default function AnalyticsPage() {
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <Package style={{ width: '20px', height: '20px', color: '#3B82F6' }} />
-            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>Commandes actives</span>
+            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>{t('analytics.kpis.activeOrders')}</span>
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {kpisLoading ? '...' : kpis?.activeOrders || 0}
@@ -330,7 +345,7 @@ export default function AnalyticsPage() {
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <CheckCircle style={{ width: '20px', height: '20px', color: '#10B981' }} />
-            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>Complétées aujourd&apos;hui</span>
+            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>{t('analytics.kpis.completedToday')}</span>
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {kpisLoading ? '...' : kpis?.completedToday || 0}
@@ -340,7 +355,7 @@ export default function AnalyticsPage() {
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <DollarSign style={{ width: '20px', height: '20px', color: '#F59E0B' }} />
-            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>Revenus aujourd&apos;hui</span>
+            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>{t('analytics.kpis.revenueToday')}</span>
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {kpisLoading ? '...' : `${(kpis?.revenueToday || 0).toLocaleString()} FCFA`}
@@ -350,7 +365,7 @@ export default function AnalyticsPage() {
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <Clock style={{ width: '20px', height: '20px', color: '#8B5CF6' }} />
-            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>Temps moyen</span>
+            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>{t('analytics.kpis.averageTime')}</span>
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {kpisLoading ? '...' : `${Math.round(kpis?.avgDeliveryTime || 0)} min`}
@@ -360,7 +375,7 @@ export default function AnalyticsPage() {
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <TrendingUp style={{ width: '20px', height: '20px', color: '#EC4899' }} />
-            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>Taux acceptation</span>
+            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>{t('analytics.kpis.acceptanceRate')}</span>
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: themeColors.textPrimary }}>
             {kpisLoading ? '...' : `${Math.round(kpis?.acceptanceRate || 0)}%`}
@@ -370,7 +385,7 @@ export default function AnalyticsPage() {
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <Star style={{ width: '20px', height: '20px', color: '#FBBF24' }} />
-            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>Note moyenne</span>
+            <span style={{ fontSize: '14px', color: themeColors.textSecondary }}>{t('analytics.kpis.averageRating')}</span>
           </div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', color: themeColors.textPrimary }}>
             {kpisLoading ? '...' : (() => {
@@ -414,7 +429,7 @@ export default function AnalyticsPage() {
           </div>
           {kpis?.totalRatings && kpis.totalRatings > 0 && (
             <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginTop: '4px' }}>
-              {kpis.totalRatings} évaluation{kpis.totalRatings > 1 ? 's' : ''}
+              {t(kpis.totalRatings > 1 ? 'analytics.ratings.countPlural' : 'analytics.ratings.count', { count: kpis.totalRatings })}
             </div>
           )}
         </div>
@@ -422,16 +437,16 @@ export default function AnalyticsPage() {
 
       {/* Export */}
       <div style={{ marginBottom: '32px', padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: themeColors.textPrimary }}>Export des données</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: themeColors.textPrimary }}>{t('analytics.export.title')}</h2>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <select
             value={days}
             onChange={(e) => setDays(parseInt(e.target.value))}
             style={{ padding: '8px 12px', borderRadius: '6px', border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary }}
           >
-            <option value={7}>7 derniers jours</option>
-            <option value={30}>30 derniers jours</option>
-            <option value={90}>90 derniers jours</option>
+            <option value={7}>{t('analytics.export.lastDays', { days: 7 })}</option>
+            <option value={30}>{t('analytics.export.lastDays', { days: 30 })}</option>
+            <option value={90}>{t('analytics.export.lastDays', { days: 90 })}</option>
           </select>
           <select
             value={exportFormat}
@@ -460,7 +475,7 @@ export default function AnalyticsPage() {
             }}
           >
             <Download style={{ width: '16px', height: '16px' }} />
-            Exporter
+            {t('analytics.export.action')}
           </button>
         </div>
       </div>
@@ -469,7 +484,7 @@ export default function AnalyticsPage() {
       {kpis && kpis.totalRatings && kpis.totalRatings > 0 && (
         <div style={{ marginBottom: '32px', padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: themeColors.textPrimary }}>Statistiques des évaluations</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.ratings.statsTitle')}</h2>
             <Link 
               href="/ratings" 
               style={{ 
@@ -482,7 +497,7 @@ export default function AnalyticsPage() {
                 fontWeight: 600
               }}
             >
-              Voir le détail
+              {t('analytics.ratings.viewDetails')}
               <ExternalLink style={{ width: '14px', height: '14px' }} />
             </Link>
           </div>
@@ -491,7 +506,7 @@ export default function AnalyticsPage() {
           {kpis.ratingDistribution && (
             <div style={{ marginBottom: '20px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textSecondary, marginBottom: '12px' }}>
-                Distribution des notes
+                {t('analytics.ratings.distribution')}
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {[5, 4, 3, 2, 1].map((rating) => {
@@ -536,14 +551,14 @@ export default function AnalyticsPage() {
           {performance?.ratingTrend && performance.ratingTrend.length > 0 && (
             <div>
               <h3 style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textSecondary, marginBottom: '12px' }}>
-                Évolution de la note moyenne ({days} derniers jours)
+                {t('analytics.ratings.trend', { days })}
               </h3>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '120px', marginBottom: '8px' }}>
                 {performance.ratingTrend.map((point: { date: string; average: number; count: number }, index: number) => {
                   const maxRating = 5;
                   const height = (point.average / maxRating) * 100;
                   const date = new Date(point.date);
-                  const dayLabel = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+                  const dayLabel = date.toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit' });
                   
                   return (
                     <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
@@ -578,14 +593,14 @@ export default function AnalyticsPage() {
       {/* Données par zone */}
       {performance && (
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: themeColors.textPrimary }}>Performance par commune</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.title')}</h2>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.grayLight }}>
-                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold', color: themeColors.textPrimary }}>Commune</th>
-                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Livraisons</th>
-                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Revenus</th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.zone')}</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.deliveries')}</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.revenue')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -615,7 +630,7 @@ export default function AnalyticsPage() {
                 <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textTertiary }} />
                 <input
                   type="text"
-                  placeholder="Rechercher par livreur, client..."
+                  placeholder={t('analytics.ratings.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{
@@ -642,12 +657,12 @@ export default function AnalyticsPage() {
                   color: themeColors.textPrimary,
                 }}
               >
-                <option value="">Toutes les notes</option>
-                <option value="5">5 étoiles</option>
-                <option value="4">4 étoiles</option>
-                <option value="3">3 étoiles</option>
-                <option value="2">2 étoiles</option>
-                <option value="1">1 étoile</option>
+                <option value="">{t('analytics.ratings.allRatings')}</option>
+                <option value="5">{t('analytics.ratings.stars', { count: 5 })}</option>
+                <option value="4">{t('analytics.ratings.stars', { count: 4 })}</option>
+                <option value="3">{t('analytics.ratings.stars', { count: 3 })}</option>
+                <option value="2">{t('analytics.ratings.stars', { count: 2 })}</option>
+                <option value="1">{t('analytics.ratings.star', { count: 1 })}</option>
               </select>
             </div>
           </div>
@@ -656,23 +671,23 @@ export default function AnalyticsPage() {
           <div style={{ backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden', border: `1px solid ${themeColors.cardBorder}` }}>
             {ratingsLoading ? (
               <div style={{ padding: '40px', textAlign: 'center', color: themeColors.textSecondary }}>
-                Chargement...
+                {t('common.loading')}
               </div>
             ) : ratings.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center', color: themeColors.textSecondary }}>
-                Aucune évaluation trouvée
+                {t('ratings.empty')}
               </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ backgroundColor: themeColors.grayLight, borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Note</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Client</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Livreur</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Commande</th>
-                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Commentaire</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('ratings.table.rating')}</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('ratings.table.client')}</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('ratings.table.driver')}</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('ratings.table.order')}</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('ratings.table.comment')}</th>
                     <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Date</th>
-                    <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>Actions</th>
+                    <th style={{ padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: themeColors.textSecondary }}>{t('ratings.table.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -813,4 +828,3 @@ export default function AnalyticsPage() {
     </div>
   )
 }
-

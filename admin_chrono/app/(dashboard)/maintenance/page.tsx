@@ -375,7 +375,7 @@ export default function FleetPage() {
               onChange={(e) => setStatusFilter(e.target.value as VehicleStatus)}
               style={selectStyle}
             >
-              <option value="all">Tous les statuts</option>
+              <option value="all">{t('maintenance.filters.allStatuses')}</option>
               <option value="active">{t('maintenance.filters.active')}</option>
               <option value="maintenance">{t('maintenance.filters.maintenance')}</option>
               <option value="retired">{t('maintenance.filters.retired')}</option>
@@ -387,7 +387,7 @@ export default function FleetPage() {
               onChange={(e) => setTypeFilter(e.target.value as VehicleType)}
               style={selectStyle}
             >
-              <option value="all">Tous les types</option>
+              <option value="all">{t('maintenance.filters.allTypes')}</option>
               <option value="moto">{t('maintenance.filters.moto')}</option>
               <option value="vehicule">{t('maintenance.filters.vehicule')}</option>
               <option value="cargo">{t('maintenance.filters.cargo')}</option>
@@ -694,4 +694,3 @@ export default function FleetPage() {
     </ScreenTransition>
   )
 }
-

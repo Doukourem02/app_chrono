@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminApiService } from '@/lib/adminApiService'
 import { Plus, Search, Percent, DollarSign } from 'lucide-react'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface PromoCode {
   id: string
@@ -29,6 +30,7 @@ interface CreatePromoCodeData {
 }
 
 export default function PromoCodesPage() {
+  const t = useTranslation()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const queryClient = useQueryClient()
@@ -182,7 +184,7 @@ export default function PromoCodesPage() {
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Codes Promo</h1>
+        <h1 style={titleStyle}>{t('promoCodes.title')}</h1>
         <button
           onClick={() => setShowCreateModal(true)}
           style={{
@@ -200,7 +202,7 @@ export default function PromoCodesPage() {
           }}
         >
           <Plus size={16} />
-          Nouveau code
+          {t('promoCodes.newCode')}
         </button>
       </div>
 
@@ -208,7 +210,7 @@ export default function PromoCodesPage() {
         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textSecondary }} />
         <input
           type="text"
-          placeholder="Rechercher un code promo..."
+          placeholder={t('promoCodes.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{
@@ -227,22 +229,22 @@ export default function PromoCodesPage() {
 
       <div style={cardStyle}>
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>Chargement...</div>
+          <div style={{ textAlign: 'center', padding: '40px' }}>{t('common.loading')}</div>
         ) : filteredCodes.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-            Aucun code promo trouvé
+            {t('promoCodes.empty')}
           </div>
         ) : (
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={thStyle}>Code</th>
-                <th style={thStyle}>Type</th>
-                <th style={thStyle}>Valeur</th>
-                <th style={thStyle}>Utilisations</th>
-                <th style={thStyle}>Valide du</th>
-                <th style={thStyle}>Valide jusqu&apos;au</th>
-                <th style={thStyle}>Statut</th>
+                <th style={thStyle}>{t('promoCodes.table.type')}</th>
+                <th style={thStyle}>{t('promoCodes.table.value')}</th>
+                <th style={thStyle}>{t('promoCodes.table.uses')}</th>
+                <th style={thStyle}>{t('promoCodes.table.validFrom')}</th>
+                <th style={thStyle}>{t('promoCodes.table.validUntil')}</th>
+                <th style={thStyle}>{t('promoCodes.table.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -257,12 +259,12 @@ export default function PromoCodesPage() {
                     {code.discount_type === 'percentage' ? (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Percent size={14} style={{ color: '#6B7280' }} />
-                        Pourcentage
+                        {t('promoCodes.discount.percentage')}
                       </span>
                     ) : (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <DollarSign size={14} style={{ color: themeColors.textSecondary }} />
-                        Fixe
+                        {t('promoCodes.discount.fixed')}
                       </span>
                     )}
                   </td>
@@ -287,7 +289,7 @@ export default function PromoCodesPage() {
                         color: code.is_active ? '#065F46' : '#991B1B',
                       }}
                     >
-                      {code.is_active ? 'Actif' : 'Inactif'}
+                      {code.is_active ? t('promoCodes.status.active') : t('promoCodes.status.inactive')}
                     </span>
                   </td>
                 </tr>
@@ -301,7 +303,7 @@ export default function PromoCodesPage() {
         <div style={modalOverlayStyle} onClick={() => setShowCreateModal(false)}>
           <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '24px', color: themeColors.textPrimary }}>
-              Créer un code promo
+              {t('promoCodes.createTitle')}
             </h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -317,7 +319,7 @@ export default function PromoCodesPage() {
               </div>
 
               <div>
-                <label style={labelStyle}>Type de réduction</label>
+                <label style={labelStyle}>{t('promoCodes.form.discountType')}</label>
                 <select
                   value={formData.discountType}
                   onChange={(e) =>
@@ -325,14 +327,14 @@ export default function PromoCodesPage() {
                   }
                   style={inputStyle}
                 >
-                  <option value="percentage">Pourcentage (%)</option>
-                  <option value="fixed">Montant fixe (FCFA)</option>
+                  <option value="percentage">{t('promoCodes.discount.percentage')} (%)</option>
+                  <option value="fixed">{t('promoCodes.discount.fixedAmount')} (FCFA)</option>
                 </select>
               </div>
 
               <div>
                 <label style={labelStyle}>
-                  Valeur ({formData.discountType === 'percentage' ? '%' : 'FCFA'})
+                  {t('promoCodes.form.value')} ({formData.discountType === 'percentage' ? '%' : 'FCFA'})
                 </label>
                 <input
                   type="number"
@@ -345,18 +347,18 @@ export default function PromoCodesPage() {
               </div>
 
               <div>
-                <label style={labelStyle}>Utilisations maximales (optionnel)</label>
+                <label style={labelStyle}>{t('promoCodes.form.maxUses')}</label>
                 <input
                   type="number"
                   value={formData.maxUses}
                   onChange={(e) => setFormData({ ...formData, maxUses: e.target.value })}
-                  placeholder="Illimité"
+                  placeholder={t('promoCodes.form.unlimited')}
                   style={inputStyle}
                 />
               </div>
 
               <div>
-                <label style={labelStyle}>Valide du (optionnel)</label>
+                <label style={labelStyle}>{t('promoCodes.form.validFrom')}</label>
                 <input
                   type="date"
                   value={formData.validFrom}
@@ -366,7 +368,7 @@ export default function PromoCodesPage() {
               </div>
 
               <div>
-                <label style={labelStyle}>Valide jusqu&apos;au (optionnel)</label>
+                <label style={labelStyle}>{t('promoCodes.form.validUntil')}</label>
                 <input
                   type="date"
                   value={formData.validUntil}
@@ -383,7 +385,7 @@ export default function PromoCodesPage() {
                   style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
                 <label style={{ fontSize: '14px', color: themeColors.textPrimary, cursor: 'pointer' }}>
-                  Actif immédiatement
+                  {t('promoCodes.form.activeImmediately')}
                 </label>
               </div>
 
@@ -402,7 +404,7 @@ export default function PromoCodesPage() {
                     color: themeColors.textPrimary,
                   }}
                 >
-                  Annuler
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={() => {
@@ -430,7 +432,7 @@ export default function PromoCodesPage() {
                     opacity: !formData.code || createMutation.isPending ? 0.5 : 1,
                   }}
                 >
-                  {createMutation.isPending ? 'Création...' : 'Créer'}
+                  {createMutation.isPending ? t('promoCodes.form.creating') : t('promoCodes.form.create')}
                 </button>
               </div>
             </div>
@@ -440,4 +442,3 @@ export default function PromoCodesPage() {
     </div>
   )
 }
-

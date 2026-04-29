@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query'
 import NewB2BShippingModal from '@/components/orders/NewB2BShippingModal'
 import { adminApiService } from '@/lib/adminApiService'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
+import { useLanguageStore } from '@/stores/languageStore'
 
 interface B2BOrder {
   id: string
@@ -36,6 +38,8 @@ interface RawOrder {
 }
 
 export default function PlanningPage() {
+  const t = useTranslation()
+  const language = useLanguageStore((state) => state.language)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week')
   const [isNewShippingModalOpen, setIsNewShippingModalOpen] = useState(false)
@@ -256,7 +260,11 @@ export default function PlanningPage() {
   }
 
   const weekDays = getWeekDays()
-  const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+  const dayNames =
+    language === 'en'
+      ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      : ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+  const dateLocale = language === 'en' ? 'en-US' : 'fr-FR'
 
   // Navigation selon la vue
   const navigatePeriod = (direction: 'prev' | 'next') => {
@@ -300,26 +308,26 @@ export default function PlanningPage() {
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Planning</h1>
+        <h1 style={titleStyle}>{t('planning.title')}</h1>
         <div style={controlsStyle}>
           <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
             <button
               style={viewMode === 'day' ? viewModeButtonActiveStyle : viewModeButtonStyle}
               onClick={() => setViewMode('day')}
             >
-              Jour
+              {t('planning.view.day')}
             </button>
             <button
               style={viewMode === 'week' ? viewModeButtonActiveStyle : viewModeButtonStyle}
               onClick={() => setViewMode('week')}
             >
-              Semaine
+              {t('planning.view.week')}
             </button>
             <button
               style={viewMode === 'month' ? viewModeButtonActiveStyle : viewModeButtonStyle}
               onClick={() => setViewMode('month')}
             >
-              Mois
+              {t('planning.view.month')}
             </button>
           </div>
           <button
@@ -346,7 +354,7 @@ export default function PlanningPage() {
             }}
           >
             <Plus size={16} />
-            Nouvelle livraison B2B
+            {t('planning.newB2B')}
           </button>
         </div>
       </div>
@@ -369,12 +377,12 @@ export default function PlanningPage() {
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: themeColors.textPrimary }}>
             {viewMode === 'week' && weekDays.length > 0 && (
               <>
-                {weekDays[0].toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} -{' '}
-                {weekDays[6].toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {weekDays[0].toLocaleDateString(dateLocale, { day: 'numeric', month: 'long' })} -{' '}
+                {weekDays[6].toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })}
               </>
             )}
-            {viewMode === 'day' && currentDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            {viewMode === 'month' && currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+            {viewMode === 'day' && currentDate.toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {viewMode === 'month' && currentDate.toLocaleDateString(dateLocale, { month: 'long', year: 'numeric' })}
           </h2>
           <button
             onClick={() => navigatePeriod('next')}
@@ -427,11 +435,11 @@ export default function PlanningPage() {
                   >
                     {isLoadingB2B ? (
                       <div style={{ fontSize: '12px', color: themeColors.textSecondary, textAlign: 'center', padding: '8px' }}>
-                        Chargement...
+                        {t('common.loading')}
                       </div>
                     ) : deliveries.length === 0 ? (
                       <div style={{ fontSize: '11px', color: themeColors.textTertiary, textAlign: 'center', padding: '4px', fontStyle: 'italic' }}>
-                        Cliquez pour ajouter
+                        {t('planning.clickToAdd')}
                       </div>
                     ) : (
                       deliveries.map((delivery) => (
@@ -513,10 +521,10 @@ export default function PlanningPage() {
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {isLoadingB2B ? (
-                        <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>Chargement...</div>
+                        <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{t('common.loading')}</div>
                       ) : hourDeliveries.length === 0 ? (
                         <div style={{ fontSize: '11px', color: themeColors.textTertiary, fontStyle: 'italic' }}>
-                          Cliquez pour ajouter une livraison
+                          {t('planning.clickToAddDelivery')}
                         </div>
                       ) : (
                         hourDeliveries.map((delivery) => (

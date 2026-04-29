@@ -115,6 +115,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "newDelivery": "+ Nouvelle livraison",
     "dateFormat": "dddd D MMMM YYYY",
     "kpis": {
       "satisfactionRate": {
@@ -476,6 +477,8 @@
     "filters": {
       "search": "Rechercher par plaque, marque, modèle...",
       "all": "Tous",
+      "allStatuses": "Tous les statuts",
+      "allTypes": "Tous les types",
       "active": "Actifs",
       "maintenance": "En maintenance",
       "retired": "Retirés",
@@ -575,6 +578,319 @@
         "fuelCost": "Coût carburant",
         "maintenanceCost": "Coût entretien"
       }
+    }
+  },
+  "planning": {
+    "title": "Planning",
+    "view": {
+      "day": "Jour",
+      "week": "Semaine",
+      "month": "Mois"
+    },
+    "newB2B": "Nouvelle livraison B2B",
+    "clickToAdd": "Cliquez pour ajouter",
+    "clickToAddDelivery": "Cliquez pour ajouter une livraison"
+  },
+  "disputes": {
+    "title": "Réclamations",
+    "supportMessages": "Messages support",
+    "searchPlaceholder": "Rechercher par ID transaction, commande...",
+    "listTitle": "Liste des réclamations",
+    "empty": "Aucune réclamation trouvée",
+    "currentStatus": "Statut actuel",
+    "adminNotes": "Notes admin",
+    "adminNotesPlaceholder": "Ajouter des notes...",
+    "filters": {
+      "allStatuses": "Tous les statuts"
+    },
+    "status": {
+      "pending": "En attente",
+      "resolved": "Résolu",
+      "rejected": "Rejeté"
+    },
+    "table": {
+      "type": "Type",
+      "client": "Client",
+      "amount": "Montant",
+      "status": "Statut",
+      "actions": "Actions"
+    },
+    "actions": {
+      "reject": "Rejeter",
+      "resolve": "Résoudre"
+    }
+  },
+  "users": {
+    "title": "Utilisateurs",
+    "searchPlaceholder": "Rechercher par nom, prénom, email, téléphone...",
+    "empty": "Aucun utilisateur trouvé",
+    "stats": {
+      "clients": "Clients",
+      "drivers": "Livreurs",
+      "admins": "Admins",
+      "total": "Total"
+    },
+    "filters": {
+      "allRoles": "Tous les rôles"
+    },
+    "roles": {
+      "client": "Client",
+      "driver": "Livreur",
+      "admin": "Admin"
+    },
+    "table": {
+      "lastName": "Nom",
+      "firstName": "Prénom",
+      "phone": "Téléphone",
+      "role": "Rôle",
+      "createdAt": "Date de création",
+      "actions": "Actions"
+    },
+    "pagination": {
+      "showing": "Affichage de {{from}} à {{to}} sur {{total}} entrées"
+    }
+  },
+  "drivers": {
+    "title": "Gestion des livreurs",
+    "searchPlaceholder": "Rechercher par nom, email, téléphone...",
+    "empty": "Aucun livreur trouvé",
+    "online": "En ligne",
+    "offline": "Hors ligne",
+    "stats": {
+      "total": "Total livreurs",
+      "partners": "Partenaires",
+      "internals": "Internes",
+      "active": "Actifs",
+      "suspended": "Suspendus"
+    },
+    "filters": {
+      "all": "Tous",
+      "partners": "Partenaires",
+      "internals": "Internes",
+      "active": "Actifs",
+      "suspended": "Suspendus",
+      "lowBalance": "Solde faible"
+    },
+    "types": {
+      "partner": "Partenaire",
+      "internal": "Interne"
+    },
+    "balance": {
+      "active": "Actif",
+      "inactive": "Non actif",
+      "low": "Faible",
+      "veryLow": "Très faible",
+      "suspended": "Suspendu"
+    },
+    "table": {
+      "name": "Nom",
+      "type": "Type",
+      "phone": "Téléphone",
+      "commissionBalance": "Solde commission",
+      "status": "Statut",
+      "deliveries": "Livraisons",
+      "actions": "Actions"
+    },
+    "pagination": {
+      "pageOf": "Page {{page}} sur {{total}}"
+    }
+  },
+  "promoCodes": {
+    "title": "Codes promo",
+    "newCode": "Nouveau code",
+    "searchPlaceholder": "Rechercher un code promo...",
+    "empty": "Aucun code promo trouvé",
+    "createTitle": "Créer un code promo",
+    "table": {
+      "type": "Type",
+      "value": "Valeur",
+      "uses": "Utilisations",
+      "validFrom": "Valide du",
+      "validUntil": "Valide jusqu'au",
+      "status": "Statut"
+    },
+    "discount": {
+      "percentage": "Pourcentage",
+      "fixed": "Fixe",
+      "fixedAmount": "Montant fixe"
+    },
+    "status": {
+      "active": "Actif",
+      "inactive": "Inactif"
+    },
+    "form": {
+      "discountType": "Type de réduction",
+      "value": "Valeur",
+      "maxUses": "Utilisations maximales (optionnel)",
+      "unlimited": "Illimité",
+      "validFrom": "Valide du (optionnel)",
+      "validUntil": "Valide jusqu'au (optionnel)",
+      "activeImmediately": "Actif immédiatement",
+      "creating": "Création...",
+      "create": "Créer"
+    }
+  },
+  "commissions": {
+    "title": "Commissions",
+    "searchPlaceholder": "Rechercher (livreur, email, commande...)",
+    "exportCsv": "Exporter CSV",
+    "empty": "Aucune transaction trouvée",
+    "viewDriver": "Voir livreur",
+    "stats": {
+      "deductions": "Commissions prélevées (mois)",
+      "recharges": "Recharges totales (mois)",
+      "net": "Solde net (mois)",
+      "deductionCount": "{{count}} prélèvements",
+      "rechargeCount": "{{count}} recharges"
+    },
+    "filters": {
+      "allTypes": "Tous les types",
+      "allDates": "Toutes les dates",
+      "last7Days": "7 derniers jours"
+    },
+    "types": {
+      "recharge": "Recharge",
+      "deduction": "Prélèvement",
+      "refund": "Remboursement",
+      "rechargePlural": "Recharges",
+      "deductionPlural": "Prélèvements",
+      "refundPlural": "Remboursements"
+    },
+    "table": {
+      "date": "Date",
+      "driver": "Livreur",
+      "type": "Type",
+      "order": "Commande",
+      "amount": "Montant",
+      "balanceAfter": "Solde après",
+      "actions": "Actions"
+    }
+  },
+  "analytics": {
+    "title": "Analytics avancés",
+    "tabs": {
+      "overview": "Vue d'ensemble",
+      "ratings": "Évaluations"
+    },
+    "kpis": {
+      "activeOrders": "Commandes actives",
+      "completedToday": "Complétées aujourd'hui",
+      "revenueToday": "Revenus aujourd'hui",
+      "averageTime": "Temps moyen",
+      "acceptanceRate": "Taux d'acceptation",
+      "averageRating": "Note moyenne"
+    },
+    "export": {
+      "title": "Export des données",
+      "lastDays": "{{days}} derniers jours",
+      "action": "Exporter",
+      "deliveryId": "ID livraison",
+      "orderNumber": "Numéro commande",
+      "createdAt": "Créé le",
+      "completedAt": "Complété le",
+      "fileTitle": "Analytics - {{days}} derniers jours"
+    },
+    "ratings": {
+      "count": "{{count}} évaluation",
+      "countPlural": "{{count}} évaluations",
+      "statsTitle": "Statistiques des évaluations",
+      "viewDetails": "Voir le détail",
+      "distribution": "Distribution des notes",
+      "trend": "Évolution de la note moyenne ({{days}} derniers jours)",
+      "searchPlaceholder": "Rechercher par livreur, client...",
+      "allRatings": "Toutes les notes",
+      "star": "{{count}} étoile",
+      "stars": "{{count}} étoiles"
+    },
+    "zonePerformance": {
+      "title": "Performance par commune",
+      "zone": "Commune",
+      "deliveries": "Livraisons",
+      "revenue": "Revenus"
+    }
+  },
+  "ratings": {
+    "title": "Évaluations",
+    "averageRating": "Note moyenne",
+    "totalRatings": "Total évaluations",
+    "distribution": "Distribution des notes",
+    "searchPlaceholder": "Rechercher par ID commande...",
+    "driverId": "ID livreur",
+    "clientId": "ID client",
+    "allRatings": "Toutes les notes",
+    "stars": "{{count}} étoiles",
+    "starsPlus": "{{count}}+ étoiles",
+    "listTitle": "Liste des évaluations",
+    "empty": "Aucune évaluation trouvée",
+    "noComment": "Aucun commentaire",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer cette évaluation ?",
+    "table": {
+      "rating": "Note",
+      "client": "Client",
+      "driver": "Livreur",
+      "order": "Commande",
+      "comment": "Commentaire",
+      "actions": "Actions"
+    }
+  },
+  "performance": {
+    "title": "Performance",
+    "zonePlaceholder": "Filtrer par zone...",
+    "topDrivers": "Top 3 livreurs",
+    "fullRanking": "Classement complet",
+    "empty": "Aucun livreur dans le classement",
+    "emptyWeek": "Aucune livraison complétée cette semaine",
+    "emptyMonth": "Aucune livraison complétée ce mois",
+    "emptyAll": "Aucune livraison complétée",
+    "deliveries": "{{count}} livraisons",
+    "period": {
+      "thisWeek": "Cette semaine",
+      "thisMonth": "Ce mois",
+      "allTime": "Tout le temps"
+    },
+    "kpis": {
+      "completedDeliveries": "Livraisons complétées",
+      "successRate": "Taux de réussite",
+      "assignedOrders": "{{count}} commandes assignées",
+      "averageRating": "Note moyenne",
+      "clientRatings": "évaluations clients",
+      "activeDrivers": "Livreurs actifs"
+    },
+    "table": {
+      "rank": "Rang",
+      "driver": "Livreur",
+      "deliveries": "Livraisons",
+      "successRate": "Taux réussite",
+      "rating": "Note"
+    }
+  },
+  "messages": {
+    "searchPlaceholder": "Rechercher une conversation...",
+    "newConversation": "Nouvelle conversation",
+    "emptySearch": "Aucune conversation trouvée",
+    "trySearch": "Essayez de modifier votre recherche",
+    "empty": "Aucune conversation",
+    "noConversationSelected": "Aucune conversation sélectionnée",
+    "selectConversationHint": "Sélectionnez une conversation pour commencer à discuter",
+    "allConversations": "Toutes les conversations",
+    "order": "Commande",
+    "driver": "Livreur",
+    "user": "Utilisateur",
+    "loadingMessages": "Chargement des messages...",
+    "noMessages": "Aucun message. Commencez la conversation !",
+    "messagePlaceholder": "Tapez votre message...",
+    "send": "Envoyer",
+    "supportClient": "Support client",
+    "driverMessage": "Message livreur",
+    "searchClient": "Rechercher un client...",
+    "searchDriver": "Rechercher un livreur...",
+    "noClientFound": "Aucun client trouvé",
+    "noDriverFound": "Aucun livreur trouvé",
+    "createError": "Impossible de créer la conversation",
+    "createErrorGeneric": "Une erreur est survenue lors de la création de la conversation",
+    "filters": {
+      "all": "Toutes",
+      "orders": "Commandes"
     }
   },
   "quickMessage": {

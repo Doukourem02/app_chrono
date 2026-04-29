@@ -9,12 +9,14 @@ import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import type { Driver } from '@/types'
+import { useTranslation } from '@/hooks/useTranslation'
 
 type DriverType = 'all' | 'partner' | 'internal'
 type BalanceStatus = 'all' | 'active' | 'suspended' | 'low_balance'
 
 export default function DriversPage() {
   const router = useRouter()
+  const t = useTranslation()
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
@@ -101,12 +103,12 @@ export default function DriversPage() {
 
   const getBalanceStatus = (balance: number | undefined, isSuspended: boolean | undefined, isInactive: boolean | undefined) => {
     // Suspendu manuellement (sanction)
-    if (isSuspended) return 'Suspendu'
+    if (isSuspended) return t('drivers.balance.suspended')
     // Non actif (solde insuffisant, pas une sanction)
-    if (isInactive || balance === 0) return 'Non actif'
-    if (balance !== undefined && balance < 1000) return 'Très faible'
-    if (balance !== undefined && balance < 3000) return 'Faible'
-    return 'Actif'
+    if (isInactive || balance === 0) return t('drivers.balance.inactive')
+    if (balance !== undefined && balance < 1000) return t('drivers.balance.veryLow')
+    if (balance !== undefined && balance < 3000) return t('drivers.balance.low')
+    return t('drivers.balance.active')
   }
 
   const containerStyle: React.CSSProperties = {
@@ -295,7 +297,7 @@ export default function DriversPage() {
     <ScreenTransition>
       <div style={containerStyle}>
         <div style={headerStyle}>
-          <h1 style={titleStyle}>Gestion des Livreurs</h1>
+          <h1 style={titleStyle}>{t('drivers.title')}</h1>
 
           {/* Statistiques */}
           <div style={statsContainerStyle}>
@@ -305,7 +307,7 @@ export default function DriversPage() {
               </div>
               <div>
                 <div style={statValueStyle}>{counts.total}</div>
-                <div style={statLabelStyle}>Total Livreurs</div>
+                <div style={statLabelStyle}>{t('drivers.stats.total')}</div>
               </div>
             </div>
             <div style={statCardStyle}>
@@ -314,7 +316,7 @@ export default function DriversPage() {
               </div>
               <div>
                 <div style={statValueStyle}>{counts.partners}</div>
-                <div style={statLabelStyle}>Partenaires</div>
+                <div style={statLabelStyle}>{t('drivers.stats.partners')}</div>
               </div>
             </div>
             <div style={statCardStyle}>
@@ -323,7 +325,7 @@ export default function DriversPage() {
               </div>
               <div>
                 <div style={statValueStyle}>{counts.internals}</div>
-                <div style={statLabelStyle}>Internes</div>
+                <div style={statLabelStyle}>{t('drivers.stats.internals')}</div>
               </div>
             </div>
             <div style={statCardStyle}>
@@ -332,7 +334,7 @@ export default function DriversPage() {
               </div>
               <div>
                 <div style={statValueStyle}>{counts.active}</div>
-                <div style={statLabelStyle}>Actifs</div>
+                <div style={statLabelStyle}>{t('drivers.stats.active')}</div>
               </div>
             </div>
             <div style={statCardStyle}>
@@ -341,7 +343,7 @@ export default function DriversPage() {
               </div>
               <div>
                 <div style={statValueStyle}>{counts.suspended}</div>
-                <div style={statLabelStyle}>Suspendus</div>
+                <div style={statLabelStyle}>{t('drivers.stats.suspended')}</div>
               </div>
             </div>
           </div>
@@ -361,7 +363,7 @@ export default function DriversPage() {
               />
               <input
                 type="text"
-                placeholder="Rechercher par nom, email, téléphone..."
+                placeholder={t('drivers.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={searchInputStyle}
@@ -377,7 +379,7 @@ export default function DriversPage() {
               }}
             >
               <Filter size={16} />
-              Tous
+              {t('drivers.filters.all')}
             </button>
             <button
               style={filterButtonStyle(typeFilter === 'partner')}
@@ -388,7 +390,7 @@ export default function DriversPage() {
               }}
             >
               <Briefcase size={16} />
-              Partenaires
+              {t('drivers.filters.partners')}
             </button>
             <button
               style={filterButtonStyle(typeFilter === 'internal')}
@@ -399,7 +401,7 @@ export default function DriversPage() {
               }}
             >
               <User size={16} />
-              Internes
+              {t('drivers.filters.internals')}
             </button>
 
             {typeFilter === 'partner' || typeFilter === 'all' ? (
@@ -413,7 +415,7 @@ export default function DriversPage() {
                   }}
                 >
                   <Wallet size={16} />
-                  Actifs
+                  {t('drivers.filters.active')}
                 </button>
                 <button
                   style={filterButtonStyle(balanceStatusFilter === 'suspended')}
@@ -424,7 +426,7 @@ export default function DriversPage() {
                   }}
                 >
                   <AlertCircle size={16} />
-                  Suspendus
+                  {t('drivers.filters.suspended')}
                 </button>
                 <button
                   style={filterButtonStyle(balanceStatusFilter === 'low_balance')}
@@ -435,7 +437,7 @@ export default function DriversPage() {
                   }}
                 >
                   <AlertCircle size={16} />
-                  Solde faible
+                  {t('drivers.filters.lowBalance')}
                 </button>
               </>
             ) : null}
@@ -461,22 +463,22 @@ export default function DriversPage() {
           <table style={{ ...tableStyle, opacity: isFetching && driversData ? 0.85 : 1, transition: 'opacity 0.15s ease' }}>
             <thead>
               <tr>
-                <th style={thStyle}>Nom</th>
-                <th style={thStyle}>Type</th>
+                <th style={thStyle}>{t('drivers.table.name')}</th>
+                <th style={thStyle}>{t('drivers.table.type')}</th>
                 <th style={thStyle}>Email</th>
-                <th style={thStyle}>Téléphone</th>
-                <th style={thStyle}>Solde Commission</th>
-                <th style={thStyle}>Statut</th>
-                <th style={thStyle}>Livraisons</th>
+                <th style={thStyle}>{t('drivers.table.phone')}</th>
+                <th style={thStyle}>{t('drivers.table.commissionBalance')}</th>
+                <th style={thStyle}>{t('drivers.table.status')}</th>
+                <th style={thStyle}>{t('drivers.table.deliveries')}</th>
                 <th style={thStyle}>Rating</th>
-                <th style={thStyle}>Actions</th>
+                <th style={thStyle}>{t('drivers.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {paginatedDrivers.length === 0 ? (
                 <tr>
                   <td colSpan={9} style={{ ...tdStyle, textAlign: 'center', padding: '40px' }}>
-                    <div style={{ color: themeColors.textSecondary }}>Aucun livreur trouvé</div>
+                    <div style={{ color: themeColors.textSecondary }}>{t('drivers.empty')}</div>
                   </td>
                 </tr>
               ) : (
@@ -501,12 +503,12 @@ export default function DriversPage() {
                             {driver.driver_type === 'partner' ? (
                               <>
                                 <Briefcase size={12} />
-                                Partenaire
+                                {t('drivers.types.partner')}
                               </>
                             ) : (
                               <>
                                 <User size={12} />
-                                Interne
+                                {t('drivers.types.internal')}
                               </>
                             )}
                           </span>
@@ -532,9 +534,9 @@ export default function DriversPage() {
                       </td>
                       <td style={tdStyle}>
                         {driver.is_online ? (
-                          <span style={{ color: '#10B981', fontWeight: 600 }}>En ligne</span>
+                          <span style={{ color: '#10B981', fontWeight: 600 }}>{t('drivers.online')}</span>
                         ) : (
-                          <span style={{ color: themeColors.textTertiary }}>Hors ligne</span>
+                          <span style={{ color: themeColors.textTertiary }}>{t('drivers.offline')}</span>
                         )}
                       </td>
                       <td style={tdStyle}>
@@ -549,7 +551,7 @@ export default function DriversPage() {
                         <button
                           style={actionButtonStyle}
                           onClick={() => router.push(`/drivers/${driver.id}`)}
-                          title="Voir détails"
+                          title={t('maintenance.table.viewDetails')}
                         >
                           <Eye size={16} color={themeColors.textSecondary} />
                         </button>
@@ -571,17 +573,17 @@ export default function DriversPage() {
               disabled={currentPage === 1}
             >
               <ChevronLeft size={16} />
-              Précédent
+              {t('common.previous')}
             </button>
             <span style={{ padding: '8px 16px', color: themeColors.textSecondary }}>
-              Page {currentPage} sur {totalPages}
+              {t('drivers.pagination.pageOf', { page: currentPage, total: totalPages })}
             </span>
             <button
               style={paginationButtonStyle(currentPage === totalPages)}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
             >
-              Suivant
+              {t('common.next')}
               <ChevronRight size={16} />
             </button>
           </div>
@@ -590,4 +592,3 @@ export default function DriversPage() {
     </ScreenTransition>
   )
 }
-

@@ -115,6 +115,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "newDelivery": "+ New delivery",
     "dateFormat": "dddd, MMMM D, YYYY",
     "kpis": {
       "satisfactionRate": {
@@ -476,6 +477,8 @@
     "filters": {
       "search": "Search by plate, brand, model...",
       "all": "All",
+      "allStatuses": "All statuses",
+      "allTypes": "All types",
       "active": "Active",
       "maintenance": "In maintenance",
       "retired": "Retired",
@@ -575,6 +578,319 @@
         "fuelCost": "Fuel cost",
         "maintenanceCost": "Maintenance cost"
       }
+    }
+  },
+  "planning": {
+    "title": "Planning",
+    "view": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month"
+    },
+    "newB2B": "New B2B delivery",
+    "clickToAdd": "Click to add",
+    "clickToAddDelivery": "Click to add a delivery"
+  },
+  "disputes": {
+    "title": "Disputes",
+    "supportMessages": "Support messages",
+    "searchPlaceholder": "Search by transaction ID, order...",
+    "listTitle": "Dispute list",
+    "empty": "No dispute found",
+    "currentStatus": "Current status",
+    "adminNotes": "Admin notes",
+    "adminNotesPlaceholder": "Add notes...",
+    "filters": {
+      "allStatuses": "All statuses"
+    },
+    "status": {
+      "pending": "Pending",
+      "resolved": "Resolved",
+      "rejected": "Rejected"
+    },
+    "table": {
+      "type": "Type",
+      "client": "Client",
+      "amount": "Amount",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "actions": {
+      "reject": "Reject",
+      "resolve": "Resolve"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "searchPlaceholder": "Search by last name, first name, email, phone...",
+    "empty": "No user found",
+    "stats": {
+      "clients": "Clients",
+      "drivers": "Drivers",
+      "admins": "Admins",
+      "total": "Total"
+    },
+    "filters": {
+      "allRoles": "All roles"
+    },
+    "roles": {
+      "client": "Client",
+      "driver": "Driver",
+      "admin": "Admin"
+    },
+    "table": {
+      "lastName": "Last name",
+      "firstName": "First name",
+      "phone": "Phone",
+      "role": "Role",
+      "createdAt": "Created at",
+      "actions": "Actions"
+    },
+    "pagination": {
+      "showing": "Showing {{from}} to {{to}} of {{total}} entries"
+    }
+  },
+  "drivers": {
+    "title": "Driver management",
+    "searchPlaceholder": "Search by name, email, phone...",
+    "empty": "No driver found",
+    "online": "Online",
+    "offline": "Offline",
+    "stats": {
+      "total": "Total drivers",
+      "partners": "Partners",
+      "internals": "Internal",
+      "active": "Active",
+      "suspended": "Suspended"
+    },
+    "filters": {
+      "all": "All",
+      "partners": "Partners",
+      "internals": "Internal",
+      "active": "Active",
+      "suspended": "Suspended",
+      "lowBalance": "Low balance"
+    },
+    "types": {
+      "partner": "Partner",
+      "internal": "Internal"
+    },
+    "balance": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "low": "Low",
+      "veryLow": "Very low",
+      "suspended": "Suspended"
+    },
+    "table": {
+      "name": "Name",
+      "type": "Type",
+      "phone": "Phone",
+      "commissionBalance": "Commission balance",
+      "status": "Status",
+      "deliveries": "Deliveries",
+      "actions": "Actions"
+    },
+    "pagination": {
+      "pageOf": "Page {{page}} of {{total}}"
+    }
+  },
+  "promoCodes": {
+    "title": "Promo codes",
+    "newCode": "New code",
+    "searchPlaceholder": "Search a promo code...",
+    "empty": "No promo code found",
+    "createTitle": "Create a promo code",
+    "table": {
+      "type": "Type",
+      "value": "Value",
+      "uses": "Uses",
+      "validFrom": "Valid from",
+      "validUntil": "Valid until",
+      "status": "Status"
+    },
+    "discount": {
+      "percentage": "Percentage",
+      "fixed": "Fixed",
+      "fixedAmount": "Fixed amount"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "form": {
+      "discountType": "Discount type",
+      "value": "Value",
+      "maxUses": "Maximum uses (optional)",
+      "unlimited": "Unlimited",
+      "validFrom": "Valid from (optional)",
+      "validUntil": "Valid until (optional)",
+      "activeImmediately": "Active immediately",
+      "creating": "Creating...",
+      "create": "Create"
+    }
+  },
+  "commissions": {
+    "title": "Commissions",
+    "searchPlaceholder": "Search (driver, email, order...)",
+    "exportCsv": "Export CSV",
+    "empty": "No transaction found",
+    "viewDriver": "View driver",
+    "stats": {
+      "deductions": "Commissions deducted (month)",
+      "recharges": "Total recharges (month)",
+      "net": "Net balance (month)",
+      "deductionCount": "{{count}} deductions",
+      "rechargeCount": "{{count}} recharges"
+    },
+    "filters": {
+      "allTypes": "All types",
+      "allDates": "All dates",
+      "last7Days": "Last 7 days"
+    },
+    "types": {
+      "recharge": "Recharge",
+      "deduction": "Deduction",
+      "refund": "Refund",
+      "rechargePlural": "Recharges",
+      "deductionPlural": "Deductions",
+      "refundPlural": "Refunds"
+    },
+    "table": {
+      "date": "Date",
+      "driver": "Driver",
+      "type": "Type",
+      "order": "Order",
+      "amount": "Amount",
+      "balanceAfter": "Balance after",
+      "actions": "Actions"
+    }
+  },
+  "analytics": {
+    "title": "Advanced analytics",
+    "tabs": {
+      "overview": "Overview",
+      "ratings": "Ratings"
+    },
+    "kpis": {
+      "activeOrders": "Active orders",
+      "completedToday": "Completed today",
+      "revenueToday": "Revenue today",
+      "averageTime": "Average time",
+      "acceptanceRate": "Acceptance rate",
+      "averageRating": "Average rating"
+    },
+    "export": {
+      "title": "Data export",
+      "lastDays": "Last {{days}} days",
+      "action": "Export",
+      "deliveryId": "Delivery ID",
+      "orderNumber": "Order number",
+      "createdAt": "Created at",
+      "completedAt": "Completed at",
+      "fileTitle": "Analytics - last {{days}} days"
+    },
+    "ratings": {
+      "count": "{{count}} rating",
+      "countPlural": "{{count}} ratings",
+      "statsTitle": "Rating statistics",
+      "viewDetails": "View details",
+      "distribution": "Rating distribution",
+      "trend": "Average rating trend (last {{days}} days)",
+      "searchPlaceholder": "Search by driver, client...",
+      "allRatings": "All ratings",
+      "star": "{{count}} star",
+      "stars": "{{count}} stars"
+    },
+    "zonePerformance": {
+      "title": "Performance by commune",
+      "zone": "Commune",
+      "deliveries": "Deliveries",
+      "revenue": "Revenue"
+    }
+  },
+  "ratings": {
+    "title": "Ratings",
+    "averageRating": "Average rating",
+    "totalRatings": "Total ratings",
+    "distribution": "Rating distribution",
+    "searchPlaceholder": "Search by order ID...",
+    "driverId": "Driver ID",
+    "clientId": "Client ID",
+    "allRatings": "All ratings",
+    "stars": "{{count}} stars",
+    "starsPlus": "{{count}}+ stars",
+    "listTitle": "Rating list",
+    "empty": "No rating found",
+    "noComment": "No comment",
+    "confirmDelete": "Are you sure you want to delete this rating?",
+    "table": {
+      "rating": "Rating",
+      "client": "Client",
+      "driver": "Driver",
+      "order": "Order",
+      "comment": "Comment",
+      "actions": "Actions"
+    }
+  },
+  "performance": {
+    "title": "Performance",
+    "zonePlaceholder": "Filter by zone...",
+    "topDrivers": "Top 3 drivers",
+    "fullRanking": "Full ranking",
+    "empty": "No driver in the ranking",
+    "emptyWeek": "No completed delivery this week",
+    "emptyMonth": "No completed delivery this month",
+    "emptyAll": "No completed delivery",
+    "deliveries": "{{count}} deliveries",
+    "period": {
+      "thisWeek": "This week",
+      "thisMonth": "This month",
+      "allTime": "All time"
+    },
+    "kpis": {
+      "completedDeliveries": "Completed deliveries",
+      "successRate": "Success rate",
+      "assignedOrders": "{{count}} assigned orders",
+      "averageRating": "Average rating",
+      "clientRatings": "client ratings",
+      "activeDrivers": "Active drivers"
+    },
+    "table": {
+      "rank": "Rank",
+      "driver": "Driver",
+      "deliveries": "Deliveries",
+      "successRate": "Success rate",
+      "rating": "Rating"
+    }
+  },
+  "messages": {
+    "searchPlaceholder": "Search a conversation...",
+    "newConversation": "New conversation",
+    "emptySearch": "No conversation found",
+    "trySearch": "Try changing your search",
+    "empty": "No conversations",
+    "noConversationSelected": "No conversation selected",
+    "selectConversationHint": "Select a conversation to start chatting",
+    "allConversations": "All conversations",
+    "order": "Order",
+    "driver": "Driver",
+    "user": "User",
+    "loadingMessages": "Loading messages...",
+    "noMessages": "No messages. Start the conversation!",
+    "messagePlaceholder": "Type your message...",
+    "send": "Send",
+    "supportClient": "Client support",
+    "driverMessage": "Driver message",
+    "searchClient": "Search a client...",
+    "searchDriver": "Search a driver...",
+    "noClientFound": "No client found",
+    "noDriverFound": "No driver found",
+    "createError": "Unable to create the conversation",
+    "createErrorGeneric": "An error occurred while creating the conversation",
+    "filters": {
+      "all": "All",
+      "orders": "Orders"
     }
   },
   "quickMessage": {

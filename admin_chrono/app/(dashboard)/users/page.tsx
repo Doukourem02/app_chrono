@@ -9,6 +9,7 @@ import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import { asApiArray } from '@/types/api'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface UserData {
   id: string
@@ -23,6 +24,7 @@ interface UserData {
 
 export default function UsersPage() {
   const router = useRouter()
+  const t = useTranslation()
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
@@ -293,7 +295,7 @@ export default function UsersPage() {
     <ScreenTransition direction="fade" duration={0.3}>
       <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Users</h1>
+        <h1 style={titleStyle}>{t('users.title')}</h1>
         <div style={statsContainerStyle}>
           <div style={statCardStyle}>
             <div style={statIconStyle('#DBEAFE')}>
@@ -301,7 +303,7 @@ export default function UsersPage() {
             </div>
             <div>
               <div style={statValueStyle}>{counts.client}</div>
-              <div style={statLabelStyle}>Clients</div>
+              <div style={statLabelStyle}>{t('users.stats.clients')}</div>
             </div>
           </div>
           <div style={statCardStyle}>
@@ -310,7 +312,7 @@ export default function UsersPage() {
             </div>
             <div>
               <div style={statValueStyle}>{counts.driver}</div>
-              <div style={statLabelStyle}>Livreurs</div>
+              <div style={statLabelStyle}>{t('users.stats.drivers')}</div>
             </div>
           </div>
           <div style={statCardStyle}>
@@ -319,7 +321,7 @@ export default function UsersPage() {
             </div>
             <div>
               <div style={statValueStyle}>{counts.admin}</div>
-              <div style={statLabelStyle}>Admins</div>
+              <div style={statLabelStyle}>{t('users.stats.admins')}</div>
             </div>
           </div>
           <div style={statCardStyle}>
@@ -328,7 +330,7 @@ export default function UsersPage() {
             </div>
             <div>
               <div style={statValueStyle}>{counts.total}</div>
-              <div style={statLabelStyle}>Total</div>
+              <div style={statLabelStyle}>{t('users.stats.total')}</div>
             </div>
           </div>
         </div>
@@ -339,7 +341,7 @@ export default function UsersPage() {
           <Search size={20} style={searchIconStyle} />
           <input
             type="text"
-            placeholder="Rechercher par nom, prénom, email, téléphone..."
+            placeholder={t('users.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={searchInputStyle}
@@ -350,10 +352,10 @@ export default function UsersPage() {
           onChange={(e) => setRoleFilter(e.target.value)}
           style={selectStyle}
         >
-          <option value="all">Tous les rôles</option>
-          <option value="client">Clients</option>
-          <option value="driver">Livreurs</option>
-          <option value="admin">Admins</option>
+          <option value="all">{t('users.filters.allRoles')}</option>
+          <option value="client">{t('users.stats.clients')}</option>
+          <option value="driver">{t('users.stats.drivers')}</option>
+          <option value="admin">{t('users.stats.admins')}</option>
         </select>
       </div>
 
@@ -368,7 +370,7 @@ export default function UsersPage() {
           </div>
         ) : filteredUsers.length === 0 ? (
           <div style={{ padding: '48px', textAlign: 'center', color: themeColors.textSecondary }}>
-            Aucun utilisateur trouvé
+            {t('users.empty')}
           </div>
         ) : (
           <>
@@ -376,13 +378,13 @@ export default function UsersPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr>
-                    <th style={thStyle}>Nom</th>
-                    <th style={thStyle}>Prénom</th>
+                    <th style={thStyle}>{t('users.table.lastName')}</th>
+                    <th style={thStyle}>{t('users.table.firstName')}</th>
                     <th style={thStyle}>Email</th>
-                    <th style={thStyle}>Téléphone</th>
-                    <th style={thStyle}>Rôle</th>
-                    <th style={thStyle}>Date de création</th>
-                    <th style={thStyle}>Actions</th>
+                    <th style={thStyle}>{t('users.table.phone')}</th>
+                    <th style={thStyle}>{t('users.table.role')}</th>
+                    <th style={thStyle}>{t('users.table.createdAt')}</th>
+                    <th style={thStyle}>{t('users.table.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -419,7 +421,7 @@ export default function UsersPage() {
                         <span style={{ fontSize: '14px', color: themeColors.textPrimary }}>{user.phone}</span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={roleBadgeStyle(user.role)}>{user.role}</span>
+                        <span style={roleBadgeStyle(user.role)}>{t(`users.roles.${user.role}`)}</span>
                       </td>
                       <td style={tdStyle}>
                         <span style={{ fontSize: '14px', color: themeColors.textPrimary }}>{user.createdAt}</span>
@@ -448,7 +450,7 @@ export default function UsersPage() {
                           }}
                         >
                           <Eye size={14} />
-                          Voir
+                          {t('common.view')}
                         </button>
                       </td>
                     </tr>
@@ -459,9 +461,11 @@ export default function UsersPage() {
             {filteredUsers.length > 0 && (
               <div style={paginationStyle}>
                 <p style={paginationTextStyle}>
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} to{' '}
-                  {Math.min(currentPage * itemsPerPage, filteredUsers.length)} of{' '}
-                  {filteredUsers.length} entries
+                  {t('users.pagination.showing', {
+                    from: ((currentPage - 1) * itemsPerPage) + 1,
+                    to: Math.min(currentPage * itemsPerPage, filteredUsers.length),
+                    total: filteredUsers.length,
+                  })}
                 </p>
                 <div style={paginationButtonsStyle}>
                   <button

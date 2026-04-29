@@ -12,6 +12,7 @@ import ConversationList from '@/components/message/ConversationList'
 import ChatArea from '@/components/message/ChatArea'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface Dispute {
   id: string
@@ -32,6 +33,7 @@ type TabType = 'disputes' | 'support-messages'
 
 export default function DisputesPage() {
   const { user } = useAuthStore()
+  const t = useTranslation()
   const [activeTab, setActiveTab] = useState<TabType>('disputes')
   
   // État pour les disputes
@@ -140,12 +142,7 @@ export default function DisputesPage() {
   }
 
   const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      resolved: 'Résolu',
-      pending: 'En attente',
-      rejected: 'Rejeté',
-    }
-    return labels[status] || status
+    return t(`disputes.status.${status}`)
   }
 
   const containerStyle: React.CSSProperties = {
@@ -426,7 +423,7 @@ export default function DisputesPage() {
             transition: 'all 0.2s',
           }}
         >
-          Disputes
+          {t('disputes.title')}
         </button>
         <button
           onClick={() => setActiveTab('support-messages')}
@@ -446,7 +443,7 @@ export default function DisputesPage() {
           }}
         >
           <MessageSquare size={16} />
-          Messages Support
+          {t('disputes.supportMessages')}
           {unreadCount > 0 && (
             <span style={{
               minWidth: '20px',
@@ -476,7 +473,7 @@ export default function DisputesPage() {
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: themeColors.textSecondary }} />
           <input
             type="text"
-            placeholder="Rechercher par ID transaction, commande..."
+            placeholder={t('disputes.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ ...inputStyle, paddingLeft: '40px' }}
@@ -490,23 +487,23 @@ export default function DisputesPage() {
           }}
           style={selectStyle}
         >
-          <option value="all">Tous les statuts</option>
-          <option value="pending">En attente</option>
-          <option value="resolved">Résolu</option>
-          <option value="rejected">Rejeté</option>
+          <option value="all">{t('disputes.filters.allStatuses')}</option>
+          <option value="pending">{t('disputes.status.pending')}</option>
+          <option value="resolved">{t('disputes.status.resolved')}</option>
+          <option value="rejected">{t('disputes.status.rejected')}</option>
         </select>
       </div>
 
       {/* Table */}
       <div style={cardStyle}>
         <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', color: themeColors.textPrimary }}>
-          Liste des disputes
+          {t('disputes.listTitle')}
         </h3>
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>Chargement...</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>{t('common.loading')}</div>
         ) : disputes.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-            Aucune dispute trouvée
+            {t('disputes.empty')}
           </div>
         ) : (
           <>
@@ -514,13 +511,13 @@ export default function DisputesPage() {
               <thead>
                 <tr>
                   <th style={thStyle}>ID</th>
-                  <th style={thStyle}>Type</th>
+                  <th style={thStyle}>{t('disputes.table.type')}</th>
                   <th style={thStyle}>Client</th>
                   <th style={thStyle}>Transaction</th>
-                  <th style={thStyle}>Montant</th>
-                  <th style={thStyle}>Statut</th>
+                  <th style={thStyle}>{t('disputes.table.amount')}</th>
+                  <th style={thStyle}>{t('disputes.table.status')}</th>
                   <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Actions</th>
+                  <th style={thStyle}>{t('disputes.table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -750,21 +747,21 @@ export default function DisputesPage() {
               )}
 
               <div>
-                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Client</div>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{t('disputes.table.client')}</div>
                 <div style={{ fontSize: '14px', color: themeColors.textPrimary }}>
                   {selectedDispute.user_email || 'N/A'}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Montant</div>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{t('disputes.table.amount')}</div>
                 <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                   {selectedDispute.amount ? formatCurrency(parseFloat(String(selectedDispute.amount))) : 'N/A'}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Statut actuel</div>
+                <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{t('disputes.currentStatus')}</div>
                 <span style={getStatusBadgeStyle(selectedDispute.status || 'pending')}>
                   {getStatusLabel(selectedDispute.status || 'pending')}
                 </span>
@@ -772,12 +769,12 @@ export default function DisputesPage() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: themeColors.textPrimary }}>
-                  Notes admin
+                  {t('disputes.adminNotes')}
                 </label>
                 <textarea
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
-                  placeholder="Ajouter des notes..."
+                  placeholder={t('disputes.adminNotesPlaceholder')}
                   rows={4}
                   style={{
                     width: '100%',
@@ -821,7 +818,7 @@ export default function DisputesPage() {
                   }}
                 >
                   <XCircle size={16} />
-                  Rejeter
+                  {t('disputes.actions.reject')}
                 </button>
                 <button
                   onClick={() => {
@@ -850,7 +847,7 @@ export default function DisputesPage() {
                   }}
                 >
                   <CheckCircle size={16} />
-                  Résoudre
+                  {t('disputes.actions.resolve')}
                 </button>
               </div>
             </div>
@@ -888,4 +885,3 @@ export default function DisputesPage() {
     </div>
   )
 }
-
