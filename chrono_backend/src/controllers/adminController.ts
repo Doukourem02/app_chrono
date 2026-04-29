@@ -1609,24 +1609,36 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     const customEnd = req.query.endDate as string | undefined;
     const hasCustomRange = !!(customStart && customEnd);
 
-    // Vérifier quelle colonne de prix existe
-    const priceColumnsInfo = await (pool as any).query(
+    // Vérifier quelles colonnes order existent : certaines bases prod n'ont pas encore
+    // toutes les colonnes paiement, mais les stats doivent rester calculables.
+    const orderColumnsInfo = await (pool as any).query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
-      [['price_cfa', 'price']]
+      [['price_cfa', 'price', 'payment_method_type']]
     );
-    const priceColumnSet = new Set(priceColumnsInfo.rows.map((row: any) => row.column_name));
-    const priceColumn = priceColumnSet.has('price_cfa') ? 'price_cfa' : priceColumnSet.has('price') ? 'price' : null;
+    const orderColumnSet = new Set(orderColumnsInfo.rows.map((row: any) => row.column_name));
+    const priceColumn = orderColumnSet.has('price_cfa') ? 'price_cfa' : orderColumnSet.has('price') ? 'price' : null;
     const orderPriceExpression =
-      priceColumnSet.has('price_cfa') && priceColumnSet.has('price')
+      orderColumnSet.has('price_cfa') && orderColumnSet.has('price')
         ? 'COALESCE(o.price_cfa, o.price, 0)'
         : priceColumn
           ? `COALESCE(o.${priceColumn}, 0)`
           : '0';
     const orderPriceGroupByColumns = [
-      priceColumnSet.has('price_cfa') ? 'o.price_cfa' : null,
-      priceColumnSet.has('price') ? 'o.price' : null,
+      orderColumnSet.has('price_cfa') ? 'o.price_cfa' : null,
+      orderColumnSet.has('price') ? 'o.price' : null,
+    ].filter(Boolean).join(', ');
+    const hasOrderPaymentMethodType = orderColumnSet.has('payment_method_type');
+    const orderPaymentMethodExpression = hasOrderPaymentMethodType ? 'o.payment_method_type' : 'NULL';
+    const deferredOrderCondition = hasOrderPaymentMethodType ? "o.payment_method_type = 'deferred'" : 'FALSE';
+    const deferredGroupByColumns = [
+      'o.id',
+      'o.status',
+      'o.created_at',
+      'o.cancelled_at',
+      hasOrderPaymentMethodType ? 'o.payment_method_type' : null,
+      orderPriceGroupByColumns || null,
     ].filter(Boolean).join(', ');
 
     if (!priceColumn) {
@@ -1817,15 +1829,15 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
             o.id,
             ${orderLossDateExpression} as loss_date,
             CASE
-              WHEN o.payment_method_type = 'deferred' THEN ${orderPriceExpression}
+              WHEN ${orderPaymentMethodExpression} = 'deferred' THEN ${orderPriceExpression}
               ELSE COALESCE(SUM(t.amount) FILTER (WHERE t.payment_method_type = 'deferred'), 0)
             END as deferred_amount
           FROM orders o
           LEFT JOIN transactions t ON t.order_id = o.id
           WHERE ${inactiveOrderCondition}
-            AND (o.payment_method_type = 'deferred' OR t.payment_method_type = 'deferred')
+            AND (${deferredOrderCondition} OR t.payment_method_type = 'deferred')
             AND ${orderLossDateExpression} >= $5
-          GROUP BY o.id, o.status, o.created_at, o.cancelled_at, o.payment_method_type${orderPriceGroupByColumns ? `, ${orderPriceGroupByColumns}` : ''}
+          GROUP BY ${deferredGroupByColumns}
         ) deferred_losses
       `;
       const [cancelledStatsResult, cancelledDeferredResult] = await Promise.all([
