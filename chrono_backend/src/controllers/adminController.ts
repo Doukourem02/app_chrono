@@ -14,11 +14,13 @@ import { resolveApproximatePickupZone } from '../utils/abidjanApproximatePickupZ
 import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const stalePendingOrderCondition = `(o.status = 'pending' AND o.created_at < CURRENT_DATE)`;
-const inactiveOrderCondition = `(o.status IN ('cancelled', 'declined') OR ${stalePendingOrderCondition})`;
-const activeOrderCondition = `(o.id IS NULL OR (o.status NOT IN ('cancelled', 'declined') AND NOT ${stalePendingOrderCondition}))`;
-const orderLossDateExpression = `CASE WHEN ${stalePendingOrderCondition} THEN o.created_at ELSE COALESCE(o.cancelled_at, o.created_at) END`;
-const effectiveOrderStatusExpression = `CASE WHEN ${stalePendingOrderCondition} THEN 'cancelled' ELSE o.status END`;
+const liveOrderStatuses = `'pending', 'accepted', 'enroute', 'picked_up'`;
+const staleLiveOrderCondition = `(o.status IN (${liveOrderStatuses}) AND o.created_at < CURRENT_DATE)`;
+const inactiveOrderCondition = `(o.status IN ('cancelled', 'declined') OR ${staleLiveOrderCondition})`;
+const activeOrderCondition = `(o.id IS NULL OR (o.status NOT IN ('cancelled', 'declined') AND NOT ${staleLiveOrderCondition}))`;
+const liveOrderCondition = `(o.status IN (${liveOrderStatuses}) AND o.created_at >= CURRENT_DATE)`;
+const orderLossDateExpression = `CASE WHEN ${staleLiveOrderCondition} THEN o.created_at ELSE COALESCE(o.cancelled_at, o.created_at) END`;
+const effectiveOrderStatusExpression = `CASE WHEN ${staleLiveOrderCondition} THEN 'cancelled' ELSE o.status END`;
 const effectivePaymentStatusExpression = `CASE
   WHEN ${inactiveOrderCondition} OR t.status IN ('cancelled', 'refunded') THEN 'cancelled'
   WHEN t.payment_method_type = 'deferred' AND t.status IN ('pending', 'delayed') THEN 'delayed'
@@ -1758,25 +1760,25 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
       ...(hasCustomRange ? { custom: { ...emptyQrPeriod } } : {}),
     };
     try {
-      // Utilise orders : une commande QR en cours peut ne pas avoir de transaction exploitable,
-      // mais elle doit apparaître comme "en attente" tant que le QR n'est pas scanné.
+      // Confirmé = QR/code validé. En attente = uniquement une commande vivante non scannée.
+      // Les anciennes commandes non scannées ne doivent pas rester en "paiement en attente".
       const qrScannedQuery = `
         SELECT
           COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $1) as scanned_today,
           COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $2) as scanned_week,
           COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $3) as scanned_month,
           COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $4) as scanned_year,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $1) as total_today,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $2) as total_week,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $3) as total_month,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $4) as total_year,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND (o.delivery_qr_scanned_at IS NOT NULL OR ${liveOrderCondition}) AND o.created_at >= $1) as total_today,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND (o.delivery_qr_scanned_at IS NOT NULL OR ${liveOrderCondition}) AND o.created_at >= $2) as total_week,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND (o.delivery_qr_scanned_at IS NOT NULL OR ${liveOrderCondition}) AND o.created_at >= $3) as total_month,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND (o.delivery_qr_scanned_at IS NOT NULL OR ${liveOrderCondition}) AND o.created_at >= $4) as total_year,
           COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $1) as cancelled_today,
           COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $2) as cancelled_week,
           COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $3) as cancelled_month,
           COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $4) as cancelled_year
           ${hasCustomRange ? `,
           COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.delivery_qr_scanned_at IS NOT NULL AND o.created_at >= $5 AND o.created_at <= $6) as scanned_custom,
-          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND o.created_at >= $5 AND o.created_at <= $6) as total_custom,
+          COUNT(*) FILTER (WHERE ${activeOrderCondition} AND (o.delivery_qr_scanned_at IS NOT NULL OR ${liveOrderCondition}) AND o.created_at >= $5 AND o.created_at <= $6) as total_custom,
           COUNT(*) FILTER (WHERE ${inactiveOrderCondition} AND ${orderLossDateExpression} >= $5 AND ${orderLossDateExpression} <= $6) as cancelled_custom` : ''}
         FROM orders o
         WHERE (o.delivery_qr_code IS NOT NULL OR o.delivery_verification_code IS NOT NULL)
@@ -2120,7 +2122,7 @@ export const getAdminReportDeliveries = async (req: Request, res: Response): Pro
       if (status === 'cancelled') {
         query += ` AND ${inactiveOrderCondition}`;
       } else if (status === 'pending') {
-        query += ` AND o.status = $${paramIndex} AND NOT ${stalePendingOrderCondition}`;
+        query += ` AND o.status = $${paramIndex} AND NOT ${staleLiveOrderCondition}`;
         params.push(status);
         paramIndex++;
       } else {
