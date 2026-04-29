@@ -4,9 +4,6 @@ import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { verifyAccessToken } from '../utils/jwt.js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
 function isTransientPgError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
   const code = typeof (error as { code?: string }).code === 'string' ? (error as { code: string }).code : '';
@@ -79,6 +76,9 @@ export const verifyAdminSupabase = async (
   const token = parts[1];
 
   try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
     // Vérifier le token avec Supabase (mode normal en production)
     if (!supabaseUrl || !supabaseServiceKey) {
       // IMPORTANT: ne jamais "décoder" un JWT sans vérifier sa signature (risque d'usurpation).
@@ -186,4 +186,3 @@ export const verifyAdminSupabase = async (
 };
 
 export default verifyAdminSupabase;
-

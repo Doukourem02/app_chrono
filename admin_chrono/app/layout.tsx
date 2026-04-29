@@ -1,5 +1,4 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 import config from "@/lib/config";
@@ -11,16 +10,6 @@ const appName = config.app.name;
 const appDescription = config.app.description;
 const siteUrl = getSiteUrl();
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -29,7 +18,6 @@ export const metadata: Metadata = {
   },
   description: appDescription,
   manifest: "/site.webmanifest",
-  themeColor: "#0F172A",
   appleWebApp: {
     capable: true,
     title: appName,
@@ -60,6 +48,10 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#0F172A",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -67,9 +59,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>

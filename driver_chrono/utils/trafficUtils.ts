@@ -18,9 +18,10 @@ export function extractTrafficData(leg: {
   duration?: number | { value?: number };
   duration_in_traffic?: { value?: number };
 }): TrafficData {
-  const durationInTraffic = leg.duration_typical ?? (leg.duration_in_traffic as { value?: number })?.value;
   const dur = leg.duration;
-  const durationBase = (typeof dur === 'number' ? dur : (dur as { value?: number })?.value) ?? durationInTraffic;
+  const duration = typeof dur === 'number' ? dur : (dur as { value?: number })?.value;
+  const durationInTraffic = duration ?? leg.duration_in_traffic?.value;
+  const durationBase = leg.duration_typical ?? durationInTraffic;
 
   return {
     durationInTraffic,

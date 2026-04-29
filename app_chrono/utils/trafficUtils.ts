@@ -9,12 +9,20 @@ export interface TrafficData {
   hasTrafficData: boolean // Indique si les données de trafic sont disponibles
 }
 
+type DirectionsLegLike = {
+  duration_typical?: number;
+  duration?: number | { value?: number };
+  duration_in_traffic?: { value?: number };
+}
+
 /**
- * Extrait les données de trafic depuis une réponse Mapbox Directions
+ * Extrait les données de trafic depuis une réponse Directions.
+ * Mapbox driving-traffic: duration = avec trafic, duration_typical = sans trafic.
  */
-export function extractTrafficData(leg: any): TrafficData {
-  const durationInTraffic = leg.duration_in_traffic?.value
-  const durationBase = leg.duration?.value
+export function extractTrafficData(leg: DirectionsLegLike): TrafficData {
+  const duration = typeof leg.duration === 'number' ? leg.duration : leg.duration?.value
+  const durationInTraffic = duration ?? leg.duration_in_traffic?.value
+  const durationBase = leg.duration_typical ?? durationInTraffic
 
   return {
     durationInTraffic,

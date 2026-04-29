@@ -238,7 +238,7 @@ describe('MobileMoneyService', () => {
 
     it('should return error for unsupported provider', async () => {
       const params = {
-        provider: 'mtn_money',
+        provider: 'moov_money',
         phoneNumber: '+2250123456789',
         amount: 5000,
         orderId: 'order-123',
@@ -355,4 +355,3 @@ describe('MobileMoneyService', () => {
     });
   });
 });
-

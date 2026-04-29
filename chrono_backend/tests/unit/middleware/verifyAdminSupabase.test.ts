@@ -2,18 +2,17 @@
  * Tests unitaires pour le middleware verifyAdminSupabase
  */
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { Request, Response, NextFunction } from 'express';
-import { verifyAdminSupabase } from '../../../src/middleware/verifyAdminSupabase.js';
+import type { Request, Response, NextFunction } from 'express';
 
 // Mock Supabase avec factory function
 const mockCreateClient = jest.fn();
-jest.mock('@supabase/supabase-js', () => ({
+await jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: mockCreateClient,
 }));
 
 // Mock database
 const mockPoolQuery = jest.fn() as any;
-jest.mock('../../../src/config/db.js', () => ({
+await jest.unstable_mockModule('../../../src/config/db.js', () => ({
   __esModule: true,
   default: {
     query: mockPoolQuery,
@@ -26,18 +25,18 @@ const mockLogger = {
   warn: jest.fn(),
   error: jest.fn(),
 };
-jest.mock('../../../src/utils/logger.js', () => ({
+await jest.unstable_mockModule('../../../src/utils/logger.js', () => ({
   __esModule: true,
   default: mockLogger,
 }));
 
-// Helper pour créer un token JWT valide pour les tests
-function createTestJWT(payload: any): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
-  const payloadEncoded = Buffer.from(JSON.stringify(payload)).toString('base64');
-  const signature = 'test-signature';
-  return `${header}.${payloadEncoded}.${signature}`;
-}
+const mockVerifyAccessToken = jest.fn();
+await jest.unstable_mockModule('../../../src/utils/jwt.js', () => ({
+  __esModule: true,
+  verifyAccessToken: mockVerifyAccessToken,
+}));
+
+const { verifyAdminSupabase } = await import('../../../src/middleware/verifyAdminSupabase.js');
 
 describe('verifyAdminSupabase Middleware', () => {
   let mockRequest: Partial<Request>;
@@ -55,6 +54,7 @@ describe('verifyAdminSupabase Middleware', () => {
     // Configuration de l'environnement
     process.env.SUPABASE_URL = 'https://test.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
+    delete process.env.ALLOW_ADMIN_JWT_FALLBACK;
 
     mockRequest = {
       headers: {},
@@ -80,6 +80,7 @@ describe('verifyAdminSupabase Middleware', () => {
 
     // Configurer le mock pour retourner le client mocké
     mockCreateClient.mockReturnValue(mockSupabaseClient);
+    mockVerifyAccessToken.mockReset();
   });
 
   describe('Error cases - Missing authorization', () => {
@@ -120,15 +121,17 @@ describe('verifyAdminSupabase Middleware', () => {
     beforeEach(() => {
       delete process.env.SUPABASE_URL;
       delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      process.env.ALLOW_ADMIN_JWT_FALLBACK = 'true';
     });
 
     it('should verify admin using PostgreSQL fallback', async () => {
-      const token = createTestJWT({ sub: 'user-123' });
+      const token = 'signed-dev-token';
 
       mockRequest.headers = {
         authorization: `Bearer ${token}`,
       };
 
+      mockVerifyAccessToken.mockReturnValue({ id: 'user-123', role: 'admin', type: 'access' });
       mockPoolQuery.mockResolvedValue({
         rows: [{ id: 'user-123', role: 'admin' }],
       });
@@ -147,12 +150,13 @@ describe('verifyAdminSupabase Middleware', () => {
     });
 
     it('should reject non-admin user in fallback mode', async () => {
-      const token = createTestJWT({ sub: 'user-123' });
+      const token = 'signed-dev-token';
 
       mockRequest.headers = {
         authorization: `Bearer ${token}`,
       };
 
+      mockVerifyAccessToken.mockReturnValue({ id: 'user-123', role: 'client', type: 'access' });
       mockPoolQuery.mockResolvedValue({
         rows: [{ id: 'user-123', role: 'client' }],
       });
@@ -168,12 +172,13 @@ describe('verifyAdminSupabase Middleware', () => {
     });
 
     it('should reject when user not found in fallback mode', async () => {
-      const token = createTestJWT({ sub: 'user-123' });
+      const token = 'signed-dev-token';
 
       mockRequest.headers = {
         authorization: `Bearer ${token}`,
       };
 
+      mockVerifyAccessToken.mockReturnValue({ id: 'user-123', role: 'admin', type: 'access' });
       mockPoolQuery.mockResolvedValue({
         rows: [],
       });
@@ -415,4 +420,3 @@ describe('verifyAdminSupabase Middleware', () => {
     });
   });
 });
-
