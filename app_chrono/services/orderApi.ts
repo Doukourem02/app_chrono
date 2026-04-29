@@ -1,6 +1,7 @@
 import { config } from '../config';
 import { apiFetch, parseApiErrorBody } from '../utils/apiFetch';
 import { logger } from '../utils/logger';
+import { realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta';
 import { userApiService } from './userApiService';
 
 type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
@@ -46,12 +47,6 @@ export function computeOrderPriceCfa(
   return Math.max(0, Math.round(flat + distanceKm * grid.perKm));
 }
 
-const AVG_SPEED_KMH: Record<DeliveryMethod, number> = {
-  moto: 25,
-  vehicule: 20,
-  cargo: 18,
-};
-
 function toRadians(deg: number) {
   return deg * (Math.PI / 180);
 }
@@ -86,9 +81,10 @@ export function calculatePrice(
 }
 
 export function estimateDurationMinutes(distanceKm: number, method: DeliveryMethod): number {
-  const speed = AVG_SPEED_KMH[method] ?? AVG_SPEED_KMH.vehicule;
-  if (!speed) return 0;
-  return Math.max(0, Math.round((distanceKm / speed) * 60));
+  return realisticEtaMinutesFromRoute({
+    distanceMeters: Math.max(0, Number(distanceKm) || 0) * 1000,
+    vehicleType: method,
+  });
 }
 
 export function formatDurationLabel(minutes: number | null | undefined): string | null {
@@ -285,4 +281,3 @@ export default {
   formatDurationLabel,
   getDistanceInKm,
 };
-

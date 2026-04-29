@@ -5,6 +5,7 @@
 export interface TrafficData {
   durationInTraffic?: number // Durée en secondes avec trafic
   durationBase?: number // Durée en secondes sans trafic
+  distanceMeters?: number
   hasTrafficData: boolean // Indique si les données de trafic sont disponibles
 }
 
@@ -60,4 +61,3 @@ export function formatETAWithTraffic(etaSeconds: number | null): string {
   }
   return `${hours}h ${remainingMinutes} min`
 }
-

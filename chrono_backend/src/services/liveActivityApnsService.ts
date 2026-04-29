@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { getDirections } from '../utils/mapboxService.js';
+import { realisticEtaMinutesFromAirDistance, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 import {
   clientStatusLabel,
   normalizeProductStatus,
@@ -55,6 +56,11 @@ type Coordinates = {
 };
 
 type ProgressPhase = 'pickup' | 'dropoff';
+
+type NavigationEtaOverride = {
+  durationRemainingSec?: number | null;
+  distanceRemainingM?: number | null;
+};
 
 type OrderTrackingLiveProps = {
   etaLabel: string;
@@ -232,9 +238,10 @@ function calculateDistanceMeters(
 }
 
 function calculateETAForVehicle(distanceMeters: number, vehicleType: 'moto' | 'vehicule' | 'cargo' | null): number {
-  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return 1;
-  const speedKmh = vehicleType === 'moto' ? 35 : vehicleType === 'cargo' ? 25 : 30;
-  return Math.max(1, Math.ceil((distanceMeters / 1000 / speedKmh) * 60));
+  return realisticEtaMinutesFromAirDistance({
+    airDistanceMeters: distanceMeters,
+    vehicleType,
+  });
 }
 
 function clampProgress(value: number): number {
@@ -287,8 +294,17 @@ function coordsCacheKey(coords: Coordinates): string {
 
 function routeEtaLabelFromSeconds(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) return '';
-  if (seconds < 60) return '< 1 min';
   return `${Math.max(1, Math.round(seconds / 60))} min`;
+}
+
+function routeEtaLabelFromNavigation(
+  status: string,
+  navigationEta?: NavigationEtaOverride | null,
+): string | undefined {
+  if (!progressPhaseForStatus(status)) return undefined;
+  const seconds = toNumber(navigationEta?.durationRemainingSec);
+  if (seconds == null || seconds <= 0) return undefined;
+  return routeEtaLabelFromSeconds(seconds);
 }
 
 function isSamePickupDropoffStop(row: OrderLiveActivityRow): boolean {
@@ -476,8 +492,14 @@ async function resolveRouteEtaLabel(
       { lat: driverCoords.latitude, lng: driverCoords.longitude },
       { lat: target.latitude, lng: target.longitude },
     );
-    const durationSeconds = directions ? (directions.durationTypical ?? directions.duration) : 0;
-    const etaLabel = routeEtaLabelFromSeconds(durationSeconds);
+    const etaMinutes = directions
+      ? realisticEtaMinutesFromRoute({
+          distanceMeters: directions.distance,
+          durationSeconds: directions.duration || directions.durationTypical || 0,
+          vehicleType: liveActivityVehicleType(row.delivery_method),
+        })
+      : 0;
+    const etaLabel = etaMinutes > 0 ? `${etaMinutes} min` : '';
     if (!etaLabel) return undefined;
     routeEtaByOrder.set(row.id, {
       phase,
@@ -550,6 +572,7 @@ async function mergeProps(
   row: OrderLiveActivityRow | null,
   status: string,
   driverCoordsOverride?: Coordinates | null,
+  navigationEta?: NavigationEtaOverride | null,
 ): Promise<OrderTrackingLiveProps> {
   const statusCode = normalizeStatus(status || row?.status || 'pending');
   const pending = statusCode === 'pending';
@@ -559,13 +582,14 @@ async function mergeProps(
   const movement = row
     ? progressFromDriverMovement(row, statusCode, driverCoordsOverride ?? driverCoordsFromRow(row))
     : { progress: progressFromStatus(statusCode) };
-  const routeEtaLabel = row
+  const navigationEtaLabel = routeEtaLabelFromNavigation(statusCode, navigationEta);
+  const routeEtaLabel = row && !navigationEtaLabel
     ? await resolveRouteEtaLabel(row, statusCode, driverCoordsOverride ?? driverCoordsFromRow(row))
     : undefined;
   const sameStopEta = sameStopLiveActivityEtaLabel(row, statusCode);
   const widgetStatusCode = sameStopLiveActivityStatusCode(row, statusCode);
   const widgetStatusLabel = sameStopLiveActivityStatusLabel(row, statusCode);
-  const eta = sameStopEta ?? (row ? (routeEtaLabel || movement.etaLabel || fallbackEtaLabel(row, statusCode, fallback)) : statusCode === 'accepted' || statusCode === 'enroute'
+  const eta = sameStopEta ?? (row ? (navigationEtaLabel || routeEtaLabel || movement.etaLabel || fallbackEtaLabel(row, statusCode, fallback)) : statusCode === 'accepted' || statusCode === 'enroute'
     ? fallback.etaLabel || ''
     : pending
       ? '—'
@@ -850,16 +874,17 @@ export async function notifyLiveActivitiesForDriverLocation(params: {
   status: string;
   payerUserId: string;
   driverCoords: Coordinates;
+  navigationEta?: NavigationEtaOverride | null;
 }): Promise<void> {
   if (!process.env.DATABASE_URL) return;
 
-  const { orderId, status, payerUserId, driverCoords } = params;
+  const { orderId, status, payerUserId, driverCoords, navigationEta } = params;
   const statusNorm = normalizeStatus(status);
   if (!LIVE_ACTIVITY_ONLY_STATUSES.has(statusNorm)) return;
 
   const now = Date.now();
   const lastAt = lastLocationPushAtByOrder.get(orderId) ?? 0;
-  if (now - lastAt < 12000) return;
+  if (now - lastAt < 6000) return;
   lastLocationPushAtByOrder.set(orderId, now);
 
   try {
@@ -871,7 +896,7 @@ export async function notifyLiveActivitiesForDriverLocation(params: {
 
     for (const token of tokens) {
       const fallback = (token.last_props || {}) as Partial<OrderTrackingLiveProps>;
-      const nextProps = await mergeProps(token.last_props, row, statusNorm, driverCoords);
+      const nextProps = await mergeProps(token.last_props, row, statusNorm, driverCoords, navigationEta);
       const previousProgress = Number(fallback.progress || 0) || 0;
       const progressDelta = Math.abs((nextProps.progress ?? 0) - previousProgress);
       const previousEta = typeof fallback.etaLabel === 'string' ? fallback.etaLabel : '';

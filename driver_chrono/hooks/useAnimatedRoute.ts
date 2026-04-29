@@ -48,9 +48,10 @@ export const useAnimatedRoute = ({
 
       if (result && result.coordinates.length > 0) {
         setTrafficData({
-          durationInTraffic: result.durationTypical ?? result.duration,
-          durationBase: result.duration,
-          hasTrafficData: !!result.durationTypical,
+          durationInTraffic: result.duration,
+          durationBase: result.durationTypical ?? result.duration,
+          distanceMeters: result.distance,
+          hasTrafficData: result.duration > 0,
         });
 
         let points = result.coordinates.map((c) => ({ latitude: c.lat, longitude: c.lng }));
@@ -239,4 +240,3 @@ export const useAnimatedRoute = ({
     },
   };
 };
-

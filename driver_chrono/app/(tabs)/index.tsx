@@ -187,6 +187,13 @@ export default function Index() {
 
   // Suivi temps réel : envoyer position au client (throttle 3s + distance filter 15m)
   const lastEmitRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
+  const latestNavigationProgressRef = useRef<{
+    orderId: string;
+    phase: 'pickup' | 'dropoff';
+    durationRemainingSec: number;
+    distanceRemainingM?: number;
+    ts: number;
+  } | null>(null);
   useEffect(() => {
     const status = String(currentOrder?.status || '');
     const needsTracking = ['accepted', 'enroute', 'picked_up', 'delivering', 'in_progress'].includes(status);
@@ -208,10 +215,28 @@ export default function Index() {
         distMeters(location, { latitude: last.lat, longitude: last.lng }) >= 15;
 
       if (shouldEmit) {
+        const currentPhase =
+          status === 'accepted' || status === 'enroute' || status === 'in_progress'
+            ? 'pickup'
+            : status === 'picked_up' || status === 'delivering'
+              ? 'dropoff'
+              : null;
+        const navProgress =
+          latestNavigationProgressRef.current?.orderId === currentOrder.id &&
+          latestNavigationProgressRef.current.phase === currentPhase &&
+          now - latestNavigationProgressRef.current.ts <= 10_000
+            ? latestNavigationProgressRef.current
+            : null;
         orderSocketService.emitDriverLocation(currentOrder.id, {
           latitude: location.latitude,
           longitude: location.longitude,
           ...(rawGpsLocation?.heading != null ? { heading: rawGpsLocation.heading } : {}),
+          ...(navProgress
+            ? {
+                navigationDurationRemainingSec: navProgress.durationRemainingSec,
+                navigationDistanceRemainingM: navProgress.distanceRemainingM,
+              }
+            : {}),
         });
         lastEmitRef.current = { lat: location.latitude, lng: location.longitude, ts: now };
       }
@@ -469,6 +494,7 @@ export default function Index() {
   }, [isInZone, currentOrder?.status]);
 
   useEffect(() => {
+    latestNavigationProgressRef.current = null;
     if (!currentOrder?.id) {
       hasValidatedViaMapboxRef.current.clear();
       lastEtaAnnouncedMinRef.current = 99;
@@ -508,12 +534,31 @@ export default function Index() {
     }) => {
     const durationRemaining =
       event?.nativeEvent?.durationRemaining ?? event?.durationRemaining;
+    const distanceRemaining =
+      event?.nativeEvent?.distanceRemaining ?? event?.distanceRemaining;
+    const status = String(currentOrder?.status || '');
 
     if (durationRemaining != null && durationRemaining > 0) {
+      if (currentOrder?.id) {
+        const phase =
+          status === 'accepted' || status === 'enroute' || status === 'in_progress'
+            ? 'pickup'
+            : status === 'picked_up' || status === 'delivering'
+              ? 'dropoff'
+              : null;
+        latestNavigationProgressRef.current = {
+          orderId: currentOrder.id,
+          phase: phase ?? 'dropoff',
+          durationRemainingSec: durationRemaining,
+          ...(distanceRemaining != null && distanceRemaining >= 0
+            ? { distanceRemainingM: distanceRemaining }
+            : {}),
+          ts: Date.now(),
+        };
+      }
       setLastEtaMinutes(Math.ceil(durationRemaining / 60));
     }
 
-    const status = String(currentOrder?.status || '');
     if (status !== 'picked_up' && status !== 'delivering') return;
 
     if (durationRemaining == null || durationRemaining <= 0) return;
@@ -529,7 +574,7 @@ export default function Index() {
       speakWithMapboxMuted('Arrivée à destination dans environ une minute.');
     }
   },
-  [currentOrder?.status, speakWithMapboxMuted]
+  [currentOrder?.id, currentOrder?.status, speakWithMapboxMuted]
   );
 
   // Route animée vers la destination

@@ -2,6 +2,7 @@
  * Source de vérité du prix livraison (niveau A — doc krono-reference-unique.md).
  * Grille alignée sur l’app client (base + km × perKm, options forfait fixe).
  */
+import { realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 
 export type DeliveryMethod = 'moto' | 'vehicule' | 'cargo';
 
@@ -22,12 +23,6 @@ const SPEED_FLAT_BY_METHOD: Record<string, Partial<Record<DeliveryMethod, number
   scheduled: { moto: 380 },
   pickup_service: { vehicule: 700 },
   full_service: { vehicule: 1000 },
-};
-
-const AVG_SPEED_KMH: Record<DeliveryMethod, number> = {
-  moto: 25,
-  vehicule: 20,
-  cargo: 18,
 };
 
 /** Si aucune option n’est passée : défauts alignés sur la 1ʳᵉ option UI après reset (moto → express, véhicule → pickup_service). */
@@ -64,10 +59,10 @@ export function computeOrderPriceCfa(
 }
 
 export function estimateDurationMinutes(distanceKm: number, method: string): number {
-  const m = normalizeDeliveryMethod(method);
-  const speed = AVG_SPEED_KMH[m] ?? AVG_SPEED_KMH.vehicule;
-  if (!speed) return 0;
-  return Math.max(0, Math.round((distanceKm / speed) * 60));
+  return realisticEtaMinutesFromRoute({
+    distanceMeters: Math.max(0, Number(distanceKm) || 0) * 1000,
+    vehicleType: normalizeDeliveryMethod(method),
+  });
 }
 
 export function haversineDistanceKm(

@@ -9,6 +9,7 @@ import { useErrorHandler } from '../utils/errorHandler';
 import { config } from '../config';
 import { locationService } from '../services/locationService';
 import { fetchMapboxDirections } from '../utils/mapboxDirections';
+import { realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta';
 
 type Coordinates = {
   latitude: number;
@@ -310,23 +311,51 @@ export const useMapLogic = ({ mapRef }: UseMapLogicParams) => {
         animatePolyline(points);
         startDestinationPulse();
 
-        const vehicleMultiplier = selectedMethod === 'moto' ? 0.85 : selectedMethod === 'cargo' ? 1.25 : 1.0;
-        const chosenSeconds = result.durationTypical ?? result.duration;
+        const chosenSeconds = result.duration || result.durationTypical || 0;
         const distanceKm =
           result.distance > 0 ? Math.round((result.distance / 1000) * 100) / 100 : 0;
 
         const adjustedSeconds =
-          chosenSeconds > 0
-            ? Math.round(chosenSeconds * vehicleMultiplier)
+          chosenSeconds > 0 && result.distance > 0
+            ? realisticEtaMinutesFromRoute({
+                distanceMeters: result.distance,
+                durationSeconds: chosenSeconds,
+                vehicleType:
+                  selectedMethod === 'moto' || selectedMethod === 'vehicule' || selectedMethod === 'cargo'
+                    ? selectedMethod
+                    : null,
+              }) * 60
             : distanceKm > 0
-              ? Math.max(60, Math.round((distanceKm / 22) * 3600))
+              ? realisticEtaMinutesFromRoute({
+                  distanceMeters: distanceKm * 1000,
+                  vehicleType:
+                    selectedMethod === 'moto' || selectedMethod === 'vehicule' || selectedMethod === 'cargo'
+                      ? selectedMethod
+                      : null,
+                }) * 60
               : 0;
 
         const durationTrafficSeconds =
-          result.duration > 0 ? Math.round(result.duration * vehicleMultiplier) : undefined;
+          result.duration > 0 && result.distance > 0
+            ? realisticEtaMinutesFromRoute({
+                distanceMeters: result.distance,
+                durationSeconds: result.duration,
+                vehicleType:
+                  selectedMethod === 'moto' || selectedMethod === 'vehicule' || selectedMethod === 'cargo'
+                    ? selectedMethod
+                    : null,
+              }) * 60
+            : undefined;
         const durationTypicalSeconds =
           result.durationTypical != null && result.durationTypical > 0
-            ? Math.round(result.durationTypical * vehicleMultiplier)
+            ? realisticEtaMinutesFromRoute({
+                distanceMeters: result.distance,
+                durationSeconds: result.durationTypical,
+                vehicleType:
+                  selectedMethod === 'moto' || selectedMethod === 'vehicule' || selectedMethod === 'cargo'
+                    ? selectedMethod
+                    : null,
+              }) * 60
             : undefined;
 
         if (distanceKm > 0 && adjustedSeconds > 0) {

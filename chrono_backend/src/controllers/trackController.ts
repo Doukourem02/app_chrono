@@ -14,6 +14,7 @@ import {
   progressWithEtaCap,
   statusBaseProgress,
 } from '../utils/orderProductRules.js';
+import { realisticEtaMinutesFromAirDistance } from '../utils/ivoryCoastEta.js';
 
 type PublicCoordinates = { latitude: number; longitude: number };
 
@@ -62,9 +63,10 @@ function etaLabelForTrack(
   if (!driver || !target) return '';
 
   const distanceMeters = calculateDistanceMeters(driver, target);
-  const method = (deliveryMethod || '').trim().toLowerCase();
-  const speedKmh = method === 'moto' ? 35 : method === 'cargo' ? 25 : 30;
-  const minutes = Math.max(1, Math.ceil((distanceMeters / 1000 / speedKmh) * 60));
+  const minutes = realisticEtaMinutesFromAirDistance({
+    airDistanceMeters: distanceMeters,
+    vehicleType: deliveryMethod,
+  });
   return `${minutes} min`;
 }
 

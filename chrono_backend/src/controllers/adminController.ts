@@ -11,6 +11,7 @@ import { formatDeliveryId } from '../utils/formatDeliveryId.js';
 import { geocodeAddress } from '../utils/geocodeService.js';
 import logger from '../utils/logger.js';
 import { resolveApproximatePickupZone } from '../utils/abidjanApproximatePickupZones.js';
+import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const stalePendingOrderCondition = `(o.status = 'pending' AND o.created_at < CURRENT_DATE)`;
@@ -3929,17 +3930,12 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     }
 
     // Calculer la durée estimée
-    const avgSpeeds: { [key: string]: number } = {
-      moto: 25,
-      vehicule: 20,
-      cargo: 18,
-    };
-    const speed = avgSpeeds[deliveryMethod] || avgSpeeds.vehicule;
-    const durationHours = distance / speed;
-    const minutes = Math.round(durationHours * 60);
-    const estimatedDuration = minutes < 60
-      ? `${minutes} min`
-      : `${Math.floor(minutes / 60)}h ${minutes % 60}min`;
+    const estimatedDuration = formatEtaMinutes(
+      realisticEtaMinutesFromRoute({
+        distanceMeters: Math.max(0, Number(distance) || 0) * 1000,
+        vehicleType: deliveryMethod,
+      })
+    );
 
     // Créer l'objet order
     const orderId = uuidv4();

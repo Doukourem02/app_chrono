@@ -3,8 +3,9 @@
  */
 
 export interface TrafficData {
-  durationInTraffic?: number // Durée en secondes avec trafic (Mapbox: duration_typical)
-  durationBase?: number // Durée en secondes sans trafic
+  durationInTraffic?: number // Durée en secondes avec trafic (Mapbox driving-traffic: duration)
+  durationBase?: number // Durée typique sans trafic fort (Mapbox: duration_typical)
+  distanceMeters?: number
   hasTrafficData: boolean
 }
 
@@ -66,4 +67,3 @@ export function formatETAWithTraffic(etaSeconds: number | null): string {
   }
   return `${hours}h ${remainingMinutes} min`
 }
-

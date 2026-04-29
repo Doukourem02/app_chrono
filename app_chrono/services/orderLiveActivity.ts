@@ -8,6 +8,7 @@ import { logger } from "../utils/logger";
 import { reportLiveActivityIssue } from "../utils/sentry";
 import { calculateDistance, calculateETAForVehicle, formatETA } from "../utils/etaCalculator";
 import { fetchMapboxDirections } from "../utils/mapboxDirections";
+import { realisticEtaMinutesFromRoute } from "../utils/ivoryCoastEta";
 import { DELIVERY_IN_PROGRESS_STATUSES, normalizeOrderStatus } from "../utils/orderStatusNormalize";
 import {
   clientStatusLabel,
@@ -273,13 +274,6 @@ function coordsCacheKey(coords: Coordinates): string {
   return `${coords.latitude.toFixed(5)},${coords.longitude.toFixed(5)}`;
 }
 
-function routeEtaLabelFromSeconds(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "";
-  if (seconds < 60) return "< 1 min";
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  return `${minutes} min`;
-}
-
 async function resolveRouteEtaLabel(
   order: OrderRequest,
   status: OrderStatus,
@@ -319,8 +313,14 @@ async function resolveRouteEtaLabel(
       { lat: target.latitude, lng: target.longitude },
       token,
     );
-    const durationSeconds = directions ? (directions.durationTypical ?? directions.duration) : 0;
-    const etaLabel = routeEtaLabelFromSeconds(durationSeconds);
+    const etaMinutes = directions
+      ? realisticEtaMinutesFromRoute({
+          distanceMeters: directions.distance,
+          durationSeconds: directions.duration || directions.durationTypical || 0,
+          vehicleType: liveActivityVehicleType(order.deliveryMethod),
+        })
+      : 0;
+    const etaLabel = etaMinutes > 0 ? formatETA(etaMinutes) : "";
     if (!etaLabel) return undefined;
     routeEtaByOrder.set(order.id, {
       phase,

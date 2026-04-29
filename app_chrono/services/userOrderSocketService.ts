@@ -4,7 +4,9 @@ import { config } from '../config';
 import { useOrderStore, type OrderRequest } from '../store/useOrderStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
+import { useTrackingEtaStore, type ActiveTrackingEtaPhase } from '../store/useTrackingEtaStore';
 import { logger } from '../utils/logger';
+import { normalizeOrderStatus } from '../utils/orderStatusNormalize';
 import {
   addSocketSuccessBreadcrumb,
   captureError,
@@ -56,6 +58,20 @@ function normalizeSocketLocation(value: unknown): { latitude: number; longitude:
   const longitude = typeof rawLng === 'number' ? rawLng : Number(rawLng);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   return { latitude, longitude };
+}
+
+function readFiniteNumber(source: unknown, key: string): number | null {
+  const record = source as Record<string, unknown> | null | undefined;
+  const value = record?.[key];
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function trackingPhaseForStatus(status: unknown): ActiveTrackingEtaPhase | null {
+  const normalized = normalizeOrderStatus(status);
+  if (normalized === 'accepted' || normalized === 'enroute' || normalized === 'in_progress') return 'pickup';
+  if (normalized === 'picked_up' || normalized === 'delivering') return 'dropoff';
+  return null;
 }
 
 class UserOrderSocketService {
@@ -801,6 +817,18 @@ class UserOrderSocketService {
         if (orderId && location) {
           const store = useOrderStore.getState();
           store.setDriverCoordsForOrder(orderId, location);
+          const order = store.activeOrders.find((o) => o.id === orderId);
+          const phase = trackingPhaseForStatus(order?.status);
+          const navigationDurationRemainingSec = readFiniteNumber(data, 'navigationDurationRemainingSec');
+          if (phase && navigationDurationRemainingSec != null && navigationDurationRemainingSec > 0) {
+            useTrackingEtaStore.getState().setActiveTrackingEta({
+              orderId,
+              phase,
+              etaLabel: `${Math.max(1, Math.round(navigationDurationRemainingSec / 60))} min`,
+              targetKind: phase,
+              computedAt: Date.now(),
+            });
+          }
         }
       } catch (err) {
         logger.warn('Error handling driver:location:update', 'userOrderSocketService', err);

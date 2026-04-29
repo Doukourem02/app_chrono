@@ -17,6 +17,7 @@ import logger from '../utils/logger.js';
 import { computeOrderPriceCfa } from '../services/priceCalculator.js';
 import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
 import { setSurgeSnapshotGetter } from '../services/surgePricing.js';
+import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 import type { SocketAckCallback, UpdateDeliveryStatusData, SendProofData } from '../types/socketEvents.js';
 interface OrderCoordinates {
   latitude: number; longitude: number;
@@ -321,24 +322,14 @@ function calculatePrice(distance: number, method: string, speedOptionId?: string
 }
 
 // Fonction pour estimer la durée
-function estimateDuration(distance: number, method: string): string {
-  const avgSpeeds: { [key: string]: number } = {
-    moto: 25, // km/h en ville
-    vehicule: 20,
-    cargo: 18
-  };
-
-  const speed = avgSpeeds[method] || avgSpeeds.vehicule;
-  const durationHours = distance / speed;
-  const minutes = Math.round(durationHours * 60);
-
-  if (minutes < 60) {
-    return `${minutes} min`;
-  } else {
-    const hours = Math.floor(minutes / 60);
-    const remainingMin = minutes % 60;
-    return `${hours}h ${remainingMin}min`;
-  }
+function estimateDuration(distance: number, method: string, routeDurationSeconds?: number): string {
+  return formatEtaMinutes(
+    realisticEtaMinutesFromRoute({
+      distanceMeters: Math.max(0, Number(distance) || 0) * 1000,
+      durationSeconds: routeDurationSeconds,
+      vehicleType: method,
+    })
+  );
 }
 
 // Fonction pour trouver les chauffeurs proches disponibles
@@ -938,7 +929,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           }
         }
         const price = serverPrice;
-        const estimatedDuration = providedEta ?? estimateDuration(distance, deliveryMethod);
+        const estimatedDuration = estimateDuration(distance, deliveryMethod, rd);
 
         // Valider les limites de paiement différé si c'est un paiement différé par le client
         if (paymentMethodType === 'deferred' && (paymentPayerType === 'client' || !paymentPayerType)) {
@@ -1907,14 +1898,38 @@ const setupOrderSocket = (io: SocketIOServer): void => {
     });
 
     // Événement location livreur (fréquent) — suivi temps réel client
-    // Contrat: { orderId, location: { lat, lng, heading?, speed?, accuracy? }, ts? }
-    socket.on('order:driver:location', async (data: { orderId: string; location: { lat: number; lng: number; heading?: number; speed?: number; accuracy?: number }; ts?: string }) => {
+    // Contrat: { orderId, location: { lat, lng, heading?, speed?, accuracy?, navigationDurationRemainingSec?, navigationDistanceRemainingM? }, ts? }
+    socket.on('order:driver:location', async (data: {
+      orderId: string;
+      location: {
+        lat: number;
+        lng: number;
+        heading?: number;
+        speed?: number;
+        accuracy?: number;
+        navigationDurationRemainingSec?: number;
+        navigationDistanceRemainingM?: number;
+      };
+      ts?: string;
+    }) => {
       try {
         const { orderId, location: loc } = data || {};
         if (!orderId || !loc?.lat || !loc?.lng) return;
 
         const driverId = socket.driverId;
         if (!driverId) return;
+        const navigationDurationRemainingSec =
+          loc.navigationDurationRemainingSec != null &&
+          Number.isFinite(loc.navigationDurationRemainingSec) &&
+          loc.navigationDurationRemainingSec > 0
+            ? loc.navigationDurationRemainingSec
+            : undefined;
+        const navigationDistanceRemainingM =
+          loc.navigationDistanceRemainingM != null &&
+          Number.isFinite(loc.navigationDistanceRemainingM) &&
+          loc.navigationDistanceRemainingM >= 0
+            ? loc.navigationDistanceRemainingM
+            : undefined;
 
         // Mettre à jour realDriverStatuses UNIQUEMENT si le driver est déjà en ligne
         // Ne jamais réinsérer un driver supprimé (offline) — la position ne doit être mise à jour
@@ -1956,6 +1971,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             orderId,
             latitude: loc.lat,
             longitude: loc.lng,
+            navigationDurationRemainingSec,
+            navigationDistanceRemainingM,
             ts: data.ts || new Date().toISOString(),
           });
         }
@@ -1965,6 +1982,10 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           status: order.status,
           payerUserId: order.user.id,
           driverCoords: { latitude: loc.lat, longitude: loc.lng },
+          navigationEta: {
+            durationRemainingSec: navigationDurationRemainingSec,
+            distanceRemainingM: navigationDistanceRemainingM,
+          },
         }).catch((notifyErr: unknown) => {
           if (DEBUG) logger.warn('notifyLiveActivitiesForDriverLocation error:', notifyErr instanceof Error ? notifyErr.message : String(notifyErr));
         });

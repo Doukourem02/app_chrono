@@ -535,10 +535,22 @@ class OrderSocketService {
    */
   emitDriverLocation(
     orderId: string,
-    location: { latitude: number; longitude: number; heading?: number }
+    location: {
+      latitude: number;
+      longitude: number;
+      heading?: number;
+      navigationDurationRemainingSec?: number;
+      navigationDistanceRemainingM?: number;
+    }
   ) {
     if (!this.socket || !this.socket.connected) return;
-    const loc: { lat: number; lng: number; heading?: number } = {
+    const loc: {
+      lat: number;
+      lng: number;
+      heading?: number;
+      navigationDurationRemainingSec?: number;
+      navigationDistanceRemainingM?: number;
+    } = {
       lat: location.latitude,
       lng: location.longitude,
     };
@@ -549,6 +561,20 @@ class OrderSocketService {
       location.heading <= 360
     ) {
       loc.heading = location.heading;
+    }
+    if (
+      location.navigationDurationRemainingSec != null &&
+      Number.isFinite(location.navigationDurationRemainingSec) &&
+      location.navigationDurationRemainingSec > 0
+    ) {
+      loc.navigationDurationRemainingSec = location.navigationDurationRemainingSec;
+    }
+    if (
+      location.navigationDistanceRemainingM != null &&
+      Number.isFinite(location.navigationDistanceRemainingM) &&
+      location.navigationDistanceRemainingM >= 0
+    ) {
+      loc.navigationDistanceRemainingM = location.navigationDistanceRemainingM;
     }
     this.socket.emit('order:driver:location', {
       orderId,
