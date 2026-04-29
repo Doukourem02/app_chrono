@@ -96,7 +96,7 @@ export default function QuickMessage() {
             if (firstName || lastName) {
               return `${firstName} ${lastName}`.trim()
             }
-            return p.email || ''
+            return ''
           }
           
           const name1 = getName(p1)
@@ -177,7 +177,7 @@ export default function QuickMessage() {
           const lastName = otherParticipant.last_name || ''
           const displayName = firstName || lastName 
             ? `${firstName} ${lastName}`.trim() 
-            : otherParticipant.email || 'Utilisateur'
+            : 'Utilisateur'
           
           // Déterminer le statut
           let isOnline = false

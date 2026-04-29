@@ -113,7 +113,7 @@ export const ErrorTypes = {
     explanation: 'Certaines informations sont manquantes ou incorrectes. Veuillez vérifier et compléter tous les champs requis.',
     suggestions: [
       'Vérifiez que tous les champs obligatoires sont remplis',
-      'Assurez-vous que les formats sont corrects (email, téléphone, etc.)',
+      'Assurez-vous que les formats sont corrects (téléphone, etc.)',
       'Vérifiez que les valeurs respectent les limites (montants, dates, etc.)',
     ],
     onClose: () => {},
@@ -280,4 +280,3 @@ export const ErrorTypes = {
     onClose: () => {},
   }),
 }
-

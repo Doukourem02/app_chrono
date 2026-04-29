@@ -178,7 +178,7 @@ export default function AnalyticsPage() {
           order.price || '0',
           order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : '',
           order.completed_at ? new Date(order.completed_at).toLocaleDateString('fr-FR') : '',
-          order.client_email || '',
+          '',
           order.driver_id || '',
         ])
         
@@ -700,8 +700,8 @@ export default function AnalyticsPage() {
                       return (
                         driverName.includes(query) ||
                         clientName.includes(query) ||
-                        rating.driver_email?.toLowerCase().includes(query) ||
-                        rating.user_email?.toLowerCase().includes(query) ||
+                        rating.driver_phone?.toLowerCase().includes(query) ||
+                        rating.user_phone?.toLowerCase().includes(query) ||
                         rating.order_id?.toLowerCase().includes(query) ||
                         rating.comment?.toLowerCase().includes(query)
                       )
@@ -719,17 +719,17 @@ export default function AnalyticsPage() {
                           <td style={{ padding: '12px' }}>
                             <div>
                               <div style={{ fontWeight: 600, color: themeColors.textPrimary }}>
-                                {rating.user_first_name || ''} {rating.user_last_name || ''}
+                                {`${rating.user_first_name || ''} ${rating.user_last_name || ''}`.trim() || rating.user_phone || 'N/A'}
                               </div>
-                              <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{rating.user_email}</div>
+                              <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{rating.user_phone || ''}</div>
                             </div>
                           </td>
                           <td style={{ padding: '12px' }}>
                             <div>
                               <div style={{ fontWeight: 600, color: themeColors.textPrimary }}>
-                                {rating.driver_first_name || ''} {rating.driver_last_name || ''}
+                                {`${rating.driver_first_name || ''} ${rating.driver_last_name || ''}`.trim() || rating.driver_phone || 'N/A'}
                               </div>
-                              <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{rating.driver_email}</div>
+                              <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{rating.driver_phone || ''}</div>
                             </div>
                           </td>
                           <td style={{ padding: '12px' }}>

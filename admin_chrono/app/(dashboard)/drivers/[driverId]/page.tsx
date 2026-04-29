@@ -163,7 +163,7 @@ export default function DriverDetailPage() {
   const driverName =
     driver.first_name && driver.last_name
       ? `${driver.first_name} ${driver.last_name}`
-      : driver.full_name || driver.email || 'N/A'
+      : driver.full_name || driver.phone || 'N/A'
   const isPartner = driver.driver_type === 'partner'
   const commissionAccount = driver.commission_account
   const balance = commissionAccount?.balance ?? 0
@@ -283,10 +283,6 @@ export default function DriverDetailPage() {
             Informations générales
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-            <div>
-              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Email</div>
-              <div style={{ fontSize: '14px', color: '#111827' }}>{driver.email || 'N/A'}</div>
-            </div>
             <div>
               <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Téléphone</div>
               <div style={{ fontSize: '14px', color: '#111827' }}>{driver.phone || 'N/A'}</div>
@@ -644,4 +640,3 @@ export default function DriverDetailPage() {
     </ScreenTransition>
   )
 }
-

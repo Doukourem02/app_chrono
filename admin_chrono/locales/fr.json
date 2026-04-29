@@ -210,10 +210,6 @@
     "subtitle": "Gérez les paramètres de l'application",
     "notifications": {
       "title": "Notifications",
-      "email": {
-        "label": "Notifications par email",
-        "description": "Recevez des notifications par email pour les événements importants"
-      },
       "push": {
         "label": "Notifications push",
         "description": "Recevez des notifications en temps réel dans votre navigateur"
@@ -382,7 +378,7 @@
       "cancelled": "Annulées"
     },
     "filters": {
-      "search": "Rechercher par ID transaction, commande, nom, prénom, email...",
+      "search": "Rechercher par ID transaction, commande, nom, prénom, téléphone...",
       "allStatuses": "Tous les statuts",
       "allMethods": "Toutes les méthodes"
     },
@@ -628,7 +624,7 @@
   },
   "users": {
     "title": "Utilisateurs",
-    "searchPlaceholder": "Rechercher par nom, prénom, email, téléphone...",
+    "searchPlaceholder": "Rechercher par nom, prénom, téléphone...",
     "empty": "Aucun utilisateur trouvé",
     "stats": {
       "clients": "Clients",
@@ -658,7 +654,7 @@
   },
   "drivers": {
     "title": "Gestion des livreurs",
-    "searchPlaceholder": "Rechercher par nom, email, téléphone...",
+    "searchPlaceholder": "Rechercher par nom, téléphone...",
     "empty": "Aucun livreur trouvé",
     "online": "En ligne",
     "offline": "Hors ligne",
@@ -738,7 +734,7 @@
   },
   "commissions": {
     "title": "Commissions",
-    "searchPlaceholder": "Rechercher (livreur, email, commande...)",
+    "searchPlaceholder": "Rechercher (livreur, commande...)",
     "exportCsv": "Exporter CSV",
     "empty": "Aucune transaction trouvée",
     "viewDriver": "Voir livreur",

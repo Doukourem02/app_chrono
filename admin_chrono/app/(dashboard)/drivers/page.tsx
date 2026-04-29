@@ -465,7 +465,6 @@ export default function DriversPage() {
               <tr>
                 <th style={thStyle}>{t('drivers.table.name')}</th>
                 <th style={thStyle}>{t('drivers.table.type')}</th>
-                <th style={thStyle}>Email</th>
                 <th style={thStyle}>{t('drivers.table.phone')}</th>
                 <th style={thStyle}>{t('drivers.table.commissionBalance')}</th>
                 <th style={thStyle}>{t('drivers.table.status')}</th>
@@ -477,7 +476,7 @@ export default function DriversPage() {
             <tbody>
               {paginatedDrivers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ ...tdStyle, textAlign: 'center', padding: '40px' }}>
+                  <td colSpan={8} style={{ ...tdStyle, textAlign: 'center', padding: '40px' }}>
                     <div style={{ color: themeColors.textSecondary }}>{t('drivers.empty')}</div>
                   </td>
                 </tr>
@@ -486,7 +485,7 @@ export default function DriversPage() {
                   const driverName =
                     driver.first_name && driver.last_name
                       ? `${driver.first_name} ${driver.last_name}`
-                      : driver.full_name || driver.email || 'N/A'
+                      : driver.full_name || driver.phone || 'N/A'
                   const isPartner = driver.driver_type === 'partner'
                   const balance = driver.commission_balance ?? 0
                   const isSuspended = driver.is_suspended ?? false // Suspension manuelle (sanction)
@@ -516,7 +515,6 @@ export default function DriversPage() {
                           'N/A'
                         )}
                       </td>
-                      <td style={tdStyle}>{driver.email || 'N/A'}</td>
                       <td style={tdStyle}>{driver.phone || 'N/A'}</td>
                       <td style={tdStyle}>
                         {isPartner ? (

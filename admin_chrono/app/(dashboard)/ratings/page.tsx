@@ -359,7 +359,7 @@ export default function RatingsPage() {
                           <div style={{ fontWeight: 600 }}>
                             {rating.user_first_name || rating.user_last_name
                               ? `${rating.user_first_name || ''} ${rating.user_last_name || ''}`.trim()
-                              : rating.user_email || 'N/A'}
+                              : rating.user_phone || 'N/A'}
                           </div>
                           <div style={{ fontSize: '12px', color: '#6B7280' }}>
                             {rating.user_phone || ''}
@@ -371,7 +371,7 @@ export default function RatingsPage() {
                           <div style={{ fontWeight: 600 }}>
                             {rating.driver_first_name || rating.driver_last_name
                               ? `${rating.driver_first_name || ''} ${rating.driver_last_name || ''}`.trim()
-                              : rating.driver_email || 'N/A'}
+                              : rating.driver_phone || 'N/A'}
                           </div>
                           <div style={{ fontSize: '12px', color: '#6B7280' }}>
                             {rating.driver_phone || ''}

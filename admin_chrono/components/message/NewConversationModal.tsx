@@ -68,7 +68,7 @@ export default function NewConversationModal({
       setFilteredUsers(
         users.filter(
           (user) =>
-            user.email.toLowerCase().includes(query) ||
+            (user.phone && user.phone.toLowerCase().includes(query)) ||
             (user.first_name && user.first_name.toLowerCase().includes(query)) ||
             (user.last_name && user.last_name.toLowerCase().includes(query)) ||
             ((user.first_name && user.last_name) &&
@@ -103,7 +103,7 @@ export default function NewConversationModal({
     if (user.first_name || user.last_name) {
       return `${user.first_name || ''} ${user.last_name || ''}`.trim()
     }
-    return user.email
+    return user.phone || 'Utilisateur'
   }
 
   if (!isOpen) return null
@@ -338,7 +338,7 @@ export default function NewConversationModal({
                   <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
                     {getUserDisplayName(user)}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#6B7280' }}>{user.email}</div>
+                  {user.phone && <div style={{ fontSize: '12px', color: '#6B7280' }}>{user.phone}</div>}
                 </div>
                 {conversationType === 'support' ? (
                   <User size={20} style={{ color: '#2563EB' }} />

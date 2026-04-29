@@ -112,7 +112,7 @@ export default function NewB2BShippingModal({
       setFilteredUsers(
         users.filter(
           (user) =>
-            user.email.toLowerCase().includes(query) ||
+            (user.phone && user.phone.toLowerCase().includes(query)) ||
             (user.first_name && user.first_name.toLowerCase().includes(query)) ||
             (user.last_name && user.last_name.toLowerCase().includes(query)) ||
             ((user.first_name && user.last_name) &&
@@ -268,7 +268,7 @@ export default function NewB2BShippingModal({
     if (user.first_name || user.last_name) {
       return `${user.first_name || ''} ${user.last_name || ''}`.trim()
     }
-    return user.email
+    return user.phone || 'Client'
   }
 
   if (!isOpen) return null
@@ -537,7 +537,6 @@ export default function NewB2BShippingModal({
                         <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                           {getUserDisplayName(user)}
                         </div>
-                        <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{user.email}</div>
                         {user.phone && (
                           <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{user.phone}</div>
                         )}

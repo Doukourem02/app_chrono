@@ -267,20 +267,16 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
                 driverData: delivery.driver,
                 person: person,
                 personFullName: person?.full_name,
-                personEmail: person?.email,
                 personAvatarUrl: person?.avatar_url,
                 displayName: (person?.full_name && person.full_name.trim()) 
                   ? person.full_name.trim() 
-                  : (person?.email || (isDriver ? 'Livreur' : 'Client')),
+                  : (isDriver ? 'Livreur' : 'Client'),
               })
             }
             
-            // Pour le client : utiliser full_name, sinon email, sinon "Client"
-            // Pour le driver : utiliser full_name, sinon email, sinon "Livreur"
-            // Si full_name existe mais est vide, utiliser email
             const displayName = (person?.full_name && person.full_name.trim()) 
               ? person.full_name.trim() 
-              : (person?.email || (isDriver ? 'Livreur' : 'Client'))
+              : (isDriver ? 'Livreur' : 'Client')
             
             const displayLabel = isDriver 
               ? 'Drive' 
@@ -289,23 +285,18 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
             const displayAddress = delivery.dropoff.address || 'Adresse de Livraison'
             const avatarUrl = person?.avatar_url
             
-            // Générer les initiales à partir du nom complet ou de l'email
-            const getInitials = (name: string | undefined, email: string | undefined): string => {
+            const getInitials = (name: string | undefined): string => {
               if (name && name.trim()) {
-                // Si c'est un nom complet, prendre les premières lettres de chaque mot
                 const parts = name.trim().split(/\s+/)
                 if (parts.length >= 2) {
                   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
                 }
                 return name.charAt(0).toUpperCase()
               }
-              if (email) {
-                return email.charAt(0).toUpperCase()
-              }
               return isDriver ? 'L' : 'C'
             }
             
-            const initial = getInitials(person?.full_name, person?.email)
+            const initial = getInitials(person?.full_name)
 
             return (
               <>
@@ -376,4 +367,3 @@ export default function DeliveryCard({ delivery, isSelected = false, onSelect, i
     </AnimatedCard>
   )
 }
-

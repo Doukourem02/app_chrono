@@ -210,10 +210,6 @@
     "subtitle": "Manage application settings",
     "notifications": {
       "title": "Notifications",
-      "email": {
-        "label": "Email notifications",
-        "description": "Receive email notifications for important events"
-      },
       "push": {
         "label": "Push notifications",
         "description": "Receive real-time notifications in your browser"
@@ -382,7 +378,7 @@
       "cancelled": "Cancelled"
     },
     "filters": {
-      "search": "Search by transaction ID, order, first name, last name, email...",
+      "search": "Search by transaction ID, order, first name, last name, phone...",
       "allStatuses": "All statuses",
       "allMethods": "All methods"
     },
@@ -628,7 +624,7 @@
   },
   "users": {
     "title": "Users",
-    "searchPlaceholder": "Search by last name, first name, email, phone...",
+    "searchPlaceholder": "Search by last name, first name, phone...",
     "empty": "No user found",
     "stats": {
       "clients": "Clients",
@@ -658,7 +654,7 @@
   },
   "drivers": {
     "title": "Driver management",
-    "searchPlaceholder": "Search by name, email, phone...",
+    "searchPlaceholder": "Search by name, phone...",
     "empty": "No driver found",
     "online": "Online",
     "offline": "Offline",
@@ -738,7 +734,7 @@
   },
   "commissions": {
     "title": "Commissions",
-    "searchPlaceholder": "Search (driver, email, order...)",
+    "searchPlaceholder": "Search (driver, order...)",
     "exportCsv": "Export CSV",
     "empty": "No transaction found",
     "viewDriver": "View driver",

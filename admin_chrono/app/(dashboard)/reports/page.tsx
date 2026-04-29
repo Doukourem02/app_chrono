@@ -258,14 +258,17 @@ export default function ReportsPage() {
     }
     const firstName = clean(order.driver_first_name)
     const lastName = clean(order.driver_last_name)
-    const email = clean(order.driver_email)
 
     if (firstName && lastName) return `${firstName} ${lastName}`
     if (firstName) return firstName
     if (lastName) return lastName
-    if (email) return email
     if (order.driver_id) return `${order.driver_id.slice(0, 8)}...`
     return language === 'fr' ? 'Non assigné' : 'Not assigned'
+  }
+
+  const getClientDisplayName = (client: Pick<Client, 'first_name' | 'last_name' | 'phone' | 'id'>) => {
+    const fullName = `${client.first_name || ''} ${client.last_name || ''}`.trim()
+    return fullName || client.phone || (client.id ? `${client.id.slice(0, 8)}...` : 'N/A')
   }
 
   const handleExport = () => {
@@ -284,7 +287,7 @@ export default function ReportsPage() {
             rows: deliveries.map((order: Delivery) => {
               const clientName = (order.user_first_name && order.user_last_name)
                 ? `${order.user_first_name} ${order.user_last_name}`
-                : order.user_email || order.user_id?.slice(0, 8) + '...' || 'N/A'
+                : order.user_phone || order.user_id?.slice(0, 8) + '...' || 'N/A'
               const driverName = getDriverDisplayName(order)
               return [
                 order.id.slice(0, 8) + '...',
@@ -340,11 +343,8 @@ export default function ReportsPage() {
             title: `${t('reportsPage.types.clients')} - ${periodPresets.find((p) => p.key === periodPreset)?.label || t('reportsPage.periods.custom')}`,
             headers: [language === 'fr' ? 'Nom et Prénom' : 'Full name', language === 'fr' ? 'Téléphone' : 'Phone', language === 'fr' ? "Date d'inscription" : 'Registration date', language === 'fr' ? 'Commandes totales' : 'Total orders', language === 'fr' ? 'Commandes complétées' : 'Completed orders'],
             rows: clients.map((client: Client) => {
-              const clientName = (client.first_name && client.last_name)
-                ? `${client.first_name} ${client.last_name}`
-                : client.email || 'N/A'
               return [
-                clientName,
+                getClientDisplayName(client),
                 client.phone || 'N/A',
                 formatDate(client.created_at || ''),
                 client.total_orders || 0,
@@ -367,14 +367,13 @@ export default function ReportsPage() {
         exportData(
           {
             title: `${t('reportsPage.types.drivers')} - ${periodPresets.find((p) => p.key === periodPreset)?.label || t('reportsPage.periods.custom')}`,
-            headers: [language === 'fr' ? 'Nom et Prénom' : 'Full name', 'Email', language === 'fr' ? 'Téléphone' : 'Phone', language === 'fr' ? "Date d'inscription" : 'Registration date', language === 'fr' ? 'Livraisons totales' : 'Total deliveries', language === 'fr' ? 'Livraisons complétées' : 'Completed deliveries', language === 'fr' ? 'Revenus totaux (FCFA)' : 'Total revenue (FCFA)', language === 'fr' ? 'Note moyenne' : 'Average rating'],
+            headers: [language === 'fr' ? 'Nom et Prénom' : 'Full name', language === 'fr' ? 'Téléphone' : 'Phone', language === 'fr' ? "Date d'inscription" : 'Registration date', language === 'fr' ? 'Livraisons totales' : 'Total deliveries', language === 'fr' ? 'Livraisons complétées' : 'Completed deliveries', language === 'fr' ? 'Revenus totaux (FCFA)' : 'Total revenue (FCFA)', language === 'fr' ? 'Note moyenne' : 'Average rating'],
             rows: drivers.map((driver: Driver) => {
               const driverName = (driver.first_name && driver.last_name)
                 ? `${driver.first_name} ${driver.last_name}`
-                : driver.email || 'N/A'
+                : driver.phone || 'N/A'
               return [
                 driverName,
-                driver.email || 'N/A',
                 driver.phone || 'N/A',
                 formatDate(driver.created_at || ''),
                 driver.total_deliveries || 0,
@@ -601,7 +600,7 @@ export default function ReportsPage() {
                   {deliveries.slice(0, 50).map((order: Delivery) => {
                     const clientName = (order.user_first_name && order.user_last_name)
                       ? `${order.user_first_name} ${order.user_last_name}`
-                      : order.user_email || order.user_id?.slice(0, 8) + '...' || 'N/A'
+                      : order.user_phone || order.user_id?.slice(0, 8) + '...' || 'N/A'
                     const driverName = getDriverDisplayName(order)
                     return (
                       <tr key={order.id}>
@@ -717,12 +716,9 @@ export default function ReportsPage() {
                 </thead>
                 <tbody>
                   {clients.map((client: Client) => {
-                    const clientName = (client.first_name && client.last_name)
-                      ? `${client.first_name} ${client.last_name}`
-                      : client.email || 'N/A'
                     return (
                       <tr key={client.id}>
-                        <td style={tdStyle}>{clientName}</td>
+                        <td style={tdStyle}>{getClientDisplayName(client)}</td>
                         <td style={tdStyle}>{client.phone || 'N/A'}</td>
                         <td style={tdStyle}>{formatDate(client.created_at || '')}</td>
                         <td style={tdStyle}>{client.total_orders || 0}</td>
@@ -752,7 +748,6 @@ export default function ReportsPage() {
                 <thead>
                   <tr>
                     <th style={thStyle}>{language === 'fr' ? 'Nom et Prénom' : 'Full name'}</th>
-                    <th style={thStyle}>Email</th>
                     <th style={thStyle}>{language === 'fr' ? 'Téléphone' : 'Phone'}</th>
                     <th style={thStyle}>{language === 'fr' ? "Date d'inscription" : 'Registration date'}</th>
                     <th style={thStyle}>{language === 'fr' ? 'Livraisons totales' : 'Total deliveries'}</th>
@@ -765,11 +760,10 @@ export default function ReportsPage() {
                   {drivers.map((driver: Driver) => {
                     const driverName = (driver.first_name && driver.last_name)
                       ? `${driver.first_name} ${driver.last_name}`
-                      : driver.email || 'N/A'
+                      : driver.phone || 'N/A'
                     return (
                       <tr key={driver.id}>
                         <td style={tdStyle}>{driverName}</td>
-                        <td style={tdStyle}>{driver.email || 'N/A'}</td>
                         <td style={tdStyle}>{driver.phone || 'N/A'}</td>
                         <td style={tdStyle}>{formatDate(driver.created_at || '')}</td>
                         <td style={tdStyle}>{driver.total_deliveries || 0}</td>

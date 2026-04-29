@@ -49,7 +49,7 @@ export default function ConversationList({
         if (firstName || lastName) {
           return `${firstName} ${lastName}`.trim()
         }
-        return p.email || ''
+        return ''
       }
       
       const name1 = getName(p1)
@@ -75,7 +75,7 @@ export default function ConversationList({
       if (firstName || lastName) {
         return `${firstName} ${lastName}`.trim()
       }
-      return participant.email || 'Utilisateur'
+      return 'Utilisateur'
     }
     
     return 'Utilisateur'
@@ -200,14 +200,6 @@ export default function ConversationList({
     const parts: string[] = []
     if (participant.first_name) parts.push(participant.first_name)
     if (participant.last_name) parts.push(participant.last_name)
-    if (participant.email) {
-      parts.push(participant.email)
-      // Ajouter aussi la partie avant @ pour une recherche plus flexible
-      const emailPrefix = participant.email.split('@')[0]
-      if (emailPrefix) parts.push(emailPrefix)
-    }
-    // Note: phone peut être ajouté ici si disponible dans le type Conversation à l'avenir
-    // if (participant.phone) parts.push(participant.phone)
     return parts.join(' ')
   }
 

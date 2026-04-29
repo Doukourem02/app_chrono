@@ -574,12 +574,11 @@ export default function Header() {
                     // Score prioritaire : correspondances directes dans le nom
                     driversScore = directNameMatches * 100 + initialsMatches * 50 + partialMatches * 25
                   } else if (hasDrivers) {
-                    // Pour les recherches non-nom (emails, téléphones, etc.)
+                    // Pour les recherches non-nom (téléphones, etc.)
                     const exactMatches = (searchResults.data.drivers as SearchDriver[]).filter(driver => {
                       const fullName = driver.fullName?.toLowerCase() || ''
-                      const email = driver.email?.toLowerCase() || ''
                       const phone = driver.phone?.toLowerCase() || ''
-                      return fullName.includes(normalizedQuery) || email.includes(normalizedQuery) || phone.includes(normalizedQuery)
+                      return fullName.includes(normalizedQuery) || phone.includes(normalizedQuery)
                     }).length
                     driversScore = exactMatches * 10 + searchResults.data.drivers.length
                   }
@@ -619,12 +618,11 @@ export default function Header() {
                     // Score prioritaire : correspondances directes dans le nom
                     clientsScore = directNameMatches * 100 + initialsMatches * 50 + partialMatches * 25
                   } else if (hasClients) {
-                    // Pour les recherches non-nom (emails, téléphones, etc.)
+                    // Pour les recherches non-nom (téléphones, etc.)
                     const exactMatches = (searchResults.data.clients as SearchClient[]).filter(client => {
                       const fullName = client.fullName?.toLowerCase() || ''
-                      const email = client.email?.toLowerCase() || ''
                       const phone = client.phone?.toLowerCase() || ''
-                      return fullName.includes(normalizedQuery) || email.includes(normalizedQuery) || phone.includes(normalizedQuery)
+                      return fullName.includes(normalizedQuery) || phone.includes(normalizedQuery)
                     }).length
                     clientsScore = exactMatches * 10 + searchResults.data.clients.length
                   }
@@ -721,7 +719,7 @@ export default function Header() {
                                 {t('header.searchResults.drivers')} ({searchResults.data?.drivers?.length || 0})
                               </div>
                               {((searchResults.data?.drivers as SearchDriver[]) || []).map((driver: SearchDriver) => {
-                                const displayName = driver.fullName || driver.email
+                                const displayName = driver.fullName || driver.phone || t('header.searchResults.driver')
                                 
                                 return (
                                   <div
@@ -768,11 +766,6 @@ export default function Header() {
                                           {driver.is_online ? t('header.searchResults.online') : t('header.searchResults.offline')}
                                         </span>
                                       </div>
-                                      {driver.fullName && (
-                                        <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
-                                          {driver.email}
-                                        </div>
-                                      )}
                                       <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
                                         {driver.phone}
                                       </div>
@@ -808,7 +801,7 @@ export default function Header() {
                                 {t('header.searchResults.clients')} ({searchResults.data?.clients?.length || 0})
                               </div>
                               {((searchResults.data?.clients as SearchClient[]) || []).map((client: SearchClient) => {
-                                const displayName = client.fullName || client.email
+                                const displayName = client.fullName || client.phone || t('header.searchResults.client')
                                 
                                 return (
                                   <div
@@ -842,11 +835,6 @@ export default function Header() {
                                           {t('header.searchResults.client')}
                                         </span>
                                       </div>
-                                      {client.fullName && (
-                                        <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
-                                          {client.email}
-                                        </div>
-                                      )}
                                       <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '2px' }}>
                                         {client.phone}
                                       </div>

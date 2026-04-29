@@ -219,7 +219,7 @@ export default function PlanningPage() {
       
       // Nom du client
       const clientName = order.client
-        ? `${order.client.first_name || ''} ${order.client.last_name || ''}`.trim() || order.client.email || 'Client'
+        ? `${order.client.first_name || ''} ${order.client.last_name || ''}`.trim() || 'Client'
         : 'Client'
       
       if (!grouped[orderDate]) {

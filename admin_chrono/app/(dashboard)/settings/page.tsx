@@ -169,15 +169,6 @@ export default function SettingsPage() {
           </h2>
           <div style={settingItemStyle}>
             <div>
-              <div style={settingLabelStyle}>{t('settings.notifications.email.label')}</div>
-              <div style={settingDescriptionStyle}>
-                {t('settings.notifications.email.description')}
-              </div>
-            </div>
-            <div style={comingSoonStyle}>{t('settings.comingSoon')}</div>
-          </div>
-          <div style={settingItemStyle}>
-            <div>
               <div style={settingLabelStyle}>{t('settings.notifications.push.label')}</div>
               <div style={settingDescriptionStyle}>
                 {t('settings.notifications.push.description')}
@@ -316,4 +307,3 @@ export default function SettingsPage() {
     </ScreenTransition>
   )
 }
-

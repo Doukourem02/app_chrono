@@ -72,7 +72,7 @@ export default function ChatArea({
         if (firstName || lastName) {
           return `${firstName} ${lastName}`.trim()
         }
-        return p.email || ''
+        return ''
       }
       
       const name1 = getName(p1)
@@ -97,7 +97,7 @@ export default function ChatArea({
       if (firstName || lastName) {
         return `${firstName} ${lastName}`.trim()
       }
-      return participant.email || 'Utilisateur'
+      return 'Utilisateur'
     }
     
     return 'Utilisateur'
@@ -292,7 +292,7 @@ export default function ChatArea({
           messages.map((message, index) => {
             const isFromCurrentUser = isMessageFromCurrentUser(message)
             const senderName = message.sender 
-              ? `${message.sender.first_name || ''} ${message.sender.last_name || ''}`.trim() || message.sender.email
+              ? `${message.sender.first_name || ''} ${message.sender.last_name || ''}`.trim() || t('messages.user')
               : t('messages.user')
             
             // Afficher le nom seulement si c'est le premier message ou si l'expéditeur a changé

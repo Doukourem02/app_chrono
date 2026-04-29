@@ -537,7 +537,7 @@ export default function DisputesPage() {
                       <td style={tdStyle}>{getDisputeTypeLabel(dispute.dispute_type || '')}</td>
                       <td style={tdStyle}>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{dispute.user_email || 'N/A'}</div>
+                          <div style={{ fontWeight: 600 }}>{dispute.user_phone || 'N/A'}</div>
                           <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>
                             {dispute.user_phone || ''}
                           </div>
@@ -745,7 +745,7 @@ export default function DisputesPage() {
               <div>
                 <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{t('disputes.table.client')}</div>
                 <div style={{ fontSize: '14px', color: themeColors.textPrimary }}>
-                  {selectedDispute.user_email || 'N/A'}
+                  {selectedDispute.user_phone || 'N/A'}
                 </div>
               </div>
 

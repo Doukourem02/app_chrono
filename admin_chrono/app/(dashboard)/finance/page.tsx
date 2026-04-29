@@ -501,7 +501,7 @@ export default function FinancePage() {
                 rows: transactions.map((tx: Transaction) => {
                   const clientName = (tx.user_first_name && tx.user_last_name)
                     ? `${tx.user_first_name} ${tx.user_last_name}`
-                    : tx.user_email || 'N/A'
+                    : tx.user_phone || 'N/A'
                   return [
                     tx.id.slice(0, 8) + '...',
                     tx.order_id_full?.slice(0, 8) + '...' || 'N/A',
@@ -889,7 +889,7 @@ export default function FinancePage() {
                         <div>
                           {(tx.user_first_name && tx.user_last_name)
                             ? `${tx.user_first_name} ${tx.user_last_name}`
-                            : tx.user_email || 'N/A'}
+                            : tx.user_phone || 'N/A'}
                         </div>
                         <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>
                           {tx.user_phone || ''}

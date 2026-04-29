@@ -13,7 +13,7 @@ import { useTranslation } from '@/hooks/useTranslation'
 
 interface UserData {
   id: string
-  email: string
+  email?: string
   phone: string
   first_name?: string | null
   last_name?: string | null
@@ -65,7 +65,6 @@ export default function UsersPage() {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
         (user: UserData) =>
-          user.email.toLowerCase().includes(query) ||
           user.phone.toLowerCase().includes(query) ||
           user.role.toLowerCase().includes(query) ||
           (user.first_name && user.first_name.toLowerCase().includes(query)) ||
@@ -380,7 +379,6 @@ export default function UsersPage() {
                   <tr>
                     <th style={thStyle}>{t('users.table.lastName')}</th>
                     <th style={thStyle}>{t('users.table.firstName')}</th>
-                    <th style={thStyle}>Email</th>
                     <th style={thStyle}>{t('users.table.phone')}</th>
                     <th style={thStyle}>{t('users.table.role')}</th>
                     <th style={thStyle}>{t('users.table.createdAt')}</th>
@@ -410,11 +408,6 @@ export default function UsersPage() {
                       <td style={tdStyle}>
                         <span style={{ fontSize: '14px', color: themeColors.textPrimary }}>
                           {user.first_name || 'N/A'}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
-                          {user.email}
                         </span>
                       </td>
                       <td style={tdStyle}>

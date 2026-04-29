@@ -158,9 +158,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     if (driver?.full_name && driver.full_name.trim()) {
       return driver.full_name
     }
-    if (driver?.email) {
-      return driver.email
-    }
+    if (driver?.phone) return driver.phone
     return t('tracking.driverUnassigned')
   }
 
@@ -172,9 +170,6 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
         return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
       }
       return parts[0].charAt(0).toUpperCase()
-    }
-    if (driver?.email) {
-      return driver.email.charAt(0).toUpperCase()
     }
     return '—'
   }

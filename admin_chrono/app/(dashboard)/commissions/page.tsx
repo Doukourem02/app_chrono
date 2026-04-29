@@ -16,7 +16,6 @@ interface CommissionTransaction {
   id: string
   driverId: string
   driverName: string
-  driverEmail: string
   type: 'recharge' | 'deduction' | 'refund'
   amount: number
   balance_before: number
@@ -57,8 +56,7 @@ export default function CommissionsPage() {
             return result.data.map((tx) => ({
               ...tx,
               driverId,
-              driverName: `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || driver.email || 'Livreur inconnu',
-              driverEmail: driver.email || '',
+              driverName: `${driver.first_name || ''} ${driver.last_name || ''}`.trim() || driver.phone || 'Livreur inconnu',
             })) as CommissionTransaction[]
           }
         } catch (error) {
@@ -86,7 +84,6 @@ export default function CommissionsPage() {
       filtered = filtered.filter(
         (tx) =>
           tx.driverName.toLowerCase().includes(searchLower) ||
-          tx.driverEmail.toLowerCase().includes(searchLower) ||
           tx.order_id?.toLowerCase().includes(searchLower) ||
           tx.id.toLowerCase().includes(searchLower)
       )
@@ -167,7 +164,6 @@ export default function CommissionsPage() {
       [
         t('commissions.table.date'),
         t('commissions.table.driver'),
-        'Email',
         t('commissions.table.type'),
         t('commissions.table.amount'),
         t('commissions.table.balanceBefore'),
@@ -178,7 +174,6 @@ export default function CommissionsPage() {
         [
           formatDate(tx.created_at),
           `"${tx.driverName}"`,
-          tx.driverEmail,
           tx.type,
           tx.amount,
           tx.balance_before,
@@ -385,10 +380,7 @@ export default function CommissionsPage() {
                         {formatDate(tx.created_at)}
                       </td>
                       <td style={{ padding: '12px', fontSize: '14px', color: themeColors.textPrimary }}>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{tx.driverName}</div>
-                          <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{tx.driverEmail}</div>
-                        </div>
+                        <div style={{ fontWeight: 600 }}>{tx.driverName}</div>
                       </td>
                       <td style={{ padding: '12px', fontSize: '14px', color: themeColors.textPrimary }}>
                         <span
