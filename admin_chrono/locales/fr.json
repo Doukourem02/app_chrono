@@ -41,7 +41,7 @@
         "title": "Gestion",
         "users": "Utilisateurs",
         "drivers": "Livreurs",
-        "performance": "Performance"
+        "performance": "Suivi terrain"
       },
       "administration": {
         "title": "Administration",
@@ -886,7 +886,11 @@
     "zonePerformance": {
       "title": "Performance par commune",
       "zone": "Commune",
+      "viewField": "Voir terrain",
+      "traffic": "Trafic",
+      "totalOrders": "Total commandes",
       "deliveries": "Livraisons",
+      "successRate": "Réussite",
       "revenue": "Revenus"
     }
   },
@@ -915,8 +919,11 @@
     }
   },
   "performance": {
-    "title": "Performance",
-    "zonePlaceholder": "Filtrer par zone...",
+    "title": "Suivi terrain",
+    "description": "Vue par commune des commandes, des trajets et des livreurs disponibles.",
+    "activeOrdersHelp": "Commandes en cours : acceptées, en route, récupérées ou en livraison",
+    "communeActivity": "Activité par commune",
+    "zonePlaceholder": "Rechercher une commune...",
     "topDrivers": "Top 3 livreurs",
     "fullRanking": "Classement complet",
     "empty": "Aucun livreur dans le classement",

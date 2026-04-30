@@ -611,7 +611,7 @@ export default function AnalyticsPage() {
                 fontWeight: 700,
               }}
             >
-              Voir terrain
+              {t('analytics.zonePerformance.viewField')}
               <ExternalLink style={{ width: '14px', height: '14px' }} />
             </Link>
           </div>
@@ -620,10 +620,10 @@ export default function AnalyticsPage() {
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.grayLight }}>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.zone')}</th>
-                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Trafic</th>
-                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Total commandes</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.traffic')}</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.totalOrders')}</th>
                   <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.deliveries')}</th>
-                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Réussite</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.successRate')}</th>
                   <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.revenue')}</th>
                 </tr>
               </thead>

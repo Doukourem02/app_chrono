@@ -207,7 +207,7 @@ export default function GamificationPage() {
           {t('performance.title')}
         </h1>
         <p style={{ color: themeColors.textSecondary, fontSize: '14px', margin: 0 }}>
-          Cockpit terrain par commune, basé sur les commandes, les flux pickup → dropoff et les livreurs libres géolocalisés.
+          {t('performance.description')}
         </p>
       </div>
 
@@ -276,10 +276,10 @@ export default function GamificationPage() {
         <div style={{ padding: '18px 20px', borderBottom: `1px solid ${themeColors.cardBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 800, color: themeColors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BarChart3 style={{ width: '18px', height: '18px', color: themeColors.purplePrimary }} />
-            Communes terrain
+            {t('performance.communeActivity')}
           </h2>
           <span style={{ fontSize: '12px', color: themeColors.textTertiary }}>
-            Actives = accepted + enroute + picked_up + delivering + in_progress
+            {t('performance.activeOrdersHelp')}
           </span>
         </div>
 

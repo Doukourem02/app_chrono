@@ -54,8 +54,9 @@ export function getTranslation(
 
   // Si la valeur finale est une chaîne, remplacer les paramètres
   if (typeof value === 'string' && params) {
-    return value.replace(/\{\{(\w+)\}\}/g, (match, paramKey) => {
-      return params[paramKey]?.toString() || match
+    return value.replace(/\{\{(\w+)\}\}|\{(\w+)\}/g, (match, doubleBraceKey, singleBraceKey) => {
+      const paramKey = doubleBraceKey || singleBraceKey
+      return params[paramKey]?.toString() ?? match
     })
   }
 
@@ -70,4 +71,3 @@ export function getTranslation(
 export function t(language: Language, key: TranslationKey, params?: Record<string, string | number>): string {
   return getTranslation(language, key, params)
 }
-
