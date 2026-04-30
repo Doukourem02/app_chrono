@@ -151,9 +151,11 @@ export async function getLeaderboard(
       dateFilter = "AND o.created_at >= CURRENT_DATE - INTERVAL '30 days'";
     }
 
+    const params: any[] = [];
     let zoneFilter = '';
     if (zone) {
-      zoneFilter = `AND o.pickup_address LIKE '%${zone}%'`;
+      params.push(`%${zone}%`);
+      zoneFilter = `AND o.pickup_address ILIKE $${params.length}`;
     }
 
     const result = await pool.query(
@@ -172,7 +174,7 @@ export async function getLeaderboard(
       HAVING COUNT(o.id) FILTER (WHERE o.status = 'completed') > 0
       ORDER BY score DESC
       LIMIT 50`,
-      []
+      params
     );
 
     return result.rows.map((row, index) => {
@@ -267,4 +269,3 @@ export async function calculateDriverScore(driverId: string): Promise<number> {
     return 0;
   }
 }
-

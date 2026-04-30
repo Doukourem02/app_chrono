@@ -15,7 +15,11 @@ import { useLanguageStore } from '@/stores/languageStore'
 interface ZoneData {
   zone: string
   completed: number
+  completedOrders?: number
   revenue: string | number
+  totalOrders?: number
+  successRate?: number
+  trafficIndex?: number
 }
 
 type TabType = 'overview' | 'ratings'
@@ -590,24 +594,52 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {/* Données par zone */}
+      {/* Synthèse par commune */}
       {performance && (
         <div style={{ padding: '20px', backgroundColor: themeColors.cardBg, borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: `1px solid ${themeColors.cardBorder}` }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.title')}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: themeColors.textPrimary, margin: 0 }}>{t('analytics.zonePerformance.title')}</h2>
+            <Link
+              href="/gamification"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: themeColors.purplePrimary,
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: 700,
+              }}
+            >
+              Voir terrain
+              <ExternalLink style={{ width: '14px', height: '14px' }} />
+            </Link>
+          </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.grayLight }}>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.zone')}</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Trafic</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Total commandes</th>
                   <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.deliveries')}</th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>Réussite</th>
                   <th style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: themeColors.textPrimary }}>{t('analytics.zonePerformance.revenue')}</th>
                 </tr>
               </thead>
               <tbody>
-                {performance.byZone?.map((zone: ZoneData, index: number) => (
-                  <tr key={index} style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
+                {[...(performance.byZone || [])]
+                  .sort((a: ZoneData, b: ZoneData) => (b.trafficIndex || 0) - (a.trafficIndex || 0))
+                  .slice(0, 8)
+                  .map((zone: ZoneData, index: number) => (
+                  <tr key={`${zone.zone}-${index}`} style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
                     <td style={{ padding: '12px', color: themeColors.textPrimary }}>{zone.zone}</td>
-                    <td style={{ padding: '12px', textAlign: 'right', color: themeColors.textPrimary }}>{zone.completed}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: themeColors.textPrimary, fontWeight: 700 }}>{zone.trafficIndex || 0}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: themeColors.textPrimary }}>{zone.totalOrders || 0}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: themeColors.textPrimary }}>{zone.completedOrders ?? zone.completed}</td>
+                    <td style={{ padding: '12px', textAlign: 'right', color: (zone.successRate || 0) >= 80 ? '#047857' : (zone.successRate || 0) >= 55 ? '#B45309' : '#B91C1C', fontWeight: 700 }}>
+                      {zone.successRate ?? 0}%
+                    </td>
                     <td style={{ padding: '12px', textAlign: 'right', color: themeColors.textPrimary }}>
                       {parseFloat(String(zone.revenue || 0)).toLocaleString()} FCFA
                     </td>

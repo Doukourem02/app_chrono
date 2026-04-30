@@ -8,6 +8,7 @@ import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import type { Driver } from '@/types'
+import { useTranslation } from '@/hooks/useTranslation'
 
 type TabType = 'overview' | 'commission' | 'deliveries' | 'ratings'
 
@@ -24,6 +25,7 @@ interface Transaction {
 export default function DriverDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const t = useTranslation()
   const driverId = params?.driverId as string
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<TabType>('overview')
@@ -131,12 +133,12 @@ export default function DriverDetailPage() {
 
   const getBalanceStatus = (balance: number | undefined, isSuspended: boolean | undefined, isInactive: boolean | undefined) => {
     // Suspendu manuellement (sanction)
-    if (isSuspended) return 'Suspendu'
+    if (isSuspended) return t('drivers.balance.suspended')
     // Non actif (solde insuffisant, pas une sanction)
-    if (isInactive || balance === 0) return 'Non actif'
-    if (balance !== undefined && balance < 1000) return 'Très faible'
-    if (balance !== undefined && balance < 3000) return 'Faible'
-    return 'Actif'
+    if (isInactive || balance === 0) return t('drivers.balance.inactive')
+    if (balance !== undefined && balance < 1000) return t('drivers.balance.veryLow')
+    if (balance !== undefined && balance < 3000) return t('drivers.balance.low')
+    return t('drivers.balance.active')
   }
 
   if (isLoading) {
@@ -154,7 +156,7 @@ export default function DriverDetailPage() {
     return (
       <ScreenTransition>
         <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
-          Livreur non trouvé
+          {t('drivers.detail.notFound')}
         </div>
       </ScreenTransition>
     )
@@ -245,7 +247,7 @@ export default function DriverDetailPage() {
   const handleRecharge = () => {
     const amount = parseFloat(rechargeAmount)
     if (amount < 10000) {
-      alert('Le montant minimum est de 10 000 FCFA')
+      alert(t('drivers.detail.minimumAmountError'))
       return
     }
     rechargeMutation.mutate(amount)
@@ -265,12 +267,12 @@ export default function DriverDetailPage() {
               {driver.driver_type === 'partner' ? (
                 <>
                   <Briefcase size={14} />
-                  Partenaire
+                  {t('drivers.types.partner')}
                 </>
               ) : (
                 <>
                   <User size={14} />
-                  Interne
+                  {t('drivers.types.internal')}
                 </>
               )}
             </span>
@@ -280,21 +282,21 @@ export default function DriverDetailPage() {
         {/* Informations générales */}
         <div style={cardStyle}>
           <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>
-            Informations générales
+            {t('drivers.detail.generalInfo')}
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
             <div>
-              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Téléphone</div>
+              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.table.phone')}</div>
               <div style={{ fontSize: '14px', color: '#111827' }}>{driver.phone || 'N/A'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Statut</div>
+              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.table.status')}</div>
               <div style={{ fontSize: '14px', color: driver.is_online ? '#10B981' : '#9CA3AF' }}>
-                {driver.is_online ? 'En ligne' : 'Hors ligne'}
+                {driver.is_online ? t('drivers.online') : t('drivers.offline')}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Livraisons</div>
+              <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.table.deliveries')}</div>
               <div style={{ fontSize: '14px', color: '#111827' }}>
                 {driver.completed_deliveries || 0} / {driver.total_deliveries || 0}
               </div>
@@ -313,7 +315,7 @@ export default function DriverDetailPage() {
           <div style={tabContainerStyle}>
             <button style={tabButtonStyle(activeTab === 'overview')} onClick={() => setActiveTab('overview')}>
               <User size={16} />
-              Vue d&apos;ensemble
+              {t('drivers.detail.tabs.overview')}
             </button>
             {isPartner && (
               <button style={tabButtonStyle(activeTab === 'commission')} onClick={() => setActiveTab('commission')}>
@@ -323,33 +325,33 @@ export default function DriverDetailPage() {
             )}
             <button style={tabButtonStyle(activeTab === 'deliveries')} onClick={() => setActiveTab('deliveries')}>
               <Package size={16} />
-              Livraisons
+              {t('drivers.detail.tabs.deliveries')}
             </button>
             <button style={tabButtonStyle(activeTab === 'ratings')} onClick={() => setActiveTab('ratings')}>
               <Star size={16} />
-              Évaluations
+              {t('drivers.detail.tabs.ratings')}
             </button>
           </div>
 
           {/* Contenu des onglets */}
           {activeTab === 'overview' && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Statistiques</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>{t('drivers.detail.statistics')}</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                 <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Livraisons totales</div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.detail.totalDeliveries')}</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827' }}>
                     {driver.completed_deliveries || 0}
                   </div>
                 </div>
                 <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Revenus totaux</div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.detail.totalRevenue')}</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827' }}>
                     {formatCurrency(driver.total_revenue)}
                   </div>
                 </div>
                 <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Rating moyen</div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.detail.averageRating')}</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827' }}>
                     {driver.average_rating ? `${driver.average_rating.toFixed(1)} ⭐` : 'N/A'}
                   </div>
@@ -364,22 +366,22 @@ export default function DriverDetailPage() {
               <div style={{ marginBottom: '24px', padding: '20px', backgroundColor: '#F9FAFB', borderRadius: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Solde Commission</div>
+                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.detail.commissionBalance')}</div>
                     <div style={{ fontSize: '32px', fontWeight: 700, color: balanceColor }}>
                       {formatCurrency(balance)}
                     </div>
                     <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
-                      Taux: {commissionAccount?.commission_rate || 10}%
+                      {t('drivers.detail.rate')}: {commissionAccount?.commission_rate || 10}%
                     </div>
                   </div>
                   <div>
                     {isSuspended ? (
                       <span style={{ padding: '6px 12px', borderRadius: '6px', backgroundColor: '#FEE2E2', color: '#DC2626', fontSize: '12px', fontWeight: 600 }}>
-                        Suspendu
+                        {t('drivers.balance.suspended')}
                       </span>
                     ) : isInactive ? (
                       <span style={{ padding: '6px 12px', borderRadius: '6px', backgroundColor: '#FEF3C7', color: '#D97706', fontSize: '12px', fontWeight: 600 }}>
-                        Non actif
+                        {t('drivers.balance.inactive')}
                       </span>
                     ) : (
                       <span style={{ padding: '6px 12px', borderRadius: '6px', backgroundColor: '#D1FAE5', color: '#065F46', fontSize: '12px', fontWeight: 600 }}>
@@ -402,7 +404,7 @@ export default function DriverDetailPage() {
                   }}
                 >
                   <CreditCard size={16} style={{ display: 'inline', marginRight: '8px' }} />
-                  Recharger
+                  {t('drivers.detail.recharge')}
                 </button>
               </div>
 
@@ -414,25 +416,25 @@ export default function DriverDetailPage() {
                 marginBottom: '24px' 
               }}>
                 <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Commissions ce mois</div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.detail.commissionsThisMonth')}</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: '#EF4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <TrendingDown size={16} />
                     {formatCurrency(commissionStats.monthlyDeductions)}
                   </div>
                   <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
-                    {commissionStats.deductionCount} prélèvements
+                    {t('drivers.detail.deductionCount', { count: commissionStats.deductionCount })}
                   </div>
                 </div>
                 
                 <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Moyenne par commande</div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.detail.averagePerOrder')}</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827' }}>
                     {formatCurrency(commissionStats.averageDeduction)}
                   </div>
                 </div>
                 
                 <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Total recharges</div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{t('drivers.detail.totalRecharges')}</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <TrendingUp size={16} />
                     {formatCurrency(commissionStats.totalRecharges)}
@@ -441,10 +443,10 @@ export default function DriverDetailPage() {
               </div>
 
               {/* Historique des transactions */}
-              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Historique des transactions</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>{t('drivers.detail.transactionHistory')}</h3>
               {transactions.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
-                  Aucune transaction
+                  {t('drivers.detail.noTransaction')}
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
@@ -453,9 +455,9 @@ export default function DriverDetailPage() {
                       <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
                         <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Date</th>
                         <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Type</th>
-                        <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Commande</th>
-                        <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Montant</th>
-                        <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>Solde après</th>
+                        <th style={{ padding: '12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>{t('drivers.detail.order')}</th>
+                        <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>{t('drivers.detail.amount')}</th>
+                        <th style={{ padding: '12px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>{t('drivers.detail.balanceAfter')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -471,7 +473,7 @@ export default function DriverDetailPage() {
                               backgroundColor: tx.type === 'recharge' ? '#D1FAE5' : tx.type === 'deduction' ? '#FEE2E2' : '#FEF3C7',
                               color: tx.type === 'recharge' ? '#065F46' : tx.type === 'deduction' ? '#DC2626' : '#92400E',
                             }}>
-                              {tx.type === 'recharge' ? 'Recharge' : tx.type === 'deduction' ? 'Prélèvement' : 'Remboursement'}
+                              {tx.type === 'recharge' ? t('drivers.detail.transactionTypes.recharge') : tx.type === 'deduction' ? t('drivers.detail.transactionTypes.deduction') : t('drivers.detail.transactionTypes.refund')}
                             </span>
                           </td>
                           <td style={{ padding: '12px', fontSize: '14px', color: '#111827' }}>
@@ -517,7 +519,7 @@ export default function DriverDetailPage() {
           {activeTab === 'deliveries' && (
             <div>
               <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
-                Historique des livraisons (à implémenter)
+                {t('drivers.detail.deliveriesComingSoon')}
               </div>
             </div>
           )}
@@ -525,7 +527,7 @@ export default function DriverDetailPage() {
           {activeTab === 'ratings' && (
             <div>
               <div style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
-                Historique des évaluations (à implémenter)
+                {t('drivers.detail.ratingsComingSoon')}
               </div>
             </div>
           )}
@@ -558,10 +560,10 @@ export default function DriverDetailPage() {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>Recharger le compte</h3>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px' }}>{t('drivers.detail.rechargeAccount')}</h3>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
-                  Montant (FCFA)
+                  {t('drivers.detail.amountFcfa')}
                 </label>
                 <input
                   type="number"
@@ -578,17 +580,17 @@ export default function DriverDetailPage() {
                   }}
                 />
                 <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
-                  Minimum: 10 000 FCFA
+                  {t('drivers.detail.minimumAmount')}
                 </div>
               </div>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
-                  Notes (optionnel)
+                  {t('drivers.detail.notesOptional')}
                 </label>
                 <textarea
                   value={rechargeNotes}
                   onChange={(e) => setRechargeNotes(e.target.value)}
-                  placeholder="Raison de la recharge..."
+                  placeholder={t('drivers.detail.rechargeReasonPlaceholder')}
                   rows={3}
                   style={{
                     width: '100%',
@@ -614,7 +616,7 @@ export default function DriverDetailPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  Annuler
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleRecharge}
@@ -630,7 +632,7 @@ export default function DriverDetailPage() {
                     cursor: rechargeMutation.isPending || !rechargeAmount || parseFloat(rechargeAmount) < 10000 ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {rechargeMutation.isPending ? 'Rechargement...' : 'Recharger'}
+                  {rechargeMutation.isPending ? t('drivers.detail.recharging') : t('drivers.detail.recharge')}
                 </button>
               </div>
             </div>

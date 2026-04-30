@@ -460,6 +460,7 @@
     "stats": {
       "totalVehicles": "Total véhicules",
       "active": "Actifs",
+      "activeVehicles": "Véhicules actifs",
       "maintenance": "En maintenance",
       "retiredVehicles": "Véhicules retirés",
       "avgOdometer": "Kilométrage moyen",
@@ -468,7 +469,11 @@
       "noExpiringDocuments": "Aucun document n'expire bientôt"
     },
     "alerts": {
-      "expiringDocuments": "document(s) expirant bientôt"
+      "expiringDocuments": "document(s) expirant bientôt",
+      "expiresOn": "expire le",
+      "other": "autre",
+      "others": "autres",
+      "noExpiringIn30Days": "Aucun document expirant dans les 30 prochains jours."
     },
     "filters": {
       "search": "Rechercher par plaque, marque, modèle...",
@@ -511,12 +516,16 @@
         "documents": "Documents"
       },
       "info": {
+        "odometer": "Kilométrage",
+        "updatedOn": "Mis à jour le",
+        "vehicleFallback": "Véhicule",
         "purchaseDate": "Date d'achat",
         "purchasePrice": "Prix d'achat",
         "fuelType": "Type de carburant",
         "lastOdometerUpdate": "Dernière mise à jour du kilométrage",
         "driver": "Livreur actuel",
-        "noDriver": "Non assigné"
+        "noDriver": "Non assigné",
+        "notSpecified": "Non spécifié"
       },
       "stats": {
         "totalRevenue": "Revenus totaux",
@@ -525,9 +534,11 @@
         "netProfit": "Profit net",
         "roi": "ROI",
         "totalDistance": "Distance totale",
-        "totalDeliveries": "Total livraisons"
+        "totalDeliveries": "Total livraisons",
+        "averageDistance": "Distance moyenne"
       },
       "sections": {
+        "statistics": "Statistiques",
         "recentFuel": "Ravitaillements récents",
         "scheduledMaintenance": "Entretiens planifiés",
         "financialSummary": "Résumé financier (dernière période)",
@@ -546,7 +557,26 @@
         },
         "scheduled": "Planifié",
         "completed": "Terminé",
-        "atOdometer": "au kilométrage"
+        "atOdometer": "au kilométrage",
+        "types": {
+          "routine": "Révision périodique",
+          "repair": "Réparation",
+          "inspection": "Contrôle technique",
+          "insurance": "Assurance",
+          "registration": "Carte grise",
+          "tireChange": "Changement pneus",
+          "batteryReplacement": "Changement batterie",
+          "other": "Autre"
+        }
+      },
+      "documentTypes": {
+        "registration": "Carte grise",
+        "insurance": "Assurance",
+        "inspection": "Contrôle technique",
+        "driverLicense": "Permis de conduire"
+      },
+      "fuel": {
+        "consumption": "Consommation"
       },
       "documents": {
         "noDocuments": "Aucun document enregistré",
@@ -574,6 +604,14 @@
         "fuelCost": "Coût carburant",
         "maintenanceCost": "Coût entretien"
       }
+    },
+    "repairs": {
+      "title": "Entretien & réparations",
+      "description": "Vue dédiée à venir. Les interventions sont pour l'instant listées au niveau de chaque véhicule."
+    },
+    "budget": {
+      "title": "Budget flotte",
+      "description": "Synthèse budgétaire à venir."
     }
   },
   "planning": {
@@ -695,6 +733,45 @@
     },
     "pagination": {
       "pageOf": "Page {{page}} sur {{total}}"
+    },
+    "detail": {
+      "notFound": "Livreur non trouvé",
+      "generalInfo": "Informations générales",
+      "tabs": {
+        "overview": "Vue d'ensemble",
+        "deliveries": "Livraisons",
+        "ratings": "Évaluations"
+      },
+      "statistics": "Statistiques",
+      "totalDeliveries": "Livraisons totales",
+      "totalRevenue": "Revenus totaux",
+      "averageRating": "Rating moyen",
+      "commissionBalance": "Solde Commission",
+      "rate": "Taux",
+      "recharge": "Recharger",
+      "commissionsThisMonth": "Commissions ce mois",
+      "deductionCount": "{{count}} prélèvements",
+      "averagePerOrder": "Moyenne par commande",
+      "totalRecharges": "Total recharges",
+      "transactionHistory": "Historique des transactions",
+      "noTransaction": "Aucune transaction",
+      "order": "Commande",
+      "amount": "Montant",
+      "balanceAfter": "Solde après",
+      "transactionTypes": {
+        "recharge": "Recharge",
+        "deduction": "Prélèvement",
+        "refund": "Remboursement"
+      },
+      "deliveriesComingSoon": "Historique des livraisons (à implémenter)",
+      "ratingsComingSoon": "Historique des évaluations (à implémenter)",
+      "rechargeAccount": "Recharger le compte",
+      "amountFcfa": "Montant (FCFA)",
+      "minimumAmount": "Minimum: 10 000 FCFA",
+      "minimumAmountError": "Le montant minimum est de 10 000 FCFA",
+      "notesOptional": "Notes (optionnel)",
+      "rechargeReasonPlaceholder": "Raison de la recharge...",
+      "recharging": "Rechargement..."
     }
   },
   "promoCodes": {

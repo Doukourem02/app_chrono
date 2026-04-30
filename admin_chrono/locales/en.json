@@ -460,6 +460,7 @@
     "stats": {
       "totalVehicles": "Total vehicles",
       "active": "Active",
+      "activeVehicles": "Active vehicles",
       "maintenance": "In maintenance",
       "retiredVehicles": "Retired vehicles",
       "avgOdometer": "Average odometer",
@@ -468,7 +469,11 @@
       "noExpiringDocuments": "No documents expiring soon"
     },
     "alerts": {
-      "expiringDocuments": "document(s) expiring soon"
+      "expiringDocuments": "document(s) expiring soon",
+      "expiresOn": "expires on",
+      "other": "other",
+      "others": "others",
+      "noExpiringIn30Days": "No documents expiring in the next 30 days."
     },
     "filters": {
       "search": "Search by plate, brand, model...",
@@ -511,12 +516,16 @@
         "documents": "Documents"
       },
       "info": {
+        "odometer": "Odometer",
+        "updatedOn": "Updated on",
+        "vehicleFallback": "Vehicle",
         "purchaseDate": "Purchase date",
         "purchasePrice": "Purchase price",
         "fuelType": "Fuel type",
         "lastOdometerUpdate": "Last odometer update",
         "driver": "Current driver",
-        "noDriver": "Not assigned"
+        "noDriver": "Not assigned",
+        "notSpecified": "Not specified"
       },
       "stats": {
         "totalRevenue": "Total revenue",
@@ -525,9 +534,11 @@
         "netProfit": "Net profit",
         "roi": "ROI",
         "totalDistance": "Total distance",
-        "totalDeliveries": "Total deliveries"
+        "totalDeliveries": "Total deliveries",
+        "averageDistance": "Average distance"
       },
       "sections": {
+        "statistics": "Statistics",
         "recentFuel": "Recent fuel logs",
         "scheduledMaintenance": "Scheduled repairs",
         "financialSummary": "Financial summary (last period)",
@@ -546,7 +557,26 @@
         },
         "scheduled": "Scheduled",
         "completed": "Completed",
-        "atOdometer": "at odometer"
+        "atOdometer": "at odometer",
+        "types": {
+          "routine": "Routine service",
+          "repair": "Repair",
+          "inspection": "Technical inspection",
+          "insurance": "Insurance",
+          "registration": "Registration certificate",
+          "tireChange": "Tire change",
+          "batteryReplacement": "Battery replacement",
+          "other": "Other"
+        }
+      },
+      "documentTypes": {
+        "registration": "Registration certificate",
+        "insurance": "Insurance",
+        "inspection": "Technical inspection",
+        "driverLicense": "Driver license"
+      },
+      "fuel": {
+        "consumption": "Consumption"
       },
       "documents": {
         "noDocuments": "No documents recorded",
@@ -574,6 +604,14 @@
         "fuelCost": "Fuel cost",
         "maintenanceCost": "Maintenance cost"
       }
+    },
+    "repairs": {
+      "title": "Repairs & maintenance",
+      "description": "Dedicated view coming soon. For now, interventions are listed on each vehicle."
+    },
+    "budget": {
+      "title": "Fleet budget",
+      "description": "Budget summary coming soon."
     }
   },
   "planning": {
@@ -695,6 +733,45 @@
     },
     "pagination": {
       "pageOf": "Page {{page}} of {{total}}"
+    },
+    "detail": {
+      "notFound": "Driver not found",
+      "generalInfo": "General information",
+      "tabs": {
+        "overview": "Overview",
+        "deliveries": "Deliveries",
+        "ratings": "Ratings"
+      },
+      "statistics": "Statistics",
+      "totalDeliveries": "Total deliveries",
+      "totalRevenue": "Total revenue",
+      "averageRating": "Average rating",
+      "commissionBalance": "Commission balance",
+      "rate": "Rate",
+      "recharge": "Top up",
+      "commissionsThisMonth": "Commissions this month",
+      "deductionCount": "{{count}} deductions",
+      "averagePerOrder": "Average per order",
+      "totalRecharges": "Total top-ups",
+      "transactionHistory": "Transaction history",
+      "noTransaction": "No transaction",
+      "order": "Order",
+      "amount": "Amount",
+      "balanceAfter": "Balance after",
+      "transactionTypes": {
+        "recharge": "Top-up",
+        "deduction": "Deduction",
+        "refund": "Refund"
+      },
+      "deliveriesComingSoon": "Delivery history (coming soon)",
+      "ratingsComingSoon": "Rating history (coming soon)",
+      "rechargeAccount": "Top up account",
+      "amountFcfa": "Amount (FCFA)",
+      "minimumAmount": "Minimum: 10,000 FCFA",
+      "minimumAmountError": "The minimum amount is 10,000 FCFA",
+      "notesOptional": "Notes (optional)",
+      "rechargeReasonPlaceholder": "Reason for the top-up...",
+      "recharging": "Topping up..."
     }
   },
   "promoCodes": {

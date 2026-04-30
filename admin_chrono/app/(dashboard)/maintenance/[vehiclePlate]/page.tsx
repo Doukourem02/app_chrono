@@ -9,12 +9,14 @@ import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { AnimatedCard } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
+import { useTranslation } from '@/hooks/useTranslation'
 
 type TabType = 'overview' | 'finances' | 'mileage' | 'maintenance' | 'documents'
 
 export default function VehicleDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const t = useTranslation()
   const vehiclePlate = params?.vehiclePlate as string
   const [activeTab, setActiveTab] = useState<TabType>('overview')
 
@@ -132,16 +134,31 @@ export default function VehicleDetailPage() {
     }
   }
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active':
+        return t('maintenance.table.active')
+      case 'maintenance':
+        return t('maintenance.table.maintenance')
+      case 'retired':
+        return t('maintenance.table.retired')
+      case 'reserved':
+        return t('maintenance.table.reserved')
+      default:
+        return status
+    }
+  }
+
   const getDocumentTypeLabel = (type: string) => {
     switch (type) {
       case 'carte_grise':
-        return 'Carte grise'
+        return t('maintenance.detail.documentTypes.registration')
       case 'assurance':
-        return 'Assurance'
+        return t('maintenance.detail.documentTypes.insurance')
       case 'controle_technique':
-        return 'Contrôle technique'
+        return t('maintenance.detail.documentTypes.inspection')
       case 'permis_conduire':
-        return 'Permis de conduire'
+        return t('maintenance.detail.documentTypes.driverLicense')
       default:
         return type
     }
@@ -150,21 +167,21 @@ export default function VehicleDetailPage() {
   const getMaintenanceTypeLabel = (type: string) => {
     switch (type) {
       case 'routine':
-        return 'Révision périodique'
+        return t('maintenance.detail.maintenance.types.routine')
       case 'repair':
-        return 'Réparation'
+        return t('maintenance.detail.maintenance.types.repair')
       case 'inspection':
-        return 'Contrôle technique'
+        return t('maintenance.detail.maintenance.types.inspection')
       case 'insurance':
-        return 'Assurance'
+        return t('maintenance.detail.maintenance.types.insurance')
       case 'registration':
-        return 'Carte grise'
+        return t('maintenance.detail.maintenance.types.registration')
       case 'tire_change':
-        return 'Changement pneus'
+        return t('maintenance.detail.maintenance.types.tireChange')
       case 'battery_replacement':
-        return 'Changement batterie'
+        return t('maintenance.detail.maintenance.types.batteryReplacement')
       case 'other':
-        return 'Autre'
+        return t('maintenance.detail.maintenance.types.other')
       default:
         return type
     }
@@ -224,7 +241,7 @@ export default function VehicleDetailPage() {
         <div className="p-6 text-center">
           <Car className="w-16 h-16 mx-auto mb-4" style={{ color: themeColors.textSecondary }} />
           <p className="text-lg font-medium" style={{ color: themeColors.textPrimary }}>
-            Véhicule non trouvé
+            {t('maintenance.detail.notFound')}
           </p>
         </div>
       </ScreenTransition>
@@ -315,7 +332,7 @@ export default function VehicleDetailPage() {
                 <span
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${getStatusColor(vehicle.status)}`}
                 >
-                  {vehicle.status === 'active' ? 'Actif' : vehicle.status === 'maintenance' ? 'Maintenance' : vehicle.status === 'retired' ? 'Retiré' : 'Réservé'}
+                  {getStatusLabel(vehicle.status)}
                 </span>
               </div>
               <p style={{
@@ -325,7 +342,7 @@ export default function VehicleDetailPage() {
               }}>
                 {vehicle.vehicle_brand && vehicle.vehicle_model
                   ? `${vehicle.vehicle_brand} ${vehicle.vehicle_model}`
-                  : vehicle.vehicle_brand || vehicle.vehicle_model || 'Véhicule'}
+                  : vehicle.vehicle_brand || vehicle.vehicle_model || t('maintenance.detail.info.vehicleFallback')}
                 {vehicle.vehicle_color && ` • ${vehicle.vehicle_color}`}
               </p>
             </div>
@@ -355,7 +372,7 @@ export default function VehicleDetailPage() {
                   fontWeight: 500,
                   color: themeColors.textSecondary,
                 }}>
-                  Kilométrage
+                  {t('maintenance.detail.info.odometer')}
                 </span>
               </div>
               <p style={{
@@ -371,7 +388,7 @@ export default function VehicleDetailPage() {
                   fontSize: '12px',
                   color: themeColors.textSecondary,
                 }}>
-                  Mis à jour le {formatDate(vehicle.last_odometer_update)}
+                  {t('maintenance.detail.info.updatedOn')} {formatDate(vehicle.last_odometer_update)}
                 </p>
               )}
             </AnimatedCard>
@@ -398,7 +415,7 @@ export default function VehicleDetailPage() {
                   fontWeight: 500,
                   color: themeColors.textSecondary,
                 }}>
-                  Livreur actuel
+                  {t('maintenance.detail.info.driver')}
                 </span>
               </div>
               {vehicle.driver_first_name || vehicle.driver_last_name ? (
@@ -415,7 +432,7 @@ export default function VehicleDetailPage() {
                   color: themeColors.textSecondary,
                   fontStyle: 'italic',
                 }}>
-                  Non assigné
+                  {t('maintenance.detail.info.noDriver')}
                 </p>
               )}
             </AnimatedCard>
@@ -442,7 +459,7 @@ export default function VehicleDetailPage() {
                   fontWeight: 500,
                   color: themeColors.textSecondary,
                 }}>
-                  Type de carburant
+                  {t('maintenance.detail.info.fuelType')}
                 </span>
               </div>
               <p style={{
@@ -451,7 +468,7 @@ export default function VehicleDetailPage() {
                 textTransform: 'capitalize',
                 color: themeColors.textPrimary,
               }}>
-                {vehicle.fuel_type || 'Non spécifié'}
+                {vehicle.fuel_type || t('maintenance.detail.info.notSpecified')}
               </p>
             </AnimatedCard>
           </div>
@@ -462,7 +479,7 @@ export default function VehicleDetailPage() {
           <div style={tabContainerStyle}>
             <button style={tabButtonStyle(activeTab === 'overview')} onClick={() => setActiveTab('overview')}>
               <Car size={16} />
-              Vue d&apos;ensemble
+              {t('maintenance.detail.tabs.overview')}
             </button>
             <button style={tabButtonStyle(activeTab === 'finances')} onClick={() => setActiveTab('finances')}>
               <DollarSign size={16} />
@@ -470,15 +487,15 @@ export default function VehicleDetailPage() {
             </button>
             <button style={tabButtonStyle(activeTab === 'mileage')} onClick={() => setActiveTab('mileage')}>
               <Gauge size={16} />
-              Kilométrage
+              {t('maintenance.detail.tabs.mileage')}
             </button>
             <button style={tabButtonStyle(activeTab === 'maintenance')} onClick={() => setActiveTab('maintenance')}>
               <Wrench size={16} />
-              Maintenance
+              {t('maintenance.detail.tabs.maintenance')}
             </button>
             <button style={tabButtonStyle(activeTab === 'documents')} onClick={() => setActiveTab('documents')}>
               <FileText size={16} />
-              Documents
+              {t('maintenance.detail.tabs.documents')}
             </button>
           </div>
 
@@ -492,7 +509,7 @@ export default function VehicleDetailPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <DollarSign className="w-4 h-4" style={{ color: themeColors.textSecondary }} />
                       <span className="text-sm font-medium" style={{ color: themeColors.textSecondary }}>
-                        Revenus totaux
+                        {t('maintenance.detail.stats.totalRevenue')}
                       </span>
                     </div>
                     <p className="text-xl font-bold" style={{ color: themeColors.textPrimary }}>
@@ -504,7 +521,7 @@ export default function VehicleDetailPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <Fuel className="w-4 h-4" style={{ color: themeColors.textSecondary }} />
                       <span className="text-sm font-medium" style={{ color: themeColors.textSecondary }}>
-                        Coût carburant
+                        {t('maintenance.detail.finances.fuelCost')}
                       </span>
                     </div>
                     <p className="text-xl font-bold" style={{ color: themeColors.textPrimary }}>
@@ -516,7 +533,7 @@ export default function VehicleDetailPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <Wrench className="w-4 h-4" style={{ color: themeColors.textSecondary }} />
                       <span className="text-sm font-medium" style={{ color: themeColors.textSecondary }}>
-                        Coût maintenance
+                        {t('maintenance.detail.finances.maintenanceCost')}
                       </span>
                     </div>
                     <p className="text-xl font-bold" style={{ color: themeColors.textPrimary }}>
@@ -528,7 +545,7 @@ export default function VehicleDetailPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <TrendingUp className="w-4 h-4" style={{ color: themeColors.textSecondary }} />
                       <span className="text-sm font-medium" style={{ color: themeColors.textSecondary }}>
-                        Profit net
+                        {t('maintenance.detail.stats.netProfit')}
                       </span>
                     </div>
                     <p className="text-xl font-bold" style={{ color: stats.netProfit >= 0 ? '#10B981' : '#EF4444' }}>
@@ -547,7 +564,7 @@ export default function VehicleDetailPage() {
               {fuelLogs.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.textPrimary }}>
-                    Ravitaillements récents
+                    {t('maintenance.detail.sections.recentFuel')}
                   </h3>
                   <div className="space-y-2">
                     {fuelLogs.slice(0, 5).map((log) => (
@@ -567,7 +584,7 @@ export default function VehicleDetailPage() {
                           </div>
                           {log.consumption_per_100km && (
                             <p className="text-xs mt-1" style={{ color: themeColors.textSecondary }}>
-                              Consommation: {log.consumption_per_100km.toFixed(2)} {log.fuel_type === 'electric' ? 'kWh/100km' : 'L/100km'}
+                              {t('maintenance.detail.fuel.consumption')}: {log.consumption_per_100km.toFixed(2)} {log.fuel_type === 'electric' ? 'kWh/100km' : 'L/100km'}
                             </p>
                           )}
                         </div>
@@ -589,7 +606,7 @@ export default function VehicleDetailPage() {
               {maintenance.filter((m) => m.status === 'scheduled').length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.textPrimary }}>
-                    Maintenances planifiées
+                    {t('maintenance.detail.sections.scheduledMaintenance')}
                   </h3>
                   <div className="space-y-2">
                     {maintenance
@@ -634,30 +651,30 @@ export default function VehicleDetailPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-4 rounded-lg border" style={{ borderColor: themeColors.cardBorder }}>
                       <h3 className="font-semibold mb-4" style={{ color: themeColors.textPrimary }}>
-                        Résumé financier (dernière période)
+                        {t('maintenance.detail.sections.financialSummary')}
                       </h3>
                       <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span style={{ color: themeColors.textSecondary }}>Revenus:</span>
+                          <span style={{ color: themeColors.textSecondary }}>{t('maintenance.detail.finances.revenue')}:</span>
                           <span className="font-semibold" style={{ color: themeColors.textPrimary }}>
                             {formatCurrency(financial[0].total_revenue)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span style={{ color: themeColors.textSecondary }}>Coût carburant:</span>
+                          <span style={{ color: themeColors.textSecondary }}>{t('maintenance.detail.finances.fuelCost')}:</span>
                           <span className="font-semibold" style={{ color: themeColors.textPrimary }}>
                             {formatCurrency(financial[0].total_fuel_cost)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span style={{ color: themeColors.textSecondary }}>Coût maintenance:</span>
+                          <span style={{ color: themeColors.textSecondary }}>{t('maintenance.detail.finances.maintenanceCost')}:</span>
                           <span className="font-semibold" style={{ color: themeColors.textPrimary }}>
                             {formatCurrency(financial[0].total_maintenance_cost)}
                           </span>
                         </div>
                         <div className="flex justify-between pt-2 border-t" style={{ borderColor: themeColors.cardBorder }}>
                           <span className="font-semibold" style={{ color: themeColors.textPrimary }}>
-                            Profit net:
+                            {t('maintenance.detail.stats.netProfit')}:
                           </span>
                           <span
                             className="font-bold"
@@ -679,23 +696,23 @@ export default function VehicleDetailPage() {
 
                     <div className="p-4 rounded-lg border" style={{ borderColor: themeColors.cardBorder }}>
                       <h3 className="font-semibold mb-4" style={{ color: themeColors.textPrimary }}>
-                        Statistiques
+                        {t('maintenance.detail.sections.statistics')}
                       </h3>
                       <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span style={{ color: themeColors.textSecondary }}>Distance totale:</span>
+                          <span style={{ color: themeColors.textSecondary }}>{t('maintenance.detail.stats.totalDistance')}:</span>
                           <span className="font-semibold" style={{ color: themeColors.textPrimary }}>
                             {formatOdometer(financial[0].total_distance_km)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span style={{ color: themeColors.textSecondary }}>Livraisons:</span>
+                          <span style={{ color: themeColors.textSecondary }}>{t('maintenance.detail.stats.totalDeliveries')}:</span>
                           <span className="font-semibold" style={{ color: themeColors.textPrimary }}>
                             {financial[0].total_deliveries}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span style={{ color: themeColors.textSecondary }}>Période:</span>
+                          <span style={{ color: themeColors.textSecondary }}>{t('maintenance.detail.finances.period')}:</span>
                           <span className="font-semibold" style={{ color: themeColors.textPrimary }}>
                             {formatDate(financial[0].period_start)} - {formatDate(financial[0].period_end)}
                           </span>
@@ -708,10 +725,10 @@ export default function VehicleDetailPage() {
                 <div className="text-center py-12">
                   <DollarSign className="w-16 h-16 mx-auto mb-4" style={{ color: themeColors.textSecondary }} />
                   <p className="text-lg font-medium" style={{ color: themeColors.textPrimary }}>
-                    Aucune donnée financière disponible
+                    {t('maintenance.detail.finances.noData')}
                   </p>
                   <p className="text-sm mt-2" style={{ color: themeColors.textSecondary }}>
-                    Les données financières seront calculées automatiquement après les premières livraisons
+                    {t('maintenance.detail.finances.noDataDesc')}
                   </p>
                 </div>
               )}
@@ -727,7 +744,7 @@ export default function VehicleDetailPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <Gauge className="w-4 h-4" style={{ color: themeColors.textSecondary }} />
                         <span className="text-sm font-medium" style={{ color: themeColors.textSecondary }}>
-                          Distance totale
+                          {t('maintenance.detail.stats.totalDistance')}
                         </span>
                       </div>
                       <p className="text-xl font-bold" style={{ color: themeColors.textPrimary }}>
@@ -739,7 +756,7 @@ export default function VehicleDetailPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <Package className="w-4 h-4" style={{ color: themeColors.textSecondary }} />
                         <span className="text-sm font-medium" style={{ color: themeColors.textSecondary }}>
-                          Livraisons
+                          {t('maintenance.detail.stats.totalDeliveries')}
                         </span>
                       </div>
                       <p className="text-xl font-bold" style={{ color: themeColors.textPrimary }}>
@@ -751,7 +768,7 @@ export default function VehicleDetailPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <TrendingUp className="w-4 h-4" style={{ color: themeColors.textSecondary }} />
                         <span className="text-sm font-medium" style={{ color: themeColors.textSecondary }}>
-                          Distance moyenne
+                          {t('maintenance.detail.stats.averageDistance')}
                         </span>
                       </div>
                       <p className="text-xl font-bold" style={{ color: themeColors.textPrimary }}>
@@ -764,23 +781,23 @@ export default function VehicleDetailPage() {
 
                   <div>
                     <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.textPrimary }}>
-                      Historique des livraisons
+                      {t('maintenance.detail.sections.deliveryHistory')}
                     </h3>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="border-b" style={{ borderColor: themeColors.cardBorder }}>
                             <th className="text-left p-3 text-sm font-semibold" style={{ color: themeColors.textSecondary }}>
-                              Date
+                              {t('maintenance.detail.mileage.date')}
                             </th>
                             <th className="text-left p-3 text-sm font-semibold" style={{ color: themeColors.textSecondary }}>
-                              Distance
+                              {t('maintenance.detail.mileage.distance')}
                             </th>
                             <th className="text-left p-3 text-sm font-semibold" style={{ color: themeColors.textSecondary }}>
-                              Kilométrage
+                              {t('maintenance.detail.mileage.odometer')}
                             </th>
                             <th className="text-left p-3 text-sm font-semibold" style={{ color: themeColors.textSecondary }}>
-                              Revenu
+                              {t('maintenance.detail.mileage.revenue')}
                             </th>
                           </tr>
                         </thead>
@@ -816,10 +833,10 @@ export default function VehicleDetailPage() {
                 <div className="text-center py-12">
                   <Gauge className="w-16 h-16 mx-auto mb-4" style={{ color: themeColors.textSecondary }} />
                   <p className="text-lg font-medium" style={{ color: themeColors.textPrimary }}>
-                    Aucun kilométrage enregistré
+                    {t('maintenance.detail.mileage.noMileage')}
                   </p>
                   <p className="text-sm mt-2" style={{ color: themeColors.textSecondary }}>
-                    Le kilométrage sera enregistré automatiquement après chaque livraison
+                    {t('maintenance.detail.mileage.noMileageDesc')}
                   </p>
                 </div>
               )}
@@ -830,13 +847,13 @@ export default function VehicleDetailPage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold" style={{ color: themeColors.textPrimary }}>
-                  Historique des maintenances
+                  {t('maintenance.detail.sections.maintenanceHistory')}
                 </h3>
                 <button
                   className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-80 transition-opacity"
                   style={{ backgroundColor: themeColors.purplePrimary }}
                 >
-                  + Planifier une maintenance
+                  + {t('maintenance.detail.maintenance.schedule')}
                 </button>
               </div>
 
@@ -866,12 +883,12 @@ export default function VehicleDetailPage() {
                               }`}
                             >
                               {m.status === 'completed'
-                                ? 'Terminée'
+                                ? t('maintenance.detail.maintenance.status.completed')
                                 : m.status === 'scheduled'
-                                ? 'Planifiée'
+                                ? t('maintenance.detail.maintenance.status.scheduled')
                                 : m.status === 'overdue'
-                                ? 'En retard'
-                                : 'Annulée'}
+                                ? t('maintenance.detail.maintenance.status.overdue')
+                                : t('maintenance.detail.maintenance.status.cancelled')}
                             </span>
                           </div>
                           {m.description && (
@@ -890,13 +907,13 @@ export default function VehicleDetailPage() {
                         {m.scheduled_date && (
                           <div className="flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
-                            <span>Planifiée: {formatDate(m.scheduled_date)}</span>
+                            <span>{t('maintenance.detail.maintenance.scheduled')}: {formatDate(m.scheduled_date)}</span>
                           </div>
                         )}
                         {m.completed_date && (
                           <div className="flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
-                            <span>Terminée: {formatDate(m.completed_date)}</span>
+                            <span>{t('maintenance.detail.maintenance.completed')}: {formatDate(m.completed_date)}</span>
                           </div>
                         )}
                         {m.odometer_at_maintenance && (
@@ -919,7 +936,7 @@ export default function VehicleDetailPage() {
                 <div className="text-center py-12">
                   <Wrench className="w-16 h-16 mx-auto mb-4" style={{ color: themeColors.textSecondary }} />
                   <p className="text-lg font-medium" style={{ color: themeColors.textPrimary }}>
-                    Aucune maintenance enregistrée
+                    {t('maintenance.detail.maintenance.noMaintenance')}
                   </p>
                 </div>
               )}
@@ -930,7 +947,7 @@ export default function VehicleDetailPage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold" style={{ color: themeColors.textPrimary }}>
-                  Documents légaux
+                  {t('maintenance.detail.sections.legalDocuments')}
                 </h3>
               </div>
 
@@ -971,20 +988,20 @@ export default function VehicleDetailPage() {
                         <div className="space-y-2 text-sm">
                           {doc.issue_date && (
                             <div className="flex justify-between">
-                              <span style={{ color: themeColors.textSecondary }}>Date d&apos;émission:</span>
+                              <span style={{ color: themeColors.textSecondary }}>{t('maintenance.detail.documents.issueDate')}:</span>
                               <span style={{ color: themeColors.textPrimary }}>{formatDate(doc.issue_date)}</span>
                             </div>
                           )}
                           {doc.expiry_date && (
                             <div className="flex justify-between">
-                              <span style={{ color: themeColors.textSecondary }}>Date d&apos;expiration:</span>
+                              <span style={{ color: themeColors.textSecondary }}>{t('maintenance.detail.documents.expiryDate')}:</span>
                               <span
                                 className={isExpired ? 'font-semibold text-red-600' : isExpiring ? 'font-semibold text-yellow-600' : ''}
                                 style={!isExpired && !isExpiring ? { color: themeColors.textPrimary } : {}}
                               >
                                 {formatDate(doc.expiry_date)}
-                                {isExpired && ' (Expiré)'}
-                                {isExpiring && !isExpired && ' (Expire bientôt)'}
+                                {isExpired && ` (${t('maintenance.detail.documents.expired')})`}
+                                {isExpiring && !isExpired && ` (${t('maintenance.detail.documents.expiringSoon')})`}
                               </span>
                             </div>
                           )}
@@ -998,7 +1015,7 @@ export default function VehicleDetailPage() {
                                 style={{ color: themeColors.purplePrimary }}
                               >
                                 <FileText className="w-4 h-4" />
-                                Voir le document
+                                {t('maintenance.detail.documents.viewDocument')}
                               </a>
                             </div>
                           )}
@@ -1011,10 +1028,10 @@ export default function VehicleDetailPage() {
                 <div className="text-center py-12">
                   <FileText className="w-16 h-16 mx-auto mb-4" style={{ color: themeColors.textSecondary }} />
                   <p className="text-lg font-medium" style={{ color: themeColors.textPrimary }}>
-                    Aucun document enregistré
+                    {t('maintenance.detail.documents.noDocuments')}
                   </p>
                   <p className="text-sm mt-2" style={{ color: themeColors.textSecondary }}>
-                    Les documents seront enregistrés par les livreurs dans leur application
+                    {t('maintenance.detail.documents.noDocumentsDesc')}
                   </p>
                 </div>
               )}
@@ -1025,4 +1042,3 @@ export default function VehicleDetailPage() {
     </ScreenTransition>
   )
 }
-

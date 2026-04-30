@@ -129,6 +129,34 @@ export default function FleetPage() {
     }
   }
 
+  const getVehicleTypeLabel = (type: string) => {
+    switch (type) {
+      case 'moto':
+        return t('maintenance.filters.moto')
+      case 'vehicule':
+        return t('maintenance.filters.vehicule')
+      case 'cargo':
+        return t('maintenance.filters.cargo')
+      default:
+        return type
+    }
+  }
+
+  const getDocumentTypeLabel = (type: string) => {
+    switch (type) {
+      case 'carte_grise':
+        return t('maintenance.detail.documentTypes.registration')
+      case 'assurance':
+        return t('maintenance.detail.documentTypes.insurance')
+      case 'controle_technique':
+        return t('maintenance.detail.documentTypes.inspection')
+      case 'permis_conduire':
+        return t('maintenance.detail.documentTypes.driverLicense')
+      default:
+        return type
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -146,6 +174,21 @@ export default function FleetPage() {
 
   const formatOdometer = (km: number) => {
     return new Intl.NumberFormat('fr-FR').format(km)
+  }
+
+  const getVehicleStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active':
+        return t('maintenance.table.active')
+      case 'maintenance':
+        return t('maintenance.table.maintenance')
+      case 'retired':
+        return t('maintenance.table.retired')
+      case 'reserved':
+        return t('maintenance.table.reserved')
+      default:
+        return status
+    }
   }
 
   const containerStyle: React.CSSProperties = {
@@ -217,10 +260,10 @@ export default function FleetPage() {
 
   const tabTitle: Record<string, string> = {
     overview: t('sidebar.sections.maintenance.overview'),
-    vehicles: t('sidebar.sections.maintenance.vehicles') || 'Véhicules',
-    documents: t('sidebar.sections.maintenance.documents') || 'Documents',
-    repairs: t('sidebar.sections.maintenance.repairs') || 'Entretien',
-    budget: t('sidebar.sections.maintenance.budget') || 'Budget',
+    vehicles: t('sidebar.sections.maintenance.vehicles'),
+    documents: t('sidebar.sections.maintenance.documents'),
+    repairs: t('sidebar.sections.maintenance.repairs'),
+    budget: t('sidebar.sections.maintenance.budget'),
   }
 
   return (
@@ -241,7 +284,7 @@ export default function FleetPage() {
               title={t('maintenance.stats.totalVehicles')}
               value={stats.total}
               change={0}
-              subtitle="Total véhicules"
+              subtitle={t('maintenance.stats.totalVehicles')}
               icon={CarFront}
               iconColor="text-purple-600"
               isLoading={isLoading}
@@ -251,7 +294,7 @@ export default function FleetPage() {
               title={t('maintenance.stats.active')}
               value={stats.active}
               change={0}
-              subtitle="Véhicules actifs"
+              subtitle={t('maintenance.stats.activeVehicles')}
               icon={TrendingUp}
               iconColor="text-green-600"
               isLoading={isLoading}
@@ -261,7 +304,7 @@ export default function FleetPage() {
               title={t('maintenance.stats.maintenance')}
               value={stats.maintenance}
               change={0}
-              subtitle="En maintenance"
+              subtitle={t('maintenance.stats.maintenance')}
               icon={Wrench}
               iconColor="text-yellow-600"
               isLoading={isLoading}
@@ -271,7 +314,7 @@ export default function FleetPage() {
               title={t('maintenance.stats.avgOdometer')}
               value={`${formatOdometer(stats.avgOdometer)} km`}
               change={0}
-              subtitle="Kilométrage moyen"
+              subtitle={t('maintenance.stats.avgOdometer')}
               icon={Gauge}
               iconColor="text-blue-600"
               isLoading={isLoading}
@@ -319,7 +362,7 @@ export default function FleetPage() {
                     backgroundColor: 'rgba(255, 255, 255, 0.5)',
                     borderRadius: '8px',
                   }}>
-                    <span style={{ fontWeight: 600 }}>{doc.vehicle_plate}</span> - {doc.document_type} expire le{' '}
+                    <span style={{ fontWeight: 600 }}>{doc.vehicle_plate}</span> - {getDocumentTypeLabel(doc.document_type)} {t('maintenance.alerts.expiresOn')}{' '}
                     {new Date(doc.expiry_date).toLocaleDateString('fr-FR')}
                   </div>
                 ))}
@@ -330,14 +373,14 @@ export default function FleetPage() {
                     fontWeight: 600,
                     padding: '8px 12px',
                   }}>
-                    +{expiringDocuments.length - 5} autre{expiringDocuments.length - 5 > 1 ? 's' : ''}
+                    +{expiringDocuments.length - 5} {expiringDocuments.length - 5 > 1 ? t('maintenance.alerts.others') : t('maintenance.alerts.other')}
                   </div>
                 )}
               </div>
             </AnimatedCard>
           ) : (
             <p style={{ fontSize: '14px', color: themeColors.textSecondary, marginBottom: '8px' }}>
-              Aucun document expirant dans les 30 prochains jours.
+              {t('maintenance.alerts.noExpiringIn30Days')}
             </p>
           )}
           </div>
@@ -564,7 +607,7 @@ export default function FleetPage() {
                             textTransform: 'capitalize',
                             color: themeColors.textPrimary,
                           }}>
-                            {vehicle.vehicle_type}
+                            {getVehicleTypeLabel(vehicle.vehicle_type)}
                           </span>
                         </div>
                       </td>
@@ -612,7 +655,7 @@ export default function FleetPage() {
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(vehicle.status)}`}
                         >
-                          {vehicle.status === 'active' ? t('maintenance.filters.active') : vehicle.status === 'maintenance' ? t('maintenance.filters.maintenance') : vehicle.status === 'retired' ? t('maintenance.filters.retired') : 'Réservé'}
+                          {getVehicleStatusLabel(vehicle.status)}
                         </span>
                       </td>
                       <td style={{ padding: '16px 20px' }}>
@@ -666,10 +709,10 @@ export default function FleetPage() {
             border: `1px solid ${themeColors.cardBorder}`,
           }}>
             <h2 style={{ fontSize: '18px', fontWeight: 600, color: themeColors.textPrimary, marginBottom: '8px' }}>
-              Entretien & réparations
+              {t('maintenance.repairs.title')}
             </h2>
             <p style={{ fontSize: '14px', color: themeColors.textSecondary }}>
-              Vue dédiée à venir — les interventions sont pour l&apos;instant listées au niveau de chaque véhicule.
+              {t('maintenance.repairs.description')}
             </p>
           </AnimatedCard>
         )}
@@ -683,10 +726,10 @@ export default function FleetPage() {
             border: `1px solid ${themeColors.cardBorder}`,
           }}>
             <h2 style={{ fontSize: '18px', fontWeight: 600, color: themeColors.textPrimary, marginBottom: '8px' }}>
-              Budget flotte
+              {t('maintenance.budget.title')}
             </h2>
             <p style={{ fontSize: '14px', color: themeColors.textSecondary }}>
-              Synthèse budgétaire à venir.
+              {t('maintenance.budget.description')}
             </p>
           </AnimatedCard>
         )}
