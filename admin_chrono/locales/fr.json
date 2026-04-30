@@ -41,7 +41,7 @@
         "title": "Gestion",
         "users": "Utilisateurs",
         "drivers": "Livreurs",
-        "performance": "Suivi terrain"
+        "performance": "Performance"
       },
       "administration": {
         "title": "Administration",
@@ -919,7 +919,7 @@
     }
   },
   "performance": {
-    "title": "Suivi terrain",
+    "title": "Performance",
     "description": "Vue par commune des commandes, des trajets et des livreurs disponibles.",
     "activeOrdersHelp": "Commandes en cours : acceptées, en route, récupérées ou en livraison",
     "communeActivity": "Activité par commune",
