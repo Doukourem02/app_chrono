@@ -109,7 +109,7 @@ class AdminSocketService {
       // Gérer la déconnexion
       this.socket.on('disconnect', (reason) => {
         this.isConnecting = false
-        
+
         // Ne pas logger les déconnexions normales ou les timeouts comme des erreurs
         if (process.env.NODE_ENV === 'development') {
           if (reason === 'io client disconnect') {
@@ -120,6 +120,10 @@ class AdminSocketService {
             logger.debug('[adminSocketService] Déconnexion:', reason)
           }
         }
+
+        // Transmettre l'événement pour que useSocketConnection mette isConnected à false
+        // et déclenche un rechargement des données à la prochaine reconnexion
+        this.emit('disconnect', { reason })
 
         // Si la déconnexion n'est pas volontaire, laisser Socket.IO gérer la reconnexion automatique
         if (reason === 'io server disconnect') {

@@ -28,7 +28,12 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
     }
   }, [])
 
-  // À chaque connexion socket : synchroniser avec l'API immédiatement
+  // Chargement initial au montage (indépendant du socket)
+  useEffect(() => {
+    queueMicrotask(() => { void loadDeliveriesFromAPI() })
+  }, [loadDeliveriesFromAPI])
+
+  // À chaque connexion socket : resynchroniser avec l'API immédiatement
   useEffect(() => {
     if (isSocketConnected) {
       queueMicrotask(() => { void loadDeliveriesFromAPI() })
@@ -56,12 +61,12 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
     }
   }, [loadDeliveriesFromAPI])
 
-  // Polling 30s — filet de sécurité si tous les canaux temps réel échouent
+  // Polling 5s — filet de sécurité si tous les canaux temps réel échouent
   useEffect(() => {
     const interval = setInterval(() => {
-      debug('[useDeliveriesTracking] Polling 30s')
+      debug('[useDeliveriesTracking] Polling 5s')
       void loadDeliveriesFromAPI()
-    }, 30_000)
+    }, 5_000)
 
     return () => clearInterval(interval)
   }, [loadDeliveriesFromAPI])

@@ -890,7 +890,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     logger.info('🚀 [getAdminOngoingDeliveries] DÉBUT');
 
     // Statuts valides pour les livraisons en cours
-    const ongoingStatuses = ['pending', 'accepted', 'enroute', 'picked_up'];
+    const ongoingStatuses = ['pending', 'accepted', 'enroute', 'picked_up', 'delivering'];
 
     let rows: any[] = [];
     let usedFallback = false;
@@ -898,7 +898,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     // Tentative via pool PostgreSQL direct
     if (process.env.DATABASE_URL) {
       const query = `SELECT * FROM orders
-                     WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')
+                     WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up', 'delivering')
                      ORDER BY created_at DESC`;
 
       logger.info('📝 [getAdminOngoingDeliveries] Requête SQL pool:', { query });

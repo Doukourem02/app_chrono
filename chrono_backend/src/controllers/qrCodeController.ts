@@ -4,6 +4,7 @@ import qrCodeService from '../services/qrCodeService.js';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
+import { broadcastOrderUpdateToAdmins } from '../sockets/adminSocket.js';
 
 /**
  * Génère un QR code de livraison pour une commande
@@ -263,6 +264,15 @@ export const scanQRCode = async (req: AuthenticatedRequest, res: Response): Prom
             logger.warn('[recipient-notify] scanQRCode:', msg);
           });
         }
+      }
+      // Notifier les admins que la livraison est terminée
+      if (io && result.data?.orderId) {
+        broadcastOrderUpdateToAdmins(io, 'order:status:update', {
+          order: {
+            id: result.data.orderId,
+            status: 'completed',
+          },
+        });
       }
     } catch (socketErr: any) {
       logger.warn('[scanQRCode] Échec notification socket:', socketErr?.message);
