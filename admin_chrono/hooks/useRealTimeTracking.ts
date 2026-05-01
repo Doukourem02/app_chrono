@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useSocketConnection } from './useSocketConnection'
 import { useDriversTracking } from './useDriversTracking'
-import { useDeliveriesTracking } from './useDeliveriesTracking'
+import { useDeliveriesSyncEngine } from './useDeliveriesSyncEngine'
 import { debugError } from '@/utils/debug'
 import type { OnlineDriver, Delivery } from './types'
 
@@ -39,10 +39,9 @@ export function useRealTimeTracking(): UseRealTimeTrackingReturn {
   const { onlineDrivers, reloadDrivers } = useDriversTracking(isConnected)
 
   // Gérer le suivi des livraisons
-  const { ongoingDeliveries, reloadDeliveries } = useDeliveriesTracking(isConnected)
+  const { ongoingDeliveries, reloadDeliveries } = useDeliveriesSyncEngine(isConnected)
 
   // Calculer isLoading : on considère qu'on a fini de charger quand on est connecté OU qu'on a des données
-  // On utilise un timeout pour permettre au fallback de se déclencher (3.5s)
   const hasData = onlineDrivers.size > 0 || ongoingDeliveries.length > 0
   const computedIsLoading = isLoading && !isConnected && !hasData
 

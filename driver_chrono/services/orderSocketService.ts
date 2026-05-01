@@ -17,6 +17,19 @@ class OrderSocketService {
   private retryCount = 0;
   /** Incrémenté à chaque nouveau connect/disconnect pour ignorer les establishSocket obsolètes. */
   private connectGeneration = 0;
+  /** Hooks enregistrés pour déclencher un resync après un événement socket critique. */
+  private refetchListeners: Set<(orderId: string) => void> = new Set();
+
+  addRefetchListener(fn: (orderId: string) => void): () => void {
+    this.refetchListeners.add(fn);
+    return () => this.refetchListeners.delete(fn);
+  }
+
+  private triggerRefetch(orderId: string): void {
+    this.refetchListeners.forEach((fn) => {
+      try { fn(orderId); } catch { /* ignore */ }
+    });
+  }
 
   connect(driverId: string) {
     if (
@@ -188,6 +201,9 @@ class OrderSocketService {
           store.acceptOrder(order.id, this.driverId || '');
           }
         }
+        if (order?.id) {
+          this.triggerRefetch(order.id);
+        }
       } catch (err) {
         logger.warn('Error handling order-accepted-confirmation', undefined, err);
       }
@@ -352,6 +368,10 @@ class OrderSocketService {
           )) {
             store.setSelectedOrder(order.id);
           }
+        }
+        // Déclenche resync pour confirmer l'état depuis le serveur (sauf statuts finaux déjà traités)
+        if (order?.id && order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'declined') {
+          this.triggerRefetch(order.id);
         }
       } catch (err) {
         logger.warn('Error handling order:status:update', undefined, err);
