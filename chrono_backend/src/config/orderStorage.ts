@@ -477,10 +477,8 @@ export async function updateOrderStatus(
   status: string,
   updates: OrderUpdates = {}
 ): Promise<boolean> {
-  // Mapper "delivering" vers "picked_up" car "delivering" n'existe pas dans l'enum PostgreSQL
-  // "delivering" est un statut intermédiaire utilisé côté application mais pas dans la DB
-  const dbStatus = status === 'delivering' ? 'picked_up' : status;
   try {
+    // Note: 'delivering' et 'in_progress' sont des statuts valides en DB depuis migration 031
     const columnsInfo = await (pool as any).query(
       `SELECT column_name FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = ANY($1)`,
@@ -495,17 +493,17 @@ export async function updateOrderStatus(
     const hasCancelledAt = columnSet.has('cancelled_at');
     
     const setClauses: string[] = ['status = $2'];
-    const values: any[] = [orderId, dbStatus]; // Utiliser dbStatus (mappé) au lieu de status (original)
+    const values: any[] = [orderId, status];
     let paramIndex = 3;
-    
+
     if (hasUpdatedAt) {
       setClauses.push('updated_at = now()');
     }
-    
+
     let driverId = updates.driver_id || null;
-    
+
     // Si driver_id n'est pas fourni mais que la colonne existe, essayer de le récupérer depuis order_assignments
-    if (hasDriverColumn && !driverId && dbStatus === 'completed') {
+    if (hasDriverColumn && !driverId && status === 'completed') {
       try {
         const existingOrderQuery = await (pool as any).query(
           `SELECT driver_id FROM orders WHERE id = $1`,
@@ -532,9 +530,9 @@ export async function updateOrderStatus(
       }
     }
     
-    const acceptedAt = coerceDate(updates.accepted_at) || (dbStatus === 'accepted' ? new Date() : undefined);
-    const completedAt = coerceDate(updates.completed_at) || (dbStatus === 'completed' ? new Date() : undefined);
-    const cancelledAt = coerceDate(updates.cancelled_at) || (dbStatus === 'cancelled' ? new Date() : undefined);
+    const acceptedAt = coerceDate(updates.accepted_at) || (status === 'accepted' ? new Date() : undefined);
+    const completedAt = coerceDate(updates.completed_at) || (status === 'completed' ? new Date() : undefined);
+    const cancelledAt = coerceDate(updates.cancelled_at) || (status === 'cancelled' ? new Date() : undefined);
     
     if (hasDriverColumn && driverId) {
       setClauses.push(`driver_id = $${paramIndex}`);
@@ -592,9 +590,9 @@ export async function updateOrderStatus(
     // Vérifier que la mise à jour a bien été appliquée
     if (updateResult.rowCount === 0) {
       logger.warn(
-        `[updateOrderStatus] Aucune ligne mise à jour pour commande ${orderId} avec statut ${dbStatus}`,
+        `[updateOrderStatus] Aucune ligne mise à jour pour commande ${orderId} avec statut ${status}`,
         undefined,
-        { orderId, status, dbStatus, setClauses, values: values.map((v, i) => i === 0 ? maskOrderId(v) : (i === 1 ? v : '***')) }
+        { orderId, status, setClauses, values: values.map((v, i) => i === 0 ? maskOrderId(v) : (i === 1 ? v : '***')) }
       );
     } else {
       // Vérifier le statut réel dans la DB après la mise à jour
@@ -605,11 +603,11 @@ export async function updateOrderStatus(
         );
         if (verifyResult.rows.length > 0) {
           const actualStatus = verifyResult.rows[0].status;
-          if (actualStatus !== dbStatus) {
+          if (actualStatus !== status) {
             logger.error(
-              `[updateOrderStatus] Incohérence de statut après UPDATE pour commande ${orderId}: attendu=${dbStatus}, réel=${actualStatus}`,
+              `[updateOrderStatus] Incohérence de statut après UPDATE pour commande ${orderId}: attendu=${status}, réel=${actualStatus}`,
               undefined,
-              { orderId, expectedStatus: dbStatus, actualStatus, status }
+              { orderId, expectedStatus: status, actualStatus }
             );
           } else {
             logger.debug(
@@ -678,7 +676,7 @@ export async function getOrderById(orderId: string): Promise<any | null> {
     const result = await (pool as any).query(
      `SELECT * FROM orders 
       WHERE user_id = $1 
-    AND status IN ('pending', 'accepted', 'enroute', 'picked_up') 
+    AND status IN ('pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering')
     AND status NOT IN ('completed', 'cancelled', 'declined')
     ORDER BY created_at DESC`, [userId] ); return (result.rows || []).map((order: any) => { const etaMinutes = order.eta_minutes != null ? Number(order.eta_minutes) : null; return {
         ...order,
@@ -694,7 +692,7 @@ export async function getOrderById(orderId: string): Promise<any | null> {
     const result = await (pool as any).query(
      `SELECT * FROM orders 
       WHERE driver_id = $1 
-    AND status IN ('accepted', 'enroute', 'picked_up') 
+    AND status IN ('accepted', 'enroute', 'in_progress', 'picked_up', 'delivering')
     AND status NOT IN ('completed', 'cancelled', 'declined')
     ORDER BY created_at DESC`, [driverId] ); return (result.rows || []).map((order: any) => { const etaMinutes = order.eta_minutes != null ? Number(order.eta_minutes) : null; return {
         ...order,
