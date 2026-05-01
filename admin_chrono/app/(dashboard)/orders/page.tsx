@@ -44,6 +44,10 @@ const statusConfig: Record<
     backgroundColor: "#DBEAFE",
     color: "#2563EB",
   },
+  in_progress: {
+    backgroundColor: "#DBEAFE",
+    color: "#2563EB",
+  },
   picked_up: {
     backgroundColor: "#F3E8FF",
     color: "#9333EA",
@@ -94,6 +98,7 @@ export default function OrdersPage() {
         pending: "onProgress",
         accepted: "onProgress",
         enroute: "onProgress",
+        in_progress: "onProgress",
         picked_up: "onProgress",
         delivering: "onProgress",
         completed: "successful",
@@ -155,7 +160,9 @@ export default function OrdersPage() {
           pending: "onProgress",
           accepted: "onProgress",
           enroute: "onProgress",
+          in_progress: "onProgress",
           picked_up: "onProgress",
+          delivering: "onProgress",
           completed: "successful",
           cancelled: "canceled",
           canceled: "canceled",

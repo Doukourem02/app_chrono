@@ -18,7 +18,7 @@ export function useDeliveriesTracking(isSocketConnected: boolean) {
         const orders: OrderFromAPI[] = (result.data as OrderFromAPI[]) || []
         const deliveries: Delivery[] = orders.map(mapOrderToDelivery)
         const activeDeliveries = deliveries.filter(
-          (d) => d.status !== 'completed' && d.status !== 'cancelled'
+          (d) => d.status !== 'completed' && d.status !== 'cancelled' && d.status !== 'declined'
         )
         setOngoingDeliveries(activeDeliveries)
         debug(`[useDeliveriesTracking] ${activeDeliveries.length} livraisons actives chargées`)

@@ -133,9 +133,9 @@ export default function TrackingPage() {
       return []
     }
     
-    // Filtrer les commandes terminées ou annulées
-    const activeDeliveries = deliveries.filter((delivery: Delivery) => 
-      delivery.status !== 'completed' && delivery.status !== 'cancelled'
+    // Filtrer les commandes terminées, annulées ou refusées
+    const activeDeliveries = deliveries.filter((delivery: Delivery) =>
+      delivery.status !== 'completed' && delivery.status !== 'cancelled' && delivery.status !== 'declined'
     )
     
     if (!searchQuery) return activeDeliveries

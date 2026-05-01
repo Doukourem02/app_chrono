@@ -92,6 +92,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     pending: { label: t('tracking.status.pending'), backgroundColor: '#FEF3C7', color: '#D97706' },
     accepted: { label: t('tracking.status.accepted'), backgroundColor: '#E0E7FF', color: '#4338CA' },
     enroute: { label: t('tracking.status.enroute'), backgroundColor: '#DBEAFE', color: '#1D4ED8' },
+    in_progress: { label: t('tracking.status.in_progress') || 'Livreur arrivé', backgroundColor: '#DBEAFE', color: '#1D4ED8' },
     picked_up: { label: t('tracking.status.picked_up'), backgroundColor: '#E0F2FE', color: '#0369A1' },
     delivering: { label: t('tracking.status.delivering'), backgroundColor: '#E9D5FF', color: '#7C3AED' },
     completed: { label: t('tracking.status.completed'), backgroundColor: '#DCFCE7', color: '#166534' },

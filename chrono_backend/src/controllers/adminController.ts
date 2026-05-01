@@ -14,7 +14,7 @@ import { resolveApproximatePickupZone } from '../utils/abidjanApproximatePickupZ
 import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const liveOrderStatuses = `'pending', 'accepted', 'enroute', 'picked_up'`;
+const liveOrderStatuses = `'pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering'`;
 const staleLiveOrderCondition = `(o.status IN (${liveOrderStatuses}) AND o.created_at < CURRENT_DATE)`;
 const inactiveOrderCondition = `(o.status IN ('cancelled', 'declined') OR ${staleLiveOrderCondition})`;
 const activeOrderCondition = `(o.id IS NULL OR (o.status NOT IN ('cancelled', 'declined') AND NOT ${staleLiveOrderCondition}))`;
@@ -890,7 +890,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     logger.info('🚀 [getAdminOngoingDeliveries] DÉBUT');
 
     // Statuts valides pour les livraisons en cours
-    const ongoingStatuses = ['pending', 'accepted', 'enroute', 'picked_up', 'delivering'];
+    const ongoingStatuses = ['pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering'];
 
     let rows: any[] = [];
     let usedFallback = false;
@@ -898,7 +898,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     // Tentative via pool PostgreSQL direct
     if (process.env.DATABASE_URL) {
       const query = `SELECT * FROM orders
-                     WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up', 'delivering')
+                     WHERE status IN ('pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering')
                      ORDER BY created_at DESC`;
 
       logger.info('📝 [getAdminOngoingDeliveries] Requête SQL pool:', { query });
@@ -1157,7 +1157,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
     }
 
     // Définir les statuts pour chaque catégorie
-    const onProgressStatuses = ['accepted', 'enroute', 'picked_up'];
+    const onProgressStatuses = ['accepted', 'enroute', 'in_progress', 'picked_up', 'delivering'];
     const onHoldStatuses = ['pending', 'declined'];
 
     const statusMap: Record<string, string[]> = {

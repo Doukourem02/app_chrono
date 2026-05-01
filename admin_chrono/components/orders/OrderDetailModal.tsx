@@ -46,6 +46,7 @@ const statusConfig: Record<string, { label: string; backgroundColor: string; col
   pending: { label: 'Recherche livreur', backgroundColor: '#FFEDD5', color: '#EA580C' },
   accepted: { label: 'Prise en charge', backgroundColor: '#DBEAFE', color: '#2563EB' },
   enroute: { label: 'Livreur en route', backgroundColor: '#DBEAFE', color: '#2563EB' },
+  in_progress: { label: 'Livreur arrivé', backgroundColor: '#DBEAFE', color: '#1D4ED8' },
   picked_up: { label: 'Colis récupéré', backgroundColor: '#F3E8FF', color: '#9333EA' },
   delivering: { label: 'Livraison', backgroundColor: '#E9D5FF', color: '#7C3AED' },
   completed: { label: 'Livraison terminée', backgroundColor: '#D1FAE5', color: '#16A34A' },
