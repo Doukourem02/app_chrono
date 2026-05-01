@@ -96,6 +96,7 @@ interface OrderStore {
   setDriverCoordsForOrder: (orderId: string, coords: { latitude: number; longitude: number } | null) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   updateFromSocket: (payload: { order?: Partial<OrderRequest> | null; location?: { latitude?: number; longitude?: number } | null; proof?: any }) => void;
+  replace: (freshOrders: OrderRequest[]) => void;
   clear: () => void;
   setPreferCreationForm: (value: boolean) => void;
   setMapNewOrderIntentPending: (value: boolean) => void;
@@ -377,6 +378,27 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
       logger.warn('useOrderStore.updateFromSocket error', undefined, err);
     }
   },
+
+  replace: (freshOrders) => set((state) => {
+    // Garde les completed non encore nettoyés (QR / notation) qui ne sont pas dans la nouvelle liste
+    const keptCompleted = state.activeOrders.filter(
+      (o) => o.status === 'completed' && !freshOrders.some((f) => f.id === o.id)
+    );
+    const merged = [
+      ...freshOrders.filter((o) => o.status !== 'cancelled' && o.status !== 'declined'),
+      ...keptCompleted,
+    ];
+    const mergedIds = new Set(merged.map((o) => o.id));
+    const newCoords = new Map([...state.driverCoords].filter(([id]) => mergedIds.has(id)));
+    const selectedStillValid = merged.some((o) => o.id === state.selectedOrderId);
+    return {
+      activeOrders: merged,
+      driverCoords: newCoords,
+      selectedOrderId: selectedStillValid
+        ? state.selectedOrderId
+        : merged.length > 0 ? merged[0].id : null,
+    };
+  }),
 
   clear: () => set({
     activeOrders: [],

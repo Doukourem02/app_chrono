@@ -59,8 +59,10 @@ Règle :
 
 | Sujet | Fichier |
 
- Page tracking public  `admin_chrono/app/track/[token]/page.tsx`
- Web push tracking `admin_chrono/public/sw.js`
+| Page tracking public | `admin_chrono/app/track/[token]/page.tsx` |
+| Web push tracking | `admin_chrono/public/sw.js` |
+| Performance dashboard / analytics | `admin_chrono/app/(dashboard)/gamification/page.tsx` |
+| Performance analytics API | `admin_chrono/app/api/analytics/performance/route.ts` |
 
 ---
 

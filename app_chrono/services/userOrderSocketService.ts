@@ -90,6 +90,19 @@ class UserOrderSocketService {
   private forcedPollingMode = false;
   /** Timestamp du dernier connect réussi (ms epoch) — pour calculer la durée de session dans les erreurs. */
   private connectedAt: number | null = null;
+  /** Hooks enregistrés pour déclencher un refetch REST après un événement socket critique. */
+  private refetchListeners: Set<(orderId: string) => void> = new Set();
+
+  addRefetchListener(fn: (orderId: string) => void): () => void {
+    this.refetchListeners.add(fn);
+    return () => this.refetchListeners.delete(fn);
+  }
+
+  private triggerRefetch(orderId: string): void {
+    this.refetchListeners.forEach((fn) => {
+      try { fn(orderId); } catch { /* ignore */ }
+    });
+  }
 
   private isAuthRelatedSocketError(message: string | undefined): boolean {
     const m = (message || '').toLowerCase();
@@ -652,6 +665,10 @@ class UserOrderSocketService {
             }
           }
         }
+        // Déclenche un refetch REST pour confirmer les données du livreur depuis la DB
+        if (order?.id) {
+          this.triggerRefetch(order.id);
+        }
         // If DB persistence failed for the assignment, notify user
         if (data && data.dbSaved === false) {
           UserFriendlyError.showSaveError('l\'affectation du livreur');
@@ -779,6 +796,10 @@ class UserOrderSocketService {
           
           // CRITIQUE : Toujours utiliser updateFromSocket pour garantir la synchronisation
           store.updateFromSocket({ order: order as any, location: statusLocation });
+          // Déclenche un refetch REST pour confirmer depuis la DB (sauf statuts finaux déjà stables)
+          if (!isFinalOrderStatus(order.status)) {
+            this.triggerRefetch(order.id);
+          }
 
           // Vérifier que la mise à jour a bien eu lieu
           const updatedStore = useOrderStore.getState();
