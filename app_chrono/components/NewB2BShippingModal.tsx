@@ -1,17 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import {Modal,View,Text,TouchableOpacity,StyleSheet,TextInput,ScrollView,ActivityIndicator,Alert,KeyboardAvoidingView,Platform,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
@@ -42,16 +30,12 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
   const canSubmit = pickup.length > 0 && dropoff.length > 0 && recipientName.trim().length > 0 && recipientPhone.trim().length > 0;
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
-    if (!user?.partner_id) {
-      Alert.alert('Compte non lié', "Votre compte n'est pas encore lié à un partenaire. Contactez votre gestionnaire Krono.");
-      return;
-    }
+    if (!canSubmit || !user?.id) return;
 
     setIsLoading(true);
     try {
       const result = await createB2BOrder({
-        partnerId: user.partner_id,
+        partnerId: user.partner_id ?? null,
         userId: user.id,
         pickup: { address: pickup, lat: pickupCoords?.lat, lng: pickupCoords?.lng },
         dropoff: { address: dropoff, lat: dropoffCoords?.lat, lng: dropoffCoords?.lng },

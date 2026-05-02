@@ -9,6 +9,7 @@ import {
   activateSubscription,
   getPartnerUsage,
   getPartnerInvoices,
+  invitePartnerUser,
 } from '../controllers/partnerController.js';
 
 const router: Router = express.Router();
@@ -21,6 +22,7 @@ router.post('/:id/subscriptions',                         verifyAdminSupabase, c
 router.patch('/:id/subscriptions/:subId/activate',        verifyAdminSupabase, activateSubscription);
 router.get('/:id/usage',                                  verifyAdminSupabase, getPartnerUsage);
 router.get('/:id/invoices',                               verifyAdminSupabase, getPartnerInvoices);
+router.post('/:id/invite',                                verifyAdminSupabase, invitePartnerUser);
 
 // ── Routes portail partenaire (verifyPartnerUser) ────────────────────────────
 // Même données mais accessibles par les owners/managers du partenaire

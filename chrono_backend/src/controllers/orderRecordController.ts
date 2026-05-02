@@ -3,6 +3,7 @@ import { supabase, supabaseAdmin } from '../config/supabase.js';
 import logger from '../utils/logger.js';
 import type { JWTPayload } from '../types/index.js';
 import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
+import { computeB2BCommission, incrementPartnerUsage } from '../services/b2bCommissionService.js';
 
 type AuthenticatedRequest = {
   body: {
@@ -15,6 +16,8 @@ type AuthenticatedRequest = {
     speedOptionId?: string;
     routeDurationSeconds?: number;
     routeDurationTypicalSeconds?: number;
+    partner_id?: string | null;
+    recipient?: { name?: string; phone?: string };
   };
   user?: JWTPayload;
 };
@@ -75,6 +78,7 @@ export const createOrderRecord = async (
       speedOptionId,
       routeDurationSeconds,
       routeDurationTypicalSeconds,
+      partner_id,
     } = req.body;
 
     if (!userId || typeof userId !== 'string') {
@@ -174,17 +178,40 @@ export const createOrderRecord = async (
       return;
     }
 
-    logOrderRecord('info', 'success', { orderId: data });
+    const orderId = data as string;
+    logOrderRecord('info', 'success', { orderId });
+
+    // ─── Logique B2B : commission + quota si partner_id présent ──────────────
+    let b2bCommission: { rate: number; type: string; plan: string | null } | null = null;
+    if (partner_id && typeof partner_id === 'string') {
+      try {
+        const commission = await computeB2BCommission(partner_id);
+        b2bCommission = { rate: commission.rate, type: commission.type, plan: commission.plan };
+
+        // Rattacher la commande au partenaire (colonne partner_id sur orders, disponible après migration 027)
+        const db = supabaseAdmin ?? supabase;
+        await db.from('orders').update({ partner_id }).eq('id', orderId);
+
+        // Incrémenter le quota mensuel
+        await incrementPartnerUsage(partner_id);
+
+        logOrderRecord('info', 'b2b_commission_applied', { orderId, partner_id, rate: commission.rate, type: commission.type });
+      } catch (b2bErr) {
+        logger.warn('[orders/record] b2b commission non bloquante', b2bErr);
+      }
+    }
+
     res.json({
       success: true,
       data: {
-        orderId: data as string,
+        orderId,
         priceCfa: serverPrice,
         distanceKm,
         dynamicPricing: {
           labels: dynamic.labels,
           contextFactorApplied: dynamic.contextFactorApplied,
         },
+        ...(b2bCommission ? { b2bCommission } : {}),
       },
     });
   } catch (e: unknown) {

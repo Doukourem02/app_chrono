@@ -11,7 +11,7 @@ async function authHeader(): Promise<{ Authorization: string } | Record<string, 
 // ─── Commande B2B unique (Profil 1) ──────────────────────────────────────────
 
 export interface B2BOrderParams {
-  partnerId: string;
+  partnerId: string | null;
   userId: string;
   pickup: { address: string; lat?: number; lng?: number };
   dropoff: { address: string; lat?: number; lng?: number };

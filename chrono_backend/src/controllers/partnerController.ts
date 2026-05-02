@@ -213,6 +213,74 @@ export const getPartnerUsage = async (req: Request, res: Response): Promise<void
   });
 };
 
+// ─── POST /api/partners/:id/invite — admin only ───────────────────────────────
+// Crée un compte Supabase pour le partenaire + envoie le mail d'invitation
+export const invitePartnerUser = async (req: Request, res: Response): Promise<void> => {
+  const { id: partnerId } = req.params;
+  const { email, role = 'owner' } = req.body as { email: string; role?: 'owner' | 'manager' };
+
+  if (!email?.trim()) {
+    res.status(400).json({ success: false, message: 'Email requis' });
+    return;
+  }
+  if (!['owner', 'manager'].includes(role)) {
+    res.status(400).json({ success: false, message: 'Rôle invalide (owner | manager)' });
+    return;
+  }
+
+  if (!supabaseAdmin) {
+    res.status(500).json({ success: false, message: 'Admin client Supabase non disponible (SUPABASE_SERVICE_ROLE_KEY manquant)' });
+    return;
+  }
+
+  // Vérifier que le partenaire existe
+  const { data: partner, error: partnerErr } = await supabaseAdmin
+    .from('partners')
+    .select('id, name')
+    .eq('id', partnerId)
+    .single();
+
+  if (partnerErr || !partner) {
+    res.status(404).json({ success: false, message: 'Partenaire introuvable' });
+    return;
+  }
+
+  const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
+
+  // Invite via Supabase (crée le compte + envoie le mail automatiquement)
+  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+    email.trim().toLowerCase(),
+    {
+      redirectTo,
+      data: { partner_id: partnerId, partner_name: partner.name, role },
+    }
+  );
+
+  if (inviteError) {
+    logger.error('[partnerController] invitePartnerUser invite error:', inviteError);
+    res.status(500).json({ success: false, message: inviteError.message ?? "Erreur lors de l'envoi de l'invitation" });
+    return;
+  }
+
+  const userId = inviteData.user.id;
+
+  // Lier l'utilisateur au partenaire dans partner_users
+  const { error: puError } = await supabaseAdmin
+    .from('partner_users')
+    .upsert(
+      { partner_id: partnerId, user_id: userId, role },
+      { onConflict: 'partner_id,user_id' }
+    );
+
+  if (puError) {
+    logger.error('[partnerController] invitePartnerUser partner_users error:', puError);
+    res.status(500).json({ success: false, message: 'Invitation envoyée mais erreur lors du lien partenaire' });
+    return;
+  }
+
+  res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: email.trim().toLowerCase(), role } });
+};
+
 // ─── GET /api/partners/:id/invoices — admin or partner ────────────────────────
 export const getPartnerInvoices = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;

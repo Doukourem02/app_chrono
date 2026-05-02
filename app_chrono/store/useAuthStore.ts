@@ -129,6 +129,16 @@ export const useAuthStore = create<AuthState>()(
           }
 
           if (data?.success && data?.user) {
+            // Sync les champs B2B depuis la base (évite le re-login après que l'admin ait lié un partenaire)
+            const remote = data.user as { partner_id?: string | null; is_business?: boolean; company_name?: string | null };
+            const current = get().user;
+            if (current && (
+              remote.partner_id !== current.partner_id ||
+              remote.is_business !== current.is_business ||
+              remote.company_name !== current.company_name
+            )) {
+              set({ user: { ...current, partner_id: remote.partner_id ?? null, is_business: remote.is_business ?? current.is_business, company_name: remote.company_name ?? current.company_name } });
+            }
             return true;
           }
 

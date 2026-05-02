@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle, Mail } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
@@ -13,6 +13,91 @@ const PLAN_DEFAULTS: Record<string, { price: number; quota: number | null; label
   starter:  { price: 15_000,  quota: 50,   label: 'Starter — 15 000 FCFA / mois' },
   pro:      { price: 40_000,  quota: 200,  label: 'Pro — 40 000 FCFA / mois' },
   business: { price: 100_000, quota: null, label: 'Business — 100 000 FCFA / mois' },
+}
+
+// ─── Modal inviter au portail ─────────────────────────────────────────────────
+function InvitePartnerModal({ partnerId, onClose }: { partnerId: string; onClose: () => void }) {
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<'owner' | 'manager'>('owner')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const result = await adminApiService.invitePartnerUser(partnerId, { email: email.trim(), role })
+    setLoading(false)
+    if (result.success) { setDone(true) }
+    else { setError(result.message ?? "Erreur lors de l'envoi de l'invitation.") }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+      <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <Mail size={18} color={themeColors.purplePrimary} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: themeColors.textPrimary }}>Inviter au portail</h2>
+        </div>
+
+        {done ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <CheckCircle size={40} color={themeColors.greenPrimary} style={{ margin: '0 auto 12px' }} />
+            <p style={{ fontSize: 15, fontWeight: 600, color: themeColors.textPrimary }}>Invitation envoyée !</p>
+            <p style={{ fontSize: 13, color: themeColors.textSecondary, marginTop: 6 }}>
+              {email} recevra un email pour définir son mot de passe et accéder au portail.
+            </p>
+            <button onClick={onClose} style={{ marginTop: 20, padding: '10px 24px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              Fermer
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="contact@entreprise.com"
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, fontSize: 14, color: themeColors.textPrimary, backgroundColor: themeColors.cardBg, boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Rôle</label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {(['owner', 'manager'] as const).map((r) => (
+                  <label key={r} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: `2px solid ${role === r ? themeColors.purplePrimary : themeColors.cardBorder}`, cursor: 'pointer', backgroundColor: role === r ? themeColors.purpleLight : 'transparent' }}>
+                    <input type="radio" name="role" value={r} checked={role === r} onChange={() => setRole(r)} style={{ accentColor: themeColors.purplePrimary }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: themeColors.textPrimary }}>{r === 'owner' ? 'Propriétaire' : 'Manager'}</div>
+                      <div style={{ fontSize: 11, color: themeColors.textSecondary }}>{r === 'owner' ? 'Accès complet' : 'Commandes uniquement'}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.purpleLight, border: `1px solid ${themeColors.purplePrimary}` }}>
+              <p style={{ fontSize: 12, color: themeColors.purplePrimary }}>
+                Un email sera envoyé avec un lien pour définir le mot de passe et accéder au portail <strong>admin.kro-no-delivery.com/partner/login</strong>
+              </p>
+            </div>
+            {error && <p style={{ fontSize: 13, color: themeColors.redPrimary }}>{error}</p>}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer' }}>
+                Annuler
+              </button>
+              <button type="submit" disabled={loading} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+                {loading ? 'Envoi…' : 'Envoyer l\'invitation'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ─── Modal créer abonnement ────────────────────────────────────────────────────
@@ -137,6 +222,7 @@ export default function PartnerDetailPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [showCreateSub, setShowCreateSub] = useState(false)
+  const [showInvite, setShowInvite] = useState(false)
 
   const { data: partnerData, isLoading } = useQuery({
     queryKey: ['partner', id],
@@ -197,10 +283,16 @@ export default function PartnerDetailPage() {
         <button onClick={() => router.back()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textSecondary, fontSize: 13, cursor: 'pointer' }}>
           <ArrowLeft size={14} /> Retour
         </button>
-        <div>
+        <div style={{ flex: 1 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: themeColors.textPrimary }}>{partner.name}</h1>
           {partner.email && <p style={{ fontSize: 13, color: themeColors.textSecondary }}>{partner.email}</p>}
         </div>
+        <button
+          onClick={() => setShowInvite(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+        >
+          <Mail size={14} /> Inviter au portail
+        </button>
       </div>
 
       {/* KPI cards */}
@@ -303,6 +395,13 @@ export default function PartnerDetailPage() {
           partnerId={id}
           onClose={() => setShowCreateSub(false)}
           onCreated={() => { setShowCreateSub(false); refresh() }}
+        />
+      )}
+
+      {showInvite && (
+        <InvitePartnerModal
+          partnerId={id}
+          onClose={() => setShowInvite(false)}
         />
       )}
     </div>

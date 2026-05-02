@@ -2433,6 +2433,21 @@ class AdminApiService {
     }
   }
 
+  async invitePartnerUser(partnerId: string, body: { email: string; role?: 'owner' | 'manager' }): Promise<ApiResponse<unknown>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/invite`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, message: result.message }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] invitePartnerUser:', error)
+      return { success: false }
+    }
+  }
+
   /**
    * 🚗 FLOTTE - Calcule le résumé financier pour une période
    */
