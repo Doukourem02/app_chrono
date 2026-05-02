@@ -59,6 +59,66 @@ export interface DeliveryAnalytics {
   reported: number
 }
 
+// ─── B2B / Partenaires ────────────────────────────────────────────────────────
+
+export interface Partner {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  status: 'active' | 'inactive' | 'suspended'
+  plan?: string | null
+  commission_rate: number
+  notes?: string | null
+  created_at: string
+}
+
+export interface PartnerSubscription {
+  id: string
+  partner_id: string
+  plan: string
+  monthly_price: number
+  included_orders: number | null
+  excess_commission_rate: number
+  starts_at: string
+  payment_status: 'pending_payment' | 'active' | 'cancelled'
+  is_active: boolean
+  created_at: string
+}
+
+export interface PartnerUsage {
+  month: string
+  deliveries_count: number
+  quota: number | null
+  remaining: number | null
+  over_quota: boolean
+  plan: string | null
+}
+
+export interface PartnerInvoice {
+  id: string
+  partner_id: string
+  amount: number
+  status: 'pending' | 'paid' | 'overdue'
+  period_start: string
+  period_end: string
+  created_at: string
+}
+
+export interface PartnerDetail extends Partner {
+  active_subscription: PartnerSubscription | null
+  current_usage: { deliveries_count: number; month: string } | null
+}
+
+export interface PartnerUser {
+  id: string
+  partner_id: string
+  user_id: string
+  role: 'owner' | 'manager'
+  created_at: string
+  user?: { email?: string; first_name?: string | null; last_name?: string | null }
+}
+
 export interface ActivityData {
   deliveryId: string
   date: string

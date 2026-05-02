@@ -8,6 +8,7 @@ export default function AuthLayout() {
       <Stack.Screen name="login" />
       <Stack.Screen name="verification" />
       <Stack.Screen name="complete-profile" />
+      <Stack.Screen name="business-onboarding" />
       <Stack.Screen name="success" />
       <Stack.Screen name="validate" />
     </Stack>

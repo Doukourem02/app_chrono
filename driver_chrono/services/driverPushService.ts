@@ -39,6 +39,13 @@ export function navigateFromDriverPushPayload(
       "driverPush",
       { orderIdPrefix: orderId.slice(0, 8) }
     );
+    return;
+  }
+  if (type === "batch_assigned") {
+    const batchId = asPushString(data.batchId);
+    if (batchId) {
+      router.push(`/batch/${batchId}` as any);
+    }
   }
 }
 

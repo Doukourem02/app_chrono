@@ -339,6 +339,7 @@ Smoke tests prod :
 | `024_users_name_avatar_columns.sql` | `users.first_name`, `last_name`, `avatar_url` |
 | `025_orders_recipient_user_id.sql` | lien compte destinataire |
 | `026_order_status_push_dedup.sql` | anti-doublon notifications par `(order_id, status)` |
+| `027_b2b_tables.sql` *(à appliquer)* | 8 tables B2B + `ALTER TABLE orders ADD COLUMN partner_id` |
 
 Migrations SQL : voir `chrono_backend/migrations/README.md`.
 
@@ -387,7 +388,155 @@ Elle doit donner confiance, rester utile sans être lourde, et créer une impres
 
 ---
 
-## 16. Documents vivants
+## 16. B2B / Partenaires
+
+### Pourquoi le B2B
+
+Krono sert aujourd'hui des particuliers (B2C). Le B2B cible des professionnels — e-commerces, restaurants, pharmacies, boutiques — qui ont des volumes élevés et réguliers. Au lieu de payer 15-25 % de commission sur chaque course, ils s'abonnent à un forfait mensuel avec un quota de livraisons incluses.
+
+Revenus Krono : forfait prévisible + commissions sur excédents. Valeur partenaire : coût réduit par livraison, tournées groupées, portail dédié.
+
+---
+
+### Plans tarifaires B2B (validés le 2026-05-02)
+
+| Plan | Prix mensuel | Quota inclus | Commission in-quota | Commission excédent |
+|---|---|---|---|---|
+| **Starter** | 15 000 FCFA | 50 courses | 3 % | 20 % |
+| **Pro** | 40 000 FCFA | 200 courses | 3 % | 15 % |
+| **Business** | 100 000 FCFA | Illimité | 0 % | 10 % |
+
+Sans abonnement : taux standard du partenaire (15-25 %, champ `partners.commission_rate`).
+
+---
+
+### Schéma de données B2B
+
+8 tables créées lors de la migration `027_b2b_tables.sql` :
+
+| Table | Rôle |
+|---|---|
+| `partners` | Fiche entreprise partenaire (nom, email, téléphone, plan, commission_rate, status) |
+| `partner_users` | Utilisateurs du partenaire (`owner` / `manager`) — porte l'accès portail |
+| `partner_drivers` | Livreurs attitrés d'un partenaire |
+| `partner_subscriptions` | Abonnement actif (`pending_payment` → `active`), historique des plans |
+| `partner_usage` | Compteur mensuel de livraisons par partenaire (upsert atomique SQL) |
+| `partner_invoices` | Factures mensuelles générées automatiquement |
+| `delivery_batches` | Tournées groupées (ensemble de commandes à livrer en une sortie) |
+| `batch_orders` | Lien tournée ↔ commandes, avec position optimisée |
+
+La table `orders` reçoit une colonne `partner_id UUID REFERENCES partners(id)` pour rattacher chaque commande B2B à son partenaire.
+
+---
+
+### Logique commission B2B (b2bCommissionService)
+
+À chaque commande B2B, trois cas :
+
+1. **Abonnement actif + quota non dépassé** → taux `in_quota` (3 % Starter/Pro, 0 % Business)
+2. **Abonnement actif + quota dépassé** → `excess_commission_rate` (10-20 % selon plan)
+3. **Pas d'abonnement** → taux standard `partners.commission_rate` (15-25 %)
+
+Le compteur `partner_usage.deliveries_count` est incrémenté via un `INSERT … ON CONFLICT DO UPDATE` SQL atomique pour éviter les doublons en cas de requêtes simultanées.
+
+---
+
+### Tournées (delivery_batches)
+
+Un partenaire B2B livre souvent plusieurs commandes en une seule sortie (ex : 8 colis confiés à un livreur). Le système :
+
+1. Crée une tournée (`delivery_batches`) regroupant les commandes
+2. Optimise automatiquement l'ordre de passage via l'algorithme nearest-neighbor (haversine)
+3. Permet au livreur de valider chaque livraison une par une
+4. Clôture la tournée automatiquement quand toutes les commandes sont `completed` ou `cancelled`
+
+---
+
+### Facturation mensuelle (partnerInvoiceJob)
+
+Un **job** est une tâche automatique qui tourne en arrière-plan sans intervention humaine. Le `partnerInvoiceJob` est un job Node.js planifié sur un timer de 24h. À chaque déclenchement il vérifie si on est le 1er du mois — si oui, il génère les factures ; sinon, il ne fait rien.
+
+Contenu de la facture générée :
+- **Forfait mensuel** (fixe selon le plan)
+- **Surplus** : estimation des commandes excédentaires × `excess_commission_rate` × prix moyen (Phase 1 : 1 000 FCFA/course — à rapprocher des transactions réelles en Phase 2)
+- Garde anti-doublon : si une facture existe déjà pour ce partenaire / cette période, rien n'est créé
+
+---
+
+### Authentification portail partenaire (verifyPartnerUser)
+
+Les routes `/api/partner/:partnerId/...` sont protégées par `verifyPartnerUser` :
+1. Vérifie le token Bearer Supabase de l'utilisateur
+2. Contrôle que cet utilisateur appartient au partenaire visé via `partner_users`
+3. Injecte `req.partnerUser` (`userId`, `partnerId`, `role`) dans la requête
+
+Un partenaire ne voit jamais les données d'un autre partenaire.
+
+---
+
+### Carte des fichiers B2B
+
+| Sujet | Fichier |
+|---|---|
+| Contrôleur partenaire | `chrono_backend/src/controllers/partnerController.ts` |
+| Contrôleur tournées | `chrono_backend/src/controllers/batchController.ts` |
+| Logique commission B2B | `chrono_backend/src/services/b2bCommissionService.ts` |
+| Job facturation mensuel | `chrono_backend/src/jobs/partnerInvoiceJob.ts` |
+| Middleware auth partenaire | `chrono_backend/src/middleware/verifyPartnerUser.ts` |
+| Routes partenaire | `chrono_backend/src/routes/partnerRoutes.ts` |
+| Routes tournées | `chrono_backend/src/routes/batchRoutes.ts` |
+| Optimisation itinéraire | `chrono_backend/src/utils/haversine.ts` |
+
+---
+
+### Routes B2B exposées
+
+**Admin uniquement (`verifyAdminSupabase`)**
+
+| Méthode | Route | Action |
+|---|---|---|
+| `POST` | `/api/partners` | Créer un partenaire |
+| `GET` | `/api/partners` | Lister les partenaires (filtre status/plan) |
+| `GET` | `/api/partners/:id` | Détail partenaire + abonnement actif + usage courant |
+| `POST` | `/api/partners/:id/subscriptions` | Créer un abonnement (`pending_payment`) |
+| `PATCH` | `/api/partners/:id/subscriptions/:subId/activate` | Valider paiement → activer l'abonnement |
+| `GET` | `/api/partners/:id/usage` | Quota du mois courant |
+| `GET` | `/api/partners/:id/invoices` | Historique factures |
+| `POST` | `/api/batches` | Créer une tournée |
+| `GET` | `/api/batches/:id` | Détail tournée + commandes ordonnées |
+| `PATCH` | `/api/batches/:id/orders/:orderId` | Valider / annuler une livraison dans la tournée |
+
+**Portail partenaire (`verifyPartnerUser`)**
+
+| Méthode | Route | Action |
+|---|---|---|
+| `GET` | `/api/partner/:partnerId/details` | Voir sa propre fiche |
+| `GET` | `/api/partner/:partnerId/usage` | Voir son quota du mois |
+| `GET` | `/api/partner/:partnerId/invoices` | Voir ses factures |
+
+---
+
+### État d'avancement B2B (au 2026-05-02)
+
+| Bloc | Contenu | Statut |
+|---|---|---|
+| **Bloc 1** | Migrations SQL (8 tables + `partner_id` sur `orders`) | ⏳ À appliquer en base |
+| **Bloc 2** | Routes backend, commission, tournées, facturation, middleware | ✅ Implémenté |
+| **Bloc 3** | Interface admin : créer/gérer partenaires, activer abonnements | ⏳ À faire |
+| **Bloc 4** | `app_chrono` : mode business, onboarding, tournées mobile | ⏳ À faire |
+| **Bloc 5** | `driver_chrono` : réception tournée groupée, validation par livraison | ⏳ À faire |
+| **Bloc 6** | Décision commission Option A/B | ✅ Validé : Option B (3 % Starter/Pro, 0 % Business) |
+
+Ordre d'exécution recommandé pour la suite :
+1. Appliquer les migrations (Bloc 1) — tout le reste en dépend
+2. Brancher `computeB2BCommission` dans le flux de création de commande
+3. Interface admin partenaires (Bloc 3)
+4. `app_chrono` mode business (Bloc 4)
+5. `driver_chrono` tournée (Bloc 5)
+
+---
+
+## 17. Documents vivants
 
 Il doit rester un fichier principal de référence dans `docs/` :
 

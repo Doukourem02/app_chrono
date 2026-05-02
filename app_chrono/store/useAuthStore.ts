@@ -10,6 +10,10 @@ interface User {
   isVerified: boolean;
   first_name?: string | null;
   last_name?: string | null;
+  // Champs B2B
+  is_business?: boolean;
+  partner_id?: string | null;
+  company_name?: string | null;
 }
 
 interface AuthState {

@@ -54,7 +54,7 @@ export default function CompleteProfileScreen() {
         phone: result.data.phone || user.phone,
       });
 
-      router.replace('/(auth)/success' as any);
+      router.replace('/(auth)/business-onboarding' as any);
     } catch (error: any) {
       console.warn('[app_chrono/complete-profile] exception', error);
       logger.error('Erreur complete-profile', 'CompleteProfile', error);

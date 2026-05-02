@@ -43,6 +43,10 @@
         "drivers": "Livreurs",
         "performance": "Performance"
       },
+      "b2b": {
+        "title": "Partenaires B2B",
+        "partners": "Partenaires"
+      },
       "administration": {
         "title": "Administration",
         "planning": "Planning",

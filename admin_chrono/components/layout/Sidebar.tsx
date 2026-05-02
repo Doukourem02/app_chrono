@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,CarFront,Wrench,Shield,Sliders,} from "lucide-react";
+import {LayoutDashboard,MapPin,Package,MessageSquare,FileText,Wallet,Calendar,Users,Truck,TrendingUp,Trophy,ChevronDown,ChevronRight,CreditCard,Coins,Tag,AlertTriangle,CarFront,Wrench,Shield,Sliders,Briefcase,} from "lucide-react";
 import Image from "next/image";
 import logoImage from "@/assets/chrono.png";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -76,6 +76,14 @@ const navigationSectionsKeys = [
       { href: "/maintenance?tab=repairs", icon: Wrench, key: "repairs" },
       { href: "/maintenance?tab=documents", icon: FileText, key: "documents" },
       { href: "/maintenance?tab=budget", icon: Wallet, key: "budget" },
+    ],
+  },
+  {
+    id: "b2b",
+    key: "b2b",
+    icon: Briefcase,
+    items: [
+      { href: "/partners", icon: Briefcase, key: "partners" },
     ],
   },
   {

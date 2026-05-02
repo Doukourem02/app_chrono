@@ -25,6 +25,8 @@ import fleetRoutes from './routes/fleetRoutes.js';
 import mapboxRoutes from './routes/mapboxRoutes.js';
 import pushRoutes from './routes/pushRoutes.js';
 import orderRecordRoutes from './routes/orderRecordRoutes.js';
+import partnerRoutes, { partnerPortalRouter } from './routes/partnerRoutes.js';
+import batchRoutes from './routes/batchRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { setupSwagger } from './config/swagger.js';
@@ -158,6 +160,9 @@ app.use('/api/fleet', fleetRoutes);
 app.use('/api/mapbox', mapboxRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/orders', orderRecordRoutes);
+app.use('/api/partners', partnerRoutes);
+app.use('/api/partner/:partnerId', partnerPortalRouter);
+app.use('/api/batches', batchRoutes);
 
 app.use(errorHandler);
 

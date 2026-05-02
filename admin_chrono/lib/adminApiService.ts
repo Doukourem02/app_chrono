@@ -2329,6 +2329,110 @@ class AdminApiService {
     }
   }
 
+  // ─── B2B / Partenaires ──────────────────────────────────────────────────────
+
+  async getPartners(filters?: { status?: string; plan?: string }): Promise<ApiResponse<import('@/types').Partner[]>> {
+    try {
+      const params = new URLSearchParams()
+      if (filters?.status) params.set('status', filters.status)
+      if (filters?.plan) params.set('plan', filters.plan)
+      const qs = params.toString()
+      const url = `${API_BASE_URL}/api/partners${qs ? `?${qs}` : ''}`
+      const response = await this.fetchWithAuth(url)
+      if (!response.ok) return { success: false, data: [] }
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: true, data: (result.data as import('@/types').Partner[]) || [] }
+      return { success: false, data: [] }
+    } catch (error) {
+      logger.error('[adminApiService] getPartners:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  async createPartner(body: { name: string; email?: string; phone?: string; commission_rate?: number; notes?: string }): Promise<ApiResponse<import('@/types').Partner>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').Partner }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] createPartner:', error)
+      return { success: false }
+    }
+  }
+
+  async getPartner(id: string): Promise<ApiResponse<import('@/types').PartnerDetail>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${id}`)
+      if (!response.ok) return { success: false }
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: true, data: result.data as import('@/types').PartnerDetail }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] getPartner:', error)
+      return { success: false }
+    }
+  }
+
+  async createPartnerSubscription(partnerId: string, body: { plan: string; starts_at?: string }): Promise<ApiResponse<import('@/types').PartnerSubscription>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/subscriptions`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').PartnerSubscription }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] createPartnerSubscription:', error)
+      return { success: false }
+    }
+  }
+
+  async activatePartnerSubscription(partnerId: string, subId: string): Promise<ApiResponse<import('@/types').PartnerSubscription>> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${API_BASE_URL}/api/partners/${partnerId}/subscriptions/${subId}/activate`,
+        { method: 'PATCH' }
+      )
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').PartnerSubscription }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] activatePartnerSubscription:', error)
+      return { success: false }
+    }
+  }
+
+  async getPartnerUsage(id: string): Promise<ApiResponse<import('@/types').PartnerUsage>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${id}/usage`)
+      if (!response.ok) return { success: false }
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: true, data: result.data as import('@/types').PartnerUsage }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] getPartnerUsage:', error)
+      return { success: false }
+    }
+  }
+
+  async getPartnerInvoices(id: string): Promise<ApiResponse<import('@/types').PartnerInvoice[]>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${id}/invoices`)
+      if (!response.ok) return { success: false, data: [] }
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: true, data: (result.data as import('@/types').PartnerInvoice[]) || [] }
+      return { success: false, data: [] }
+    } catch (error) {
+      logger.error('[adminApiService] getPartnerInvoices:', error)
+      return { success: false, data: [] }
+    }
+  }
+
   /**
    * 🚗 FLOTTE - Calcule le résumé financier pour une période
    */

@@ -28,13 +28,27 @@ Le problème n'est pas le device (mobile vs ordinateur). Le problème est la **f
 - Revendeur, boutique de quartier, petit commerçant informel
 - Tout se passe sur téléphone uniquement
 - Faible volume : 5 à 20 commandes par jour
-- Pas de structure formelle, pas d'abonnement au départ
+- Pas de structure formelle : **pas d'abonnement obligatoire** au départ
 - Veut de la simplicité absolue
+
+**Paiement (harmonisé avec le reste du système)**
+
+- **Commandes pour ses clients** : paiement sur le **compte business** du commerçant — **immédiat** (carte / mobile money selon dispositif existant) ou **différé** (`deferred`) si le profil / partenaire y est éligible, comme pour le B2B déjà en place
+- **Commande pour lui-même** (voir §4) : même règles que Profil 0 si l'utilisateur bascule en contexte « perso » — typiquement **paiement immédiat** à la commande
+
+**Commission**
+
+- Sans abonnement actif : **Axe 1** — `partners.commission_rate` (cible documentaire **15 à 25 %**), aligné sur le petit volume
+- Avec abonnement (s'il souscrit plus tard) : règles **Axe 2** et section **Commission dans le quota** (§8)
+
+**Limites**
+
+- Pas de quota plateforme imposé au Profil 1 par défaut ; les garde-fous sont **opérationnels** (anti-fraude, plafonds de différé si activé) et **commerciaux** (évolution vers Profil 2 / 3 si le volume explose)
 
 ### Profil 2 — Vendeur à volume (vendeuse TikTok, live)
 
 - Fait des lives TikTok, collecte 20+ commandes d'un coup
-- A **un seul livreur attitré** qu'il connaît personnellement
+- Un ou **plusieurs livreurs attitrés** (voir table `partner_drivers`, §7) — relation persistante, pas seulement le `driver_id` figé sur une tournée
 - A besoin de créer une tournée entière en une session
 - Tout se passe sur téléphone
 
@@ -69,22 +83,25 @@ Un partenaire ne voit jamais : les autres partenaires, les livreurs et leurs com
 
 ---
 
-## 4. Inscription — la distinction se fait une seule fois
+## 4. Comptes et contexte d'utilisation (critique)
 
-À l'inscription dans `app_chrono`, l'utilisateur choisit **une fois pour toutes** :
+**Un seul compte utilisateur**, avec un **mode d'utilisation** (contexte) — pas deux comptes « particulier » / « commerçant » figés à vie.
 
-"Je suis un particulier"   → compte client (Profil 0)
-"Je suis commerçant"       → compte business (Profil 1 ou 2)
+- **Contexte client** : commandes pour soi (Profil 0), flux B2C habituel
+- **Contexte business** : commandes pour ses clients, livraisons multiples, options B2B (différé, livreurs attitrés, tournées, etc.)
 
-Après ça, l'app sait qui il est et lui montre directement la bonne interface.
-Le commerçant ne voit plus jamais cette question.
+**Règles**
 
-||Particulier|Commerçant|
-|---|---|---|
-|Nombre de commandes|Une à la fois|Plusieurs, pour ses propres clients|
-|Qui paie|Lui, immédiatement|Son compte business, différé possible|
-|Les destinataires|Quelqu'un à qui il envoie|Ses clients à lui|
-|Livreur|Dispatch automatique|Peut avoir un livreur attitré|
+- Un **commerçant peut aussi commander pour lui-même** : il bascule en contexte client (ou équivalent UX) ; l'interface et les règles de paiement **s'adaptent au contexte**, pas à « un second compte »
+- L'onboarding peut demander **« tu vends aussi des colis à des clients ? »** pour activer le mode business et les champs associés — ce n'est pas un verrou définitif : l'utilisateur reste une seule identité
+- L'app affiche les parcours pertinents selon le **contexte actif** (création de commande perso vs commande client / tournée)
+
+| Critère | Contexte client | Contexte business |
+| --- | --- | --- |
+| Nombre de commandes | Une à la fois (typique) | Plusieurs, pour ses propres clients |
+| Qui paie | Lui, immédiatement (typique) | Son compte business ; différé possible si éligible |
+| Les destinataires | Lui ou un proche | Ses clients |
+| Livreur | Dispatch automatique | Livreur(s) attitré(s) possible(s) ; sinon dispatch |
 
 ---
 
@@ -95,8 +112,8 @@ Le commerçant ne voit plus jamais cette question.
 Elle ouvre le mode tournée après son live :
 
 1. Elle entre les commandes une par une (nom, adresse, téléphone, notes)
-2. Elle sélectionne son livreur attitré (lié à son compte)
-3. L'app propose un ordre de livraison optimisé
+2. Elle choisit un **livreur attitré** parmi ceux liés à son compte (`partner_drivers`, défaut possible)
+3. L'app propose un ordre de livraison optimisé (voir §11 — promesse produit liée à une implémentation technique explicite)
 4. Elle envoie toute la tournée d'un coup
 
 ### Côté livreur dans `driver_chrono`
@@ -158,7 +175,11 @@ partner.krono.com
 
 ---
 
-## 7. Modèle de données — les 7 tables à créer
+## 7. Modèle de données — 8 tables nouvelles + évolution `orders`
+
+Formulation exacte : **8 tables à créer** + **modification de `orders`** (ajout `partner_id`).
+
+Les livreurs attitrés ne sont plus implicites via seul `delivery_batches.driver_id` : la relation persistante commerçant ↔ livreur est portée par **`partner_drivers`** (le `driver_id` sur une tournée reste le **snapshot** d'exécution pour la batch).
 
 ### Table `partners` — l'entreprise partenaire
 
@@ -189,7 +210,27 @@ CREATE TABLE partner_users (
 );
 ```
 
-### Table `partner_subscriptions` — l'abonnement actif
+### Table `partner_drivers` — livreurs attitrés (relation persistante)
+
+```sql
+CREATE TABLE partner_drivers (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  partner_id     UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  is_default     BOOLEAN DEFAULT false,         -- livreur proposé par défaut en tournée
+  created_at     TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(partner_id, driver_user_id)
+);
+```
+
+Un commerçant peut avoir **plusieurs** livreurs attitrés ; l'UI choisit parmi eux (ou le défaut).
+
+### Table `partner_subscriptions` — l'abonnement (évolutif)
+
+`ends_at` **obligatoire** dès le MVP peut gêner renouvellements et annulations. Modèle prévu évolutif :
+
+- **Phase 1** : période claire `starts_at` / `ends_at` + statuts de paiement (voir §8)
+- **Évolutions** : renouvellement tacite ou automatique, `cancelled_at`, `next_renewal_at` (ou équivalent), `ends_at` nullable si « actif jusqu'à résiliation »
 
 ```sql
 CREATE TABLE partner_subscriptions (
@@ -200,11 +241,17 @@ CREATE TABLE partner_subscriptions (
   included_orders         INTEGER,              -- NULL = illimité
   excess_commission_rate  DECIMAL NOT NULL,
   starts_at               TIMESTAMPTZ NOT NULL,
-  ends_at                 TIMESTAMPTZ NOT NULL,
-  is_active               BOOLEAN DEFAULT true,
+  ends_at                 TIMESTAMPTZ,          -- nullable si politique « sans fin fixe » + cancelled_at
+  cancelled_at            TIMESTAMPTZ,          -- résiliation
+  next_renewal_at         TIMESTAMPTZ,          -- optionnel : échéance renouvellement auto (futur)
+  payment_status          TEXT NOT NULL DEFAULT 'pending_payment',
+                            -- 'trial' | 'pending_payment' | 'active' | 'past_due' | 'cancelled'
+  is_active               BOOLEAN DEFAULT false, -- true seulement quand droits réels (ex. après validation admin Phase 1)
   created_at              TIMESTAMPTZ DEFAULT now()
 );
 ```
+
+**Règle** : en Phase 1, `is_active = true` après validation admin une fois le paiement manuel constaté ; `trial` peut activer des droits limités selon politique produit (à trancher avant implémentation).
 
 ### Table `partner_usage` — compteur mensuel de courses
 
@@ -212,19 +259,23 @@ CREATE TABLE partner_subscriptions (
 CREATE TABLE partner_usage (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   partner_id        UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
-  month             DATE NOT NULL,              -- ex : 2025-05-01
+  month             DATE NOT NULL,              -- ex : 2026-05-01
   deliveries_count  INTEGER DEFAULT 0,
   UNIQUE(partner_id, month)
 );
 ```
 
-### Table `invoices` — factures générées
+### Table `partner_invoices` — factures B2B générées
+
+> ⚠️ Nommée `partner_invoices` (et non `invoices`) car la table `invoices` est déjà utilisée pour les factures par livraison.
+
+Une ligne de facture côté métier : **une facture mensuelle = forfait d'abonnement du mois + lignes de dépassement éventuelles** (commissions sur courses au-delà du quota). Pas de double facturation : ce qui est **déjà prélevé ou facturé en temps réel** (ex. commission à la course hors abonnement) doit être **exclu** ou **rapproché** explicitement dans la même période — voir §8 « Facturation ».
 
 ```sql
-CREATE TABLE invoices (
+CREATE TABLE partner_invoices (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   partner_id   UUID NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
-  amount       INTEGER NOT NULL,                -- en FCFA
+  amount       INTEGER NOT NULL,                -- en FCFA — total dû pour la période (abonnement + ajustements)
   status       TEXT DEFAULT 'pending',          -- 'pending' | 'paid' | 'overdue'
   period_start DATE NOT NULL,
   period_end   DATE NOT NULL,
@@ -233,6 +284,8 @@ CREATE TABLE invoices (
 );
 ```
 
+**Évolution** : lignes de facture détaillées (`partner_invoice_lines`) si besoin de ventilation abonnement / dépassement / ajustements en compta.
+
 ### Table `delivery_batches` — les tournées
 
 ```sql
@@ -240,7 +293,7 @@ CREATE TABLE delivery_batches (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   partner_id   UUID REFERENCES partners(id),
   user_id      UUID REFERENCES users(id),       -- pour les Profil 1/2 via app_chrono
-  driver_id    UUID REFERENCES users(id),       -- livreur attitré assigné
+  driver_id    UUID REFERENCES users(id),       -- livreur exécutant cette tournée (snapshot)
   status       TEXT DEFAULT 'pending',          -- 'pending' | 'in_progress' | 'completed'
   created_at   TIMESTAMPTZ DEFAULT now()
 );
@@ -284,32 +337,76 @@ Commission de **15 à 25%** par livraison. Zéro engagement.
 |Pro|40 000 FCFA|200 courses|15%|
 |Business|100 000 FCFA|illimité|10%|
 
-#### Flux de paiement
+#### Paiement abonnement — Phase 1 vs scale
+
+**Phase 1 (MVP)** : paiement **manuel** (Orange Money / Wave / virement) + **validation admin** pour activer l'abonnement. Statuts intermédiaires dans `partner_subscriptions.payment_status` :
+
+- `trial` — période d'essai si offre produit (droits à définir)
+- `pending_payment` — en attente de preuve / encaissement
+- `active` — droits pleins une fois validé
+- `past_due` / `cancelled` — évolutions comptables
+
+**Au-delà de la Phase 1 (roadmap)** : passage à **paiement récurrent automatisé** (intégration prestataire, prélèvement, relances) ; le flux manuel reste éventuellement secours ou grands comptes.
+
+#### Flux de paiement (Phase 1)
 
 ```text
 Partenaire choisit son forfait
         ↓
-Paiement via Orange Money / Wave / virement
+Paiement manuel (OM / Wave / virement) → payment_status = pending_payment
         ↓
-Admin Krono confirme → partner_subscriptions (is_active = true)
+Admin Krono confirme → payment_status = active, is_active = true
         ↓
 Commandes créées → partner_usage.deliveries_count++
         ↓
-Si quota dépassé → excess_commission_rate appliqué
+Si quota dépassé → excess_commission_rate appliqué (sur les courses excédentaires)
         ↓
-Fin de mois → génération invoice
+Fin de mois → génération invoice (abonnement + dépassements, voir ci-dessous)
 ```
 
-#### Logique de facturation à chaque commande B2B
+#### Facturation mensuelle (clarification critique)
+
+**Une facture pour une période** (`period_start` → `period_end`) représente typiquement :
+
+1. **Le montant de l'abonnement** du forfait (`monthly_price`)
+2. **Plus** tout **ajustement** dû au **dépassement de quota** (commissions `excess_commission_rate` sur les courses au-delà du quota inclus)
+
+**Séparation des concepts**
+
+| Concept | Rôle |
+| --- | --- |
+| Abonnement | Forfait mensuel récurrent (prix du plan) |
+| Usage (`partner_usage`) | Compteur de courses dans le mois — sert au quota |
+| Commission temps réel | Courses hors forfait ou sans abonnement : Axe 1 ou taux excédent |
+| Facture (`invoices`) | **Synthèse** période : ce que le partenaire **doit encore payer** ou qui **clôt** la période — **sans doublon** avec ce qui a déjà été encaissé en flux (règles compta à figer dans le spec billing) |
+
+**Garantie** : une course ne doit pas être **facturée deux fois** (ex. commission déjà appliquée en ligne + reprise pleine sur facture) ; si commission déjà prélevée, la facture ne reprend que **solde** abonnement / pénalités / régularisations.
+
+#### Logique de commission à chaque commande B2B
 
 ```text
 1. Récupérer le partenaire via orders.partner_id
-2. Vérifier partner_subscriptions actif ce mois
-3a. Abonnement actif + quota non dépassé  → 0% commission, incrémenter usage
+2. Vérifier partner_subscriptions avec payment_status = active et is_active ce mois
+3a. Abonnement actif + quota non dépassé  → commission plateforme documentaire « dans le quota » (voir encadré ci-dessous)
 3b. Abonnement actif + quota dépassé      → excess_commission_rate
-3c. Pas d'abonnement                      → partners.commission_rate (Axe 1)
-4. Enregistrer dans partner_usage
+3c. Pas d'abonnement actif                → partners.commission_rate (Axe 1)
+4. Enregistrer / mettre à jour partner_usage et traces de facturation
 ```
+
+**Commission dans le quota — décision business (validation obligatoire)**
+
+- **Option A — SaaS pur** : abonnement actif + quota non dépassé ⇒ **0 %** commission plateforme sur la course ; le revenu est le forfait
+- **Option B — Commission minimale** : même cas ⇒ **3 à 5 %** (ou palier fixe) pour préserver la marge unitaire
+
+**Décision validée :**
+
+| Plan | Commission dans le quota |
+| --- | --- |
+| Starter (15 000 FCFA / 50 courses) | **3 %** (Option B) |
+| Pro (40 000 FCFA / 200 courses) | **3 %** (Option B) |
+| Business (100 000 FCFA / illimité) | **0 %** (Option A) |
+
+Logique : le forfait Business couvre entièrement le coût variable ; sur Starter/Pro, 3 % préserve la marge unitaire sans pénaliser le partenaire.
 
 ### Axe 3 — API d'intégration (Phase 2, 6 mois)
 
@@ -338,7 +435,7 @@ Déjà implémenté, à conserver :
 - Tous les livreurs disponibles notifiés
 - Livreurs **internes** prioritaires sur commandes B2B
 - Paiement **différé** (`deferred`) disponible
-- Si livreur attitré défini → assignation directe, pas de dispatch
+- Si livreur attitré défini (`partner_drivers` + choix pour la course ou tournée) → assignation directe, pas de dispatch large
 
 ---
 
@@ -346,11 +443,12 @@ Déjà implémenté, à conserver :
 
 Les commandes B2B actuelles ont `is_b2b_order = true` sans `partner_id`.
 
-1. Créer les 7 tables
+1. Créer les **8 tables** (dont `partner_drivers`)
 2. Ajouter `orders.partner_id` (nullable, pas de rupture)
 3. Créer manuellement les entrées `partners` pour les partenaires existants
-4. `UPDATE orders SET partner_id = ? WHERE ...` pour rattacher l'historique
-5. `is_b2b_order` reste pendant la transition
+4. Renseigner `partner_drivers` pour les couples commerçant / livreur déjà connus (si données disponibles)
+5. `UPDATE orders SET partner_id = ? WHERE ...` pour rattacher l'historique
+6. `is_b2b_order` reste pendant la transition
 
 ---
 
@@ -358,18 +456,23 @@ Les commandes B2B actuelles ont `is_b2b_order = true` sans `partner_id`.
 
 ### Phase 1 — Lancement (J0)
 
-- [ ] Créer les 7 tables en base
-- [ ] Ajouter `orders.partner_id`
-- [ ] Migration des partenaires existants
-- [ ] Inscription "particulier / commerçant" dans `app_chrono`
-- [ ] Mode business dans `app_chrono` (Profil 1)
-- [ ] Mode tournée + livreur attitré dans `app_chrono` (Profil 2)
+- [ ] Créer les **8 tables** en base + `orders.partner_id`
+- [ ] Migration des partenaires existants + `partner_drivers` si applicable
+- [ ] Compte unique + **contexte** client / business dans `app_chrono` (pas de double compte figé)
+- [ ] Mode business dans `app_chrono` (Profil 1) — paiement / commission alignés §2
+- [ ] Mode tournée + livreurs attitrés persistants + choix à l'envoi (Profil 2)
+- [ ] **Optimisation d'itinéraire** : implémenter au minimum un **algo simple** (ex. ordre par distance euclidienne / haversine entre adresses géocodées) **ou** appel **Directions** (Google) / **OSRM** selon contraintes coût et licence — objectif : ne pas promettre « optimisé » sans livrable technique
 - [ ] Mettre à jour `NewB2BShippingModal` pour renseigner `partner_id`
 - [ ] Page admin : créer / gérer un partenaire
-- [ ] Page admin : activer un abonnement
-- [ ] Logique de décompte quota à chaque commande B2B
-- [ ] Génération de facture mensuelle
+- [ ] Page admin : activer un abonnement (`pending_payment` → `active`)
+- [ ] Logique de décompte quota + commission (option A ou B validée §8) à chaque commande B2B
+- [ ] Génération de facture mensuelle (abonnement + dépassements, sans double facturation)
 - [ ] Portail `/partner` dans `admin_chrono` : tableau de bord + créer commande + mes commandes
+
+### Phase 1 bis / Phase 2 — Monétisation scale
+
+- [ ] Paiement abonnement **récurrent / automatisé** (préférences prestataires locaux)
+- [ ] Affinage `partner_subscriptions` : renouvellement auto, `cancelled_at`, politique `ends_at` nullable
 
 ### Phase 2 — 6 mois après lancement
 
@@ -390,7 +493,10 @@ Les commandes B2B actuelles ont `is_b2b_order = true` sans `partner_id`.
 
 ## 12. Feature séparée — Commissionnaire (hors B2B)
 
-Feature B2C à documenter séparément.
-Le livreur agit à la place du client : va acheter un médicament, faire les courses au marché.
-Ce n'est pas une livraison classique (point A → point B avec colis existant).
-Questions à résoudre : qui avance l'argent des achats, budget maximum, que faire si article indisponible.
+**Hors périmètre B2B** : pas de mélange avec logique produit, pricing ou tables `partners` / abonnements ci-dessus.
+
+Feature **B2C** à documenter dans un **fichier dédié** (parcours, pricing, avance de fonds).
+
+Résumé métier : le livreur agit à la place du client (courses, achats ponctuels) — ce n'est pas une livraison classique point A → point B avec colis déjà prêt.
+
+Questions à traiter dans ce doc séparé : qui avance l'argent, plafond budget, article indisponible, assurance / litiges.

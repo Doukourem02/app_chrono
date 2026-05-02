@@ -164,6 +164,7 @@ class OrderSocketService {
     this.socket.removeAllListeners('resync-order-state');
     this.socket.removeAllListeners('order:status:update');
     this.socket.removeAllListeners('order:cancelled');
+    this.socket.removeAllListeners('batch-assigned');
 
     // Nouvelle commande reçue
     this.socket.on('new-order-request', (order: OrderRequest) => {
@@ -388,6 +389,31 @@ class OrderSocketService {
         }
       } catch (err) {
         logger.warn('Error handling order:cancelled', undefined, err);
+      }
+    });
+
+    // Tournée B2B assignée — une seule notification pour N livraisons
+    this.socket.on('batch-assigned', (data: { batchId: string; ordersCount: number }) => {
+      try {
+        logger.info('Tournée B2B assignée', undefined, data);
+        const { batchId, ordersCount } = data || {};
+        if (!batchId) return;
+
+        import('../store/useBatchStore').then(({ useBatchStore }) => {
+          // Pré-remplir avec le minimum connu, l'écran chargera les détails complets
+          useBatchStore.getState().setActiveBatch({ id: batchId, ordersCount: ordersCount ?? 0, stops: [] });
+        });
+
+        import('expo-router').then(({ router }) => {
+          router.push(`/batch/${batchId}` as any);
+        });
+
+        void soundService.playOrderSound().catch(() => {});
+        import('expo-haptics').then((Haptics) => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        });
+      } catch (err) {
+        logger.warn('Error handling batch-assigned', undefined, err);
       }
     });
   }

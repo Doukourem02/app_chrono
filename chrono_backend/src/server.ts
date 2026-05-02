@@ -11,6 +11,7 @@ import { setupAdminSocket } from './sockets/adminSocket.js';
 import { setupMessageSocket } from './sockets/messageSocket.js';
 import logger from './utils/logger.js';
 import { runDeferredDebtReminderJob } from './jobs/deferredDebtReminderJob.js';
+import { runPartnerInvoiceJob } from './jobs/partnerInvoiceJob.js';
 import { initializeRedis, closeRedis, pubClient, subClient } from './config/redis.js';
 import { createClient } from '@supabase/supabase-js';
 import pool from './config/db.js';
@@ -234,11 +235,21 @@ server.listen(PORT, HOST, () => {
   }
 
   // Job quotidien : rappel bienveillant aux clients ayant une dette différée ≥ 7 jours
-  const REMINDER_INTERVAL_MS = 24 * 60 * 60 * 1000; // toutes les 24h
+  const REMINDER_INTERVAL_MS = 24 * 60 * 60 * 1000;
   setTimeout(() => {
     void runDeferredDebtReminderJob();
     setInterval(() => void runDeferredDebtReminderJob(), REMINDER_INTERVAL_MS);
-  }, 60_000); // démarre 1 minute après le boot pour laisser la DB s'initialiser
+  }, 60_000);
+
+  // Job mensuel : génération des factures partenaires B2B (tourne quotidiennement, s'exécute le 1er du mois)
+  const INVOICE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+  setTimeout(() => {
+    const maybeRunInvoiceJob = () => {
+      if (new Date().getDate() === 1) void runPartnerInvoiceJob();
+    };
+    maybeRunInvoiceJob();
+    setInterval(maybeRunInvoiceJob, INVOICE_INTERVAL_MS);
+  }, 90_000);
 });
 
 // Nettoyage propre à l'arrêt du serveur

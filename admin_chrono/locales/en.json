@@ -43,6 +43,10 @@
         "drivers": "Drivers",
         "performance": "Field monitoring"
       },
+      "b2b": {
+        "title": "B2B Partners",
+        "partners": "Partners"
+      },
       "administration": {
         "title": "Administration",
         "planning": "Planning",

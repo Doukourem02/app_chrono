@@ -114,6 +114,16 @@ interface NearbyDriver {
 const activeOrders = new Map<string, Order>();
 const connectedDrivers = new Map<string, string>(); // driverId -> socketId
 const connectedUsers = new Map<string, string>(); // userId -> socketId // Limites configurable pour les commandes multiples
+
+let _ioInstance: SocketIOServer | null = null;
+
+function emitBatchAssigned(driverId: string, payload: { batchId: string; ordersCount: number }): boolean {
+  if (!_ioInstance) return false;
+  const socketId = connectedDrivers.get(driverId);
+  if (!socketId) return false;
+  _ioInstance.to(socketId).emit('batch-assigned', payload);
+  return true;
+}
 const MAX_ACTIVE_ORDERS_PER_CLIENT = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_CLIENT || '5');
 const MAX_ACTIVE_ORDERS_PER_DRIVER = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_DRIVER || '3');
 
@@ -792,6 +802,7 @@ async function notifyDriversForOrder(
 }
 
 const setupOrderSocket = (io: SocketIOServer): void => {
+  _ioInstance = io;
   setSurgeSnapshotGetter(() => ({
     pendingOrders: Array.from(activeOrders.values()).filter((o) => o.status === 'pending').length,
     onlineDrivers: connectedDrivers.size,
@@ -2497,5 +2508,6 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 export {
   activeOrders, calculatePrice, connectedDrivers,
   connectedUsers, estimateDuration,
-  findNearbyDrivers, findAllAvailableDrivers, setupOrderSocket, notifyDriversForOrder
+  findNearbyDrivers, findAllAvailableDrivers, setupOrderSocket, notifyDriversForOrder,
+  emitBatchAssigned,
 };
