@@ -3,9 +3,7 @@ import logger from '../utils/logger.js';
 import { sendCampaignPushToUser } from '../services/expoPushService.js';
 
 // Jours exacts où on envoie une notification (8 au total, stop après J+31)
-// J+7, J+14           → Phase 1 : 💜 1x/semaine
-// J+18, J+21, J+25    → Phase 2 : 🌟 2x/semaine
-// J+27, J+29, J+31    → Phase 3 : 💳 3x/semaine puis sanctions
+// J+7, J+14 → phase 1 (1x/semaine) ; J+18,21,25 → phase 2 ; J+27,29,31 → phase 3
 const REMINDER_DAYS = [7, 14, 18, 21, 25, 27, 29, 31];
 
 // Garde le dernier jour de notif envoyé par userId pour éviter les doublons
@@ -18,21 +16,21 @@ function getNotification(daysOld: number, totalAmount: number): { title: string;
 
   if (daysOld <= 14) {
     return {
-      title: 'Petit rappel 💜',
+      title: 'Petit rappel',
       body: `Vous avez un crédit Krono de ${amount} FCFA à rembourser. Prenez votre temps, on est là pour vous !`,
     };
   }
 
   if (daysOld <= 25) {
     return {
-      title: 'On pense à vous 🌟',
+      title: 'On pense à vous',
       body: `Votre crédit Krono (${amount} FCFA) attend toujours. Réglez facilement depuis l'app quand vous êtes prêt.`,
     };
   }
 
   return {
-    title: 'Votre crédit Krono 💳',
-    body: `N'oubliez pas votre crédit de ${amount} FCFA. Un simple tap depuis "Mes dettes" et c'est réglé !`,
+    title: 'Votre crédit Krono',
+    body: `N'oubliez pas votre crédit de ${amount} FCFA. Un simple tap depuis « Mes dettes » et c'est réglé !`,
   };
 }
 

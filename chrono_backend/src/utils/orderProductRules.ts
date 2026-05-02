@@ -304,15 +304,15 @@ export function publicTrackCopy(raw: unknown): { title: string; body: string } |
       return { title: 'Recherche livreur', body: 'Recherche d’un livreur pour cette livraison.' };
     case 'accepted':
     case 'enroute':
-      return { title: 'Prise en charge', body: 'Le livreur se dirige vers le point de collecte.' };
+      return { title: 'Prise en charge', body: 'Le livreur va récupérer le colis.' };
     case 'in_progress':
       return { title: 'Livreur arrivé', body: 'Le livreur est au point de collecte.' };
     case 'picked_up':
       return { title: 'Colis récupéré', body: 'Votre colis a été récupéré.' };
     case 'delivering':
-      return { title: 'Livraison en cours', body: 'Le livreur se dirige vers la destination.' };
+      return { title: 'Livraison en cours', body: 'Le livreur se dirige vers vous.' };
     case 'completed':
-      return { title: 'Livraison terminée', body: 'Votre commande est livrée.' };
+      return { title: 'Livraison terminée', body: 'Votre colis a été livré.' };
     case 'cancelled':
       return { title: 'Commande annulée', body: 'Cette livraison a été annulée.' };
     case 'declined':

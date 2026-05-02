@@ -1106,6 +1106,21 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           io.to(socket.id).emit('no-drivers-available', { orderId: order.id, message: 'Aucun chauffeur disponible dans votre zone' });
           return;
         }
+
+        if (dbSaved && order.status === 'pending') {
+          void notifyAllForOrderStatus({
+            orderId: order.id,
+            status: 'pending',
+            payerUserId: order.user.id,
+            recipientUserId: (order as any).recipient_user_id ?? undefined,
+            recipientPhone: order.recipient?.phone || order.dropoff?.details?.phone || undefined,
+            trackingToken: (order as any).trackingToken ?? undefined,
+          }).catch((e: unknown) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            logger.warn('[recipient-notify] create-order pending:', msg);
+          });
+        }
+
         if (DEBUG) logger.debug(`${nearbyDrivers.length} chauffeurs trouvés pour la commande ${maskOrderId(order.id)}`);
         
         // Matching équitable : tous les livreurs reçoivent la commande, triés par priorité (notes)

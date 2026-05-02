@@ -4,14 +4,15 @@ export type PublicTrackStep = {
   body: string;
 };
 
+/** Aligné sur `publicTrackCopy` (backend) — même voix que SMS / web push suivi. */
 export const PUBLIC_TRACK_FLOW_STEPS: PublicTrackStep[] = [
   { status: 'pending', title: 'Recherche livreur', body: 'Recherche d’un livreur pour cette livraison.' },
-  { status: 'accepted', title: 'Livreur assigné', body: 'Un livreur a accepté votre commande.' },
-  { status: 'enroute', title: 'En route vers le colis', body: 'Le livreur se dirige vers le point de collecte.' },
+  { status: 'accepted', title: 'Prise en charge', body: 'Le livreur va récupérer le colis.' },
+  { status: 'enroute', title: 'Prise en charge', body: 'Le livreur va récupérer le colis.' },
   { status: 'in_progress', title: 'Livreur arrivé', body: 'Le livreur est au point de collecte.' },
   { status: 'picked_up', title: 'Colis récupéré', body: 'Votre colis a été récupéré.' },
-  { status: 'delivering', title: 'Livraison en cours', body: 'Le livreur se dirige vers la destination.' },
-  { status: 'completed', title: 'Livraison terminée', body: 'Votre commande est livrée.' },
+  { status: 'delivering', title: 'Livraison en cours', body: 'Le livreur se dirige vers vous.' },
+  { status: 'completed', title: 'Livraison terminée', body: 'Votre colis a été livré.' },
 ];
 
 export function publicTrackStatusTitle(status: string): string {

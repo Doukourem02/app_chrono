@@ -860,7 +860,8 @@ export async function notifyLiveActivitiesForOrderStatus(params: {
       activeTokenCount: tokens.length,
       apnsConfigured: true,
       successfulPushCount: successCount,
-      shouldSuppressClassicPush: successCount > 0 && LIVE_ACTIVITY_ONLY_STATUSES.has(statusNorm),
+      // Toujours false : les pushes Expo statut commande restent la référence produit ; Live Activity est additive.
+      shouldSuppressClassicPush: false,
     };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);

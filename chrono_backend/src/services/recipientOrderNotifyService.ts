@@ -11,6 +11,7 @@ import {
 } from './trackWebPushService.js';
 
 const NOTIFY_STATUSES = new Set([
+  'pending',
   'accepted',
   'enroute',
   'in_progress',
@@ -18,6 +19,7 @@ const NOTIFY_STATUSES = new Set([
   'delivering',
   'completed',
   'cancelled',
+  'declined',
 ]);
 
 /**
@@ -201,19 +203,19 @@ export async function notifyAllForOrderStatus(params: {
       ? `${trackBase}/track/${encodeURIComponent(trackingToken)}`
       : null;
 
-  const liveActivityResult = await notifyLiveActivitiesForOrderStatus({
+  await notifyLiveActivitiesForOrderStatus({
     orderId,
     status: statusNorm,
     payerUserId,
   });
 
+  // Pushes statut payeur + destinataire : toujours envoyées (titres/corps produit), la Live Activity iOS est en plus.
   void notifyOrderStatusPushes({
     orderId,
     status,
     payerUserId,
     recipientUserId,
     trackUrl,
-    suppressPayerPush: liveActivityResult.shouldSuppressClassicPush,
   }).catch((e: unknown) => {
     logger.warn('[recipient-notify] expo:', e instanceof Error ? e.message : String(e));
   });
