@@ -5,6 +5,7 @@ import StatusKPICard from "@/components/orders/StatusKPICard";
 import OrderDetailModal from "@/components/orders/OrderDetailModal";
 import { adminApiService } from "@/lib/adminApiService";
 import { adminSocketService } from "@/lib/adminSocketService";
+import { supabase } from "@/lib/supabase";
 import { formatDeliveryId } from "@/utils/formatDeliveryId";
 import { logger } from "@/utils/logger";
 import { themeColors } from "@/utils/theme";
@@ -363,6 +364,19 @@ export default function OrdersPage() {
 
     return () => {
       unsubscribe();
+    };
+  }, [queryClient]);
+
+  React.useEffect(() => {
+    const channel = supabase
+      .channel("admin-orders-page-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
     };
   }, [queryClient]);
 

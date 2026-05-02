@@ -8,6 +8,7 @@ import QuickMessage from '@/components/dashboard/QuickMessage'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import React, { useState, useEffect } from 'react'
 import { adminSocketService } from '@/lib/adminSocketService'
+import { supabase } from '@/lib/supabase'
 import { getDashboardStats } from '@/lib/dashboardApi'
 import { adminApiService } from '@/lib/adminApiService'
 import { Truck, ShieldCheck, DollarSign, Calendar, Star, Clock, XCircle, Users, UserCheck } from 'lucide-react'
@@ -35,6 +36,19 @@ export default function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['ongoing-delivery-card'] })
     })
     return () => unsubscribe()
+  }, [queryClient])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-dashboard-orders-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['ongoing-delivery-card'] })
+      })
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
   }, [queryClient])
 
   const getPeriodLabel = () => {
