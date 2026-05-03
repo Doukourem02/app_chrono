@@ -35,6 +35,7 @@ const mainNavigationKeys = [
   { href: "/tracking", icon: MapPin, key: "tracking" },
   { href: "/orders", icon: Package, key: "orders" },
   { href: "/message", icon: MessageSquare, key: "message" },
+  { href: "/partners", icon: Briefcase, key: "b2b" },
 ];
 
 const navigationSectionsKeys = [
@@ -76,14 +77,6 @@ const navigationSectionsKeys = [
       { href: "/maintenance?tab=repairs", icon: Wrench, key: "repairs" },
       { href: "/maintenance?tab=documents", icon: FileText, key: "documents" },
       { href: "/maintenance?tab=budget", icon: Wallet, key: "budget" },
-    ],
-  },
-  {
-    id: "b2b",
-    key: "b2b",
-    icon: Briefcase,
-    items: [
-      { href: "/partners", icon: Briefcase, key: "partners" },
     ],
   },
   {

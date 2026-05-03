@@ -24,7 +24,8 @@
       "dashboard": "Dashboard",
       "tracking": "Suivi des commandes",
       "orders": "Commandes",
-      "message": "Messages"
+      "message": "Messages",
+      "b2b": "Partenaires B2B"
     },
     "sections": {
       "analyses": {
