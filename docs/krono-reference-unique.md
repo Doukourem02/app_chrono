@@ -425,11 +425,62 @@ Elle doit donner confiance, rester utile sans être lourde, et créer une impres
 
 ## 16. B2B / Partenaires
 
+### Principe fondamental
+
+Krono doit s'adapter au workflow du commerçant, et non l'inverse. Le problème n'est pas le device (mobile vs ordinateur). Le problème est la **friction** pour créer et gérer des commandes.
+
+> Si Krono impose "utilise notre système" → échec
+> Si Krono dit "continue comme tu fais déjà, mais en mieux" → adoption massive
+
+---
+
 ### Pourquoi le B2B
 
 Krono sert aujourd'hui des particuliers (B2C). Le B2B cible des professionnels — e-commerces, restaurants, pharmacies, boutiques — qui ont des volumes élevés et réguliers. Au lieu de payer 15-25 % de commission sur chaque course, ils s'abonnent à un forfait mensuel avec un quota de livraisons incluses.
 
 Revenus Krono : forfait prévisible + commissions sur excédents. Valeur partenaire : coût réduit par livraison, tournées groupées, portail dédié.
+
+### Les 4 profils utilisateurs
+
+| Profil | Description | App | Volume | Abonnement |
+|--------|-------------|-----|--------|------------|
+| **Profil 0** | Client particulier B2C | `app_chrono` | 1 commande à la fois | Non |
+| **Profil 1** | Petit commerçant mobile (revendeur, boutique de quartier) | `app_chrono` mode business | 5–20 commandes/jour | Optionnel |
+| **Profil 2** | Vendeur à volume (live TikTok, 20+ commandes d'un coup) | `app_chrono` mode tournée | 20+ à la session | Optionnel |
+| **Profil 3** | B2B professionnel structuré (restaurant, pharmacie, boutique) | `admin_chrono` portail partenaire | Régulier et prévisible | Oui (mensuel) |
+
+**Paiement Profil 1** : commandes pour ses clients → compte business, immédiat ou différé si éligible ; commandes pour lui-même → contexte client, règles Profil 0.
+
+**Commission Profil 1** : sans abonnement → `partners.commission_rate` (15–25 %) ; avec abonnement → taux in-quota selon plan (voir Plans tarifaires).
+
+### Interfaces — qui utilise quoi
+
+```text
+app_chrono      → Profil 0 (client B2C)
+                → Profil 1 (petit commerçant, mode business)
+                → Profil 2 (vendeur volume, mode tournée)
+
+driver_chrono   → livreurs (menus différents selon driver_type)
+
+admin_chrono
+  └── (admin)   → équipe Krono uniquement — jamais exposé aux partenaires
+  └── (partner) → Profil 3, portail web (Phase 1 — même projet, layout séparé)
+
+partner_chrono  → Profil 3, portail web indépendant (Phase 2 — si ça grossit)
+```
+
+**Règle absolue** : l'admin Krono et le portail partenaire ne se mélangent jamais. Un partenaire ne voit jamais : les autres partenaires, les livreurs et leurs commissions, les finances globales de Krono, les clients des autres.
+
+### Contexte d'utilisation — compte unique
+
+Un seul compte utilisateur avec un **contexte actif** (client ou business) — pas deux comptes figés à vie.
+
+| Critère | Contexte client | Contexte business |
+|---------|-----------------|-------------------|
+| Nombre de commandes | Une à la fois | Plusieurs, pour ses propres clients |
+| Qui paie | Lui, immédiatement | Son compte business ; différé possible si éligible |
+| Destinataires | Lui ou un proche | Ses clients |
+| Livreur | Dispatch automatique | Livreur(s) attitré(s) possible(s) ; sinon dispatch |
 
 ---
 
@@ -498,6 +549,15 @@ Le `partner_id` est requis seulement pour les fonctionnalités liées à l'abonn
 
 Sans abonnement : taux standard du partenaire (15-25 %, champ `partners.commission_rate`).
 
+### Axes de monétisation futurs (Axes 3–6)
+
+| Axe | Horizon | Description |
+|-----|---------|-------------|
+| **Axe 3 — API d'intégration** | Phase 2 (~6 mois) | Grandes enseignes intègrent Krono dans leur SI via API. Nécessite `partner_api_keys`, middleware auth, webhooks signés. |
+| **Axe 4 — Marque blanche** | Phase 3 (~12 mois) | Krono gère la livraison, le partenaire garde sa marque. |
+| **Axe 5 — Flotte dédiée Enterprise** | Phase 3 | Chauffeurs dédiés assignés à un seul partenaire. Forfait hebdomadaire ou mensuel. |
+| **Axe 6 — Publicité et données agrégées** | Après volume atteint | Partenaires premium mis en avant. Insights analytiques vendus. |
+
 ---
 
 ### Schéma de données B2B
@@ -528,6 +588,14 @@ La table `orders` reçoit une colonne `partner_id UUID REFERENCES partners(id)` 
 3. **Pas d'abonnement** → taux standard `partners.commission_rate` (15-25 %)
 
 Le compteur `partner_usage.deliveries_count` est incrémenté via un `INSERT … ON CONFLICT DO UPDATE` SQL atomique pour éviter les doublons en cas de requêtes simultanées.
+
+### Comportement dispatch B2B
+
+- GPS optionnel (contrairement au B2C)
+- Tous les livreurs disponibles notifiés
+- Livreurs **internes** prioritaires sur commandes B2B
+- Paiement **différé** (`deferred`) disponible
+- Si livreur attitré défini (`partner_drivers` + choix pour la course ou tournée) → assignation directe, pas de dispatch large
 
 ---
 
@@ -928,6 +996,33 @@ Les N commandes d'un batch sont créées **silencieusement** via REST. Aucune po
 4. Assouplir la condition `partner_id` dans `NewB2BShippingModal` : Profil 1 (`is_business=true`, `partner_id=null`) doit pouvoir créer des livraisons avec commission par défaut 3 % — le blocage actuel est trop restrictif (voir section "Concepts fondamentaux")
 5. **Audit / traçabilité** (non implémenté) : journaliser désactivation, réactivation et suspension avec `user_id` / `partner_id` / `ancien_statut` / `nouveau_statut` / `timestamp` / `source` (`app` | `admin` | `portail`). Créer une table `partner_audit_logs` ou enrichir les logs backend existants.
 6. Activer Realtime sur la table `partners` dans Supabase Dashboard (Database → Replication) pour que la sync admin instantanée fonctionne
+
+### Roadmap produit
+
+**Phase 1bis / Phase 2 — Monétisation scale**
+- [ ] Paiement abonnement récurrent / automatisé (prestataires locaux : OM, Wave, MTN)
+- [ ] Renouvellement auto `partner_subscriptions` : `cancelled_at`, politique `ends_at` nullable
+
+**Phase 2 — ~6 mois après lancement**
+- [ ] Portail partenaire : Facturation + Équipe (côté partenaire self-service)
+- [ ] Table `partner_api_keys`
+- [ ] Endpoint `POST /api/partner/orders` (Axe 3)
+- [ ] Webhooks signés avec retries
+- [ ] WhatsApp bot pour création de commande rapide
+
+**Phase 3 — ~12 mois et au-delà**
+- [ ] Marque blanche (Axe 4)
+- [ ] Flotte dédiée Enterprise (Axe 5)
+- [ ] Publicité et analytics (Axe 6)
+- [ ] Séparation `partner_chrono` en app indépendante si nécessaire
+
+---
+
+### Feature Commissionnaire (hors périmètre B2B)
+
+Le commissionnaire est une feature **B2C** distincte : le livreur agit à la place du client (courses, achats ponctuels) — ce n'est pas une livraison classique point A → point B avec colis déjà prêt. Pas de mélange avec la logique B2B (tables `partners`, abonnements, pricing).
+
+À documenter dans `docs/commissionnaire.md` : parcours, pricing, avance de fonds, qui avance l'argent, plafond budget, article indisponible, assurance / litiges.
 
 ---
 
