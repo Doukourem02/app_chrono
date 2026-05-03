@@ -26,10 +26,14 @@ export async function registerAsPartner(companyName: string): Promise<{ partner_
 // ─── Se désenregistrer comme partenaire (retour utilisateur simple) ───────────
 export async function deregisterAsPartner(): Promise<void> {
   const headers = await authHeader();
-  await apiFetch(`${config.apiUrl}/api/partners/deregister`, {
+  const response = await apiFetch(`${config.apiUrl}/api/partners/deregister`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
   });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(body.message ?? 'Erreur lors du passage en mode personnel');
+  }
 }
 
 // ─── Commande B2B unique (Profil 1) ──────────────────────────────────────────

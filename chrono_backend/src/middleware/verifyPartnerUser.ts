@@ -40,24 +40,47 @@ export const verifyPartnerUser = async (
     }
 
     const db = supabaseAdmin ?? supabase;
-    const { data: partnerUser, error: puErr } = await db
-      .from('partner_users')
-      .select('id, role')
-      .eq('partner_id', partnerId)
-      .eq('user_id', user.id)
-      .maybeSingle();
 
-    if (puErr) logger.warn('[verifyPartnerUser] DB error:', puErr.message);
+    const [puRes, partnerRes] = await Promise.all([
+      db
+        .from('partner_users')
+        .select('id, role')
+        .eq('partner_id', partnerId)
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      db
+        .from('partners')
+        .select('status')
+        .eq('id', partnerId)
+        .maybeSingle(),
+    ]);
 
-    if (!partnerUser) {
+    if (puRes.error) logger.warn('[verifyPartnerUser] DB error:', puRes.error.message);
+
+    if (!puRes.data) {
       res.status(403).json({ success: false, message: 'Accès refusé à ce partenaire' });
+      return;
+    }
+
+    const partnerStatus = partnerRes.data?.status;
+    if (partnerStatus !== 'active') {
+      const STATUS_MESSAGES: Record<string, string> = {
+        pending:   'Votre compte partenaire est en attente de validation par un administrateur Krono.',
+        inactive:  "Votre compte partenaire est inactif. Repassez en mode business depuis l'application pour le réactiver.",
+        suspended: 'Votre compte partenaire est suspendu. Contactez le support Krono.',
+      };
+      res.status(403).json({
+        success: false,
+        code: `partner_${partnerStatus ?? 'unavailable'}`,
+        message: STATUS_MESSAGES[partnerStatus ?? ''] ?? 'Accès partenaire non disponible.',
+      });
       return;
     }
 
     (req as any).partnerUser = {
       userId: user.id,
       partnerId,
-      role: partnerUser.role, // 'owner' | 'manager'
+      role: puRes.data.role,
     };
 
     next();

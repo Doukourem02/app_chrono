@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Package, Plus, CreditCard, Users, LogOut } from 'lucide-react'
+import { LayoutDashboard, Package, Plus, CreditCard, Users, LogOut, AlertTriangle, Clock, ShieldOff } from 'lucide-react'
 import Image from 'next/image'
 import logoImage from '@/assets/chrono.png'
 import { supabase } from '@/lib/supabase'
@@ -15,6 +15,22 @@ interface PartnerCtx {
   partnerId: string
   role: 'owner' | 'manager'
   partnerName: string
+  status: string
+}
+
+const STATUS_BANNER: Record<string, { message: string; bg: string; color: string; Icon: React.ElementType }> = {
+  pending: {
+    message: 'Votre compte partenaire est en attente de validation par un administrateur Krono. Les fonctionnalités B2B seront disponibles une fois activé.',
+    bg: '#FEF3C7', color: '#D97706', Icon: Clock,
+  },
+  inactive: {
+    message: "Votre compte est inactif. Repassez en mode business depuis l'application Krono pour réactiver l'accès.",
+    bg: themeColors.grayLight, color: themeColors.grayDark, Icon: AlertTriangle,
+  },
+  suspended: {
+    message: 'Votre compte partenaire est suspendu. Contactez le support Krono pour rétablir l\'accès.',
+    bg: themeColors.redLight, color: themeColors.redPrimary, Icon: ShieldOff,
+  },
 }
 
 const NAV = [
@@ -48,6 +64,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
         partnerId,
         role: access.role!,
         partnerName: detail.data?.name ?? 'Partenaire',
+        status: detail.data?.status ?? 'active',
       })
       setLoading(false)
     }
@@ -127,6 +144,15 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
 
       {/* Contenu principal */}
       <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+        {ctx.status !== 'active' && STATUS_BANNER[ctx.status] && (() => {
+          const { message, bg, color, Icon } = STATUS_BANNER[ctx.status]!
+          return (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 10, backgroundColor: bg, border: `1px solid ${color}`, marginBottom: 20 }}>
+              <Icon size={16} color={color} style={{ marginTop: 2, flexShrink: 0 }} />
+              <p style={{ fontSize: 13, color, lineHeight: 1.5 }}>{message}</p>
+            </div>
+          )
+        })()}
         {children}
       </main>
     </div>

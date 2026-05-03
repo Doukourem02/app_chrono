@@ -373,6 +373,8 @@ Smoke tests prod :
 | `033_create_b2b_subscriptions_billing.sql` *(à appliquer)* | Tables `partner_subscriptions`, `partner_usage`, `partner_invoices` |
 | `034_create_b2b_batches.sql` *(à appliquer)* | Tables `delivery_batches`, `batch_orders` |
 | `035_orders_add_b2b_columns.sql` *(à appliquer)* | `ALTER TABLE orders ADD COLUMN partner_id` + `is_b2b_order` |
+| `036_migrate_existing_b2b_partners.sql` *(à appliquer)* | Backfill partenaires existants : crée `partners` + `partner_users` + remplit `orders.partner_id` |
+| `037_partners_add_inactive_status.sql` *(à appliquer)* | **Critique** — ajoute `inactive` au CHECK constraint de `partners.status` |
 
 Migrations SQL : voir `chrono_backend/migrations/README.md`.
 
@@ -551,14 +553,39 @@ Contenu de la facture générée :
 
 ---
 
+### Statuts partenaire — lexique et règles de transition
+
+| Statut | Qui l'applique | Sens métier |
+|--------|----------------|-------------|
+| `pending` | Système / onboarding | En attente de validation admin avant accès B2B. |
+| `active` | Admin (activation) | Partenaire opérationnel — commandes, quota, portail. |
+| `inactive` | **Partenaire** (toggle Mode personnel / `deregister`) | Choix volontaire de ne plus être actif en B2B. À ne **pas** confondre avec une sanction admin. |
+| `suspended` | **Admin Krono** | Suspension contractuelle, litige, impayé — levée par l'admin. |
+
+**Règle de réactivation (Option B — retenue)** : `registerAsPartner` repasse le partenaire en `pending` si le statut était `inactive`. L'admin doit ensuite cliquer "Activer" pour passer en `active`. L'admin dispose d'un bouton "Réactiver" (override direct `→ active`) pour les cas exceptionnels (suspension levée, etc.).
+
+**Séparation inactif volontaire / sanction admin** : le bouton "Désactiver" depuis l'admin passe en `inactive` mais doit être tracé (`actor = admin`) dans les logs d'audit pour ne pas être confondu avec un toggle partenaire. Le bouton "Suspendre" passe en `suspended`. Ces deux actions sont distinctes visuellement et dans les audits.
+
+**Lien `partner_users` en mode `inactive`** : le lien `user_id ↔ partner_id` est conservé — jamais supprimé automatiquement. Cela préserve l'historique, les invitations et la réactivation sans recréer une identité.
+
+---
+
 ### Authentification portail partenaire (verifyPartnerUser)
 
 Les routes `/api/partner/:partnerId/...` sont protégées par `verifyPartnerUser` :
 1. Vérifie le token Bearer Supabase de l'utilisateur
-2. Contrôle que cet utilisateur appartient au partenaire visé via `partner_users`
-3. Injecte `req.partnerUser` (`userId`, `partnerId`, `role`) dans la requête
+2. Contrôle que cet utilisateur appartient au partenaire visé via `partner_users` (403 sinon)
+3. Vérifie que `partners.status = 'active'` — si non, retourne 403 avec un message contextualisé :
+   - `pending` → "En attente de validation par un administrateur Krono"
+   - `inactive` → "Repassez en mode business depuis l'application"
+   - `suspended` → "Compte suspendu — contactez le support Krono"
+4. Injecte `req.partnerUser` (`userId`, `partnerId`, `role`) dans la requête
 
-Un partenaire ne voit jamais les données d'un autre partenaire.
+Un partenaire ne voit jamais les données d'un autre partenaire. Un partenaire non `active` n'accède à aucune route sensible du portail.
+
+**Portail — banner de statut** : le layout `/partner/:partnerId/layout.tsx` affiche un bandeau contextuel en haut de chaque page si `partners.status ≠ active`. Le message varie selon `pending` / `inactive` / `suspended`.
+
+**Admin — synchronisation temps réel** : les pages liste et fiche partenaire utilisent une subscription Supabase Realtime (`postgres_changes` sur `partners`). Quand le partenaire bascule son mode depuis l'app, l'admin voit le changement instantanément via WebSocket — sans poll ni refresh manuel. Prérequis : activer Realtime sur la table `partners` dans Supabase Dashboard → Database → Replication.
 
 ---
 
@@ -881,12 +908,15 @@ Les N commandes d'un batch sont créées **silencieusement** via REST. Aucune po
 | **Bloc 4** | `app_chrono` : onboarding B2B, Profil 1 (livraison client), Profil 2 (tournée), ActionCards | ✅ Implémenté |
 | **Bloc 5** | `driver_chrono` : réception tournée groupée (1 notif), vue ordonnée, validation par livraison, contexte partenaire (nom, position tournée, bouton "Voir la tournée") | ✅ Implémenté (2026-05-03) |
 | **Bloc 6** | Décision commission Option A/B | ✅ Validé : Option B (3 % Starter/Pro, 0 % Business) |
+| **Bloc 7** | Statuts, sécurité portail, sync admin temps réel | ✅ Implémenté (2026-05-03) |
 
 **Reste à faire :**
-1. Appliquer les migrations `032` → `035` dans Supabase SQL Editor (dans l'ordre) — tout le reste en dépend
+1. Appliquer les migrations `032` → `037` dans Supabase SQL Editor (dans l'ordre) — la `037` est critique : elle ajoute `inactive` au CHECK constraint sans lequel tous les `deregister` échouent silencieusement
 2. Brancher `computeB2BCommission` dans le flux de création de commande (`orderRecordController`)
 3. Synchroniser `partner_id` dans `useAuthStore` lors du `validateUser` (pour ne pas forcer re-login)
 4. Assouplir la condition `partner_id` dans `NewB2BShippingModal` : Profil 1 (`is_business=true`, `partner_id=null`) doit pouvoir créer des livraisons avec commission par défaut 3 % — le blocage actuel est trop restrictif (voir section "Concepts fondamentaux")
+5. **Audit / traçabilité** (non implémenté) : journaliser désactivation, réactivation et suspension avec `user_id` / `partner_id` / `ancien_statut` / `nouveau_statut` / `timestamp` / `source` (`app` | `admin` | `portail`). Créer une table `partner_audit_logs` ou enrichir les logs backend existants.
+6. Activer Realtime sur la table `partners` dans Supabase Dashboard (Database → Replication) pour que la sync admin instantanée fonctionne
 
 ---
 

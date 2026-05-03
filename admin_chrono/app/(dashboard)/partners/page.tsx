@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Search, Plus, Building2, Eye, CheckCircle, Clock, XCircle, Zap } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
+import { supabase } from '@/lib/supabase'
 import { ScreenTransition, SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import type { Partner } from '@/types'
@@ -125,6 +126,16 @@ export default function PartnersPage() {
     queryClient.invalidateQueries({ queryKey: ['partners'] })
     setActivating(null)
   }
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-partners-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partners' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['partners'] })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [queryClient])
 
   const { data, isLoading } = useQuery({
     queryKey: ['partners', statusFilter, planFilter],

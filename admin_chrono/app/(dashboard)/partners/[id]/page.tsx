@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle, Mail, Zap, ShieldOff, XCircle, RefreshCw } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
+import { supabase } from '@/lib/supabase'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import type { PartnerSubscription } from '@/types'
@@ -232,6 +233,18 @@ export default function PartnerDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['partners'] })
     setStatusLoading(false)
   }
+
+  useEffect(() => {
+    if (!id) return
+    const channel = supabase
+      .channel(`admin-partner-${id}-realtime`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partners', filter: `id=eq.${id}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['partner', id] })
+        queryClient.invalidateQueries({ queryKey: ['partners'] })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [id, queryClient])
 
   const { data: partnerData, isLoading } = useQuery({
     queryKey: ['partner', id],
