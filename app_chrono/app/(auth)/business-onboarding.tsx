@@ -97,13 +97,20 @@ export default function BusinessOnboardingScreen() {
           partner_id: result.partner_id,
         });
       }
+      setIsLoading(false);
+      if (result.status === 'active') {
+        const planLabel = selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1);
+        router.replace({ pathname: '/(auth)/success', params: { message: `Forfait ${planLabel} mis a jour` } } as any);
+      } else {
+        next('/(auth)/success');
+      }
     } catch {
       if (user) {
         setUser({ ...user, is_business: true, company_name: companyName.trim(), partner_id: user.partner_id ?? null });
       }
+      setIsLoading(false);
+      next('/(auth)/success');
     }
-    setIsLoading(false);
-    next('/(auth)/success');
   };
 
   // ─── Étape : choix de forfait + email portail ─────────────────────────────

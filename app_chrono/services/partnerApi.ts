@@ -44,6 +44,20 @@ export async function deregisterAsPartner(): Promise<void> {
   }
 }
 
+// ─── Toggle simple mode business/perso (partner déjà enregistré) ─────────────
+export async function setBusinessMode(active: boolean): Promise<void> {
+  const headers = await authHeader();
+  const response = await apiFetch(`${config.apiUrl}/api/partners/business-mode`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ active }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(body.message ?? 'Erreur toggle mode business');
+  }
+}
+
 // ─── Commande B2B unique (Profil 1) ──────────────────────────────────────────
 
 export interface B2BOrderParams {

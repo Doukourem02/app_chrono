@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import {View,Text,TouchableOpacity,StyleSheet,Animated} from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SuccessScreen() {
+  const { message } = useLocalSearchParams<{ message?: string }>();
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -45,9 +46,9 @@ export default function SuccessScreen() {
 
         {/* Texte de succès */}
         <Animated.View style={[styles.textContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.title}>Succès !</Text>
+          <Text style={styles.title}>Succes !</Text>
           <Text style={styles.subtitle}>
-            Félicitations ! Vous avez été authentifié avec succès.
+            {message ?? 'Felicitations ! Vous avez ete authentifie avec succes.'}
           </Text>
         </Animated.View>
 

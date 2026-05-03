@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Switch,Text,TouchableOpacity,View,} from "react-native";
 import { userApiService } from "../../services/userApiService";
-import { deregisterAsPartner, registerAsPartner } from "../../services/partnerApi";
+import { setBusinessMode } from "../../services/partnerApi";
 import { useAuthStore } from "../../store/useAuthStore";
 import { formatUserName, isSyntheticAuthEmail } from "../../utils/formatName";
 import { logger } from "../../utils/logger";
@@ -229,16 +229,14 @@ export default function ProfilePage() {
   const handleModeToggle = async (value: boolean) => {
     if (value) {
       if (user?.partner_id) {
-        // Partenaire déjà enregistré : réactiver sans repasser par l'onboarding
         setUser({ ...user!, is_business: true });
-        try { await registerAsPartner(user.company_name ?? 'Mon entreprise'); } catch { /* silencieux */ }
+        try { await setBusinessMode(true); } catch { /* silencieux */ }
       } else {
         router.push('/(auth)/business-onboarding?mode=update' as any);
       }
     } else {
-      // Mode perso : API met partners.status à inactive si agrément était actif (liste admin / Realtime).
       setUser({ ...user!, is_business: false });
-      try { await deregisterAsPartner(); } catch { /* silencieux si hors ligne */ }
+      try { await setBusinessMode(false); } catch { /* silencieux si hors ligne */ }
     }
   };
 
