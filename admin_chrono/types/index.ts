@@ -114,7 +114,7 @@ export interface PartnerUser {
   id: string
   partner_id: string
   user_id: string
-  role: 'owner' | 'manager'
+  role: 'owner'
   created_at: string
   user?: { email?: string; first_name?: string | null; last_name?: string | null }
 }

@@ -93,7 +93,7 @@ class PartnerApiService {
   // Membres de l'équipe
   async getTeam(partnerId: string): Promise<ApiResponse<PartnerUser[]>> {
     try {
-      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/users`)
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/users`)
       if (!res.ok) return { success: false, data: [] }
       return res.json()
     } catch (err) {
@@ -102,9 +102,9 @@ class PartnerApiService {
     }
   }
 
-  async inviteTeamMember(partnerId: string, body: { email: string; role: 'manager' }): Promise<ApiResponse<unknown>> {
+  async inviteTeamMember(partnerId: string, body: { email: string }): Promise<ApiResponse<unknown>> {
     try {
-      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/users/invite`, {
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/users/invite`, {
         method: 'POST',
         body: JSON.stringify(body),
       })
@@ -115,8 +115,8 @@ class PartnerApiService {
     }
   }
 
-  // Vérifie que l'utilisateur courant appartient bien à ce partenaire
-  async verifyAccess(partnerId: string): Promise<{ allowed: boolean; role: 'owner' | 'manager' | null }> {
+  // Vérifie que l'utilisateur courant appartient bien à ce partenaire (owner uniquement)
+  async verifyAccess(partnerId: string): Promise<{ allowed: boolean; role: 'owner' | null }> {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return { allowed: false, role: null }
@@ -128,8 +128,8 @@ class PartnerApiService {
         .eq('user_id', user.id)
         .maybeSingle()
 
-      if (error || !data) return { allowed: false, role: null }
-      return { allowed: true, role: data.role as 'owner' | 'manager' }
+      if (error || !data || data.role !== 'owner') return { allowed: false, role: null }
+      return { allowed: true, role: 'owner' }
     } catch {
       return { allowed: false, role: null }
     }

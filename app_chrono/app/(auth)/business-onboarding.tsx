@@ -120,46 +120,65 @@ export default function BusinessOnboardingScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 40 }]}>
-      <View style={styles.inner}>
-        <Text style={styles.wordmark}>Krono</Text>
+    <View
+      style={[
+        styles.container,
+        { paddingTop: insets.top + 40, paddingBottom: Math.max(insets.bottom, 16) + 8 },
+      ]}
+    >
+      <View style={[styles.inner, styles.questionInner]}>
+        <View style={styles.questionBody}>
+          <Text style={styles.wordmark}>Krono</Text>
 
-        <View style={styles.iconCircle}>
-          <Ionicons name="cube-outline" size={40} color="#8B5CF6" />
+          <View style={styles.iconCircle}>
+            <Ionicons name="cube-outline" size={40} color="#8B5CF6" />
+          </View>
+
+          <Text style={styles.headline}>
+            {isUpdate ? 'Comment utilisez-vous Krono ?' : 'Tu vends des colis à des clients ?'}
+          </Text>
+          <Text style={styles.subline}>
+            {isUpdate
+              ? 'Dites-nous comment vous utilisez l\'app pour personnaliser votre expérience.'
+              : 'Si tu es e-commerce, boutique ou professionnel, active le mode business pour gérer tes livraisons en lot et bénéficier de tarifs partenaires.'}
+          </Text>
+
+          {/* Oui */}
+          <TouchableOpacity style={styles.optionCard} onPress={handleYes}>
+            <View style={styles.optionIcon}>
+              <Ionicons name="storefront-outline" size={26} color="#8B5CF6" />
+            </View>
+            <View style={styles.optionTextCol}>
+              <Text style={styles.optionTitle}>
+                {isUpdate ? 'Oui, activité professionnelle' : 'Oui, pour mon activité pro'}
+              </Text>
+              <Text style={styles.optionSub}>
+                {isUpdate
+                  ? 'Commerce physique ou en ligne, livraisons pour vos clients…'
+                  : 'Boutique, site web, resto : tu livres pour des clients…'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" style={styles.optionChevron} />
+          </TouchableOpacity>
+
+          {/* Non */}
+          <TouchableOpacity style={[styles.optionCard, styles.optionCardMuted]} onPress={handleNo}>
+            <View style={[styles.optionIcon, styles.optionIconMuted]}>
+              <Ionicons name="person-outline" size={26} color="#6B7280" />
+            </View>
+            <View style={styles.optionTextCol}>
+              <Text style={styles.optionTitle}>
+                {isUpdate ? 'Non, usage personnel' : 'Non, pour un usage perso'}
+              </Text>
+              <Text style={styles.optionSub}>
+                {isUpdate
+                  ? 'Colis pour vous ou votre entourage, sans clientèle commerciale.'
+                  : 'Colis pour toi ou ton entourage, pas pour des clients.'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" style={styles.optionChevron} />
+          </TouchableOpacity>
         </View>
-
-        <Text style={styles.headline}>
-          {isUpdate ? 'Mettez à jour votre profil' : 'Tu vends des colis à des clients ?'}
-        </Text>
-        <Text style={styles.subline}>
-          {isUpdate
-            ? 'Krono évolue ! Dites-nous comment vous utilisez l\'app pour personnaliser votre expérience.'
-            : 'Si tu es e-commerce, boutique ou professionnel, active le mode business pour gérer tes livraisons en lot et bénéficier de tarifs partenaires.'}
-        </Text>
-
-        {/* Oui */}
-        <TouchableOpacity style={styles.optionCard} onPress={handleYes}>
-          <View style={styles.optionIcon}>
-            <Ionicons name="storefront-outline" size={26} color="#8B5CF6" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optionTitle}>Oui, je suis professionnel</Text>
-            <Text style={styles.optionSub}>E-commerce, boutique, restaurant, pharmacie…</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-        </TouchableOpacity>
-
-        {/* Non */}
-        <TouchableOpacity style={[styles.optionCard, { borderColor: '#E5E7EB' }]} onPress={handleNo}>
-          <View style={[styles.optionIcon, { backgroundColor: '#F3F4F6' }]}>
-            <Ionicons name="person-outline" size={26} color="#6B7280" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.optionTitle, { color: '#374151' }]}>{"Non, j'envoie pour moi"}</Text>
-            <Text style={styles.optionSub}>Utilisation personnelle uniquement</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-        </TouchableOpacity>
 
         <Text style={styles.hint}>
           {isUpdate
@@ -179,6 +198,13 @@ const styles = StyleSheet.create({
   inner: {
     flex: 1,
     paddingHorizontal: 24,
+  },
+  questionInner: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  questionBody: {
+    width: '100%',
   },
   back: {
     marginBottom: 12,
@@ -227,6 +253,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
     marginBottom: 14,
   },
+  optionCardMuted: {
+    borderColor: '#E5E7EB',
+  },
   optionIcon: {
     width: 48,
     height: 48,
@@ -234,6 +263,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5E8FF',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  optionIconMuted: {
+    backgroundColor: '#F3F4F6',
+  },
+  optionTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  optionChevron: {
+    alignSelf: 'center',
   },
   optionTitle: {
     fontSize: 15,
@@ -249,8 +288,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
     textAlign: 'center',
-    marginTop: 8,
     lineHeight: 18,
+    paddingTop: 16,
   },
   label: {
     fontSize: 14,

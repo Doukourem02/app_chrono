@@ -1,20 +1,7 @@
 import express, { Router } from 'express';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyPartnerUser } from '../middleware/verifyPartnerUser.js';
-import {
-  createPartner,
-  listPartners,
-  getPartner,
-  createSubscription,
-  activateSubscription,
-  getPartnerUsage,
-  getPartnerInvoices,
-  invitePartnerUser,
-  registerAsPartner,
-  activatePartner,
-  deregisterAsPartner,
-  updatePartnerStatus,
-} from '../controllers/partnerController.js';
+import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,} from '../controllers/partnerController.js';
 import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
@@ -40,8 +27,10 @@ router.post('/:id/invite',                                verifyAdminSupabase, i
 // Montées sous /api/partner/:partnerId/...
 export const partnerPortalRouter: Router = express.Router({ mergeParams: true });
 
-partnerPortalRouter.get('/details',  verifyPartnerUser, getPartner);
-partnerPortalRouter.get('/usage',    verifyPartnerUser, getPartnerUsage);
-partnerPortalRouter.get('/invoices', verifyPartnerUser, getPartnerInvoices);
+partnerPortalRouter.get('/details',      verifyPartnerUser, getPartner);
+partnerPortalRouter.get('/usage',        verifyPartnerUser, getPartnerUsage);
+partnerPortalRouter.get('/invoices',     verifyPartnerUser, getPartnerInvoices);
+partnerPortalRouter.get('/users',        verifyPartnerUser, getPartnerUsers);
+partnerPortalRouter.post('/users/invite', verifyPartnerUser, invitePortalUser);
 
 export default router;

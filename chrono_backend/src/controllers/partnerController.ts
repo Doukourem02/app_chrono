@@ -217,14 +217,11 @@ export const getPartnerUsage = async (req: Request, res: Response): Promise<void
 // Crée un compte Supabase pour le partenaire + envoie le mail d'invitation
 export const invitePartnerUser = async (req: Request, res: Response): Promise<void> => {
   const { id: partnerId } = req.params;
-  const { email, role = 'owner' } = req.body as { email: string; role?: 'owner' | 'manager' };
+  const { email } = req.body as { email: string };
+  const role = 'owner';
 
   if (!email?.trim()) {
     res.status(400).json({ success: false, message: 'Email requis' });
-    return;
-  }
-  if (!['owner', 'manager'].includes(role)) {
-    res.status(400).json({ success: false, message: 'Rôle invalide (owner | manager)' });
     return;
   }
 
@@ -428,6 +425,85 @@ export const activatePartner = async (req: Request, res: Response): Promise<void
   }
 
   res.json({ success: true, data });
+};
+
+// ─── GET /api/partner/:partnerId/users — portail owner only ──────────────────
+export const getPartnerUsers = async (req: Request, res: Response): Promise<void> => {
+  const partnerId = (req as any).partnerUser?.partnerId;
+
+  const { data, error } = await db()
+    .from('partner_users')
+    .select('id, partner_id, user_id, role, created_at, user:users(email, first_name, last_name)')
+    .eq('partner_id', partnerId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    logger.error('[partnerController] getPartnerUsers error:', error);
+    res.status(500).json({ success: false, message: "Erreur lors de la récupération de l'équipe" });
+    return;
+  }
+
+  res.json({ success: true, data });
+};
+
+// ─── POST /api/partner/:partnerId/users/invite — portail owner only ──────────
+export const invitePortalUser = async (req: Request, res: Response): Promise<void> => {
+  const partnerId = (req as any).partnerUser?.partnerId;
+  const { email } = req.body as { email: string };
+
+  if (!email?.trim()) {
+    res.status(400).json({ success: false, message: 'Email requis' });
+    return;
+  }
+
+  if (!supabaseAdmin) {
+    res.status(500).json({ success: false, message: 'Admin client Supabase non disponible' });
+    return;
+  }
+
+  const { data: partner, error: partnerErr } = await supabaseAdmin
+    .from('partners')
+    .select('id, name')
+    .eq('id', partnerId)
+    .single();
+
+  if (partnerErr || !partner) {
+    res.status(404).json({ success: false, message: 'Partenaire introuvable' });
+    return;
+  }
+
+  const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
+
+  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+    email.trim().toLowerCase(),
+    {
+      redirectTo,
+      data: { partner_id: partnerId, partner_name: partner.name, role: 'owner' },
+    }
+  );
+
+  if (inviteError) {
+    logger.error('[partnerController] invitePortalUser invite error:', inviteError);
+    res.status(500).json({ success: false, message: inviteError.message ?? "Erreur lors de l'envoi de l'invitation" });
+    return;
+  }
+
+  const userId = inviteData.user.id;
+
+  const { error: puError } = await supabaseAdmin
+    .from('partner_users')
+    .upsert(
+      { partner_id: partnerId, user_id: userId, role: 'owner' },
+      { onConflict: 'partner_id,user_id' }
+    );
+
+  if (puError) {
+    logger.error('[partnerController] invitePortalUser partner_users error:', puError);
+    res.status(500).json({ success: false, message: 'Invitation envoyée mais erreur lors du lien partenaire' });
+    return;
+  }
+
+  res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: email.trim().toLowerCase(), role: 'owner' } });
 };
 
 // ─── GET /api/partners/:id/invoices — admin or partner ────────────────────────

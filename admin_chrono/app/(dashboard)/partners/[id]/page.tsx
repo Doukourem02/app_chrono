@@ -19,7 +19,6 @@ const PLAN_DEFAULTS: Record<string, { price: number; quota: number | null; label
 // ─── Modal inviter au portail ─────────────────────────────────────────────────
 function InvitePartnerModal({ partnerId, onClose }: { partnerId: string; onClose: () => void }) {
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'owner' | 'manager'>('owner')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
@@ -28,7 +27,7 @@ function InvitePartnerModal({ partnerId, onClose }: { partnerId: string; onClose
     e.preventDefault()
     setLoading(true)
     setError('')
-    const result = await adminApiService.invitePartnerUser(partnerId, { email: email.trim(), role })
+    const result = await adminApiService.invitePartnerUser(partnerId, { email: email.trim() })
     setLoading(false)
     if (result.success) { setDone(true) }
     else { setError(result.message ?? "Erreur lors de l'envoi de l'invitation.") }
@@ -65,20 +64,6 @@ function InvitePartnerModal({ partnerId, onClose }: { partnerId: string; onClose
                 placeholder="contact@entreprise.com"
                 style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, fontSize: 14, color: themeColors.textPrimary, backgroundColor: themeColors.cardBg, boxSizing: 'border-box' }}
               />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Rôle</label>
-              <div style={{ display: 'flex', gap: 10 }}>
-                {(['owner', 'manager'] as const).map((r) => (
-                  <label key={r} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: `2px solid ${role === r ? themeColors.purplePrimary : themeColors.cardBorder}`, cursor: 'pointer', backgroundColor: role === r ? themeColors.purpleLight : 'transparent' }}>
-                    <input type="radio" name="role" value={r} checked={role === r} onChange={() => setRole(r)} style={{ accentColor: themeColors.purplePrimary }} />
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: themeColors.textPrimary }}>{r === 'owner' ? 'Propriétaire' : 'Manager'}</div>
-                      <div style={{ fontSize: 11, color: themeColors.textSecondary }}>{r === 'owner' ? 'Accès complet' : 'Commandes uniquement'}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
             </div>
             <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.purpleLight, border: `1px solid ${themeColors.purplePrimary}` }}>
               <p style={{ fontSize: 12, color: themeColors.purplePrimary }}>

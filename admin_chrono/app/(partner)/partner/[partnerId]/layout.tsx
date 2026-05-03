@@ -13,7 +13,6 @@ import { SkeletonLoader } from '@/components/animations'
 
 interface PartnerCtx {
   partnerId: string
-  role: 'owner' | 'manager'
   partnerName: string
   status: string
 }
@@ -62,7 +61,6 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
       const detail = await partnerApiService.getDetails(partnerId)
       setCtx({
         partnerId,
-        role: access.role!,
         partnerName: detail.data?.name ?? 'Partenaire',
         status: detail.data?.status ?? 'active',
       })
@@ -81,7 +79,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
 
   if (!ctx) return null
 
-  const allNav = ctx.role === 'owner' ? [...NAV, ...OWNER_NAV] : NAV
+  const allNav = [...NAV, ...OWNER_NAV]
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -100,7 +98,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           </div>
           <p style={{ fontSize: 12, color: themeColors.textSecondary, fontWeight: 500 }}>{ctx.partnerName}</p>
           <span style={{ display: 'inline-block', marginTop: 4, padding: '2px 8px', borderRadius: 20, backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary, fontSize: 11, fontWeight: 600 }}>
-            {ctx.role === 'owner' ? 'Propriétaire' : 'Manager'}
+            Propriétaire
           </span>
         </div>
 

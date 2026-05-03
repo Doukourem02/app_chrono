@@ -62,6 +62,11 @@ export const verifyPartnerUser = async (
       return;
     }
 
+    if (puRes.data.role !== 'owner') {
+      res.status(403).json({ success: false, message: 'Accès réservé au propriétaire du compte partenaire' });
+      return;
+    }
+
     const partnerStatus = partnerRes.data?.status;
     if (partnerStatus !== 'active') {
       const STATUS_MESSAGES: Record<string, string> = {
