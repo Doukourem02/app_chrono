@@ -587,6 +587,17 @@ Un partenaire ne voit jamais les données d'un autre partenaire. Un partenaire n
 
 **Admin — synchronisation temps réel** : les pages liste et fiche partenaire utilisent une subscription Supabase Realtime (`postgres_changes` sur `partners`). Quand le partenaire bascule son mode depuis l'app, l'admin voit le changement instantanément via WebSocket — sans poll ni refresh manuel. Prérequis : activer Realtime sur la table `partners` dans Supabase Dashboard → Database → Replication.
 
+### Portail partenaire — alignement rôle unique et points ouverts
+
+Cette liste regroupe le travail restant pour que le portail B2B, l'API et les types reflètent le même modèle d'accès (sans rôle intermédiaire « manager » si le produit ne le propose plus). À traiter en implémentation ; quand une règle devient définitive, la résumer dans les sections concernées ci-dessus et retirer l'item d'ici si besoin.
+
+- **Rôles `partner_users`** : passer tous les enregistrements en `owner` et n'accepter que `owner` côté API — un seul modèle d'accès web ; éviter un rôle `manager` encore en base alors qu'on ne veut plus le produit ainsi.
+- **UI portail** : retirer la logique « manager » dans le layout et la page Mon équipe (`admin_chrono/app/(partner)/partner/[partnerId]/layout.tsx`, `.../team/page.tsx`) — menu, textes, invitation « manager » — pour que l'UI colle au même modèle et ne suggère pas un accès restreint imposé par Krono.
+- **Types TypeScript** : aligner `role`, `invitePartnerUser`, etc. (`admin_chrono/types`, `partnerApiService`) — éviter incohérences et bugs entre front et réalité des données.
+- **Invitation équipe** : vérifier ou implémenter `POST /api/partners/:id/users/invite` (ou retirer l'appel côté front) — le portail s'en sert pour l'équipe ; sans route valide, la fonctionnalité est inutile ou cassée.
+- **Séparation des droits** : revue courte des droits admin Krono vs portail partenaire — un compte partenaire ne doit pas pouvoir déclencher des actions réservées à l'équipe Krono.
+- **Communication partenaire** : une phrase côté doc / FAQ partenaire — qui est invité au portail relève du choix de l'entreprise partenaire (responsabilité claire sans alourdir le produit).
+
 ---
 
 ### Compatibilité descendante — utilisateurs existants

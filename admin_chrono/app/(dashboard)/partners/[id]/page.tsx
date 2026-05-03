@@ -67,7 +67,7 @@ function InvitePartnerModal({ partnerId, onClose }: { partnerId: string; onClose
             </div>
             <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.purpleLight, border: `1px solid ${themeColors.purplePrimary}` }}>
               <p style={{ fontSize: 12, color: themeColors.purplePrimary }}>
-                Un email sera envoyé avec un lien pour définir le mot de passe et accéder au portail <strong>admin.kro-no-delivery.com/partner/login</strong>
+                {"L'invité recevra un email avec un lien sécurisé pour choisir son mot de passe et accéder au portail partenaire Krono."}
               </p>
             </div>
             {error && <p style={{ fontSize: 13, color: themeColors.redPrimary }}>{error}</p>}
