@@ -602,3 +602,53 @@ export const getPartnerInvoices = async (req: Request, res: Response): Promise<v
 
   res.json({ success: true, data });
 };
+
+// ─── DELETE /api/partners/:id — admin only ───────────────────────────────────
+// Supprime la fiche partenaire et les lignes liées (factures, abonnements, usage, équipe).
+// Détache les commandes / tournées (partner_id → null) et remet is_business à false pour les utilisateurs liés.
+export const deletePartner = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+
+  const { data: existing, error: exErr } = await db().from('partners').select('id').eq('id', id).maybeSingle();
+  if (exErr || !existing) {
+    res.status(404).json({ success: false, message: 'Partenaire introuvable' });
+    return;
+  }
+
+  const { data: puRows } = await db().from('partner_users').select('user_id').eq('partner_id', id);
+  const userIds = [...new Set((puRows ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean))];
+
+  const detachBatches = await db().from('delivery_batches').update({ partner_id: null }).eq('partner_id', id);
+  if (detachBatches.error) {
+    logger.warn('[partnerController] deletePartner delivery_batches:', detachBatches.error.message);
+  }
+
+  const detachOrders = await db().from('orders').update({ partner_id: null }).eq('partner_id', id);
+  if (detachOrders.error) {
+    logger.warn('[partnerController] deletePartner orders:', detachOrders.error.message);
+  }
+
+  const childTables = ['partner_invoices', 'partner_subscriptions', 'partner_usage', 'partner_users'] as const;
+  for (const table of childTables) {
+    const { error } = await db().from(table).delete().eq('partner_id', id);
+    if (error) {
+      logger.error(`[partnerController] deletePartner ${table}:`, error);
+      res.status(500).json({ success: false, message: 'Erreur lors de la suppression des données liées' });
+      return;
+    }
+  }
+
+  if (userIds.length) {
+    const { error: uErr } = await db().from('users').update({ is_business: false }).in('id', userIds);
+    if (uErr) logger.warn('[partnerController] deletePartner users is_business:', uErr.message);
+  }
+
+  const { error: delErr } = await db().from('partners').delete().eq('id', id);
+  if (delErr) {
+    logger.error('[partnerController] deletePartner partners:', delErr);
+    res.status(500).json({ success: false, message: 'Erreur lors de la suppression du partenaire' });
+    return;
+  }
+
+  res.json({ success: true });
+};

@@ -2422,6 +2422,19 @@ class AdminApiService {
     }
   }
 
+  async deletePartner(partnerId: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}`, { method: 'DELETE' })
+      const result: unknown = await response.json().catch(() => ({}))
+      if (response.ok && isApiResponse(result) && result.success) return { success: true }
+      const msg = isApiResponse(result) && result.message ? result.message : 'Suppression impossible'
+      return { success: false, message: msg }
+    } catch (error) {
+      logger.error('[adminApiService] deletePartner:', error)
+      return { success: false, message: 'Erreur réseau' }
+    }
+  }
+
   async activatePartnerSubscription(partnerId: string, subId: string): Promise<ApiResponse<import('@/types').PartnerSubscription>> {
     try {
       const response = await this.fetchWithAuth(

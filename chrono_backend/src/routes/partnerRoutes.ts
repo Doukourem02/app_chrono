@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyPartnerUser } from '../middleware/verifyPartnerUser.js';
-import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,} from '../controllers/partnerController.js';
+import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,} from '../controllers/partnerController.js';
 import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
@@ -18,6 +18,7 @@ router.post('/:id/subscriptions',                         verifyAdminSupabase, c
 router.patch('/:id/subscriptions/:subId/activate',        verifyAdminSupabase, activateSubscription);
 router.patch('/:id/activate',                             verifyAdminSupabase, activatePartner);
 router.patch('/:id/status',                               verifyAdminSupabase, updatePartnerStatus);
+router.delete('/:id',                                     verifyAdminSupabase, deletePartner);
 router.get('/:id/usage',                                  verifyAdminSupabase, getPartnerUsage);
 router.get('/:id/invoices',                               verifyAdminSupabase, getPartnerInvoices);
 router.post('/:id/invite',                                verifyAdminSupabase, invitePartnerUser);

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Building2, Eye, CheckCircle, Clock, XCircle, Zap } from 'lucide-react'
+import { Search, Plus, Building2, Eye, CheckCircle, Clock, XCircle, Zap, Trash2, AlertTriangle } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
 import { ScreenTransition, SkeletonLoader } from '@/components/animations'
@@ -22,6 +22,8 @@ const STATUS_CONFIG = {
   inactive:  { label: 'Inactif',    color: themeColors.grayDark,      bg: themeColors.grayLight,   Icon: Clock       },
   suspended: { label: 'Suspendu',   color: themeColors.redPrimary,    bg: themeColors.redLight,    Icon: XCircle     },
 }
+
+const STATUS_SELECT_ORDER = ['active', 'pending', 'inactive', 'suspended'] as const
 
 // ─── Modal créer partenaire ───────────────────────────────────────────────────
 function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
@@ -126,6 +128,57 @@ function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCre
   )
 }
 
+// ─── Modal suppression partenaire ─────────────────────────────────────────────
+function DeletePartnerModal({
+  partner,
+  onClose,
+  onDeleted,
+}: {
+  partner: Partner
+  onClose: () => void
+  onDeleted: () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleDelete = async () => {
+    setLoading(true)
+    setError('')
+    const result = await adminApiService.deletePartner(partner.id)
+    setLoading(false)
+    if (result.success) {
+      onDeleted()
+      onClose()
+    } else {
+      setError(result.message ?? 'Impossible de supprimer ce partenaire.')
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+      <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <AlertTriangle size={22} color={themeColors.redPrimary} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: themeColors.textPrimary }}>Supprimer le partenaire</h2>
+        </div>
+        <p style={{ fontSize: 14, color: themeColors.textSecondary, lineHeight: 1.5, marginBottom: 8 }}>
+          Tu supprimes définitivement <strong style={{ color: themeColors.textPrimary }}>{partner.name}</strong>.
+          Les factures et abonnements liés seront effacés ; les commandes restent en base sans lien partenaire.
+        </p>
+        {error && <p style={{ fontSize: 13, color: themeColors.redPrimary, marginBottom: 12 }}>{error}</p>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+          <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer' }}>
+            Annuler
+          </button>
+          <button type="button" onClick={handleDelete} disabled={loading} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+            {loading ? 'Suppression…' : 'Supprimer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page principale ───────────────────────────────────────────────────────────
 export default function PartnersPage() {
   const router = useRouter()
@@ -135,6 +188,8 @@ export default function PartnersPage() {
   const [planFilter, setPlanFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [activating, setActivating] = useState<string | null>(null)
+  const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
+  const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null)
 
   const handleActivate = async (e: React.MouseEvent, partnerId: string) => {
     e.stopPropagation()
@@ -142,6 +197,21 @@ export default function PartnersPage() {
     await adminApiService.activatePartner(partnerId)
     queryClient.invalidateQueries({ queryKey: ['partners'] })
     setActivating(null)
+  }
+
+  const handleListStatusChange = async (partner: Partner, next: string) => {
+    if (next === partner.status || statusSavingId) return
+    setStatusSavingId(partner.id)
+    if (next === 'active' && partner.status === 'pending') {
+      await adminApiService.activatePartner(partner.id)
+    } else {
+      await adminApiService.updatePartnerStatus(
+        partner.id,
+        next as 'active' | 'inactive' | 'suspended' | 'pending'
+      )
+    }
+    await queryClient.invalidateQueries({ queryKey: ['partners'] })
+    setStatusSavingId(null)
   }
 
   useEffect(() => {
@@ -237,15 +307,13 @@ export default function PartnersPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                  {['Partenaire', 'Plan', 'Commission', 'Statut', 'Créé le', ''].map((h) => (
+                  {['Partenaire', 'Plan', 'Commission', 'Statut', 'Créé le', 'Actions'].map((h) => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((partner) => {
-                  const st = STATUS_CONFIG[partner.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.inactive
-                  const StIcon = st.Icon
                   return (
                     <tr
                       key={partner.id}
@@ -271,17 +339,44 @@ export default function PartnersPage() {
                           ? `${(partner.commission_rate * 100).toFixed(0)} %`
                           : <span style={{ color: themeColors.textSecondary }}>via forfait</span>}
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, backgroundColor: st.bg, color: st.color, fontSize: 12, fontWeight: 600 }}>
-                          <StIcon size={12} />
-                          {st.label}
-                        </span>
+                      <td
+                        style={{ padding: '14px 16px' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <select
+                          value={partner.status}
+                          disabled={statusSavingId === partner.id}
+                          onChange={(e) => { void handleListStatusChange(partner, e.target.value) }}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: 8,
+                            border: `1px solid ${themeColors.cardBorder}`,
+                            backgroundColor: themeColors.cardBg,
+                            color: themeColors.textPrimary,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: statusSavingId === partner.id ? 'wait' : 'pointer',
+                            maxWidth: 160,
+                          }}
+                        >
+                          {STATUS_SELECT_ORDER.map((key) => {
+                            const cfg = STATUS_CONFIG[key]
+                            return (
+                              <option key={key} value={key}>
+                                {cfg.label}
+                              </option>
+                            )
+                          })}
+                        </select>
+                        {statusSavingId === partner.id && (
+                          <span style={{ marginLeft: 8, fontSize: 11, color: themeColors.textSecondary }}>Mise à jour…</span>
+                        )}
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textSecondary }}>
                         {new Date(partner.created_at).toLocaleDateString('fr-FR')}
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                      <td style={{ padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {partner.status === 'pending' && (
                             <button
                               onClick={(e) => handleActivate(e, partner.id)}
@@ -292,10 +387,19 @@ export default function PartnersPage() {
                             </button>
                           )}
                           <button
+                            type="button"
                             onClick={(e) => { e.stopPropagation(); router.push(`/partners/${partner.id}`) }}
                             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 13, cursor: 'pointer' }}
                           >
                             <Eye size={14} /> Voir
+                          </button>
+                          <button
+                            type="button"
+                            title="Supprimer"
+                            onClick={(e) => { e.stopPropagation(); setPartnerToDelete(partner) }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${themeColors.redPrimary}`, backgroundColor: 'transparent', color: themeColors.redPrimary, fontSize: 13, cursor: 'pointer' }}
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -313,6 +417,16 @@ export default function PartnersPage() {
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false)
+            queryClient.invalidateQueries({ queryKey: ['partners'] })
+          }}
+        />
+      )}
+
+      {partnerToDelete && (
+        <DeletePartnerModal
+          partner={partnerToDelete}
+          onClose={() => setPartnerToDelete(null)}
+          onDeleted={() => {
             queryClient.invalidateQueries({ queryKey: ['partners'] })
           }}
         />

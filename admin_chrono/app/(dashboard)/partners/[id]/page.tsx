@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle, Mail, Zap, ShieldOff, XCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle, Mail, Zap, ShieldOff, XCircle, RefreshCw, Trash2, AlertTriangle } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
 import { SkeletonLoader } from '@/components/animations'
@@ -87,6 +87,56 @@ function InvitePartnerModal({ partnerId, partnerEmail, onClose }: { partnerId: s
 }
 
 // ─── Modal créer abonnement ────────────────────────────────────────────────────
+function DeletePartnerConfirmModal({
+  partnerId,
+  partnerName,
+  onClose,
+  onDeleted,
+}: {
+  partnerId: string
+  partnerName: string
+  onClose: () => void
+  onDeleted: () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleDelete = async () => {
+    setLoading(true)
+    setError('')
+    const result = await adminApiService.deletePartner(partnerId)
+    setLoading(false)
+    if (result.success) {
+      onDeleted()
+    } else {
+      setError(result.message ?? 'Impossible de supprimer ce partenaire.')
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+      <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 16, padding: 28, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <AlertTriangle size={22} color={themeColors.redPrimary} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: themeColors.textPrimary }}>Supprimer le partenaire</h2>
+        </div>
+        <p style={{ fontSize: 14, color: themeColors.textSecondary, lineHeight: 1.5 }}>
+          Suppression définitive de <strong style={{ color: themeColors.textPrimary }}>{partnerName}</strong>. Factures et abonnements liés seront effacés ; les commandes restent sans lien partenaire.
+        </p>
+        {error && <p style={{ fontSize: 13, color: themeColors.redPrimary, marginTop: 12 }}>{error}</p>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+          <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer' }}>
+            Annuler
+          </button>
+          <button type="button" onClick={handleDelete} disabled={loading} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+            {loading ? 'Suppression…' : 'Supprimer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CreateSubscriptionModal({ partnerId, onClose, onCreated }: { partnerId: string; onClose: () => void; onCreated: () => void }) {
   const [plan, setPlan] = useState('starter')
   const [loading, setLoading] = useState(false)
@@ -209,6 +259,7 @@ export default function PartnerDetailPage() {
   const queryClient = useQueryClient()
   const [showCreateSub, setShowCreateSub] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
 
   const handleStatusChange = async (status: 'active' | 'inactive' | 'suspended') => {
@@ -444,6 +495,21 @@ export default function PartnerDetailPage() {
         )}
       </div>
 
+      {/* Suppression (admin) */}
+      <div style={{ backgroundColor: themeColors.redLight, border: `1px solid ${themeColors.redPrimary}`, borderRadius: 12, padding: '16px 20px' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: themeColors.redPrimary, marginBottom: 8 }}>Zone sensible</h2>
+        <p style={{ fontSize: 13, color: themeColors.textSecondary, marginBottom: 12 }}>
+          Supprimer définitivement ce partenaire et ses données de facturation B2B. Les commandes historiques conservent une trace sans lien partenaire.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowDelete(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+        >
+          <Trash2 size={15} /> Supprimer le partenaire
+        </button>
+      </div>
+
       {showCreateSub && (
         <CreateSubscriptionModal
           partnerId={id}
@@ -457,6 +523,18 @@ export default function PartnerDetailPage() {
           partnerId={id}
           partnerEmail={partner.email ?? undefined}
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {showDelete && partner && (
+        <DeletePartnerConfirmModal
+          partnerId={id}
+          partnerName={partner.name}
+          onClose={() => setShowDelete(false)}
+          onDeleted={() => {
+            queryClient.invalidateQueries({ queryKey: ['partners'] })
+            router.push('/partners')
+          }}
         />
       )}
     </div>
