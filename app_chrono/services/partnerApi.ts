@@ -9,12 +9,20 @@ async function authHeader(): Promise<{ Authorization: string } | Record<string, 
 }
 
 // ─── Inscription comme partenaire depuis l'app ────────────────────────────────
-export async function registerAsPartner(companyName: string): Promise<{ partner_id: string; status: string }> {
+export async function registerAsPartner(
+  companyName: string,
+  plan?: string,
+  portalEmail?: string,
+): Promise<{ partner_id: string; status: string }> {
   const headers = await authHeader();
   const response = await apiFetch(`${config.apiUrl}/api/partners/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify({ company_name: companyName }),
+    body: JSON.stringify({
+      company_name: companyName,
+      ...(plan ? { plan } : {}),
+      ...(portalEmail ? { portal_email: portalEmail } : {}),
+    }),
   });
   const body = await response.json() as { success?: boolean; data?: { partner_id: string; status: string }; message?: string };
   if (!response.ok || !body.success) {

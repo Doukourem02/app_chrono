@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,13 +16,45 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { registerAsPartner } from '../../services/partnerApi';
 
-type Step = 'question' | 'company';
+type Step = 'question' | 'company' | 'plan';
+
+const PLANS = [
+  {
+    key: 'starter',
+    label: 'Starter',
+    price: '15 000 FCFA / mois',
+    quota: '50 livraisons incluses',
+    inQuota: '3% de commission sur les livraisons incluses',
+    excess: '20% sur les livraisons excédentaires',
+    icon: 'rocket-outline' as const,
+  },
+  {
+    key: 'pro',
+    label: 'Pro',
+    price: '40 000 FCFA / mois',
+    quota: '200 livraisons incluses',
+    inQuota: '3% de commission sur les livraisons incluses',
+    excess: '15% sur les livraisons excédentaires',
+    icon: 'trending-up-outline' as const,
+  },
+  {
+    key: 'business',
+    label: 'Business',
+    price: '100 000 FCFA / mois',
+    quota: 'Livraisons illimitées',
+    inQuota: '0% de commission sur toutes les livraisons',
+    excess: '10% sur dépassement de capacité',
+    icon: 'business-outline' as const,
+  },
+];
 
 export default function BusinessOnboardingScreen() {
   const insets = useSafeAreaInsets();
   const { user, setUser } = useAuthStore();
   const [step, setStep] = useState<Step>('question');
   const [companyName, setCompanyName] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [portalEmail, setPortalEmail] = useState(user?.email ?? '');
   const [isLoading, setIsLoading] = useState(false);
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isUpdate = mode === 'update';
@@ -31,43 +64,135 @@ export default function BusinessOnboardingScreen() {
   };
 
   const handleNo = () => {
-    if (user) {
-      setUser({ ...user, is_business: false });
-    }
+    if (user) setUser({ ...user, is_business: false });
     next('/(auth)/success');
   };
 
-  const handleYes = () => {
-    setStep('company');
+  const handleYes = () => setStep('company');
+
+  const handleCompanyNext = () => {
+    if (companyName.trim().length < 1) return;
+    setStep('plan');
   };
 
   const handleActivateBusiness = async () => {
-    const name = companyName.trim();
-    if (name.length < 1) return;
-
+    if (!selectedPlan) return;
     setIsLoading(true);
-
     try {
-      const result = await registerAsPartner(name);
+      const result = await registerAsPartner(companyName.trim(), selectedPlan, portalEmail.trim() || undefined);
       if (user) {
         setUser({
           ...user,
           is_business: true,
-          company_name: name,
+          company_name: companyName.trim(),
           partner_id: result.partner_id,
         });
       }
     } catch {
-      // En cas d'erreur réseau, on enregistre quand même localement
       if (user) {
-        setUser({ ...user, is_business: true, company_name: name, partner_id: user.partner_id ?? null });
+        setUser({ ...user, is_business: true, company_name: companyName.trim(), partner_id: user.partner_id ?? null });
       }
     }
-
     setIsLoading(false);
     next('/(auth)/success');
   };
 
+  // ─── Étape : choix de forfait + email portail ─────────────────────────────
+  if (step === 'plan') {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16, paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableOpacity onPress={() => setStep('company')} style={styles.back}>
+            <Ionicons name="arrow-back" size={22} color="#8B5CF6" />
+          </TouchableOpacity>
+
+          <Text style={styles.wordmark}>Krono</Text>
+
+          <Text style={styles.headline}>Choisissez votre forfait</Text>
+          <Text style={styles.subline}>
+            La commission est prélevée sur vos livraisons selon le forfait souscrit. Vous pouvez changer de forfait à tout moment.
+          </Text>
+
+          {/* Cartes de plan */}
+          {PLANS.map((plan) => {
+            const isSelected = selectedPlan === plan.key;
+            return (
+              <TouchableOpacity
+                key={plan.key}
+                style={[styles.planCard, isSelected && styles.planCardSelected]}
+                onPress={() => setSelectedPlan(plan.key)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.planHeader}>
+                  <View style={[styles.planIconCircle, isSelected && styles.planIconCircleSelected]}>
+                    <Ionicons name={plan.icon} size={20} color={isSelected ? '#fff' : '#8B5CF6'} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.planLabel, isSelected && styles.planLabelSelected]}>{plan.label}</Text>
+                    <Text style={styles.planPrice}>{plan.price}</Text>
+                  </View>
+                  {isSelected && <Ionicons name="checkmark-circle" size={22} color="#8B5CF6" />}
+                </View>
+                <View style={styles.planDetails}>
+                  <Text style={styles.planDetail}>• {plan.quota}</Text>
+                  <Text style={styles.planDetail}>• {plan.inQuota}</Text>
+                  <Text style={[styles.planDetail, styles.planDetailMuted]}>• {plan.excess}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* Info "comment ça marche" */}
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>Comment ça marche ?</Text>
+            <Text style={styles.infoStep}>① Vous choisissez votre forfait ici</Text>
+            <Text style={styles.infoStep}>② Un admin Krono valide votre demande</Text>
+            <Text style={styles.infoStep}>③ Vous recevez un lien d{"'"}accès au portail partenaire</Text>
+          </View>
+
+          {/* Email portail */}
+          <Text style={styles.label}>Email pour le portail partenaire</Text>
+          <Text style={styles.emailHint}>Cet email recevra le lien d{"'"}accès au portail. Vous pouvez utiliser une adresse professionnelle.</Text>
+          <TextInput
+            style={styles.input}
+            value={portalEmail}
+            onChangeText={setPortalEmail}
+            placeholder="votre@email-pro.com"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!isLoading}
+          />
+
+          <TouchableOpacity
+            style={[styles.cta, (!selectedPlan || isLoading) && styles.ctaDisabled]}
+            onPress={handleActivateBusiness}
+            disabled={!selectedPlan || isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.ctaText}>Envoyer ma demande</Text>
+            )}
+          </TouchableOpacity>
+
+          <Text style={styles.hint}>
+            Votre demande sera examinée par l{"'"}équipe Krono. Aucune facturation avant activation.
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ─── Étape : nom de l'entreprise ─────────────────────────────────────────
   if (step === 'company') {
     return (
       <KeyboardAvoidingView
@@ -99,26 +224,22 @@ export default function BusinessOnboardingScreen() {
             placeholderTextColor="#9CA3AF"
             autoCapitalize="words"
             autoCorrect={false}
-            editable={!isLoading}
             autoFocus
           />
 
           <TouchableOpacity
-            style={[styles.cta, (!companyName.trim() || isLoading) && styles.ctaDisabled]}
-            onPress={handleActivateBusiness}
-            disabled={!companyName.trim() || isLoading}
+            style={[styles.cta, !companyName.trim() && styles.ctaDisabled]}
+            onPress={handleCompanyNext}
+            disabled={!companyName.trim()}
           >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.ctaText}>Activer le mode business</Text>
-            )}
+            <Text style={styles.ctaText}>Continuer</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     );
   }
 
+  // ─── Étape : question pro / perso ─────────────────────────────────────────
   return (
     <View
       style={[
@@ -139,11 +260,10 @@ export default function BusinessOnboardingScreen() {
           </Text>
           <Text style={styles.subline}>
             {isUpdate
-              ? 'Dites-nous comment vous utilisez l\'app pour personnaliser votre expérience.'
+              ? "Dites-nous comment vous utilisez l'app pour personnaliser votre expérience."
               : 'Si tu es e-commerce, boutique ou professionnel, active le mode business pour gérer tes livraisons en lot et bénéficier de tarifs partenaires.'}
           </Text>
 
-          {/* Oui */}
           <TouchableOpacity style={styles.optionCard} onPress={handleYes}>
             <View style={styles.optionIcon}>
               <Ionicons name="storefront-outline" size={26} color="#8B5CF6" />
@@ -161,7 +281,6 @@ export default function BusinessOnboardingScreen() {
             <Ionicons name="chevron-forward" size={18} color="#9CA3AF" style={styles.optionChevron} />
           </TouchableOpacity>
 
-          {/* Non */}
           <TouchableOpacity style={[styles.optionCard, styles.optionCardMuted]} onPress={handleNo}>
             <View style={[styles.optionIcon, styles.optionIconMuted]}>
               <Ionicons name="person-outline" size={26} color="#6B7280" />
@@ -197,6 +316,9 @@ const styles = StyleSheet.create({
   },
   inner: {
     flex: 1,
+    paddingHorizontal: 24,
+  },
+  scrollContent: {
     paddingHorizontal: 24,
   },
   questionInner: {
@@ -240,8 +362,82 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 32,
+    marginBottom: 24,
   },
+  // Plan cards
+  planCard: {
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: '#FAFAFA',
+  },
+  planCardSelected: {
+    borderColor: '#8B5CF6',
+    backgroundColor: '#FAF5FF',
+  },
+  planHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  planIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#F5E8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  planIconCircleSelected: {
+    backgroundColor: '#8B5CF6',
+  },
+  planLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  planLabelSelected: {
+    color: '#8B5CF6',
+  },
+  planPrice: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  planDetails: {
+    gap: 4,
+  },
+  planDetail: {
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  planDetailMuted: {
+    color: '#9CA3AF',
+  },
+  // Info box
+  infoBox: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 16,
+    gap: 6,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#15803D',
+    marginBottom: 4,
+  },
+  infoStep: {
+    fontSize: 13,
+    color: '#166534',
+    lineHeight: 20,
+  },
+  // Option cards (question step)
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -284,17 +480,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
   },
-  hint: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingTop: 16,
-  },
+  // Form fields
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: '#374151',
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  emailHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
     marginBottom: 8,
   },
   input: {
@@ -302,15 +498,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    fontSize: 17,
+    fontSize: 16,
     color: '#111827',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   cta: {
     backgroundColor: '#8B5CF6',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
+    marginBottom: 12,
   },
   ctaDisabled: {
     opacity: 0.45,
@@ -319,5 +516,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '600',
+  },
+  hint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingTop: 8,
   },
 });
