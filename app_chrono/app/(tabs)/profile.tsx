@@ -236,7 +236,7 @@ export default function ProfilePage() {
         router.push('/(auth)/business-onboarding?mode=update' as any);
       }
     } else {
-      // Garder partner_id : l'agrément reste actif, seul le mode business est désactivé
+      // Mode perso : API met partners.status à inactive si agrément était actif (liste admin / Realtime).
       setUser({ ...user!, is_business: false });
       try { await deregisterAsPartner(); } catch { /* silencieux si hors ligne */ }
     }

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Building2, Eye, CheckCircle, Clock, XCircle, Zap, Trash2, AlertTriangle } from 'lucide-react'
+import { Search, Plus, Building2, Eye, CheckCircle, XCircle, Zap, Trash2, AlertTriangle } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
 import { ScreenTransition, SkeletonLoader } from '@/components/animations'
@@ -19,23 +19,8 @@ const PLAN_LABELS: Record<string, string> = {
 const STATUS_CONFIG = {
   active:    { label: 'Actif',       color: themeColors.greenPrimary,  bg: themeColors.greenLight,  Icon: CheckCircle },
   pending:   { label: 'En attente',  color: '#D97706',                 bg: '#FEF3C7',               Icon: Zap         },
-  inactive:  { label: 'Inactif',    color: themeColors.grayDark,      bg: themeColors.grayLight,   Icon: Clock       },
+  inactive:  { label: 'Inactif',    color: themeColors.redPrimary,      bg: themeColors.redLight,    Icon: XCircle     },
   suspended: { label: 'Suspendu',   color: themeColors.redPrimary,    bg: themeColors.redLight,    Icon: XCircle     },
-}
-
-/** Indication texte seule : le vrai interrupteur est dans l’app partenaire. */
-function BusinessModeAppHint({ on }: { on: boolean | null }) {
-  if (on === null) {
-    return <span style={{ fontSize: 13, color: themeColors.textSecondary }}>—</span>
-  }
-  return (
-    <span
-      style={{ fontSize: 13, fontWeight: 500, color: on ? themeColors.textPrimary : themeColors.textSecondary }}
-      title="Réglé uniquement par l’utilisateur dans l’app Krono (pas depuis l’admin)."
-    >
-      {on ? 'Oui' : 'Non'}
-    </span>
-  )
 }
 
 // ─── Modal créer partenaire ───────────────────────────────────────────────────
@@ -304,7 +289,7 @@ export default function PartnersPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                  {['Partenaire', 'Plan', 'Commission', 'Agrément', 'Mode pro (app)', 'Créé le', 'Actions'].map((h) => (
+                  {['Partenaire', 'Plan', 'Commission', 'Agrément', 'Créé le', 'Actions'].map((h) => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -354,9 +339,6 @@ export default function PartnersPage() {
                         >
                           <AgrIcon size={14} /> {agr.label}
                         </span>
-                      </td>
-                      <td style={{ padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
-                        <BusinessModeAppHint on={partner.is_business ?? null} />
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textSecondary }}>
                         {new Date(partner.created_at).toLocaleDateString('fr-FR')}

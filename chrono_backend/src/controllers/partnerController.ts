@@ -10,6 +10,16 @@ const PLAN_DEFAULTS: Record<string, { monthly_price: number; included_orders: nu
   business: { monthly_price: 100000, included_orders: null, excess_commission_rate: 0.10 },
 };
 
+/** Statut partenaire depuis une jointure Supabase (objet ou tableau). */
+function statusFromPartnerJoin(partners: unknown): string | undefined {
+  if (partners == null) return undefined;
+  if (Array.isArray(partners)) return (partners[0] as { status?: string } | undefined)?.status;
+  if (typeof partners === 'object' && 'status' in (partners as object)) {
+    return (partners as { status: string }).status;
+  }
+  return undefined;
+}
+
 // ─── POST /api/partners — admin only ─────────────────────────────────────────
 export const createPartner = async (req: Request, res: Response): Promise<void> => {
   const { name, email, phone, commission_rate, notes } = req.body as {
@@ -55,7 +65,7 @@ export const listPartners = async (req: Request, res: Response): Promise<void> =
   if (status) query = query.eq('status', status as string);
   if (plan)   query = query.eq('plan', plan as string);
 
-  const { data: partners, error } = await query;
+  const { data, error } = await query;
 
   if (error) {
     logger.error('[partnerController] listPartners error:', error);
@@ -63,58 +73,7 @@ export const listPartners = async (req: Request, res: Response): Promise<void> =
     return;
   }
 
-  const rows = partners ?? [];
-  if (rows.length === 0) {
-    res.json({ success: true, data: [] });
-    return;
-  }
-
-  const partnerIds = rows.map((p: { id: string }) => p.id);
-  const { data: puRows, error: puError } = await db()
-    .from('partner_users')
-    .select('partner_id, user_id, role')
-    .in('partner_id', partnerIds);
-
-  if (puError) {
-    logger.warn('[partnerController] listPartners partner_users:', puError.message);
-  }
-
-  const userIds = [...new Set((puRows ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean))];
-  const userMap = new Map<string, boolean>();
-  if (userIds.length > 0) {
-    const { data: usersData, error: uError } = await db()
-      .from('users')
-      .select('id, is_business')
-      .in('id', userIds);
-    if (uError) {
-      logger.warn('[partnerController] listPartners users:', uError.message);
-    } else {
-      for (const u of usersData ?? []) {
-        const row = u as { id: string; is_business?: boolean | null };
-        userMap.set(row.id, Boolean(row.is_business));
-      }
-    }
-  }
-
-  const byPartner = new Map<string, { user_id: string; role: string | null }[]>();
-  for (const r of puRows ?? []) {
-    const pid = (r as { partner_id: string }).partner_id;
-    if (!byPartner.has(pid)) byPartner.set(pid, []);
-    byPartner.get(pid)!.push({
-      user_id: (r as { user_id: string }).user_id,
-      role: ((r as { role?: string | null }).role ?? null) as string | null,
-    });
-  }
-
-  const enriched = rows.map((p: { id: string }) => {
-    const links = byPartner.get(p.id) ?? [];
-    const owner = links.find((l) => l.role === 'owner');
-    const pick = owner ?? links[0];
-    const is_business = pick ? (userMap.get(pick.user_id) ?? false) : null;
-    return { ...p, is_business };
-  });
-
-  res.json({ success: true, data: enriched });
+  res.json({ success: true, data });
 };
 
 // ─── GET /api/partners/:id — admin or partner ─────────────────────────────────
@@ -365,7 +324,7 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     .maybeSingle();
 
   if (existing?.partner_id) {
-    const currentStatus = (existing.partners as any)?.status;
+    const currentStatus = statusFromPartnerJoin(existing.partners);
 
     if (currentStatus === 'active') {
       // Partenaire agréé : réactiver le mode business sans changer le statut
@@ -379,6 +338,7 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     }
 
     if (currentStatus === 'pending') {
+      await db().from('users').update({ is_business: true }).eq('id', userId);
       res.status(200).json({
         success: true,
         data: { partner_id: existing.partner_id, status: 'pending' },
@@ -475,7 +435,7 @@ export const deregisterAsPartner = async (req: Request, res: Response): Promise<
     .limit(1)
     .maybeSingle();
 
-  const pStatus = (link?.partners as { status?: string } | null)?.status;
+  const pStatus = statusFromPartnerJoin(link?.partners);
 
   if (link?.partner_id && pStatus === 'active') {
     await db()
