@@ -12,6 +12,7 @@ import { getQRScanErrorAlert } from '../utils/qrScanUserMessage';
 import { normalizeDropoffDetails, parseClientOrderInstructions } from '../utils/clientOrderInstructions';
 import { driverFacingSpeedOptionLabel } from '../utils/speedOptionLabel';
 import { OperatorCourseNotesBlock, OperatorDriverNotesBlock } from './AdminOrderInfo';
+import { router } from 'expo-router';
 
 const NAV_BAR_HEIGHT = 80;
 const NAV_BAR_BOTTOM = 25;
@@ -267,6 +268,10 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   const isB2BOrder = currentOrder?.isB2BOrder === true;
   const driverNotes = currentOrder?.driverNotes || '';
   const operatorCourseNotes = currentOrder?.operatorCourseNotes || '';
+  const partnerName = currentOrder?.partner_name;
+  const batchId = currentOrder?.batch_id;
+  const batchPosition = currentOrder?.batch_position;
+  const batchTotal = currentOrder?.batch_total;
 
   const handleCall = () => {
     if (!recipientPhone && !currentOrder?.user?.phone) {
@@ -511,6 +516,37 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
           >
             {activeTab === 'details' ? (
               <View style={styles.detailsContent}>
+                {/* Contexte B2B : partenaire + position dans la tournée */}
+                {isB2BOrder && (partnerName || (batchPosition != null && batchTotal != null)) ? (
+                  <View style={styles.b2bContextCard}>
+                    <View style={styles.b2bContextHeader}>
+                      <Ionicons name="briefcase-outline" size={16} color="#4338CA" />
+                      <Text style={styles.b2bContextTitle}>Contexte B2B</Text>
+                    </View>
+                    {partnerName ? (
+                      <View style={styles.b2bContextRow}>
+                        <Ionicons name="business-outline" size={14} color="#4338CA" />
+                        <Text style={styles.b2bContextText}>Partenaire : {partnerName}</Text>
+                      </View>
+                    ) : null}
+                    {batchPosition != null && batchTotal != null ? (
+                      <View style={styles.b2bContextRow}>
+                        <Ionicons name="list-outline" size={14} color="#4338CA" />
+                        <Text style={styles.b2bContextText}>Livraison {batchPosition}/{batchTotal} de la tournée</Text>
+                      </View>
+                    ) : null}
+                    {batchId ? (
+                      <TouchableOpacity
+                        style={styles.b2bBatchBtn}
+                        onPress={() => router.push(`/batch/${batchId}` as any)}
+                      >
+                        <Ionicons name="map-outline" size={14} color="#4338CA" />
+                        <Text style={styles.b2bBatchBtnText}>Voir la tournée</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : null}
+
                 {/* Notes / mode / consignes en premier : visibles dès l’ouverture ou le tap « Notes et consignes » */}
                 {operatorCourseNotes || driverNotes ? (
                   <View style={styles.section}>
@@ -1313,6 +1349,52 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  b2bContextCard: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  b2bContextHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  b2bContextTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4338CA',
+  },
+  b2bContextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  b2bContextText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#3730A3',
+  },
+  b2bBatchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  b2bBatchBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4338CA',
   },
 });
 

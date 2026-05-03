@@ -491,7 +491,72 @@ Les commandes B2B actuelles ont `is_b2b_order = true` sans `partner_id`.
 
 ---
 
-## 12. Feature séparée — Commissionnaire (hors B2B)
+## 12. Adaptation `driver_chrono` au contexte B2B — ✅ Implémenté (2026-05-03)
+
+Le livreur avait déjà le flag `isB2BOrder` et l'écran `/batch/[batchId]`, mais était aveugle au partenaire, à sa position dans la tournée et aux livreurs attitrés. Voici ce qui a été ajouté.
+
+### Types TypeScript — `store/useOrderStore.ts`
+
+Champs ajoutés à `OrderRequest` :
+
+```typescript
+partner_id?: string;
+partner_name?: string;
+batch_id?: string;
+batch_position?: number;
+batch_total?: number;
+```
+
+### Mapping — `utils/mapAdminOrderFlags.ts`
+
+`mapAdminOrderFlags()` extrait désormais ces 5 champs depuis la racine du payload socket (et `_chrono_admin` pour `partner_id`). Le mapping s'applique automatiquement dans `addPendingOrder` et `addOrder`.
+
+### Store tournées — `store/useBatchStore.ts`
+
+Champs ajoutés à `ActiveBatch` :
+
+```typescript
+partner_id?: string;
+partner_name?: string;
+status?: 'pending' | 'in_progress' | 'completed';
+created_at?: string;
+```
+
+### Socket `batch-assigned` — `services/orderSocketService.ts`
+
+Payload étendu :
+```typescript
+{ batchId: string; ordersCount: number; partner_id?: string; partner_name?: string; status?: string }
+```
+`partner_id` et `partner_name` sont passés à `setActiveBatch()`.
+
+### Composants UI
+
+| Composant | Ce qui a été ajouté |
+|---|---|
+| `AdminOrderInfo.tsx` | Affiche "Partenaire : X" et "Livraison Y/Z de la tournée" si champs présents |
+| `OrderRequestPopup.tsx` | Popup d'acceptation : interface locale étendue, props transmises à `AdminOrderInfo` |
+| `DriverOrderBottomSheet.tsx` | Section "Contexte B2B" dans l'onglet détails : partenaire, position tournée, bouton "Voir la tournée" |
+| `app/batch/[batchId].tsx` | Header affiche `partner_name` si présent, sinon "Tournée B2B" |
+
+### Résultat
+
+**Avant :**
+```
+[Popup] Commande B2B — Jean Dupont — 2500 FCFA
+← livreur ne sait pas pour qui
+```
+
+**Après :**
+```
+[Popup] Partenaire : Resto Chez Maman
+        Livraison 2/5 de la tournée
+        Jean Dupont — 2500 FCFA
+```
+
+---
+
+## 13. Feature séparée — Commissionnaire (hors B2B)
 
 **Hors périmètre B2B** : pas de mélange avec logique produit, pricing ou tables `partners` / abonnements ci-dessus.
 

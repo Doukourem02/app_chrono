@@ -129,6 +129,11 @@ export interface OrderRequest {
   /** Toute commande créée via l’admin — badge informatif ; navigation = identique au client si GPS OK */
   placedByAdmin?: boolean;
   isB2BOrder?: boolean;
+  partner_id?: string;
+  partner_name?: string;
+  batch_id?: string;
+  batch_position?: number;
+  batch_total?: number;
   driverNotes?: string;
   payment_method_type?: 'orange_money' | 'wave' | 'cash' | 'deferred';
 }

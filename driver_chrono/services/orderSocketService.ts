@@ -393,15 +393,21 @@ class OrderSocketService {
     });
 
     // Tournée B2B assignée — une seule notification pour N livraisons
-    this.socket.on('batch-assigned', (data: { batchId: string; ordersCount: number }) => {
+    this.socket.on('batch-assigned', (data: { batchId: string; ordersCount: number; partner_id?: string; partner_name?: string; status?: string }) => {
       try {
         logger.info('Tournée B2B assignée', undefined, data);
-        const { batchId, ordersCount } = data || {};
+        const { batchId, ordersCount, partner_id, partner_name } = data || {};
         if (!batchId) return;
 
         import('../store/useBatchStore').then(({ useBatchStore }) => {
           // Pré-remplir avec le minimum connu, l'écran chargera les détails complets
-          useBatchStore.getState().setActiveBatch({ id: batchId, ordersCount: ordersCount ?? 0, stops: [] });
+          useBatchStore.getState().setActiveBatch({
+            id: batchId,
+            ordersCount: ordersCount ?? 0,
+            stops: [],
+            ...(partner_id ? { partner_id } : {}),
+            ...(partner_name ? { partner_name } : {}),
+          });
         });
 
         import('expo-router').then(({ router }) => {

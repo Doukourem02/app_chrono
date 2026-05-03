@@ -115,7 +115,7 @@ export default function BatchScreen() {
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Tournée B2B</Text>
+          <Text style={styles.headerTitle}>{batch?.partner_name ?? 'Tournée B2B'}</Text>
           {batchId && (
             <Text style={styles.headerSub}>#{batchId.slice(-8).toUpperCase()}</Text>
           )}

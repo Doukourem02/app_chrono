@@ -771,7 +771,107 @@ Si le livreur est hors ligne au moment du socket, la push `batch_assigned` (`dri
 
 ---
 
-### État d'avancement B2B (au 2026-05-02)
+### Simulation — comment le livreur reçoit les commandes (référence produit)
+
+Trois cas possibles selon la nature de la commande.
+
+#### Cas 1 — Commande classique (client particulier, 1 livraison)
+
+```
+CLIENT APP              BACKEND                  LIVREUR APP
+    │                      │                          │
+    │── passe commande ──►  │                          │
+    │                      │── socket "new-order" ──► │
+    │                      │                          │ [POPUP s'affiche — 30s]
+    │                      │                          │  "Jean Dupont — 2 500 FCFA"
+    │                      │                          │  [Accepter] [Décliner]
+    │                      │ ◄── "accept-order" ──────│
+    │                      │── confirmation ─────────►│
+    │                      │                          │ [BottomSheet] → navigation
+    │                      │                          │ → [Je pars] → géofencing auto
+    │                      │                          │ → [Scanner QR] → TERMINÉ ✓
+```
+
+#### Cas 2 — Tournée B2B (1 partenaire, N livraisons)
+
+**1 seule notification groupée**, pas N popups séparées.
+
+```
+ADMIN                   BACKEND                  LIVREUR APP
+    │                      │                          │
+    │── crée N livraisons   │                          │
+    │   pour "Resto Chez    │                          │
+    │   Maman" ──────────►  │                          │
+    │                      │ crée batch + optimise     │
+    │                      │ l'ordre (haversine)       │
+    │                      │── socket "batch-assigned"►│
+    │                      │   { batchId, ordersCount, │
+    │                      │     partner_name }        │
+    │                      │                          │ Son + vibration
+    │                      │                          │ → router.push("/batch/id")
+    │                      │                          │ → GET /api/batches/:id
+    │                      │                          │ → liste ordonnée affichée
+```
+
+Écran tournée — ce que voit le livreur :
+
+```
+┌────────────────────────────────────────┐
+│  ←  Resto Chez Maman              🔄   │
+│     #BATCH_XYZ                         │
+│  3/10 livraisons       7 restantes     │
+│  ████████░░░░░░░░░░░░░░░░░░░░░░░       │
+│                                        │
+│  ①  Mamadou Diallo               📞   │
+│     12 Rue des Peupliers      Livré ✓  │
+│  ②✓ Aïssa Koné          [Livré]       │
+│  ③✓ Ibrahima Sow         [Livré]      │
+│  ④  Fatou Traoré                 📞   │
+│     45 Ave de la Paix         Livré ✓  │
+│  ⑤…⑥…⑦…⑧…⑨…⑩                       │
+│                                        │
+│  Appui long sur « Livré ✓ » → annuler  │
+└────────────────────────────────────────┘
+```
+
+Le livreur valide **stop par stop** dans l'ordre qu'il veut. Quand tout est `completed` ou `cancelled` → écran "Tournée terminée !".
+
+#### Cas 3 — Commande B2B individuelle (1 livraison d'un partenaire)
+
+Même flux que le Cas 1, mais la popup affiche le contexte B2B :
+
+```
+┌────────────────────────────────────────┐
+│  [🧳 Commande B2B]                     │
+│  Partenaire : Resto Chez Maman         │
+│  Livraison 2/5 de la tournée           │
+│  ─────────────────────────────────     │
+│  Jean Dupont ⭐4.8          2 500 FCFA │
+│  Moto · 3.2 km · 12 min               │
+│  [Décliner]          [Accepter]        │
+└────────────────────────────────────────┘
+```
+
+#### Tableau récapitulatif
+
+| Situation | Notification livreur | Comment valider |
+|---|---|---|
+| Client standard, 1 livraison | Popup d'acceptation (30s) | Géofencing + QR |
+| Partenaire B2B, 1 livraison | Popup avec badge B2B + nom partenaire | Idem |
+| Partenaire B2B, N livraisons (tournée) | 1 notification → écran liste des stops | Bouton "Livré ✓" par stop |
+
+#### Règle socket (anti-spam tournée)
+
+```
+Tournée (batch)        → socket "batch-assigned"   → écran /batch/[id]
+Commande individuelle  → socket "new-order-request" → popup d'acceptation
+```
+
+Les N commandes d'un batch sont créées **silencieusement** via REST. Aucune popup individuelle n'apparaît pour une commande appartenant à une tournée.
+
+---
+
+### État d'avancement B2B (au 2026-05-03)
 
 | Bloc | Contenu | Statut |
 |---|---|---|
@@ -779,7 +879,7 @@ Si le livreur est hors ligne au moment du socket, la push `batch_assigned` (`dri
 | **Bloc 2** | Routes backend, commission, tournées, facturation, middleware | ✅ Implémenté |
 | **Bloc 3** | Interface admin : créer/gérer partenaires, activer abonnements + portail partenaire complet | ✅ Implémenté |
 | **Bloc 4** | `app_chrono` : onboarding B2B, Profil 1 (livraison client), Profil 2 (tournée), ActionCards | ✅ Implémenté |
-| **Bloc 5** | `driver_chrono` : réception tournée groupée (1 notif), vue ordonnée, validation par livraison | ✅ Implémenté |
+| **Bloc 5** | `driver_chrono` : réception tournée groupée (1 notif), vue ordonnée, validation par livraison, contexte partenaire (nom, position tournée, bouton "Voir la tournée") | ✅ Implémenté (2026-05-03) |
 | **Bloc 6** | Décision commission Option A/B | ✅ Validé : Option B (3 % Starter/Pro, 0 % Business) |
 
 **Reste à faire :**

@@ -13,6 +13,9 @@ interface AdminOrderInfoProps {
   driverNotes?: string;
   /** Commune / zone indiquée par l’opérateur quand le retrait n’a pas de GPS précis */
   approximatePickupZoneLabel?: string;
+  partner_name?: string;
+  batch_position?: number;
+  batch_total?: number;
 }
 
 /** Notes générales de course saisies par l’opérateur (champ « Notes (optionnel) » du formulaire admin). */
@@ -55,6 +58,9 @@ export const AdminOrderInfo: React.FC<AdminOrderInfoProps> = ({
   operatorCourseNotes,
   driverNotes,
   approximatePickupZoneLabel,
+  partner_name,
+  batch_position,
+  batch_total,
 }) => {
   const show = isB2BOrder || placedByAdmin || isPhoneOrder;
   if (!show) {
@@ -81,6 +87,20 @@ export const AdminOrderInfo: React.FC<AdminOrderInfoProps> = ({
           <Text style={[styles.badgeText, { color: badgeColor }]}>{badgeText}</Text>
         </View>
       </View>
+
+      {isB2B && partner_name ? (
+        <View style={styles.b2bContextRow}>
+          <Ionicons name="business-outline" size={14} color="#4338CA" />
+          <Text style={styles.b2bContextText}>Partenaire : {partner_name}</Text>
+        </View>
+      ) : null}
+
+      {isB2B && batch_position != null && batch_total != null ? (
+        <View style={styles.b2bContextRow}>
+          <Ionicons name="list-outline" size={14} color="#4338CA" />
+          <Text style={styles.b2bContextText}>Livraison {batch_position}/{batch_total} de la tournée</Text>
+        </View>
+      ) : null}
 
       <OperatorCourseNotesBlock operatorCourseNotes={operatorCourseNotes} />
       <OperatorDriverNotesBlock driverNotes={driverNotes} />
@@ -198,6 +218,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     lineHeight: 16,
+  },
+  b2bContextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  b2bContextText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4338CA',
   },
 });
 

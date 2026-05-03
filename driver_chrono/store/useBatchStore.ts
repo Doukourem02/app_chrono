@@ -14,6 +14,10 @@ export interface ActiveBatch {
   id: string;
   ordersCount: number;
   stops: BatchStop[];
+  partner_id?: string;
+  partner_name?: string;
+  status?: 'pending' | 'in_progress' | 'completed';
+  created_at?: string;
 }
 
 interface BatchState {

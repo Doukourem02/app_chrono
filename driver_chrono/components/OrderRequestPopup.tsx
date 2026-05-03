@@ -44,7 +44,10 @@ interface OrderRequest {
   isB2BOrder?: boolean;
   /** Champ « Notes (optionnel) » côté admin. */
   operatorCourseNotes?: string;
-  driverNotes?: string; // Notes spéciales pour le livreur
+  driverNotes?: string;
+  partner_name?: string;
+  batch_position?: number;
+  batch_total?: number;
   payment_method_type?: 'orange_money' | 'wave' | 'cash' | 'deferred';
 }
 
@@ -333,6 +336,9 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
             operatorCourseNotes={order.operatorCourseNotes}
             driverNotes={order.driverNotes}
             approximatePickupZoneLabel={order.pickup?.approximate_pickup_zone_label}
+            partner_name={order.partner_name}
+            batch_position={order.batch_position}
+            batch_total={order.batch_total}
           />
 
           {/* Info de livraison */}
