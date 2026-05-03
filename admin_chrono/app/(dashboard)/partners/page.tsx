@@ -23,44 +23,17 @@ const STATUS_CONFIG = {
   suspended: { label: 'Suspendu',   color: themeColors.redPrimary,    bg: themeColors.redLight,    Icon: XCircle     },
 }
 
-function BusinessModeToggleReadOnly({ on }: { on: boolean | null }) {
+/** Indication texte seule : le vrai interrupteur est dans l’app partenaire. */
+function BusinessModeAppHint({ on }: { on: boolean | null }) {
   if (on === null) {
     return <span style={{ fontSize: 13, color: themeColors.textSecondary }}>—</span>
   }
-  const h = 26
-  const w = 44
-  const knob = 20
   return (
     <span
-      title="État du toggle « mode business » sur l’application (lecture seule)."
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+      style={{ fontSize: 13, fontWeight: 500, color: on ? themeColors.textPrimary : themeColors.textSecondary }}
+      title="Réglé uniquement par l’utilisateur dans l’app Krono (pas depuis l’admin)."
     >
-      <span
-        style={{
-          width: w,
-          height: h,
-          borderRadius: h / 2,
-          backgroundColor: on ? themeColors.purplePrimary : themeColors.grayLight,
-          position: 'relative',
-          flexShrink: 0,
-        }}
-      >
-        <span
-          style={{
-            position: 'absolute',
-            top: (h - knob) / 2,
-            left: on ? w - knob - 3 : 3,
-            width: knob,
-            height: knob,
-            borderRadius: '50%',
-            backgroundColor: '#fff',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-          }}
-        />
-      </span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: on ? themeColors.textPrimary : themeColors.textSecondary }}>
-        {on ? 'Activé' : 'Désactivé'}
-      </span>
+      {on ? 'Oui' : 'Non'}
     </span>
   )
 }
@@ -331,7 +304,7 @@ export default function PartnersPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                  {['Partenaire', 'Plan', 'Commission', 'Agrément', 'Mode business (app)', 'Créé le', 'Actions'].map((h) => (
+                  {['Partenaire', 'Plan', 'Commission', 'Agrément', 'Mode pro (app)', 'Créé le', 'Actions'].map((h) => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -383,7 +356,7 @@ export default function PartnersPage() {
                         </span>
                       </td>
                       <td style={{ padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
-                        <BusinessModeToggleReadOnly on={partner.is_business ?? null} />
+                        <BusinessModeAppHint on={partner.is_business ?? null} />
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textSecondary }}>
                         {new Date(partner.created_at).toLocaleDateString('fr-FR')}

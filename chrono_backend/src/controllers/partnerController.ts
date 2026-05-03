@@ -387,7 +387,23 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Statut inactive ou suspended : ne pas repasser en pending sans action admin
+    if (currentStatus === 'inactive') {
+      // Même partenaire : passage mode perso → business remet l’agrément actif (sync avec le switch app)
+      await db()
+        .from('partners')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', existing.partner_id)
+        .eq('status', 'inactive');
+      await db().from('users').update({ is_business: true }).eq('id', userId);
+      res.status(200).json({
+        success: true,
+        data: { partner_id: existing.partner_id, status: 'active' },
+        message: 'Mode business réactivé',
+      });
+      return;
+    }
+
+    // suspended : inchangé (réservé à l’admin)
     res.status(200).json({
       success: true,
       data: { partner_id: existing.partner_id, status: currentStatus },
@@ -443,13 +459,30 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
 };
 
 // ─── POST /api/partners/deregister — utilisateur authentifié ─────────────────
-// Désactive le mode business dans l'app SANS changer le statut d'agrément du partenaire.
-// L'agrément (partners.status = 'active') est permanent sauf action admin explicite.
+// Mode perso : is_business = false + partenaire déjà agréé (active) → partners.status = inactive (sync admin / Realtime).
+// Ne modifie pas pending ni suspended.
 export const deregisterAsPartner = async (req: Request, res: Response): Promise<void> => {
   const userId = (req as any).user?.id;
   if (!userId) {
     res.status(401).json({ success: false, message: 'Non autorisé' });
     return;
+  }
+
+  const { data: link } = await db()
+    .from('partner_users')
+    .select('partner_id, partners(status)')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  const pStatus = (link?.partners as { status?: string } | null)?.status;
+
+  if (link?.partner_id && pStatus === 'active') {
+    await db()
+      .from('partners')
+      .update({ status: 'inactive', updated_at: new Date().toISOString() })
+      .eq('id', link.partner_id)
+      .eq('status', 'active');
   }
 
   await db().from('users').update({ is_business: false }).eq('id', userId);
