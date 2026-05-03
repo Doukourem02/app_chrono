@@ -17,8 +17,8 @@ const PLAN_DEFAULTS: Record<string, { price: number; quota: number | null; label
 }
 
 // ─── Modal inviter au portail ─────────────────────────────────────────────────
-function InvitePartnerModal({ partnerId, onClose }: { partnerId: string; onClose: () => void }) {
-  const [email, setEmail] = useState('')
+function InvitePartnerModal({ partnerId, partnerEmail, onClose }: { partnerId: string; partnerEmail?: string; onClose: () => void }) {
+  const [email, setEmail] = useState(partnerEmail ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
@@ -213,7 +213,12 @@ export default function PartnerDetailPage() {
 
   const handleStatusChange = async (status: 'active' | 'inactive' | 'suspended') => {
     setStatusLoading(true)
-    await adminApiService.updatePartnerStatus(id, status)
+    // Activation depuis pending → passe par activatePartner pour créer l'abonnement + envoyer le lien portail
+    if (status === 'active' && partner?.status === 'pending') {
+      await adminApiService.activatePartner(id)
+    } else {
+      await adminApiService.updatePartnerStatus(id, status)
+    }
     queryClient.invalidateQueries({ queryKey: ['partner', id] })
     queryClient.invalidateQueries({ queryKey: ['partners'] })
     setStatusLoading(false)
@@ -298,9 +303,25 @@ export default function PartnerDetailPage() {
           onClick={() => setShowInvite(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
-          <Mail size={14} /> Inviter au portail
+          <Mail size={14} /> {partner.email ? 'Renvoyer le lien portail' : 'Inviter au portail'}
         </button>
       </div>
+
+      {/* Bandeau plan demandé pour les pending */}
+      {partner.status === 'pending' && partner.plan && (
+        <div style={{ padding: '12px 16px', backgroundColor: '#FEF3C7', borderRadius: 10, border: '1px solid #D97706', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Clock size={16} color="#D97706" />
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#92400E' }}>Forfait demandé : </span>
+            <span style={{ fontSize: 13, color: '#92400E' }}>{PLAN_DEFAULTS[partner.plan]?.label ?? partner.plan}</span>
+            {partner.email && (
+              <span style={{ fontSize: 12, color: '#B45309', display: 'block', marginTop: 2 }}>
+                Email portail : {partner.email}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Gestion du statut */}
       {(() => {
@@ -334,7 +355,7 @@ export default function PartnerDetailPage() {
           { label: 'Plan actuel', value: partner.plan ? (PLAN_DEFAULTS[partner.plan]?.label?.split(' — ')[0] ?? partner.plan) : 'Aucun', Icon: CreditCard, color: themeColors.purplePrimary },
           { label: 'Courses ce mois', value: count, Icon: Package, color: themeColors.bluePrimary },
           { label: 'Quota restant', value: usage?.remaining !== null ? String(usage?.remaining ?? '—') : '∞', Icon: TrendingUp, color: themeColors.greenPrimary },
-          { label: 'Commission std.', value: `${(partner.commission_rate * 100).toFixed(0)} %`, Icon: CreditCard, color: themeColors.yellowPrimary },
+          { label: 'Commission std.', value: partner.commission_rate != null ? `${(partner.commission_rate * 100).toFixed(0)} %` : 'via forfait', Icon: CreditCard, color: themeColors.yellowPrimary },
         ].map(({ label, value, Icon, color }) => (
           <div key={label} style={{ backgroundColor: themeColors.cardBg, border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -434,6 +455,7 @@ export default function PartnerDetailPage() {
       {showInvite && (
         <InvitePartnerModal
           partnerId={id}
+          partnerEmail={partner.email ?? undefined}
           onClose={() => setShowInvite(false)}
         />
       )}

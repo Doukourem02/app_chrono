@@ -40,7 +40,7 @@ export async function computeB2BCommission(partnerId: string): Promise<Commissio
       .single();
 
     return {
-      rate: Number(partner?.commission_rate ?? 0.20),
+      rate: Number(partner?.commission_rate ?? 0),
       type: 'no_subscription',
       subscriptionId: null,
       plan: null,

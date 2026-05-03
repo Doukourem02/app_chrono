@@ -25,7 +25,7 @@ const STATUS_CONFIG = {
 
 // ─── Modal créer partenaire ───────────────────────────────────────────────────
 function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', commission_rate: '20', notes: '' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', plan: '', commission_rate: '', notes: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -38,7 +38,8 @@ function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCre
       name: form.name.trim(),
       email: form.email.trim() || undefined,
       phone: form.phone.trim() || undefined,
-      commission_rate: parseFloat(form.commission_rate) / 100,
+      ...(form.plan ? { plan: form.plan } : {}),
+      ...(form.commission_rate ? { commission_rate: parseFloat(form.commission_rate) / 100 } : {}),
       notes: form.notes.trim() || undefined,
     })
     setLoading(false)
@@ -72,12 +73,28 @@ function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCre
 
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 6 }}>
-              Commission standard (%) — sans abonnement
+              Forfait (optionnel — cas back-office sans app)
+            </label>
+            <select
+              value={form.plan}
+              onChange={(e) => setForm(f => ({ ...f, plan: e.target.value }))}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.background, color: themeColors.textPrimary, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            >
+              <option value="">— Sans forfait —</option>
+              <option value="starter">Starter — 15 000 FCFA / mois</option>
+              <option value="pro">Pro — 40 000 FCFA / mois</option>
+              <option value="business">Business — 100 000 FCFA / mois</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 6 }}>
+              Commission manuelle (%) — uniquement si pas de forfait
             </label>
             <input
               type="number" min={0} max={100} step={1}
               value={form.commission_rate}
               onChange={(e) => setForm(f => ({ ...f, commission_rate: e.target.value }))}
+              placeholder="Laisser vide si forfait renseigné"
               style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.background, color: themeColors.textPrimary, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
@@ -242,10 +259,17 @@ export default function PartnersPage() {
                         {partner.email && <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>{partner.email}</div>}
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textPrimary }}>
-                        {partner.plan ? PLAN_LABELS[partner.plan] ?? partner.plan : <span style={{ color: themeColors.textSecondary }}>—</span>}
+                        {partner.plan
+                          ? <span style={{ fontWeight: 600 }}>{PLAN_LABELS[partner.plan] ?? partner.plan}</span>
+                          : <span style={{ color: themeColors.textSecondary, fontStyle: 'italic' }}>—</span>}
+                        {partner.status === 'pending' && partner.plan && (
+                          <span style={{ marginLeft: 6, fontSize: 11, color: '#D97706', backgroundColor: '#FEF3C7', padding: '2px 6px', borderRadius: 8 }}>demandé</span>
+                        )}
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textPrimary }}>
-                        {(partner.commission_rate * 100).toFixed(0)} %
+                        {partner.commission_rate != null
+                          ? `${(partner.commission_rate * 100).toFixed(0)} %`
+                          : <span style={{ color: themeColors.textSecondary }}>via forfait</span>}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 20, backgroundColor: st.bg, color: st.color, fontSize: 12, fontWeight: 600 }}>

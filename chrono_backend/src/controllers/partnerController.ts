@@ -31,7 +31,7 @@ export const createPartner = async (req: Request, res: Response): Promise<void> 
       name: name.trim(),
       email: email?.trim() ?? null,
       phone: phone?.trim() ?? null,
-      commission_rate: commission_rate ?? 0.20,
+      commission_rate: commission_rate ?? null,
       notes: notes?.trim() ?? null,
     })
     .select()
@@ -286,9 +286,22 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     return;
   }
 
-  const { company_name } = req.body as { company_name?: string };
+  const { company_name, plan, portal_email } = req.body as {
+    company_name?: string;
+    plan?: string;
+    portal_email?: string;
+  };
+
   if (!company_name?.trim()) {
     res.status(400).json({ success: false, message: "Le nom de l'entreprise est requis" });
+    return;
+  }
+
+  if (plan && !PLAN_DEFAULTS[plan]) {
+    res.status(400).json({
+      success: false,
+      message: `Plan invalide. Valeurs acceptées : ${Object.keys(PLAN_DEFAULTS).join(', ')}`,
+    });
     return;
   }
 
@@ -302,11 +315,33 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
 
   if (existing?.partner_id) {
     const currentStatus = (existing.partners as any)?.status;
-    // Si le partenaire existe mais est inactif, on le repasse en pending pour réapprobation
-    if (currentStatus === 'inactive') {
-      await db().from('partners').update({ status: 'pending', name: company_name.trim(), updated_at: new Date().toISOString() }).eq('id', existing.partner_id);
+
+    if (currentStatus === 'active') {
+      // Partenaire agréé : réactiver le mode business sans changer le statut
+      await db().from('users').update({ is_business: true }).eq('id', userId);
+      res.status(200).json({
+        success: true,
+        data: { partner_id: existing.partner_id, status: 'active' },
+        message: 'Mode business réactivé',
+      });
+      return;
     }
-    res.status(200).json({ success: true, data: { partner_id: existing.partner_id }, message: 'Déjà enregistré comme partenaire' });
+
+    if (currentStatus === 'pending') {
+      res.status(200).json({
+        success: true,
+        data: { partner_id: existing.partner_id, status: 'pending' },
+        message: 'Demande partenaire déjà en cours de traitement',
+      });
+      return;
+    }
+
+    // Statut inactive ou suspended : ne pas repasser en pending sans action admin
+    res.status(200).json({
+      success: true,
+      data: { partner_id: existing.partner_id, status: currentStatus },
+      message: 'Compte partenaire existant',
+    });
     return;
   }
 
@@ -317,15 +352,17 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     .eq('id', userId)
     .maybeSingle();
 
+  const emailForPortal = portal_email?.trim() || user?.email || null;
+
   // Créer le partenaire avec status pending
   const { data: partner, error } = await db()
     .from('partners')
     .insert({
       name: company_name.trim(),
-      email: user?.email ?? null,
+      email: emailForPortal,
       phone: user?.phone ?? null,
-      commission_rate: 0.20,
       status: 'pending',
+      ...(plan ? { plan } : {}),
     })
     .select()
     .single();
@@ -348,10 +385,15 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     return;
   }
 
+  // Marquer l'utilisateur comme business dans la table users
+  await db().from('users').update({ is_business: true }).eq('id', userId);
+
   res.status(201).json({ success: true, data: { partner_id: partner.id, status: partner.status } });
 };
 
 // ─── POST /api/partners/deregister — utilisateur authentifié ─────────────────
+// Désactive le mode business dans l'app SANS changer le statut d'agrément du partenaire.
+// L'agrément (partners.status = 'active') est permanent sauf action admin explicite.
 export const deregisterAsPartner = async (req: Request, res: Response): Promise<void> => {
   const userId = (req as any).user?.id;
   if (!userId) {
@@ -359,22 +401,7 @@ export const deregisterAsPartner = async (req: Request, res: Response): Promise<
     return;
   }
 
-  const { data: existing } = await db()
-    .from('partner_users')
-    .select('partner_id')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle();
-
-  if (!existing?.partner_id) {
-    res.status(200).json({ success: true, message: 'Aucun partenaire lié' });
-    return;
-  }
-
-  await db()
-    .from('partners')
-    .update({ status: 'inactive', updated_at: new Date().toISOString() })
-    .eq('id', existing.partner_id);
+  await db().from('users').update({ is_business: false }).eq('id', userId);
 
   res.json({ success: true });
 };
@@ -407,6 +434,8 @@ export const updatePartnerStatus = async (req: Request, res: Response): Promise<
 };
 
 // ─── PATCH /api/partners/:id/activate — admin only ───────────────────────────
+// Active le partenaire (pending → active) + crée l'abonnement si plan déjà choisi
+// + envoie l'invitation portail à partner.email (best-effort).
 export const activatePartner = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
 
@@ -422,6 +451,55 @@ export const activatePartner = async (req: Request, res: Response): Promise<void
     logger.error('[partnerController] activatePartner error:', error);
     res.status(500).json({ success: false, message: "Erreur lors de l'activation" });
     return;
+  }
+
+  // Créer l'abonnement depuis le plan choisi côté app (si aucun abonnement actif)
+  if (data.plan && PLAN_DEFAULTS[data.plan]) {
+    const { data: existingSub } = await db()
+      .from('partner_subscriptions')
+      .select('id')
+      .eq('partner_id', id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!existingSub) {
+      const defaults = PLAN_DEFAULTS[data.plan]!;
+      const { error: subError } = await db()
+        .from('partner_subscriptions')
+        .insert({
+          partner_id: id,
+          plan: data.plan,
+          monthly_price: defaults.monthly_price,
+          included_orders: defaults.included_orders,
+          excess_commission_rate: defaults.excess_commission_rate,
+          starts_at: new Date().toISOString(),
+          payment_status: 'pending_payment',
+          is_active: false,
+        });
+      if (subError) logger.warn('[partnerController] Création abonnement auto échouée:', subError.message);
+    }
+  }
+
+  // Envoyer l'invitation portail à l'email fourni lors de l'inscription (best-effort)
+  if (data.email && supabaseAdmin) {
+    const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
+    try {
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        data.email.toLowerCase(),
+        { redirectTo, data: { partner_id: id, partner_name: data.name, role: 'owner' } }
+      );
+      if (!inviteError && inviteData) {
+        await supabaseAdmin
+          .from('partner_users')
+          .upsert(
+            { partner_id: id, user_id: inviteData.user.id, role: 'owner' },
+            { onConflict: 'partner_id,user_id' }
+          );
+        logger.info(`[partnerController] Invitation portail envoyée à ${data.email}`);
+      }
+    } catch (inviteErr) {
+      logger.warn('[partnerController] Auto-invite portail échouée:', inviteErr);
+    }
   }
 
   res.json({ success: true, data });

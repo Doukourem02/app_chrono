@@ -71,7 +71,7 @@ export const verifyPartnerUser = async (
     if (partnerStatus !== 'active') {
       const STATUS_MESSAGES: Record<string, string> = {
         pending:   'Votre compte partenaire est en attente de validation par un administrateur Krono.',
-        inactive:  "Votre compte partenaire est inactif. Repassez en mode business depuis l'application pour le réactiver.",
+        inactive:  'Votre compte partenaire est inactif. Contactez le support Krono pour le réactiver.',
         suspended: 'Votre compte partenaire est suspendu. Contactez le support Krono.',
       };
       res.status(403).json({
