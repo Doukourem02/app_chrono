@@ -422,10 +422,22 @@ const checkUserByIdInPostgreSQL = async (
     }
 
     if (users && users.length > 0) {
+      // Récupérer le partner_id depuis partner_users (liaison B2B)
+      const { data: pu } = await supabase
+        .from('partner_users')
+        .select('partner_id, partners(status)')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+
       res.json({
         success: true,
         message: 'Utilisateur trouvé dans PostgreSQL',
-        user: users[0],
+        user: {
+          ...users[0],
+          partner_id: pu?.partner_id ?? null,
+          partner_status: (pu?.partners as any)?.status ?? null,
+        },
       });
     } else {
       res.json({

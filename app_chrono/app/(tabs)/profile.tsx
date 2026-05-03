@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Switch,Text,TouchableOpacity,View,} from "react-native";
 import { userApiService } from "../../services/userApiService";
+import { deregisterAsPartner } from "../../services/partnerApi";
 import { useAuthStore } from "../../store/useAuthStore";
 import { formatUserName, isSyntheticAuthEmail } from "../../utils/formatName";
 import { logger } from "../../utils/logger";
@@ -225,11 +226,12 @@ export default function ProfilePage() {
 
   const isBusiness = user?.is_business === true;
 
-  const handleModeToggle = (value: boolean) => {
-    if (value && !user?.company_name) {
+  const handleModeToggle = async (value: boolean) => {
+    if (value) {
       router.push('/(auth)/business-onboarding?mode=update' as any);
     } else {
-      setUser({ ...user!, is_business: value });
+      setUser({ ...user!, is_business: false, partner_id: null });
+      try { await deregisterAsPartner(); } catch { /* silencieux si hors ligne */ }
     }
   };
 

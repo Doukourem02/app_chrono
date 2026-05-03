@@ -281,6 +281,155 @@ export const invitePartnerUser = async (req: Request, res: Response): Promise<vo
   res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: email.trim().toLowerCase(), role } });
 };
 
+// ─── POST /api/partners/register — utilisateur authentifié ───────────────────
+export const registerAsPartner = async (req: Request, res: Response): Promise<void> => {
+  const userId = (req as any).user?.id;
+  if (!userId) {
+    res.status(401).json({ success: false, message: 'Non autorisé' });
+    return;
+  }
+
+  const { company_name } = req.body as { company_name?: string };
+  if (!company_name?.trim()) {
+    res.status(400).json({ success: false, message: "Le nom de l'entreprise est requis" });
+    return;
+  }
+
+  // Vérifier si l'utilisateur est déjà lié à un partenaire
+  const { data: existing } = await db()
+    .from('partner_users')
+    .select('partner_id, partners(id, status)')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.partner_id) {
+    const currentStatus = (existing.partners as any)?.status;
+    // Si le partenaire existe mais est inactif, on le repasse en pending pour réapprobation
+    if (currentStatus === 'inactive') {
+      await db().from('partners').update({ status: 'pending', name: company_name.trim(), updated_at: new Date().toISOString() }).eq('id', existing.partner_id);
+    }
+    res.status(200).json({ success: true, data: { partner_id: existing.partner_id }, message: 'Déjà enregistré comme partenaire' });
+    return;
+  }
+
+  // Récupérer email et téléphone de l'utilisateur
+  const { data: user } = await db()
+    .from('users')
+    .select('email, phone')
+    .eq('id', userId)
+    .maybeSingle();
+
+  // Créer le partenaire avec status pending
+  const { data: partner, error } = await db()
+    .from('partners')
+    .insert({
+      name: company_name.trim(),
+      email: user?.email ?? null,
+      phone: user?.phone ?? null,
+      commission_rate: 0.20,
+      status: 'pending',
+    })
+    .select()
+    .single();
+
+  if (error || !partner) {
+    logger.error('[partnerController] registerAsPartner error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la création du partenaire' });
+    return;
+  }
+
+  // Lier l'utilisateur comme owner
+  const { error: puError } = await db()
+    .from('partner_users')
+    .insert({ partner_id: partner.id, user_id: userId, role: 'owner' });
+
+  if (puError) {
+    logger.error('[partnerController] registerAsPartner partner_users error:', puError);
+    await db().from('partners').delete().eq('id', partner.id);
+    res.status(500).json({ success: false, message: 'Erreur lors du lien utilisateur-partenaire' });
+    return;
+  }
+
+  res.status(201).json({ success: true, data: { partner_id: partner.id, status: partner.status } });
+};
+
+// ─── POST /api/partners/deregister — utilisateur authentifié ─────────────────
+export const deregisterAsPartner = async (req: Request, res: Response): Promise<void> => {
+  const userId = (req as any).user?.id;
+  if (!userId) {
+    res.status(401).json({ success: false, message: 'Non autorisé' });
+    return;
+  }
+
+  const { data: existing } = await db()
+    .from('partner_users')
+    .select('partner_id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (!existing?.partner_id) {
+    res.status(200).json({ success: true, message: 'Aucun partenaire lié' });
+    return;
+  }
+
+  await db()
+    .from('partners')
+    .update({ status: 'inactive', updated_at: new Date().toISOString() })
+    .eq('id', existing.partner_id);
+
+  res.json({ success: true });
+};
+
+// ─── PATCH /api/partners/:id/status — admin only ──────────────────────────────
+export const updatePartnerStatus = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { status } = req.body as { status?: string };
+  const allowed = ['active', 'inactive', 'suspended', 'pending'];
+
+  if (!status || !allowed.includes(status)) {
+    res.status(400).json({ success: false, message: `Statut invalide. Valeurs possibles : ${allowed.join(', ')}` });
+    return;
+  }
+
+  const { data, error } = await db()
+    .from('partners')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    logger.error('[partnerController] updatePartnerStatus error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors du changement de statut' });
+    return;
+  }
+
+  res.json({ success: true, data });
+};
+
+// ─── PATCH /api/partners/:id/activate — admin only ───────────────────────────
+export const activatePartner = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+
+  const { data, error } = await db()
+    .from('partners')
+    .update({ status: 'active', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'pending')
+    .select()
+    .single();
+
+  if (error || !data) {
+    logger.error('[partnerController] activatePartner error:', error);
+    res.status(500).json({ success: false, message: "Erreur lors de l'activation" });
+    return;
+  }
+
+  res.json({ success: true, data });
+};
+
 // ─── GET /api/partners/:id/invoices — admin or partner ────────────────────────
 export const getPartnerInvoices = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;

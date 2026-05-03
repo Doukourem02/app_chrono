@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Building2, Eye, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { Search, Plus, Building2, Eye, CheckCircle, Clock, XCircle, Zap } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition, SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
@@ -16,9 +16,10 @@ const PLAN_LABELS: Record<string, string> = {
 }
 
 const STATUS_CONFIG = {
-  active:    { label: 'Actif',    color: themeColors.greenPrimary,  bg: themeColors.greenLight,  Icon: CheckCircle },
-  inactive:  { label: 'Inactif', color: themeColors.grayDark,      bg: themeColors.grayLight,   Icon: Clock       },
-  suspended: { label: 'Suspendu', color: themeColors.redPrimary,    bg: themeColors.redLight,    Icon: XCircle     },
+  active:    { label: 'Actif',       color: themeColors.greenPrimary,  bg: themeColors.greenLight,  Icon: CheckCircle },
+  pending:   { label: 'En attente',  color: '#D97706',                 bg: '#FEF3C7',               Icon: Zap         },
+  inactive:  { label: 'Inactif',    color: themeColors.grayDark,      bg: themeColors.grayLight,   Icon: Clock       },
+  suspended: { label: 'Suspendu',   color: themeColors.redPrimary,    bg: themeColors.redLight,    Icon: XCircle     },
 }
 
 // ─── Modal créer partenaire ───────────────────────────────────────────────────
@@ -115,6 +116,15 @@ export default function PartnersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [planFilter, setPlanFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
+  const [activating, setActivating] = useState<string | null>(null)
+
+  const handleActivate = async (e: React.MouseEvent, partnerId: string) => {
+    e.stopPropagation()
+    setActivating(partnerId)
+    await adminApiService.activatePartner(partnerId)
+    queryClient.invalidateQueries({ queryKey: ['partners'] })
+    setActivating(null)
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['partners', statusFilter, planFilter],
@@ -236,9 +246,23 @@ export default function PartnersPage() {
                         {new Date(partner.created_at).toLocaleDateString('fr-FR')}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
-                        <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 13, cursor: 'pointer' }}>
-                          <Eye size={14} /> Voir
-                        </button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          {partner.status === 'pending' && (
+                            <button
+                              onClick={(e) => handleActivate(e, partner.id)}
+                              disabled={activating === partner.id}
+                              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: 'none', backgroundColor: '#D97706', color: '#fff', fontSize: 13, fontWeight: 600, cursor: activating === partner.id ? 'not-allowed' : 'pointer', opacity: activating === partner.id ? 0.7 : 1 }}
+                            >
+                              <Zap size={13} /> {activating === partner.id ? '…' : 'Activer'}
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); router.push(`/partners/${partner.id}`) }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 13, cursor: 'pointer' }}
+                          >
+                            <Eye size={14} /> Voir
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

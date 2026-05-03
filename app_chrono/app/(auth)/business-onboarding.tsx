@@ -13,6 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
+import { registerAsPartner } from '../../services/partnerApi';
 
 type Step = 'question' | 'company';
 
@@ -46,13 +47,21 @@ export default function BusinessOnboardingScreen() {
 
     setIsLoading(true);
 
-    if (user) {
-      setUser({
-        ...user,
-        is_business: true,
-        company_name: name,
-        partner_id: user.partner_id ?? null,
-      });
+    try {
+      const result = await registerAsPartner(name);
+      if (user) {
+        setUser({
+          ...user,
+          is_business: true,
+          company_name: name,
+          partner_id: result.partner_id,
+        });
+      }
+    } catch {
+      // En cas d'erreur réseau, on enregistre quand même localement
+      if (user) {
+        setUser({ ...user, is_business: true, company_name: name, partner_id: user.partner_id ?? null });
+      }
     }
 
     setIsLoading(false);

@@ -66,7 +66,7 @@ export interface Partner {
   name: string
   email?: string | null
   phone?: string | null
-  status: 'active' | 'inactive' | 'suspended'
+  status: 'active' | 'inactive' | 'suspended' | 'pending'
   plan?: string | null
   commission_rate: number
   notes?: string | null

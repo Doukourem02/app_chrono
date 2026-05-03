@@ -8,6 +8,30 @@ async function authHeader(): Promise<{ Authorization: string } | Record<string, 
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// ─── Inscription comme partenaire depuis l'app ────────────────────────────────
+export async function registerAsPartner(companyName: string): Promise<{ partner_id: string; status: string }> {
+  const headers = await authHeader();
+  const response = await apiFetch(`${config.apiUrl}/api/partners/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ company_name: companyName }),
+  });
+  const body = await response.json() as { success?: boolean; data?: { partner_id: string; status: string }; message?: string };
+  if (!response.ok || !body.success) {
+    throw new Error(body.message ?? 'Erreur inscription partenaire');
+  }
+  return body.data!;
+}
+
+// ─── Se désenregistrer comme partenaire (retour utilisateur simple) ───────────
+export async function deregisterAsPartner(): Promise<void> {
+  const headers = await authHeader();
+  await apiFetch(`${config.apiUrl}/api/partners/deregister`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+  });
+}
+
 // ─── Commande B2B unique (Profil 1) ──────────────────────────────────────────
 
 export interface B2BOrderParams {

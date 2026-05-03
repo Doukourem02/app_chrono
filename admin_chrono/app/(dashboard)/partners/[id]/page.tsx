@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle, Mail } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle, Mail, Zap, ShieldOff, XCircle, RefreshCw } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
@@ -223,6 +223,15 @@ export default function PartnerDetailPage() {
   const queryClient = useQueryClient()
   const [showCreateSub, setShowCreateSub] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
+  const [statusLoading, setStatusLoading] = useState(false)
+
+  const handleStatusChange = async (status: 'active' | 'inactive' | 'suspended') => {
+    setStatusLoading(true)
+    await adminApiService.updatePartnerStatus(id, status)
+    queryClient.invalidateQueries({ queryKey: ['partner', id] })
+    queryClient.invalidateQueries({ queryKey: ['partners'] })
+    setStatusLoading(false)
+  }
 
   const { data: partnerData, isLoading } = useQuery({
     queryKey: ['partner', id],
@@ -294,6 +303,32 @@ export default function PartnerDetailPage() {
           <Mail size={14} /> Inviter au portail
         </button>
       </div>
+
+      {/* Gestion du statut */}
+      {(() => {
+        const s = partner.status
+        const actions: { label: string; status: 'active' | 'inactive' | 'suspended'; Icon: React.ElementType; bg: string; color: string }[] = []
+        if (s === 'pending')   actions.push({ label: 'Activer',     status: 'active',    Icon: Zap,       bg: '#D97706', color: '#fff' })
+        if (s === 'active')    actions.push({ label: 'Suspendre',   status: 'suspended', Icon: ShieldOff, bg: themeColors.redLight,  color: themeColors.redPrimary })
+        if (s === 'active')    actions.push({ label: 'Désactiver',  status: 'inactive',  Icon: XCircle,   bg: themeColors.grayLight, color: themeColors.grayDark })
+        if (s === 'suspended' || s === 'inactive') actions.push({ label: 'Réactiver', status: 'active', Icon: RefreshCw, bg: themeColors.greenLight, color: themeColors.greenPrimary })
+        if (actions.length === 0) return null
+        return (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '12px 16px', backgroundColor: themeColors.cardBg, borderRadius: 12, border: `1px solid ${themeColors.cardBorder}`, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: themeColors.textSecondary, fontWeight: 600, marginRight: 4 }}>Statut :</span>
+            {actions.map(({ label, status, Icon, bg, color }) => (
+              <button
+                key={status}
+                onClick={() => handleStatusChange(status)}
+                disabled={statusLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${bg === '#fff' ? '#D97706' : bg}`, backgroundColor: bg, color, fontSize: 13, fontWeight: 600, cursor: statusLoading ? 'not-allowed' : 'pointer', opacity: statusLoading ? 0.6 : 1 }}
+              >
+                <Icon size={14} /> {statusLoading ? '…' : label}
+              </button>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* KPI cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>

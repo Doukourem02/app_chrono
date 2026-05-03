@@ -10,9 +10,18 @@ import {
   getPartnerUsage,
   getPartnerInvoices,
   invitePartnerUser,
+  registerAsPartner,
+  activatePartner,
+  deregisterAsPartner,
+  updatePartnerStatus,
 } from '../controllers/partnerController.js';
+import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
+
+// ── Routes utilisateur authentifié ──────────────────────────────────────────
+router.post('/register',                                  verifyJWT, registerAsPartner);
+router.post('/deregister',                                verifyJWT, deregisterAsPartner);
 
 // ── Routes admin (verifyAdminSupabase) ──────────────────────────────────────
 router.post('/',                                          verifyAdminSupabase, createPartner);
@@ -20,6 +29,8 @@ router.get('/',                                           verifyAdminSupabase, l
 router.get('/:id',                                        verifyAdminSupabase, getPartner);
 router.post('/:id/subscriptions',                         verifyAdminSupabase, createSubscription);
 router.patch('/:id/subscriptions/:subId/activate',        verifyAdminSupabase, activateSubscription);
+router.patch('/:id/activate',                             verifyAdminSupabase, activatePartner);
+router.patch('/:id/status',                               verifyAdminSupabase, updatePartnerStatus);
 router.get('/:id/usage',                                  verifyAdminSupabase, getPartnerUsage);
 router.get('/:id/invoices',                               verifyAdminSupabase, getPartnerInvoices);
 router.post('/:id/invite',                                verifyAdminSupabase, invitePartnerUser);

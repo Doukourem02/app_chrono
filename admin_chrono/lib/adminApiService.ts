@@ -2392,6 +2392,36 @@ class AdminApiService {
     }
   }
 
+  async updatePartnerStatus(partnerId: string, status: 'active' | 'inactive' | 'suspended' | 'pending'): Promise<ApiResponse<import('@/types').Partner>> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${API_BASE_URL}/api/partners/${partnerId}/status`,
+        { method: 'PATCH', body: JSON.stringify({ status }) }
+      )
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').Partner }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] updatePartnerStatus:', error)
+      return { success: false }
+    }
+  }
+
+  async activatePartner(partnerId: string): Promise<ApiResponse<import('@/types').Partner>> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${API_BASE_URL}/api/partners/${partnerId}/activate`,
+        { method: 'PATCH' }
+      )
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').Partner }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] activatePartner:', error)
+      return { success: false }
+    }
+  }
+
   async activatePartnerSubscription(partnerId: string, subId: string): Promise<ApiResponse<import('@/types').PartnerSubscription>> {
     try {
       const response = await this.fetchWithAuth(
