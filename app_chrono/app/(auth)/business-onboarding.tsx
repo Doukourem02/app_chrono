@@ -9,7 +9,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -22,10 +22,18 @@ export default function BusinessOnboardingScreen() {
   const [step, setStep] = useState<Step>('question');
   const [companyName, setCompanyName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isUpdate = mode === 'update';
+
+  const next = (path: '/(tabs)' | '/(auth)/success') => {
+    router.replace((isUpdate ? '/(tabs)' : path) as any);
+  };
 
   const handleNo = () => {
-    // Compte client standard : on va directement au succès
-    router.replace('/(auth)/success' as any);
+    if (user) {
+      setUser({ ...user, is_business: false });
+    }
+    next('/(auth)/success');
   };
 
   const handleYes = () => {
@@ -43,13 +51,12 @@ export default function BusinessOnboardingScreen() {
         ...user,
         is_business: true,
         company_name: name,
-        // partner_id sera défini par l'admin dans le back-office
         partner_id: user.partner_id ?? null,
       });
     }
 
     setIsLoading(false);
-    router.replace('/(auth)/success' as any);
+    next('/(auth)/success');
   };
 
   if (step === 'company') {
@@ -112,9 +119,13 @@ export default function BusinessOnboardingScreen() {
           <Ionicons name="cube-outline" size={40} color="#8B5CF6" />
         </View>
 
-        <Text style={styles.headline}>Tu vends des colis à des clients ?</Text>
+        <Text style={styles.headline}>
+          {isUpdate ? 'Mettez à jour votre profil' : 'Tu vends des colis à des clients ?'}
+        </Text>
         <Text style={styles.subline}>
-          Si tu es e-commerce, boutique ou professionnel, active le mode business pour gérer tes livraisons en lot et bénéficier de tarifs partenaires.
+          {isUpdate
+            ? 'Krono évolue ! Dites-nous comment vous utilisez l\'app pour personnaliser votre expérience.'
+            : 'Si tu es e-commerce, boutique ou professionnel, active le mode business pour gérer tes livraisons en lot et bénéficier de tarifs partenaires.'}
         </Text>
 
         {/* Oui */}
@@ -142,7 +153,9 @@ export default function BusinessOnboardingScreen() {
         </TouchableOpacity>
 
         <Text style={styles.hint}>
-          Tu pourras activer ou désactiver le mode business à tout moment depuis ton profil.
+          {isUpdate
+            ? 'Vous pouvez changer ce paramètre à tout moment depuis votre profil.'
+            : 'Tu pourras activer ou désactiver le mode business à tout moment depuis ton profil.'}
         </Text>
       </View>
     </View>

@@ -53,7 +53,15 @@ export default function RootIndex() {
         if (cancelled) return;
 
         if (validationResult === true || validationResult === null || validationResult === 'not_found') {
-          router.replace('/(tabs)' as any);
+          const { user: freshUser } = useAuthStore.getState();
+          const hasCompletedProfile = !!(freshUser?.first_name && freshUser?.last_name);
+          const hasChosenMode = freshUser?.is_business === true || freshUser?.is_business === false;
+
+          if (hasCompletedProfile && !hasChosenMode) {
+            router.replace('/(auth)/business-onboarding?mode=update' as any);
+          } else {
+            router.replace('/(tabs)' as any);
+          }
         } else {
           logout();
           router.replace('/(auth)' as any);
