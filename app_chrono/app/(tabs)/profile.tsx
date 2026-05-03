@@ -3,7 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Text,TouchableOpacity,View,} from "react-native";
+import {ActivityIndicator,Alert,Image,ScrollView,StatusBar,StyleSheet,Switch,Text,TouchableOpacity,View,} from "react-native";
 import { userApiService } from "../../services/userApiService";
 import { useAuthStore } from "../../store/useAuthStore";
 import { formatUserName, isSyntheticAuthEmail } from "../../utils/formatName";
@@ -223,6 +223,16 @@ export default function ProfilePage() {
     ]);
   };
 
+  const isBusiness = user?.is_business === true;
+
+  const handleModeToggle = (value: boolean) => {
+    if (value && !user?.company_name) {
+      router.push('/(auth)/business-onboarding?mode=update' as any);
+    } else {
+      setUser({ ...user!, is_business: value });
+    }
+  };
+
   const menuItems = [
     {
       icon: "person-outline",
@@ -355,6 +365,35 @@ export default function ProfilePage() {
         </View>
 
 
+        {/* Mode d'utilisation */}
+        <View style={styles.modeCard}>
+          <View style={styles.modeLeft}>
+            <View style={[styles.modeIcon, { backgroundColor: isBusiness ? '#F5E8FF' : '#F3F4F6' }]}>
+              <Ionicons
+                name={isBusiness ? 'storefront-outline' : 'person-outline'}
+                size={22}
+                color={isBusiness ? '#8B5CF6' : '#6B7280'}
+              />
+            </View>
+            <View>
+              <Text style={styles.modeTitle}>
+                Mode {isBusiness ? 'Business' : 'Personnel'}
+              </Text>
+              <Text style={styles.modeSub}>
+                {isBusiness
+                  ? (user?.company_name ?? 'Professionnel')
+                  : 'Utilisation personnelle'}
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={isBusiness}
+            onValueChange={handleModeToggle}
+            trackColor={{ false: '#E5E7EB', true: '#8B5CF6' }}
+            thumbColor={isBusiness ? '#FFFFFF' : '#9CA3AF'}
+          />
+        </View>
+
         {/* Menu principal */}
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
@@ -482,6 +521,40 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontWeight: "500",
     marginTop: 2,
+  },
+  modeCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  modeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  modeSub: {
+    fontSize: 13,
+    color: '#6B7280',
   },
   menuContainer: {
     backgroundColor: "#FFFFFF",
