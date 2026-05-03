@@ -10,7 +10,7 @@ const PLAN_DEFAULTS: Record<string, { monthly_price: number; included_orders: nu
   business: { monthly_price: 100000, included_orders: null, excess_commission_rate: 0.10 },
 };
 
-/** Sans forfait mensuel : commission prélevée sur chaque course (pas d’abonnement). Ajustable côté admin sur la fiche partenaire. */
+/** Sans forfait mensuel : commission prélevée sur chaque course (pas d'abonnement). Ajustable côté admin sur la fiche partenaire. */
 const PAY_PER_DELIVERY_COMMISSION_RATE = 0.2;
 
 /** Statut partenaire depuis une jointure Supabase (objet ou tableau). */
@@ -334,7 +334,11 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     const currentStatus = statusFromPartnerJoin(existing.partners);
 
     if (currentStatus === 'active') {
-      // Partenaire agréé : réactiver le mode business sans changer le statut
+      if (subscribedPlan) {
+        await db().from('partners').update({ plan: subscribedPlan }).eq('id', existing.partner_id);
+      } else if (explicitNoPlan) {
+        await db().from('partners').update({ plan: 'none', commission_rate: PAY_PER_DELIVERY_COMMISSION_RATE }).eq('id', existing.partner_id);
+      }
       await db().from('users').update({ is_business: true }).eq('id', userId);
       res.status(200).json({
         success: true,
@@ -345,6 +349,11 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     }
 
     if (currentStatus === 'pending') {
+      if (subscribedPlan) {
+        await db().from('partners').update({ plan: subscribedPlan }).eq('id', existing.partner_id);
+      } else if (explicitNoPlan) {
+        await db().from('partners').update({ plan: 'none', commission_rate: PAY_PER_DELIVERY_COMMISSION_RATE }).eq('id', existing.partner_id);
+      }
       await db().from('users').update({ is_business: true }).eq('id', userId);
       res.status(200).json({
         success: true,
@@ -355,22 +364,17 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     }
 
     if (currentStatus === 'inactive') {
-      // Même partenaire : passage mode perso → business remet l’agrément actif (sync avec le switch app)
-      await db()
-        .from('partners')
-        .update({ status: 'active', updated_at: new Date().toISOString() })
-        .eq('id', existing.partner_id)
-        .eq('status', 'inactive');
+      // Toggle mode business uniquement : ne pas remettre partners.status sans validation admin
       await db().from('users').update({ is_business: true }).eq('id', userId);
       res.status(200).json({
         success: true,
-        data: { partner_id: existing.partner_id, status: 'active' },
-        message: 'Mode business réactivé',
+        data: { partner_id: existing.partner_id, status: 'inactive' },
+        message: 'Mode business active - agrement en attente de reactivation admin',
       });
       return;
     }
 
-    // suspended : inchangé (réservé à l’admin)
+    // suspended : inchangé (réservé à l'admin)
     res.status(200).json({
       success: true,
       data: { partner_id: existing.partner_id, status: currentStatus },
@@ -429,31 +433,29 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
   res.status(201).json({ success: true, data: { partner_id: partner.id, status: partner.status } });
 };
 
+// ─── PATCH /api/partners/business-mode — utilisateur authentifié ─────────────
+// Toggle simple is_business sans toucher partners.status.
+export const setBusinessMode = async (req: Request, res: Response): Promise<void> => {
+  const userId = (req as any).user?.id;
+  if (!userId) { res.status(401).json({ success: false, message: 'Non autorise' }); return; }
+
+  const { active } = req.body as { active?: boolean };
+  if (typeof active !== 'boolean') {
+    res.status(400).json({ success: false, message: 'Parametre active (boolean) requis' });
+    return;
+  }
+
+  await db().from('users').update({ is_business: active }).eq('id', userId);
+  res.json({ success: true });
+};
+
 // ─── POST /api/partners/deregister — utilisateur authentifié ─────────────────
-// Mode perso : is_business = false + partenaire déjà agréé (active) → partners.status = inactive (sync admin / Realtime).
-// Ne modifie pas pending ni suspended.
+// Mode perso simple : is_business = false. Ne touche pas partners.status.
 export const deregisterAsPartner = async (req: Request, res: Response): Promise<void> => {
   const userId = (req as any).user?.id;
   if (!userId) {
     res.status(401).json({ success: false, message: 'Non autorisé' });
     return;
-  }
-
-  const { data: link } = await db()
-    .from('partner_users')
-    .select('partner_id, partners(status)')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle();
-
-  const pStatus = statusFromPartnerJoin(link?.partners);
-
-  if (link?.partner_id && pStatus === 'active') {
-    await db()
-      .from('partners')
-      .update({ status: 'inactive', updated_at: new Date().toISOString() })
-      .eq('id', link.partner_id)
-      .eq('status', 'active');
   }
 
   await db().from('users').update({ is_business: false }).eq('id', userId);
@@ -528,8 +530,8 @@ export const activatePartner = async (req: Request, res: Response): Promise<void
           included_orders: defaults.included_orders,
           excess_commission_rate: defaults.excess_commission_rate,
           starts_at: new Date().toISOString(),
-          payment_status: 'pending_payment',
-          is_active: false,
+          payment_status: 'active',
+          is_active: true,
         });
       if (subError) logger.warn('[partnerController] Création abonnement auto échouée:', subError.message);
     }

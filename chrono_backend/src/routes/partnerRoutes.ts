@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyPartnerUser } from '../middleware/verifyPartnerUser.js';
-import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,} from '../controllers/partnerController.js';
+import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,} from '../controllers/partnerController.js';
 import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
@@ -9,6 +9,7 @@ const router: Router = express.Router();
 // ── Routes utilisateur authentifié ──────────────────────────────────────────
 router.post('/register',                                  verifyJWT, registerAsPartner);
 router.post('/deregister',                                verifyJWT, deregisterAsPartner);
+router.patch('/business-mode',                            verifyJWT, setBusinessMode);
 
 // ── Routes admin (verifyAdminSupabase) ──────────────────────────────────────
 router.post('/',                                          verifyAdminSupabase, createPartner);

@@ -183,6 +183,7 @@ export default function PartnersPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [activating, setActivating] = useState<string | null>(null)
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null)
@@ -206,9 +207,10 @@ export default function PartnersPage() {
   }, [queryClient])
 
   const { data, isLoading } = useQuery({
-    queryKey: ['partners', planFilter],
+    queryKey: ['partners', planFilter, statusFilter],
     queryFn: () => adminApiService.getPartners({
       plan: planFilter === 'all' ? undefined : planFilter,
+      status: statusFilter === 'all' ? undefined : statusFilter,
     }),
     staleTime: 30_000,
   })
@@ -257,6 +259,22 @@ export default function PartnersPage() {
               style={{ width: '100%', paddingLeft: 34, paddingRight: 12, paddingTop: 9, paddingBottom: 9, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="Filtrer par statut"
+            style={{ padding: '9px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer', outline: 'none' }}
+          >
+            {[
+              ['all', 'Tous les statuts'],
+              ['pending', 'En attente'],
+              ['active', 'Actif'],
+              ['inactive', 'Inactif'],
+              ['suspended', 'Suspendu'],
+            ].map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
           <select
             value={planFilter}
             onChange={(e) => setPlanFilter(e.target.value)}
