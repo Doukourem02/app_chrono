@@ -10,6 +10,9 @@ const PLAN_DEFAULTS: Record<string, { monthly_price: number; included_orders: nu
   business: { monthly_price: 100000, included_orders: null, excess_commission_rate: 0.10 },
 };
 
+/** Sans forfait mensuel : commission prélevée sur chaque course (pas d’abonnement). Ajustable côté admin sur la fiche partenaire. */
+const PAY_PER_DELIVERY_COMMISSION_RATE = 0.2;
+
 /** Statut partenaire depuis une jointure Supabase (objet ou tableau). */
 function statusFromPartnerJoin(partners: unknown): string | undefined {
   if (partners == null) return undefined;
@@ -63,7 +66,8 @@ export const listPartners = async (req: Request, res: Response): Promise<void> =
   let query = db().from('partners').select('*').order('created_at', { ascending: false });
 
   if (status) query = query.eq('status', status as string);
-  if (plan)   query = query.eq('plan', plan as string);
+  if (plan === 'none') query = query.is('plan', null);
+  else if (plan) query = query.eq('plan', plan as string);
 
   const { data, error } = await query;
 
@@ -307,13 +311,16 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
     return;
   }
 
-  if (plan && !PLAN_DEFAULTS[plan]) {
+  if (plan && plan !== 'none' && !PLAN_DEFAULTS[plan]) {
     res.status(400).json({
       success: false,
-      message: `Plan invalide. Valeurs acceptées : ${Object.keys(PLAN_DEFAULTS).join(', ')}`,
+      message: `Plan invalide. Valeurs acceptées : none, ${Object.keys(PLAN_DEFAULTS).join(', ')}`,
     });
     return;
   }
+
+  const explicitNoPlan = plan === 'none';
+  const subscribedPlan = plan && plan !== 'none' && PLAN_DEFAULTS[plan] ? plan : null;
 
   // Vérifier si l'utilisateur est déjà lié à un partenaire
   const { data: existing } = await db()
@@ -381,7 +388,7 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
 
   const emailForPortal = portal_email?.trim() || user?.email || null;
 
-  // Créer le partenaire avec status pending
+  // Créer le partenaire avec status pending (forfait optionnel ; « none » = commission à la course uniquement)
   const { data: partner, error } = await db()
     .from('partners')
     .insert({
@@ -389,7 +396,11 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
       email: emailForPortal,
       phone: user?.phone ?? null,
       status: 'pending',
-      ...(plan ? { plan } : {}),
+      ...(explicitNoPlan
+        ? { plan: null, commission_rate: PAY_PER_DELIVERY_COMMISSION_RATE }
+        : subscribedPlan
+          ? { plan: subscribedPlan, commission_rate: null }
+          : {}),
     })
     .select()
     .single();

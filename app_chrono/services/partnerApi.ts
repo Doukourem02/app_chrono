@@ -20,7 +20,7 @@ export async function registerAsPartner(
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({
       company_name: companyName,
-      ...(plan ? { plan } : {}),
+      ...(plan != null && plan !== '' ? { plan } : {}),
       ...(portalEmail ? { portal_email: portalEmail } : {}),
     }),
   });

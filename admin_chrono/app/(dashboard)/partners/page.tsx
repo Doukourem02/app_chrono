@@ -265,6 +265,7 @@ export default function PartnersPage() {
           >
             {[
               ['all', 'Tous les plans'],
+              ['none', 'Sans forfait'],
               ['starter', 'Starter'],
               ['pro', 'Pro'],
               ['business', 'Business'],
@@ -311,10 +312,14 @@ export default function PartnersPage() {
                         {partner.email && <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>{partner.email}</div>}
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textPrimary }}>
-                        {partner.plan
-                          ? <span style={{ fontWeight: 600 }}>{PLAN_LABELS[partner.plan] ?? partner.plan}</span>
-                          : <span style={{ color: themeColors.textSecondary, fontStyle: 'italic' }}>—</span>}
-                        {partner.status === 'pending' && partner.plan && (
+                        {partner.plan ? (
+                          <span style={{ fontWeight: 600 }}>{PLAN_LABELS[partner.plan] ?? partner.plan}</span>
+                        ) : partner.commission_rate != null ? (
+                          <span style={{ fontWeight: 600 }}>Sans forfait</span>
+                        ) : (
+                          <span style={{ color: themeColors.textSecondary, fontStyle: 'italic' }}>—</span>
+                        )}
+                        {partner.status === 'pending' && (partner.plan || partner.commission_rate != null) && (
                           <span style={{ marginLeft: 6, fontSize: 11, color: '#D97706', backgroundColor: '#FEF3C7', padding: '2px 6px', borderRadius: 8 }}>demandé</span>
                         )}
                       </td>

@@ -46,6 +46,15 @@ const PLANS = [
     excess: '10% sur dépassement de capacité',
     icon: 'business-outline' as const,
   },
+  {
+    key: 'none',
+    label: 'Sans forfait',
+    price: 'Pas d’abonnement mensuel',
+    quota: 'Vous payez une commission sur chaque livraison',
+    inQuota: 'Idéal si votre volume est faible ou irrégulier',
+    excess: 'Taux par défaut 20 % par course (ajustable avec Krono après validation)',
+    icon: 'swap-horizontal-outline' as const,
+  },
 ];
 
 export default function BusinessOnboardingScreen() {
@@ -115,9 +124,9 @@ export default function BusinessOnboardingScreen() {
 
           <Text style={styles.wordmark}>Krono</Text>
 
-          <Text style={styles.headline}>Choisissez votre forfait</Text>
+          <Text style={styles.headline}>Forfait ou paiement à la course</Text>
           <Text style={styles.subline}>
-            La commission est prélevée sur vos livraisons selon le forfait souscrit. Vous pouvez changer de forfait à tout moment.
+            Les forfaits aident à encadrer quota et commissions. Si vous préférez ne pas vous abonner, vous pouvez rester sans forfait : vous serez facturé sur chaque course selon un taux convenu avec Krono.
           </Text>
 
           {/* Cartes de plan */}
@@ -152,7 +161,7 @@ export default function BusinessOnboardingScreen() {
           {/* Info "comment ça marche" */}
           <View style={styles.infoBox}>
             <Text style={styles.infoTitle}>Comment ça marche ?</Text>
-            <Text style={styles.infoStep}>① Vous choisissez votre forfait ici</Text>
+            <Text style={styles.infoStep}>① Vous choisissez un forfait ou l’option sans forfait</Text>
             <Text style={styles.infoStep}>② Un admin Krono valide votre demande</Text>
             <Text style={styles.infoStep}>③ Vous recevez un lien d{"'"}accès au portail partenaire</Text>
           </View>
