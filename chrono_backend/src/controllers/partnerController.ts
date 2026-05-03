@@ -55,7 +55,7 @@ export const listPartners = async (req: Request, res: Response): Promise<void> =
   if (status) query = query.eq('status', status as string);
   if (plan)   query = query.eq('plan', plan as string);
 
-  const { data, error } = await query;
+  const { data: partners, error } = await query;
 
   if (error) {
     logger.error('[partnerController] listPartners error:', error);
@@ -63,7 +63,58 @@ export const listPartners = async (req: Request, res: Response): Promise<void> =
     return;
   }
 
-  res.json({ success: true, data });
+  const rows = partners ?? [];
+  if (rows.length === 0) {
+    res.json({ success: true, data: [] });
+    return;
+  }
+
+  const partnerIds = rows.map((p: { id: string }) => p.id);
+  const { data: puRows, error: puError } = await db()
+    .from('partner_users')
+    .select('partner_id, user_id, role')
+    .in('partner_id', partnerIds);
+
+  if (puError) {
+    logger.warn('[partnerController] listPartners partner_users:', puError.message);
+  }
+
+  const userIds = [...new Set((puRows ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean))];
+  const userMap = new Map<string, boolean>();
+  if (userIds.length > 0) {
+    const { data: usersData, error: uError } = await db()
+      .from('users')
+      .select('id, is_business')
+      .in('id', userIds);
+    if (uError) {
+      logger.warn('[partnerController] listPartners users:', uError.message);
+    } else {
+      for (const u of usersData ?? []) {
+        const row = u as { id: string; is_business?: boolean | null };
+        userMap.set(row.id, Boolean(row.is_business));
+      }
+    }
+  }
+
+  const byPartner = new Map<string, { user_id: string; role: string | null }[]>();
+  for (const r of puRows ?? []) {
+    const pid = (r as { partner_id: string }).partner_id;
+    if (!byPartner.has(pid)) byPartner.set(pid, []);
+    byPartner.get(pid)!.push({
+      user_id: (r as { user_id: string }).user_id,
+      role: ((r as { role?: string | null }).role ?? null) as string | null,
+    });
+  }
+
+  const enriched = rows.map((p: { id: string }) => {
+    const links = byPartner.get(p.id) ?? [];
+    const owner = links.find((l) => l.role === 'owner');
+    const pick = owner ?? links[0];
+    const is_business = pick ? (userMap.get(pick.user_id) ?? false) : null;
+    return { ...p, is_business };
+  });
+
+  res.json({ success: true, data: enriched });
 };
 
 // ─── GET /api/partners/:id — admin or partner ─────────────────────────────────

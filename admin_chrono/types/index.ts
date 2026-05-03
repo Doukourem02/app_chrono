@@ -71,6 +71,8 @@ export interface Partner {
   commission_rate: number
   notes?: string | null
   created_at: string
+  /** `users.is_business` (toggle app), utilisateur owner ou premier lien — liste admin. */
+  is_business?: boolean | null
 }
 
 export interface PartnerSubscription {

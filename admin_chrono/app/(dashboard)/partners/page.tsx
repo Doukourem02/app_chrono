@@ -23,7 +23,47 @@ const STATUS_CONFIG = {
   suspended: { label: 'Suspendu',   color: themeColors.redPrimary,    bg: themeColors.redLight,    Icon: XCircle     },
 }
 
-const STATUS_SELECT_ORDER = ['active', 'pending', 'inactive', 'suspended'] as const
+function BusinessModeToggleReadOnly({ on }: { on: boolean | null }) {
+  if (on === null) {
+    return <span style={{ fontSize: 13, color: themeColors.textSecondary }}>—</span>
+  }
+  const h = 26
+  const w = 44
+  const knob = 20
+  return (
+    <span
+      title="État du toggle « mode business » sur l’application (lecture seule)."
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+    >
+      <span
+        style={{
+          width: w,
+          height: h,
+          borderRadius: h / 2,
+          backgroundColor: on ? themeColors.purplePrimary : themeColors.grayLight,
+          position: 'relative',
+          flexShrink: 0,
+        }}
+      >
+        <span
+          style={{
+            position: 'absolute',
+            top: (h - knob) / 2,
+            left: on ? w - knob - 3 : 3,
+            width: knob,
+            height: knob,
+            borderRadius: '50%',
+            backgroundColor: '#fff',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+          }}
+        />
+      </span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: on ? themeColors.textPrimary : themeColors.textSecondary }}>
+        {on ? 'Activé' : 'Désactivé'}
+      </span>
+    </span>
+  )
+}
 
 // ─── Modal créer partenaire ───────────────────────────────────────────────────
 function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
@@ -184,11 +224,9 @@ export default function PartnersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [planFilter, setPlanFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [activating, setActivating] = useState<string | null>(null)
-  const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null)
 
   const handleActivate = async (e: React.MouseEvent, partnerId: string) => {
@@ -197,21 +235,6 @@ export default function PartnersPage() {
     await adminApiService.activatePartner(partnerId)
     queryClient.invalidateQueries({ queryKey: ['partners'] })
     setActivating(null)
-  }
-
-  const handleListStatusChange = async (partner: Partner, next: string) => {
-    if (next === partner.status || statusSavingId) return
-    setStatusSavingId(partner.id)
-    if (next === 'active' && partner.status === 'pending') {
-      await adminApiService.activatePartner(partner.id)
-    } else {
-      await adminApiService.updatePartnerStatus(
-        partner.id,
-        next as 'active' | 'inactive' | 'suspended' | 'pending'
-      )
-    }
-    await queryClient.invalidateQueries({ queryKey: ['partners'] })
-    setStatusSavingId(null)
   }
 
   useEffect(() => {
@@ -225,9 +248,8 @@ export default function PartnersPage() {
   }, [queryClient])
 
   const { data, isLoading } = useQuery({
-    queryKey: ['partners', statusFilter, planFilter],
+    queryKey: ['partners', planFilter],
     queryFn: () => adminApiService.getPartners({
-      status: statusFilter === 'all' ? undefined : statusFilter,
       plan: planFilter === 'all' ? undefined : planFilter,
     }),
     staleTime: 30_000,
@@ -277,19 +299,21 @@ export default function PartnersPage() {
               style={{ width: '100%', paddingLeft: 34, paddingRight: 12, paddingTop: 9, paddingBottom: 9, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
-          {[
-            { label: 'Statut', value: statusFilter, set: setStatusFilter, options: [['all','Tous'], ['active','Actifs'], ['inactive','Inactifs'], ['suspended','Suspendus']] },
-            { label: 'Plan', value: planFilter, set: setPlanFilter, options: [['all','Tous les plans'], ['starter','Starter'], ['pro','Pro'], ['business','Business']] },
-          ].map(({ value, set, options }) => (
-            <select
-              key={value}
-              value={value}
-              onChange={(e) => set(e.target.value)}
-              style={{ padding: '9px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer', outline: 'none' }}
-            >
-              {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          ))}
+          <select
+            value={planFilter}
+            onChange={(e) => setPlanFilter(e.target.value)}
+            aria-label="Filtrer par forfait"
+            style={{ padding: '9px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer', outline: 'none' }}
+          >
+            {[
+              ['all', 'Tous les plans'],
+              ['starter', 'Starter'],
+              ['pro', 'Pro'],
+              ['business', 'Business'],
+            ].map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
         </div>
 
         {/* Table */}
@@ -307,13 +331,15 @@ export default function PartnersPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                  {['Partenaire', 'Plan', 'Commission', 'Statut', 'Créé le', 'Actions'].map((h) => (
+                  {['Partenaire', 'Plan', 'Commission', 'Agrément', 'Mode business (app)', 'Créé le', 'Actions'].map((h) => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((partner) => {
+                  const agr = STATUS_CONFIG[partner.status]
+                  const AgrIcon = agr.Icon
                   return (
                     <tr
                       key={partner.id}
@@ -339,38 +365,25 @@ export default function PartnersPage() {
                           ? `${(partner.commission_rate * 100).toFixed(0)} %`
                           : <span style={{ color: themeColors.textSecondary }}>via forfait</span>}
                       </td>
-                      <td
-                        style={{ padding: '14px 16px' }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <select
-                          value={partner.status}
-                          disabled={statusSavingId === partner.id}
-                          onChange={(e) => { void handleListStatusChange(partner, e.target.value) }}
+                      <td style={{ padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
+                        <span
                           style={{
-                            padding: '6px 10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '5px 10px',
                             borderRadius: 8,
-                            border: `1px solid ${themeColors.cardBorder}`,
-                            backgroundColor: themeColors.cardBg,
-                            color: themeColors.textPrimary,
-                            fontSize: 13,
+                            backgroundColor: agr.bg,
+                            color: agr.color,
+                            fontSize: 12,
                             fontWeight: 600,
-                            cursor: statusSavingId === partner.id ? 'wait' : 'pointer',
-                            maxWidth: 160,
                           }}
                         >
-                          {STATUS_SELECT_ORDER.map((key) => {
-                            const cfg = STATUS_CONFIG[key]
-                            return (
-                              <option key={key} value={key}>
-                                {cfg.label}
-                              </option>
-                            )
-                          })}
-                        </select>
-                        {statusSavingId === partner.id && (
-                          <span style={{ marginLeft: 8, fontSize: 11, color: themeColors.textSecondary }}>Mise à jour…</span>
-                        )}
+                          <AgrIcon size={14} /> {agr.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
+                        <BusinessModeToggleReadOnly on={partner.is_business ?? null} />
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textSecondary }}>
                         {new Date(partner.created_at).toLocaleDateString('fr-FR')}
