@@ -239,6 +239,68 @@ function isInviteEmailAlreadyRegisteredError(err: { message?: string } | null | 
   );
 }
 
+/**
+ * partner_users.user_id référence public.users.id. Les invitations Supabase créent souvent
+ * uniquement auth.users : on aligne une ligne public.users avant la liaison partenaire.
+ */
+async function ensurePublicUserProfileForAuthUser(
+  userId: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!supabaseAdmin) {
+    return { ok: false, message: 'Configuration serveur incomplète (Supabase admin).' };
+  }
+
+  const { data: existing, error: selErr } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (selErr) {
+    logger.error('[partnerController] ensurePublicUserProfile select users:', selErr);
+    return { ok: false, message: 'Erreur lors de la vérification du profil utilisateur.' };
+  }
+  if (existing?.id) {
+    return { ok: true };
+  }
+
+  const { data: authBundle, error: authErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (authErr || !authBundle?.user) {
+    logger.error('[partnerController] ensurePublicUserProfile getUserById:', authErr);
+    return { ok: false, message: 'Utilisateur introuvable dans Auth.' };
+  }
+
+  const authUser = authBundle.user;
+  const email = (authUser.email ?? '').trim().toLowerCase();
+  if (!email) {
+    return { ok: false, message: "L'utilisateur Auth n'a pas d'e-mail : impossible de créer le profil public." };
+  }
+
+  const phone = authUser.phone && String(authUser.phone).trim() ? String(authUser.phone).trim() : null;
+  const roleFromMeta = authUser.user_metadata?.role;
+  const role =
+    typeof roleFromMeta === 'string' && roleFromMeta.trim() ? roleFromMeta.trim() : 'client';
+
+  const { error: insErr } = await supabaseAdmin.from('users').insert({
+    id: authUser.id,
+    email,
+    phone,
+    role,
+    created_at: authUser.created_at ?? new Date().toISOString(),
+  });
+
+  if (insErr) {
+    if (insErr.code === '23505') {
+      const { data: recheck } = await supabaseAdmin.from('users').select('id').eq('id', userId).maybeSingle();
+      if (recheck?.id) return { ok: true };
+    }
+    logger.error('[partnerController] ensurePublicUserProfile insert users:', insErr);
+    return { ok: false, message: 'Impossible de synchroniser le profil utilisateur (table public.users).' };
+  }
+
+  return { ok: true };
+}
+
 /** Résout l’UUID Auth / public.users à partir de l’e-mail (compte app déjà créé). */
 async function resolveUserIdByEmail(normalizedEmail: string): Promise<string | null> {
   const { data: row } = await db()
@@ -279,6 +341,11 @@ async function attachExistingUserAndSendPortalLink(params: {
       message:
         "Cet e-mail a déjà un compte, mais aucun profil correspondant n'a été trouvé. Vérifiez que le mail est le même que sur l'app client.",
     };
+  }
+
+  const ensured = await ensurePublicUserProfileForAuthUser(userId);
+  if (!ensured.ok) {
+    return { ok: false, message: ensured.message };
   }
 
   const { error: puError } = await db()
@@ -399,6 +466,13 @@ export const invitePartnerUser = async (req: Request, res: Response): Promise<vo
   }
 
   const userId = inviteData.user.id;
+
+  const ensuredNew = await ensurePublicUserProfileForAuthUser(userId);
+  if (!ensuredNew.ok) {
+    logger.error('[partnerController] invitePartnerUser ensure public users failed:', ensuredNew.message);
+    res.status(500).json({ success: false, message: ensuredNew.message });
+    return;
+  }
 
   const { error: puError } = await supabaseAdmin
     .from('partner_users')
@@ -783,6 +857,13 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
   }
 
   const userId = inviteData.user.id;
+
+  const ensuredPortal = await ensurePublicUserProfileForAuthUser(userId);
+  if (!ensuredPortal.ok) {
+    logger.error('[partnerController] invitePortalUser ensure public users failed:', ensuredPortal.message);
+    res.status(500).json({ success: false, message: ensuredPortal.message });
+    return;
+  }
 
   const { error: puError } = await supabaseAdmin
     .from('partner_users')
