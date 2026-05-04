@@ -21,15 +21,18 @@ export function mapAdminOrderFlags(order: Record<string, unknown> | null | undef
   const placedByAdmin = chrono?.placed_by_admin === true;
   const isPhoneStrict =
     chrono?.is_phone_order === true || (order as { is_phone_order?: boolean }).is_phone_order === true;
-  const isB2B =
-    chrono?.is_b2b_order === true ||
-    (order as { is_b2b_order?: boolean }).is_b2b_order === true ||
-    (order as { isB2BOrder?: boolean }).isB2BOrder === true;
 
   const o = order as Record<string, unknown>;
   const partner_id =
     (typeof o.partner_id === 'string' ? o.partner_id : undefined) ??
     (typeof chrono?.partner_id === 'string' ? chrono.partner_id : undefined);
+
+  // §3.5 : partner_id présent → commande rattachée à un partenaire = B2B, même sans flag is_b2b_order explicite
+  const isB2B =
+    chrono?.is_b2b_order === true ||
+    (order as { is_b2b_order?: boolean }).is_b2b_order === true ||
+    (order as { isB2BOrder?: boolean }).isB2BOrder === true ||
+    partner_id !== undefined;
   const partner_name = typeof o.partner_name === 'string' ? o.partner_name : undefined;
   const batch_id = typeof o.batch_id === 'string' ? o.batch_id : undefined;
   const batch_position = typeof o.batch_position === 'number' ? o.batch_position : undefined;

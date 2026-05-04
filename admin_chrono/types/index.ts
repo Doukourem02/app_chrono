@@ -106,6 +106,8 @@ export interface PartnerInvoice {
 }
 
 export interface PartnerDetail extends Partner {
+  b2b_tier: 'small' | 'large' | null
+  portal_eligible: boolean
   active_subscription: PartnerSubscription | null
   current_usage: { deliveries_count: number; month: string } | null
 }

@@ -5,6 +5,12 @@ import { sendPartnerPortalMagicLinkEmail } from '../services/emailService.js';
 
 const db = () => supabaseAdmin ?? supabase;
 
+function getPlanTier(plan: string | null | undefined): { b2b_tier: 'small' | 'large' | null; portal_eligible: boolean } {
+  if (plan === 'pro' || plan === 'business') return { b2b_tier: 'large', portal_eligible: true };
+  if (plan === 'starter') return { b2b_tier: 'small', portal_eligible: false };
+  return { b2b_tier: null, portal_eligible: false };
+}
+
 const PLAN_DEFAULTS: Record<string, { monthly_price: number; included_orders: number | null; excess_commission_rate: number }> = {
   starter:  { monthly_price: 8000,  included_orders: 35,  excess_commission_rate: 0.06 },
   pro:      { monthly_price: 16000, included_orders: 70,  excess_commission_rate: 0.05 },
@@ -110,6 +116,7 @@ export const getPartner = async (req: Request, res: Response): Promise<void> => 
     success: true,
     data: {
       ...partnerRes.data,
+      ...getPlanTier(partnerRes.data.plan),
       active_subscription: subRes.data ?? null,
       current_usage: usageRes.data ?? null,
     },

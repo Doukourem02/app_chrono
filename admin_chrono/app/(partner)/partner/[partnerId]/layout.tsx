@@ -58,6 +58,12 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
       const access = await partnerApiService.verifyAccess(partnerId)
       if (!access.allowed) { router.push('/login'); return }
 
+      const PORTAL_PLANS = ['pro', 'business']
+      if (!PORTAL_PLANS.includes(access.plan ?? '')) {
+        router.push(`/partner/${partnerId}/upgrade`)
+        return
+      }
+
       const detail = await partnerApiService.getDetails(partnerId)
       setCtx({
         partnerId,

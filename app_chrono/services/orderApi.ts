@@ -111,6 +111,7 @@ export async function createOrderInDatabase(params: {
   speedOptionId?: string;
   routeDurationSeconds?: number;
   routeDurationTypicalSeconds?: number;
+  partnerId?: string | null;
 }): Promise<{ orderId: string; priceCfa: number; distanceKm: number }> {
   const token = await userApiService.ensureAccessToken();
   if (!token) {
@@ -142,6 +143,7 @@ export async function createOrderInDatabase(params: {
         ...(params.routeDurationTypicalSeconds != null
           ? { routeDurationTypicalSeconds: params.routeDurationTypicalSeconds }
           : {}),
+        ...(params.partnerId ? { partner_id: params.partnerId } : {}),
       }),
     });
   } catch (e: unknown) {
@@ -222,6 +224,7 @@ export async function createOrderRecord(options: {
   routeDurationSeconds?: number;
   /** Durée typique Mapbox (secondes) — facteur trafic côté serveur */
   routeDurationTypicalSeconds?: number;
+  partnerId?: string | null;
 }) {
   // NOTE: we intentionally do NOT pre-check for profile existence here.
   // The database RPC `fn_create_order` already contains logic to create a
@@ -261,6 +264,7 @@ export async function createOrderRecord(options: {
     speedOptionId: options.speedOptionId,
     routeDurationSeconds: options.routeDurationSeconds,
     routeDurationTypicalSeconds: options.routeDurationTypicalSeconds,
+    partnerId: options.partnerId,
   });
 
   return {

@@ -188,9 +188,9 @@ export const createOrderRecord = async (
         const commission = await computeB2BCommission(partner_id);
         b2bCommission = { rate: commission.rate, type: commission.type, plan: commission.plan };
 
-        // Rattacher la commande au partenaire (colonne partner_id sur orders, disponible après migration 027)
+        // Rattacher la commande au partenaire + marquer B2B pour cohérence côté livreur
         const db = supabaseAdmin ?? supabase;
-        await db.from('orders').update({ partner_id }).eq('id', orderId);
+        await db.from('orders').update({ partner_id, is_b2b_order: true }).eq('id', orderId);
 
         // Incrémenter le quota mensuel
         await incrementPartnerUsage(partner_id);

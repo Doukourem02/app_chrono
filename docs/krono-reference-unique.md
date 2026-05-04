@@ -49,6 +49,9 @@ Règle :
 | **Store tournée active** | `driver_chrono/store/useBatchStore.ts` |
 | **API tournées chauffeur** | `driver_chrono/services/batchApiService.ts` |
 | **Écran tournée B2B** | `driver_chrono/app/batch/[batchId].tsx` |
+| **Encart admin / B2B / hors-ligne** | `driver_chrono/components/AdminOrderInfo.tsx` |
+| **Normalisation flags commande** | `driver_chrono/utils/mapAdminOrderFlags.ts` |
+| **Store commande livreur** | `driver_chrono/store/useOrderStore.ts` |
 
 ### Backend
 
@@ -63,11 +66,13 @@ Règle :
 | Tarification dynamique | `chrono_backend/src/services/dynamicPricing.ts` |
 | QR livraison | `chrono_backend/src/services/qrCodeService.ts` |
 | Commission livreur | `chrono_backend/src/services/commissionService.ts` |
-| **Contrôleur partenaire (admin)** | `chrono_backend/src/controllers/partnerController.ts` |
+| **Création commande admin (hors-ligne / téléphone / B2B)** | `chrono_backend/src/controllers/adminController.ts` (`createAdminOrder`, `_chrono_admin`) |
+| **Contrôleur partenaire (admin + invitation portail)** | `chrono_backend/src/controllers/partnerController.ts` |
 | **Contrôleur tournées** | `chrono_backend/src/controllers/batchController.ts` |
 | **Commission B2B** | `chrono_backend/src/services/b2bCommissionService.ts` |
 | **Job facturation mensuel** | `chrono_backend/src/jobs/partnerInvoiceJob.ts` |
 | **Middleware auth portail partenaire** | `chrono_backend/src/middleware/verifyPartnerUser.ts` |
+| **E-mail lien portail (magic / recovery)** | `chrono_backend/src/services/emailService.ts` (`sendPartnerPortalMagicLinkEmail`) |
 | **Notification socket tournée** | `chrono_backend/src/sockets/orderSocket.ts` (`emitBatchAssigned`) |
 | **Optimisation itinéraire** | `chrono_backend/src/utils/haversine.ts` |
 
@@ -82,6 +87,7 @@ Règle :
 | **Liste partenaires B2B** | `admin_chrono/app/(dashboard)/partners/page.tsx` |
 | **Fiche partenaire (KPIs + abonnement + factures)** | `admin_chrono/app/(dashboard)/partners/[id]/page.tsx` |
 | **Layout portail partenaire** | `admin_chrono/app/(partner)/partner/[partnerId]/layout.tsx` |
+| **Page upgrade (Starter / none bloqué portail)** | `admin_chrono/app/(partner)/partner/[partnerId]/upgrade/page.tsx` |
 | **Dashboard portail partenaire** | `admin_chrono/app/(partner)/partner/[partnerId]/dashboard/page.tsx` |
 | **Commandes portail partenaire** | `admin_chrono/app/(partner)/partner/[partnerId]/orders/page.tsx` |
 | **Nouvelle commande portail** | `admin_chrono/app/(partner)/partner/[partnerId]/orders/new/page.tsx` |
@@ -539,6 +545,29 @@ Le `partner_id` est requis seulement pour les fonctionnalités liées à l'abonn
 
 ---
 
+### Segmentation par forfait — règles arrêtées
+
+| Règle | Décision |
+|-------|----------|
+| **Starter** = petit B2B | App uniquement — pas d'accès portail partenaire. |
+| **Pro / Business** = grand B2B | Accès portail — `verifyPartnerUser` vérifie `plan ∈ {pro, business}` via `partners.status = active`. |
+| **`none`** (paiement à la course) | Orienter vers choix de forfait ; `commission_rate = 0.07` sur chaque livraison. |
+| **`pending` sans abonnement actif** | Traité comme `none` côté app — message « en attente de validation Krono » ; pas d'accès portail. |
+| **Partenaire créé admin sans plan** | Défaut `none` → `commission_rate = 0.07` sauf choix explicite à la création. |
+| **Plan effectif** | `partner_subscriptions` (`is_active + payment_status='active'`) prime sur `partners.plan`. En cas de divergence temporaire, `partner_subscriptions` gagne toujours. |
+| **Portail blocage** | API 403 via `verifyPartnerUser` **et** bandeau visuel dans le layout — les deux coexistent. Message upgrade Pro/Business uniquement sur les entrées portail/grand only, jamais sur l'usage app courant Starter. |
+| **Libellé livreur** | Inchangé — seul `is_b2b_order` utilisé, pas de distinction petit/grand B2B côté livreur. |
+| **Partenaires existants `none`** | Conserver `none` + communication pour choisir un forfait ; pas de migration automatique. |
+| **Invitations `partner_users` si reclassé Starter** | Lien `partner_users` conservé ; accès portail bloqué automatiquement par `verifyPartnerUser` (status `active` requis). |
+| **Tier calculé** | Dérivé du plan dans l'API — pas de champ `b2b_segment` persisté en base. |
+
+**Backlog technique (à implémenter, pas de décision produit bloquante) :**
+- Inventorier précisément les écrans/boutons « grand only » à bloquer côté `app_chrono` (entrées portail, invite équipe, etc.).
+- Resync profil après passage Starter → Pro (admin ou paiement).
+- Filtre / colonne Petit (Starter) vs Grand (Pro/Business) sur la liste partenaires dans l'admin (optionnel, utile ops).
+
+---
+
 ### Plans tarifaires B2B (grille v2 — 2026-05-04)
 
 Un abonnement réduit les frais de service sur les livraisons dans le quota par rapport au paiement à la course.
@@ -614,6 +643,37 @@ Pour une commande B2B rattachée à un `partner_id`, le service lit l'abonnement
 
 Branchement : `orderRecordController` appelle `computeB2BCommission` puis `incrementPartnerUsage`. Le compteur `partner_usage.deliveries_count` est incrémenté via un `INSERT … ON CONFLICT DO UPDATE` SQL atomique pour éviter les doublons en cas de requêtes simultanées.
 
+### Types de livraison — flags et encart livreur
+
+| Type | Flags / données | Encart livreur (`AdminOrderInfo`) |
+|------|-----------------|-----------------------------------|
+| **En ligne (classique)** | Aucun flag admin | Pas d'encart |
+| **Hors-ligne / opérateur** | `placed_by_admin` dans `_chrono_admin` | Badge « Hors-ligne · Opérateur » |
+| **Téléphonique / coords souples** | `is_phone_order` | Badge fusionné « Hors-ligne · Opérateur » si `placed_by_admin` vrai (comportement actuel conservé — pas de badge séparé « Téléphonique ») |
+| **B2B planning** | `is_b2b_order` | Badge « Commande B2B » + partenaire + tournée si données présentes |
+| **Tournée (batch)** | `batch_id`, `batch_position`, `batch_total`, `partner_name` | Affichage X/Y, contexte partenaire |
+
+**Règle mnémotechnique :** encart = `isB2BOrder` OU `placedByAdmin` OU `isPhoneOrder` (normalisé via `mapAdminOrderFlags`). Priorité badge : B2B > opérateur.
+
+**Décisions arrêtées :**
+- `partner_id` présent → toujours propager `is_b2b_order = true` sur la commande (pas de `partner_id` silencieux sans encart B2B livreur).
+- Tournée hybride (petit B2B sans portail) → batch créé avec `user_id` (pas de `partner_id` requis).
+- Tournée grand B2B → batch avec `partner_id` + `partner_name` remontés côté livreur.
+
+### Matrice segment × type de livraison (arrêtée)
+
+**O** = cas courant, **—** = non prévu.
+
+|  | En ligne | Hors-ligne opérateur | Téléphonique | B2B planning | Tournée (batch) |
+|--|:--------:|:--------------------:|:------------:|:------------:|:---------------:|
+| **Lambda** | O | — | — | — | — |
+| **Hybride (Starter, sans portail)** | O | — | — | O | O (`user_id`) |
+| **Grand B2B (Pro/Business)** | — | O | O | O | O (`partner_id`) |
+
+Lambda : pas de tournée grand public pour l'instant. Hybride : pas de saisie hors-ligne ni téléphonique (flow app uniquement). Grand B2B : pas de commande en ligne classique (passe par admin/portail).
+
+---
+
 ### Comportement dispatch B2B
 
 - GPS optionnel (contrairement au B2C)
@@ -675,13 +735,30 @@ Les routes `/api/partner/:partnerId/...` sont protégées par `verifyPartnerUser
 3. Vérifie que `partners.status = 'active'` — si non, retourne 403 avec un message contextualisé :
    - `pending` → attente validation administrateur Krono
    - `inactive` / `suspended` → contacter le support Krono (agrément ou suspension — distinct du toggle mode business dans l'app)
-4. Injecte `req.partnerUser` (`userId`, `partnerId`, `role`) dans la requête
+4. Vérifie que `partners.plan ∈ {pro, business}` — si non, retourne 403 code `portal_plan_required` (Starter → message upgrade Pro/Business ; none → message choisir un forfait). Côté frontend, `verifyAccess()` lit le plan avant d'appeler le backend et redirige vers `/partner/:id/upgrade` si non éligible.
+5. Injecte `req.partnerUser` (`userId`, `partnerId`, `role`) dans la requête
 
 Un partenaire ne voit jamais les données d'un autre partenaire. Un partenaire non `active` n'accède à aucune route sensible du portail.
 
 **Portail — banner de statut** : le layout `/partner/:partnerId/layout.tsx` affiche un bandeau contextuel en haut de chaque page si `partners.status ≠ active`. Le message varie selon `pending` / `inactive` / `suspended`.
 
 **Admin — synchronisation temps réel** : les pages liste et fiche partenaire peuvent s'abonner à Supabase Realtime (`postgres_changes` sur `partners`) pour refléter les changements de **fiche partenaire** (statut, plan, etc.). Le simple toggle **mode business** dans l'app met à jour `users`, pas `partners` — une colonne « mode business » côté admin nécessiterait une autre source (poll, vue matérialisée ou Realtime sur `users` si activé). Prérequis pour les changements `partners` : activer Realtime sur la table `partners` dans Supabase Dashboard → Database → Replication.
+
+### Portail — invitation, e-mail déjà dans Supabase Auth et configuration
+
+**Comportement implémenté (backend)** : `inviteUserByEmail` est tenté en premier. Si Supabase renvoie une erreur du type *e-mail déjà enregistré*, le backend ne traite plus l’opération comme un échec fatal : résolution de l’utilisateur (`public.users`, puis liste Auth admin en secours), assurance du profil public (`ensurePublicUserProfileForAuthUser`), `upsert` sur `partner_users`, génération d’un lien **`magiclink`** via `auth.admin.generateLink` (repli **`recovery`** si besoin) avec `redirectTo = PARTNER_PORTAL_URL` (fallback codé vers la page de login portail prod si la variable est absente), envoi du lien par SMTP Krono quand il est configuré (`sendPartnerPortalMagicLinkEmail` dans `chrono_backend/src/services/emailService.ts`). Points d’entrée : `invitePartnerUser`, `invitePortalUser`, et à l’activation `activatePartner` (auto-invitation best-effort sur l’e-mail fiche partenaire). Fichier : `chrono_backend/src/controllers/partnerController.ts`.
+
+**À valider en exploitation** (le code seul ne suffit pas) : déployer ou redémarrer le backend sur l’environnement cible ; tester « Inviter au portail » avec le **même** e-mail qu’un compte app client — la réponse doit réussir (plus de message brut *A user with this email address has already been registered*) ; **Supabase Dashboard → Authentication → URL configuration** : déclarer l’URL exacte de **`PARTNER_PORTAL_URL`** (page de connexion du portail) dans **Redirect URLs**, sinon les liens magic / recovery sont rejetés après clic.
+
+**SMTP Krono** : dans `chrono_backend/.env`, renseigner `EMAIL_USER`, `EMAIL_PASS`, idéalement `EMAIL_FROM_NAME`, `EMAIL_FROM_ADDRESS`, et `EMAIL_HOST` / `EMAIL_PORT` si le fournisseur n’est pas celui par défaut ; redémarrer le backend ; retester réception du mail « Se connecter au portail ». Référence des variables : `chrono_backend/.env.example`.
+
+**Sans SMTP Krono** : s’appuyer sur **Mot de passe oublié** sur la page de login du portail (SMTP / templates Auth côté Supabase) ; communiquer l’URL du portail et la consigne : une fois la ligne `partner_users` créée, la réinitialisation mot de passe Supabase permet la première connexion.
+
+**Données / parcours (encore ouverts)** : rendre l’e-mail portail **obligatoire** à l’étape forfait (`app_chrono/app/(auth)/business-onboarding.tsx`) si le produit l’exige — aujourd’hui le flux peut partir sans e-mail portail si `users.email` est vide et que la validation ne bloque pas ; colonne **`users.partner_id`** : migration SQL et alignement avec `partner_users` si l’app ou les écrans admin doivent s’en servir comme source unique.
+
+**Recette bout en bout** : app (parcours boutique → partenaire `pending`) → admin (activation, auto-liaison / invitation si e-mail connu) → admin (« Inviter au portail » ou renvoi) → portail (connexion, dashboard, commandes, facturation selon besoin).
+
+**Vigilance** : vider les tables **`partners`** / B2B en SQL **ne supprime pas** les comptes **Supabase Authentication**. Les conflits « e-mail déjà utilisé » viennent d’Auth, pas seulement des lignes `partners`.
 
 ### Portail partenaire — alignement rôle unique et points ouverts
 
@@ -861,6 +938,7 @@ Si le livreur est hors ligne au moment du socket, la push `batch_assigned` (`dri
 | Sujet | Fichier |
 |---|---|
 | Contrôleur partenaire | `chrono_backend/src/controllers/partnerController.ts` |
+| E-mail lien portail (magic / recovery) | `chrono_backend/src/services/emailService.ts` |
 | Contrôleur tournées | `chrono_backend/src/controllers/batchController.ts` |
 | Logique commission B2B | `chrono_backend/src/services/b2bCommissionService.ts` |
 | Job facturation mensuel | `chrono_backend/src/jobs/partnerInvoiceJob.ts` |
@@ -877,6 +955,7 @@ Si le livreur est hors ligne au moment du socket, la push `batch_assigned` (`dri
 | Liste partenaires | `admin_chrono/app/(dashboard)/partners/page.tsx` |
 | Fiche partenaire | `admin_chrono/app/(dashboard)/partners/[id]/page.tsx` |
 | Layout portail partenaire | `admin_chrono/app/(partner)/partner/[partnerId]/layout.tsx` |
+| Page upgrade (Starter / none bloqué portail) | `admin_chrono/app/(partner)/partner/[partnerId]/upgrade/page.tsx` |
 | Dashboard portail | `admin_chrono/app/(partner)/partner/[partnerId]/dashboard/page.tsx` |
 | Commandes portail | `admin_chrono/app/(partner)/partner/[partnerId]/orders/page.tsx` |
 | Nouvelle commande portail | `admin_chrono/app/(partner)/partner/[partnerId]/orders/new/page.tsx` |
@@ -1016,6 +1095,7 @@ Les N commandes d'un batch sont créées **silencieusement** via REST. Aucune po
 | **Bloc 5** | `driver_chrono` : réception tournée groupée (1 notif), vue ordonnée, validation par livraison, contexte partenaire | ✅ Implémenté |
 | **Bloc 6** | Grille tarifaire v2 (forfaits + paiement à la course) | ✅ Alignée doc + `PLAN_DEFAULTS` + `QUOTA_COMMISSION` (toute évolution : une seule source puis propagation) |
 | **Bloc 7** | Statuts, séparation agrément / mode business, sécurité portail, sync admin temps réel | ✅ Implémenté (ajustements audit voir ci-dessous) |
+| **Bloc 8** | Segmentation Starter (petit B2B) vs Pro/Business (grand B2B) : blocage portail API 403 + redirection frontend page upgrade + `b2b_tier` / `portal_eligible` exposés dans `getPartner` | ✅ Implémenté |
 
 **Reste à faire :**
 1. Appliquer les migrations `032` → `037` sur l'environnement Supabase cible (dans l'ordre) — la `037` ajoute `inactive` au CHECK de `partners.status` (requis pour les chemins admin qui passent un partenaire en `inactive`).

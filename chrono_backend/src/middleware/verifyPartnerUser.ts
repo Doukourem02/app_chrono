@@ -50,7 +50,7 @@ export const verifyPartnerUser = async (
         .maybeSingle(),
       db
         .from('partners')
-        .select('status')
+        .select('status, plan')
         .eq('id', partnerId)
         .maybeSingle(),
     ]);
@@ -78,6 +78,20 @@ export const verifyPartnerUser = async (
         success: false,
         code: `partner_${partnerStatus ?? 'unavailable'}`,
         message: STATUS_MESSAGES[partnerStatus ?? ''] ?? 'Accès partenaire non disponible.',
+      });
+      return;
+    }
+
+    const partnerPlan = partnerRes.data?.plan;
+    const PORTAL_ELIGIBLE_PLANS = ['pro', 'business'];
+    if (!PORTAL_ELIGIBLE_PLANS.includes(partnerPlan ?? '')) {
+      res.status(403).json({
+        success: false,
+        code: 'portal_plan_required',
+        current_plan: partnerPlan ?? 'none',
+        message: partnerPlan === 'starter'
+          ? 'Le portail partenaire est réservé aux forfaits Pro et Business. Passez à Pro ou Business pour y accéder.'
+          : 'Choisissez un forfait Pro ou Business pour accéder au portail partenaire.',
       });
       return;
     }

@@ -116,22 +116,21 @@ class PartnerApiService {
   }
 
   // Vérifie que l'utilisateur courant appartient bien à ce partenaire (owner uniquement)
-  async verifyAccess(partnerId: string): Promise<{ allowed: boolean; role: 'owner' | null }> {
+  // Retourne aussi le plan pour décider si le portail est accessible (pro/business uniquement)
+  async verifyAccess(partnerId: string): Promise<{ allowed: boolean; role: 'owner' | null; plan: string | null }> {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return { allowed: false, role: null }
+      if (!user) return { allowed: false, role: null, plan: null }
 
-      const { data, error } = await supabase
-        .from('partner_users')
-        .select('role')
-        .eq('partner_id', partnerId)
-        .eq('user_id', user.id)
-        .maybeSingle()
+      const [puRes, partnerRes] = await Promise.all([
+        supabase.from('partner_users').select('role').eq('partner_id', partnerId).eq('user_id', user.id).maybeSingle(),
+        supabase.from('partners').select('plan').eq('id', partnerId).maybeSingle(),
+      ])
 
-      if (error || !data || data.role !== 'owner') return { allowed: false, role: null }
-      return { allowed: true, role: 'owner' }
+      if (puRes.error || !puRes.data || puRes.data.role !== 'owner') return { allowed: false, role: null, plan: null }
+      return { allowed: true, role: 'owner', plan: partnerRes.data?.plan ?? null }
     } catch {
-      return { allowed: false, role: null }
+      return { allowed: false, role: null, plan: null }
     }
   }
 }

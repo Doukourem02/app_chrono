@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import { useAuthStore } from "../store/useAuthStore";
 import { AnimatedCard } from "./animations";
-import NewB2BShippingModal from "./NewB2BShippingModal";
 import BatchShippingBottomSheet from "./BatchShippingBottomSheet";
 
 export default function ActionCards() {
@@ -12,7 +11,6 @@ export default function ActionCards() {
   const { user } = useAuthStore();
   const isBusiness = user?.is_business === true;
 
-  const [b2bModalVisible, setB2bModalVisible] = useState(false);
   const [batchSheetVisible, setBatchSheetVisible] = useState(false);
 
   const handleNewDelivery = () => {
@@ -27,10 +25,6 @@ export default function ActionCards() {
     });
   };
 
-  const handleB2BOrder = () => {
-    requireAuth(() => setB2bModalVisible(true));
-  };
-
   const handleBatch = () => {
     requireAuth(() => setBatchSheetVisible(true));
   };
@@ -43,9 +37,9 @@ export default function ActionCards() {
             index={0}
             delay={0}
             style={[styles.actionCard, { backgroundColor: "#EDE9FE" }]}
-            onPress={handleB2BOrder}
+            onPress={handleNewDelivery}
           >
-            <Text style={styles.cardTitle}>Livraison{"\n"}Client</Text>
+            <Text style={styles.cardTitle}>Nouvelle{"\n"}Livraison</Text>
             <Image
               source={require("../assets/images/delivery.png")}
               style={styles.cardImage}
@@ -95,10 +89,6 @@ export default function ActionCards() {
         </View>
       )}
 
-      <NewB2BShippingModal
-        visible={b2bModalVisible}
-        onClose={() => setB2bModalVisible(false)}
-      />
       <BatchShippingBottomSheet
         visible={batchSheetVisible}
         onClose={() => setBatchSheetVisible(false)}

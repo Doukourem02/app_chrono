@@ -71,13 +71,15 @@ export const AdminOrderInfo: React.FC<AdminOrderInfoProps> = ({
   const isOperator = !isB2B && !!placedByAdmin;
   const badgeText = isB2B
     ? 'Commande B2B'
-    : isOperator
-      ? 'Hors-ligne · Opérateur'
-      : 'Commande téléphonique';
+    : isOperator && isPhoneOrder
+      ? 'Téléphonique · Opérateur'
+      : isOperator
+        ? 'Hors-ligne · Opérateur'
+        : 'Commande téléphonique';
   const badgeColor = isB2B ? '#4338CA' : '#EA580C';
   const containerBgColor = isB2B ? '#E0E7FF' : '#FFEDD5';
   const borderColor = isB2B ? '#4338CA' : '#EA580C';
-  const badgeIcon = isB2B ? ('briefcase-outline' as const) : isOperator ? ('headset-outline' as const) : ('call-outline' as const);
+  const badgeIcon = isB2B ? ('briefcase-outline' as const) : isPhoneOrder ? ('call-outline' as const) : isOperator ? ('headset-outline' as const) : ('call-outline' as const);
 
   return (
     <View style={[styles.container, { backgroundColor: containerBgColor, borderLeftColor: borderColor }]}>

@@ -452,15 +452,15 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                     name={
                       isB2BOrder
                         ? 'briefcase-outline'
-                        : placedByAdmin
-                          ? 'headset-outline'
-                          : 'phone-portrait-outline'
+                        : isPhoneOrder
+                          ? 'call-outline'
+                          : 'headset-outline'
                     }
                     size={14}
                     color="#EA580C"
                   />
                   <Text style={styles.offlineBadgeText}>
-                    {isB2BOrder ? 'B2B' : placedByAdmin ? 'Saisie admin' : 'Hors ligne'}
+                    {isB2BOrder ? 'B2B' : isPhoneOrder ? 'Téléphonique' : 'Saisie admin'}
                   </Text>
                 </View>
               )}

@@ -1076,6 +1076,7 @@ class UserOrderSocketService {
     paymentMethodType?: PaymentMethodType;
     paymentPhone?: string;
     estimatedPrice?: number;
+    partnerId?: string | null;
   }): Promise<boolean> {
     return new Promise<boolean>(async (resolve) => {
       // Protection contre les appels multiples simultanés
@@ -1152,6 +1153,7 @@ class UserOrderSocketService {
           routeDistanceKm: orderData.routeDistanceKm,
           routeDurationSeconds: orderData.routeDurationSeconds,
           routeDurationTypicalSeconds: orderData.routeDurationTypicalSeconds,
+          partnerId: orderData.partnerId,
         });
       } catch (error: any) {
         // Log full error for debugging (httpStatus / requestId si createOrderInDatabase les a posés)
