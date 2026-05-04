@@ -66,8 +66,7 @@ export const listPartners = async (req: Request, res: Response): Promise<void> =
   let query = db().from('partners').select('*').order('created_at', { ascending: false });
 
   if (status) query = query.eq('status', status as string);
-  if (plan === 'none') query = query.is('plan', null);
-  else if (plan) query = query.eq('plan', plan as string);
+  if (plan) query = query.eq('plan', plan as string);
 
   const { data, error } = await query;
 
@@ -401,9 +400,9 @@ export const registerAsPartner = async (req: Request, res: Response): Promise<vo
       phone: user?.phone ?? null,
       status: 'pending',
       ...(explicitNoPlan
-        ? { plan: null, commission_rate: PAY_PER_DELIVERY_COMMISSION_RATE }
+        ? { plan: 'none', commission_rate: PAY_PER_DELIVERY_COMMISSION_RATE }
         : subscribedPlan
-          ? { plan: subscribedPlan, commission_rate: null }
+          ? { plan: subscribedPlan }
           : {}),
     })
     .select()
