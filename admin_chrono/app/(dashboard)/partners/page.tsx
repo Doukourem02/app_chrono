@@ -16,6 +16,12 @@ const PLAN_LABELS: Record<string, string> = {
   business: 'Business',
 }
 
+const PLAN_COMMISSION: Record<string, number> = {
+  starter: 3,
+  pro: 3,
+  business: 0,
+}
+
 const STATUS_CONFIG = {
   active:    { label: 'Actif',       color: themeColors.greenPrimary,  bg: themeColors.greenLight,  Icon: CheckCircle },
   pending:   { label: 'En attente',  color: '#D97706',                 bg: '#FEF3C7',               Icon: Zap         },
@@ -340,9 +346,11 @@ export default function PartnersPage() {
                         )}
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textPrimary }}>
-                        {partner.commission_rate != null
-                          ? `${(partner.commission_rate * 100).toFixed(0)} %`
-                          : <span style={{ color: themeColors.textSecondary }}>via forfait</span>}
+                        {partner.plan && partner.plan !== 'none' && PLAN_COMMISSION[partner.plan] !== undefined
+                          ? `${PLAN_COMMISSION[partner.plan]} %`
+                          : partner.commission_rate != null
+                            ? `${(partner.commission_rate * 100).toFixed(0)} %`
+                            : <span style={{ color: themeColors.textSecondary }}>—</span>}
                       </td>
                       <td style={{ padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
                         <span
