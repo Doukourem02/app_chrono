@@ -436,7 +436,7 @@ Krono doit s'adapter au workflow du commerçant, et non l'inverse. Le problème 
 
 ### Pourquoi le B2B
 
-Krono sert aujourd'hui des particuliers (B2C). Le B2B cible des professionnels — e-commerces, restaurants, pharmacies, boutiques — qui ont des volumes élevés et réguliers. Au lieu de payer 15-25 % de commission sur chaque course, ils s'abonnent à un forfait mensuel avec un quota de livraisons incluses.
+Krono sert aujourd'hui des particuliers (B2C). Le B2B cible des professionnels — e-commerces, restaurants, pharmacies, boutiques — qui ont des volumes élevés et réguliers. Au lieu de payer 6 % de frais à la course, ils s'abonnent à un forfait mensuel avec un quota de livraisons incluses et un taux réduit dans ce quota.
 
 Revenus Krono : forfait prévisible + commissions sur excédents. Valeur partenaire : coût réduit par livraison, tournées groupées, portail dédié.
 
@@ -451,7 +451,7 @@ Revenus Krono : forfait prévisible + commissions sur excédents. Valeur partena
 
 **Paiement Profil 1** : commandes pour ses clients → compte business, immédiat ou différé si éligible ; commandes pour lui-même → contexte client, règles Profil 0.
 
-**Commission Profil 1** : sans abonnement → `partners.commission_rate` (15–25 %) ; avec abonnement → taux in-quota selon plan (voir Plans tarifaires).
+**Commission Profil 1** : sans abonnement → `partners.commission_rate` (6 % par défaut) ; avec abonnement → frais in-quota selon plan (voir Plans tarifaires).
 
 ### Interfaces — qui utilise quoi
 
@@ -506,7 +506,7 @@ Ce profil correspond aux **Profil 1** et **Profil 2** de la stratégie Krono (pe
 
 C'est une **entité distincte** créée par l'admin dans la table `partners`. Elle a un plan d'abonnement, un quota mensuel, une facturation automatique, et un accès au portail web. Elle peut avoir plusieurs utilisateurs liés (ex : 3 gestionnaires d'une même enseigne).
 
-> **Exemple concret :** MedExpress est une chaîne de pharmacies avec 150 livraisons/mois. L'admin Krono crée une fiche partenaire "MedExpress" dans `partners`, lui attribue le plan Pro (200 courses/mois, 3 % de commission). Les 3 managers de MedExpress sont ensuite liés à ce partenaire via `partner_users`. Ils accèdent au portail web `/partner/:id/dashboard` pour voir leurs commandes, leur quota, leurs factures.
+> **Exemple concret :** MedExpress est une chaîne de pharmacies avec 150 livraisons/mois. L'admin Krono crée une fiche partenaire "MedExpress" dans `partners`, lui attribue le plan Pro (70 courses/mois, 3 % de frais de service in-quota). Les 3 managers de MedExpress sont ensuite liés à ce partenaire via `partner_users`. Ils accèdent au portail web `/partner/:id/dashboard` pour voir leurs commandes, leur quota, leurs factures.
 
 Ce profil correspond au **Profil 3** de la stratégie Krono (entreprise structurée, e-commerce professionnel).
 
@@ -531,7 +531,7 @@ Dans l'implémentation actuelle, `NewB2BShippingModal` bloque si `user.partner_i
 
 | Profil | `is_business` | `partner_id` | Accès B2B attendu |
 |--------|--------------|--------------|-------------------|
-| Profil 1 (petit commerçant) | `true` | `null` | ✅ Doit pouvoir créer des livraisons — commission par défaut 3 % |
+| Profil 1 (petit commerçant) | `true` | `null` | ✅ Doit pouvoir créer des livraisons — frais de service 6 % par défaut |
 | Profil 2 (volume modéré) | `true` | `null` ou lié | ✅ Tournées disponibles — commission selon abonnement si lié |
 | Profil 3 (entreprise) | `true` | lié par admin | ✅ Quota, facturation, portail — commission selon plan |
 
@@ -539,15 +539,19 @@ Le `partner_id` est requis seulement pour les fonctionnalités liées à l'abonn
 
 ---
 
-### Plans tarifaires B2B (validés le 2026-05-02)
+### Plans tarifaires B2B (grille v2 — 2026-05-04)
 
-| Plan | Prix mensuel | Quota inclus | Commission in-quota | Commission excédent |
+Un abonnement réduit les frais de service sur les livraisons dans le quota par rapport au paiement à la course.
+
+| Plan | Abonnement (FCFA/mois) | Quota livraisons/mois | Frais in-quota | Frais au-delà |
 |---|---|---|---|---|
-| **Starter** | 15 000 FCFA | 50 courses | 3 % | 20 % |
-| **Pro** | 40 000 FCFA | 200 courses | 3 % | 15 % |
-| **Business** | 100 000 FCFA | Illimité | 0 % | 10 % |
+| **Paiement à la course** | 0 | — | 7 % | = même taux |
+| **Starter** | 8 000 | 35 | 5 % | 6 % |
+| **Pro** *(recommandé)* | 16 000 | 70 | 3 % | 5 % |
+| **Business** | 29 000 | 110 | 2 % | 3 % |
 
-Sans abonnement : taux standard du partenaire (15-25 %, champ `partners.commission_rate`).
+Sans abonnement : `partners.commission_rate = 0.07` (7 % sur chaque livraison — taux le plus élevé pour inciter à l'abonnement).
+Ces valeurs sont les constantes uniques : toute modification passe par `PLAN_DEFAULTS` dans `partnerController.ts` et `QUOTA_COMMISSION` dans `b2bCommissionService.ts`, puis propagée app + admin + doc.
 
 ### Axes de monétisation futurs (Axes 3–6)
 

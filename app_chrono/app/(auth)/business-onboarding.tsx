@@ -18,42 +18,57 @@ import { registerAsPartner } from '../../services/partnerApi';
 
 type Step = 'question' | 'company' | 'plan';
 
-const PLANS = [
+type PlanOption = {
+  key: string;
+  label: string;
+  badge: string | null;
+  price: string;
+  quota: string;
+  inQuota: string;
+  excess: string;
+  icon: 'rocket-outline' | 'trending-up-outline' | 'business-outline' | 'swap-horizontal-outline';
+};
+
+const PLANS: PlanOption[] = [
   {
     key: 'starter',
     label: 'Starter',
-    price: '15 000 FCFA / mois',
-    quota: '50 livraisons incluses',
-    inQuota: '3% de commission sur les livraisons incluses',
-    excess: '20% sur les livraisons excédentaires',
-    icon: 'rocket-outline' as const,
+    badge: null,
+    price: '8 000 FCFA / mois',
+    quota: '35 livraisons incluses',
+    inQuota: '5 % de frais de service dans le quota',
+    excess: '6 % au-delà de 35 livraisons',
+    icon: 'rocket-outline',
   },
   {
     key: 'pro',
     label: 'Pro',
-    price: '40 000 FCFA / mois',
-    quota: '200 livraisons incluses',
-    inQuota: '3% de commission sur les livraisons incluses',
-    excess: '15% sur les livraisons excédentaires',
-    icon: 'trending-up-outline' as const,
+    badge: 'Recommandé',
+    price: '16 000 FCFA / mois',
+    quota: '70 livraisons incluses',
+    inQuota: '3 % de frais de service dans le quota',
+    excess: '5 % au-delà de 70 livraisons',
+    icon: 'trending-up-outline',
   },
   {
     key: 'business',
     label: 'Business',
-    price: '100 000 FCFA / mois',
-    quota: 'Livraisons illimitées',
-    inQuota: '0% de commission sur toutes les livraisons',
-    excess: '10% sur dépassement de capacité',
-    icon: 'business-outline' as const,
+    badge: null,
+    price: '29 000 FCFA / mois',
+    quota: '110 livraisons incluses',
+    inQuota: '2 % de frais de service dans le quota',
+    excess: '3 % au-delà de 110 livraisons',
+    icon: 'business-outline',
   },
   {
     key: 'none',
-    label: 'Sans forfait',
-    price: 'Pas d’abonnement mensuel',
-    quota: 'Vous payez une commission sur chaque livraison',
-    inQuota: 'Idéal si votre volume est faible ou irrégulier',
-    excess: 'Taux par défaut 20 % par course (ajustable avec Krono après validation)',
-    icon: 'swap-horizontal-outline' as const,
+    label: 'Paiement à la course',
+    badge: null,
+    price: "Pas d'abonnement mensuel",
+    quota: 'Idéal si votre volume est faible ou irrégulier',
+    inQuota: '7 % de frais de service sur chaque livraison',
+    excess: 'Aucun engagement — commencez sans risque',
+    icon: 'swap-horizontal-outline',
   },
 ];
 
@@ -133,7 +148,7 @@ export default function BusinessOnboardingScreen() {
 
           <Text style={styles.headline}>Forfait ou paiement à la course</Text>
           <Text style={styles.subline}>
-            Les forfaits aident à encadrer quota et commissions. Si vous préférez ne pas vous abonner, vous pouvez rester sans forfait : vous serez facturé sur chaque course selon un taux convenu avec Krono.
+            Choisissez le plan adapté à votre volume. Un abonnement réduit les frais de service sur vos livraisons dans le quota, par rapport au paiement à la course.
           </Text>
 
           {/* Cartes de plan */}
@@ -151,7 +166,12 @@ export default function BusinessOnboardingScreen() {
                     <Ionicons name={plan.icon} size={20} color={isSelected ? '#fff' : '#8B5CF6'} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.planLabel, isSelected && styles.planLabelSelected]}>{plan.label}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.planLabel, isSelected && styles.planLabelSelected]}>{plan.label}</Text>
+                      {plan.badge && (
+                        <Text style={styles.planBadge}>{plan.badge}</Text>
+                      )}
+                    </View>
                     <Text style={styles.planPrice}>{plan.price}</Text>
                   </View>
                   {isSelected && <Ionicons name="checkmark-circle" size={22} color="#8B5CF6" />}
@@ -168,7 +188,7 @@ export default function BusinessOnboardingScreen() {
           {/* Info "comment ça marche" */}
           <View style={styles.infoBox}>
             <Text style={styles.infoTitle}>Comment ça marche ?</Text>
-            <Text style={styles.infoStep}>① Vous choisissez un forfait ou l’option sans forfait</Text>
+            <Text style={styles.infoStep}>① Vous choisissez un forfait ou l{"'"}option sans forfait</Text>
             <Text style={styles.infoStep}>② Un admin Krono valide votre demande</Text>
             <Text style={styles.infoStep}>③ Vous recevez un lien d{"'"}accès au portail partenaire</Text>
           </View>
@@ -199,6 +219,10 @@ export default function BusinessOnboardingScreen() {
               <Text style={styles.ctaText}>Envoyer ma demande</Text>
             )}
           </TouchableOpacity>
+
+          {!selectedPlan && (
+            <Text style={styles.noSelectionMsg}>Sélectionnez un forfait pour continuer</Text>
+          )}
 
           <Text style={styles.hint}>
             Votre demande sera examinée par l{"'"}équipe Krono. Aucune facturation avant activation.
@@ -418,6 +442,15 @@ const styles = StyleSheet.create({
   planLabelSelected: {
     color: '#8B5CF6',
   },
+  planBadge: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7C3AED',
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
   planPrice: {
     fontSize: 13,
     color: '#6B7280',
@@ -532,6 +565,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '600',
+  },
+  noSelectionMsg: {
+    fontSize: 13,
+    color: '#D97706',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   hint: {
     fontSize: 12,

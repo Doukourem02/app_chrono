@@ -2,11 +2,11 @@ import pool from '../config/db.js';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import logger from '../utils/logger.js';
 
-// Décision validée 2026-05-02 : Option B (3%) sur Starter/Pro, Option A (0%) sur Business
+// Grille tarifaire v2 (2026-05-04) : taux in-quota par plan
 const QUOTA_COMMISSION: Record<string, number> = {
-  starter: 0.03,
-  pro: 0.03,
-  business: 0.00,
+  starter: 0.05,
+  pro:     0.03,
+  business: 0.02,
 };
 
 const db = () => supabaseAdmin ?? supabase;
@@ -73,7 +73,7 @@ export async function computeB2BCommission(partnerId: string): Promise<Commissio
   }
 
   return {
-    rate: QUOTA_COMMISSION[sub.plan as string] ?? 0.03,
+    rate: QUOTA_COMMISSION[sub.plan as string] ?? 0.05,
     type: 'in_quota',
     subscriptionId: sub.id as string,
     plan: sub.plan as string,

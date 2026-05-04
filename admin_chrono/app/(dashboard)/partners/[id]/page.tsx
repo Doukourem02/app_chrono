@@ -11,9 +11,9 @@ import { themeColors } from '@/utils/theme'
 import type { PartnerSubscription } from '@/types'
 
 const PLAN_DEFAULTS: Record<string, { price: number; quota: number | null; label: string }> = {
-  starter:  { price: 15_000,  quota: 50,   label: 'Starter — 15 000 FCFA / mois' },
-  pro:      { price: 40_000,  quota: 200,  label: 'Pro — 40 000 FCFA / mois' },
-  business: { price: 100_000, quota: null, label: 'Business — 100 000 FCFA / mois' },
+  starter:  { price: 8_000,  quota: 35,  label: 'Starter — 8 000 FCFA / mois' },
+  pro:      { price: 16_000, quota: 70,  label: 'Pro — 16 000 FCFA / mois' },
+  business: { price: 29_000, quota: 110, label: 'Business — 29 000 FCFA / mois' },
 }
 
 // ─── Modal inviter au portail ─────────────────────────────────────────────────

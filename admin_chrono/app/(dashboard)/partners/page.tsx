@@ -17,9 +17,9 @@ const PLAN_LABELS: Record<string, string> = {
 }
 
 const PLAN_COMMISSION: Record<string, number> = {
-  starter: 3,
+  starter: 5,
   pro: 3,
-  business: 0,
+  business: 2,
 }
 
 const STATUS_CONFIG = {
@@ -87,9 +87,9 @@ function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCre
               style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.background, color: themeColors.textPrimary, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
             >
               <option value="">— Sans forfait —</option>
-              <option value="starter">Starter — 15 000 FCFA / mois</option>
-              <option value="pro">Pro — 40 000 FCFA / mois</option>
-              <option value="business">Business — 100 000 FCFA / mois</option>
+              <option value="starter">Starter — 8 000 FCFA / mois</option>
+              <option value="pro">Pro — 16 000 FCFA / mois</option>
+              <option value="business">Business — 29 000 FCFA / mois</option>
             </select>
           </div>
           <div>

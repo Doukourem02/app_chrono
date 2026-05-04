@@ -4,6 +4,80 @@ Document de suivi pour aligner produit, app, admin et backend sur la vision vali
 
 ---
 
+## Grille tarifaire de référence (version finale — à appliquer partout)
+
+**Avant intégration** : remplacer chaque fourchette par **un seul nombre** (facturation + app + admin).
+
+| Plan | Abonnement (FCFA/mois) | Quota livraisons / mois | Commission **dans** le quota | Commission **au-delà** |
+|------|------------------------|-------------------------|------------------------------|---------------------------|
+| **Sans forfait** | 0 | — (chaque course) | **6 % ou 7 %** (à trancher) | = même taux |
+| **Starter** | 8 000 | 35 | **5 %** | **7 %** |
+| **Pro** (recommandé) | 16 000 | 70 | **3 %** | **5 %** |
+| **Business** | 29 000 | 110 | **1,5 % ou 2 %** (à trancher) | **3 % ou 4 %** (à trancher) |
+
+- [ ] Trancher et noter ici les **4 valeurs uniques** retenues : sans forfait ___ % ; Business in-quota ___ % ; Business excédent ___ %.
+- [ ] Mettre à jour **`krono-reference-unique.md`** (ou doc tarifaire unique) avec cette grille + une phrase « **l’abonnement réduit la commission** sur les courses dans le quota par rapport au paiement à la course ».
+- [ ] Aligner **`partnerController.ts`** (`PLAN_DEFAULTS`, `PAY_PER_DELIVERY_COMMISSION_RATE`) sur les montants, quotas et `excess_commission_rate`.
+- [ ] Aligner **`b2bCommissionService.ts`** (`QUOTA_COMMISSION` + défaut si plan inconnu) sur les taux **dans le quota** par plan.
+- [ ] Vérifier **`partnerInvoiceJob.ts`** (forfait + excédent volume) avec les **nouveaux quotas** (Business = **110** inclus, plus `null` / « illimité » contradictoire).
+- [ ] Aligner **`app_chrono` / `business-onboarding.tsx`** : cartes, prix FCFA, bullets, **aucune** promesse « illimité » incompatible avec un excédent chiffré.
+- [ ] Aligner **admin** : `partners/page.tsx` (`PLAN_COMMISSION` ou équivalent), `partners/[id]/page.tsx` (`PLAN_DEFAULTS`), portail **`partner/.../billing/page.tsx`** (`PLAN_DETAILS` / affichage quota + taux).
+- [ ] Recette : un partenaire par plan → taux calculés / affichés **identiques** sur app, admin, portail et logs commission.
+
+---
+
+## Produit & UX — corrections identifiées (parcours forfaits)
+
+*(Les tâches **rédactionnelles** détaillées — audit global, glossaire, admin, doc — sont dans la section suivante **« Copywriting & cohérence textuelle »**.)*
+
+- [ ] **Business** : ne plus afficher **« livraisons illimitées »** en contradiction avec un **dépassement de quota** ; rester sur **quota chiffré** (ex. 110) + taux au-delà.
+- [ ] **Pédagogie forfait** : une courte phrase du type « **L’abonnement baisse la commission** sur les livraisons dans votre quota par rapport au **paiement à la course** » (sous-titre ou encart).
+- [ ] **Sans forfait** : libellé plus neutre (ex. **« Paiement à la course »**), clé API `none` inchangée si besoin.
+- [ ] **Validation admin** : texte aligné sur le réel — ex. **accès / usage avec statut « en attente »** + validation en arrière-plan, sans laisser croire que **rien** n’est possible avant l’admin si ce n’est pas le cas (à caler avec le produit).
+- [ ] **E-mail portail** : ne pas laisser un préremplissage type `*@otp.chrono.local` sans explication ; placeholder pro + aide, ou masquage si e-mail compte = technique.
+- [ ] **Bouton « Envoyer ma demande »** désactivé : message explicite si **aucun forfait sélectionné** (et erreur saisie si règles e-mail renforcées).
+- [ ] **Header** : raccourcir le paragraphe d’intro si trop long ; garder le détail dans « Comment ça marche » ou lien conditions.
+- [ ] **Guidage** : pastille **« Recommandé »** sur **Pro** ; une ligne **« Idéal pour… »** par palier (optionnel mais fort impact).
+- [ ] **(Plus tard)** Simulateur « estimation mensuelle » — hors scope minimal ; noter en backlog.
+
+---
+
+## Copywriting & cohérence textuelle — refonte (obligatoire avec la nouvelle grille)
+
+**Constat (captures actuelles type onboarding forfaits)** : textes **désalignés** avec la grille finale — ex. **15k / 40k / 100k**, **20 %** sans forfait, **illimité + 0 % + 10 %** Business, intro longue, étapes « admin valide » sans nuancer l’accès, e-mail technique visible. Même après correction des **chiffres**, les **formulations** peuvent rester fausses ou contradictoires : cette section impose une **repasse transverse** sur **tous** les libellés.
+
+### Audit & périmètre
+
+- [ ] **Inventaire des chaînes** : lister (grep / doc) tous les textes visibles partenaire B2B — **`app_chrono`** (`business-onboarding.tsx`, `success.tsx`, profil / mode business, erreurs réseau), **`admin_chrono`** (liste + fiche partenaire + modales + **`partner/.../billing`**), **messages API** (`message` renvoyés au client), **e-mails / templates** (invitation portail, reset, etc.).
+- [ ] **Alignement chiffres + mots** : chaque écran doit dire la **même chose** que le tableau « Grille tarifaire de référence » (prix, quotas, **dans le quota** / **au-delà**, sans forfait = **un** taux unique retenu).
+- [ ] **Glossaire produit** (une page ou bloc en tête de doc interne) : définitions stables — ex. **« Quota mensuel »** = nombre de livraisons où s’applique le taux réduit ; **« Au-delà du quota »** = taux majoré ; **« Abonnement »** = montant FCFA / mois ; **« Paiement à la course »** = pas d’abonnement, commission sur **chaque** livraison. **Ne pas** mélanger **capacité**, **excédent**, **dépassement** sans la même définition partout.
+- [ ] **Cohérence tutoiement / vouvoiement** : choisir **une** règle sur tout le parcours « Je suis pro » (aujourd’hui mélange possible entre étapes) et l’appliquer.
+- [ ] **Ton & promesses** : pas de superlatifs faux (**illimité**, **0 %** si ce n’est plus le modèle) ; pas de « ajustable avec Krono » sans dire **ce qui est figé dans l’app** vs **ce qui est contrat**.
+
+### Contenu par bloc d’écran (checklist fine)
+
+- [ ] **Titre + sous-titre** de l’écran forfaits : phrase courte + **une** phrase pédagogique (« l’abonnement réduit la commission dans le quota vs paiement à la course ») ; retirer le paragraphe trop long si redondant avec les cartes.
+- [ ] **Carte par plan** : titre, prix **FCFA/mois**, **3 lignes** alignées modèle mental — (1) quota inclus, (2) % dans le quota, (3) % au-delà ; **Business** = **toujours** un quota chiffré (ex. 110), jamais « illimité » contradictoire.
+- [ ] **Carte « sans forfait / paiement à la course »** : une ligne claire sur le **taux unique** (après tranche 6–7 %) + « pas d’abonnement » + **pour qui** (volume faible / test).
+- [ ] **Bloc « Comment ça marche ? »** : étapes **factuelles** (ce qui se passe dans l’app vs ce que fait l’admin vs e-mail portail) — recâbler le texte si le produit autorise un usage **avant** validation complète.
+- [ ] **Champ e-mail portail** : label + aide + placeholder **pro** ; pas d’affichage brut d’adresse technique type `*.chrono.local` sans cadre « compte de test ».
+- [ ] **Bouton principal + états** : libellé clair ; si désactivé → **message visible** (ex. « Choisissez un forfait ») ; texte de bas de page (facturation / activation) **aligné** avec la réalité juridique et produit.
+- [ ] **Écran succès / profil** : pas de mention d’anciens plans ou taux ; messages après envoi de demande **cohérents** avec statut `pending` / `active`.
+
+### Admin, portail, doc
+
+- [ ] **Admin** : libellés colonnes, filtres, modales création / abonnement — **même vocabulaire** que l’app ; tooltips ou aide si un champ dérive du plan.
+- [ ] **Portail partenaire (billing)** : intitulés « Taux in-quota / excédent / courses incluses » — chiffres issus de la **souscription** ou de la grille doc, pas d’anciennes constantes UI.
+- [ ] **`krono-reference-unique.md`** et **`diagnostic-flux-partenaire.md`** : supprimer toute phrase qui **contredit** la grille finale ou les écrans ; une seule narration tarifaire.
+- [ ] **Relecture finale** : orthographe, « FCFA », format des pourcentages (espace avant % si règle FR), accessibilité (contraste texte secondaire sur cartes).
+
+### Recette (copy)
+
+- [ ] **Parcours lecture seule** : quelqu’un qui ne connaît pas Krono lit les écrans **sans** voir de contradiction entre titre, cartes, encart vert et pied de page.
+- [ ] **Cross-check** : comparer **capture à capture** (ou Figma) app ↔ admin ↔ portail pour les **quatre** plans.
+
+---
+
 ## Scénario retenu (répartition téléphone / admin)
 
 **Téléphone (partenaire)** — tout est saisi côté app :
@@ -55,6 +129,7 @@ Document de suivi pour aligner produit, app, admin et backend sur la vision vali
 
 ## 1. Expérience mobile / app (parcours “Je suis professionnel”)
 
+- [ ] Reprendre **tous les textes** de ce parcours selon la section **« Copywriting & cohérence textuelle »** (pas seulement les nombres).
 - [ ] Après le profil “professionnel”, afficher un **écran comparatif** des **3 abonnements** (avantages clairs : quota, prix mensuel, ce qui se passe sur les courses in / hors quota).
 - [ ] Enchaîner sur un **menu ou écran “Comment ça marche”** (étapes : choix du forfait sur le téléphone → attente validation admin → activation → e-mail avec lien portail).
 - [ ] Le partenaire ne peut **pas valider** sans avoir **sélectionné le type de forfait** (et sans **e-mail portail** renseigné — au minimum prérempli et validable).
@@ -71,7 +146,7 @@ Document de suivi pour aligner produit, app, admin et backend sur la vision vali
 - [ ] Action **Activer** : déclenche **uniquement** validation + **envoi du lien portail** (et création souscription / rattachements selon règles métier), **sans** refaire la saisie du forfait ni de l’e-mail (sauf correction optionnelle de l’e-mail avant envoi).
 - [ ] **Création “Nouveau partenaire” depuis l’admin** : à redéfinir — soit **réservé** aux cas sans compte app (B2B pur back-office), soit **interdit** si un `partner_users` existe déjà pour l’utilisateur, soit **rattachement** à une demande existante pour éviter les doublons (ex. DM + DOUKOURE SHOP).
 - [ ] **Suppression / fusion en admin** : **constat actuel** — pas de bouton « Supprimer » sur la liste ni la fiche partenaire ; pas d’endpoint `DELETE /api/partners/:id` (`partnerRoutes.ts` + `adminApiService`). Pour les doublons (ancien vs nouveau modèle), nettoyage **manuel en base** jusqu’à implémentation : **suppression contrôlée** (règles FK : `partner_users`, commandes, souscriptions, factures) **ou** **fusion** guidée (conserver un `partner_id`, réaffecter les lignes liées).
-- [ ] Vérifier cohérence avec les **3 plans** documentés (prix, quotas, taux in-quota / excédent) et l’historique métier (doc `krono-reference-unique.md` si toujours à jour).
+- [ ] Vérifier cohérence avec la **grille tarifaire de référence** (section en tête) et `krono-reference-unique.md` ; supprimer les anciens montants (15k / 40k / 100k, 3 % / 0 % Business, etc.) partout où ils traînent.
 
 ---
 
@@ -102,13 +177,15 @@ Référence code actuelle : création partenaire auto avec `commission_rate: 0.2
 
 ## 5. Communication & conformité
 
-- [ ] Texte court sur l’app : ce que le partenaire **accepte** en cochant un plan (récap commission sur livraisons selon plan).
+- [ ] Texte court sur l’app : ce que le partenaire **accepte** en cochant un plan (récap commission sur livraisons selon plan) — **même formulation** que la section **Copywriting** (pas un récap légal différent des cartes).
 - [ ] Cohérence avec facturation / factures partenaire (`partner_invoices`, jobs) une fois le plan réellement actif.
+- [ ] Conditions générales / mentions légales (si existantes) : mettre à jour les **montants et %** en même temps que l’app.
 
 ---
 
 ## 6. Tests / recette (à cocher après implémentation)
 
+- [ ] **Recette copy** : critères de la section **« Copywriting & cohérence textuelle »** (parcours lecture seule + cross-check app / admin / portail).
 - [ ] Nouveau partenaire : parcours complet jusqu’au choix de plan sans 20 % “fantôme” en admin.
 - [ ] Toggle business off puis on (partenaire déjà agréé) : **aucune** remise en `pending`, **aucune** nouvelle activation admin requise.
 - [ ] Vraie réadhésion / changement de dossier (si flux prévu) : re-demande nom + **re-choix plan** uniquement dans ce cas, pas à chaque toggle.
@@ -121,9 +198,9 @@ Référence code actuelle : création partenaire auto avec `commission_rate: 0.2
 
 ## Notes de contexte (interne)
 
-- Les trois plans tarifaires et taux associés sont déjà décrits côté doc / code (`starter` / `pro` / `business`, quotas, commissions in-quota et excédent). La checklist **ne fige pas les chiffres** ici pour limiter la duplication ; mettre à jour ce fichier si les montants changent.
-- Fichiers déjà identifiés pour les corrections : `chrono_backend/src/controllers/partnerController.ts`, `chrono_backend/src/routes/partnerRoutes.ts`, `chrono_backend/src/services/b2bCommissionService.ts`, `app_chrono/app/(tabs)/profile.tsx` (`handleModeToggle`, `deregisterAsPartner`), `chrono_backend/src/middleware/verifyPartnerUser.ts`, `admin_chrono/app/(dashboard)/partners/page.tsx` et `[id]/page.tsx`, `admin_chrono/lib/adminApiService.ts`, flux `invitePartnerUser` / activation.
+- Les **chiffres officiels** partenaire B2B sont ceux du **tableau « Grille tarifaire de référence »** en tête de ce fichier ; toute évolution passe par ce tableau puis propagation **app + admin + backend + doc** dans la même série de commits / release.
+- Fichiers déjà identifiés pour les corrections : `chrono_backend/src/controllers/partnerController.ts`, `chrono_backend/src/routes/partnerRoutes.ts`, `chrono_backend/src/services/b2bCommissionService.ts`, `app_chrono/app/(tabs)/profile.tsx` (`handleModeToggle`, `deregisterAsPartner`), `chrono_backend/src/middleware/verifyPartnerUser.ts`, `admin_chrono/app/(dashboard)/partners/page.tsx` et `[id]/page.tsx`, `admin_chrono/lib/adminApiService.ts`, flux `invitePartnerUser` / activation ; **copy** : `app_chrono/app/(auth)/business-onboarding.tsx`, `app_chrono/app/(auth)/success.tsx`, `admin_chrono/app/(partner)/partner/[partnerId]/billing/page.tsx`, `docs/krono-reference-unique.md`, `docs/diagnostic-flux-partenaire.md`.
 
 ---
 
-*Dernière mise à jour : §2 gestion admin — absence delete/fusion (constat + tâches) ; §6 recette ; chemins admin/API.*
+*Dernière mise à jour : section **Copywriting & cohérence textuelle** (refonte transverse + recette copy) ; fichiers copy listés en note ; grille + produit/UX inchangés en substance.*

@@ -5,13 +5,13 @@ import logger from '../utils/logger.js';
 const db = () => supabaseAdmin ?? supabase;
 
 const PLAN_DEFAULTS: Record<string, { monthly_price: number; included_orders: number | null; excess_commission_rate: number }> = {
-  starter:  { monthly_price: 15000, included_orders: 50,   excess_commission_rate: 0.20 },
-  pro:      { monthly_price: 40000, included_orders: 200,  excess_commission_rate: 0.15 },
-  business: { monthly_price: 100000, included_orders: null, excess_commission_rate: 0.10 },
+  starter:  { monthly_price: 8000,  included_orders: 35,  excess_commission_rate: 0.06 },
+  pro:      { monthly_price: 16000, included_orders: 70,  excess_commission_rate: 0.05 },
+  business: { monthly_price: 29000, included_orders: 110, excess_commission_rate: 0.03 },
 };
 
-/** Sans forfait mensuel : commission prélevée sur chaque course (pas d'abonnement). Ajustable côté admin sur la fiche partenaire. */
-const PAY_PER_DELIVERY_COMMISSION_RATE = 0.2;
+/** Sans forfait : commission prélevée sur chaque course (pas d'abonnement). */
+const PAY_PER_DELIVERY_COMMISSION_RATE = 0.07;
 
 /** Statut partenaire depuis une jointure Supabase (objet ou tableau). */
 function statusFromPartnerJoin(partners: unknown): string | undefined {

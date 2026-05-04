@@ -9,9 +9,9 @@ import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 
 const PLAN_DETAILS: Record<string, { price: number; quota: number | null; inQuotaRate: number }> = {
-  starter:  { price: 15_000,  quota: 50,   inQuotaRate: 0.03 },
-  pro:      { price: 40_000,  quota: 200,  inQuotaRate: 0.03 },
-  business: { price: 100_000, quota: null, inQuotaRate: 0.00 },
+  starter:  { price: 8_000,  quota: 35,  inQuotaRate: 0.05 },
+  pro:      { price: 16_000, quota: 70,  inQuotaRate: 0.03 },
+  business: { price: 29_000, quota: 110, inQuotaRate: 0.02 },
 }
 
 export default function PartnerBillingPage() {
@@ -60,7 +60,7 @@ export default function PartnerBillingPage() {
             {[
               { label: 'Plan', value: sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1), Icon: CreditCard, color: themeColors.purplePrimary },
               { label: 'Forfait mensuel', value: `${sub.monthly_price.toLocaleString('fr-FR')} FCFA`, Icon: CreditCard, color: themeColors.bluePrimary },
-              { label: 'Courses incluses', value: sub.included_orders !== null ? String(sub.included_orders) : 'Illimité', Icon: TrendingUp, color: themeColors.greenPrimary },
+              { label: 'Courses incluses', value: sub.included_orders !== null ? String(sub.included_orders) : '—', Icon: TrendingUp, color: themeColors.greenPrimary },
               { label: 'Taux in-quota', value: planDetails ? `${(planDetails.inQuotaRate * 100).toFixed(0)} %` : '—', Icon: CheckCircle, color: themeColors.greenPrimary },
               { label: 'Taux excédent', value: `${(sub.excess_commission_rate * 100).toFixed(0)} %`, Icon: Clock, color: themeColors.yellowPrimary },
               { label: 'Statut', value: sub.is_active ? 'Actif' : 'Inactif', Icon: CheckCircle, color: sub.is_active ? themeColors.greenPrimary : themeColors.redPrimary },
