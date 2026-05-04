@@ -118,6 +118,59 @@
       "registeredOn": "Inscrit le"
     }
   },
+  "partnersPage": {
+    "title": "Partenaires B2B",
+    "partnerCountOne": "{{count}} partenaire",
+    "partnerCountMany": "{{count}} partenaires",
+    "newPartner": "Nouveau partenaire",
+    "searchPlaceholder": "Rechercher un partenaire…",
+    "filterStatusAria": "Filtrer par statut",
+    "filterPlanAria": "Filtrer par forfait",
+    "statusAll": "Tous les statuts",
+    "planAll": "Tous les plans",
+    "empty": "Aucun partenaire trouvé",
+    "colPartner": "Partenaire",
+    "colPlan": "Plan",
+    "colCommission": "Commission",
+    "colApproval": "Status",
+    "colCreated": "Créé le",
+    "colActions": "Actions",
+    "noPlan": "Sans forfait",
+    "requestedBadge": "demandé",
+    "activate": "Activer",
+    "deleteTitle": "Supprimer",
+    "status": {
+      "active": "Actif",
+      "pending": "En attente",
+      "inactive": "Inactif",
+      "suspended": "Suspendu"
+    },
+    "createModal": {
+      "title": "Nouveau partenaire",
+      "nameRequired": "Le nom est requis",
+      "createError": "Erreur lors de la création. Réessaie.",
+      "labelName": "Nom *",
+      "labelEmail": "Email",
+      "labelPhone": "Téléphone",
+      "planOptional": "Forfait (optionnel — cas back-office sans app)",
+      "planNoneOption": "— Sans forfait —",
+      "planStarterOption": "Starter — 8 000 FCFA / mois",
+      "planProOption": "Pro — 16 000 FCFA / mois",
+      "planBusinessOption": "Business — 29 000 FCFA / mois",
+      "commissionLabel": "Commission manuelle (%) — uniquement si pas de forfait",
+      "commissionPlaceholder": "Laisser vide si forfait renseigné",
+      "notes": "Notes",
+      "notesPlaceholder": "Infos internes...",
+      "creating": "Création…",
+      "create": "Créer"
+    },
+    "deleteModal": {
+      "title": "Supprimer le partenaire",
+      "description": "Tu supprimes définitivement {{name}}. Les factures et abonnements liés seront effacés ; les commandes restent en base sans lien partenaire.",
+      "deleteError": "Impossible de supprimer ce partenaire.",
+      "deleting": "Suppression…"
+    }
+  },
   "dashboard": {
     "title": "Dashboard",
     "newDelivery": "+ Nouvelle livraison",

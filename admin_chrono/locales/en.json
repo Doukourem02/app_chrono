@@ -118,6 +118,59 @@
       "registeredOn": "Registered on"
     }
   },
+  "partnersPage": {
+    "title": "B2B Partners",
+    "partnerCountOne": "{{count}} partner",
+    "partnerCountMany": "{{count}} partners",
+    "newPartner": "New partner",
+    "searchPlaceholder": "Search for a partner…",
+    "filterStatusAria": "Filter by status",
+    "filterPlanAria": "Filter by plan",
+    "statusAll": "All statuses",
+    "planAll": "All plans",
+    "empty": "No partners found",
+    "colPartner": "Partner",
+    "colPlan": "Plan",
+    "colCommission": "Commission",
+    "colApproval": "Status",
+    "colCreated": "Created",
+    "colActions": "Actions",
+    "noPlan": "No plan",
+    "requestedBadge": "requested",
+    "activate": "Activate",
+    "deleteTitle": "Delete",
+    "status": {
+      "active": "Active",
+      "pending": "Pending",
+      "inactive": "Inactive",
+      "suspended": "Suspended"
+    },
+    "createModal": {
+      "title": "New partner",
+      "nameRequired": "Name is required",
+      "createError": "Could not create. Please try again.",
+      "labelName": "Name *",
+      "labelEmail": "Email",
+      "labelPhone": "Phone",
+      "planOptional": "Plan (optional — back-office only)",
+      "planNoneOption": "— No plan —",
+      "planStarterOption": "Starter — 8,000 FCFA / month",
+      "planProOption": "Pro — 16,000 FCFA / month",
+      "planBusinessOption": "Business — 29,000 FCFA / month",
+      "commissionLabel": "Manual commission (%) — only if no plan",
+      "commissionPlaceholder": "Leave empty if a plan is set",
+      "notes": "Notes",
+      "notesPlaceholder": "Internal notes...",
+      "creating": "Creating…",
+      "create": "Create"
+    },
+    "deleteModal": {
+      "title": "Delete partner",
+      "description": "You are permanently deleting {{name}}. Related invoices and subscriptions will be removed; orders stay in the database without a partner link.",
+      "deleteError": "Could not delete this partner.",
+      "deleting": "Deleting…"
+    }
+  },
   "dashboard": {
     "title": "Dashboard",
     "newDelivery": "+ New delivery",

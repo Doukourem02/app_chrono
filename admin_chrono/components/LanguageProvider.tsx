@@ -5,6 +5,7 @@ import { useLanguageStore } from '@/stores/languageStore'
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const language = useLanguageStore((state) => state.language)
+  const setLanguage = useLanguageStore((state) => state.setLanguage)
 
   useEffect(() => {
     // Appliquer la langue au document
@@ -13,27 +14,18 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
   }, [language])
 
-  // Initialiser la langue au premier rendu
+  // Première visite : aligner le store (donc les traductions) avec la langue du navigateur.
+  // Avant la correction, on ne mettait que document.lang, ce qui désynchronisait l’UI.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedLanguage = localStorage.getItem('language-storage')
-      if (storedLanguage) {
-        try {
-          const parsed = JSON.parse(storedLanguage)
-          if (parsed.state?.language) {
-            document.documentElement.lang = parsed.state.language
-          }
-        } catch {
-          // Ignorer les erreurs de parsing
-        }
-      } else {
-        // Si aucune langue n'est stockée, détecter la langue du navigateur
-        const browserLang = navigator.language.split('-')[0]
-        const defaultLang = browserLang === 'en' ? 'en' : 'fr'
-        document.documentElement.lang = defaultLang
-      }
+    if (typeof window === 'undefined') return
+    if (localStorage.getItem('language-storage')) return
+
+    const browserLang = navigator.language.split('-')[0]
+    const defaultLang = browserLang === 'en' ? 'en' : 'fr'
+    if (useLanguageStore.getState().language !== defaultLang) {
+      setLanguage(defaultLang)
     }
-  }, [])
+  }, [setLanguage])
 
   return <>{children}</>
 }
