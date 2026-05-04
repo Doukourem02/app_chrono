@@ -436,7 +436,7 @@ Krono doit s'adapter au workflow du commerçant, et non l'inverse. Le problème 
 
 ### Pourquoi le B2B
 
-Krono sert aujourd'hui des particuliers (B2C). Le B2B cible des professionnels — e-commerces, restaurants, pharmacies, boutiques — qui ont des volumes élevés et réguliers. Au lieu de payer 6 % de frais à la course, ils s'abonnent à un forfait mensuel avec un quota de livraisons incluses et un taux réduit dans ce quota.
+Krono sert aujourd'hui des particuliers (B2C). Le B2B cible des professionnels — e-commerces, restaurants, pharmacies, boutiques — qui ont des volumes élevés et réguliers. Au lieu de payer le taux « paiement à la course » (voir grille ; typiquement 7 %), ils s'abonnent à un forfait mensuel avec un quota de livraisons incluses et un taux réduit dans ce quota.
 
 Revenus Krono : forfait prévisible + commissions sur excédents. Valeur partenaire : coût réduit par livraison, tournées groupées, portail dédié.
 
@@ -451,7 +451,7 @@ Revenus Krono : forfait prévisible + commissions sur excédents. Valeur partena
 
 **Paiement Profil 1** : commandes pour ses clients → compte business, immédiat ou différé si éligible ; commandes pour lui-même → contexte client, règles Profil 0.
 
-**Commission Profil 1** : sans abonnement → `partners.commission_rate` (6 % par défaut) ; avec abonnement → frais in-quota selon plan (voir Plans tarifaires).
+**Commission Profil 1** : sans abonnement actif → `partners.commission_rate` (aligné grille « paiement à la course », typiquement 7 %) ; avec abonnement actif → frais in-quota selon plan (voir Plans tarifaires).
 
 ### Interfaces — qui utilise quoi
 
@@ -504,7 +504,7 @@ Ce profil correspond aux **Profil 1** et **Profil 2** de la stratégie Krono (pe
 
 **Partenaire** — contrat formel entre Krono et une entreprise
 
-C'est une **entité distincte** créée par l'admin dans la table `partners`. Elle a un plan d'abonnement, un quota mensuel, une facturation automatique, et un accès au portail web. Elle peut avoir plusieurs utilisateurs liés (ex : 3 gestionnaires d'une même enseigne).
+C'est une **entité distincte** dans la table `partners`. Le parcours **prioritaire** est la demande depuis l'app (`registerAsPartner` : statut `pending`, plan et e-mail portail) puis **activation** admin ; l'admin peut aussi créer une fiche hors app (cas B2B pur back-office). La ligne a un plan demandé ou souscrit, un quota mensuel, une facturation automatique, et un accès au portail web. Elle peut avoir plusieurs utilisateurs liés (ex : 3 gestionnaires d'une même enseigne).
 
 > **Exemple concret :** MedExpress est une chaîne de pharmacies avec 150 livraisons/mois. L'admin Krono crée une fiche partenaire "MedExpress" dans `partners`, lui attribue le plan Pro (70 courses/mois, 3 % de frais de service in-quota). Les 3 managers de MedExpress sont ensuite liés à ce partenaire via `partner_users`. Ils accèdent au portail web `/partner/:id/dashboard` pour voir leurs commandes, leur quota, leurs factures.
 
@@ -531,7 +531,7 @@ Dans l'implémentation actuelle, `NewB2BShippingModal` bloque si `user.partner_i
 
 | Profil | `is_business` | `partner_id` | Accès B2B attendu |
 |--------|--------------|--------------|-------------------|
-| Profil 1 (petit commerçant) | `true` | `null` | ✅ Doit pouvoir créer des livraisons — frais de service 6 % par défaut |
+| Profil 1 (petit commerçant) | `true` | `null` | ✅ Doit pouvoir créer des livraisons — frais selon `partners.commission_rate` ou règle métier sans abonnement (voir grille) |
 | Profil 2 (volume modéré) | `true` | `null` ou lié | ✅ Tournées disponibles — commission selon abonnement si lié |
 | Profil 3 (entreprise) | `true` | lié par admin | ✅ Quota, facturation, portail — commission selon plan |
 
@@ -553,6 +553,27 @@ Un abonnement réduit les frais de service sur les livraisons dans le quota par 
 Sans abonnement : `partners.commission_rate = 0.07` (7 % sur chaque livraison — taux le plus élevé pour inciter à l'abonnement).
 Ces valeurs sont les constantes uniques : toute modification passe par `PLAN_DEFAULTS` dans `partnerController.ts` et `QUOTA_COMMISSION` dans `b2bCommissionService.ts`, puis propagée app + admin + doc.
 
+### Principes produit, glossaire et parcours partenaire
+
+**Vision** : mettre en avant les forfaits (Starter, Pro, Business) et l'option « paiement à la course » avant toute commission opaque. Aucun abonnement ni taux d'accord sans **choix explicite** (sélection de plan + validation). Les **frais de service sur les livraisons** (souvent appelés « commission » en interne) sont distincts du **montant de l'abonnement** dans la communication utilisateur.
+
+**Glossaire stable** :
+
+| Terme | Définition |
+|--------|-------------|
+| **Quota mensuel** | Nombre de livraisons du mois civil où s'applique le taux in-quota réduit du plan. |
+| **Au-delà du quota** | Livraisons du même mois après le quota → taux majoré (`excess_commission_rate` sur la souscription). |
+| **Abonnement** | Montant FCFA/mois du forfait (Starter / Pro / Business). |
+| **Paiement à la course** | Pas d'abonnement ; clé plan API `none` ; commission sur **chaque** livraison (`partners.commission_rate`). |
+
+**Scénario retenu (téléphone / admin)** : tout le métier forfait + e-mail portail est saisi dans l'app. L'admin **active** (`pending` → `active`), l'abonnement facturable et l'invitation portail suivent le plan et l'e-mail déjà enregistrés (pas de re-saisie standard du forfait). Garde-fou : corriger l'e-mail portail avant envoi si erreur évidente. **Unicité** : un utilisateur → un partenaire logique via `partner_users` ; éviter doublon « admin + app » sans règle de fusion.
+
+**Agrément vs mode business** : une fois le partenaire **accepté** (activation + lien portail), couper le mode business dans l'app ne doit pas exiger une **nouvelle** activation admin à chaque fois (le statut agrément reste `active` ; seul `users.is_business` reflète l'usage immédiat). Voir la sous-section « Statuts partenaire » ci-dessous.
+
+**Copy et cohérence** : les écrans app (`business-onboarding.tsx`, succès, profil), admin (liste, fiche, portail facturation) et les messages API doivent reprendre les **mêmes chiffres** que la grille ; pas de « livraisons illimitées » contradictoire avec un quota chiffré ; pas d'anciens paliers (15k / 40k / 100k, 20 % implicite, etc.).
+
+**Périmètre encore ouvert (hors doc seule)** : suppression ou fusion partenaire côté admin (API + FK) ; comportement explicite si `commission_rate` absent sans abonnement ; assouplissement `NewB2BShippingModal` / `partner_id` ; CGU alignées sur la grille ; simulateur d'estimation mensuelle = backlog produit.
+
 ### Axes de monétisation futurs (Axes 3–6)
 
 | Axe | Horizon | Description |
@@ -573,7 +594,7 @@ Ces valeurs sont les constantes uniques : toute modification passe par `PLAN_DEF
 | `partners` | Fiche entreprise partenaire (nom, email, téléphone, plan, commission_rate, status) |
 | `partner_users` | Utilisateurs du partenaire (`owner` / `manager`) — porte l'accès portail |
 | `partner_drivers` | Livreurs attitrés d'un partenaire |
-| `partner_subscriptions` | Abonnement actif (`pending_payment` → `active`), historique des plans |
+| `partner_subscriptions` | Abonnement (`payment_status`, `is_active`) — à l'activation admin, création en `active` si le plan est déjà choisi côté app |
 | `partner_usage` | Compteur mensuel de livraisons par partenaire (upsert atomique SQL) |
 | `partner_invoices` | Factures mensuelles générées automatiquement |
 | `delivery_batches` | Tournées groupées (ensemble de commandes à livrer en une sortie) |
@@ -585,13 +606,13 @@ La table `orders` reçoit une colonne `partner_id UUID REFERENCES partners(id)` 
 
 ### Logique commission B2B (b2bCommissionService)
 
-À chaque commande B2B, trois cas :
+Pour une commande B2B rattachée à un `partner_id`, le service lit l'abonnement actif (`is_active`, `payment_status = active`) puis l'usage du mois (`partner_usage`) :
 
-1. **Abonnement actif + quota non dépassé** → taux `in_quota` (3 % Starter/Pro, 0 % Business)
-2. **Abonnement actif + quota dépassé** → `excess_commission_rate` (10-20 % selon plan)
-3. **Pas d'abonnement** → taux standard `partners.commission_rate` (15-25 %)
+1. **Abonnement actif + quota non dépassé** → taux **in-quota** (`QUOTA_COMMISSION`) : Starter **5 %**, Pro **3 %**, Business **2 %**.
+2. **Abonnement actif + quota dépassé** → `excess_commission_rate` de la souscription (aligné sur `PLAN_DEFAULTS` dans `partnerController.ts`, ex. Starter **6 %**, Pro **5 %**, Business **3 %**).
+3. **Pas d'abonnement actif** → `partners.commission_rate` (souvent **0,07** pour paiement à la course ; pas de repli implicite type 20 % sur données propres).
 
-Le compteur `partner_usage.deliveries_count` est incrémenté via un `INSERT … ON CONFLICT DO UPDATE` SQL atomique pour éviter les doublons en cas de requêtes simultanées.
+Branchement : `orderRecordController` appelle `computeB2BCommission` puis `incrementPartnerUsage`. Le compteur `partner_usage.deliveries_count` est incrémenté via un `INSERT … ON CONFLICT DO UPDATE` SQL atomique pour éviter les doublons en cas de requêtes simultanées.
 
 ### Comportement dispatch B2B
 
@@ -629,16 +650,20 @@ Contenu de la facture générée :
 
 | Statut | Qui l'applique | Sens métier |
 |--------|----------------|-------------|
-| `pending` | Système / onboarding | En attente de validation admin avant accès B2B. |
-| `active` | Admin (activation) | Partenaire opérationnel — commandes, quota, portail. |
-| `inactive` | **Partenaire** (toggle Mode personnel / `deregister`) | Choix volontaire de ne plus être actif en B2B. À ne **pas** confondre avec une sanction admin. |
-| `suspended` | **Admin Krono** | Suspension contractuelle, litige, impayé — levée par l'admin. |
+| `pending` | Onboarding app / création admin | En attente de validation admin avant agrément complet. |
+| `active` | Admin (activation) | Partenaire opérationnel — commandes sous contrat, quota, portail. |
+| `inactive` | **Admin Krono** (sortie programme, impayé, etc.) | Agrément retiré ou gelé côté contrat — portail bloqué. **Ce n'est pas** le simple passage « mode perso » dans l'app. |
+| `suspended` | **Admin Krono** | Suspension contractuelle, litige — levée par l'admin. |
 
-**Règle de réactivation (Option B — retenue)** : `registerAsPartner` repasse le partenaire en `pending` si le statut était `inactive`. L'admin doit ensuite cliquer "Activer" pour passer en `active`. L'admin dispose d'un bouton "Réactiver" (override direct `→ active`) pour les cas exceptionnels (suspension levée, etc.).
+**Séparation `users.is_business` (mode business à l'usage) / `partners.status` (agrément)** : couper le mode business dans le profil app met `is_business` à `false` via `setBusinessMode` (endpoint dédié) — **sans** modifier `partners.status`. Le rallumage avec un partenaire déjà `active` remet `is_business` à `true` sans repasser en `pending`. Si le partenaire est `inactive` côté agrément, le portail reste bloqué jusqu'à action admin, même si l'utilisateur remet le toggle.
 
-**Séparation inactif volontaire / sanction admin** : le bouton "Désactiver" depuis l'admin passe en `inactive` mais doit être tracé (`actor = admin`) dans les logs d'audit pour ne pas être confondu avec un toggle partenaire. Le bouton "Suspendre" passe en `suspended`. Ces deux actions sont distinctes visuellement et dans les audits.
+**`registerAsPartner`** : crée un partenaire `pending` + lien `partner_users` si absent ; si lien existant en `active` ou `pending`, met à jour le `plan` (et cohérence « none » + taux à la course) selon le corps de requête ; si `inactive`, ne rétablit pas l'agrément seul — message métier côté API indiquant qu'une réactivation admin peut être nécessaire.
 
-**Lien `partner_users` en mode `inactive`** : le lien `user_id ↔ partner_id` est conservé — jamais supprimé automatiquement. Cela préserve l'historique, les invitations et la réactivation sans recréer une identité.
+**`activatePartner` (admin)** : `pending` → `active`, création de `partner_subscriptions` **active** si un plan forfait est déjà choisi, invitation portail best-effort sur `partners.email`.
+
+**Séparation inactif administratif / sanction** : les actions admin « Désactiver » / « Suspendre » doivent rester **tracées** (`actor = admin`) dans les audits pour ne pas être confondues avec le toggle utilisateur (voir « Reste à faire » — table d'audit dédiée si absente).
+
+**Lien `partner_users`** : conservé pour l'historique ; une désactivation agrément ne supprime pas automatiquement le lien utilisateur ↔ partenaire.
 
 ---
 
@@ -648,16 +673,15 @@ Les routes `/api/partner/:partnerId/...` sont protégées par `verifyPartnerUser
 1. Vérifie le token Bearer Supabase de l'utilisateur
 2. Contrôle que cet utilisateur appartient au partenaire visé via `partner_users` (403 sinon)
 3. Vérifie que `partners.status = 'active'` — si non, retourne 403 avec un message contextualisé :
-   - `pending` → "En attente de validation par un administrateur Krono"
-   - `inactive` → "Repassez en mode business depuis l'application"
-   - `suspended` → "Compte suspendu — contactez le support Krono"
+   - `pending` → attente validation administrateur Krono
+   - `inactive` / `suspended` → contacter le support Krono (agrément ou suspension — distinct du toggle mode business dans l'app)
 4. Injecte `req.partnerUser` (`userId`, `partnerId`, `role`) dans la requête
 
 Un partenaire ne voit jamais les données d'un autre partenaire. Un partenaire non `active` n'accède à aucune route sensible du portail.
 
 **Portail — banner de statut** : le layout `/partner/:partnerId/layout.tsx` affiche un bandeau contextuel en haut de chaque page si `partners.status ≠ active`. Le message varie selon `pending` / `inactive` / `suspended`.
 
-**Admin — synchronisation temps réel** : les pages liste et fiche partenaire utilisent une subscription Supabase Realtime (`postgres_changes` sur `partners`). Quand le partenaire bascule son mode depuis l'app, l'admin voit le changement instantanément via WebSocket — sans poll ni refresh manuel. Prérequis : activer Realtime sur la table `partners` dans Supabase Dashboard → Database → Replication.
+**Admin — synchronisation temps réel** : les pages liste et fiche partenaire peuvent s'abonner à Supabase Realtime (`postgres_changes` sur `partners`) pour refléter les changements de **fiche partenaire** (statut, plan, etc.). Le simple toggle **mode business** dans l'app met à jour `users`, pas `partners` — une colonne « mode business » côté admin nécessiterait une autre source (poll, vue matérialisée ou Realtime sur `users` si activé). Prérequis pour les changements `partners` : activer Realtime sur la table `partners` dans Supabase Dashboard → Database → Replication.
 
 ### Portail partenaire — alignement rôle unique et points ouverts
 
@@ -981,25 +1005,25 @@ Les N commandes d'un batch sont créées **silencieusement** via REST. Aucune po
 
 ---
 
-### État d'avancement B2B (au 2026-05-03)
+### État d'avancement B2B (au 2026-05-04)
 
 | Bloc | Contenu | Statut |
 |---|---|---|
-| **Bloc 1** | Migrations SQL `032`→`035` (8 tables + `partner_id` sur `orders`) | ⏳ À appliquer dans Supabase SQL Editor |
-| **Bloc 2** | Routes backend, commission, tournées, facturation, middleware | ✅ Implémenté |
+| **Bloc 1** | Migrations SQL `032`→`037` (8 tables + `partner_id` sur `orders` + statut `inactive`) | ⏳ À appliquer sur chaque projet Supabase (SQL Editor, dans l'ordre) |
+| **Bloc 2** | Routes backend, `computeB2BCommission` dans `orderRecordController`, tournées, facturation, middleware | ✅ Implémenté |
 | **Bloc 3** | Interface admin : créer/gérer partenaires, activer abonnements + portail partenaire complet | ✅ Implémenté |
-| **Bloc 4** | `app_chrono` : onboarding B2B, Profil 1 (livraison client), Profil 2 (tournée), ActionCards | ✅ Implémenté |
-| **Bloc 5** | `driver_chrono` : réception tournée groupée (1 notif), vue ordonnée, validation par livraison, contexte partenaire (nom, position tournée, bouton "Voir la tournée") | ✅ Implémenté (2026-05-03) |
-| **Bloc 6** | Décision commission Option A/B | ✅ Validé : Option B (3 % Starter/Pro, 0 % Business) |
-| **Bloc 7** | Statuts, sécurité portail, sync admin temps réel | ✅ Implémenté (2026-05-03) |
+| **Bloc 4** | `app_chrono` : onboarding B2B, Profil 1 (livraison client), Profil 2 (tournée), ActionCards, `setBusinessMode` pour le toggle | ✅ Implémenté |
+| **Bloc 5** | `driver_chrono` : réception tournée groupée (1 notif), vue ordonnée, validation par livraison, contexte partenaire | ✅ Implémenté |
+| **Bloc 6** | Grille tarifaire v2 (forfaits + paiement à la course) | ✅ Alignée doc + `PLAN_DEFAULTS` + `QUOTA_COMMISSION` (toute évolution : une seule source puis propagation) |
+| **Bloc 7** | Statuts, séparation agrément / mode business, sécurité portail, sync admin temps réel | ✅ Implémenté (ajustements audit voir ci-dessous) |
 
 **Reste à faire :**
-1. Appliquer les migrations `032` → `037` dans Supabase SQL Editor (dans l'ordre) — la `037` est critique : elle ajoute `inactive` au CHECK constraint sans lequel tous les `deregister` échouent silencieusement
-2. Brancher `computeB2BCommission` dans le flux de création de commande (`orderRecordController`)
-3. Synchroniser `partner_id` dans `useAuthStore` lors du `validateUser` (pour ne pas forcer re-login)
-4. Assouplir la condition `partner_id` dans `NewB2BShippingModal` : Profil 1 (`is_business=true`, `partner_id=null`) doit pouvoir créer des livraisons avec commission par défaut 3 % — le blocage actuel est trop restrictif (voir section "Concepts fondamentaux")
-5. **Audit / traçabilité** (non implémenté) : journaliser désactivation, réactivation et suspension avec `user_id` / `partner_id` / `ancien_statut` / `nouveau_statut` / `timestamp` / `source` (`app` | `admin` | `portail`). Créer une table `partner_audit_logs` ou enrichir les logs backend existants.
-6. Activer Realtime sur la table `partners` dans Supabase Dashboard (Database → Replication) pour que la sync admin instantanée fonctionne
+1. Appliquer les migrations `032` → `037` sur l'environnement Supabase cible (dans l'ordre) — la `037` ajoute `inactive` au CHECK de `partners.status` (requis pour les chemins admin qui passent un partenaire en `inactive`).
+2. Synchroniser `partner_id` dans `useAuthStore` lors du `validateUser` si besoin (éviter alertes « compte non lié » après onboarding sans re-login).
+3. Assouplir la condition `partner_id` dans `NewB2BShippingModal` : Profil 1 (`is_business=true`, `partner_id=null`) doit pouvoir créer des livraisons avec commission selon règle métier (voir section « Concepts fondamentaux » et grille sans abonnement).
+4. **Audit / traçabilité** (non implémenté) : journaliser désactivation, réactivation et suspension avec `user_id` / `partner_id` / `ancien_statut` / `nouveau_statut` / `timestamp` / `source` (`app` | `admin` | `portail`). Créer une table `partner_audit_logs` ou enrichir les logs backend existants.
+5. Activer Realtime sur la table `partners` dans Supabase Dashboard (Database → Replication) pour que la sync admin instantanée fonctionne.
+6. API suppression / fusion partenaire, unicité stricte, CGU : voir « Périmètre encore ouvert » dans la section principes partenaire ci-dessus.
 
 ### Roadmap produit
 
@@ -1034,4 +1058,4 @@ Le commissionnaire est une feature **B2C** distincte : le livreur agit à la pla
 
 Il doit rester un fichier principal de référence dans `docs/` :
 
-- `docs/krono-reference-unique.md` : référence projet, contrat produit, décisions, cartes de fichiers.
+- `docs/krono-reference-unique.md` : référence projet, contrat produit, décisions, cartes de fichiers — y compris principes, glossaire, parcours et dette ouverte **partenaire B2B** (section 16), source unique à tenir alignée avec le code.

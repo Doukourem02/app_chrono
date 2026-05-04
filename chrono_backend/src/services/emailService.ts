@@ -244,3 +244,42 @@ Expire dans ${OTP_TTL_MINUTES} min.
     return { success: false, error: msg };
   }
 };
+
+/** Lien magic / recovery généré par Supabase Admin — à envoyer quand le compte existe déjà (portail partenaire). */
+export async function sendPartnerPortalMagicLinkEmail(
+  to: string,
+  actionLink: string,
+  partnerName: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!process.env.EMAIL_USER?.trim() || !process.env.EMAIL_PASS?.trim()) {
+    logger.warn('[emailService] Partner portal: SMTP non configuré (EMAIL_USER / EMAIL_PASS)');
+    return { success: false, error: 'smtp_not_configured' };
+  }
+  try {
+    const fromName = process.env.EMAIL_FROM_NAME || 'Krono';
+    const fromAddr = process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER;
+    const html = `
+      <!DOCTYPE html>
+      <html><head><meta charset="utf-8"></head>
+      <body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
+        <p>Bonjour,</p>
+        <p>Votre accès au <strong>portail partenaire Krono</strong> (${partnerName}) est prêt.</p>
+        <p><a href="${actionLink}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;">Se connecter au portail</a></p>
+        <p style="font-size:13px;color:#666;">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>${actionLink}</p>
+        <p style="font-size:13px;color:#666;">— Krono</p>
+      </body></html>`;
+    await createTransporter().sendMail({
+      from: `${fromName} <${fromAddr}>`,
+      to,
+      subject: `Portail partenaire Krono — ${partnerName}`,
+      html,
+      text: `Portail partenaire Krono (${partnerName})\n\nConnexion : ${actionLink}\n`,
+    });
+    logger.info(`[emailService] Lien portail partenaire envoyé à ${to}`);
+    return { success: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('[emailService] sendPartnerPortalMagicLinkEmail:', error);
+    return { success: false, error: msg };
+  }
+}

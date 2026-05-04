@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import logger from '../utils/logger.js';
+import { sendPartnerPortalMagicLinkEmail } from '../services/emailService.js';
 
 const db = () => supabaseAdmin ?? supabase;
 
@@ -226,8 +227,109 @@ export const getPartnerUsage = async (req: Request, res: Response): Promise<void
   });
 };
 
+function isInviteEmailAlreadyRegisteredError(err: { message?: string } | null | undefined): boolean {
+  const m = (err?.message ?? '').toLowerCase();
+  return (
+    m.includes('already been registered') ||
+    m.includes('already registered') ||
+    m.includes('user already exists') ||
+    m.includes('email address is already') ||
+    m.includes('duplicate') ||
+    m.includes('email_exists')
+  );
+}
+
+/** Résout l’UUID Auth / public.users à partir de l’e-mail (compte app déjà créé). */
+async function resolveUserIdByEmail(normalizedEmail: string): Promise<string | null> {
+  const { data: row } = await db()
+    .from('users')
+    .select('id')
+    .ilike('email', normalizedEmail)
+    .maybeSingle();
+  if (row?.id) return row.id as string;
+
+  if (!supabaseAdmin) return null;
+  for (let page = 1; page <= 20; page++) {
+    const { data: bundle, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error || !bundle?.users?.length) break;
+    const hit = bundle.users.find((u) => (u.email ?? '').toLowerCase() === normalizedEmail);
+    if (hit?.id) return hit.id;
+    if (bundle.users.length < 1000) break;
+  }
+  return null;
+}
+
+type AttachPortalResult =
+  | { ok: true; userId: string; magicLinkEmailed: boolean }
+  | { ok: false; message: string };
+
+/** Compte Auth déjà existant : lien partner_users + e-mail avec lien de connexion (SMTP Krono). */
+async function attachExistingUserAndSendPortalLink(params: {
+  normalizedEmail: string;
+  partnerId: string;
+  partnerName: string;
+  role: string;
+  redirectTo: string;
+}): Promise<AttachPortalResult> {
+  const { normalizedEmail, partnerId, partnerName, role, redirectTo } = params;
+  const userId = await resolveUserIdByEmail(normalizedEmail);
+  if (!userId) {
+    return {
+      ok: false,
+      message:
+        "Cet e-mail a déjà un compte, mais aucun profil correspondant n'a été trouvé. Vérifiez que le mail est le même que sur l'app client.",
+    };
+  }
+
+  const { error: puError } = await db()
+    .from('partner_users')
+    .upsert({ partner_id: partnerId, user_id: userId, role }, { onConflict: 'partner_id,user_id' });
+
+  if (puError) {
+    logger.error('[partnerController] attachExisting partner_users:', puError);
+    return { ok: false, message: 'Erreur lors de la liaison au partenaire' };
+  }
+
+  if (!supabaseAdmin) {
+    return { ok: true, userId, magicLinkEmailed: false };
+  }
+
+  let actionLink: string | undefined;
+  const { data: magicGen, error: magicErr } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: normalizedEmail,
+    options: { redirectTo },
+  });
+  if (!magicErr && magicGen?.properties?.action_link) {
+    actionLink = magicGen.properties.action_link;
+  } else {
+    logger.warn('[partnerController] generateLink magiclink:', magicErr?.message);
+    const { data: recGen, error: recErr } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email: normalizedEmail,
+      options: { redirectTo },
+    });
+    if (!recErr && recGen?.properties?.action_link) {
+      actionLink = recGen.properties.action_link;
+    } else {
+      logger.warn('[partnerController] generateLink recovery:', recErr?.message);
+    }
+  }
+
+  let magicLinkEmailed = false;
+  if (actionLink) {
+    const sendResult = await sendPartnerPortalMagicLinkEmail(normalizedEmail, actionLink, partnerName);
+    magicLinkEmailed = sendResult.success;
+    if (!sendResult.success) {
+      logger.info(`[partnerController] Lien portail (SMTP non utilisé), à transmettre manuellement si besoin : ${actionLink}`);
+    }
+  }
+
+  return { ok: true, userId, magicLinkEmailed };
+}
+
 // ─── POST /api/partners/:id/invite — admin only ───────────────────────────────
-// Crée un compte Supabase pour le partenaire + envoie le mail d'invitation
+// Nouveau compte : invite Supabase. Compte déjà existant (app) : liaison + lien de connexion par mail.
 export const invitePartnerUser = async (req: Request, res: Response): Promise<void> => {
   const { id: partnerId } = req.params;
   const { email } = req.body as { email: string };
@@ -255,18 +357,42 @@ export const invitePartnerUser = async (req: Request, res: Response): Promise<vo
     return;
   }
 
+  const normalized = email.trim().toLowerCase();
   const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
 
-  // Invite via Supabase (crée le compte + envoie le mail automatiquement)
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-    email.trim().toLowerCase(),
-    {
-      redirectTo,
-      data: { partner_id: partnerId, partner_name: partner.name, role },
-    }
-  );
+  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(normalized, {
+    redirectTo,
+    data: { partner_id: partnerId, partner_name: partner.name, role },
+  });
 
   if (inviteError) {
+    if (isInviteEmailAlreadyRegisteredError(inviteError)) {
+      const attached = await attachExistingUserAndSendPortalLink({
+        normalizedEmail: normalized,
+        partnerId,
+        partnerName: partner.name,
+        role,
+        redirectTo,
+      });
+      if (!attached.ok) {
+        res.status(400).json({ success: false, message: attached.message });
+        return;
+      }
+      res.status(201).json({
+        success: true,
+        message: attached.magicLinkEmailed
+          ? "Compte déjà existant : accès portail ajouté. Un e-mail avec un lien de connexion vient d'être envoyé."
+          : "Compte déjà existant : accès portail ajouté. Configurez SMTP (EMAIL_USER / EMAIL_PASS) pour envoyer le lien automatiquement, ou utilisez « Mot de passe oublié » sur la page de connexion du portail.",
+        data: {
+          userId: attached.userId,
+          email: normalized,
+          role,
+          existingUser: true,
+          magicLinkEmailed: attached.magicLinkEmailed,
+        },
+      });
+      return;
+    }
     logger.error('[partnerController] invitePartnerUser invite error:', inviteError);
     res.status(500).json({ success: false, message: inviteError.message ?? "Erreur lors de l'envoi de l'invitation" });
     return;
@@ -274,13 +400,9 @@ export const invitePartnerUser = async (req: Request, res: Response): Promise<vo
 
   const userId = inviteData.user.id;
 
-  // Lier l'utilisateur au partenaire dans partner_users
   const { error: puError } = await supabaseAdmin
     .from('partner_users')
-    .upsert(
-      { partner_id: partnerId, user_id: userId, role },
-      { onConflict: 'partner_id,user_id' }
-    );
+    .upsert({ partner_id: partnerId, user_id: userId, role }, { onConflict: 'partner_id,user_id' });
 
   if (puError) {
     logger.error('[partnerController] invitePartnerUser partner_users error:', puError);
@@ -288,7 +410,7 @@ export const invitePartnerUser = async (req: Request, res: Response): Promise<vo
     return;
   }
 
-  res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: email.trim().toLowerCase(), role } });
+  res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: normalized, role } });
 };
 
 // ─── POST /api/partners/register — utilisateur authentifié ───────────────────
@@ -536,22 +658,35 @@ export const activatePartner = async (req: Request, res: Response): Promise<void
     }
   }
 
-  // Envoyer l'invitation portail à l'email fourni lors de l'inscription (best-effort)
+  // Invitation portail à l'email fourni lors de l'inscription (best-effort)
   if (data.email && supabaseAdmin) {
     const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
+    const em = data.email.toLowerCase();
     try {
-      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-        data.email.toLowerCase(),
-        { redirectTo, data: { partner_id: id, partner_name: data.name, role: 'owner' } }
-      );
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(em, {
+        redirectTo,
+        data: { partner_id: id, partner_name: data.name, role: 'owner' },
+      });
       if (!inviteError && inviteData) {
         await supabaseAdmin
           .from('partner_users')
-          .upsert(
-            { partner_id: id, user_id: inviteData.user.id, role: 'owner' },
-            { onConflict: 'partner_id,user_id' }
-          );
+          .upsert({ partner_id: id, user_id: inviteData.user.id, role: 'owner' }, { onConflict: 'partner_id,user_id' });
         logger.info(`[partnerController] Invitation portail envoyée à ${data.email}`);
+      } else if (inviteError && isInviteEmailAlreadyRegisteredError(inviteError)) {
+        const attached = await attachExistingUserAndSendPortalLink({
+          normalizedEmail: em,
+          partnerId: id,
+          partnerName: data.name,
+          role: 'owner',
+          redirectTo,
+        });
+        if (attached.ok) {
+          logger.info(
+            `[partnerController] Activation : compte existant lié au portail (${data.email}), mail lien=${attached.magicLinkEmailed}`
+          );
+        } else {
+          logger.warn('[partnerController] Activation : compte existant non lié:', attached.message);
+        }
       }
     } catch (inviteErr) {
       logger.warn('[partnerController] Auto-invite portail échouée:', inviteErr);
@@ -606,17 +741,42 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
     return;
   }
 
+  const normalized = email.trim().toLowerCase();
   const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
 
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-    email.trim().toLowerCase(),
-    {
-      redirectTo,
-      data: { partner_id: partnerId, partner_name: partner.name, role: 'owner' },
-    }
-  );
+  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(normalized, {
+    redirectTo,
+    data: { partner_id: partnerId, partner_name: partner.name, role: 'owner' },
+  });
 
   if (inviteError) {
+    if (isInviteEmailAlreadyRegisteredError(inviteError)) {
+      const attached = await attachExistingUserAndSendPortalLink({
+        normalizedEmail: normalized,
+        partnerId,
+        partnerName: partner.name,
+        role: 'owner',
+        redirectTo,
+      });
+      if (!attached.ok) {
+        res.status(400).json({ success: false, message: attached.message });
+        return;
+      }
+      res.status(201).json({
+        success: true,
+        message: attached.magicLinkEmailed
+          ? "Compte déjà existant : accès portail ajouté. Un e-mail avec un lien de connexion vient d'être envoyé."
+          : "Compte déjà existant : accès portail ajouté. Configurez SMTP ou utilisez « Mot de passe oublié » sur la page de connexion du portail.",
+        data: {
+          userId: attached.userId,
+          email: normalized,
+          role: 'owner',
+          existingUser: true,
+          magicLinkEmailed: attached.magicLinkEmailed,
+        },
+      });
+      return;
+    }
     logger.error('[partnerController] invitePortalUser invite error:', inviteError);
     res.status(500).json({ success: false, message: inviteError.message ?? "Erreur lors de l'envoi de l'invitation" });
     return;
@@ -626,10 +786,7 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
 
   const { error: puError } = await supabaseAdmin
     .from('partner_users')
-    .upsert(
-      { partner_id: partnerId, user_id: userId, role: 'owner' },
-      { onConflict: 'partner_id,user_id' }
-    );
+    .upsert({ partner_id: partnerId, user_id: userId, role: 'owner' }, { onConflict: 'partner_id,user_id' });
 
   if (puError) {
     logger.error('[partnerController] invitePortalUser partner_users error:', puError);
@@ -637,7 +794,7 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
     return;
   }
 
-  res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: email.trim().toLowerCase(), role: 'owner' } });
+  res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: normalized, role: 'owner' } });
 };
 
 // ─── GET /api/partners/:id/invoices — admin or partner ────────────────────────
