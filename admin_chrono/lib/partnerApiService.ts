@@ -79,9 +79,48 @@ class PartnerApiService {
 
   async createOrder(partnerId: string, body: Record<string, unknown>): Promise<ApiResponse<unknown>> {
     try {
-      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/orders`, {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user?.id) {
+        return { success: false, message: 'Utilisateur non authentifié' }
+      }
+
+      const pickupAddress = String(body.pickup_address ?? '').trim()
+      const dropoffAddress = String(body.dropoff_address ?? '').trim()
+      const recipientName = String(body.recipient_name ?? '').trim()
+      const recipientPhone = String(body.recipient_phone ?? '').trim()
+      const notes = String(body.notes ?? '').trim()
+      const vehicleType = String(body.vehicle_type ?? 'moto').trim().toLowerCase()
+
+      const method =
+        vehicleType === 'moto'
+          ? 'moto'
+          : vehicleType === 'cargo'
+            ? 'cargo'
+            : 'vehicule'
+
+      const distanceKmRaw = Number(body.distance_km ?? 5)
+      const distanceKm = Number.isFinite(distanceKmRaw) && distanceKmRaw > 0 ? distanceKmRaw : 5
+
+      const payload = {
+        userId: user.id,
+        partner_id: partnerId,
+        pickup: {
+          address: pickupAddress,
+          coordinates: { latitude: 0, longitude: 0 },
+        },
+        dropoff: {
+          address: dropoffAddress,
+          coordinates: { latitude: 0, longitude: 0 },
+        },
+        recipient: { name: recipientName, phone: recipientPhone },
+        method,
+        notes: notes || undefined,
+        distanceKm,
+      }
+
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/orders/record`, {
         method: 'POST',
-        body: JSON.stringify({ ...body, partner_id: partnerId }),
+        body: JSON.stringify(payload),
       })
       return res.json()
     } catch (err) {
