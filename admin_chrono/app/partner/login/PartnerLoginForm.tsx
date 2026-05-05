@@ -9,14 +9,10 @@ import config from '@/lib/config'
 export default function PartnerLoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
   const [error, setError] = useState('')
-  const [forgotMode, setForgotMode] = useState(false)
-  const [forgotEmail, setForgotEmail] = useState('')
-  const [forgotSent, setForgotSent] = useState(false)
-  const [forgotLoading, setForgotLoading] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
 
   const redirectToPartnerDashboard = useCallback(async (userId: string) => {
     const { data, error } = await supabase
@@ -37,7 +33,7 @@ export default function PartnerLoginForm() {
     router.replace(`/partner/${data.partner_id}/dashboard`)
   }, [router])
 
-  // Gère le retour depuis le lien d'invitation Supabase (hash dans l'URL)
+  // Gère le retour depuis le lien magic link / invitation Supabase (hash dans l'URL)
   useEffect(() => {
     const handleSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -48,7 +44,6 @@ export default function PartnerLoginForm() {
       setChecking(false)
     }
 
-    // Supabase détecte automatiquement le hash d'invitation dans l'URL
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session) {
         await redirectToPartnerDashboard(session.user.id)
@@ -59,37 +54,23 @@ export default function PartnerLoginForm() {
     return () => subscription.unsubscribe()
   }, [redirectToPartnerDashboard])
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    setForgotLoading(true)
-    setError('')
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
-      redirectTo: `${window.location.origin}/partner/login`,
-    })
-    setForgotLoading(false)
-    if (resetError) {
-      setError("Impossible d'envoyer l'email de réinitialisation. Vérifiez l'adresse saisie.")
-    } else {
-      setForgotSent(true)
-    }
-  }
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+    if (!email.trim()) { setError('Email requis'); return }
     setLoading(true)
     setError('')
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: `${window.location.origin}/partner/login` },
+    })
 
-    if (signInError) {
-      setError('Email ou mot de passe incorrect.')
-      setLoading(false)
+    setLoading(false)
+    if (otpError) {
+      setError("Impossible d'envoyer le lien de connexion. Vérifiez l'adresse email saisie.")
       return
     }
-
-    if (data.user) {
-      await redirectToPartnerDashboard(data.user.id)
-    }
+    setOtpSent(true)
   }
 
   if (checking) {
@@ -114,117 +95,55 @@ export default function PartnerLoginForm() {
           <p style={{ fontSize: 14, color: '#6B7280' }}>Connectez-vous à votre espace Krono Pro</p>
         </div>
 
-        {forgotMode ? (
-          forgotSent ? (
-            <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <p style={{ fontSize: 14, color: '#065F46', backgroundColor: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
-                Un email de réinitialisation a été envoyé à <strong>{forgotEmail}</strong>. Vérifiez votre boîte mail.
-              </p>
-              <button onClick={() => { setForgotMode(false); setForgotSent(false); setForgotEmail('') }} style={{ fontSize: 13, color: '#8B5CF6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                Retour à la connexion
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <p style={{ fontSize: 13, color: '#6B7280' }}>Saisissez votre adresse email pour recevoir un lien de réinitialisation de mot de passe.</p>
-              {error && (
-                <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', padding: '12px 16px', borderRadius: 8, fontSize: 14 }}>
-                  {error}
-                </div>
-              )}
-              <div>
-                <label htmlFor="forgot-email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#374151', marginBottom: 8 }}>Email</label>
-                <input
-                  id="forgot-email"
-                  type="email"
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
-                  required
-                  placeholder="contact@entreprise.com"
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.1)' }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.boxShadow = 'none' }}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={forgotLoading}
-                style={{ width: '100%', backgroundColor: '#8B5CF6', color: '#fff', padding: '11px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, border: 'none', cursor: forgotLoading ? 'not-allowed' : 'pointer', opacity: forgotLoading ? 0.6 : 1 }}
-              >
-                {forgotLoading ? 'Envoi…' : 'Envoyer le lien'}
-              </button>
-              <button type="button" onClick={() => { setForgotMode(false); setError('') }} style={{ fontSize: 13, color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                Retour à la connexion
-              </button>
-            </form>
-          )
-        ) : (
-          <>
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {error && (
-                <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', padding: '12px 16px', borderRadius: 8, fontSize: 14 }}>
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#374151', marginBottom: 8 }}>
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="contact@entreprise.com"
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.1)' }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.boxShadow = 'none' }}
-                />
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <label htmlFor="password" style={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>
-                    Mot de passe
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => { setForgotMode(true); setForgotEmail(email); setError('') }}
-                    style={{ fontSize: 12, color: '#8B5CF6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
-                  >
-                    Mot de passe oublié ?
-                  </button>
-                </div>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.1)' }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.boxShadow = 'none' }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                style={{ width: '100%', backgroundColor: '#8B5CF6', color: '#fff', padding: '11px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, transition: 'background-color 0.2s' }}
-                onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#7C3AED' }}
-                onMouseLeave={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#8B5CF6' }}
-              >
-                {loading ? 'Connexion…' : 'Se connecter'}
-              </button>
-            </form>
-
-            <p style={{ textAlign: 'center', fontSize: 12, color: '#9CA3AF', marginTop: 24 }}>
-              Vous avez reçu un email d&apos;invitation ? Cliquez sur le lien dans l&apos;email pour définir votre mot de passe.
+        {otpSent ? (
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>📬</div>
+            <p style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 8 }}>Vérifiez votre boîte mail</p>
+            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 24 }}>
+              Un lien de connexion a été envoyé à <strong>{email}</strong>. Cliquez dessus pour accéder à votre portail.
             </p>
-          </>
+            <button
+              onClick={() => { setOtpSent(false); setError('') }}
+              style={{ fontSize: 13, color: '#8B5CF6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Utiliser une autre adresse
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {error && (
+              <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', padding: '12px 16px', borderRadius: 8, fontSize: 14 }}>
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#374151', marginBottom: 8 }}>
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="contact@entreprise.com"
+                style={{ width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.1)' }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.boxShadow = 'none' }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ width: '100%', backgroundColor: '#8B5CF6', color: '#fff', padding: '11px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, transition: 'background-color 0.2s' }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#7C3AED' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#8B5CF6' }}
+            >
+              {loading ? 'Envoi…' : 'Recevoir un lien de connexion'}
+            </button>
+          </form>
         )}
       </div>
     </div>

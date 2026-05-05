@@ -825,13 +825,19 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
   const normalized = email.trim().toLowerCase();
   const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
 
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(normalized, {
-    redirectTo,
-    data: { partner_id: partnerId, partner_name: partner.name, role: 'owner' },
+  // generateLink crée l'utilisateur dans Auth et retourne le lien d'invitation
+  // sans déléguer l'envoi email à Supabase (évite les limites de débit et les envois silencieux ratés).
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'invite',
+    email: normalized,
+    options: {
+      redirectTo,
+      data: { partner_id: partnerId, partner_name: partner.name, role: 'owner' },
+    },
   });
 
-  if (inviteError) {
-    if (isInviteEmailAlreadyRegisteredError(inviteError)) {
+  if (linkError) {
+    if (isInviteEmailAlreadyRegisteredError(linkError)) {
       const attached = await attachExistingUserAndSendPortalLink({
         normalizedEmail: normalized,
         partnerId,
@@ -847,7 +853,7 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
         success: true,
         message: attached.magicLinkEmailed
           ? "Compte déjà existant : accès portail ajouté. Un e-mail avec un lien de connexion vient d'être envoyé."
-          : "Compte déjà existant : accès portail ajouté. Configurez SMTP ou utilisez « Mot de passe oublié » sur la page de connexion du portail.",
+          : "Compte déjà existant : accès portail ajouté. Configurez SMTP (EMAIL_USER / EMAIL_PASS) pour envoyer les liens automatiquement.",
         data: {
           userId: attached.userId,
           email: normalized,
@@ -858,12 +864,13 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
       });
       return;
     }
-    logger.error('[partnerController] invitePortalUser invite error:', inviteError);
-    res.status(500).json({ success: false, message: inviteError.message ?? "Erreur lors de l'envoi de l'invitation" });
+    logger.error('[partnerController] invitePortalUser generateLink error:', linkError);
+    res.status(500).json({ success: false, message: linkError.message ?? "Erreur lors de la création du lien d'invitation" });
     return;
   }
 
-  const userId = inviteData.user.id;
+  const userId = linkData.user.id;
+  const actionLink: string | undefined = linkData.properties?.action_link;
 
   const ensuredPortal = await ensurePublicUserProfileForAuthUser(userId);
   if (!ensuredPortal.ok) {
@@ -878,11 +885,26 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
 
   if (puError) {
     logger.error('[partnerController] invitePortalUser partner_users error:', puError);
-    res.status(500).json({ success: false, message: 'Invitation envoyée mais erreur lors du lien partenaire' });
+    res.status(500).json({ success: false, message: 'Erreur lors de la liaison au partenaire' });
     return;
   }
 
-  res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: normalized, role: 'owner' } });
+  let emailSent = false;
+  if (actionLink) {
+    const sendResult = await sendPartnerPortalMagicLinkEmail(normalized, actionLink, partner.name);
+    emailSent = sendResult.success;
+    if (!sendResult.success) {
+      logger.warn(`[partnerController] SMTP non configuré — lien d'invitation à transmettre manuellement : ${actionLink}`);
+    }
+  }
+
+  res.status(201).json({
+    success: true,
+    message: emailSent
+      ? 'Invitation envoyée par email.'
+      : "Membre ajouté au portail. Configurez SMTP (EMAIL_USER / EMAIL_PASS) pour envoyer les invitations par email.",
+    data: { userId, email: normalized, role: 'owner', emailSent },
+  });
 };
 
 // ─── GET /api/partners/:id/invoices — admin or partner ────────────────────────
