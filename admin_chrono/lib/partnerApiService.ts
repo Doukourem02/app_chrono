@@ -115,6 +115,18 @@ class PartnerApiService {
     }
   }
 
+  async removeTeamMember(partnerId: string, memberId: string): Promise<ApiResponse<unknown>> {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/users/${memberId}`, {
+        method: 'DELETE',
+      })
+      return res.json()
+    } catch (err) {
+      logger.error('[partnerApiService] removeTeamMember:', err)
+      return { success: false }
+    }
+  }
+
   // Vérifie que l'utilisateur courant appartient bien à ce partenaire (owner uniquement)
   // Retourne aussi le plan pour décider si le portail est accessible (pro/business uniquement)
   async verifyAccess(partnerId: string): Promise<{ allowed: boolean; role: 'owner' | null; plan: string | null }> {

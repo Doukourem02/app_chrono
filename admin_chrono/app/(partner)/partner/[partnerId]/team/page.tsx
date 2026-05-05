@@ -3,8 +3,9 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
-import { Users, UserPlus, Mail } from 'lucide-react'
+import { Users, UserPlus, Mail, Trash2 } from 'lucide-react'
 import { partnerApiService } from '@/lib/partnerApiService'
+import { supabase } from '@/lib/supabase'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import type { PartnerUser } from '@/types'
@@ -74,6 +75,8 @@ export default function PartnerTeamPage() {
   const { partnerId } = useParams<{ partnerId: string }>()
   const queryClient = useQueryClient()
   const [showInvite, setShowInvite] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['partner-portal-team', partnerId],
@@ -81,6 +84,19 @@ export default function PartnerTeamPage() {
   })
 
   const members = (data?.data ?? []) as PartnerUser[]
+
+  const handleRemove = async (member: PartnerUser) => {
+    setRemovingId(member.id)
+    await partnerApiService.removeTeamMember(partnerId, member.id)
+    setConfirmId(null)
+    setRemovingId(null)
+    queryClient.invalidateQueries({ queryKey: ['partner-portal-team', partnerId] })
+  }
+
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setCurrentUserId(data.session?.user?.id ?? null))
+  }, [])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -115,7 +131,7 @@ export default function PartnerTeamPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                {['Membre', 'Rôle', 'Ajouté le'].map(h => (
+                {['Membre', 'Rôle', 'Ajouté le', ''].map(h => (
                   <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary }}>{h}</th>
                 ))}
               </tr>
@@ -125,6 +141,9 @@ export default function PartnerTeamPage() {
                 const name = m.user?.first_name && m.user?.last_name
                   ? `${m.user.first_name} ${m.user.last_name}`
                   : m.user?.email ?? '—'
+                const isSelf = m.user_id === currentUserId
+                const isConfirming = confirmId === m.id
+                const isRemoving = removingId === m.id
                 return (
                   <tr key={m.id} style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
                     <td style={{ padding: '14px 16px' }}>
@@ -132,16 +151,42 @@ export default function PartnerTeamPage() {
                       {m.user?.email && <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>{m.user.email}</div>}
                     </td>
                     <td style={{ padding: '14px 16px' }}>
-                      <span style={{
-                        padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                        backgroundColor: themeColors.purpleLight,
-                        color: themeColors.purplePrimary,
-                      }}>
+                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary }}>
                         Propriétaire
                       </span>
                     </td>
                     <td style={{ padding: '14px 16px', fontSize: 13, color: themeColors.textSecondary }}>
                       {new Date(m.created_at).toLocaleDateString('fr-FR')}
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                      {!isSelf && (
+                        isConfirming ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+                            <span style={{ fontSize: 12, color: themeColors.textSecondary }}>Confirmer ?</span>
+                            <button
+                              onClick={() => handleRemove(m)}
+                              disabled={isRemoving}
+                              style={{ padding: '4px 12px', borderRadius: 6, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: isRemoving ? 0.6 : 1 }}
+                            >
+                              {isRemoving ? '…' : 'Oui'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmId(null)}
+                              style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textSecondary, fontSize: 12, cursor: 'pointer' }}
+                            >
+                              Annuler
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmId(m.id)}
+                            title="Retirer ce membre"
+                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.redPrimary, cursor: 'pointer' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )
+                      )}
                     </td>
                   </tr>
                 )

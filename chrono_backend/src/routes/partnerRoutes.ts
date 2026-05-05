@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyPartnerUser } from '../middleware/verifyPartnerUser.js';
-import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,} from '../controllers/partnerController.js';
+import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,removePartnerUser,} from '../controllers/partnerController.js';
 import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
@@ -32,7 +32,8 @@ export const partnerPortalRouter: Router = express.Router({ mergeParams: true })
 partnerPortalRouter.get('/details',      verifyPartnerUser, getPartner);
 partnerPortalRouter.get('/usage',        verifyPartnerUser, getPartnerUsage);
 partnerPortalRouter.get('/invoices',     verifyPartnerUser, getPartnerInvoices);
-partnerPortalRouter.get('/users',        verifyPartnerUser, getPartnerUsers);
-partnerPortalRouter.post('/users/invite', verifyPartnerUser, invitePortalUser);
+partnerPortalRouter.get('/users',                    verifyPartnerUser, getPartnerUsers);
+partnerPortalRouter.post('/users/invite',             verifyPartnerUser, invitePortalUser);
+partnerPortalRouter.delete('/users/:memberId',        verifyPartnerUser, removePartnerUser);
 
 export default router;

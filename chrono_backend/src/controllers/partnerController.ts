@@ -798,6 +798,39 @@ export const activatePartner = async (req: Request, res: Response): Promise<void
   res.json({ success: true, data });
 };
 
+// ─── DELETE /api/partner/:partnerId/users/:memberId — portail owner only ─────
+export const removePartnerUser = async (req: Request, res: Response): Promise<void> => {
+  const partnerId = (req as any).partnerUser?.partnerId;
+  const currentUserId = (req as any).partnerUser?.userId;
+  const { memberId } = req.params;
+
+  const { data: row, error: fetchErr } = await db()
+    .from('partner_users')
+    .select('id, user_id')
+    .eq('id', memberId)
+    .eq('partner_id', partnerId)
+    .maybeSingle();
+
+  if (fetchErr || !row) {
+    res.status(404).json({ success: false, message: 'Membre introuvable' });
+    return;
+  }
+
+  if (row.user_id === currentUserId) {
+    res.status(400).json({ success: false, message: 'Vous ne pouvez pas vous retirer vous-même.' });
+    return;
+  }
+
+  const { error } = await db().from('partner_users').delete().eq('id', memberId).eq('partner_id', partnerId);
+  if (error) {
+    logger.error('[partnerController] removePartnerUser:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la suppression du membre' });
+    return;
+  }
+
+  res.json({ success: true });
+};
+
 // ─── GET /api/partner/:partnerId/users — portail owner only ──────────────────
 export const getPartnerUsers = async (req: Request, res: Response): Promise<void> => {
   const partnerId = (req as any).partnerUser?.partnerId;
