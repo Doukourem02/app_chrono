@@ -141,6 +141,12 @@ export const calculatePrice = async (req: Request, res: Response): Promise<void>
   try {
     const body = req.body as Record<string, unknown>;
     const { deliveryMethod, isUrgent, customPricePerKm, speedOptionId } = body;
+    const isB2BPriority =
+      body.isB2BPriority === true ||
+      body.isB2BOrder === true ||
+      body.isB2BPriority === 'true' ||
+      body.isB2BOrder === 'true' ||
+      (typeof body.partner_id === 'string' && body.partner_id.trim().length > 0);
 
     let distanceNum =
       body.distance !== undefined && body.distance !== null && body.distance !== ''
@@ -207,6 +213,7 @@ export const calculatePrice = async (req: Request, res: Response): Promise<void>
       pickupLongitude: pCoords?.longitude,
       routeDurationSeconds: Number.isFinite(routeDur) && routeDur! > 0 ? routeDur : undefined,
       routeDurationTypicalSeconds: Number.isFinite(routeTyp) && routeTyp! > 0 ? routeTyp : undefined,
+      isB2BPriority,
     });
 
     const urgencyOnLine = params.isUrgent

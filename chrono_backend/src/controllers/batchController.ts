@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import { optimizeRouteOrder } from '../utils/haversine.js';
-import { incrementPartnerUsage } from '../services/b2bCommissionService.js';
-import { emitBatchAssigned } from '../sockets/orderSocket.js';
+import { emitBatchAssigned, findAllAvailableDrivers } from '../sockets/orderSocket.js';
 import logger from '../utils/logger.js';
 
 const db = () => supabaseAdmin ?? supabase;
@@ -26,6 +25,12 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
     return;
   }
 
+  let assignedDriverId = driver_id || null;
+  if (!assignedDriverId) {
+    const availableDrivers = await findAllAvailableDrivers('moto');
+    assignedDriverId = availableDrivers[0]?.driverId ?? null;
+  }
+
   // Optimiser l'ordre si les coordonnées sont fournies
   let optimizedOrder: number[];
   const hasCoords = orders.every((o) => o.lat !== undefined && o.lng !== undefined);
@@ -43,7 +48,7 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
     .insert({
       partner_id: partner_id ?? null,
       user_id: user_id ?? null,
-      driver_id: driver_id ?? null,
+      driver_id: assignedDriverId,
       status: 'pending',
     })
     .select()
@@ -72,19 +77,22 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
     return;
   }
 
-  // Incrémenter le quota B2B si partenaire
-  if (partner_id) {
-    for (const _ of orders) {
-      await incrementPartnerUsage(partner_id);
+  // Notifier le livreur attitré via socket (une seule notification pour toute la tournée)
+  if (assignedDriverId) {
+    const emitted = emitBatchAssigned(assignedDriverId, {
+      batchId: (batch as any).id,
+      ordersCount: orders.length,
+      ...(partner_id ? { partner_id } : {}),
+    });
+    if (!emitted) {
+      logger.warn('[batchController] Tournée créée mais livreur non connecté', {
+        batchId: (batch as any).id,
+        driverId: assignedDriverId,
+      });
     }
   }
 
-  // Notifier le livreur attitré via socket (une seule notification pour toute la tournée)
-  if (driver_id) {
-    emitBatchAssigned(driver_id, { batchId: (batch as any).id, ordersCount: orders.length });
-  }
-
-  res.status(201).json({ success: true, data: { ...batch, orders_count: orders.length } });
+  res.status(201).json({ success: true, data: { ...batch, driver_id: assignedDriverId, orders_count: orders.length } });
 };
 
 // ─── GET /api/batches/:id — détail tournée + statuts ────────────────────────

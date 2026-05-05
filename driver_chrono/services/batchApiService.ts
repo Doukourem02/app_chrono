@@ -8,6 +8,23 @@ async function authHeader(): Promise<{ Authorization: string } | Record<string, 
   return result.token ? { Authorization: `Bearer ${result.token}` } : {};
 }
 
+function addressText(value: unknown): string {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as { address?: unknown };
+      return typeof parsed?.address === 'string' ? parsed.address : value;
+    } catch {
+      return value;
+    }
+  }
+  if (typeof value === 'object' && 'address' in value) {
+    const address = (value as { address?: unknown }).address;
+    return typeof address === 'string' ? address : '';
+  }
+  return '';
+}
+
 export async function getBatch(batchId: string): Promise<ActiveBatch> {
   const headers = await authHeader();
   const response = await apiFetch(`${config.apiUrl}/api/batches/${encodeURIComponent(batchId)}`, {
@@ -24,7 +41,7 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
         orders?: {
           id: string;
           status: string;
-          dropoff_address?: string;
+          dropoff_address?: unknown;
           recipient?: { name?: string; phone?: string };
           price_cfa?: number;
         };
@@ -43,7 +60,7 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
       position: item.position,
       recipientName: item.orders?.recipient?.name ?? 'Destinataire',
       phone: item.orders?.recipient?.phone ?? '',
-      address: item.orders?.dropoff_address ?? '',
+      address: addressText(item.orders?.dropoff_address),
       status: (item.orders?.status === 'completed'
         ? 'completed'
         : item.orders?.status === 'cancelled'

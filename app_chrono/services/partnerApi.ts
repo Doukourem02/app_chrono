@@ -68,21 +68,36 @@ export interface B2BOrderParams {
   recipient: { name: string; phone: string };
   vehicleType?: 'moto' | 'vehicule' | 'cargo';
   notes?: string;
+  notifyDrivers?: boolean;
 }
 
 export async function createB2BOrder(params: B2BOrderParams): Promise<{ orderId: string }> {
   const headers = await authHeader();
+  const pickup = {
+    address: params.pickup.address,
+    ...(params.pickup.lat !== undefined && params.pickup.lng !== undefined
+      ? { coordinates: { latitude: params.pickup.lat, longitude: params.pickup.lng } }
+      : {}),
+  };
+  const dropoff = {
+    address: params.dropoff.address,
+    ...(params.dropoff.lat !== undefined && params.dropoff.lng !== undefined
+      ? { coordinates: { latitude: params.dropoff.lat, longitude: params.dropoff.lng } }
+      : {}),
+  };
+
   const response = await apiFetch(`${config.apiUrl}/api/orders/record`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({
       userId: params.userId,
       partner_id: params.partnerId,
-      pickup: { address: params.pickup.address, coordinates: { latitude: params.pickup.lat ?? 0, longitude: params.pickup.lng ?? 0 } },
-      dropoff: { address: params.dropoff.address, coordinates: { latitude: params.dropoff.lat ?? 0, longitude: params.dropoff.lng ?? 0 } },
+      pickup,
+      dropoff,
       recipient: params.recipient,
       method: params.vehicleType ?? 'moto',
       notes: params.notes,
+      notifyDrivers: params.notifyDrivers ?? true,
     }),
   });
 
@@ -126,6 +141,7 @@ export async function createBatch(params: CreateBatchParams): Promise<{ batchId:
         recipient: { name: item.recipient.name, phone: item.recipient.phone },
         vehicleType: 'moto',
         notes: item.notes,
+        notifyDrivers: false,
       });
       createdOrders.push({ orderId: result.orderId, lat: item.lat, lng: item.lng });
     } catch (err) {

@@ -32,6 +32,8 @@ interface ApiResponse<T = unknown> {
   }
 }
 
+type LatLng = { latitude: number; longitude: number }
+
 // Types pour la gestion de flotte
 interface FleetVehicle {
   id: string
@@ -1550,8 +1552,8 @@ class AdminApiService {
     }
     deliveryMethod: 'moto' | 'vehicule' | 'cargo'
     paymentMethodType?: 'orange_money' | 'wave' | 'cash' | 'deferred'
-    distance: number
-    price: number
+    distance?: number
+    price?: number
     notes?: string
     isPhoneOrder?: boolean
     isB2BOrder?: boolean
@@ -1606,6 +1608,49 @@ class AdminApiService {
         success: false,
         message: 'Erreur lors de la création de la commande',
       }
+    }
+  }
+
+  async calculateOrderEstimate(params: {
+    pickupCoordinates: LatLng
+    dropoffCoordinates: LatLng
+    deliveryMethod: 'moto' | 'vehicule' | 'cargo'
+    isB2BPriority?: boolean
+  }): Promise<ApiResponse<{ price: number; distance: number; estimatedDuration?: string }>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/payments/calculate-price`, {
+        method: 'POST',
+        body: JSON.stringify({
+          deliveryMethod: params.deliveryMethod,
+          pickup: { coordinates: params.pickupCoordinates },
+          dropoff: { coordinates: params.dropoffCoordinates },
+          ...(params.isB2BPriority ? { isB2BPriority: true } : {}),
+        }),
+      })
+
+      const body = await response.json().catch(() => ({})) as {
+        success?: boolean
+        price?: number
+        distance?: number
+        estimatedDuration?: string
+        message?: string
+      }
+
+      if (!response.ok || !body.success || typeof body.price !== 'number' || typeof body.distance !== 'number') {
+        return { success: false, message: body.message || 'Impossible de calculer le prix' }
+      }
+
+      return {
+        success: true,
+        data: {
+          price: body.price,
+          distance: body.distance,
+          estimatedDuration: body.estimatedDuration,
+        },
+      }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Error calculateOrderEstimate:', getErrorMessage(error))
+      return { success: false, message: 'Erreur lors du calcul du prix' }
     }
   }
 

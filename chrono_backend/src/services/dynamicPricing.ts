@@ -13,6 +13,7 @@ import { getWeatherMultiplierForCoords } from './openMeteoPricing.js';
 import { getSurgeMultiplierSync } from './surgePricing.js';
 
 export const MAX_CONTEXT_FACTOR = 1.85;
+export const B2B_PRIORITY_FACTOR = 1.15;
 
 /** F CFA par minute au-delà de la durée théorique (trafic / route réelle). */
 const EXTRA_MINUTE_RATES: Record<DeliveryMethod, number> = {
@@ -64,6 +65,8 @@ export interface DynamicPricingInput {
   includeWeather?: boolean;
   /** Si false, surge = 1 */
   includeSurge?: boolean;
+  /** Livraison B2B prioritaire / urgente. Prime produit appliquée après le contexte. */
+  isB2BPriority?: boolean;
 }
 
 export interface DynamicPricingBreakdown {
@@ -76,6 +79,7 @@ export interface DynamicPricingBreakdown {
   trafficFactor: number;
   contextFactorRaw: number;
   contextFactorApplied: number;
+  priorityFactor: number;
   totalCfa: number;
   labels: string[];
 }
@@ -123,14 +127,16 @@ export async function computeDynamicDeliveryPrice(
 
   const contextFactorRaw = weatherFactor * surgeFactor * hourFactor * trafficFactor;
   const contextFactorApplied = Math.min(MAX_CONTEXT_FACTOR, Math.max(1, contextFactorRaw));
+  const priorityFactor = input.isB2BPriority ? B2B_PRIORITY_FACTOR : 1;
 
-  const totalCfa = roundToNearest25(subtotalBeforeContextCfa * contextFactorApplied);
+  const totalCfa = roundToNearest25(subtotalBeforeContextCfa * contextFactorApplied * priorityFactor);
 
   const labels: string[] = [];
   if (weatherFactor > 1.02) labels.push('météo');
   if (surgeFactor > 1.03) labels.push('forte demande');
   if (hourFactor > 1.02) labels.push('heures de pointe');
   if (trafficFactor > 1.03) labels.push('trafic');
+  if (priorityFactor > 1) labels.push('priorité B2B');
 
   return {
     lineSubtotalCfa,
@@ -142,6 +148,7 @@ export async function computeDynamicDeliveryPrice(
     trafficFactor,
     contextFactorRaw,
     contextFactorApplied,
+    priorityFactor,
     totalCfa,
     labels,
   };

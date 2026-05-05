@@ -87,6 +87,7 @@ class PartnerApiService {
     try {
       const body: Record<string, unknown> = {
         deliveryMethod: params.deliveryMethod,
+        isB2BPriority: true,
       }
 
       if (params.pickupCoordinates) {
@@ -129,8 +130,8 @@ class PartnerApiService {
       const recipientPhone = String(recipientFromBody?.phone ?? body.recipient_phone ?? '').trim()
       const notes = String(body.notes ?? '').trim()
       const vehicleType = String(body.vehicle_type ?? 'moto').trim().toLowerCase()
-      const pickupCoordinates = (body.pickup_coordinates as LatLng | undefined) ?? { latitude: 0, longitude: 0 }
-      const dropoffCoordinates = (body.dropoff_coordinates as LatLng | undefined) ?? { latitude: 0, longitude: 0 }
+      const pickupCoordinates = body.pickup_coordinates as LatLng | undefined
+      const dropoffCoordinates = body.dropoff_coordinates as LatLng | undefined
 
       const method =
         vehicleType === 'moto'
@@ -139,8 +140,8 @@ class PartnerApiService {
             ? 'cargo'
             : 'vehicule'
 
-      const distanceKmRaw = Number(body.distance_km ?? 5)
-      const distanceKm = Number.isFinite(distanceKmRaw) && distanceKmRaw > 0 ? distanceKmRaw : 5
+      const distanceKmRaw = Number(body.distance_km)
+      const distanceKm = Number.isFinite(distanceKmRaw) && distanceKmRaw > 0 ? distanceKmRaw : undefined
       const priceCfaRaw = Number(body.price_cfa)
       const priceCfa = Number.isFinite(priceCfaRaw) && priceCfaRaw > 0 ? priceCfaRaw : undefined
 
@@ -149,17 +150,18 @@ class PartnerApiService {
         partner_id: partnerId,
         pickup: {
           address: pickupAddress,
-          coordinates: pickupCoordinates,
+          ...(pickupCoordinates ? { coordinates: pickupCoordinates } : {}),
         },
         dropoff: {
           address: dropoffAddress,
-          coordinates: dropoffCoordinates,
+          ...(dropoffCoordinates ? { coordinates: dropoffCoordinates } : {}),
         },
         recipient: { name: recipientName, phone: recipientPhone },
         method,
         notes: notes || undefined,
-        distanceKm,
-        priceCfa,
+        ...(distanceKm !== undefined ? { distanceKm } : {}),
+        ...(priceCfa !== undefined ? { priceCfa } : {}),
+        notifyDrivers: true,
       }
 
       const res = await this.fetchWithAuth(`${API_BASE_URL}/api/orders/record`, {

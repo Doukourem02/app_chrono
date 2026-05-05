@@ -12,6 +12,8 @@ import { geocodeAddress } from '../utils/geocodeService.js';
 import logger from '../utils/logger.js';
 import { resolveApproximatePickupZone } from '../utils/abidjanApproximatePickupZones.js';
 import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
+import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
+import { haversineDistanceKm } from '../services/priceCalculator.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const liveOrderStatuses = `'pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering'`;
@@ -45,6 +47,24 @@ const parseDateParam = (value?: string, endOfDay = false): Date | null => {
   if (Number.isNaN(parsed.getTime())) return null;
   return normalizeDate(parsed, endOfDay);
 };
+
+function isUsableLatLon(value: any): value is { latitude: number; longitude: number } {
+  return (
+    value &&
+    typeof value.latitude === 'number' &&
+    Number.isFinite(value.latitude) &&
+    typeof value.longitude === 'number' &&
+    Number.isFinite(value.longitude) &&
+    Math.abs(value.latitude) <= 90 &&
+    Math.abs(value.longitude) <= 180 &&
+    !(value.latitude === 0 && value.longitude === 0)
+  );
+}
+
+function positiveNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 const getDateRange = (startParam?: string, endParam?: string) => {
   const now = new Date();
@@ -3815,11 +3835,11 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       driverNotes,
     } = req.body;
 
-    // Validation des champs obligatoires
-    if (!userId || !pickup || !dropoff || !deliveryMethod || !distance || !price) {
+    // Validation des champs obligatoires. Distance/prix sont recalculés côté serveur.
+    if (!userId || !pickup || !dropoff || !deliveryMethod) {
       res.status(400).json({
         success: false,
-        message: 'Champs obligatoires manquants: userId, pickup, dropoff, deliveryMethod, distance, price',
+        message: 'Champs obligatoires manquants: userId, pickup, dropoff, deliveryMethod',
       });
       return;
     }
@@ -3829,7 +3849,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     
     if (!isPhoneOrderBool) {
       // Pour les commandes normales, les coordonnées GPS sont obligatoires
-      if (!pickup.coordinates || !pickup.coordinates.latitude || !pickup.coordinates.longitude) {
+      if (!isUsableLatLon(pickup.coordinates)) {
         res.status(400).json({
           success: false,
           message: 'Coordonnées de pickup manquantes',
@@ -3837,7 +3857,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
         return;
       }
 
-      if (!dropoff.coordinates || !dropoff.coordinates.latitude || !dropoff.coordinates.longitude) {
+      if (!isUsableLatLon(dropoff.coordinates)) {
         res.status(400).json({
           success: false,
           message: 'Coordonnées de dropoff manquantes',
@@ -3878,11 +3898,11 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     }
 
     // Géocoder les adresses si les coordonnées ne sont pas fournies
-    let pickupCoords = pickup.coordinates && pickup.coordinates.latitude && pickup.coordinates.longitude
+    let pickupCoords = isUsableLatLon(pickup.coordinates)
       ? { latitude: pickup.coordinates.latitude, longitude: pickup.coordinates.longitude }
       : null;
     
-    let dropoffCoords = dropoff.coordinates && dropoff.coordinates.latitude && dropoff.coordinates.longitude
+    let dropoffCoords = isUsableLatLon(dropoff.coordinates)
       ? { latitude: dropoff.coordinates.latitude, longitude: dropoff.coordinates.longitude }
       : null;
 
@@ -3931,10 +3951,52 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       };
     }
 
+    const clientDistance = positiveNumber(distance);
+    const clientPrice = positiveNumber(price);
+    const serverDistance =
+      pickupCoords && dropoffCoords
+        ? haversineDistanceKm(pickupCoords, dropoffCoords)
+        : clientDistance;
+
+    if (!serverDistance) {
+      res.status(400).json({
+        success: false,
+        message:
+          'Impossible de calculer la distance: sélectionnez des adresses avec GPS ou renseignez une distance valide.',
+      });
+      return;
+    }
+
+    const dynamic = await computeDynamicDeliveryPrice({
+      distanceKm: serverDistance,
+      method: deliveryMethod,
+      pickupLatitude: pickupCoords?.latitude,
+      pickupLongitude: pickupCoords?.longitude,
+      isB2BPriority: isB2BOrder === true,
+    });
+    const serverPrice = dynamic.totalCfa;
+
+    if (clientDistance != null && Math.abs(clientDistance - serverDistance) > 0.05) {
+      logger.warn('[createAdminOrder] Écart distance admin/serveur', {
+        clientDistance,
+        serverDistance,
+        deliveryMethod,
+      });
+    }
+    if (clientPrice != null && Math.abs(clientPrice - serverPrice) > 5) {
+      logger.warn('[createAdminOrder] Écart prix admin/serveur', {
+        clientPrice,
+        serverPrice,
+        serverDistance,
+        deliveryMethod,
+        labels: dynamic.labels,
+      });
+    }
+
     // Calculer la durée estimée
     const estimatedDuration = formatEtaMinutes(
       realisticEtaMinutesFromRoute({
-        distanceMeters: Math.max(0, Number(distance) || 0) * 1000,
+        distanceMeters: Math.max(0, serverDistance) * 1000,
         vehicleType: deliveryMethod,
       })
     );
@@ -3991,9 +4053,9 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       },
       recipient: { phone: recipientPhoneInput },
       packageImages: [],
-      price: Math.round(price),
+      price: serverPrice,
       deliveryMethod,
-      distance: Math.round(distance * 100) / 100,
+      distance: Math.round(serverDistance * 100) / 100,
       estimatedDuration,
       status: 'pending',
       createdAt: new Date(),
@@ -4096,15 +4158,15 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       }
 
       // Optionnel: créer une transaction si paymentMethodType est fourni
-      if (paymentMethodType && price) {
+      if (paymentMethodType && serverPrice) {
         try {
           const { createTransactionAndInvoiceForOrder } = await import('../utils/createTransactionForOrder.js');
           await createTransactionAndInvoiceForOrder(
             orderId,
             userId,
             paymentMethodType,
-            price,
-            distance,
+            serverPrice,
+            serverDistance,
             null,
             0,
             null,

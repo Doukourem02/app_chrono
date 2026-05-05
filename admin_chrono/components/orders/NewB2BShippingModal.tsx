@@ -64,6 +64,7 @@ export default function NewB2BShippingModal({
   // Calculated values
   const [distance, setDistance] = useState<number | null>(null)
   const [price, setPrice] = useState<number | null>(null)
+  const [isEstimating, setIsEstimating] = useState(false)
 
   // Initialiser la date/heure depuis les props
   useEffect(() => {
@@ -124,24 +125,51 @@ export default function NewB2BShippingModal({
     }
   }, [searchQuery, users])
 
-  // Recalcul à l’ouverture : resetForm remet distance/prix à null à la fermeture
+  // Devis réel: calculé seulement quand départ + arrivée ont des coordonnées.
   useEffect(() => {
     if (!isOpen) return
-    const estimatedDistance = 5
-    setDistance(estimatedDistance)
-    setPrice(calculatePrice(estimatedDistance, deliveryMethod))
-  }, [deliveryMethod, isOpen])
 
-  const calculatePrice = (distance: number, method: string): number => {
-    const basePrices: { [key: string]: { base: number; perKm: number } } = {
-      moto: { base: 500, perKm: 200 },
-      vehicule: { base: 800, perKm: 300 },
-      cargo: { base: 1200, perKm: 450 },
+    if (!pickupCoordinates || !dropoffCoordinates) {
+      setDistance(null)
+      setPrice(null)
+      setIsEstimating(false)
+      return
     }
 
-    const pricing = basePrices[method] || basePrices.vehicule
-    return Math.round(pricing.base + distance * pricing.perKm)
-  }
+    let cancelled = false
+    setIsEstimating(true)
+    adminApiService
+      .calculateOrderEstimate({
+        pickupCoordinates,
+        dropoffCoordinates,
+        deliveryMethod,
+        isB2BPriority: true,
+      })
+      .then((result) => {
+        if (cancelled) return
+        if (result.success && result.data) {
+          setDistance(Math.round(result.data.distance * 100) / 100)
+          setPrice(result.data.price)
+        } else {
+          setDistance(null)
+          setPrice(null)
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          logger.error('Error calculating B2B estimate:', error)
+          setDistance(null)
+          setPrice(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsEstimating(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [deliveryMethod, dropoffCoordinates, isOpen, pickupCoordinates])
 
   const handleClientSelect = (user: UserData) => {
     setSelectedClient(user)
@@ -194,7 +222,7 @@ export default function NewB2BShippingModal({
 
   const handleCreateOrder = async () => {
     // Validation
-    if (!selectedClient || !pickupAddress || !dropoffAddress || !distance || !price) {
+    if (!selectedClient || !pickupAddress || !dropoffAddress) {
       alert('Veuillez remplir tous les champs obligatoires')
       return
     }
@@ -235,8 +263,8 @@ export default function NewB2BShippingModal({
         },
         deliveryMethod,
         paymentMethodType: paymentMethod,
-        distance,
-        price,
+        distance: distance ?? undefined,
+        price: price ?? undefined,
         notes: combinedNotes,
         isPhoneOrder: true, // Toujours true pour B2B
         isB2BOrder: true, // Toujours true pour les commandes créées depuis le planning
@@ -620,11 +648,24 @@ export default function NewB2BShippingModal({
                 />
               </div>
 
-              {distance !== null && price !== null && (
+              {isEstimating && (
+                <div style={{ padding: '12px', backgroundColor: themeColors.cardBg, borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>Calcul du prix...</div>
+                </div>
+              )}
+
+              {!isEstimating && distance !== null && price !== null && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.purpleLight, borderRadius: '8px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{language === 'fr' ? 'Estimation' : 'Estimate'}</div>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                     {language === 'fr' ? 'Distance' : 'Distance'}: {distance} km • {language === 'fr' ? 'Prix' : 'Price'}: {price.toLocaleString(locale)} FCFA
+                  </div>
+                </div>
+              )}
+              {!isEstimating && (distance === null || price === null) && pickupAddress && dropoffAddress && (
+                <div style={{ padding: '12px', backgroundColor: themeColors.yellowLight, borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
+                    Sélectionnez les deux adresses dans la liste pour afficher un devis. Le serveur recalculera le prix final à la création.
                   </div>
                 </div>
               )}
@@ -692,11 +733,24 @@ export default function NewB2BShippingModal({
                 </div>
               </div>
 
-              {distance !== null && price !== null && (
+              {isEstimating && (
+                <div style={{ padding: '12px', backgroundColor: themeColors.cardBg, borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>Calcul du prix...</div>
+                </div>
+              )}
+
+              {!isEstimating && distance !== null && price !== null && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.purpleLight, borderRadius: '8px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Estimation</div>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                     Distance: {distance} km • Prix: {price.toLocaleString('fr-FR')} FCFA
+                  </div>
+                </div>
+              )}
+              {!isEstimating && (distance === null || price === null) && pickupAddress && dropoffAddress && (
+                <div style={{ padding: '12px', backgroundColor: themeColors.yellowLight, borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
+                    Devis indisponible côté interface. Le prix final sera recalculé côté serveur.
                   </div>
                 </div>
               )}
@@ -860,13 +914,13 @@ export default function NewB2BShippingModal({
             <button
               type="button"
               onClick={handleCreateOrder}
-              disabled={isCreating || !distance || !price || !scheduledDateValue || !scheduledTimeValue}
+              disabled={isCreating || !selectedClient || !pickupAddress || !dropoffAddress || !scheduledDateValue || !scheduledTimeValue}
               style={{
                 ...buttonStyle,
                 backgroundColor: themeColors.purplePrimary,
                 color: themeColors.textPrimary,
-                opacity: isCreating || !distance || !price || !scheduledDateValue || !scheduledTimeValue ? 0.5 : 1,
-                cursor: isCreating || !distance || !price || !scheduledDateValue || !scheduledTimeValue ? 'not-allowed' : 'pointer',
+                opacity: isCreating || !selectedClient || !pickupAddress || !dropoffAddress || !scheduledDateValue || !scheduledTimeValue ? 0.5 : 1,
+                cursor: isCreating || !selectedClient || !pickupAddress || !dropoffAddress || !scheduledDateValue || !scheduledTimeValue ? 'not-allowed' : 'pointer',
               }}
             >
               {isCreating ? 'Création...' : 'Créer la commande B2B'}

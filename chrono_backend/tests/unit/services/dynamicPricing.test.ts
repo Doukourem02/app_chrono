@@ -3,6 +3,8 @@ import {
   trafficContextFactor,
   getHourMultiplierAbidjan,
   MAX_CONTEXT_FACTOR,
+  B2B_PRIORITY_FACTOR,
+  computeDynamicDeliveryPrice,
 } from '../../../src/services/dynamicPricing.js';
 
 describe('dynamicPricing', () => {
@@ -30,5 +32,26 @@ describe('dynamicPricing', () => {
 
   it('MAX_CONTEXT_FACTOR is bounded', () => {
     expect(MAX_CONTEXT_FACTOR).toBe(1.85);
+  });
+
+  it('applies a B2B priority premium after the base dynamic price', async () => {
+    const base = await computeDynamicDeliveryPrice({
+      distanceKm: 5,
+      method: 'moto',
+      includeWeather: false,
+      includeSurge: false,
+    });
+    const b2b = await computeDynamicDeliveryPrice({
+      distanceKm: 5,
+      method: 'moto',
+      includeWeather: false,
+      includeSurge: false,
+      isB2BPriority: true,
+    });
+
+    expect(B2B_PRIORITY_FACTOR).toBe(1.15);
+    expect(b2b.priorityFactor).toBe(B2B_PRIORITY_FACTOR);
+    expect(b2b.totalCfa).toBeGreaterThan(base.totalCfa);
+    expect(b2b.labels).toContain('priorité B2B');
   });
 });

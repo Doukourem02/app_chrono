@@ -117,7 +117,7 @@ const connectedUsers = new Map<string, string>(); // userId -> socketId // Limit
 
 let _ioInstance: SocketIOServer | null = null;
 
-function emitBatchAssigned(driverId: string, payload: { batchId: string; ordersCount: number }): boolean {
+function emitBatchAssigned(driverId: string, payload: { batchId: string; ordersCount: number; partner_id?: string; partner_name?: string; status?: string }): boolean {
   if (!_ioInstance) return false;
   const socketId = connectedDrivers.get(driverId);
   if (!socketId) return false;

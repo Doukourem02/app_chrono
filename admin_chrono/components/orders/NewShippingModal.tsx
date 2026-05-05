@@ -57,6 +57,7 @@ export default function NewShippingModal({
   // Calculated values
   const [distance, setDistance] = useState<number | null>(null)
   const [price, setPrice] = useState<number | null>(null)
+  const [isEstimating, setIsEstimating] = useState(false)
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true)
@@ -107,24 +108,50 @@ export default function NewShippingModal({
     }
   }, [searchQuery, users])
 
-  // Distance / prix devis (5 km défaut) — recalcul à chaque ouverture du modal car resetForm les remet à null à la fermeture
+  // Devis réel: calculé seulement quand départ + arrivée ont des coordonnées.
   useEffect(() => {
     if (!isOpen) return
-    const estimatedDistance = 5
-    setDistance(estimatedDistance)
-    setPrice(calculatePrice(estimatedDistance, deliveryMethod))
-  }, [deliveryMethod, isOpen])
 
-  const calculatePrice = (distance: number, method: string): number => {
-    const basePrices: { [key: string]: { base: number; perKm: number } } = {
-      moto: { base: 500, perKm: 200 },
-      vehicule: { base: 800, perKm: 300 },
-      cargo: { base: 1200, perKm: 450 },
+    if (!pickupCoordinates || !dropoffCoordinates) {
+      setDistance(null)
+      setPrice(null)
+      setIsEstimating(false)
+      return
     }
 
-    const pricing = basePrices[method] || basePrices.vehicule
-    return Math.round(pricing.base + distance * pricing.perKm)
-  }
+    let cancelled = false
+    setIsEstimating(true)
+    adminApiService
+      .calculateOrderEstimate({
+        pickupCoordinates,
+        dropoffCoordinates,
+        deliveryMethod,
+      })
+      .then((result) => {
+        if (cancelled) return
+        if (result.success && result.data) {
+          setDistance(Math.round(result.data.distance * 100) / 100)
+          setPrice(result.data.price)
+        } else {
+          setDistance(null)
+          setPrice(null)
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          logger.error('Error calculating estimate:', error)
+          setDistance(null)
+          setPrice(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsEstimating(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [deliveryMethod, dropoffCoordinates, isOpen, pickupCoordinates])
 
   const handleClientSelect = (user: UserData) => {
     setSelectedClient(user)
@@ -171,7 +198,7 @@ export default function NewShippingModal({
 
   const handleCreateOrder = async () => {
     // Validation
-    if (!selectedClient || !pickupAddress || !dropoffAddress || !distance || !price) {
+    if (!selectedClient || !pickupAddress || !dropoffAddress) {
       alert('Veuillez remplir tous les champs obligatoires')
       return
     }
@@ -215,8 +242,8 @@ export default function NewShippingModal({
         },
         deliveryMethod,
         paymentMethodType: paymentMethod,
-        distance,
-        price,
+        distance: distance ?? undefined,
+        price: price ?? undefined,
         notes: notes || undefined,
         isPhoneOrder: isPhoneOrder || undefined,
         isB2BOrder: false, // Les commandes créées depuis NewShippingModal ne sont pas B2B
@@ -576,11 +603,24 @@ export default function NewShippingModal({
                 />
               </div>
 
-              {distance !== null && price !== null && (
+              {isEstimating && (
+                <div style={{ padding: '12px', backgroundColor: '#F3F4F6', borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280' }}>Calcul du prix...</div>
+                </div>
+              )}
+
+              {!isEstimating && distance !== null && price !== null && (
                 <div style={{ padding: '12px', backgroundColor: '#F3E8FF', borderRadius: '8px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>{language === 'fr' ? 'Estimation' : 'Estimate'}</div>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
                     {language === 'fr' ? 'Distance' : 'Distance'}: {distance} km • {language === 'fr' ? 'Prix' : 'Price'}: {price.toLocaleString(locale)} FCFA
+                  </div>
+                </div>
+              )}
+              {!isEstimating && (distance === null || price === null) && pickupAddress && dropoffAddress && (
+                <div style={{ padding: '12px', backgroundColor: '#FEF3C7', borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#92400E' }}>
+                    Sélectionnez les deux adresses dans la liste pour afficher un devis. Le serveur recalculera le prix final à la création.
                   </div>
                 </div>
               )}
@@ -619,11 +659,24 @@ export default function NewShippingModal({
                 </div>
               </div>
 
-              {distance !== null && price !== null && (
+              {isEstimating && (
+                <div style={{ padding: '12px', backgroundColor: '#F3F4F6', borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280' }}>Calcul du prix...</div>
+                </div>
+              )}
+
+              {!isEstimating && distance !== null && price !== null && (
                 <div style={{ padding: '12px', backgroundColor: '#F3E8FF', borderRadius: '8px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '4px' }}>Estimation</div>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
                     Distance: {distance} km • Prix: {price.toLocaleString('fr-FR')} FCFA
+                  </div>
+                </div>
+              )}
+              {!isEstimating && (distance === null || price === null) && pickupAddress && dropoffAddress && (
+                <div style={{ padding: '12px', backgroundColor: '#FEF3C7', borderRadius: '8px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#92400E' }}>
+                    Devis indisponible côté interface. Le prix final sera recalculé côté serveur.
                   </div>
                 </div>
               )}
@@ -831,13 +884,13 @@ export default function NewShippingModal({
             <button
               type="button"
               onClick={handleCreateOrder}
-              disabled={isCreating || !distance || !price}
+              disabled={isCreating || !selectedClient || !pickupAddress || !dropoffAddress}
               style={{
                 ...buttonStyle,
                 backgroundColor: '#8B5CF6',
                 color: '#FFFFFF',
-                opacity: isCreating || !distance || !price ? 0.5 : 1,
-                cursor: isCreating || !distance || !price ? 'not-allowed' : 'pointer',
+                opacity: isCreating || !selectedClient || !pickupAddress || !dropoffAddress ? 0.5 : 1,
+                cursor: isCreating || !selectedClient || !pickupAddress || !dropoffAddress ? 'not-allowed' : 'pointer',
               }}
             >
               {isCreating ? 'Création...' : 'Créer la commande'}
