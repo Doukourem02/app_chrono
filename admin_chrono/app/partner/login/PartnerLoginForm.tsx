@@ -42,6 +42,68 @@ export default function PartnerLoginForm() {
     router.replace(`/partner/${data.partner_id}/dashboard`)
   }, [router])
 
+  const ensureEmailIsEligibleForPartnerPortal = useCallback(async (rawEmail: string): Promise<{ allowed: boolean; message?: string }> => {
+    const normalizedEmail = rawEmail.trim().toLowerCase()
+    if (!normalizedEmail) {
+      return { allowed: false, message: 'Email requis' }
+    }
+
+    const userRes = await supabase
+      .from('users')
+      .select('id')
+      .ilike('email', normalizedEmail)
+      .maybeSingle()
+
+    if (userRes.error) {
+      return {
+        allowed: false,
+        message: "Impossible de vérifier votre invitation pour le moment. Réessayez dans quelques instants.",
+      }
+    }
+
+    if (!userRes.data?.id) {
+      return {
+        allowed: false,
+        message: "Accès refusé : cet email n'est pas invité au portail partenaire.",
+      }
+    }
+
+    const membershipRes = await supabase
+      .from('partner_users')
+      .select('id, partner:partners(status, plan)')
+      .eq('user_id', userRes.data.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (membershipRes.error || !membershipRes.data) {
+      return {
+        allowed: false,
+        message: "Accès refusé : cet email n'est pas membre d'une équipe partenaire.",
+      }
+    }
+
+    const partner = membershipRes.data.partner as { status?: string; plan?: string } | null
+    const partnerStatus = partner?.status ?? null
+    const partnerPlan = partner?.plan ?? null
+    const portalPlans = new Set(['pro', 'business'])
+
+    if (partnerStatus !== 'active') {
+      return {
+        allowed: false,
+        message: "Accès refusé : le compte partenaire n'est pas actif.",
+      }
+    }
+
+    if (!portalPlans.has(partnerPlan ?? '')) {
+      return {
+        allowed: false,
+        message: "Accès refusé : le portail partenaire n'est pas disponible pour ce forfait.",
+      }
+    }
+
+    return { allowed: true }
+  }, [])
+
   // Gère le retour depuis le lien magic link / invitation Supabase (hash dans l'URL)
   useEffect(() => {
     const handleSession = async () => {
@@ -68,6 +130,13 @@ export default function PartnerLoginForm() {
     if (!email.trim()) { setError('Email requis'); return }
     setLoading(true)
     setError('')
+
+    const eligibility = await ensureEmailIsEligibleForPartnerPortal(email)
+    if (!eligibility.allowed) {
+      setLoading(false)
+      setError(eligibility.message ?? "Accès refusé : cet email n'est pas autorisé.")
+      return
+    }
 
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
@@ -110,12 +179,9 @@ export default function PartnerLoginForm() {
             <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 24, maxWidth: 320 }}>
               Un lien de connexion a été envoyé à <strong>{email}</strong>. Cliquez dessus pour accéder à votre portail.
             </p>
-            <button
-              onClick={() => { setOtpSent(false); setError('') }}
-              style={{ fontSize: 13, color: '#8B5CF6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              Utiliser une autre adresse
-            </button>
+            <p style={{ fontSize: 12, color: '#9CA3AF', maxWidth: 320 }}>
+              Si vous ne recevez rien, contactez le propriétaire B2B pour vérifier votre invitation.
+            </p>
           </div>
         ) : (
           <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
