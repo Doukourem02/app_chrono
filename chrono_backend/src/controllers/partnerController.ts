@@ -860,7 +860,34 @@ export const getPartnerUsers = async (req: Request, res: Response): Promise<void
     };
   });
 
-  res.json({ success: true, data: sanitized });
+  // Certains comptes peuvent exister en double (compte réel + compte technique OTP).
+  // On déduplique pour n'afficher qu'un seul membre par e-mail, en privilégiant la
+  // fiche la plus complète (nom/prénom présent).
+  const dedupedByEmail = new Map<string, any>();
+  for (const row of sanitized) {
+    const emailKey = (row.user?.email ?? '').trim().toLowerCase();
+    const fallbackKey = row.user_id ? `id:${row.user_id}` : `row:${row.id}`;
+    const key = emailKey || fallbackKey;
+
+    const existing = dedupedByEmail.get(key);
+    if (!existing) {
+      dedupedByEmail.set(key, row);
+      continue;
+    }
+
+    const existingHasName = !!(existing.user?.first_name && existing.user?.last_name);
+    const currentHasName = !!(row.user?.first_name && row.user?.last_name);
+
+    if (!existingHasName && currentHasName) {
+      dedupedByEmail.set(key, row);
+    }
+  }
+
+  const deduped = [...dedupedByEmail.values()].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  res.json({ success: true, data: deduped });
 };
 
 // ─── POST /api/partner/:partnerId/users/invite — portail owner only ──────────
