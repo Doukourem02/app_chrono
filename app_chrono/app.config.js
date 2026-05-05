@@ -37,7 +37,7 @@ module.exports = {
     },
     android: {
       package: "com.anonymous.app_chrono",
-      versionCode: 129,
+      versionCode: 130,
       /**
        * "pan" évite adjustResize : sinon la fenêtre se redimensionne en même temps que le sheet
        * animé (expandForAddressInput), ce qui provoque des tremblements au focus des champs adresse.
@@ -54,7 +54,7 @@ module.exports = {
     web: {
       output: "static",
       favicon: "./assets/images/logo/LOGO_APP2.png"
-    },
+      buildNumber: "130",
     plugins: [
       "expo-asset",
       "expo-router",
