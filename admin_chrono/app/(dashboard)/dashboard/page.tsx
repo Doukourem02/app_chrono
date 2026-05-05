@@ -225,6 +225,8 @@ export default function DashboardPage() {
     display: 'flex',
     gap: '12px',
     alignItems: 'stretch',
+    height: 'clamp(760px, calc(100vh - 238px), 860px)',
+    minHeight: 0,
   }
 
   // Sous-grille gauche + milieu : 2 colonnes seulement, pas liée au panneau droit
@@ -233,8 +235,10 @@ export default function DashboardPage() {
     display: 'grid',
     gap: '12px',
     gridTemplateColumns: '240px 1fr',
-    gridTemplateRows: 'auto 1fr',
+    gridTemplateRows: 'minmax(0, 1fr) auto',
+    height: '100%',
     minWidth: 0,
+    minHeight: 0,
   }
 
   const leftColumnStyle: React.CSSProperties = {
@@ -265,6 +269,9 @@ export default function DashboardPage() {
     minWidth: '380px',
     maxWidth: '380px',
     flexShrink: 0,
+    height: '100%',
+    minHeight: 0,
+    overflow: 'hidden',
   }
 
   return (

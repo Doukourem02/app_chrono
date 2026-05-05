@@ -258,18 +258,20 @@ export default function QuickMessage() {
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     border: `1px solid ${themeColors.cardBorder}`,
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
-    flex: 0.8,
+    flex: '0.8 1 0',
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
+    overflow: 'hidden',
   }
 
   const headerStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: '12px',
+    marginBottom: '10px',
     flexShrink: 0,
+    gap: '10px',
   }
 
   const titleStyle: React.CSSProperties = {
@@ -288,12 +290,14 @@ export default function QuickMessage() {
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: 600,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
   }
 
   const contactsListStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '10px',
     flex: 1,
     minHeight: 0,
     overflow: 'auto',
@@ -302,8 +306,8 @@ export default function QuickMessage() {
   const contactItemStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    padding: '12px',
+    gap: '12px',
+    padding: '10px',
     borderRadius: '12px',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
@@ -315,8 +319,8 @@ export default function QuickMessage() {
   }
 
   const avatarStyle: React.CSSProperties = {
-    width: '48px',
-    height: '48px',
+    width: '44px',
+    height: '44px',
     backgroundColor: '#9333EA',
     borderRadius: '50%',
     display: 'flex',

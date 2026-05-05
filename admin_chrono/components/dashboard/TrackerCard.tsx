@@ -182,10 +182,11 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     border: `1px solid ${themeColors.cardBorder}`,
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
-    flex: 1.5,
+    flex: '1.5 1 0',
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
+    overflow: 'hidden',
   }
 
   const sectionStyle: React.CSSProperties = {
@@ -204,12 +205,18 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: '10px',
+    minWidth: 0,
   }
 
   const trackerIdStyle: React.CSSProperties = {
-    fontSize: '20px',
+    fontSize: '19px',
     fontWeight: 700,
     color: themeColors.textPrimary,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   }
 
   const statusBadgeStyle: React.CSSProperties = {
@@ -222,17 +229,19 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: 600,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   }
 
   const timelineStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '8px',
   }
 
   const timelineItemStyle: React.CSSProperties = {
     display: 'flex',
-    gap: '16px',
+    gap: '12px',
   }
 
   const timelineDotContainerStyle: React.CSSProperties = {
@@ -250,7 +259,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
 
   const timelineLineStyle: React.CSSProperties = {
     width: '2px',
-    height: '24px',
+    height: '16px',
     backgroundColor: themeColors.cardBorder,
     marginTop: '4px',
   }
@@ -274,21 +283,23 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px',
+    padding: '10px',
     backgroundColor: isDarkMode ? 'rgba(167, 139, 250, 0.12)' : '#FEF9C3',
     border: `1px solid ${isDarkMode ? 'rgba(167, 139, 250, 0.22)' : '#FDE68A'}`,
     borderRadius: '12px',
+    gap: '10px',
   }
 
   const driverLeftStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '10px',
+    minWidth: 0,
   }
 
   const avatarStyle: React.CSSProperties = {
-    width: '48px',
-    height: '48px',
+    width: '44px',
+    height: '44px',
     backgroundColor: isDarkMode ? themeColors.purplePrimary : '#9333EA',
     borderRadius: '50%',
     display: 'flex',
@@ -303,6 +314,10 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     fontSize: '14px',
     fontWeight: 600,
     color: themeColors.textPrimary,
+    maxWidth: '170px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   }
 
   const driverRoleStyle: React.CSSProperties = {
@@ -328,16 +343,16 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   const infoRowStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '12px',
-    padding: '10px 12px',
+    gap: '10px',
+    padding: '8px 10px',
     borderRadius: '12px',
     backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.72)' : '#F9FAFB',
     border: `1px solid ${isDarkMode ? themeColors.cardBorder : '#E5E7EB'}`,
-    marginBottom: '8px',
+    marginBottom: '6px',
   }
 
   const infoIconStyle: React.CSSProperties = {
-    padding: '8px',
+    padding: '7px',
     borderRadius: '10px',
     backgroundColor: isDarkMode ? 'rgba(167, 139, 250, 0.18)' : '#EEF2FF',
     color: isDarkMode ? themeColors.purpleLight : '#4C1D95',
@@ -361,6 +376,10 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     fontSize: '14px',
     fontWeight: 600,
     color: themeColors.textPrimary,
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
   }
 
   const renderEmpty = () => (
@@ -384,7 +403,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
 
   return (
     <AnimatedCard index={0} delay={150} style={cardStyle}>
-      <div style={sectionStyle}>
+      <div style={{ ...sectionStyle, marginBottom: activeDelivery ? '10px' : sectionStyle.marginBottom }}>
         <MapboxMiniMap routePath={computedRoute} />
       </div>
 
@@ -400,7 +419,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
             </div>
           </div>
 
-          <div style={{ ...sectionStyle, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ ...sectionStyle, display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
             <div style={infoRowStyle}>
               <div style={infoIconStyle}>
                 <MapPin size={16} />
@@ -421,7 +440,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
             </div>
           </div>
 
-          <div style={{ ...sectionStyle, marginBottom: '12px', flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <div style={{ ...sectionStyle, marginBottom: '10px', flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '4px', overscrollBehavior: 'contain' }}>
             <style>{`
               @keyframes krono-step-in {
                 from { opacity: 0; transform: translateY(10px); }
