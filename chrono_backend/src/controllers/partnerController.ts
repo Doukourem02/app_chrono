@@ -88,7 +88,7 @@ export const listPartners = async (req: Request, res: Response): Promise<void> =
 
 // ─── GET /api/partners/:id — admin or partner ─────────────────────────────────
 export const getPartner = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const id = req.params.id ?? req.params.partnerId;
 
   const [partnerRes, subRes, usageRes] = await Promise.all([
     db().from('partners').select('*').eq('id', id).single(),
@@ -197,7 +197,7 @@ export const activateSubscription = async (req: Request, res: Response): Promise
 
 // ─── GET /api/partners/:id/usage — admin or partner ───────────────────────────
 export const getPartnerUsage = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const id = req.params.id ?? req.params.partnerId;
 
   const month = new Date();
   month.setDate(1);
@@ -930,7 +930,7 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
 
 // ─── GET /api/partners/:id/invoices — admin or partner ────────────────────────
 export const getPartnerInvoices = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const id = req.params.id ?? req.params.partnerId;
 
   const { data, error } = await db()
     .from('partner_invoices')
