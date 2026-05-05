@@ -837,7 +837,7 @@ export const getPartnerUsers = async (req: Request, res: Response): Promise<void
 
   const { data, error } = await db()
     .from('partner_users')
-    .select('id, partner_id, user_id, role, created_at, user:users(email, first_name, last_name)')
+    .select('id, partner_id, user_id, role, created_at, user:users(email, first_name, last_name), partner:partners(email)')
     .eq('partner_id', partnerId)
     .order('created_at', { ascending: true });
 
@@ -847,7 +847,20 @@ export const getPartnerUsers = async (req: Request, res: Response): Promise<void
     return;
   }
 
-  res.json({ success: true, data });
+  const sanitized = (data ?? []).map((row: any) => {
+    const userEmail: string | null = row.user?.email ?? null;
+    const isOtp = userEmail?.includes('@otp.') || userEmail?.endsWith('.local');
+    const partnerEmail: string | null = (row.partner as any)?.email ?? null;
+    return {
+      ...row,
+      user: row.user
+        ? { ...row.user, email: isOtp ? (partnerEmail ?? null) : userEmail }
+        : row.user,
+      partner: undefined,
+    };
+  });
+
+  res.json({ success: true, data: sanitized });
 };
 
 // ─── POST /api/partner/:partnerId/users/invite — portail owner only ──────────
