@@ -14,6 +14,15 @@ export default function PartnerLoginForm() {
   const [error, setError] = useState('')
   const [otpSent, setOtpSent] = useState(false)
 
+  const getPartnerOrigin = useCallback(() => {
+    if (typeof window === 'undefined') return ''
+    const url = new URL(window.location.href)
+    if (url.hostname.startsWith('admin.')) {
+      url.hostname = url.hostname.replace(/^admin\./, 'partner.')
+    }
+    return url.origin
+  }, [])
+
   const redirectToPartnerDashboard = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('partner_users')
@@ -62,7 +71,7 @@ export default function PartnerLoginForm() {
 
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${window.location.origin}/partner/login` },
+      options: { emailRedirectTo: `${getPartnerOrigin()}/partner/login` },
     })
 
     setLoading(false)
