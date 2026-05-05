@@ -96,10 +96,9 @@ export default function PartnerLoginForm() {
         </div>
 
         {otpSent ? (
-          <div style={{ textAlign: 'center', padding: '8px 0' }}>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>📬</div>
+          <div style={{ textAlign: 'center', padding: '8px 0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <p style={{ fontSize: 15, fontWeight: 600, color: '#111827', marginBottom: 8 }}>Vérifiez votre boîte mail</p>
-            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 24, maxWidth: 320 }}>
               Un lien de connexion a été envoyé à <strong>{email}</strong>. Cliquez dessus pour accéder à votre portail.
             </p>
             <button

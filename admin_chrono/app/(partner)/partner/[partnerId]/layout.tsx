@@ -86,6 +86,10 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   if (!ctx) return null
 
   const allNav = [...NAV, ...OWNER_NAV]
+  const activeHref = allNav
+    .map(({ href }) => `/partner/${partnerId}/${href}`)
+    .filter((fullHref) => pathname === fullHref || pathname.startsWith(`${fullHref}/`))
+    .sort((a, b) => b.length - a.length)[0]
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -112,7 +116,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
         <nav style={{ flex: 1, padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {allNav.map(({ href, label, Icon }) => {
             const fullHref = `/partner/${partnerId}/${href}`
-            const active = pathname === fullHref || pathname.startsWith(fullHref + '/')
+            const active = fullHref === activeHref
             return (
               <Link
                 key={href}

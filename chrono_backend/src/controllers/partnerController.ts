@@ -332,6 +332,41 @@ type AttachPortalResult =
   | { ok: true; userId: string; magicLinkEmailed: boolean }
   | { ok: false; message: string };
 
+/** Envoie uniquement le lien portail par e-mail sans toucher partner_users. */
+async function sendPortalLinkOnly(params: {
+  normalizedEmail: string;
+  partnerName: string;
+  redirectTo: string;
+}): Promise<void> {
+  if (!supabaseAdmin) return;
+  const { normalizedEmail, partnerName, redirectTo } = params;
+  try {
+    let actionLink: string | undefined;
+    const { data: magicGen, error: magicErr } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: normalizedEmail,
+      options: { redirectTo },
+    });
+    if (!magicErr && magicGen?.properties?.action_link) {
+      actionLink = magicGen.properties.action_link;
+    } else {
+      logger.warn('[partnerController] sendPortalLinkOnly generateLink:', magicErr?.message);
+      const { data: recGen, error: recErr } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: normalizedEmail,
+        options: { redirectTo },
+      });
+      if (!recErr && recGen?.properties?.action_link) actionLink = recGen.properties.action_link;
+    }
+    if (actionLink) {
+      await sendPartnerPortalMagicLinkEmail(normalizedEmail, actionLink, partnerName);
+    }
+    logger.info(`[partnerController] Lien portail envoyé à ${normalizedEmail} (sans ajout membre)`);
+  } catch (err) {
+    logger.warn('[partnerController] sendPortalLinkOnly échec:', err);
+  }
+}
+
 /** Compte Auth déjà existant : lien partner_users + e-mail avec lien de connexion (SMTP Krono). */
 async function attachExistingUserAndSendPortalLink(params: {
   normalizedEmail: string;
@@ -749,25 +784,11 @@ export const activatePartner = async (req: Request, res: Response): Promise<void
         data: { partner_id: id, partner_name: data.name, role: 'owner' },
       });
       if (!inviteError && inviteData) {
-        await supabaseAdmin
-          .from('partner_users')
-          .upsert({ partner_id: id, user_id: inviteData.user.id, role: 'owner' }, { onConflict: 'partner_id,user_id' });
+        // Email de bienvenue envoyé — partner_users est géré uniquement via registerAsPartner ou invitePartnerUser
         logger.info(`[partnerController] Invitation portail envoyée à ${data.email}`);
       } else if (inviteError && isInviteEmailAlreadyRegisteredError(inviteError)) {
-        const attached = await attachExistingUserAndSendPortalLink({
-          normalizedEmail: em,
-          partnerId: id,
-          partnerName: data.name,
-          role: 'owner',
-          redirectTo,
-        });
-        if (attached.ok) {
-          logger.info(
-            `[partnerController] Activation : compte existant lié au portail (${data.email}), mail lien=${attached.magicLinkEmailed}`
-          );
-        } else {
-          logger.warn('[partnerController] Activation : compte existant non lié:', attached.message);
-        }
+        // Compte existant : envoyer uniquement le lien de connexion, sans toucher partner_users
+        await sendPortalLinkOnly({ normalizedEmail: em, partnerName: data.name, redirectTo });
       }
     } catch (inviteErr) {
       logger.warn('[partnerController] Auto-invite portail échouée:', inviteErr);

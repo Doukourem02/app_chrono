@@ -37,6 +37,7 @@ export default function PartnerBillingPage() {
   const invoices = invoicesData?.data ?? []
   const sub = partner?.active_subscription
   const planDetails = sub ? PLAN_DETAILS[sub.plan] : null
+  const fallbackPlan = !sub && partner?.plan && partner.plan !== 'none' ? partner.plan : null
 
   const isLoading = detailLoading || usageLoading
 
@@ -52,8 +53,16 @@ export default function PartnerBillingPage() {
         <h2 style={{ fontSize: 15, fontWeight: 700, color: themeColors.textPrimary, marginBottom: 16 }}>Abonnement actuel</h2>
         {isLoading ? <SkeletonLoader width="100%" height={80} borderRadius={8} /> : !sub ? (
           <div style={{ padding: '16px', borderRadius: 10, backgroundColor: themeColors.yellowLight, border: `1px solid ${themeColors.yellowPrimary}` }}>
-            <p style={{ fontSize: 14, color: themeColors.yellowPrimary, fontWeight: 600 }}>Aucun abonnement actif</p>
-            <p style={{ fontSize: 13, color: themeColors.textSecondary, marginTop: 4 }}>Contactez votre gestionnaire Krono pour activer un abonnement.</p>
+            <p style={{ fontSize: 14, color: themeColors.yellowPrimary, fontWeight: 600 }}>
+              {fallbackPlan
+                ? `Plan ${fallbackPlan.charAt(0).toUpperCase() + fallbackPlan.slice(1)} — activation en cours`
+                : 'Aucun abonnement actif'}
+            </p>
+            <p style={{ fontSize: 13, color: themeColors.textSecondary, marginTop: 4 }}>
+              {fallbackPlan
+                ? "Votre plan a bien été sélectionné. L'activation de l'abonnement sera confirmée par votre gestionnaire Krono."
+                : 'Contactez votre gestionnaire Krono pour activer un abonnement.'}
+            </p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
