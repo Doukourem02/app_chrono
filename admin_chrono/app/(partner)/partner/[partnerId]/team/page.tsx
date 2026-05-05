@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
 import { Users, UserPlus, Mail, Trash2 } from 'lucide-react'
 import { partnerApiService } from '@/lib/partnerApiService'
-import { supabase } from '@/lib/supabase'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import type { PartnerUser } from '@/types'
@@ -93,11 +92,6 @@ export default function PartnerTeamPage() {
     queryClient.invalidateQueries({ queryKey: ['partner-portal-team', partnerId] })
   }
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  React.useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setCurrentUserId(data.session?.user?.id ?? null))
-  }, [])
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
@@ -144,7 +138,6 @@ export default function PartnerTeamPage() {
                   : m.user?.email ?? '—'
                 const isOtpEmail = !!(m.user?.email?.includes('@otp.') || m.user?.email?.endsWith('.local'))
                 const emailToShow = hasName && m.user?.email && !isOtpEmail ? m.user.email : null
-                const isSelf = m.user_id === currentUserId
                 const isConfirming = confirmId === m.id
                 const isRemoving = removingId === m.id
                 return (
@@ -162,8 +155,7 @@ export default function PartnerTeamPage() {
                       {new Date(m.created_at).toLocaleDateString('fr-FR')}
                     </td>
                     <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                      {!isSelf && (
-                        isConfirming ? (
+                      {isConfirming ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
                             <span style={{ fontSize: 12, color: themeColors.textSecondary }}>Confirmer ?</span>
                             <button
@@ -188,8 +180,7 @@ export default function PartnerTeamPage() {
                           >
                             <Trash2 size={14} />
                           </button>
-                        )
-                      )}
+                        )}
                     </td>
                   </tr>
                 )
