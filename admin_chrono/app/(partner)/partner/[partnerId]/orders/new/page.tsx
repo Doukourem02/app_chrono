@@ -43,6 +43,33 @@ export default function NewPartnerOrderPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [pickupCoordinates, setPickupCoordinates] = useState<{ latitude: number; longitude: number } | undefined>(undefined)
+  const [dropoffCoordinates, setDropoffCoordinates] = useState<{ latitude: number; longitude: number } | undefined>(undefined)
+  const [distanceKm, setDistanceKm] = useState<number | null>(null)
+  const [priceCfa, setPriceCfa] = useState<number | null>(null)
+  const [isEstimating, setIsEstimating] = useState(false)
+
+  const canEstimate = !!pickupCoordinates && !!dropoffCoordinates
+
+  const estimatePrice = async (vehicleType: string, pickup?: { latitude: number; longitude: number }, dropoff?: { latitude: number; longitude: number }) => {
+    if (!pickup || !dropoff) return
+    setIsEstimating(true)
+    const method = vehicleType === 'moto' ? 'moto' : vehicleType === 'velo' ? 'vehicule' : 'vehicule'
+    const estimation = await partnerApiService.calculateOrderEstimate({
+      pickupCoordinates: pickup,
+      dropoffCoordinates: dropoff,
+      deliveryMethod: method,
+    })
+    setIsEstimating(false)
+
+    if (estimation.success && estimation.data) {
+      setDistanceKm(estimation.data.distance)
+      setPriceCfa(estimation.data.price)
+    } else {
+      setDistanceKm(null)
+      setPriceCfa(null)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,6 +86,10 @@ export default function NewPartnerOrderPage() {
       recipient:       { name: form.recipient_name.trim(), phone: form.recipient_phone.trim() },
       notes:           form.notes.trim() || undefined,
       vehicle_type:    form.vehicle_type,
+      pickup_coordinates: pickupCoordinates,
+      dropoff_coordinates: dropoffCoordinates,
+      distance_km: distanceKm ?? undefined,
+      price_cfa: priceCfa ?? undefined,
     })
 
     setLoading(false)
@@ -102,7 +133,15 @@ export default function NewPartnerOrderPage() {
             </label>
             <AddressAutocomplete
               value={form.pickup_address}
-              onChange={(address) => setForm((f) => ({ ...f, pickup_address: address }))}
+              onChange={(address, coordinates) => {
+                setForm((f) => ({ ...f, pickup_address: address }))
+                setPickupCoordinates(coordinates)
+                setDistanceKm(null)
+                setPriceCfa(null)
+                if (coordinates && dropoffCoordinates) {
+                  void estimatePrice(form.vehicle_type, coordinates, dropoffCoordinates)
+                }
+              }}
               placeholder="Ex: 12 rue des Almadies, Dakar"
             />
           </div>
@@ -113,7 +152,15 @@ export default function NewPartnerOrderPage() {
             </label>
             <AddressAutocomplete
               value={form.dropoff_address}
-              onChange={(address) => setForm((f) => ({ ...f, dropoff_address: address }))}
+              onChange={(address, coordinates) => {
+                setForm((f) => ({ ...f, dropoff_address: address }))
+                setDropoffCoordinates(coordinates)
+                setDistanceKm(null)
+                setPriceCfa(null)
+                if (coordinates && pickupCoordinates) {
+                  void estimatePrice(form.vehicle_type, pickupCoordinates, coordinates)
+                }
+              }}
               placeholder="Ex: Marché Sandaga, Dakar"
             />
           </div>
@@ -139,7 +186,12 @@ export default function NewPartnerOrderPage() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, vehicle_type: value }))}
+                  onClick={() => {
+                    setForm(f => ({ ...f, vehicle_type: value }))
+                    if (pickupCoordinates && dropoffCoordinates) {
+                      void estimatePrice(value, pickupCoordinates, dropoffCoordinates)
+                    }
+                  }}
                   style={{ padding: '8px 16px', borderRadius: 8, border: `2px solid ${form.vehicle_type === value ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: form.vehicle_type === value ? themeColors.purpleLight : 'transparent', color: form.vehicle_type === value ? themeColors.purplePrimary : themeColors.textPrimary, fontSize: 13, fontWeight: form.vehicle_type === value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
                 >
                   {label}
@@ -147,6 +199,24 @@ export default function NewPartnerOrderPage() {
               ))}
             </div>
           </div>
+
+          {(isEstimating || (distanceKm !== null && priceCfa !== null)) && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.purpleLight, border: `1px solid ${themeColors.purplePrimary}` }}>
+              <p style={{ fontSize: 13, color: themeColors.purplePrimary }}>
+                {isEstimating
+                  ? 'Calcul du prix en cours…'
+                  : `Estimation: ${distanceKm?.toFixed(1)} km • ${priceCfa?.toLocaleString('fr-FR')} FCFA`}
+              </p>
+            </div>
+          )}
+
+          {form.pickup_address && form.dropoff_address && !canEstimate && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.redLight, border: `1px solid ${themeColors.redPrimary}` }}>
+              <p style={{ fontSize: 13, color: themeColors.redPrimary }}>
+                Sélectionnez une adresse dans les suggestions pour calculer le prix correctement.
+              </p>
+            </div>
+          )}
 
           {error && (
             <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.redLight, border: `1px solid ${themeColors.redPrimary}` }}>

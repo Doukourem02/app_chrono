@@ -74,11 +74,18 @@ export function getBackendPublicOriginCandidates(): string[] {
 }
 
 export function getAllowedOrigins(): string[] {
+  const kronoWebDefaults = [
+    'https://admin.kro-no-delivery.com',
+    'https://partner.kro-no-delivery.com',
+    'https://app.kro-no-delivery.com',
+  ];
+
   // En production, utiliser uniquement les origines configurées
   if (process.env.NODE_ENV === 'production') {
-    const origins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
-    
-    if (!origins || origins.length === 0) {
+    const configuredOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || [];
+    const origins = [...new Set([...configuredOrigins, ...kronoWebDefaults])];
+
+    if (origins.length === 0) {
       throw new Error(
         'ALLOWED_ORIGINS doit être défini en production. ' +
         'Exemple: ALLOWED_ORIGINS=https://admin.yourdomain.com,https://app.yourdomain.com'
@@ -102,7 +109,7 @@ export function getAllowedOrigins(): string[] {
   // Ajouter les origines personnalisées si définies
   const customOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || [];
   
-  return [...new Set([...defaultDevOrigins, ...customOrigins])];
+  return [...new Set([...defaultDevOrigins, ...customOrigins, ...kronoWebDefaults])];
 }
 
 export function isOriginAllowed(origin: string | undefined): boolean {

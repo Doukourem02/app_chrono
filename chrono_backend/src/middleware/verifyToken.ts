@@ -1,11 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt.js';
+import { supabase, supabaseAdmin } from '../config/supabase.js';
+import logger from '../utils/logger.js';
 
-export const verifyJWT = (
+export const verifyJWT = async (
   req: Request,
   res: Response,
   next: NextFunction
-): void => {
+): Promise<void> => {
   const auth = req.headers.authorization || req.headers.Authorization;
 
   if (!auth) {
@@ -33,6 +35,25 @@ export const verifyJWT = (
     (req as any).user = decoded;
     next();
   } catch (err: any) {
+    // Fallback portail web: accepte aussi le JWT Supabase (auth du portail partenaire).
+    // Utile pour les routes protégées par verifyJWT mais appelées depuis une session Supabase.
+    try {
+      const authClient = supabaseAdmin ?? supabase;
+      const { data: { user }, error } = await authClient.auth.getUser(token);
+
+      if (!error && user?.id) {
+        (req as any).user = {
+          id: user.id,
+          role: 'client',
+          type: 'access',
+        };
+        next();
+        return;
+      }
+    } catch (supabaseErr) {
+      logger.warn('[verifyJWT] Supabase token fallback failed:', supabaseErr);
+    }
+
     if (err.message === 'Token expiré') {
       res.status(401).json({
         success: false,

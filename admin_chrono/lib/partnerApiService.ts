@@ -11,6 +11,8 @@ interface ApiResponse<T = unknown> {
   message?: string
 }
 
+type LatLng = { latitude: number; longitude: number }
+
 class PartnerApiService {
   private async getToken(): Promise<string | null> {
     const { data } = await supabase.auth.getSession()
@@ -77,6 +79,40 @@ class PartnerApiService {
     }
   }
 
+  async calculateOrderEstimate(params: {
+    pickupCoordinates?: LatLng
+    dropoffCoordinates?: LatLng
+    deliveryMethod: 'moto' | 'vehicule' | 'cargo'
+  }): Promise<ApiResponse<{ price: number; distance: number; estimatedDuration?: string }>> {
+    try {
+      const body: Record<string, unknown> = {
+        deliveryMethod: params.deliveryMethod,
+      }
+
+      if (params.pickupCoordinates) {
+        body.pickup = { coordinates: params.pickupCoordinates }
+      }
+      if (params.dropoffCoordinates) {
+        body.dropoff = { coordinates: params.dropoffCoordinates }
+      }
+
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/payments/calculate-price`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) return { success: false }
+
+      const json = await res.json() as { success?: boolean; price?: number; distance?: number; estimatedDuration?: string }
+      if (!json.success || typeof json.price !== 'number' || typeof json.distance !== 'number') {
+        return { success: false }
+      }
+      return { success: true, data: { price: json.price, distance: json.distance, estimatedDuration: json.estimatedDuration } }
+    } catch (err) {
+      logger.error('[partnerApiService] calculateOrderEstimate:', err)
+      return { success: false }
+    }
+  }
+
   async createOrder(partnerId: string, body: Record<string, unknown>): Promise<ApiResponse<unknown>> {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -86,10 +122,15 @@ class PartnerApiService {
 
       const pickupAddress = String(body.pickup_address ?? '').trim()
       const dropoffAddress = String(body.dropoff_address ?? '').trim()
-      const recipientName = String(body.recipient_name ?? '').trim()
-      const recipientPhone = String(body.recipient_phone ?? '').trim()
+      const recipientFromBody = (body.recipient && typeof body.recipient === 'object')
+        ? (body.recipient as { name?: unknown; phone?: unknown })
+        : undefined
+      const recipientName = String(recipientFromBody?.name ?? body.recipient_name ?? '').trim()
+      const recipientPhone = String(recipientFromBody?.phone ?? body.recipient_phone ?? '').trim()
       const notes = String(body.notes ?? '').trim()
       const vehicleType = String(body.vehicle_type ?? 'moto').trim().toLowerCase()
+      const pickupCoordinates = (body.pickup_coordinates as LatLng | undefined) ?? { latitude: 0, longitude: 0 }
+      const dropoffCoordinates = (body.dropoff_coordinates as LatLng | undefined) ?? { latitude: 0, longitude: 0 }
 
       const method =
         vehicleType === 'moto'
@@ -100,22 +141,25 @@ class PartnerApiService {
 
       const distanceKmRaw = Number(body.distance_km ?? 5)
       const distanceKm = Number.isFinite(distanceKmRaw) && distanceKmRaw > 0 ? distanceKmRaw : 5
+      const priceCfaRaw = Number(body.price_cfa)
+      const priceCfa = Number.isFinite(priceCfaRaw) && priceCfaRaw > 0 ? priceCfaRaw : undefined
 
       const payload = {
         userId: user.id,
         partner_id: partnerId,
         pickup: {
           address: pickupAddress,
-          coordinates: { latitude: 0, longitude: 0 },
+          coordinates: pickupCoordinates,
         },
         dropoff: {
           address: dropoffAddress,
-          coordinates: { latitude: 0, longitude: 0 },
+          coordinates: dropoffCoordinates,
         },
         recipient: { name: recipientName, phone: recipientPhone },
         method,
         notes: notes || undefined,
         distanceKm,
+        priceCfa,
       }
 
       const res = await this.fetchWithAuth(`${API_BASE_URL}/api/orders/record`, {
