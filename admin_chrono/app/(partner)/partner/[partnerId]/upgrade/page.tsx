@@ -38,7 +38,7 @@ export default function UpgradePage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.replace('/partner/login')
   }
 
   return (
@@ -124,7 +124,7 @@ export default function UpgradePage() {
             Pour changer de forfait, contactez votre gestionnaire Krono ou modifiez votre abonnement depuis l&apos;application mobile.
           </p>
           <button
-            onClick={() => router.push('/login')}
+            onClick={() => router.replace('/partner/login')}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 10, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textSecondary, fontSize: 13, cursor: 'pointer' }}
           >
             <ArrowLeft size={14} />

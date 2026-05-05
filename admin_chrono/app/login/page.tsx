@@ -1,5 +1,7 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import LoginForm from './LoginForm'
 
 export const metadata: Metadata = {
@@ -22,7 +24,14 @@ function LoginFallback() {
   )
 }
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const requestHeaders = await headers()
+  const host = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').toLowerCase()
+
+  if (host.startsWith('partner.')) {
+    redirect('/partner/login')
+  }
+
   return (
     <Suspense fallback={<LoginFallback />}>
       <LoginForm />

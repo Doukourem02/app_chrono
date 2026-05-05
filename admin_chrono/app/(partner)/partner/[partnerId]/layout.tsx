@@ -54,10 +54,10 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+      if (!session) { router.replace('/partner/login'); return }
 
       const access = await partnerApiService.verifyAccess(partnerId)
-      if (!access.allowed) { router.push('/login'); return }
+      if (!access.allowed) { router.replace('/partner/login'); return }
 
       const PORTAL_PLANS = ['pro', 'business']
       if (!PORTAL_PLANS.includes(access.plan ?? '')) {
@@ -94,7 +94,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.replace('/partner/login')
   }
 
   return (
