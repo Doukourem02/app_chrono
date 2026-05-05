@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle } from 'lucide-react'
 import { partnerApiService } from '@/lib/partnerApiService'
 import { themeColors } from '@/utils/theme'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface FormState {
   pickup_address: string
@@ -22,8 +23,6 @@ const VEHICLE_TYPES = [
 ]
 
 const FIELDS: Array<{ key: keyof FormState; label: string; type: string; placeholder: string; required?: boolean }> = [
-  { key: 'pickup_address',   label: 'Adresse de collecte *',    type: 'text', placeholder: 'Ex: 12 rue des Almadies, Dakar', required: true },
-  { key: 'dropoff_address',  label: 'Adresse de livraison *',   type: 'text', placeholder: 'Ex: Marché Sandaga, Dakar',      required: true },
   { key: 'recipient_name',   label: 'Nom du destinataire *',    type: 'text', placeholder: 'Ibrahima Diallo',               required: true },
   { key: 'recipient_phone',  label: 'Téléphone du destinataire *', type: 'tel', placeholder: '+221 77 000 00 00',          required: true },
   { key: 'notes',            label: 'Instructions livreur',     type: 'text', placeholder: 'Carton fragile, code portail…' },
@@ -97,6 +96,28 @@ export default function NewPartnerOrderPage() {
       {/* Formulaire */}
       <div style={{ backgroundColor: themeColors.cardBg, border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: '24px 28px' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 6 }}>
+              Adresse de collecte *
+            </label>
+            <AddressAutocomplete
+              value={form.pickup_address}
+              onChange={(address) => setForm((f) => ({ ...f, pickup_address: address }))}
+              placeholder="Ex: 12 rue des Almadies, Dakar"
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 6 }}>
+              Adresse de livraison *
+            </label>
+            <AddressAutocomplete
+              value={form.dropoff_address}
+              onChange={(address) => setForm((f) => ({ ...f, dropoff_address: address }))}
+              placeholder="Ex: Marché Sandaga, Dakar"
+            />
+          </div>
+
           {FIELDS.map(({ key, label, type, placeholder }) => (
             <div key={key}>
               <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 6 }}>{label}</label>

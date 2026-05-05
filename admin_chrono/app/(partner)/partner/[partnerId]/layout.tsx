@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase'
 import { partnerApiService } from '@/lib/partnerApiService'
 import { themeColors } from '@/utils/theme'
 import { SkeletonLoader } from '@/components/animations'
+import { MapboxProvider } from '@/contexts/MapboxContext'
 
 interface PartnerCtx {
   partnerId: string
@@ -97,6 +98,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   }
 
   return (
+    <MapboxProvider>
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--background)' }}>
       {/* Sidebar portail partenaire */}
       <aside style={{ width: 240, flexShrink: 0, backgroundColor: themeColors.cardBg, borderRight: `1px solid ${themeColors.cardBorder}`, display: 'flex', flexDirection: 'column', padding: '20px 0' }}>
@@ -164,5 +166,6 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
         {children}
       </main>
     </div>
+    </MapboxProvider>
   )
 }
