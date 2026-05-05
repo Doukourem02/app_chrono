@@ -138,9 +138,12 @@ export default function PartnerTeamPage() {
             </thead>
             <tbody>
               {members.map((m) => {
-                const name = m.user?.first_name && m.user?.last_name
-                  ? `${m.user.first_name} ${m.user.last_name}`
+                const hasName = !!(m.user?.first_name && m.user?.last_name)
+                const name = hasName
+                  ? `${m.user!.first_name} ${m.user!.last_name}`
                   : m.user?.email ?? '—'
+                const isOtpEmail = !!(m.user?.email?.includes('@otp.') || m.user?.email?.endsWith('.local'))
+                const emailToShow = hasName && m.user?.email && !isOtpEmail ? m.user.email : null
                 const isSelf = m.user_id === currentUserId
                 const isConfirming = confirmId === m.id
                 const isRemoving = removingId === m.id
@@ -148,7 +151,7 @@ export default function PartnerTeamPage() {
                   <tr key={m.id} style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
                     <td style={{ padding: '14px 16px' }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: themeColors.textPrimary }}>{name}</div>
-                      {m.user?.email && <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>{m.user.email}</div>}
+                      {emailToShow && <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>{emailToShow}</div>}
                     </td>
                     <td style={{ padding: '14px 16px' }}>
                       <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary }}>
