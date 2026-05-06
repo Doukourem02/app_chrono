@@ -266,20 +266,14 @@ export default function DashboardPage() {
     minHeight: 0,
   }
 
-  const trackerAreaStyle: React.CSSProperties = {
+  const rightColumnStyle: React.CSSProperties = {
     gridColumn: '3',
-    gridRow: '1',
+    gridRow: '1 / 3',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
     minWidth: 0,
     minHeight: 0,
-    display: 'flex',
-  }
-
-  const quickMessageAreaStyle: React.CSSProperties = {
-    gridColumn: '3',
-    gridRow: '2',
-    minWidth: 0,
-    minHeight: 0,
-    display: 'flex',
   }
 
   return (
@@ -427,11 +421,8 @@ export default function DashboardPage() {
             <ActivityTable />
           </div>
 
-        <div style={trackerAreaStyle}>
+        <div style={rightColumnStyle}>
           <TrackerCard deliveries={ongoingDeliveries} isLoading={ongoingDeliveriesLoading} />
-        </div>
-
-        <div style={quickMessageAreaStyle}>
           <QuickMessage />
         </div>
       </div>
