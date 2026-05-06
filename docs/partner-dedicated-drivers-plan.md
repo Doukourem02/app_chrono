@@ -17,6 +17,53 @@ Aujourd'hui, le code sait deja lire `partner_drivers`, mais il manque l'interfac
 
 Ajouter une section "Livreurs dedies" dans la fiche admin d'un partenaire.
 
+Le principe produit a retenir :
+
+- le partenaire sait souvent mieux que Krono quel livreur il veut dedier ;
+- le partenaire peut donc demander, proposer ou identifier un livreur dedie ;
+- seul l'admin Krono valide et rattache officiellement le livreur au partenaire.
+
+On implemente donc 3 cas d'usage complementaires.
+
+### Cas 1 - Le partenaire connait deja le livreur
+
+Le partenaire connait le livreur par son nom, son telephone, ou parce qu'il travaille deja avec lui hors Krono.
+
+Parcours :
+
+1. Le partenaire transmet les informations a Krono, via WhatsApp, telephone, mail ou formulaire.
+2. L'admin recherche le livreur dans Krono.
+3. L'admin verifie que le livreur existe et qu'il peut recevoir des commandes B2B.
+4. L'admin rattache le livreur au partenaire.
+
+Ce cas permet de demarrer rapidement, meme si le partenaire n'a qu'une information partielle comme le nom du livreur.
+
+### Cas 2 - Le partenaire a connu le livreur via Krono
+
+Le partenaire ne connait pas forcement le telephone du livreur, mais il se souvient d'une livraison ou d'un livreur rencontre via Krono.
+
+Parcours :
+
+1. Depuis l'historique ou le detail d'une commande, le partenaire clique sur une action du type "Demander ce livreur comme livreur dedie".
+2. Krono cree une demande de rattachement avec le contexte de la commande.
+3. L'admin voit la demande, identifie le livreur concerne, puis valide ou refuse.
+4. Si la demande est validee, le livreur est rattache au partenaire.
+
+Ce cas evite au partenaire de devoir connaitre les informations completes du livreur.
+
+### Cas 3 - Le partenaire veut un livreur dedie mais ne sait pas qui choisir
+
+Le partenaire veut un livreur dedie, mais il n'a personne en tete.
+
+Parcours :
+
+1. Le partenaire clique sur une action du type "Demander un livreur dedie".
+2. Il peut ajouter un commentaire optionnel sur ses besoins : zone, horaires, volume, habitudes.
+3. L'admin Krono choisit un livreur adapte.
+4. L'admin rattache ce livreur au partenaire.
+
+Ce cas permet a Krono de proposer un livreur dedie meme quand le partenaire n'a pas encore de preference.
+
 L'admin pourra :
 
 - voir les livreurs dedies du partenaire ;
@@ -26,11 +73,15 @@ L'admin pourra :
 - voir si le livreur accepte les commandes B2B ;
 - voir son statut online/disponible.
 
-Le portail partenaire ne doit pas servir a rattacher des livreurs. Il doit seulement proposer les livreurs deja configures par Krono.
+Le portail partenaire ne doit pas rattacher directement des livreurs. Il doit permettre de faire une demande, puis proposer uniquement les livreurs deja valides et configures par Krono.
 
 Phrase front a utiliser dans la section livreur dedie :
 
 > "Livreur dédié : Krono propose d’abord la commande au livreur sélectionné pour ce partenaire. Si aucun livreur dédié n’est disponible, l’assignation automatique prend le relais."
+
+Phrase front possible pour la demande :
+
+> "Vous souhaitez un livreur dédié ? Envoyez une demande à Krono. Notre équipe vérifie le livreur et l’ajoute à votre compte si tout est conforme."
 
 ## Checklist implementation
 
@@ -78,16 +129,48 @@ Phrase front a utiliser dans la section livreur dedie :
 - [ ] Permettre "Definir par defaut".
 - [ ] Permettre "Retirer".
 - [ ] Afficher un message clair si aucun livreur dedie n'est configure.
+- [ ] Afficher les demandes de livreur dedie en attente pour ce partenaire.
+- [ ] Permettre a l'admin de valider une demande en rattachant un livreur existant.
+- [ ] Permettre a l'admin de refuser une demande avec un motif optionnel.
 
 ### 4. Portail partenaire
 
-- [ ] Garder le portail en lecture seule sur les livreurs dedies.
+- [ ] Garder le rattachement final en lecture seule cote portail : le partenaire ne peut pas rattacher directement un livreur.
+- [ ] Ajouter une action "Demander un livreur dedie".
+- [ ] Ajouter un formulaire de demande avec :
+  - [ ] nom du livreur si connu ;
+  - [ ] telephone du livreur si connu ;
+  - [ ] commentaire optionnel ;
+  - [ ] type de demande : livreur connu, livreur rencontre via Krono, demande generale.
+- [ ] Depuis l'historique ou le detail d'une commande, permettre "Demander ce livreur comme livreur dedie".
 - [ ] Sur la creation de commande, afficher :
   - [ ] "Assignation automatique" ;
   - [ ] les livreurs dedies configurés ;
   - [ ] les livreurs non B2B en disabled avec un libelle clair.
 - [ ] Si aucun livreur dedie n'est configure, expliquer que la commande partira aux livreurs B2B disponibles.
-- [ ] Ne jamais laisser croire que le partenaire active lui-meme la reception B2B des livreurs.
+- [ ] Si aucun livreur dedie n'est configure, proposer au partenaire de faire une demande.
+- [ ] Ne jamais laisser croire que le partenaire active lui-meme la reception B2B des livreurs ou rattache directement un livreur.
+
+### 4 bis. Demandes de livreur dedie
+
+- [ ] Prevoir une table ou un modele de demande de rattachement.
+- [ ] Champs possibles :
+  - [ ] `id`
+  - [ ] `partner_id`
+  - [ ] `request_type` : `known_driver`, `previous_krono_driver`, `general_request`
+  - [ ] `driver_name`
+  - [ ] `driver_phone`
+  - [ ] `source_order_id`
+  - [ ] `comment`
+  - [ ] `status` : `pending`, `approved`, `rejected`
+  - [ ] `reviewed_by_admin_id`
+  - [ ] `review_note`
+  - [ ] `created_at`
+  - [ ] `reviewed_at`
+- [ ] Ajouter une route portail pour creer une demande.
+- [ ] Ajouter une route admin pour lister les demandes.
+- [ ] Ajouter une route admin pour valider/refuser une demande.
+- [ ] Lors de la validation, rattacher le livreur via `partner_drivers`.
 
 ### 5. Dispatch commande
 
@@ -131,15 +214,19 @@ Pourquoi :
 
 ## Parcours cible
 
-1. L'admin ouvre la fiche partenaire.
-2. Il va dans "Livreurs dedies".
-3. Il recherche un livreur Krono.
-4. Il l'ajoute au partenaire.
-5. Optionnel : il le marque "par defaut".
-6. Le partenaire cree une commande depuis le portail.
-7. Le portail affiche ce livreur dans "Prioriser un livreur dedie".
-8. Si le partenaire le selectionne, la commande part avec `preferred_driver_id`.
-9. Le backend priorise ce livreur, puis retombe en automatique si necessaire.
+1. Le partenaire demande un livreur dedie :
+   - soit avec un nom ou un telephone ;
+   - soit depuis une ancienne commande Krono ;
+   - soit sans livreur precis.
+2. L'admin ouvre la demande dans l'admin.
+3. L'admin identifie ou choisit un livreur Krono.
+4. L'admin verifie que le livreur existe et accepte les commandes B2B.
+5. L'admin rattache le livreur au partenaire.
+6. Optionnel : il le marque "par defaut".
+7. Le partenaire cree une commande depuis le portail.
+8. Le portail affiche ce livreur dans "Prioriser un livreur dedie".
+9. Si le partenaire le selectionne, la commande part avec `preferred_driver_id`.
+10. Le backend priorise ce livreur, puis retombe en automatique si necessaire.
 
 ## Points a clarifier avant dev complet
 
@@ -148,3 +235,5 @@ Pourquoi :
 - Est-ce que le partenaire peut choisir le livreur pour chaque commande, ou seulement utiliser le livreur par defaut ?
 - Est-ce que Krono veut une assignation stricte pour certains partenaires premium ?
 - Est-ce que les livreurs internes doivent rester prioritaires meme devant un livreur dedie ?
+- Est-ce qu'une demande de livreur dedie doit notifier l'admin par email/WhatsApp ou seulement apparaitre dans l'admin ?
+- Est-ce qu'un partenaire peut demander plusieurs livreurs dedies en meme temps ?

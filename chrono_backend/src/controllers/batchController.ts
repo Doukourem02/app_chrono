@@ -4,7 +4,7 @@ import path from 'path';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
 import { optimizeRouteOrder } from '../utils/haversine.js';
-import { emitBatchAssigned, findAllAvailableDrivers } from '../sockets/orderSocket.js';
+import { emitBatchAssigned, emitBatchOfferToDrivers, findAllAvailableDrivers } from '../sockets/orderSocket.js';
 import logger from '../utils/logger.js';
 import type { JWTPayload } from '../types/index.js';
 import qrCodeService from '../services/qrCodeService.js';
@@ -153,14 +153,15 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
     return;
   }
 
-  let assignedDriverId = driver_id || null;
+  const explicitDriverId = typeof driver_id === 'string' && driver_id.trim() ? driver_id.trim() : null;
+  let assignedDriverId = explicitDriverId;
+  let automaticOfferDrivers: Awaited<ReturnType<typeof findAllAvailableDrivers>> = [];
   if (!assignedDriverId) {
-    let availableDrivers = await findAllAvailableDrivers('moto', { b2bOnly: true });
-    if (availableDrivers.length === 0) {
+    automaticOfferDrivers = await findAllAvailableDrivers('moto', { b2bOnly: true });
+    if (automaticOfferDrivers.length === 0) {
       logger.warn('[batchController] Aucun livreur opt-in B2B disponible — fallback tous livreurs disponibles');
-      availableDrivers = await findAllAvailableDrivers('moto');
+      automaticOfferDrivers = await findAllAvailableDrivers('moto');
     }
-    assignedDriverId = availableDrivers[0]?.driverId ?? null;
   }
 
   // Optimiser l'ordre si les coordonnées sont fournies
@@ -211,17 +212,32 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
 
   await ensureBatchOrderProofs(orders.map((order) => order.order_id));
 
-  // Notifier le livreur attitré via socket (une seule notification pour toute la tournée)
+  // Si un livreur est choisi explicitement, on assigne directement la tournée.
+  // Sinon, la tournée part en offre aux livreurs B2B connectés : le premier qui accepte devient assigné.
   if (assignedDriverId) {
     const emitted = emitBatchAssigned(assignedDriverId, {
       batchId: (batch as any).id,
       ordersCount: orders.length,
       ...(partner_id ? { partner_id } : {}),
+      status: 'assigned',
     });
     if (!emitted) {
       logger.warn('[batchController] Tournée créée mais livreur non connecté', {
         batchId: (batch as any).id,
         driverId: assignedDriverId,
+      });
+    }
+  } else {
+    const emittedCount = emitBatchOfferToDrivers(automaticOfferDrivers, {
+      batchId: (batch as any).id,
+      ordersCount: orders.length,
+      ...(partner_id ? { partner_id } : {}),
+      status: 'offer',
+    });
+    if (emittedCount === 0) {
+      logger.warn('[batchController] Tournée créée mais aucun livreur connecté notifié', {
+        batchId: (batch as any).id,
+        candidateDrivers: automaticOfferDrivers.length,
       });
     }
   }

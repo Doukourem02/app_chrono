@@ -117,12 +117,30 @@ const connectedUsers = new Map<string, string>(); // userId -> socketId // Limit
 
 let _ioInstance: SocketIOServer | null = null;
 
-function emitBatchAssigned(driverId: string, payload: { batchId: string; ordersCount: number; partner_id?: string; partner_name?: string; status?: string }): boolean {
+type BatchSocketPayload = { batchId: string; ordersCount: number; partner_id?: string; partner_name?: string; status?: string };
+
+function emitBatchAssigned(driverId: string, payload: BatchSocketPayload): boolean {
   if (!_ioInstance) return false;
   const socketId = connectedDrivers.get(driverId);
   if (!socketId) return false;
   _ioInstance.to(socketId).emit('batch-assigned', payload);
   return true;
+}
+
+function emitBatchOfferToDrivers(drivers: NearbyDriver[], payload: BatchSocketPayload): number {
+  if (!_ioInstance) return 0;
+  let emitted = 0;
+  const seen = new Set<string>();
+  for (const driver of drivers) {
+    const driverId = driver.driverId;
+    if (!driverId || seen.has(driverId)) continue;
+    seen.add(driverId);
+    const socketId = connectedDrivers.get(driverId);
+    if (!socketId) continue;
+    _ioInstance.to(socketId).emit('batch-assigned', { ...payload, status: 'offer' });
+    emitted += 1;
+  }
+  return emitted;
 }
 const MAX_ACTIVE_ORDERS_PER_CLIENT = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_CLIENT || '5');
 const MAX_ACTIVE_ORDERS_PER_DRIVER = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_DRIVER || '3');
@@ -1565,6 +1583,119 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       sendOrderAccepted();
     });
 
+    socket.on('accept-batch', async (data: { batchId: string; driverId?: string }) => {
+      const { batchId } = data;
+      const driverId = socket.driverId;
+      if (!driverId || authRole !== 'driver') {
+        socket.emit('unauthorized', { message: 'Driver not authenticated on socket' });
+        return;
+      }
+      if (!batchId) {
+        socket.emit('batch-accept-error', { message: 'Tournée introuvable' });
+        return;
+      }
+      if (data.driverId && data.driverId !== driverId) {
+        logger.warn(`[accept-batch] driverId mismatch (ignored): provided=${maskUserId(data.driverId)} auth=${maskUserId(driverId)}`);
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const batchResult = await client.query<{
+          id: string;
+          partner_id: string | null;
+          driver_id: string | null;
+        }>(
+          `UPDATE delivery_batches
+              SET driver_id = $1
+            WHERE id = $2
+              AND driver_id IS NULL
+            RETURNING id, partner_id, driver_id`,
+          [driverId, batchId]
+        );
+
+        if (batchResult.rowCount === 0) {
+          const existing = await client.query<{ driver_id: string | null }>(
+            `SELECT driver_id FROM delivery_batches WHERE id = $1`,
+            [batchId]
+          );
+          await client.query('ROLLBACK');
+          socket.emit('batch-accept-error', {
+            batchId,
+            message: existing.rowCount === 0
+              ? 'Cette tournée est introuvable.'
+              : 'Cette tournée a déjà été prise par un autre livreur.',
+          });
+          return;
+        }
+
+        const countResult = await client.query<{ count: string }>(
+          `SELECT COUNT(*)::text AS count FROM batch_orders WHERE batch_id = $1`,
+          [batchId]
+        );
+        const ordersCount = Number.parseInt(countResult.rows[0]?.count ?? '0', 10) || 0;
+
+        await client.query(
+          `UPDATE orders
+              SET driver_id = $1,
+                  status = CASE WHEN status = 'pending' THEN 'accepted' ELSE status END,
+                  accepted_at = COALESCE(accepted_at, NOW()),
+                  updated_at = NOW()
+            WHERE id IN (
+              SELECT order_id FROM batch_orders WHERE batch_id = $2
+            )`,
+          [driverId, batchId]
+        );
+
+        await client.query(
+          `UPDATE invoices
+              SET driver_id = $1
+            WHERE driver_id IS NULL
+              AND order_id IN (
+                SELECT order_id FROM batch_orders WHERE batch_id = $2
+              )`,
+          [driverId, batchId]
+        ).catch(() => {});
+
+        await client.query('COMMIT');
+
+        const payload: BatchSocketPayload = {
+          batchId,
+          ordersCount,
+          ...(batchResult.rows[0]?.partner_id ? { partner_id: batchResult.rows[0].partner_id } : {}),
+          status: 'assigned',
+        };
+        socket.emit('batch-accepted-confirmation', {
+          success: true,
+          ...payload,
+          message: 'Tournée acceptée avec succès',
+        });
+        socket.emit('batch-assigned', payload);
+        broadcastOrderUpdateToAdmins(io, 'batch:assigned', { batchId, driverId, ordersCount });
+      } catch (error: any) {
+        await client.query('ROLLBACK').catch(() => {});
+        logger.error('[accept-batch] Erreur acceptation tournée:', error);
+        socket.emit('batch-accept-error', {
+          batchId,
+          message: 'Impossible d’accepter cette tournée pour le moment.',
+        });
+      } finally {
+        client.release();
+      }
+    });
+
+    socket.on('decline-batch', (data: { batchId: string; driverId?: string }) => {
+      const driverId = socket.driverId;
+      if (!driverId || authRole !== 'driver') {
+        socket.emit('unauthorized', { message: 'Driver not authenticated on socket' });
+        return;
+      }
+      socket.emit('batch-declined-confirmation', {
+        success: true,
+        batchId: data.batchId,
+      });
+    });
+
     socket.on('decline-order', (data: { orderId: string; driverId: string }) => {
       const { orderId } = data;
       const driverId = socket.driverId;
@@ -2549,5 +2680,5 @@ export {
   activeOrders, calculatePrice, connectedDrivers,
   connectedUsers, estimateDuration,
   findNearbyDrivers, findAllAvailableDrivers, setupOrderSocket, notifyDriversForOrder,
-  emitBatchAssigned,
+  emitBatchAssigned, emitBatchOfferToDrivers,
 };

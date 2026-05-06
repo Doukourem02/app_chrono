@@ -165,6 +165,9 @@ class OrderSocketService {
     this.socket.removeAllListeners('order:status:update');
     this.socket.removeAllListeners('order:cancelled');
     this.socket.removeAllListeners('batch-assigned');
+    this.socket.removeAllListeners('batch-accepted-confirmation');
+    this.socket.removeAllListeners('batch-accept-error');
+    this.socket.removeAllListeners('batch-declined-confirmation');
 
     // Nouvelle commande reçue
     this.socket.on('new-order-request', (order: OrderRequest) => {
@@ -396,8 +399,35 @@ class OrderSocketService {
     this.socket.on('batch-assigned', (data: { batchId: string; ordersCount: number; partner_id?: string; partner_name?: string; status?: string }) => {
       try {
         logger.info('Tournée B2B assignée', undefined, data);
-        const { batchId, ordersCount, partner_id, partner_name } = data || {};
+        const { batchId, ordersCount, partner_id, partner_name, status } = data || {};
         if (!batchId) return;
+
+        if (status === 'offer') {
+          void soundService.playOrderSound().catch(() => {});
+          import('expo-haptics').then((Haptics) => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          });
+          Alert.alert(
+            'Nouvelle tournée B2B',
+            `${ordersCount ?? 0} livraison${ordersCount === 1 ? '' : 's'} à effectuer.`,
+            [
+              {
+                text: 'Refuser',
+                style: 'cancel',
+                onPress: () => {
+                  void this.declineBatch(batchId);
+                },
+              },
+              {
+                text: 'Accepter',
+                onPress: () => {
+                  void this.acceptBatch(batchId);
+                },
+              },
+            ]
+          );
+          return;
+        }
 
         import('../store/useBatchStore').then(({ useBatchStore }) => {
           // Pré-remplir avec le minimum connu, l'écran chargera les détails complets
@@ -421,6 +451,19 @@ class OrderSocketService {
       } catch (err) {
         logger.warn('Error handling batch-assigned', undefined, err);
       }
+    });
+
+    this.socket.on('batch-accepted-confirmation', (data: { batchId?: string; message?: string }) => {
+      logger.info('Tournée acceptée confirmée', undefined, data);
+    });
+
+    this.socket.on('batch-accept-error', (data: { batchId?: string; message?: string }) => {
+      logger.warn('Erreur acceptation tournée', undefined, data);
+      Alert.alert('Tournée indisponible', data?.message ?? 'Cette tournée ne peut plus être acceptée.');
+    });
+
+    this.socket.on('batch-declined-confirmation', (data: { batchId?: string }) => {
+      logger.info('Tournée refusée confirmée', undefined, data);
     });
   }
 
@@ -579,6 +622,41 @@ class OrderSocketService {
     });
 
     // Attendre la confirmation du serveur ('order-declined-confirmation') pour mettre à jour le store local
+  }
+
+  async acceptBatch(batchId: string) {
+    if (!this.socket || !this.driverId) {
+      logger.error('Socket non connecté');
+      return;
+    }
+
+    try {
+      const tokenResult = await apiService.ensureAccessToken();
+      if (!tokenResult.token) {
+        logger.warn('Token d\'authentification invalide ou expiré lors de l\'acceptation tournée', undefined, { batchId });
+      }
+    } catch (error) {
+      logger.error('Erreur lors de la vérification du token tournée', undefined, error);
+    }
+
+    logger.info('Acceptation tournée', undefined, { batchId });
+    this.socket.emit('accept-batch', {
+      batchId,
+      driverId: this.driverId,
+    });
+  }
+
+  async declineBatch(batchId: string) {
+    if (!this.socket || !this.driverId) {
+      logger.error('Socket non connecté');
+      return;
+    }
+
+    logger.info('Déclinaison tournée', undefined, { batchId });
+    this.socket.emit('decline-batch', {
+      batchId,
+      driverId: this.driverId,
+    });
   }
 
   /**

@@ -41,6 +41,7 @@ backups-test/
 !migrations/027_live_activity_tokens.sql
 !migrations/028_notification_campaign_deliveries.sql
 !migrations/039_b2b_subscription_payment_records.sql
+!migrations/040_qr_code_scans_allow_delivery_proof_types.sql
 *.sql.gz
 *.json.backup
 backup_metadata.json

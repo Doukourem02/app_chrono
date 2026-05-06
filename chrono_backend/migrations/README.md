@@ -35,6 +35,7 @@ Ce dossier décrit le **schéma Postgres** attendu par l’API Node. Les fichier
 | 24  | `024_users_name_avatar_columns.sql`                | `users.first_name`, `last_name`, `avatar_url` — requis pour compléter le profil (app livreur / client)                   |
 | 25  | `025_orders_recipient_user_id.sql`                 | `orders.recipient_user_id` — lien compte destinataire (push in-app)                                                      |
 | 26  | `026_order_status_push_dedup.sql`                  | `order_status_push_sent` — anti-doublon notifications par `(order_id, status)`                                           |
+| 40  | `040_qr_code_scans_allow_delivery_proof_types.sql` | Autorise `qr_scan`, `manual_code` et les preuves alternatives B2B/batch dans `qr_code_scans.qr_code_type`                |
 
 
 **Important — doublons `016_` et `017_`** : deux fichiers partagent le même préfixe. L’ordre **lexicographique** des noms de fichier est :
