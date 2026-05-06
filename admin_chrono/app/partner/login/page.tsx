@@ -5,7 +5,12 @@ import { redirect } from 'next/navigation'
 import PartnerLoginForm from './PartnerLoginForm'
 
 export const metadata: Metadata = {
-  title: 'Portail Partenaire — Connexion',
+  title: {
+    absolute: 'Connexion | Partner Portal Krono',
+  },
+  appleWebApp: {
+    title: 'Partner Portal Krono',
+  },
 }
 
 type SearchParams = Record<string, string | string[] | undefined>
