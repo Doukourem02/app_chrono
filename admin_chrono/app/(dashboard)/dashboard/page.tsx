@@ -274,7 +274,7 @@ export default function DashboardPage() {
     minWidth: '420px',
     maxWidth: '420px',
     flexShrink: 0,
-    height: 'clamp(780px, calc(100vh - 190px), 940px)',
+    height: 'clamp(900px, calc(100vh - 150px), 1080px)',
     minHeight: 0,
     overflow: 'visible',
   }
