@@ -2,14 +2,15 @@
 
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useParams } from 'next/navigation'
-import { Package, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react'
+import { useParams, useRouter } from 'next/navigation'
+import { Package, TrendingUp, AlertTriangle, CheckCircle, Navigation } from 'lucide-react'
 import { partnerApiService } from '@/lib/partnerApiService'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 
 export default function PartnerDashboardPage() {
   const { partnerId } = useParams<{ partnerId: string }>()
+  const router = useRouter()
 
   const { data: usageData, isLoading: usageLoading } = useQuery({
     queryKey: ['partner-portal-usage', partnerId],
@@ -102,9 +103,18 @@ export default function PartnerDashboardPage() {
                   <p style={{ fontSize: 13, fontWeight: 600, color: themeColors.textPrimary }}>{o.dropoff_address as string ?? '—'}</p>
                   <p style={{ fontSize: 12, color: themeColors.textSecondary }}>{o.orderId as string ?? o.id as string}</p>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary }}>
-                  {o.status as string}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary }}>
+                    {o.status as string}
+                  </span>
+                  <button
+                    onClick={() => router.push(`/partner/${partnerId}/orders/${o.id as string}/tracking`)}
+                    aria-label="Suivre la livraison"
+                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.purplePrimary, cursor: 'pointer' }}
+                  >
+                    <Navigation size={15} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

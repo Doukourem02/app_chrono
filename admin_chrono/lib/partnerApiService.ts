@@ -36,6 +36,49 @@ export interface PartnerDriver {
   }
 }
 
+export interface PartnerOrderTracking {
+  id: string
+  status: string
+  phase?: string
+  statusLabel?: string
+  etaLabel?: string
+  progress?: number
+  pickup: {
+    name?: string
+    address: string
+    coordinates: LatLng | null
+  }
+  dropoff: {
+    name?: string
+    address: string
+    coordinates: LatLng | null
+  }
+  recipient: {
+    name?: string | null
+    phone?: string | null
+  }
+  driver: {
+    id: string
+    name: string | null
+    phone?: string | null
+    avatarUrl?: string | null
+    vehiclePlate?: string | null
+    vehicleType?: string | null
+    latitude: number | null
+    longitude: number | null
+    heading?: number | null
+  } | null
+  price: number | null
+  deliveryMethod: string | null
+  distance: number | null
+  createdAt: string
+  updatedAt?: string | null
+  proof?: {
+    method?: string | null
+    validatedAt?: string | null
+  }
+}
+
 class PartnerApiService {
   private async getToken(): Promise<string | null> {
     const { data } = await supabase.auth.getSession()
@@ -124,6 +167,17 @@ class PartnerApiService {
     } catch (err) {
       logger.error('[partnerApiService] getOrders:', err)
       return { success: false, data: [] }
+    }
+  }
+
+  async getOrderTracking(partnerId: string, orderId: string): Promise<ApiResponse<PartnerOrderTracking>> {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/orders/${orderId}/tracking`)
+      if (!res.ok) return { success: false }
+      return res.json()
+    } catch (err) {
+      logger.error('[partnerApiService] getOrderTracking:', err)
+      return { success: false }
     }
   }
 

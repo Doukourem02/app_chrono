@@ -45,6 +45,7 @@ export default function NewPartnerOrderPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
   const [preferredDriversEnabled, setPreferredDriversEnabled] = useState(false)
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
   const [partnerDrivers, setPartnerDrivers] = useState<PartnerDriver[]>([])
@@ -56,6 +57,18 @@ export default function NewPartnerOrderPage() {
   const [isEstimating, setIsEstimating] = useState(false)
 
   const canEstimate = !!pickupCoordinates && !!dropoffCoordinates
+
+  useEffect(() => {
+    if (!success) return
+    const timer = setTimeout(() => {
+      if (createdOrderId) {
+        router.push(`/partner/${partnerId}/orders/${createdOrderId}/tracking`)
+      } else {
+        router.push(`/partner/${partnerId}/orders`)
+      }
+    }, 1600)
+    return () => clearTimeout(timer)
+  }, [createdOrderId, partnerId, router, success])
 
   useEffect(() => {
     let mounted = true
@@ -139,8 +152,9 @@ export default function NewPartnerOrderPage() {
 
     setLoading(false)
     if (result.success) {
+      const resultData = result.data as { orderId?: string } | undefined
+      setCreatedOrderId(resultData?.orderId ?? null)
       setSuccess(true)
-      setTimeout(() => router.push(`/partner/${partnerId}/orders`), 2000)
     } else {
       setError((result as { message?: string }).message ?? 'Erreur lors de la création de la commande.')
     }
@@ -151,7 +165,9 @@ export default function NewPartnerOrderPage() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 16 }}>
         <CheckCircle size={48} color={themeColors.greenPrimary} />
         <h2 style={{ fontSize: 20, fontWeight: 700, color: themeColors.textPrimary }}>Commande créée !</h2>
-        <p style={{ fontSize: 14, color: themeColors.textSecondary }}>Redirection vers vos commandes…</p>
+        <p style={{ fontSize: 14, color: themeColors.textSecondary }}>
+          {createdOrderId ? 'Ouverture du suivi de livraison…' : 'Redirection vers vos commandes…'}
+        </p>
       </div>
     )
   }

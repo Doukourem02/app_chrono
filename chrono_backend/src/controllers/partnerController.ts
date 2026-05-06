@@ -1,7 +1,16 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
+import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { sendPartnerPortalMagicLinkEmail } from '../services/emailService.js';
+import {
+  clientHeadline,
+  normalizeProductStatus,
+  orderStatusDefinition,
+  progressWithEtaCap,
+  statusBaseProgress,
+} from '../utils/orderProductRules.js';
+import { realisticEtaMinutesFromAirDistance } from '../utils/ivoryCoastEta.js';
 
 const db = () => supabaseAdmin ?? supabase;
 
@@ -19,6 +28,73 @@ const PLAN_DEFAULTS: Record<string, { monthly_price: number; included_orders: nu
 
 /** Sans forfait : commission prélevée sur chaque course (pas d'abonnement). */
 const PAY_PER_DELIVERY_COMMISSION_RATE = 0.07;
+
+type PartnerTrackingCoordinates = { latitude: number; longitude: number };
+
+function parseLocationField(value: unknown): Record<string, any> {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : { address: value };
+    } catch {
+      return { address: value };
+    }
+  }
+  return typeof value === 'object' ? (value as Record<string, any>) : {};
+}
+
+function toPartnerTrackingCoordinates(value: unknown): PartnerTrackingCoordinates | null {
+  const record = value as Record<string, unknown> | null | undefined;
+  const coords = (record?.coordinates || record) as Record<string, unknown> | null | undefined;
+  if (!coords) return null;
+  const latitude = typeof coords.latitude === 'number' ? coords.latitude : Number(coords.latitude ?? coords.lat);
+  const longitude = typeof coords.longitude === 'number' ? coords.longitude : Number(coords.longitude ?? coords.lng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
+}
+
+function calculateDistanceMeters(a: PartnerTrackingCoordinates, b: PartnerTrackingCoordinates): number {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const rLat1 = toRad(a.latitude);
+  const rLat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function etaLabelForPartnerTracking(
+  status: string,
+  driver: PartnerTrackingCoordinates | null,
+  pickup: unknown,
+  dropoff: unknown,
+  deliveryMethod: string | null
+): string {
+  const normalized = normalizeProductStatus(status) ?? status;
+  if (normalized === 'pending') return '';
+  if (normalized === 'in_progress') return '1 min';
+  if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'declined') return '';
+
+  const etaMode = orderStatusDefinition(normalized).etaMode;
+  const target =
+    etaMode === 'pickup'
+      ? toPartnerTrackingCoordinates(pickup)
+      : etaMode === 'dropoff'
+        ? toPartnerTrackingCoordinates(dropoff)
+        : null;
+  if (!driver || !target) return '';
+
+  const distanceMeters = calculateDistanceMeters(driver, target);
+  const minutes = realisticEtaMinutesFromAirDistance({
+    airDistanceMeters: distanceMeters,
+    vehicleType: deliveryMethod,
+  });
+  return `${minutes} min`;
+}
 
 /** Statut partenaire depuis une jointure Supabase (objet ou tableau). */
 function statusFromPartnerJoin(partners: unknown): string | undefined {
@@ -995,6 +1071,148 @@ export const getPartnerDriversForUser = async (req: Request, res: Response): Pro
   };
 
   await getPartnerDrivers(req, res);
+};
+
+export const getPartnerOrderTracking = async (req: Request, res: Response): Promise<void> => {
+  const partnerId = (req as any).partnerUser?.partnerId ?? req.params.partnerId;
+  const { orderId } = req.params;
+
+  if (!partnerId || !orderId) {
+    res.status(400).json({ success: false, message: 'partnerId et orderId requis' });
+    return;
+  }
+
+  try {
+    const result = await (pool as any).query(
+      `SELECT
+        o.id,
+        o.status,
+        o.driver_id,
+        o.pickup_address,
+        o.dropoff_address,
+        o.price_cfa,
+        o.delivery_method,
+        o.distance_km,
+        o.created_at,
+        o.updated_at,
+        o.recipient,
+        o.delivery_qr_scanned_at,
+        d.first_name as driver_first_name,
+        d.last_name as driver_last_name,
+        d.phone as driver_phone,
+        d.avatar_url as driver_avatar_url,
+        dp.profile_image_url as driver_profile_image_url,
+        dp.vehicle_plate as driver_vehicle_plate,
+        dp.vehicle_type as driver_vehicle_type,
+        dp.current_latitude as driver_lat,
+        dp.current_longitude as driver_lng,
+        dp.heading_degrees as driver_heading,
+        latest_proof.qr_code_type as delivery_proof_method,
+        latest_proof.scanned_at as delivery_proof_validated_at
+      FROM orders o
+      LEFT JOIN users d ON o.driver_id = d.id
+      LEFT JOIN driver_profiles dp ON dp.user_id = o.driver_id
+      LEFT JOIN LATERAL (
+        SELECT qr_code_type, scanned_at
+        FROM qr_code_scans
+        WHERE order_id = o.id AND is_valid = true
+        ORDER BY scanned_at DESC
+        LIMIT 1
+      ) latest_proof ON true
+      WHERE o.id = $1 AND o.partner_id = $2
+      LIMIT 1`,
+      [orderId, partnerId]
+    );
+
+    if (!result.rows?.length) {
+      res.status(404).json({ success: false, message: 'Commande introuvable pour ce partenaire' });
+      return;
+    }
+
+    const row = result.rows[0];
+    const pickup = parseLocationField(row.pickup_address);
+    const dropoff = parseLocationField(row.dropoff_address);
+    const recipient = parseLocationField(row.recipient);
+    const status = normalizeProductStatus(row.status) ?? row.status;
+    const driverCoordinates =
+      row.driver_lat != null && row.driver_lng != null
+        ? { latitude: Number(row.driver_lat), longitude: Number(row.driver_lng) }
+        : null;
+    const safeDriverCoordinates =
+      driverCoordinates &&
+      Number.isFinite(driverCoordinates.latitude) &&
+      Number.isFinite(driverCoordinates.longitude)
+        ? driverCoordinates
+        : null;
+    const etaLabel = etaLabelForPartnerTracking(
+      status,
+      safeDriverCoordinates,
+      pickup,
+      dropoff,
+      row.delivery_method
+    );
+    const progress = progressWithEtaCap(status, statusBaseProgress(status), etaLabel);
+    const driverName =
+      row.driver_first_name || row.driver_last_name
+        ? [row.driver_first_name, row.driver_last_name].filter(Boolean).join(' ')
+        : null;
+
+    res.json({
+      success: true,
+      data: {
+        id: row.id,
+        status,
+        phase: orderStatusDefinition(status).phase,
+        statusLabel: etaLabel ? clientHeadline(status, etaLabel) : orderStatusDefinition(status).clientLabel,
+        etaLabel,
+        progress,
+        pickup: {
+          name: pickup.name || pickup.label || 'Point de collecte',
+          address: pickup.address || pickup.formatted_address || pickup.street || '',
+          coordinates: toPartnerTrackingCoordinates(pickup),
+        },
+        dropoff: {
+          name: dropoff.name || dropoff.label || recipient.name || 'Destination',
+          address: dropoff.address || dropoff.formatted_address || dropoff.street || '',
+          coordinates: toPartnerTrackingCoordinates(dropoff),
+        },
+        recipient: {
+          name: recipient.name || recipient.fullName || null,
+          phone: recipient.phone || null,
+        },
+        driver: row.driver_id
+          ? {
+              id: row.driver_id,
+              name: driverName,
+              phone: row.driver_phone || null,
+              avatarUrl: row.driver_avatar_url || row.driver_profile_image_url || null,
+              vehiclePlate: row.driver_vehicle_plate || null,
+              vehicleType: row.driver_vehicle_type || null,
+              latitude: safeDriverCoordinates?.latitude ?? null,
+              longitude: safeDriverCoordinates?.longitude ?? null,
+              heading: (() => {
+                const heading = row.driver_heading;
+                if (heading == null || heading === '') return null;
+                const n = Number(heading);
+                return Number.isFinite(n) ? n : null;
+              })(),
+            }
+          : null,
+        price: row.price_cfa != null ? Number(row.price_cfa) : null,
+        deliveryMethod: row.delivery_method,
+        distance: row.distance_km != null ? Number(row.distance_km) : null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        proof: {
+          method: row.delivery_proof_method || null,
+          validatedAt: row.delivery_proof_validated_at || row.delivery_qr_scanned_at || null,
+        },
+      },
+    });
+  } catch (error: any) {
+    logger.error('[partnerController] getPartnerOrderTracking error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors du chargement du suivi partenaire' });
+  }
 };
 
 export const updatePartnerPreferences = async (req: Request, res: Response): Promise<void> => {

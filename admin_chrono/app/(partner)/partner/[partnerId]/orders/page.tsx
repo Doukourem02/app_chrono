@@ -3,17 +3,22 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import { Plus, Search, Package, ShieldCheck } from 'lucide-react'
+import { Plus, Search, Package, ShieldCheck, Navigation } from 'lucide-react'
 import { partnerApiService } from '@/lib/partnerApiService'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pending:     { label: 'En attente',  color: themeColors.yellowPrimary, bg: themeColors.yellowLight },
+  accepted:    { label: 'Acceptée',    color: themeColors.bluePrimary,   bg: themeColors.blueLight },
+  enroute:     { label: 'Vers collecte', color: themeColors.bluePrimary, bg: themeColors.blueLight },
   assigned:    { label: 'Assignée',    color: themeColors.bluePrimary,   bg: themeColors.blueLight },
   in_progress: { label: 'En cours',   color: themeColors.purplePrimary,  bg: themeColors.purpleLight },
+  picked_up:   { label: 'Récupérée',   color: themeColors.purplePrimary,  bg: themeColors.purpleLight },
+  delivering:  { label: 'Livraison',   color: themeColors.purplePrimary,  bg: themeColors.purpleLight },
   completed:   { label: 'Livrée',      color: themeColors.greenPrimary,  bg: themeColors.greenLight },
   cancelled:   { label: 'Annulée',     color: themeColors.redPrimary,    bg: themeColors.redLight },
+  declined:    { label: 'Refusée',     color: themeColors.yellowPrimary, bg: themeColors.yellowLight },
 }
 
 const proofLabel = (method?: unknown) => {
@@ -111,7 +116,7 @@ export default function PartnerOrdersPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                {['N° commande', 'Destination', 'Statut', 'Preuve', 'Prix', 'Date'].map(h => (
+                {['N° commande', 'Destination', 'Statut', 'Preuve', 'Prix', 'Date', 'Suivi'].map(h => (
                   <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary }}>{h}</th>
                 ))}
               </tr>
@@ -157,6 +162,15 @@ export default function PartnerOrdersPage() {
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: themeColors.textSecondary }}>
                       {new Date(o.created_at as string).toLocaleDateString('fr-FR')}
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <button
+                        onClick={() => router.push(`/partner/${partnerId}/orders/${o.id as string}/tracking`)}
+                        aria-label="Suivre la livraison"
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.background, color: themeColors.purplePrimary, cursor: 'pointer' }}
+                      >
+                        <Navigation size={16} />
+                      </button>
                     </td>
                   </tr>
                 )
