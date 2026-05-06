@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle, Phone, User } from 'lucide-react'
-import { partnerApiService, type PartnerDriver } from '@/lib/partnerApiService'
+import { partnerApiService, type PartnerDriver, type PartnerDriverRequestType } from '@/lib/partnerApiService'
 import { themeColors } from '@/utils/theme'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 
@@ -55,6 +55,15 @@ export default function NewPartnerOrderPage() {
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [priceCfa, setPriceCfa] = useState<number | null>(null)
   const [isEstimating, setIsEstimating] = useState(false)
+  const [showDriverRequest, setShowDriverRequest] = useState(false)
+  const [driverRequest, setDriverRequest] = useState({
+    request_type: 'general_request' as PartnerDriverRequestType,
+    driver_name: '',
+    driver_phone: '',
+    comment: '',
+  })
+  const [driverRequestLoading, setDriverRequestLoading] = useState(false)
+  const [driverRequestDone, setDriverRequestDone] = useState(false)
 
   const canEstimate = !!pickupCoordinates && !!dropoffCoordinates
 
@@ -157,6 +166,26 @@ export default function NewPartnerOrderPage() {
       setSuccess(true)
     } else {
       setError((result as { message?: string }).message ?? 'Erreur lors de la création de la commande.')
+    }
+  }
+
+  const submitDriverRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setDriverRequestLoading(true)
+    setError('')
+    const result = await partnerApiService.createDriverRequest(partnerId, {
+      request_type: driverRequest.request_type,
+      driver_name: driverRequest.driver_name.trim() || undefined,
+      driver_phone: driverRequest.driver_phone.trim() || undefined,
+      comment: driverRequest.comment.trim() || undefined,
+    })
+    setDriverRequestLoading(false)
+    if (result.success) {
+      setDriverRequestDone(true)
+      setShowDriverRequest(false)
+      setDriverRequest({ request_type: 'general_request', driver_name: '', driver_phone: '', comment: '' })
+    } else {
+      setError((result as { message?: string }).message ?? 'Impossible d’envoyer la demande de livreur dédié.')
     }
   }
 
@@ -283,6 +312,15 @@ export default function NewPartnerOrderPage() {
                 <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 3 }}>
                   Livreur dédié : Krono propose d’abord la commande au livreur sélectionné pour ce partenaire. Si aucun livreur dédié n’est disponible, l’assignation automatique prend le relais.
                 </div>
+                {!driversLoading && partnerDrivers.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDriverRequest(true)}
+                    style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Demander un livreur dédié
+                  </button>
+                )}
               </div>
               <button
                 type="button"
@@ -300,7 +338,14 @@ export default function NewPartnerOrderPage() {
                   <div style={{ fontSize: 13, color: themeColors.textSecondary }}>Chargement des livreurs…</div>
                 ) : partnerDrivers.length === 0 ? (
                   <div style={{ border: `1px dashed ${themeColors.cardBorder}`, borderRadius: 8, padding: 14, color: themeColors.textSecondary, fontSize: 13 }}>
-                    Aucun livreur dédié lié à ce partenaire. Les livreurs qui acceptent les commandes B2B recevront quand même la commande automatiquement.
+                    <p>Aucun livreur dédié lié à ce partenaire. Les livreurs qui acceptent les commandes B2B recevront quand même la commande automatiquement.</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowDriverRequest(true)}
+                      style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Demander un livreur dédié
+                    </button>
                   </div>
                 ) : (
                   <>
@@ -387,6 +432,12 @@ export default function NewPartnerOrderPage() {
             </div>
           )}
 
+          {driverRequestDone && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.greenLight, border: `1px solid ${themeColors.greenPrimary}` }}>
+              <p style={{ fontSize: 13, color: themeColors.greenPrimary }}>Demande envoyée à Krono.</p>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
@@ -396,6 +447,55 @@ export default function NewPartnerOrderPage() {
           </button>
         </form>
       </div>
+
+      {showDriverRequest && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)', padding: 16 }}>
+          <div style={{ width: '100%', maxWidth: 460, backgroundColor: themeColors.cardBg, borderRadius: 12, padding: 22, border: `1px solid ${themeColors.cardBorder}` }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, color: themeColors.textPrimary }}>Demander un livreur dédié</h2>
+            <p style={{ fontSize: 13, color: themeColors.textSecondary, marginTop: 6 }}>
+              Vous souhaitez un livreur dédié ? Envoyez une demande à Krono. Notre équipe vérifie le livreur et l’ajoute à votre compte si tout est conforme.
+            </p>
+            <form onSubmit={submitDriverRequest} style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <select
+                value={driverRequest.request_type}
+                onChange={(e) => setDriverRequest((f) => ({ ...f, request_type: e.target.value as PartnerDriverRequestType }))}
+                style={{ padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14 }}
+              >
+                <option value="general_request">Je veux un livreur dédié</option>
+                <option value="known_driver">Je connais déjà le livreur</option>
+                <option value="previous_krono_driver">J’ai rencontré ce livreur via Krono</option>
+              </select>
+              <input
+                value={driverRequest.driver_name}
+                onChange={(e) => setDriverRequest((f) => ({ ...f, driver_name: e.target.value }))}
+                placeholder="Nom du livreur si connu"
+                style={{ padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14 }}
+              />
+              <input
+                value={driverRequest.driver_phone}
+                onChange={(e) => setDriverRequest((f) => ({ ...f, driver_phone: e.target.value }))}
+                placeholder="Téléphone du livreur si connu"
+                style={{ padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14 }}
+              />
+              <textarea
+                value={driverRequest.comment}
+                onChange={(e) => setDriverRequest((f) => ({ ...f, comment: e.target.value }))}
+                placeholder="Zone, horaires, volume, habitudes…"
+                rows={4}
+                style={{ padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, resize: 'vertical' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button type="button" onClick={() => setShowDriverRequest(false)} style={{ padding: '9px 14px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 13, cursor: 'pointer' }}>
+                  Annuler
+                </button>
+                <button type="submit" disabled={driverRequestLoading} style={{ padding: '9px 14px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 13, fontWeight: 800, cursor: driverRequestLoading ? 'not-allowed' : 'pointer', opacity: driverRequestLoading ? 0.6 : 1 }}>
+                  {driverRequestLoading ? 'Envoi…' : 'Envoyer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

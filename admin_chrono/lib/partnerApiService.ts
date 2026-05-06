@@ -91,6 +91,8 @@ export interface PartnerOrderQRCode {
   message?: string
 }
 
+export type PartnerDriverRequestType = 'known_driver' | 'previous_krono_driver' | 'general_request'
+
 class PartnerApiService {
   private async getToken(): Promise<string | null> {
     const { data } = await supabase.auth.getSession()
@@ -163,6 +165,25 @@ class PartnerApiService {
       return res.json()
     } catch (err) {
       logger.error('[partnerApiService] updatePreferences:', err)
+      return { success: false }
+    }
+  }
+
+  async createDriverRequest(partnerId: string, body: {
+    request_type: PartnerDriverRequestType
+    driver_name?: string
+    driver_phone?: string
+    source_order_id?: string
+    comment?: string
+  }): Promise<ApiResponse<unknown>> {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/driver-requests`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      return res.json()
+    } catch (err) {
+      logger.error('[partnerApiService] createDriverRequest:', err)
       return { success: false }
     }
   }

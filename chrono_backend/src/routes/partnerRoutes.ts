@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyPartnerUser } from '../middleware/verifyPartnerUser.js';
-import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,markPartnerInvoicePaid,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,removePartnerUser,getPartnerDrivers,getPartnerDriversForUser,updatePartnerPreferences,getPartnerOrderTracking,getPartnerOrderQRCode,} from '../controllers/partnerController.js';
+import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,markPartnerInvoicePaid,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,removePartnerUser,getPartnerDrivers,addPartnerDriver,removePartnerDriver,setDefaultPartnerDriver,createPartnerDriverRequest,listPartnerDriverRequests,reviewPartnerDriverRequest,updatePartnerPreferences,getPartnerOrderTracking,getPartnerOrderQRCode,} from '../controllers/partnerController.js';
 import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
@@ -20,7 +20,12 @@ router.patch('/:id/subscriptions/:subId/activate',        verifyAdminSupabase, a
 router.patch('/:id/activate',                             verifyAdminSupabase, activatePartner);
 router.patch('/:id/status',                               verifyAdminSupabase, updatePartnerStatus);
 router.delete('/:id',                                     verifyAdminSupabase, deletePartner);
-router.get('/:id/drivers',                                verifyJWT, getPartnerDriversForUser);
+router.get('/:id/drivers',                                verifyAdminSupabase, getPartnerDrivers);
+router.post('/:id/drivers',                               verifyAdminSupabase, addPartnerDriver);
+router.delete('/:id/drivers/:driverUserId',               verifyAdminSupabase, removePartnerDriver);
+router.patch('/:id/drivers/:driverUserId/default',        verifyAdminSupabase, setDefaultPartnerDriver);
+router.get('/:id/driver-requests',                        verifyAdminSupabase, listPartnerDriverRequests);
+router.patch('/:id/driver-requests/:requestId',           verifyAdminSupabase, reviewPartnerDriverRequest);
 router.get('/:id/usage',                                  verifyAdminSupabase, getPartnerUsage);
 router.get('/:id/invoices',                               verifyAdminSupabase, getPartnerInvoices);
 router.patch('/:id/invoices/:invoiceId/pay',              verifyAdminSupabase, markPartnerInvoicePaid);
@@ -38,6 +43,7 @@ partnerPortalRouter.get('/users',                    verifyPartnerUser, getPartn
 partnerPortalRouter.post('/users/invite',             verifyPartnerUser, invitePortalUser);
 partnerPortalRouter.delete('/users/:memberId',        verifyPartnerUser, removePartnerUser);
 partnerPortalRouter.get('/drivers',                   verifyPartnerUser, getPartnerDrivers);
+partnerPortalRouter.post('/driver-requests',          verifyPartnerUser, createPartnerDriverRequest);
 partnerPortalRouter.get('/orders/:orderId/tracking',  verifyPartnerUser, getPartnerOrderTracking);
 partnerPortalRouter.get('/orders/:orderId/qr-code',   verifyPartnerUser, getPartnerOrderQRCode);
 partnerPortalRouter.patch('/preferences',             verifyPartnerUser, updatePartnerPreferences);

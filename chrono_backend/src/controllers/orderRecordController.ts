@@ -329,13 +329,18 @@ export const listOrderRecords = async (
 
     values.push(limit, offset);
     const result = await (pool as any).query(
-      `SELECT id, user_id, partner_id, status, pickup_address, dropoff_address,
-              delivery_method, price_cfa, distance_km, created_at, updated_at,
-              is_b2b_order,
-              delivery_qr_scanned_at,
+      `SELECT orders.id, orders.user_id, orders.partner_id, orders.status, orders.pickup_address, orders.dropoff_address,
+              orders.delivery_method, orders.price_cfa, orders.distance_km, orders.created_at, orders.updated_at,
+              orders.driver_id,
+              du.first_name AS driver_first_name,
+              du.last_name AS driver_last_name,
+              du.phone AS driver_phone,
+              orders.is_b2b_order,
+              orders.delivery_qr_scanned_at,
               latest_proof.qr_code_type as delivery_proof_method,
               latest_proof.scanned_at as delivery_proof_validated_at
          FROM orders
+         LEFT JOIN users du ON du.id = orders.driver_id
          LEFT JOIN LATERAL (
            SELECT qr_code_type, scanned_at
            FROM qr_code_scans
@@ -359,6 +364,14 @@ export const listOrderRecords = async (
         dropoff,
         pickup_address: pickup?.address ?? '',
         dropoff_address: dropoff?.address ?? '',
+        driver: row.driver_id
+          ? {
+              id: row.driver_id,
+              first_name: row.driver_first_name ?? null,
+              last_name: row.driver_last_name ?? null,
+              phone: row.driver_phone ?? null,
+            }
+          : null,
       };
     });
 

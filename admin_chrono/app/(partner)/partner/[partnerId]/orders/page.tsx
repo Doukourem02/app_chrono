@@ -17,6 +17,12 @@ type PartnerOrderListItem = {
   price_cfa?: number | null
   created_at?: string
   delivery_proof_method?: string | null
+  driver?: {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    phone?: string | null
+  } | null
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -60,6 +66,8 @@ export default function PartnerOrdersPage() {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [requestingDriverForOrderId, setRequestingDriverForOrderId] = useState<string | null>(null)
+  const [requestMessage, setRequestMessage] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['partner-portal-orders', partnerId, statusFilter],
@@ -86,6 +94,22 @@ export default function PartnerOrdersPage() {
 
   const openTracking = (orderId: string) => {
     router.push(`/partner/${partnerId}/orders/${orderId}/tracking`)
+  }
+
+  const requestDedicatedDriverFromOrder = async (order: PartnerOrderListItem) => {
+    if (!order.driver?.id) return
+    setRequestingDriverForOrderId(order.id)
+    setRequestMessage('')
+    const name = [order.driver.first_name, order.driver.last_name].filter(Boolean).join(' ').trim()
+    const result = await partnerApiService.createDriverRequest(partnerId, {
+      request_type: 'previous_krono_driver',
+      source_order_id: order.id,
+      driver_name: name || undefined,
+      driver_phone: order.driver.phone || undefined,
+      comment: 'Demande depuis l’historique de commande.',
+    })
+    setRequestingDriverForOrderId(null)
+    setRequestMessage(result.success ? 'Demande envoyée à Krono.' : 'Impossible d’envoyer la demande.')
   }
 
   return (
@@ -126,6 +150,12 @@ export default function PartnerOrdersPage() {
           ))}
         </select>
       </div>
+
+      {requestMessage && (
+        <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: requestMessage.includes('Impossible') ? themeColors.redLight : themeColors.greenLight, border: `1px solid ${requestMessage.includes('Impossible') ? themeColors.redPrimary : themeColors.greenPrimary}` }}>
+          <p style={{ fontSize: 13, color: requestMessage.includes('Impossible') ? themeColors.redPrimary : themeColors.greenPrimary }}>{requestMessage}</p>
+        </div>
+      )}
 
       {!isLoading && activeOrders.length > 0 && (
         <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -258,32 +288,44 @@ export default function PartnerOrdersPage() {
                       {o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : '—'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      {canTrack ? (
-                        <button
-                          onClick={() => openTracking(o.id)}
-                          aria-label="Suivre la livraison"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 7,
-                            minWidth: 112,
-                            padding: '8px 11px',
-                            borderRadius: 8,
-                            border: `1px solid ${themeColors.purplePrimary}`,
-                            backgroundColor: themeColors.purplePrimary,
-                            color: '#fff',
-                            cursor: 'pointer',
-                            fontSize: 13,
-                            fontWeight: 800,
-                          }}
-                        >
-                          <Navigation size={15} />
-                          Suivre
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 12, color: themeColors.textSecondary }}>Terminé</span>
-                      )}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {canTrack ? (
+                          <button
+                            onClick={() => openTracking(o.id)}
+                            aria-label="Suivre la livraison"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 7,
+                              minWidth: 112,
+                              padding: '8px 11px',
+                              borderRadius: 8,
+                              border: `1px solid ${themeColors.purplePrimary}`,
+                              backgroundColor: themeColors.purplePrimary,
+                              color: '#fff',
+                              cursor: 'pointer',
+                              fontSize: 13,
+                              fontWeight: 800,
+                            }}
+                          >
+                            <Navigation size={15} />
+                            Suivre
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 12, color: themeColors.textSecondary }}>Terminé</span>
+                        )}
+                        {o.driver?.id && (
+                          <button
+                            type="button"
+                            disabled={requestingDriverForOrderId === o.id}
+                            onClick={() => void requestDedicatedDriverFromOrder(o)}
+                            style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, cursor: requestingDriverForOrderId === o.id ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap', opacity: requestingDriverForOrderId === o.id ? 0.6 : 1 }}
+                          >
+                            {requestingDriverForOrderId === o.id ? 'Envoi…' : 'Demander ce livreur'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

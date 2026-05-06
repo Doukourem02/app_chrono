@@ -791,6 +791,14 @@ async function notifyDriversForOrder(
 
     if (isB2BOrder && preferredDriverId) {
       selectedDrivers = prioritizePreferredDrivers(selectedDrivers, preferredDriverId);
+      logger.info('[notifyDriversForOrder] Livreur dédié priorisé pour commande B2B', {
+        orderId: maskOrderId(order.id),
+        preferredDriverId: maskUserId(preferredDriverId),
+        candidates: selectedDrivers.length,
+        firstCandidate: selectedDrivers[0]?.driverId
+          ? maskUserId(selectedDrivers[0].driverId)
+          : null,
+      });
     }
 
     // Envoyer la commande aux livreurs sélectionnés (top 3)

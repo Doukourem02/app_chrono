@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle, Mail, Zap, ShieldOff, XCircle, RefreshCw, Trash2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Clock, Package, CreditCard, TrendingUp, AlertCircle, Mail, Zap, ShieldOff, XCircle, RefreshCw, Trash2, AlertTriangle, Search, User, Phone, Star, Plus } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
-import type { PartnerInvoice, PartnerPaymentMethod, PartnerSubscription } from '@/types'
+import type { Driver, PartnerDriver, PartnerDriverRequest, PartnerInvoice, PartnerPaymentMethod, PartnerSubscription } from '@/types'
 
 const PLAN_DEFAULTS: Record<string, { price: number; quota: number | null; label: string }> = {
   starter:  { price: 8_000,  quota: 35,  label: 'Starter — 8 000 FCFA / mois' },
@@ -437,6 +437,246 @@ function SubscriptionCard({ sub, partnerId, onRefresh }: { sub: PartnerSubscript
   )
 }
 
+function driverDisplayName(driver: {
+  first_name?: string | null
+  last_name?: string | null
+  email?: string | null
+}) {
+  return [driver.first_name, driver.last_name].filter(Boolean).join(' ').trim() || driver.email || 'Livreur Krono'
+}
+
+const REQUEST_TYPE_LABELS: Record<PartnerDriverRequest['request_type'], string> = {
+  known_driver: 'Livreur connu',
+  previous_krono_driver: 'Livreur rencontré via Krono',
+  general_request: 'Demande générale',
+}
+
+function PartnerDedicatedDriversSection({ partnerId }: { partnerId: string }) {
+  const queryClient = useQueryClient()
+  const [search, setSearch] = useState('')
+  const [selectedDriverId, setSelectedDriverId] = useState('')
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
+  const [reviewNote, setReviewNote] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const { data: driversData } = useQuery({
+    queryKey: ['partner-dedicated-drivers', partnerId],
+    queryFn: () => adminApiService.getPartnerDrivers(partnerId),
+    enabled: !!partnerId,
+  })
+
+  const { data: requestsData } = useQuery({
+    queryKey: ['partner-driver-requests', partnerId],
+    queryFn: () => adminApiService.getPartnerDriverRequests(partnerId),
+    enabled: !!partnerId,
+  })
+
+  const { data: searchData, isFetching: searchLoading } = useQuery({
+    queryKey: ['admin-driver-search', search],
+    queryFn: () => adminApiService.getDrivers({ search }),
+    enabled: search.trim().length >= 2,
+  })
+
+  const drivers = driversData?.data ?? []
+  const requests = requestsData?.data ?? []
+  const pendingRequests = requests.filter((r) => r.status === 'pending')
+  const searchResults = (searchData?.data ?? []).slice(0, 8)
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['partner-dedicated-drivers', partnerId] })
+    queryClient.invalidateQueries({ queryKey: ['partner-driver-requests', partnerId] })
+  }
+
+  const runAction = async (fn: () => Promise<{ success: boolean; message?: string }>, failure: string) => {
+    setBusy(true)
+    setError('')
+    const result = await fn()
+    setBusy(false)
+    if (!result.success) {
+      setError(result.message ?? failure)
+      return false
+    }
+    refresh()
+    return true
+  }
+
+  const handleAdd = async (isDefault = false) => {
+    if (!selectedDriverId) {
+      setError('Sélectionne un livreur à rattacher.')
+      return
+    }
+    const ok = await runAction(
+      () => adminApiService.addPartnerDriver(partnerId, { driver_user_id: selectedDriverId, is_default: isDefault }),
+      'Rattachement impossible.',
+    )
+    if (ok) {
+      setSelectedDriverId('')
+      setSearch('')
+    }
+  }
+
+  const handleApprove = async (requestId: string) => {
+    if (!selectedDriverId) {
+      setError('Sélectionne le livreur Krono à rattacher avant de valider.')
+      return
+    }
+    const ok = await runAction(
+      () => adminApiService.reviewPartnerDriverRequest(partnerId, requestId, {
+        action: 'approve',
+        driver_user_id: selectedDriverId,
+        review_note: reviewNote.trim() || undefined,
+      }),
+      'Validation impossible.',
+    )
+    if (ok) {
+      setSelectedRequestId(null)
+      setSelectedDriverId('')
+      setSearch('')
+      setReviewNote('')
+    }
+  }
+
+  const handleReject = async (requestId: string) => {
+    const ok = await runAction(
+      () => adminApiService.reviewPartnerDriverRequest(partnerId, requestId, {
+        action: 'reject',
+        review_note: reviewNote.trim() || undefined,
+      }),
+      'Refus impossible.',
+    )
+    if (ok) {
+      setSelectedRequestId(null)
+      setReviewNote('')
+    }
+  }
+
+  return (
+    <div style={{ backgroundColor: themeColors.cardBg, border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: themeColors.textPrimary }}>Livreurs dédiés</h2>
+          <p style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 4, maxWidth: 760 }}>
+            Livreur dédié : Krono propose d’abord la commande au livreur sélectionné pour ce partenaire. Si aucun livreur dédié n’est disponible, l’assignation automatique prend le relais.
+          </p>
+        </div>
+        <span style={{ padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, backgroundColor: pendingRequests.length ? themeColors.yellowLight : themeColors.greenLight, color: pendingRequests.length ? themeColors.yellowPrimary : themeColors.greenPrimary }}>
+          {pendingRequests.length} demande{pendingRequests.length > 1 ? 's' : ''} en attente
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(280px, 0.8fr)', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {drivers.length === 0 ? (
+            <div style={{ border: `1px dashed ${themeColors.cardBorder}`, borderRadius: 8, padding: 16, fontSize: 13, color: themeColors.textSecondary }}>
+              Aucun livreur dédié n’est configuré pour ce partenaire.
+            </div>
+          ) : (
+            drivers.map((item: PartnerDriver) => {
+              const name = driverDisplayName(item.driver)
+              return (
+                <div key={item.id} style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 8, padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 240 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 8, backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      {item.driver.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={item.driver.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : <User size={18} />}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: themeColors.textPrimary }}>{name}</span>
+                        {item.is_default && <span style={{ fontSize: 11, fontWeight: 800, color: themeColors.purplePrimary, backgroundColor: themeColors.purpleLight, borderRadius: 999, padding: '2px 8px' }}>Par défaut</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 3 }}>
+                        {item.driver.phone || 'Téléphone non renseigné'} • {item.profile.is_online && item.profile.is_available ? 'Disponible' : 'Indisponible'} • {item.profile.accepts_b2b_orders ? 'B2B actif' : 'B2B désactivé'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {!item.is_default && (
+                      <button disabled={busy} onClick={() => void runAction(() => adminApiService.setDefaultPartnerDriver(partnerId, item.driver_user_id), 'Action impossible.')} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 12, fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer' }}>
+                        <Star size={13} /> Défaut
+                      </button>
+                    )}
+                    <button disabled={busy} onClick={() => void runAction(() => adminApiService.removePartnerDriver(partnerId, item.driver_user_id), 'Retrait impossible.')} style={{ padding: '7px 10px', borderRadius: 8, border: `1px solid ${themeColors.redPrimary}`, backgroundColor: 'transparent', color: themeColors.redPrimary, fontSize: 12, fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer' }}>
+                      Retirer
+                    </button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        <div style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: themeColors.textSecondary }}>Rechercher un livreur</label>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: themeColors.textSecondary }} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nom, téléphone, email…" style={{ width: '100%', padding: '9px 12px 9px 32px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, color: themeColors.textPrimary, fontSize: 13, boxSizing: 'border-box' }} />
+          </div>
+          {search.trim().length >= 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
+              {searchLoading ? <p style={{ fontSize: 12, color: themeColors.textSecondary }}>Recherche…</p> : searchResults.map((driver: Driver) => {
+                const selected = selectedDriverId === driver.id
+                return (
+                  <button key={driver.id} type="button" onClick={() => setSelectedDriverId(driver.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: 9, borderRadius: 8, border: `1px solid ${selected ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: selected ? themeColors.purpleLight : 'transparent', textAlign: 'left', cursor: 'pointer' }}>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: themeColors.textPrimary }}>{driverDisplayName(driver)}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: themeColors.textSecondary, marginTop: 2 }}>{driver.phone || driver.email || 'Contact non renseigné'} • {driver.accepts_b2b_orders ? 'B2B actif' : 'B2B désactivé'}</span>
+                    </span>
+                    {driver.phone && <Phone size={13} color={themeColors.textSecondary} />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <button type="button" disabled={busy || !selectedDriverId} onClick={() => void handleAdd(false)} style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: 6, padding: '9px 10px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 12, fontWeight: 800, cursor: busy || !selectedDriverId ? 'not-allowed' : 'pointer', opacity: busy || !selectedDriverId ? 0.6 : 1 }}>
+              <Plus size={14} /> Ajouter
+            </button>
+            <button type="button" disabled={busy || !selectedDriverId} onClick={() => void handleAdd(true)} style={{ padding: '9px 10px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 12, fontWeight: 800, cursor: busy || !selectedDriverId ? 'not-allowed' : 'pointer', opacity: busy || !selectedDriverId ? 0.6 : 1 }}>
+              Ajouter défaut
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {pendingRequests.length > 0 && (
+        <div style={{ borderTop: `1px solid ${themeColors.cardBorder}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, color: themeColors.textPrimary }}>Demandes partenaire</h3>
+          {pendingRequests.map((request) => (
+            <div key={request.id} style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 8, padding: 12, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: themeColors.textPrimary }}>{REQUEST_TYPE_LABELS[request.request_type]}</div>
+                <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 4 }}>
+                  {[request.driver_name, request.driver_phone, request.source_order_id ? `Commande ${request.source_order_id.slice(0, 8)}` : null].filter(Boolean).join(' • ') || 'Aucune précision'}
+                </div>
+                {request.comment && <p style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 6 }}>{request.comment}</p>}
+                {selectedRequestId === request.id && (
+                  <input value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} placeholder="Note de revue optionnelle" style={{ marginTop: 8, width: '100%', padding: '8px 10px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, fontSize: 12, boxSizing: 'border-box' }} />
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {selectedRequestId === request.id ? (
+                  <>
+                    <button disabled={busy} onClick={() => void handleApprove(request.id)} style={{ padding: '8px 10px', borderRadius: 8, border: 'none', backgroundColor: themeColors.greenPrimary, color: '#fff', fontSize: 12, fontWeight: 800, cursor: busy ? 'not-allowed' : 'pointer' }}>Valider</button>
+                    <button disabled={busy} onClick={() => void handleReject(request.id)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${themeColors.redPrimary}`, backgroundColor: 'transparent', color: themeColors.redPrimary, fontSize: 12, fontWeight: 800, cursor: busy ? 'not-allowed' : 'pointer' }}>Refuser</button>
+                  </>
+                ) : (
+                  <button onClick={() => setSelectedRequestId(request.id)} style={{ padding: '8px 10px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>Traiter</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <p style={{ fontSize: 13, color: themeColors.redPrimary }}>{error}</p>}
+    </div>
+  )
+}
+
 // ─── Page principale ───────────────────────────────────────────────────────────
 export default function PartnerDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -641,6 +881,8 @@ export default function PartnerDetailPage() {
           <p style={{ fontSize: 13, color: themeColors.textSecondary }}>Aucun abonnement actif.</p>
         )}
       </div>
+
+      <PartnerDedicatedDriversSection partnerId={id} />
 
       {/* Factures */}
       <div style={{ backgroundColor: themeColors.cardBg, border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: '16px 20px' }}>

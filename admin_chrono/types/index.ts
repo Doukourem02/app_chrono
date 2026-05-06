@@ -34,6 +34,8 @@ export interface Driver extends User {
   average_rating?: number
   total_deliveries?: number
   is_online?: boolean
+  is_available?: boolean
+  accepts_b2b_orders?: boolean
   driver_type?: 'internal' | 'partner'
   commission_balance?: number
   commission_rate?: number
@@ -140,6 +142,46 @@ export interface PartnerUser {
   role: 'owner'
   created_at: string
   user?: { email?: string; first_name?: string | null; last_name?: string | null }
+}
+
+export interface PartnerDriver {
+  id: string
+  partner_id: string
+  driver_user_id: string
+  is_default: boolean
+  created_at: string
+  driver: {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    phone?: string | null
+    avatar_url?: string | null
+  }
+  profile: {
+    is_online: boolean
+    is_available: boolean
+    accepts_b2b_orders: boolean
+    vehicle_type: 'moto' | 'vehicule' | 'cargo'
+    completed_deliveries: number
+    rating?: number | null
+  }
+}
+
+export interface PartnerDriverRequest {
+  id: string
+  partner_id: string
+  request_type: 'known_driver' | 'previous_krono_driver' | 'general_request'
+  driver_name?: string | null
+  driver_phone?: string | null
+  source_order_id?: string | null
+  comment?: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  reviewed_by_admin_id?: string | null
+  review_note?: string | null
+  approved_driver_user_id?: string | null
+  created_by_user_id?: string | null
+  created_at: string
+  reviewed_at?: string | null
 }
 
 export interface ActivityData {

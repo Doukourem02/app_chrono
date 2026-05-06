@@ -4373,6 +4373,7 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
         dp.driver_type,
         dp.is_online,
         dp.is_available,
+        dp.accepts_b2b_orders,
         cb.balance as commission_balance,
         cb.commission_rate,
         cb.is_suspended,
@@ -4408,7 +4409,7 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
     }
 
     query += ` GROUP BY u.id, u.email, u.phone, u.first_name, u.last_name, u.role, u.created_at, u.avatar_url, 
-               dp.driver_type, dp.is_online, dp.is_available, cb.balance, cb.commission_rate, cb.is_suspended
+               dp.driver_type, dp.is_online, dp.is_available, dp.accepts_b2b_orders, cb.balance, cb.commission_rate, cb.is_suspended
                ORDER BY u.created_at DESC`;
 
     const result = await (pool as any).query(query, params);
@@ -4471,6 +4472,8 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
           avatar_url: row.avatar_url || null,
           driver_type: driverType,
           is_online: row.is_online || false,
+          is_available: row.is_available || false,
+          accepts_b2b_orders: row.accepts_b2b_orders === true,
           commission_balance: balance,
           commission_rate: parseFloat(row.commission_rate || 10),
           is_suspended: isSuspended, // Seulement si suspendu manuellement

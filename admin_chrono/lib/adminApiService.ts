@@ -2563,6 +2563,94 @@ class AdminApiService {
     }
   }
 
+  async getPartnerDrivers(partnerId: string): Promise<ApiResponse<import('@/types').PartnerDriver[]>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/drivers`)
+      if (!response.ok) return { success: false, data: [] }
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: (result.data as import('@/types').PartnerDriver[]) || [] }
+      return { success: false, data: [] }
+    } catch (error) {
+      logger.error('[adminApiService] getPartnerDrivers:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  async addPartnerDriver(partnerId: string, body: { driver_user_id: string; is_default?: boolean }): Promise<ApiResponse<import('@/types').PartnerDriver>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/drivers`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').PartnerDriver, message: result.message }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] addPartnerDriver:', error)
+      return { success: false }
+    }
+  }
+
+  async removePartnerDriver(partnerId: string, driverUserId: string): Promise<ApiResponse<void>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/drivers/${driverUserId}`, {
+        method: 'DELETE',
+      })
+      const result: unknown = await response.json().catch(() => ({}))
+      if (response.ok && isApiResponse(result)) return { success: result.success }
+      return { success: false, message: isApiResponse(result) ? result.message : undefined }
+    } catch (error) {
+      logger.error('[adminApiService] removePartnerDriver:', error)
+      return { success: false }
+    }
+  }
+
+  async setDefaultPartnerDriver(partnerId: string, driverUserId: string): Promise<ApiResponse<import('@/types').PartnerDriver>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/drivers/${driverUserId}/default`, {
+        method: 'PATCH',
+      })
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').PartnerDriver, message: result.message }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] setDefaultPartnerDriver:', error)
+      return { success: false }
+    }
+  }
+
+  async getPartnerDriverRequests(partnerId: string): Promise<ApiResponse<import('@/types').PartnerDriverRequest[]>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/driver-requests`)
+      if (!response.ok) return { success: false, data: [] }
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: (result.data as import('@/types').PartnerDriverRequest[]) || [] }
+      return { success: false, data: [] }
+    } catch (error) {
+      logger.error('[adminApiService] getPartnerDriverRequests:', error)
+      return { success: false, data: [] }
+    }
+  }
+
+  async reviewPartnerDriverRequest(
+    partnerId: string,
+    requestId: string,
+    body: { action: 'approve' | 'reject'; driver_user_id?: string; is_default?: boolean; review_note?: string }
+  ): Promise<ApiResponse<import('@/types').PartnerDriverRequest>> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/partners/${partnerId}/driver-requests/${requestId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      })
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').PartnerDriverRequest, message: result.message }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] reviewPartnerDriverRequest:', error)
+      return { success: false }
+    }
+  }
+
   /**
    * 🚗 FLOTTE - Calcule le résumé financier pour une période
    */
