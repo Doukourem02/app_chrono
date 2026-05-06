@@ -390,7 +390,18 @@ export default function QuickMessage() {
   return (
     <AnimatedCard index={0} delay={200} style={cardStyle}>
       <div style={headerStyle}>
-        <h2 style={titleStyle}>{t('quickMessage.title')}</h2>
+        <h2
+          style={{ ...titleStyle, cursor: 'pointer' }}
+          onClick={() => router.push('/message')}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = themeColors.purplePrimary
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = themeColors.textPrimary
+          }}
+        >
+          {t('quickMessage.title')}
+        </h2>
         <span style={onlineBadgeStyle}>
           {t('quickMessage.onlineCount').replace('{count}', String(onlineCount))}
         </span>

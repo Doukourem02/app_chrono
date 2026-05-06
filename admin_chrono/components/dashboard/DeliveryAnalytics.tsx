@@ -3,6 +3,7 @@
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,Legend,ResponsiveContainer,} from 'recharts'
+import { useRouter } from 'next/navigation'
 import { getDeliveryAnalytics } from '@/lib/dashboardApi'
 import { AnimatedCard } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
@@ -13,6 +14,7 @@ import { useTranslation } from '@/hooks/useTranslation'
 
 export default function DeliveryAnalytics() {
   const t = useTranslation()
+  const router = useRouter()
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   
@@ -144,7 +146,18 @@ export default function DeliveryAnalytics() {
   return (
     <AnimatedCard index={0} delay={100} style={cardStyle}>
       <div style={headerStyle}>
-        <h2 style={titleStyle}>{t('dashboard.deliveryAnalytics.title')}</h2>
+        <h2
+          style={{ ...titleStyle, cursor: 'pointer' }}
+          onClick={() => router.push('/analytics')}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = themeColors.purplePrimary
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = themeColors.textPrimary
+          }}
+        >
+          {t('dashboard.deliveryAnalytics.title')}
+        </h2>
         <div style={legendContainerStyle}>
           <div style={legendItemStyle}>
             <div style={{ ...legendDotStyle, backgroundColor: '#2563EB' }}></div>
@@ -222,4 +235,3 @@ export default function DeliveryAnalytics() {
     </AnimatedCard>
   )
 }
-
