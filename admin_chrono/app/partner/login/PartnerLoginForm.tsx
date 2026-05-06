@@ -140,7 +140,10 @@ export default function PartnerLoginForm() {
 
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${getPartnerOrigin()}/partner/login` },
+      options: {
+        emailRedirectTo: `${getPartnerOrigin()}/partner/login`,
+        shouldCreateUser: false,
+      },
     })
 
     setLoading(false)

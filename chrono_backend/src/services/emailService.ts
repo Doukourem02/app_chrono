@@ -9,6 +9,14 @@ import {
 
 let transporter: Transporter | null = null;
 
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 const createTransporter = (): Transporter => {
   if (!transporter) {
     transporter = nodemailer.createTransport({
@@ -258,20 +266,59 @@ export async function sendPartnerPortalMagicLinkEmail(
   try {
     const fromName = process.env.EMAIL_FROM_NAME || 'Krono';
     const fromAddr = process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER;
+    const logoUrl = process.env.EMAIL_LOGO_URL || 'https://admin.kro-no-delivery.com/assets/chrono.png';
+    const safePartnerName = escapeHtml(partnerName || 'votre entreprise');
+    const safeActionLink = escapeHtml(actionLink);
+    const safeLogoUrl = escapeHtml(logoUrl);
     const html = `
       <!DOCTYPE html>
-      <html><head><meta charset="utf-8"></head>
-      <body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">
-        <p>Bonjour,</p>
-        <p>Votre accès au <strong>portail partenaire Krono</strong> (${partnerName}) est prêt.</p>
-        <p><a href="${actionLink}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;">Se connecter au portail</a></p>
-        <p style="font-size:13px;color:#666;">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>${actionLink}</p>
-        <p style="font-size:13px;color:#666;">— Krono</p>
-      </body></html>`;
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Accès portail partenaire Krono</title>
+        </head>
+        <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:28px 16px;">
+            <tr>
+              <td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                  <tr>
+                    <td style="padding:28px 28px 18px;">
+                      <img src="${safeLogoUrl}" alt="Krono" width="64" height="64" style="display:block;width:64px;height:64px;object-fit:contain;margin:0 0 14px;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#7c3aed;">Krono</div>
+                      <h1 style="margin:10px 0 0;font-size:24px;line-height:1.25;color:#111827;">Connexion au portail partenaire</h1>
+                      <p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#4b5563;">
+                        Vous avez maintenant accès au portail partenaire Krono pour <strong style="color:#111827;">${safePartnerName}</strong>.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 28px 24px;">
+                      <a href="${safeActionLink}" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 18px;border-radius:8px;">
+                        Ouvrir le portail
+                      </a>
+                      <p style="margin:18px 0 0;font-size:13px;line-height:1.6;color:#6b7280;">
+                        Ce lien est personnel et à usage unique. Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :
+                      </p>
+                      <p style="margin:8px 0 0;font-size:12px;line-height:1.5;color:#6b7280;word-break:break-all;">${safeActionLink}</p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:18px 28px;background:#fafafa;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.5;color:#6b7280;">
+                      Si vous n'avez pas demandé cet accès, vous pouvez ignorer cet email.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>`;
     await createTransporter().sendMail({
       from: `${fromName} <${fromAddr}>`,
       to,
-      subject: `Portail partenaire Krono — ${partnerName}`,
+      subject: `Krono - Connexion au portail partenaire ${partnerName}`,
       html,
       text: `Portail partenaire Krono (${partnerName})\n\nConnexion : ${actionLink}\n`,
     });
