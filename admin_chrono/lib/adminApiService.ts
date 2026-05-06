@@ -34,6 +34,15 @@ interface ApiResponse<T = unknown> {
 
 type LatLng = { latitude: number; longitude: number }
 
+type PartnerPaymentPayload = {
+  payment_method_type: import('@/types').PartnerPaymentMethod
+  payment_provider_account?: string
+  payment_reference?: string
+  payment_amount?: number
+  paid_at?: string
+  payment_notes?: string
+}
+
 // Types pour la gestion de flotte
 interface FleetVehicle {
   id: string
@@ -2483,17 +2492,32 @@ class AdminApiService {
     }
   }
 
-  async activatePartnerSubscription(partnerId: string, subId: string): Promise<ApiResponse<import('@/types').PartnerSubscription>> {
+  async activatePartnerSubscription(partnerId: string, subId: string, payment?: PartnerPaymentPayload): Promise<ApiResponse<import('@/types').PartnerSubscription>> {
     try {
       const response = await this.fetchWithAuth(
         `${API_BASE_URL}/api/partners/${partnerId}/subscriptions/${subId}/activate`,
-        { method: 'PATCH' }
+        { method: 'PATCH', body: JSON.stringify(payment ?? {}) }
       )
       const result: unknown = await response.json()
       if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').PartnerSubscription }
       return { success: false }
     } catch (error) {
       logger.error('[adminApiService] activatePartnerSubscription:', error)
+      return { success: false }
+    }
+  }
+
+  async markPartnerInvoicePaid(partnerId: string, invoiceId: string, payment: PartnerPaymentPayload): Promise<ApiResponse<import('@/types').PartnerInvoice>> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${API_BASE_URL}/api/partners/${partnerId}/invoices/${invoiceId}/pay`,
+        { method: 'PATCH', body: JSON.stringify(payment) }
+      )
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) return { success: result.success, data: result.data as import('@/types').PartnerInvoice, message: result.message }
+      return { success: false }
+    } catch (error) {
+      logger.error('[adminApiService] markPartnerInvoicePaid:', error)
       return { success: false }
     }
   }

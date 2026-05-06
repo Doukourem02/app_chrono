@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyPartnerUser } from '../middleware/verifyPartnerUser.js';
-import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,removePartnerUser,getPartnerDrivers,getPartnerDriversForUser,updatePartnerPreferences,getPartnerOrderTracking,} from '../controllers/partnerController.js';
+import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,markPartnerInvoicePaid,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,removePartnerUser,getPartnerDrivers,getPartnerDriversForUser,updatePartnerPreferences,getPartnerOrderTracking,} from '../controllers/partnerController.js';
 import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
@@ -23,6 +23,7 @@ router.delete('/:id',                                     verifyAdminSupabase, d
 router.get('/:id/drivers',                                verifyJWT, getPartnerDriversForUser);
 router.get('/:id/usage',                                  verifyAdminSupabase, getPartnerUsage);
 router.get('/:id/invoices',                               verifyAdminSupabase, getPartnerInvoices);
+router.patch('/:id/invoices/:invoiceId/pay',              verifyAdminSupabase, markPartnerInvoicePaid);
 router.post('/:id/invite',                                verifyAdminSupabase, invitePartnerUser);
 
 // ── Routes portail partenaire (verifyPartnerUser) ────────────────────────────

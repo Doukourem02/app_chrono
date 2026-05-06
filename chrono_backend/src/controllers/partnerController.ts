@@ -20,6 +20,70 @@ const PLAN_DEFAULTS: Record<string, { monthly_price: number; included_orders: nu
   business: { monthly_price: 29000, included_orders: 110, excess_commission_rate: 0.03 },
 };
 
+const PARTNER_PAYMENT_METHODS = new Set([
+  'wave',
+  'orange_money',
+  'mtn_money',
+  'cash',
+  'bank_transfer',
+  'other',
+]);
+
+function cleanOptionalText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function readPartnerPaymentInput(
+  body: Record<string, unknown>,
+  options: { defaultAmount?: number; requireMethod?: boolean } = {}
+): {
+  error?: string;
+  data?: {
+    payment_method_type: string | null;
+    payment_provider_account: string | null;
+    payment_reference: string | null;
+    payment_amount?: number | null;
+    paid_at: string;
+    payment_notes: string | null;
+  };
+} {
+  const method = cleanOptionalText(body.payment_method_type ?? body.paymentMethodType)?.toLowerCase() ?? null;
+  if (options.requireMethod && !method) {
+    return { error: 'Moyen de paiement requis' };
+  }
+  if (method && !PARTNER_PAYMENT_METHODS.has(method)) {
+    return { error: 'Moyen de paiement invalide' };
+  }
+
+  const amountInput = body.payment_amount ?? body.amount ?? options.defaultAmount;
+  const amount =
+    amountInput == null || amountInput === ''
+      ? null
+      : Number(amountInput);
+  if (amount != null && (!Number.isFinite(amount) || amount < 0)) {
+    return { error: 'Montant payé invalide' };
+  }
+
+  const paidAtInput = cleanOptionalText(body.paid_at ?? body.paidAt);
+  const paidAt = paidAtInput ? new Date(paidAtInput) : new Date();
+  if (Number.isNaN(paidAt.getTime())) {
+    return { error: 'Date de paiement invalide' };
+  }
+
+  return {
+    data: {
+      payment_method_type: method,
+      payment_provider_account: cleanOptionalText(body.payment_provider_account ?? body.providerAccount),
+      payment_reference: cleanOptionalText(body.payment_reference ?? body.reference),
+      payment_amount: amount,
+      paid_at: paidAt.toISOString(),
+      payment_notes: cleanOptionalText(body.payment_notes ?? body.notes),
+    },
+  };
+}
+
 const PARTNER_PORTAL_LOGIN_URL = 'https://partner.kro-no-delivery.com/partner/login';
 
 /** Sans forfait : commission prélevée sur chaque course (pas d'abonnement). */
@@ -168,7 +232,9 @@ export const getPartner = async (req: Request, res: Response): Promise<void> => 
       .from('partner_subscriptions')
       .select('*')
       .eq('partner_id', id)
-      .eq('is_active', true)
+      .order('is_active', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle(),
     db()
       .from('partner_usage')
@@ -240,6 +306,27 @@ export const createSubscription = async (req: Request, res: Response): Promise<v
 export const activateSubscription = async (req: Request, res: Response): Promise<void> => {
   const { id: partnerId, subId } = req.params;
 
+  const current = await db()
+    .from('partner_subscriptions')
+    .select('*')
+    .eq('id', subId)
+    .eq('partner_id', partnerId)
+    .maybeSingle();
+
+  if (current.error || !current.data) {
+    res.status(404).json({ success: false, message: 'Abonnement introuvable' });
+    return;
+  }
+
+  const payment = readPartnerPaymentInput(req.body ?? {}, {
+    defaultAmount: Number(current.data.monthly_price ?? 0),
+    requireMethod: false,
+  });
+  if (payment.error) {
+    res.status(400).json({ success: false, message: payment.error });
+    return;
+  }
+
   // Désactiver tout abonnement précédemment actif
   await db()
     .from('partner_subscriptions')
@@ -250,7 +337,16 @@ export const activateSubscription = async (req: Request, res: Response): Promise
 
   const { data, error } = await db()
     .from('partner_subscriptions')
-    .update({ payment_status: 'active', is_active: true })
+    .update({
+      payment_status: 'active',
+      is_active: true,
+      payment_method_type: payment.data?.payment_method_type ?? null,
+      payment_provider_account: payment.data?.payment_provider_account ?? null,
+      payment_reference: payment.data?.payment_reference ?? null,
+      payment_amount: payment.data?.payment_amount ?? Number(current.data.monthly_price ?? 0),
+      paid_at: payment.data?.paid_at ?? new Date().toISOString(),
+      payment_notes: payment.data?.payment_notes ?? null,
+    })
     .eq('id', subId)
     .eq('partner_id', partnerId)
     .select()
@@ -263,6 +359,57 @@ export const activateSubscription = async (req: Request, res: Response): Promise
 
   // Mettre à jour le plan sur le partenaire
   await db().from('partners').update({ plan: data.plan }).eq('id', partnerId);
+
+  res.json({ success: true, data });
+};
+
+// ─── PATCH /api/partners/:id/invoices/:invoiceId/pay — admin only ────────────
+// Enregistre le règlement manuel d'une facture mensuelle B2B
+export const markPartnerInvoicePaid = async (req: Request, res: Response): Promise<void> => {
+  const { id: partnerId, invoiceId } = req.params;
+
+  const invoice = await db()
+    .from('partner_invoices')
+    .select('*')
+    .eq('id', invoiceId)
+    .eq('partner_id', partnerId)
+    .maybeSingle();
+
+  if (invoice.error || !invoice.data) {
+    res.status(404).json({ success: false, message: 'Facture introuvable' });
+    return;
+  }
+
+  const payment = readPartnerPaymentInput(req.body ?? {}, {
+    defaultAmount: Number(invoice.data.amount ?? 0),
+    requireMethod: true,
+  });
+  if (payment.error || !payment.data) {
+    res.status(400).json({ success: false, message: payment.error ?? 'Paiement invalide' });
+    return;
+  }
+
+  const { data, error } = await db()
+    .from('partner_invoices')
+    .update({
+      status: 'paid',
+      paid_at: payment.data.paid_at,
+      payment_method_type: payment.data.payment_method_type,
+      payment_provider_account: payment.data.payment_provider_account,
+      payment_reference: payment.data.payment_reference,
+      payment_amount: payment.data.payment_amount ?? Number(invoice.data.amount ?? 0),
+      payment_notes: payment.data.payment_notes,
+    })
+    .eq('id', invoiceId)
+    .eq('partner_id', partnerId)
+    .select()
+    .single();
+
+  if (error || !data) {
+    logger.error('[partnerController] markPartnerInvoicePaid error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la validation du paiement' });
+    return;
+  }
 
   res.json({ success: true, data });
 };

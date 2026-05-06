@@ -8,12 +8,34 @@ import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
-import type { PartnerSubscription } from '@/types'
+import type { PartnerInvoice, PartnerPaymentMethod, PartnerSubscription } from '@/types'
 
 const PLAN_DEFAULTS: Record<string, { price: number; quota: number | null; label: string }> = {
   starter:  { price: 8_000,  quota: 35,  label: 'Starter — 8 000 FCFA / mois' },
   pro:      { price: 16_000, quota: 70,  label: 'Pro — 16 000 FCFA / mois' },
   business: { price: 29_000, quota: 110, label: 'Business — 29 000 FCFA / mois' },
+}
+
+const PAYMENT_METHOD_LABELS: Record<PartnerPaymentMethod, string> = {
+  wave: 'Wave',
+  orange_money: 'Orange Money',
+  mtn_money: 'MTN Money',
+  cash: 'Espèces',
+  bank_transfer: 'Virement',
+  other: 'Autre',
+}
+
+type PartnerPaymentForm = {
+  payment_method_type: PartnerPaymentMethod
+  payment_provider_account: string
+  payment_reference: string
+  payment_amount: string
+  paid_at: string
+  payment_notes: string
+}
+
+function todayInputValue(): string {
+  return new Date().toISOString().slice(0, 10)
 }
 
 // ─── Modal inviter au portail ─────────────────────────────────────────────────
@@ -137,6 +159,152 @@ function DeletePartnerConfirmModal({
   )
 }
 
+function PaymentConfirmModal({
+  title,
+  amount,
+  submitLabel,
+  onClose,
+  onSubmit,
+}: {
+  title: string
+  amount: number
+  submitLabel: string
+  onClose: () => void
+  onSubmit: (payload: {
+    payment_method_type: PartnerPaymentMethod
+    payment_provider_account?: string
+    payment_reference?: string
+    payment_amount?: number
+    paid_at?: string
+    payment_notes?: string
+  }) => Promise<{ success: boolean; message?: string }>
+}) {
+  const [form, setForm] = useState<PartnerPaymentForm>({
+    payment_method_type: 'wave',
+    payment_provider_account: '',
+    payment_reference: '',
+    payment_amount: String(amount),
+    paid_at: todayInputValue(),
+    payment_notes: '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const paymentAmount = Number(form.payment_amount)
+    if (!Number.isFinite(paymentAmount) || paymentAmount < 0) {
+      setError('Montant payé invalide.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    const result = await onSubmit({
+      payment_method_type: form.payment_method_type,
+      payment_provider_account: form.payment_provider_account.trim() || undefined,
+      payment_reference: form.payment_reference.trim() || undefined,
+      payment_amount: paymentAmount,
+      paid_at: form.paid_at ? new Date(form.paid_at).toISOString() : undefined,
+      payment_notes: form.payment_notes.trim() || undefined,
+    })
+    setLoading(false)
+    if (!result.success) {
+      setError(result.message ?? 'Paiement impossible à enregistrer.')
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+      <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 16, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <CreditCard size={18} color={themeColors.purplePrimary} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: themeColors.textPrimary }}>{title}</h2>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Moyen</label>
+              <select
+                value={form.payment_method_type}
+                onChange={(e) => setForm((f) => ({ ...f, payment_method_type: e.target.value as PartnerPaymentMethod }))}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14 }}
+              >
+                {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Montant payé</label>
+              <input
+                type="number"
+                min={0}
+                value={form.payment_amount}
+                onChange={(e) => setForm((f) => ({ ...f, payment_amount: e.target.value }))}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Numéro / compte</label>
+            <input
+              value={form.payment_provider_account}
+              onChange={(e) => setForm((f) => ({ ...f, payment_provider_account: e.target.value }))}
+              placeholder="Ex: +225 07 00 00 00 00"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Référence</label>
+              <input
+                value={form.payment_reference}
+                onChange={(e) => setForm((f) => ({ ...f, payment_reference: e.target.value }))}
+                placeholder="ID transaction"
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Date</label>
+              <input
+                type="date"
+                value={form.paid_at}
+                onChange={(e) => setForm((f) => ({ ...f, paid_at: e.target.value }))}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Note admin</label>
+            <input
+              value={form.payment_notes}
+              onChange={(e) => setForm((f) => ({ ...f, payment_notes: e.target.value }))}
+              placeholder="Ex: paiement reçu par caisse"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {error && <p style={{ fontSize: 13, color: themeColors.redPrimary }}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 6 }}>
+            <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer' }}>
+              Annuler
+            </button>
+            <button type="submit" disabled={loading} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', backgroundColor: themeColors.greenPrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+              {loading ? 'Enregistrement…' : submitLabel}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function CreateSubscriptionModal({ partnerId, onClose, onCreated }: { partnerId: string; onClose: () => void; onCreated: () => void }) {
   const [plan, setPlan] = useState('starter')
   const [loading, setLoading] = useState(false)
@@ -208,47 +376,64 @@ function CreateSubscriptionModal({ partnerId, onClose, onCreated }: { partnerId:
 
 // ─── Carte abonnement ─────────────────────────────────────────────────────────
 function SubscriptionCard({ sub, partnerId, onRefresh }: { sub: PartnerSubscription; partnerId: string; onRefresh: () => void }) {
-  const [loading, setLoading] = useState(false)
-
-  const handleActivate = async () => {
-    setLoading(true)
-    await adminApiService.activatePartnerSubscription(partnerId, sub.id)
-    setLoading(false)
-    onRefresh()
-  }
+  const [showPayment, setShowPayment] = useState(false)
 
   const isPending = sub.payment_status === 'pending_payment'
   const isActive = sub.payment_status === 'active' && sub.is_active
+  const paymentLabel = sub.payment_method_type ? PAYMENT_METHOD_LABELS[sub.payment_method_type] : null
 
   return (
-    <div style={{ padding: '16px 20px', borderRadius: 12, border: `1px solid ${isActive ? themeColors.greenPrimary : themeColors.cardBorder}`, backgroundColor: isActive ? themeColors.greenLight : themeColors.background, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          {isActive
-            ? <CheckCircle size={16} color={themeColors.greenPrimary} />
-            : <Clock size={16} color={themeColors.yellowPrimary} />}
-          <span style={{ fontSize: 15, fontWeight: 700, color: themeColors.textPrimary }}>
-            Plan {PLAN_DEFAULTS[sub.plan]?.label ?? sub.plan}
-          </span>
+    <>
+      <div style={{ padding: '16px 20px', borderRadius: 12, border: `1px solid ${isActive ? themeColors.greenPrimary : themeColors.cardBorder}`, backgroundColor: isActive ? themeColors.greenLight : themeColors.background, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            {isActive
+              ? <CheckCircle size={16} color={themeColors.greenPrimary} />
+              : <Clock size={16} color={themeColors.yellowPrimary} />}
+            <span style={{ fontSize: 15, fontWeight: 700, color: themeColors.textPrimary }}>
+              Plan {PLAN_DEFAULTS[sub.plan]?.label ?? sub.plan}
+            </span>
+          </div>
+          <p style={{ fontSize: 13, color: themeColors.textSecondary }}>
+            {sub.included_orders !== null ? `${sub.included_orders} courses incluses` : 'Courses illimitées'} •{' '}
+            Excédent : {(sub.excess_commission_rate * 100).toFixed(0)} %
+          </p>
+          <p style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 4 }}>
+            Statut : {isPending ? 'En attente de paiement' : isActive ? 'Actif' : sub.payment_status}
+          </p>
+          {(paymentLabel || sub.payment_reference || sub.paid_at) && (
+            <p style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 4 }}>
+              Paiement : {[paymentLabel, sub.payment_reference, sub.paid_at ? new Date(sub.paid_at).toLocaleDateString('fr-FR') : null].filter(Boolean).join(' • ')}
+            </p>
+          )}
         </div>
-        <p style={{ fontSize: 13, color: themeColors.textSecondary }}>
-          {sub.included_orders !== null ? `${sub.included_orders} courses incluses` : 'Courses illimitées'} •{' '}
-          Excédent : {(sub.excess_commission_rate * 100).toFixed(0)} %
-        </p>
-        <p style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 4 }}>
-          Statut : {isPending ? 'En attente de paiement' : isActive ? 'Actif' : sub.payment_status}
-        </p>
+        {isPending && (
+          <button
+            onClick={() => setShowPayment(true)}
+            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.greenPrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Enregistrer paiement & activer
+          </button>
+        )}
       </div>
-      {isPending && (
-        <button
-          onClick={handleActivate}
-          disabled={loading}
-          style={{ padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.greenPrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
-        >
-          {loading ? 'Activation…' : 'Confirmer paiement & activer'}
-        </button>
+
+      {showPayment && (
+        <PaymentConfirmModal
+          title="Paiement de l'abonnement"
+          amount={sub.monthly_price}
+          submitLabel="Activer l'abonnement"
+          onClose={() => setShowPayment(false)}
+          onSubmit={async (payload) => {
+            const result = await adminApiService.activatePartnerSubscription(partnerId, sub.id, payload)
+            if (result.success) {
+              setShowPayment(false)
+              onRefresh()
+            }
+            return { success: result.success, message: result.message }
+          }}
+        />
       )}
-    </div>
+    </>
   )
 }
 
@@ -260,6 +445,7 @@ export default function PartnerDetailPage() {
   const [showCreateSub, setShowCreateSub] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [payingInvoice, setPayingInvoice] = useState<PartnerInvoice | null>(null)
   const [statusLoading, setStatusLoading] = useState(false)
 
   const handleStatusChange = async (status: 'active' | 'inactive' | 'suspended') => {
@@ -465,7 +651,7 @@ export default function PartnerDetailPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                {['Période', 'Montant', 'Statut'].map(h => (
+                {['Période', 'Montant', 'Statut', 'Paiement', 'Action'].map(h => (
                   <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary }}>{h}</th>
                 ))}
               </tr>
@@ -487,6 +673,29 @@ export default function PartnerDetailPage() {
                     }}>
                       {inv.status === 'paid' ? 'Payée' : inv.status === 'overdue' ? 'En retard' : 'En attente'}
                     </span>
+                  </td>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: themeColors.textSecondary }}>
+                    {inv.payment_method_type
+                      ? [
+                          PAYMENT_METHOD_LABELS[inv.payment_method_type],
+                          inv.payment_amount != null ? `${inv.payment_amount.toLocaleString('fr-FR')} FCFA` : null,
+                          inv.payment_reference,
+                          inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('fr-FR') : null,
+                        ].filter(Boolean).join(' • ')
+                      : '—'}
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    {inv.status !== 'paid' ? (
+                      <button
+                        type="button"
+                        onClick={() => setPayingInvoice(inv)}
+                        style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${themeColors.greenPrimary}`, backgroundColor: 'transparent', color: themeColors.greenPrimary, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Marquer payée
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 12, color: themeColors.textSecondary }}>—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -534,6 +743,23 @@ export default function PartnerDetailPage() {
           onDeleted={() => {
             queryClient.invalidateQueries({ queryKey: ['partners'] })
             router.push('/partners')
+          }}
+        />
+      )}
+
+      {payingInvoice && (
+        <PaymentConfirmModal
+          title="Paiement de facture"
+          amount={payingInvoice.amount}
+          submitLabel="Marquer comme payée"
+          onClose={() => setPayingInvoice(null)}
+          onSubmit={async (payload) => {
+            const result = await adminApiService.markPartnerInvoicePaid(id, payingInvoice.id, payload)
+            if (result.success) {
+              setPayingInvoice(null)
+              refresh()
+            }
+            return { success: result.success, message: result.message }
           }}
         />
       )}

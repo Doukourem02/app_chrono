@@ -82,10 +82,24 @@ export interface PartnerSubscription {
   included_orders: number | null
   excess_commission_rate: number
   starts_at: string
-  payment_status: 'pending_payment' | 'active' | 'cancelled'
+  payment_status: 'trial' | 'pending_payment' | 'active' | 'past_due' | 'cancelled'
   is_active: boolean
+  payment_method_type?: PartnerPaymentMethod | null
+  payment_provider_account?: string | null
+  payment_reference?: string | null
+  payment_amount?: number | null
+  paid_at?: string | null
+  payment_notes?: string | null
   created_at: string
 }
+
+export type PartnerPaymentMethod =
+  | 'wave'
+  | 'orange_money'
+  | 'mtn_money'
+  | 'cash'
+  | 'bank_transfer'
+  | 'other'
 
 export interface PartnerUsage {
   month: string
@@ -103,6 +117,12 @@ export interface PartnerInvoice {
   status: 'pending' | 'paid' | 'overdue'
   period_start: string
   period_end: string
+  paid_at?: string | null
+  payment_method_type?: PartnerPaymentMethod | null
+  payment_provider_account?: string | null
+  payment_reference?: string | null
+  payment_amount?: number | null
+  payment_notes?: string | null
   created_at: string
 }
 
