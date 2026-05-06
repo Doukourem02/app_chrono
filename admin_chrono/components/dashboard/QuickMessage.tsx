@@ -254,14 +254,14 @@ export default function QuickMessage() {
   const cardStyle: React.CSSProperties = {
     backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
-    padding: '16px',
+    padding: '12px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     border: `1px solid ${themeColors.cardBorder}`,
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
-    flex: '0.75 1 0',
+    flex: '15 1 0',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: 0,
+    minHeight: '150px',
     overflow: 'hidden',
   }
 
@@ -269,22 +269,22 @@ export default function QuickMessage() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: '10px',
+    marginBottom: '6px',
     flexShrink: 0,
     gap: '10px',
   }
 
   const titleStyle: React.CSSProperties = {
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 700,
     color: themeColors.textPrimary,
   }
 
   const onlineBadgeStyle: React.CSSProperties = {
-    paddingLeft: '12px',
-    paddingRight: '12px',
-    paddingTop: '4px',
-    paddingBottom: '4px',
+    paddingLeft: '10px',
+    paddingRight: '10px',
+    paddingTop: '3px',
+    paddingBottom: '3px',
     backgroundColor: '#D1FAE5',
     color: '#16A34A',
     borderRadius: '8px',
@@ -297,7 +297,7 @@ export default function QuickMessage() {
   const contactsListStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '4px',
     flex: 1,
     minHeight: 0,
     overflow: 'auto',
@@ -306,8 +306,8 @@ export default function QuickMessage() {
   const contactItemStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '10px',
+    gap: '10px',
+    padding: '5px 6px',
     borderRadius: '12px',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
@@ -319,8 +319,8 @@ export default function QuickMessage() {
   }
 
   const avatarStyle: React.CSSProperties = {
-    width: '44px',
-    height: '44px',
+    width: '36px',
+    height: '36px',
     backgroundColor: '#9333EA',
     borderRadius: '50%',
     display: 'flex',
@@ -351,7 +351,7 @@ export default function QuickMessage() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: '4px',
+    marginBottom: '2px',
     gap: '8px',
   }
 
@@ -365,16 +365,20 @@ export default function QuickMessage() {
   }
 
   const unreadBadgeStyle: React.CSSProperties = {
-    paddingLeft: '8px',
-    paddingRight: '8px',
-    paddingTop: '4px',
-    paddingBottom: '4px',
+    paddingLeft: '7px',
+    paddingRight: '7px',
+    paddingTop: '3px',
+    paddingBottom: '3px',
     backgroundColor: '#2563EB',
     color: '#FFFFFF',
     fontSize: '12px',
     fontWeight: 600,
     borderRadius: '4px',
     flexShrink: 0,
+    maxWidth: '142px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   }
 
   const contactStatusStyle: React.CSSProperties = {

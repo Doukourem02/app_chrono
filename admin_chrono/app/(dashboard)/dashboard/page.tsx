@@ -224,9 +224,15 @@ export default function DashboardPage() {
   const mainWrapperStyle: React.CSSProperties = {
     display: 'flex',
     gap: '12px',
-    alignItems: 'stretch',
-    height: 'clamp(760px, calc(100vh - 238px), 860px)',
+    alignItems: 'flex-start',
     minHeight: 0,
+    overflow: 'visible',
+  }
+
+  const mainContentStyle: React.CSSProperties = {
+    flex: '1 1 auto',
+    minHeight: 0,
+    minWidth: 0,
   }
 
   // Sous-grille gauche + milieu : 2 colonnes seulement, pas liée au panneau droit
@@ -235,8 +241,7 @@ export default function DashboardPage() {
     display: 'grid',
     gap: '12px',
     gridTemplateColumns: '240px 1fr',
-    gridTemplateRows: 'minmax(0, 1fr) auto',
-    height: '100%',
+    gridTemplateRows: 'auto auto',
     minWidth: 0,
     minHeight: 0,
   }
@@ -264,14 +269,14 @@ export default function DashboardPage() {
   const rightColumnStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
-    width: '380px',
-    minWidth: '380px',
-    maxWidth: '380px',
+    gap: '8px',
+    width: '420px',
+    minWidth: '420px',
+    maxWidth: '420px',
     flexShrink: 0,
-    height: '100%',
+    height: 'clamp(780px, calc(100vh - 190px), 940px)',
     minHeight: 0,
-    overflow: 'hidden',
+    overflow: 'visible',
   }
 
   return (
@@ -367,7 +372,8 @@ export default function DashboardPage() {
 
       <div style={mainWrapperStyle}>
         {/* Sous-grille gauche + milieu : taille indépendante du panneau droit */}
-        <div style={mainGridStyle}>
+        <div style={mainContentStyle}>
+          <div style={mainGridStyle}>
           {/* Colonne gauche : 3 cartes KPI empilées */}
           <div style={leftColumnStyle}>
             <KPICard
@@ -416,6 +422,7 @@ export default function DashboardPage() {
           {/* Activity Data : s'étend sous les KPI et Analytics */}
           <div style={middleColumnBottomStyle}>
             <ActivityTable />
+          </div>
           </div>
         </div>
 

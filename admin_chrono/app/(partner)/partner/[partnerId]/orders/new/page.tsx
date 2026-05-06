@@ -123,7 +123,7 @@ export default function NewPartnerOrderPage() {
     })
     if (!result.success) {
       setPreferredDriversEnabled(!enabled)
-      setError("Impossible de mettre à jour la préférence livreur attitré.")
+      setError("Impossible de mettre à jour la préférence de livreur dédié.")
     }
   }
 
@@ -279,9 +279,9 @@ export default function NewPartnerOrderPage() {
           <div style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>Livreur attitré</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>Prioriser un livreur dédié</div>
                 <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 3 }}>
-                  Prioritaire si disponible, fallback automatique sinon.
+                  Livreur dédié : Krono propose d’abord la commande au livreur sélectionné pour ce partenaire. Si aucun livreur dédié n’est disponible, l’assignation automatique prend le relais.
                 </div>
               </div>
               <button
@@ -300,16 +300,33 @@ export default function NewPartnerOrderPage() {
                   <div style={{ fontSize: 13, color: themeColors.textSecondary }}>Chargement des livreurs…</div>
                 ) : partnerDrivers.length === 0 ? (
                   <div style={{ border: `1px dashed ${themeColors.cardBorder}`, borderRadius: 8, padding: 14, color: themeColors.textSecondary, fontSize: 13 }}>
-                    Aucun livreur attitré. La commande restera en assignation automatique.
+                    Aucun livreur dédié lié à ce partenaire. Les livreurs qui acceptent les commandes B2B recevront quand même la commande automatiquement.
                   </div>
                 ) : (
-                  partnerDrivers.map((driver) => {
-                    const firstName = driver.driver.first_name ?? ''
-                    const lastName = driver.driver.last_name ?? ''
-                    const name = [firstName, lastName].filter(Boolean).join(' ') || 'Livreur Krono'
-                    const canSelect = driver.profile.accepts_b2b_orders
-                    const selected = selectedDriverId === driver.driver_user_id
-                    return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDriverId(null)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, borderRadius: 8, border: `2px solid ${selectedDriverId === null ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: selectedDriverId === null ? themeColors.purpleLight : '#fff', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: '#F3F4F6', color: themeColors.textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <CheckCircle size={18} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>Assignation automatique</div>
+                        <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>
+                          Tous les livreurs B2B disponibles restent éligibles.
+                        </div>
+                      </div>
+                    </button>
+
+                    {partnerDrivers.map((driver) => {
+                      const firstName = driver.driver.first_name ?? ''
+                      const lastName = driver.driver.last_name ?? ''
+                      const name = [firstName, lastName].filter(Boolean).join(' ') || 'Livreur Krono'
+                      const canSelect = driver.profile.accepts_b2b_orders
+                      const selected = selectedDriverId === driver.driver_user_id
+                      return (
                       <button
                         key={driver.id}
                         type="button"
@@ -329,7 +346,7 @@ export default function NewPartnerOrderPage() {
                           <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>{name}</div>
                           <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>
                             {driver.profile.is_online && driver.profile.is_available ? 'Disponible' : 'Indisponible'}
-                            {!canSelect ? ' • B2B non activé' : ''}
+                            {!canSelect ? ' • ne reçoit pas les commandes B2B' : ''}
                           </div>
                         </div>
                         {driver.driver.phone && (
@@ -338,8 +355,9 @@ export default function NewPartnerOrderPage() {
                           </span>
                         )}
                       </button>
-                    )
-                  })
+                      )
+                    })}
+                  </>
                 )}
               </div>
             )}

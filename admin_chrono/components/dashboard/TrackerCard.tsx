@@ -182,10 +182,10 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     border: `1px solid ${themeColors.cardBorder}`,
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
-    flex: '1.65 1 0',
+    flex: '85 1 0',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: 0,
+    minHeight: '620px',
     overflow: 'hidden',
   }
 
@@ -266,6 +266,7 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
 
   const timelineContentStyle: React.CSSProperties = {
     flex: 1,
+    minWidth: 0,
   }
 
   const timelineTitleStyle: React.CSSProperties = {
@@ -440,7 +441,19 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
             </div>
           </div>
 
-          <div style={{ ...sectionStyle, marginBottom: '10px', flex: 1, minHeight: 0, overflow: 'auto', paddingRight: '4px', overscrollBehavior: 'contain' }}>
+          <div
+            style={{
+              ...sectionStyle,
+              marginBottom: '10px',
+              flex: 1,
+              minHeight: '150px',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              paddingRight: '4px',
+              overscrollBehavior: 'contain',
+              scrollbarWidth: 'thin',
+            }}
+          >
             <style>{`
               @keyframes krono-step-in {
                 from { opacity: 0; transform: translateY(10px); }
