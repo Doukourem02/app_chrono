@@ -46,7 +46,7 @@ function InvitePartnerModal({ partnerId, partnerEmail, onClose }: { partnerId: s
             <CheckCircle size={40} color={themeColors.greenPrimary} style={{ margin: '0 auto 12px' }} />
             <p style={{ fontSize: 15, fontWeight: 600, color: themeColors.textPrimary }}>Invitation envoyée !</p>
             <p style={{ fontSize: 13, color: themeColors.textSecondary, marginTop: 6 }}>
-              {email} recevra un email pour définir son mot de passe et accéder au portail.
+              {email} recevra un email avec un lien sécurisé pour accéder au portail.
             </p>
             <button onClick={onClose} style={{ marginTop: 20, padding: '10px 24px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
               Fermer
@@ -67,7 +67,7 @@ function InvitePartnerModal({ partnerId, partnerEmail, onClose }: { partnerId: s
             </div>
             <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.purpleLight, border: `1px solid ${themeColors.purplePrimary}` }}>
               <p style={{ fontSize: 12, color: themeColors.purplePrimary }}>
-                {"L'invité recevra un email avec un lien sécurisé pour choisir son mot de passe et accéder au portail partenaire Krono."}
+                {"L'invité recevra un email avec un lien sécurisé pour accéder au portail partenaire Krono."}
               </p>
             </div>
             {error && <p style={{ fontSize: 13, color: themeColors.redPrimary }}>{error}</p>}

@@ -8,12 +8,28 @@ export const metadata: Metadata = {
   title: 'Portail Partenaire — Connexion',
 }
 
-export default async function PartnerLoginPage() {
+type SearchParams = Record<string, string | string[] | undefined>
+
+function queryStringFromSearchParams(searchParams: SearchParams): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (Array.isArray(value)) {
+      for (const item of value) params.append(key, item)
+    } else if (typeof value === 'string') {
+      params.set(key, value)
+    }
+  }
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export default async function PartnerLoginPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const requestHeaders = await headers()
+  const resolvedSearchParams = await searchParams
   const host = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').toLowerCase()
 
   if (host.startsWith('admin.')) {
-    redirect('https://partner.kro-no-delivery.com/login')
+    redirect(`https://partner.kro-no-delivery.com/partner/login${queryStringFromSearchParams(resolvedSearchParams ?? {})}`)
   }
 
   return (

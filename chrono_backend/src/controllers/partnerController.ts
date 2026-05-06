@@ -3,13 +3,7 @@ import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { sendPartnerPortalMagicLinkEmail } from '../services/emailService.js';
-import {
-  clientHeadline,
-  normalizeProductStatus,
-  orderStatusDefinition,
-  progressWithEtaCap,
-  statusBaseProgress,
-} from '../utils/orderProductRules.js';
+import {clientHeadline,normalizeProductStatus,orderStatusDefinition,progressWithEtaCap,statusBaseProgress,} from '../utils/orderProductRules.js';
 import { realisticEtaMinutesFromAirDistance } from '../utils/ivoryCoastEta.js';
 
 const db = () => supabaseAdmin ?? supabase;
@@ -25,6 +19,8 @@ const PLAN_DEFAULTS: Record<string, { monthly_price: number; included_orders: nu
   pro:      { monthly_price: 16000, included_orders: 70,  excess_commission_rate: 0.05 },
   business: { monthly_price: 29000, included_orders: 110, excess_commission_rate: 0.03 },
 };
+
+const PARTNER_PORTAL_LOGIN_URL = 'https://partner.kro-no-delivery.com/partner/login';
 
 /** Sans forfait : commission prélevée sur chaque course (pas d'abonnement). */
 const PAY_PER_DELIVERY_COMMISSION_RATE = 0.07;
@@ -408,41 +404,6 @@ type AttachPortalResult =
   | { ok: true; userId: string; magicLinkEmailed: boolean }
   | { ok: false; message: string };
 
-/** Envoie uniquement le lien portail par e-mail sans toucher partner_users. */
-async function sendPortalLinkOnly(params: {
-  normalizedEmail: string;
-  partnerName: string;
-  redirectTo: string;
-}): Promise<void> {
-  if (!supabaseAdmin) return;
-  const { normalizedEmail, partnerName, redirectTo } = params;
-  try {
-    let actionLink: string | undefined;
-    const { data: magicGen, error: magicErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: normalizedEmail,
-      options: { redirectTo },
-    });
-    if (!magicErr && magicGen?.properties?.action_link) {
-      actionLink = magicGen.properties.action_link;
-    } else {
-      logger.warn('[partnerController] sendPortalLinkOnly generateLink:', magicErr?.message);
-      const { data: recGen, error: recErr } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email: normalizedEmail,
-        options: { redirectTo },
-      });
-      if (!recErr && recGen?.properties?.action_link) actionLink = recGen.properties.action_link;
-    }
-    if (actionLink) {
-      await sendPartnerPortalMagicLinkEmail(normalizedEmail, actionLink, partnerName);
-    }
-    logger.info(`[partnerController] Lien portail envoyé à ${normalizedEmail} (sans ajout membre)`);
-  } catch (err) {
-    logger.warn('[partnerController] sendPortalLinkOnly échec:', err);
-  }
-}
-
 /** Compte Auth déjà existant : lien partner_users + e-mail avec lien de connexion (SMTP Krono). */
 async function attachExistingUserAndSendPortalLink(params: {
   normalizedEmail: string;
@@ -543,15 +504,21 @@ export const invitePartnerUser = async (req: Request, res: Response): Promise<vo
   }
 
   const normalized = email.trim().toLowerCase();
-  const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
+  const redirectTo = process.env.PARTNER_PORTAL_URL ?? PARTNER_PORTAL_LOGIN_URL;
 
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(normalized, {
-    redirectTo,
-    data: { partner_id: partnerId, partner_name: partner.name, role },
+  // generateLink crée l'utilisateur Auth et retourne le lien d'invitation sans utiliser
+  // l'envoi email Supabase, dont le SMTP par défaut peut être lent en production.
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'invite',
+    email: normalized,
+    options: {
+      redirectTo,
+      data: { partner_id: partnerId, partner_name: partner.name, role },
+    },
   });
 
-  if (inviteError) {
-    if (isInviteEmailAlreadyRegisteredError(inviteError)) {
+  if (linkError) {
+    if (isInviteEmailAlreadyRegisteredError(linkError)) {
       const attached = await attachExistingUserAndSendPortalLink({
         normalizedEmail: normalized,
         partnerId,
@@ -578,12 +545,13 @@ export const invitePartnerUser = async (req: Request, res: Response): Promise<vo
       });
       return;
     }
-    logger.error('[partnerController] invitePartnerUser invite error:', inviteError);
-    res.status(500).json({ success: false, message: inviteError.message ?? "Erreur lors de l'envoi de l'invitation" });
+    logger.error('[partnerController] invitePartnerUser generateLink error:', linkError);
+    res.status(500).json({ success: false, message: linkError.message ?? "Erreur lors de la création du lien d'invitation" });
     return;
   }
 
-  const userId = inviteData.user.id;
+  const userId = linkData.user.id;
+  const actionLink: string | undefined = linkData.properties?.action_link;
 
   const ensuredNew = await ensurePublicUserProfileForAuthUser(userId);
   if (!ensuredNew.ok) {
@@ -602,7 +570,22 @@ export const invitePartnerUser = async (req: Request, res: Response): Promise<vo
     return;
   }
 
-  res.status(201).json({ success: true, message: 'Invitation envoyée', data: { userId, email: normalized, role } });
+  let emailSent = false;
+  if (actionLink) {
+    const sendResult = await sendPartnerPortalMagicLinkEmail(normalized, actionLink, partner.name);
+    emailSent = sendResult.success;
+    if (!sendResult.success) {
+      logger.warn(`[partnerController] SMTP non configuré — lien d'invitation à transmettre manuellement : ${actionLink}`);
+    }
+  }
+
+  res.status(201).json({
+    success: true,
+    message: emailSent
+      ? 'Invitation envoyée par email.'
+      : "Membre ajouté au portail. Configurez SMTP (EMAIL_USER / EMAIL_PASS) pour envoyer les invitations par email.",
+    data: { userId, email: normalized, role, emailSent },
+  });
 };
 
 // ─── POST /api/partners/register — utilisateur authentifié ───────────────────
@@ -852,19 +835,41 @@ export const activatePartner = async (req: Request, res: Response): Promise<void
 
   // Invitation portail à l'email fourni lors de l'inscription (best-effort)
   if (data.email && supabaseAdmin) {
-    const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
+    const redirectTo = process.env.PARTNER_PORTAL_URL ?? PARTNER_PORTAL_LOGIN_URL;
     const em = data.email.toLowerCase();
     try {
       const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(em, {
         redirectTo,
         data: { partner_id: id, partner_name: data.name, role: 'owner' },
       });
-      if (!inviteError && inviteData) {
-        // Email de bienvenue envoyé — partner_users est géré uniquement via registerAsPartner ou invitePartnerUser
-        logger.info(`[partnerController] Invitation portail envoyée à ${data.email}`);
+      if (!inviteError && inviteData?.user?.id) {
+        const ensured = await ensurePublicUserProfileForAuthUser(inviteData.user.id);
+        if (!ensured.ok) {
+          logger.warn('[partnerController] Auto-invite profil public échoué:', ensured.message);
+        } else {
+          const { error: puError } = await db()
+            .from('partner_users')
+            .upsert({ partner_id: id, user_id: inviteData.user.id, role: 'owner' }, { onConflict: 'partner_id,user_id' });
+          if (puError) {
+            logger.warn('[partnerController] Auto-invite liaison partner_users échouée:', puError.message);
+          } else {
+            logger.info(`[partnerController] Invitation portail envoyée et owner lié à ${data.email}`);
+          }
+        }
       } else if (inviteError && isInviteEmailAlreadyRegisteredError(inviteError)) {
-        // Compte existant : envoyer uniquement le lien de connexion, sans toucher partner_users
-        await sendPortalLinkOnly({ normalizedEmail: em, partnerName: data.name, redirectTo });
+        // Compte existant : lier le owner, puis envoyer un lien de connexion.
+        const attached = await attachExistingUserAndSendPortalLink({
+          normalizedEmail: em,
+          partnerId: id,
+          partnerName: data.name,
+          role: 'owner',
+          redirectTo,
+        });
+        if (!attached.ok) {
+          logger.warn('[partnerController] Auto-invite compte existant non lié:', attached.message);
+        }
+      } else if (inviteError) {
+        logger.warn('[partnerController] Auto-invite portail échouée:', inviteError.message);
       }
     } catch (inviteErr) {
       logger.warn('[partnerController] Auto-invite portail échouée:', inviteErr);
@@ -1267,7 +1272,7 @@ export const invitePortalUser = async (req: Request, res: Response): Promise<voi
   }
 
   const normalized = email.trim().toLowerCase();
-  const redirectTo = process.env.PARTNER_PORTAL_URL ?? 'https://admin.kro-no-delivery.com/partner/login';
+  const redirectTo = process.env.PARTNER_PORTAL_URL ?? PARTNER_PORTAL_LOGIN_URL;
 
   // generateLink crée l'utilisateur dans Auth et retourne le lien d'invitation
   // sans déléguer l'envoi email à Supabase (évite les limites de débit et les envois silencieux ratés).
