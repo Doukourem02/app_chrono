@@ -244,8 +244,8 @@ export default function DashboardPage() {
   }
 
   const leftKpiCardStyle: React.CSSProperties = {
-    flex: '1 1 0',
-    minHeight: '0',
+    flex: '1 1 128px',
+    minHeight: '128px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'flex-start',

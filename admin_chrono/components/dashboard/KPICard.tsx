@@ -38,7 +38,7 @@ export default function KPICard({
   const cardStyle: React.CSSProperties = {
     backgroundColor: themeColors.cardBg,
     borderRadius: '16px',
-    padding: compact ? '14px' : '16px',
+    padding: compact ? '12px' : '16px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     border: `1px solid ${themeColors.cardBorder}`,
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
@@ -50,7 +50,7 @@ export default function KPICard({
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: compact ? '6px' : '12px',
+    marginBottom: compact ? '4px' : '12px',
   }
 
   const getIconBgColor = () => {
@@ -72,14 +72,14 @@ export default function KPICard({
   }
 
   const iconContainerStyle: React.CSSProperties = {
-    padding: compact ? '7px' : '8px',
+    padding: compact ? '6px' : '8px',
     borderRadius: compact ? '10px' : '12px',
     backgroundColor: getIconBgColor(),
   }
 
   const iconStyle: React.CSSProperties = {
-    width: compact ? '18px' : '20px',
-    height: compact ? '18px' : '20px',
+    width: compact ? '17px' : '20px',
+    height: compact ? '17px' : '20px',
     color: getIconColor(),
   }
 
@@ -93,26 +93,26 @@ export default function KPICard({
   const contentStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
-    gap: compact ? '2px' : '4px',
+    gap: compact ? '1px' : '4px',
     minHeight: 0,
   }
 
   const titleStyle: React.CSSProperties = {
-    fontSize: compact ? '13px' : '14px',
+    fontSize: compact ? '12px' : '14px',
     color: themeColors.textSecondary,
     fontWeight: 500,
     lineHeight: 1.2,
   }
 
   const valueStyle: React.CSSProperties = {
-    fontSize: compact ? '28px' : '30px',
+    fontSize: compact ? '26px' : '30px',
     fontWeight: 700,
     color: themeColors.textPrimary,
     lineHeight: 1.12,
   }
 
   const subtitleStyle: React.CSSProperties = {
-    fontSize: '12px',
+    fontSize: compact ? '11px' : '12px',
     color: themeColors.textSecondary,
     lineHeight: 1.2,
     overflow: 'hidden',
