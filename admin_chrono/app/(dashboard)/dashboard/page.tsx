@@ -220,33 +220,21 @@ export default function DashboardPage() {
     transition: 'background-color 0.2s',
   }
 
-  // Wrapper flex-row : sous-grille gauche+milieu indépendante du panneau droit
+  // Grille commune : les lignes gauche/milieu/droite restent alignées quel que soit le zoom.
   const mainWrapperStyle: React.CSSProperties = {
-    display: 'flex',
+    display: 'grid',
     gap: '12px',
-    alignItems: 'flex-start',
+    gridTemplateColumns: '240px minmax(0, 1fr) 420px',
+    gridTemplateRows: 'auto auto',
+    alignItems: 'stretch',
+    minWidth: 0,
     minHeight: 0,
     overflow: 'visible',
   }
 
-  const mainContentStyle: React.CSSProperties = {
-    flex: '1 1 auto',
-    minHeight: 0,
-    minWidth: 0,
-  }
-
-  // Sous-grille gauche + milieu : 2 colonnes seulement, pas liée au panneau droit
-  const mainGridStyle: React.CSSProperties = {
-    flex: 1,
-    display: 'grid',
-    gap: '12px',
-    gridTemplateColumns: '240px 1fr',
-    gridTemplateRows: 'auto auto',
-    minWidth: 0,
-    minHeight: 0,
-  }
-
   const leftColumnStyle: React.CSSProperties = {
+    gridColumn: '1',
+    gridRow: '1',
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
@@ -255,6 +243,8 @@ export default function DashboardPage() {
   }
 
   const middleColumnTopStyle: React.CSSProperties = {
+    gridColumn: '2',
+    gridRow: '1',
     minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
@@ -262,21 +252,25 @@ export default function DashboardPage() {
 
   const middleColumnBottomStyle: React.CSSProperties = {
     gridColumn: '1 / 3',
+    gridRow: '2',
     minWidth: 0,
+    minHeight: 0,
   }
 
-  // Panneau droit : indépendant, ne pousse plus la grille gauche+milieu
-  const rightColumnStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    width: '420px',
-    minWidth: '420px',
-    maxWidth: '420px',
-    flexShrink: 0,
-    height: 'clamp(900px, calc(100vh - 150px), 1080px)',
+  const trackerAreaStyle: React.CSSProperties = {
+    gridColumn: '3',
+    gridRow: '1',
+    minWidth: 0,
     minHeight: 0,
-    overflow: 'visible',
+    display: 'flex',
+  }
+
+  const quickMessageAreaStyle: React.CSSProperties = {
+    gridColumn: '3',
+    gridRow: '2',
+    minWidth: 0,
+    minHeight: 0,
+    display: 'flex',
   }
 
   return (
@@ -371,9 +365,6 @@ export default function DashboardPage() {
       </div>
 
       <div style={mainWrapperStyle}>
-        {/* Sous-grille gauche + milieu : taille indépendante du panneau droit */}
-        <div style={mainContentStyle}>
-          <div style={mainGridStyle}>
           {/* Colonne gauche : 3 cartes KPI empilées */}
           <div style={leftColumnStyle}>
             <KPICard
@@ -423,12 +414,12 @@ export default function DashboardPage() {
           <div style={middleColumnBottomStyle}>
             <ActivityTable />
           </div>
-          </div>
+
+        <div style={trackerAreaStyle}>
+          <TrackerCard deliveries={ongoingDeliveries} isLoading={ongoingDeliveriesLoading} />
         </div>
 
-        {/* Panneau droit : Tracker + Quick Message — indépendant de la sous-grille */}
-        <div style={rightColumnStyle}>
-          <TrackerCard deliveries={ongoingDeliveries} isLoading={ongoingDeliveriesLoading} />
+        <div style={quickMessageAreaStyle}>
           <QuickMessage />
         </div>
       </div>
