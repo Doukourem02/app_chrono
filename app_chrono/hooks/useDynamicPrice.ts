@@ -72,7 +72,11 @@ export function useDynamicPrice(
         if (err.name === 'AbortError') return;
         const airKm = getDistanceInKm(pickupCoords, dropoffCoords);
         const distance = routeSnapshot?.distanceKm ?? airKm;
-        const fallback = calculatePrice(distance, (selectedMethod ?? 'moto') as 'moto' | 'vehicule' | 'cargo');
+        const fallback = calculatePrice(
+          distance,
+          (selectedMethod ?? 'moto') as 'moto' | 'vehicule' | 'cargo',
+          speedOptionId
+        );
         setPrice(fallback);
       }
     }, DEBOUNCE_MS);

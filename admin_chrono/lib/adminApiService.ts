@@ -1671,6 +1671,9 @@ class AdminApiService {
       deliveryMethod?: string
       distance?: number
       delivery_qr_scanned_at?: string | null
+      delivery_proof_method?: string | null
+      delivery_proof_location?: unknown
+      delivery_proof_metadata?: unknown
       delivery_qr_scanned_by?: { id: string; name: string } | null
       driver?: { id: string; name: string; phone?: string; email?: string } | null
       client?: { id: string; name: string; phone?: string; email?: string } | null

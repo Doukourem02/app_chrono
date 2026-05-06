@@ -69,6 +69,7 @@ export interface Partner {
   status: 'active' | 'inactive' | 'suspended' | 'pending'
   plan?: string | null
   commission_rate: number
+  use_preferred_drivers?: boolean
   notes?: string | null
   created_at: string
 }
@@ -137,4 +138,3 @@ export interface QuickMessage {
   lastSeen: string
   unreadCount?: number
 }
-

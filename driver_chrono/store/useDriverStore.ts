@@ -26,6 +26,7 @@ export interface DriverProfile {
   total_earnings: number;
   profile_image_url?: string;
   driver_type?: 'internal' | 'partner';
+  accepts_b2b_orders?: boolean;
 }
 
 export interface DriverUser {

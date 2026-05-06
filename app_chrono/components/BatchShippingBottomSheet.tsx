@@ -1,17 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import {Modal,View,Text,TouchableOpacity,StyleSheet,TextInput,ScrollView,ActivityIndicator,Alert,KeyboardAvoidingView,Platform,Image,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
@@ -103,7 +91,7 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
     onClose();
   };
 
-  const selectedDriver = drivers.find((d) => d.id === batchDriverId);
+  const selectedDriver = drivers.find((d) => d.driver_user_id === batchDriverId);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
@@ -267,24 +255,42 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                     {batchDriverId === null && <Ionicons name="checkmark-circle" size={22} color="#8B5CF6" />}
                   </TouchableOpacity>
 
-                  {drivers.map((d) => (
-                    <TouchableOpacity
-                      key={d.id}
-                      style={[styles.driverCard, batchDriverId === d.id && styles.driverCardActive]}
-                      onPress={() => setBatchDriver(d.id)}
-                    >
-                      <View style={styles.driverAvatar}>
-                        <Text style={styles.driverAvatarText}>
-                          {(d.first_name ?? '?').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.driverName}>{d.first_name ?? ''} {d.last_name ?? ''}</Text>
-                        <Text style={styles.driverSub}>{d.phone ?? ''}{d.vehicle_type ? ` · ${d.vehicle_type}` : ''}</Text>
-                      </View>
-                      {batchDriverId === d.id && <Ionicons name="checkmark-circle" size={22} color="#8B5CF6" />}
-                    </TouchableOpacity>
-                  ))}
+                  {drivers.map((d) => {
+                    const name = `${d.driver.first_name ?? ''} ${d.driver.last_name ?? ''}`.trim() || 'Livreur Krono';
+                    const selected = batchDriverId === d.driver_user_id;
+                    const canSelect = d.profile.accepts_b2b_orders === true;
+                    return (
+                      <TouchableOpacity
+                        key={d.id}
+                        style={[
+                          styles.driverCard,
+                          selected && styles.driverCardActive,
+                          !canSelect && styles.driverCardDisabled,
+                        ]}
+                        disabled={!canSelect}
+                        onPress={() => setBatchDriver(d.driver_user_id)}
+                      >
+                        <View style={styles.driverAvatar}>
+                          {d.driver.avatar_url ? (
+                            <Image source={{ uri: d.driver.avatar_url }} style={styles.driverAvatarImage} />
+                          ) : (
+                            <Text style={styles.driverAvatarText}>
+                              {(d.driver.first_name ?? '?').charAt(0).toUpperCase()}
+                            </Text>
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.driverName}>{name}</Text>
+                          <Text style={styles.driverSub}>
+                            {d.driver.phone ?? 'Contact non renseigné'}
+                            {d.profile.is_online && d.profile.is_available ? ' · Disponible' : ' · Indisponible'}
+                            {!canSelect ? ' · B2B non activé' : ''}
+                          </Text>
+                        </View>
+                        {selected && <Ionicons name="checkmark-circle" size={22} color="#8B5CF6" />}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </>
               )}
               <View style={{ height: 24 }} />
@@ -311,7 +317,9 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
               <View style={styles.summaryRow}>
                 <Ionicons name="person-circle-outline" size={16} color="#6B7280" />
                 <Text style={styles.summaryText}>
-                  {selectedDriver ? `${selectedDriver.first_name ?? ''} ${selectedDriver.last_name ?? ''}`.trim() : 'Automatique'}
+                  {selectedDriver
+                    ? `${selectedDriver.driver.first_name ?? ''} ${selectedDriver.driver.last_name ?? ''}`.trim() || 'Livreur Krono'
+                    : 'Automatique'}
                 </Text>
               </View>
 
@@ -563,6 +571,9 @@ const styles = StyleSheet.create({
     borderColor: '#8B5CF6',
     backgroundColor: '#F5F3FF',
   },
+  driverCardDisabled: {
+    opacity: 0.55,
+  },
   driverAvatar: {
     width: 44,
     height: 44,
@@ -570,6 +581,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE9FE',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  driverAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   driverAvatarText: {
     fontSize: 18,

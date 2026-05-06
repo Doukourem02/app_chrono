@@ -706,30 +706,28 @@ export default function NewB2BShippingModal({
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
                   <Package size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary }} />
-                  Méthode de livraison
+                  Service disponible
                 </label>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                  {(['moto', 'vehicule', 'cargo'] as const).map((method) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setDeliveryMethod(method)}
-                      style={{
-                        flex: 1,
-                        padding: '12px',
-                        borderRadius: '8px',
-                        border: `1px solid ${deliveryMethod === method ? themeColors.purplePrimary : themeColors.cardBorder}`,
-                        backgroundColor: deliveryMethod === method ? themeColors.purpleLight : themeColors.cardBg,
-                        color: deliveryMethod === method ? themeColors.purplePrimary : themeColors.textSecondary,
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        textTransform: 'capitalize',
-                      }}
-                    >
-                      {method === 'moto' ? 'Moto' : method === 'vehicule' ? 'Véhicule' : 'Cargo'}
-                    </button>
-                  ))}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryMethod('moto')}
+                    style={{
+                      padding: '12px 18px',
+                      borderRadius: '8px',
+                      border: `1px solid ${themeColors.purplePrimary}`,
+                      backgroundColor: themeColors.purpleLight,
+                      color: themeColors.purplePrimary,
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'default',
+                    }}
+                  >
+                    Moto
+                  </button>
+                  <span style={{ fontSize: 12, color: themeColors.textSecondary }}>
+                    Voiture et cargo ne sont pas actifs côté client.
+                  </span>
                 </div>
               </div>
 

@@ -2,12 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {StyleSheet,View,Text,TouchableOpacity,ScrollView,Image,Animated,Switch,Dimensions,PanResponder,Alert,TextInput,Platform,} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
+import {CLIENT_DELIVERY_METHODS,getClientDeliveryOptions,getEffectiveClientDeliveryMethod,isDeliveryMethodEnabledForClient,type ClientDeliveryOptionId,} from '../constants/clientDeliveryMethods';
 import { calculatePrice, getDistanceInKm, estimateDurationMinutes, formatDurationLabel } from '../services/orderApi';
-import {
-  distanceMetricCaption,
-  durationMetricCaption,
-} from '../utils/routePricingLabels';
+import {distanceMetricCaption,durationMetricCaption,} from '../utils/routePricingLabels';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DELIVERY_METHOD_MAX_HEIGHT = SCREEN_HEIGHT * 0.85; 
@@ -51,93 +48,6 @@ interface DeliveryMethodBottomSheetProps {
   }) => void;
 }
 
-const deliveryMethods = [
-  {
-    id: 'moto',
-    name: 'Livraison à moto',
-    icon: require('../assets/images/motoo.png'),
-    price: 400,
-    largeImage: require('../assets/images/motoo.png'),
-    popular: true, 
-    avgTime: '15-20 min',
-    badge: '⭐ Populaire',
-  },
-  {
-    id: 'cargo',
-    name: 'Express Cargo',
-    icon: require('../assets/images/ccargo.png'),
-    price: 3400,
-    largeImage: require('../assets/images/ccargo.png'),
-    popular: false,
-    avgTime: '30-45 min',
-    badge: '🚚 Grand volume',
-  },
-  {
-    id: 'vehicule',
-    name: 'Livraison en voiture',
-    icon: require('../assets/images/carrss.png'),
-    price: 700,
-    largeImage: require('../assets/images/carrss.png'),
-    popular: false,
-    avgTime: '20-25 min',
-    badge: '🚗 Confortable',
-  },
-];
-
-const getDeliveryOptions = (method: string) => {
-  switch (method) {
-    case 'vehicule':
-      return [
-        {
-          id: 'pickup_service',
-          name: 'Service de récupération',
-          icon: 'location',
-          price: 700,
-          description: 'Récupération de votre colis à l\'adresse indiquée',
-          time: '15-20 min',
-        },
-        {
-          id: 'full_service',
-          name: 'Service complet',
-          icon: 'cube',
-          price: 1000,
-          description: 'Récupération et livraison complètes avec suivi en temps réel',
-          time: '20-25 min',
-        },
-      ];
-    case 'cargo':
-      return [];
-    case 'moto':
-    default:
-      return [
-        {
-          id: 'express',
-          name: 'Express',
-          icon: 'rocket',
-          price: 400,
-          description: 'Livraison rapide en ville',
-          time: '15-20 min',
-        },
-        {
-          id: 'standard',
-          name: 'Standard',
-          icon: 'bicycle',
-          price: 350,
-          description: 'Livraison standard optimisée',
-          time: '25-30 min',
-        },
-        {
-          id: 'scheduled',
-          name: 'Programmée',
-          icon: 'calendar',
-          price: 380,
-          description: 'Planifiez votre livraison à l\'avance',
-          time: 'Selon planning',
-        },
-      ];
-  }
-};
-
 export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps> = ({
   animatedHeight,
   panResponder: externalPanResponder,
@@ -165,19 +75,19 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
   },
   onScheduledDeliveryExtrasChange,
 }) => {
-  const effectiveMethod = (
-    isDeliveryMethodEnabledForClient(selectedMethod) ? selectedMethod : 'moto'
-  ) as 'moto' | 'vehicule' | 'cargo';
+  const selectedMethodConfig = getEffectiveClientDeliveryMethod(selectedMethod);
+  const effectiveMethod = selectedMethodConfig.id;
 
-  const [selectedSpeed, setSelectedSpeed] = useState<string>('express');
+  const [selectedSpeed, setSelectedSpeed] = useState<ClientDeliveryOptionId>('express');
   /** Accordéon sous « Mode de livraison » — colis, messages, créneau (programmée). */
   const [deliveryDetailsExpanded, setDeliveryDetailsExpanded] = useState(false);
   const dragHandleRef = useRef<View>(null);
 
-  const selectedMethodData =
-    deliveryMethods.find((m) => m.id === effectiveMethod) || deliveryMethods[0];
+  const selectedMethodData = selectedMethodConfig;
   
-  const selectedSpeedOption = getDeliveryOptions(effectiveMethod).find(opt => opt.id === selectedSpeed);
+  const selectedSpeedOption = getClientDeliveryOptions(effectiveMethod).find(
+    (opt) => opt.id === selectedSpeed
+  );
 
   const legDistanceKm = useMemo(() => {
     if (!pickupCoords || !dropoffCoords) return null;
@@ -235,7 +145,7 @@ export const DeliveryMethodBottomSheet: React.FC<DeliveryMethodBottomSheetProps>
 
 
   useEffect(() => {
-    const options = getDeliveryOptions(effectiveMethod);
+    const options = getClientDeliveryOptions(effectiveMethod);
     if (options.length > 0) {
       setSelectedSpeed(options[0].id);
     }
@@ -378,7 +288,7 @@ useEffect(() => {
 
   
           <View style={styles.methodOptionsContainer}>
-            {deliveryMethods.map((method) => {
+            {CLIENT_DELIVERY_METHODS.map((method) => {
               const enabled = isDeliveryMethodEnabledForClient(method.id);
               const isSelected = effectiveMethod === method.id;
               return (
@@ -394,7 +304,8 @@ useEffect(() => {
                     if (!enabled) {
                       Alert.alert(
                         'Bientôt disponible',
-                        'Pour l’instant, Krono propose uniquement la livraison à moto.',
+                        method.unavailableMessage ??
+                          'Ce service n’est pas encore disponible dans l’app client.',
                       );
                       return;
                     }
@@ -405,7 +316,7 @@ useEffect(() => {
                 >
                   {method.popular && enabled && (
                     <View style={styles.popularBadge}>
-                      <Text style={styles.popularBadgeText}>⭐</Text>
+                      <Ionicons name="star" size={13} color="#8B5CF6" />
                     </View>
                   )}
                   <View
@@ -448,7 +359,7 @@ useEffect(() => {
                           (pickupCoords && dropoffCoords
                             ? getDistanceInKm(pickupCoords, dropoffCoords)
                             : 0);
-                        const options = getDeliveryOptions(method.id);
+                        const options = getClientDeliveryOptions(method.id);
                         const selectedOption = options.find((opt) => opt.id === selectedSpeed);
                         const realPrice = calculatePrice(
                           dKm,
@@ -469,12 +380,12 @@ useEffect(() => {
             })}
           </View>
 
-        {effectiveMethod !== 'cargo' && getDeliveryOptions(effectiveMethod).length > 0 && (
+        {effectiveMethod !== 'cargo' && getClientDeliveryOptions(effectiveMethod).length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                {effectiveMethod === 'vehicule' ? 'Type de service' : 'Mode de livraison'}
+                {effectiveMethod === 'vehicule' ? 'Type de service' : 'Type de course'}
               </Text>
-              {getDeliveryOptions(effectiveMethod).map((option) => (
+              {getClientDeliveryOptions(effectiveMethod).map((option) => (
                 <TouchableOpacity
                   key={option.id}
                   style={[
@@ -517,7 +428,7 @@ useEffect(() => {
             </View>
           )}
 
-          {effectiveMethod === 'moto' && getDeliveryOptions(effectiveMethod).length > 0 && (
+          {effectiveMethod === 'moto' && getClientDeliveryOptions(effectiveMethod).length > 0 && (
             <View style={styles.deliveryDetailsAccordion}>
               <TouchableOpacity
                 style={styles.deliveryDetailsAccordionHeader}
@@ -743,7 +654,7 @@ useEffect(() => {
           activeOpacity={0.8}
         >
           <Text style={styles.peekText} numberOfLines={1}>
-            Méthode de livraison
+            Type de course
           </Text>
         </TouchableOpacity>
       )}
@@ -1435,4 +1346,3 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 });
-

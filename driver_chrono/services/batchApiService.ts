@@ -44,6 +44,11 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
           dropoff_address?: unknown;
           recipient?: { name?: string; phone?: string };
           price_cfa?: number;
+          delivery_qr_scanned_at?: string | null;
+          proof?: {
+            method?: BatchStop['proofMethod'];
+            validated_at?: string | null;
+          } | null;
         };
       }[];
     };
@@ -66,6 +71,8 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
         : item.orders?.status === 'cancelled'
         ? 'cancelled'
         : 'pending') as BatchStop['status'],
+      proofMethod: item.orders?.proof?.method ?? (item.orders?.delivery_qr_scanned_at ? 'batch_driver_confirmation' : null),
+      proofValidatedAt: item.orders?.proof?.validated_at ?? item.orders?.delivery_qr_scanned_at ?? null,
     }));
 
   return {
@@ -78,7 +85,16 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
 export async function validateBatchOrder(
   batchId: string,
   orderId: string,
-  status: 'completed' | 'cancelled'
+  status: 'completed' | 'cancelled',
+  proof?: {
+    proofMethod?: BatchStop['proofMethod'];
+    location?: { latitude: number; longitude: number };
+    alternativeProof?: {
+      photoBase64?: string | null;
+      signatureName?: string | null;
+      timestamp?: string;
+    };
+  }
 ): Promise<void> {
   const headers = await authHeader();
   const response = await apiFetch(
@@ -86,7 +102,7 @@ export async function validateBatchOrder(
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...headers },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...(proof ?? {}) }),
     }
   );
   const body = await response.json() as { success?: boolean };

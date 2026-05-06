@@ -503,7 +503,8 @@ async function findNearbyDrivers(
  * Trouve tous les livreurs disponibles (pour les commandes B2B sans coordonnées GPS précises)
  */
 async function findAllAvailableDrivers(
-  deliveryMethod: string
+  deliveryMethod: string,
+  options: { b2bOnly?: boolean } = {}
 ): Promise<NearbyDriver[]> {
   const DEBUG = process.env.DEBUG_SOCKETS === 'true';
   // Import dynamique pour éviter les problèmes de dépendances circulaires
@@ -582,26 +583,38 @@ async function findAllAvailableDrivers(
 
   const ids = [...new Set(availableDrivers.map((d) => d.driverId))];
   const vtMap = new Map<string, string>();
+  const b2bOptInMap = new Map<string, boolean>();
   if (ids.length && process.env.DATABASE_URL) {
     try {
-      const { rows } = await pool.query<{ user_id: string; vehicle_type: string | null }>(
-        `SELECT user_id, vehicle_type FROM driver_profiles WHERE user_id = ANY($1::uuid[])`,
+      const { rows } = await pool.query<{
+        user_id: string;
+        vehicle_type: string | null;
+        accepts_b2b_orders?: boolean | null;
+      }>(
+        `SELECT user_id, vehicle_type, accepts_b2b_orders
+           FROM driver_profiles
+          WHERE user_id = ANY($1::uuid[])`,
         [ids]
       );
       for (const r of rows) {
         if (r.vehicle_type != null && String(r.vehicle_type).trim() !== '') {
           vtMap.set(r.user_id, r.vehicle_type);
         }
+        b2bOptInMap.set(r.user_id, r.accepts_b2b_orders === true);
       }
     } catch (e: any) {
-      logger.warn('[findAllAvailableDrivers] vehicle_type:', e?.message);
+      logger.warn('[findAllAvailableDrivers] vehicle_type / accepts_b2b_orders:', e?.message);
     }
   }
 
   const filtered = availableDrivers.filter((d) => {
     let vt = (d as { vehicle_type?: string }).vehicle_type;
     if (vt == null || String(vt).trim() === '') vt = vtMap.get(d.driverId);
-    return driverMatchesOrderEngin(vt, deliveryMethod);
+    if (!driverMatchesOrderEngin(vt, deliveryMethod)) return false;
+    if (options.b2bOnly && b2bOptInMap.size > 0) {
+      return b2bOptInMap.get(d.driverId) === true;
+    }
+    return true;
   });
 
   if (DEBUG && filtered.length < availableDrivers.length) {
@@ -611,6 +624,20 @@ async function findAllAvailableDrivers(
   }
 
   return filtered;
+}
+
+function prioritizePreferredDrivers(
+  drivers: NearbyDriver[],
+  preferredDriverId?: string | null
+): NearbyDriver[] {
+  const preferred = preferredDriverId?.trim();
+  if (!preferred) return drivers;
+  return [...drivers].sort((a, b) => {
+    const aPreferred = a.driverId === preferred ? 0 : 1;
+    const bPreferred = b.driverId === preferred ? 0 : 1;
+    if (aPreferred !== bPreferred) return aPreferred - bPreferred;
+    return a.distance - b.distance;
+  });
 }
 
 /**
@@ -629,6 +656,10 @@ async function notifyDriversForOrder(
   const isPhoneOrder = (order as any).is_phone_order === true;
   const isB2BOrder = (order as any).is_b2b_order === true;
   const isPhoneOrB2B = isPhoneOrder || isB2BOrder;
+  const preferredDriverId =
+    typeof (order as any).preferred_driver_id === 'string'
+      ? (order as any).preferred_driver_id
+      : null;
   
   // Si pas de coordonnées ET ce n'est pas une commande téléphonique/B2B, ne pas chercher de livreurs
   if ((!pickupCoords || !pickupCoords.latitude || !pickupCoords.longitude) && !isPhoneOrB2B) {
@@ -650,7 +681,12 @@ async function notifyDriversForOrder(
       if (DEBUG) {
         logger.debug(`[notifyDriversForOrder] Commande B2B ${maskOrderId(order.id)} - recherche de tous les livreurs disponibles (avec coordonnées: ${!!(pickupCoords && pickupCoords.latitude && pickupCoords.longitude)})`);
       }
-      nearbyDrivers = await findAllAvailableDrivers(deliveryMethod);
+      nearbyDrivers = await findAllAvailableDrivers(deliveryMethod, { b2bOnly: true });
+      if (nearbyDrivers.length === 0) {
+        logger.warn(`[notifyDriversForOrder] Aucun livreur opt-in B2B disponible pour ${maskOrderId(order.id)} — fallback tous livreurs disponibles`);
+        nearbyDrivers = await findAllAvailableDrivers(deliveryMethod);
+      }
+      nearbyDrivers = prioritizePreferredDrivers(nearbyDrivers, preferredDriverId);
     } else if (isPhoneOrder && (!pickupCoords || !pickupCoords.latitude || !pickupCoords.longitude)) {
       // Pour les commandes téléphoniques normales sans coordonnées GPS, notifier tous les livreurs
       if (DEBUG) {
@@ -733,6 +769,10 @@ async function notifyDriversForOrder(
         logger.debug(`[notifyDriversForOrder] Utilisation du tri par distance (matching équitable désactivé)`);
       }
       selectedDrivers = nearbyDrivers.sort((a, b) => a.distance - b.distance);
+    }
+
+    if (isB2BOrder && preferredDriverId) {
+      selectedDrivers = prioritizePreferredDrivers(selectedDrivers, preferredDriverId);
     }
 
     // Envoyer la commande aux livreurs sélectionnés (top 3)

@@ -609,18 +609,13 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                 </View>
               )}
               
-              {/* Méthode de livraison */}
+              {/* Service disponible */}
               {currentOrder?.deliveryMethod && (
                 <View style={styles.detailRow}>
                   <Ionicons name="car" size={16} color="#F59E0B" />
                   <View style={styles.detailContent}>
-                    <Text style={styles.detailLabel}>Méthode</Text>
-                    <Text style={[styles.detailValue, { textTransform: 'capitalize' }]}>
-                      {currentOrder.deliveryMethod === 'moto' ? 'Moto' : 
-                       currentOrder.deliveryMethod === 'vehicule' ? 'Véhicule' : 
-                       currentOrder.deliveryMethod === 'cargo' ? 'Cargo' : 
-                       currentOrder.deliveryMethod}
-                    </Text>
+                    <Text style={styles.detailLabel}>Service</Text>
+                    <Text style={styles.detailValue}>Moto</Text>
                   </View>
                 </View>
               )}

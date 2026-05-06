@@ -632,30 +632,28 @@ export default function NewShippingModal({
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
                   <Package size={16} style={{ display: 'inline', marginRight: '8px', color: '#6B7280' }} />
-                  Méthode de livraison
+                  Service disponible
                 </label>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                  {(['moto', 'vehicule', 'cargo'] as const).map((method) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setDeliveryMethod(method)}
-                      style={{
-                        flex: 1,
-                        padding: '12px',
-                        borderRadius: '8px',
-                        border: `1px solid ${deliveryMethod === method ? '#8B5CF6' : '#E5E7EB'}`,
-                        backgroundColor: deliveryMethod === method ? '#F3E8FF' : '#FFFFFF',
-                        color: deliveryMethod === method ? '#8B5CF6' : '#6B7280',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        textTransform: 'capitalize',
-                      }}
-                    >
-                      {method === 'moto' ? 'Moto' : method === 'vehicule' ? 'Véhicule' : 'Cargo'}
-                    </button>
-                  ))}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryMethod('moto')}
+                    style={{
+                      padding: '12px 18px',
+                      borderRadius: '8px',
+                      border: '1px solid #8B5CF6',
+                      backgroundColor: '#F3E8FF',
+                      color: '#8B5CF6',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'default',
+                    }}
+                  >
+                    Moto
+                  </button>
+                  <span style={{ fontSize: 12, color: '#6B7280' }}>
+                    Voiture et cargo ne sont pas actifs côté client.
+                  </span>
                 </div>
               </div>
 

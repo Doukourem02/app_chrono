@@ -13,6 +13,7 @@ const TITLE_BY_CODE: Record<string, string> = {
   DRIVER_NOT_ASSIGNED: 'Pas votre course',
   ORDER_STATUS_INVALID: 'Étape incorrecte',
   QR_ALREADY_SCANNED: 'Déjà scanné',
+  QR_ORDER_MISMATCH: 'Mauvais arrêt',
   SCAN_SERVER_ERROR: 'Erreur serveur',
   SCAN_INVALID: 'Scan refusé',
   AUTH_REQUIRED: 'Session expirée',
@@ -41,6 +42,8 @@ const FALLBACK_MESSAGE_BY_CODE: Record<string, string> = {
     'Le scan n’est autorisé qu’avec le colis pris en charge (statut ramassage / livraison).',
   QR_ALREADY_SCANNED:
     'Ce QR a déjà été enregistré pour votre compte. Si l’app ne reflète pas la livraison, tirez vers le bas pour rafraîchir.',
+  QR_ORDER_MISMATCH:
+    'Ce QR appartient à une autre commande de la tournée. Ouvrez le scanner depuis la ligne correspondant à ce destinataire.',
   SCAN_SERVER_ERROR:
     'Le serveur n’a pas pu valider le scan. Réessayez dans quelques secondes.',
   SCAN_INVALID: 'Le scan a été refusé. Vérifiez le QR et réessayez.',

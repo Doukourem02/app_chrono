@@ -1658,3 +1658,59 @@ export const updateDriverType = async (req: RequestWithUser, res: Response): Pro
     });
   }
 };
+
+export const updateDriverB2BPreference = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { accepts_b2b_orders } = req.body as { accepts_b2b_orders?: boolean };
+
+    if (req.user && req.user.id !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez modifier que vos propres préférences B2B',
+      });
+      return;
+    }
+
+    if (typeof accepts_b2b_orders !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        message: 'accepts_b2b_orders doit être un booléen',
+      });
+      return;
+    }
+
+    const result = await (pool as any).query(
+      `UPDATE driver_profiles
+       SET accepts_b2b_orders = $1, updated_at = NOW()
+       WHERE user_id = $2
+       RETURNING accepts_b2b_orders`,
+      [accepts_b2b_orders, userId]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Profil chauffeur non trouvé',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: accepts_b2b_orders
+        ? 'Réception des commandes B2B activée'
+        : 'Réception des commandes B2B désactivée',
+      data: {
+        accepts_b2b_orders: result.rows[0].accepts_b2b_orders === true,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Erreur mise à jour préférence B2B livreur:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la mise à jour de la préférence B2B',
+      error: error.message,
+    });
+  }
+};

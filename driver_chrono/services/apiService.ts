@@ -1274,6 +1274,55 @@ class ApiService {
   }
 
   /**
+   * 🏢 Activer/désactiver la réception des commandes B2B.
+   */
+  async updateDriverB2BPreference(
+    userId: string,
+    acceptsB2BOrders: boolean
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      accepts_b2b_orders: boolean;
+    };
+  }> {
+    try {
+      const tokenResult = await this.ensureAccessToken();
+      if (!tokenResult.token) {
+        return {
+          success: false,
+          message: tokenResult.reason === 'missing'
+            ? 'Session expirée. Veuillez vous reconnecter.'
+            : 'Impossible de rafraîchir la session. Veuillez vous reconnecter.',
+        };
+      }
+
+      const response = await apiFetch(`${API_BASE_URL}/api/drivers/${userId}/b2b-preference`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${tokenResult.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accepts_b2b_orders: acceptsB2BOrders }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la mise à jour B2B');
+      }
+
+      return result;
+    } catch (error) {
+      logger.error('Erreur updateDriverB2BPreference:', 'apiService', error);
+      return {
+        success: false,
+        message: transportOrErrorMessage(error, 'Erreur de connexion'),
+      };
+    }
+  }
+
+  /**
    * 🚗 Récupérer le profil driver complet
    */
   async getDriverProfile(userId: string): Promise<{

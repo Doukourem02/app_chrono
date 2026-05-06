@@ -1391,11 +1391,21 @@ export const getAdminOrderById = async (req: Request, res: Response): Promise<vo
         u.phone as client_phone,
         u.email as client_email,
         scanned_by_u.first_name as scanned_by_first_name,
-        scanned_by_u.last_name as scanned_by_last_name
+        scanned_by_u.last_name as scanned_by_last_name,
+        latest_proof.qr_code_type as delivery_proof_method,
+        latest_proof.location as delivery_proof_location,
+        latest_proof.device_info as delivery_proof_metadata
       FROM orders o
       LEFT JOIN users d ON o.driver_id = d.id
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN users scanned_by_u ON o.delivery_qr_scanned_by = scanned_by_u.id
+      LEFT JOIN LATERAL (
+        SELECT qr_code_type, location, device_info
+        FROM qr_code_scans
+        WHERE order_id = o.id AND is_valid = true
+        ORDER BY scanned_at DESC
+        LIMIT 1
+      ) latest_proof ON true
       WHERE o.id = $1`,
       [orderId]
     );
@@ -1435,6 +1445,9 @@ export const getAdminOrderById = async (req: Request, res: Response): Promise<vo
         deliveryMethod: order.delivery_method,
         distance: order.distance_km,
         delivery_qr_scanned_at: order.delivery_qr_scanned_at,
+        delivery_proof_method: order.delivery_proof_method || null,
+        delivery_proof_location: parseJsonField(order.delivery_proof_location),
+        delivery_proof_metadata: parseJsonField(order.delivery_proof_metadata),
         delivery_qr_scanned_by: order.delivery_qr_scanned_by
           ? {
               id: order.delivery_qr_scanned_by,

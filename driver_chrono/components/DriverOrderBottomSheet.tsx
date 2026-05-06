@@ -217,7 +217,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     const hasWritten =
       oc.length > 0 || dn.length > 0 || clientInstructions != null;
     if (hasWritten) return 'Notes et consignes';
-    if (effectiveSpeedOptionId) return 'Mode de livraison';
+    if (effectiveSpeedOptionId) return 'Type de course';
     return 'Notes et consignes';
   }, [currentOrder, clientInstructions, effectiveSpeedOptionId]);
 
@@ -396,8 +396,8 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
                     hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                     accessibilityRole="button"
                     accessibilityLabel={
-                      collapsedDetailsLinkLabel === 'Mode de livraison'
-                        ? 'Voir le mode de livraison'
+                      collapsedDetailsLinkLabel === 'Type de course'
+                        ? 'Voir le type de course'
                         : 'Voir notes et consignes'
                     }
                   >

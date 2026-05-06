@@ -890,6 +890,138 @@ export const getPartnerUsers = async (req: Request, res: Response): Promise<void
   res.json({ success: true, data: deduped });
 };
 
+export const getPartnerDrivers = async (req: Request, res: Response): Promise<void> => {
+  const partnerId = (req as any).partnerUser?.partnerId ?? req.params.id ?? req.params.partnerId;
+
+  const { data, error } = await db()
+    .from('partner_drivers')
+    .select(`
+      id,
+      partner_id,
+      driver_user_id,
+      is_default,
+      created_at,
+      driver:users(id, first_name, last_name, phone, avatar_url),
+      profile:driver_profiles(user_id, is_online, is_available, accepts_b2b_orders, vehicle_type, completed_deliveries, rating)
+    `)
+    .eq('partner_id', partnerId)
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    logger.error('[partnerController] getPartnerDrivers error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la récupération des livreurs attitrés' });
+    return;
+  }
+
+  const rows = (data ?? []).map((row: any) => {
+    const driver = Array.isArray(row.driver) ? row.driver[0] : row.driver;
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    return {
+      id: row.id,
+      partner_id: row.partner_id,
+      driver_user_id: row.driver_user_id,
+      is_default: row.is_default === true,
+      created_at: row.created_at,
+      driver: {
+        id: row.driver_user_id,
+        first_name: driver?.first_name ?? null,
+        last_name: driver?.last_name ?? null,
+        phone: driver?.phone ?? null,
+        avatar_url: driver?.avatar_url ?? null,
+      },
+      profile: {
+        is_online: profile?.is_online === true,
+        is_available: profile?.is_available === true,
+        accepts_b2b_orders: profile?.accepts_b2b_orders === true,
+        vehicle_type: profile?.vehicle_type ?? 'moto',
+        completed_deliveries: profile?.completed_deliveries ?? 0,
+        rating: profile?.rating ?? null,
+      },
+    };
+  });
+
+  res.json({ success: true, data: rows });
+};
+
+export const getPartnerDriversForUser = async (req: Request, res: Response): Promise<void> => {
+  const userId = (req as any).user?.id;
+  const partnerId = req.params.id ?? req.params.partnerId;
+
+  if (!userId) {
+    res.status(401).json({ success: false, message: 'Non autorisé' });
+    return;
+  }
+
+  if (!partnerId) {
+    res.status(400).json({ success: false, message: 'partnerId manquant' });
+    return;
+  }
+
+  const [membershipRes, partnerRes] = await Promise.all([
+    db()
+      .from('partner_users')
+      .select('id, role')
+      .eq('partner_id', partnerId)
+      .eq('user_id', userId)
+      .maybeSingle(),
+    db()
+      .from('partners')
+      .select('status')
+      .eq('id', partnerId)
+      .maybeSingle(),
+  ]);
+
+  if (membershipRes.error) {
+    logger.error('[partnerController] getPartnerDriversForUser membership error:', membershipRes.error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la vérification partenaire' });
+    return;
+  }
+
+  if (!membershipRes.data) {
+    res.status(403).json({ success: false, message: 'Accès refusé à ce partenaire' });
+    return;
+  }
+
+  if (partnerRes.data?.status !== 'active') {
+    res.status(403).json({ success: false, message: 'Compte partenaire non actif' });
+    return;
+  }
+
+  (req as any).partnerUser = {
+    userId,
+    partnerId,
+    role: membershipRes.data.role,
+  };
+
+  await getPartnerDrivers(req, res);
+};
+
+export const updatePartnerPreferences = async (req: Request, res: Response): Promise<void> => {
+  const partnerId = (req as any).partnerUser?.partnerId ?? req.params.id ?? req.params.partnerId;
+  const { use_preferred_drivers } = req.body as { use_preferred_drivers?: boolean };
+
+  if (typeof use_preferred_drivers !== 'boolean') {
+    res.status(400).json({ success: false, message: 'use_preferred_drivers doit être un booléen' });
+    return;
+  }
+
+  const { data, error } = await db()
+    .from('partners')
+    .update({ use_preferred_drivers })
+    .eq('id', partnerId)
+    .select('*')
+    .single();
+
+  if (error) {
+    logger.error('[partnerController] updatePartnerPreferences error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la mise à jour des préférences partenaire' });
+    return;
+  }
+
+  res.json({ success: true, data });
+};
+
 // ─── POST /api/partner/:partnerId/users/invite — portail owner only ──────────
 export const invitePortalUser = async (req: Request, res: Response): Promise<void> => {
   const partnerId = (req as any).partnerUser?.partnerId;

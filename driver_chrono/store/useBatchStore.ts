@@ -8,6 +8,8 @@ export interface BatchStop {
   address: string;
   notes?: string;
   status: 'pending' | 'completed' | 'cancelled';
+  proofMethod?: 'qr_scan' | 'manual_code' | 'photo_signature' | 'batch_driver_confirmation' | null;
+  proofValidatedAt?: string | null;
 }
 
 export interface ActiveBatch {
@@ -24,7 +26,11 @@ interface BatchState {
   activeBatch: ActiveBatch | null;
   isLoading: boolean;
   setActiveBatch: (batch: ActiveBatch) => void;
-  updateStop: (orderId: string, status: 'completed' | 'cancelled') => void;
+  updateStop: (
+    orderId: string,
+    status: 'completed' | 'cancelled',
+    proof?: Pick<BatchStop, 'proofMethod' | 'proofValidatedAt'>
+  ) => void;
   clearBatch: () => void;
   setLoading: (v: boolean) => void;
 }
@@ -35,14 +41,14 @@ export const useBatchStore = create<BatchState>((set) => ({
 
   setActiveBatch: (batch) => set({ activeBatch: batch }),
 
-  updateStop: (orderId, status) =>
+  updateStop: (orderId, status, proof) =>
     set((state) => {
       if (!state.activeBatch) return state;
       return {
         activeBatch: {
           ...state.activeBatch,
           stops: state.activeBatch.stops.map((s) =>
-            s.orderId === orderId ? { ...s, status } : s
+            s.orderId === orderId ? { ...s, status, ...(proof ?? {}) } : s
           ),
         },
       };

@@ -177,11 +177,25 @@ export async function createBatch(params: CreateBatchParams): Promise<{ batchId:
 
 export interface PartnerDriver {
   id: string;
-  user_id: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  phone?: string | null;
-  vehicle_type?: string | null;
+  partner_id: string;
+  driver_user_id: string;
+  is_default: boolean;
+  created_at: string;
+  driver: {
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    phone?: string | null;
+    avatar_url?: string | null;
+  };
+  profile: {
+    is_online: boolean;
+    is_available: boolean;
+    accepts_b2b_orders: boolean;
+    vehicle_type?: string | null;
+    completed_deliveries: number;
+    rating?: number | null;
+  };
 }
 
 export async function getPartnerDrivers(partnerId: string): Promise<PartnerDriver[]> {

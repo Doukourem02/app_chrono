@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import {StyleSheet,View,Text,TouchableOpacity,Animated,ScrollView,Image,Alert,KeyboardAvoidingView,Platform,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { isDeliveryMethodEnabledForClient } from '../constants/clientDeliveryMethods';
+import {CLIENT_ENABLED_DELIVERY_METHODS,isDeliveryMethodEnabledForClient,} from '../constants/clientDeliveryMethods';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 import type { SavedClientAddress } from '../store/useSavedAddressesStore';
 import { useShipmentStore } from '../store/useShipmentStore';
@@ -47,12 +47,6 @@ interface DeliveryBottomSheetProps {
   pickupAddressDetail?: string | null;
   deliveryAddressDetail?: string | null;
 }
-
-const deliveryMethods = [
-  { id: 'moto', name: 'Moto', icon: require('../assets/images/motoo.png') },
-  { id: 'vehicule', name: 'Véhicule', icon: require('../assets/images/carrss.png') },
-  { id: 'cargo', name: 'Cargo', icon: require('../assets/images/ccargo.png') },
-];
 
 export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
   animatedHeight,
@@ -184,9 +178,9 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
             </View>
 
             <View style={styles.deliveryMethodsContainer}>
-            <Text style={styles.deliveryMethodsTitle}>Méthode de livraison</Text>
+            <Text style={styles.deliveryMethodsTitle}>Service disponible</Text>
             <View style={styles.deliveryOptions}>
-              {deliveryMethods.map((method) => {
+              {CLIENT_ENABLED_DELIVERY_METHODS.map((method) => {
                 const enabled = isDeliveryMethodEnabledForClient(method.id);
                 return (
                   <TouchableOpacity
@@ -219,12 +213,15 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
                         !enabled && styles.methodNameDisabled,
                       ]}
                     >
-                      {method.name}
+                      {method.shortName}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
+            <Text style={styles.deliveryMethodsHint}>
+              Voiture et cargo seront proposés ici dès leur disponibilité côté client.
+            </Text>
           </View>
 
       
@@ -236,7 +233,7 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
             disabled={!pickupLocation || !deliveryLocation}
             onPress={handleConfirm}
           >
-            <Text style={styles.chooseButtonText}>Choix de la méthode de livraison</Text>
+            <Text style={styles.chooseButtonText}>Choisir le type de course</Text>
           </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -337,7 +334,7 @@ const styles = StyleSheet.create({
   },
   deliveryOptions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     gap: 12,
   },
   deliveryOption: {
@@ -379,6 +376,12 @@ const styles = StyleSheet.create({
   },
   methodNameDisabled: {
     color: '#9CA3AF',
+  },
+  deliveryMethodsHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 17,
+    marginTop: 10,
   },
   chooseButton: {
     backgroundColor: '#8B5CF6',

@@ -13,6 +13,29 @@ interface ApiResponse<T = unknown> {
 
 type LatLng = { latitude: number; longitude: number }
 
+export interface PartnerDriver {
+  id: string
+  partner_id: string
+  driver_user_id: string
+  is_default: boolean
+  created_at: string
+  driver: {
+    id: string
+    first_name?: string | null
+    last_name?: string | null
+    phone?: string | null
+    avatar_url?: string | null
+  }
+  profile: {
+    is_online: boolean
+    is_available: boolean
+    accepts_b2b_orders: boolean
+    vehicle_type: 'moto' | 'vehicule' | 'cargo'
+    completed_deliveries: number
+    rating?: number | null
+  }
+}
+
 class PartnerApiService {
   private async getToken(): Promise<string | null> {
     const { data } = await supabase.auth.getSession()
@@ -64,6 +87,31 @@ class PartnerApiService {
     }
   }
 
+  async getDrivers(partnerId: string): Promise<ApiResponse<PartnerDriver[]>> {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/drivers`)
+      if (!res.ok) return { success: false, data: [] }
+      return res.json()
+    } catch (err) {
+      logger.error('[partnerApiService] getDrivers:', err)
+      return { success: false, data: [] }
+    }
+  }
+
+  async updatePreferences(partnerId: string, body: { use_preferred_drivers: boolean }): Promise<ApiResponse<PartnerDetail>> {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/preferences`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) return { success: false }
+      return res.json()
+    } catch (err) {
+      logger.error('[partnerApiService] updatePreferences:', err)
+      return { success: false }
+    }
+  }
+
   // Orders des partenaires (filtrés par partner_id)
   async getOrders(partnerId: string, params?: { status?: string; page?: number }): Promise<ApiResponse<unknown[]>> {
     try {
@@ -83,10 +131,12 @@ class PartnerApiService {
     pickupCoordinates?: LatLng
     dropoffCoordinates?: LatLng
     deliveryMethod: 'moto' | 'vehicule' | 'cargo'
+    speedOptionId?: string
   }): Promise<ApiResponse<{ price: number; distance: number; estimatedDuration?: string }>> {
     try {
       const body: Record<string, unknown> = {
         deliveryMethod: params.deliveryMethod,
+        ...(params.speedOptionId ? { speedOptionId: params.speedOptionId } : {}),
         isB2BPriority: true,
       }
 
@@ -129,16 +179,11 @@ class PartnerApiService {
       const recipientName = String(recipientFromBody?.name ?? body.recipient_name ?? '').trim()
       const recipientPhone = String(recipientFromBody?.phone ?? body.recipient_phone ?? '').trim()
       const notes = String(body.notes ?? '').trim()
-      const vehicleType = String(body.vehicle_type ?? 'moto').trim().toLowerCase()
+      const courseType = String(body.course_type ?? 'express').trim().toLowerCase()
       const pickupCoordinates = body.pickup_coordinates as LatLng | undefined
       const dropoffCoordinates = body.dropoff_coordinates as LatLng | undefined
 
-      const method =
-        vehicleType === 'moto'
-          ? 'moto'
-          : vehicleType === 'cargo'
-            ? 'cargo'
-            : 'vehicule'
+      const method = 'moto' as const
 
       const distanceKmRaw = Number(body.distance_km)
       const distanceKm = Number.isFinite(distanceKmRaw) && distanceKmRaw > 0 ? distanceKmRaw : undefined
@@ -158,7 +203,13 @@ class PartnerApiService {
         },
         recipient: { name: recipientName, phone: recipientPhone },
         method,
+        speedOptionId: ['express', 'standard', 'scheduled'].includes(courseType)
+          ? courseType
+          : 'express',
         notes: notes || undefined,
+        ...(typeof body.preferred_driver_id === 'string' && body.preferred_driver_id
+          ? { preferred_driver_id: body.preferred_driver_id }
+          : {}),
         ...(distanceKm !== undefined ? { distanceKm } : {}),
         ...(priceCfa !== undefined ? { priceCfa } : {}),
         notifyDrivers: true,

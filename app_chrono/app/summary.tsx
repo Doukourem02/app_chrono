@@ -108,11 +108,9 @@ export default function SummaryPage() {
           <View style={styles.detailRow}>
             <Text style={styles.methodIcon}>{getMethodIcon()}</Text>
             <View style={styles.detailContent}>
-              <Text style={styles.detailLabel}>Méthode de livraison</Text>
+              <Text style={styles.detailLabel}>Service disponible</Text>
               <Text style={styles.detailValue}>
-                {selectedMethod === 'moto' ? 'Livraison par moto' :
-                 selectedMethod === 'vehicule' ? 'Livraison par véhicule' :
-                 'Livraison par cargo'}
+                {selectedMethod === 'moto' ? 'Moto' : 'Moto'}
               </Text>
             </View>
           </View>

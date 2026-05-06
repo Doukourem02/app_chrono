@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import {View,Text,StyleSheet,ScrollView,Switch,TouchableOpacity} from 'react-native';
+import {Alert,View,Text,StyleSheet,ScrollView,Switch,TouchableOpacity} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { soundService } from '../../services/soundService';
+import { apiService } from '../../services/apiService';
+import { useDriverStore } from '../../store/useDriverStore';
 
 export default function SettingsPage() {
+  const { user, profile, updateProfile } = useDriverStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [acceptsB2BOrders, setAcceptsB2BOrders] = useState(profile?.accepts_b2b_orders === true);
+  const [savingB2BPreference, setSavingB2BPreference] = useState(false);
 
   useEffect(() => {
     // Charger la préférence de son au montage
@@ -16,9 +21,30 @@ export default function SettingsPage() {
     });
   }, []);
 
+  useEffect(() => {
+    setAcceptsB2BOrders(profile?.accepts_b2b_orders === true);
+  }, [profile?.accepts_b2b_orders]);
+
   const handleSoundToggle = async (value: boolean) => {
     setSoundEnabled(value);
     await soundService.setSoundEnabled(value);
+  };
+
+  const handleB2BToggle = async (value: boolean) => {
+    if (!user?.id || savingB2BPreference) return;
+    const previous = acceptsB2BOrders;
+    setAcceptsB2BOrders(value);
+    setSavingB2BPreference(true);
+    const result = await apiService.updateDriverB2BPreference(user.id, value);
+    setSavingB2BPreference(false);
+
+    if (result.success) {
+      updateProfile({ accepts_b2b_orders: result.data?.accepts_b2b_orders ?? value });
+      return;
+    }
+
+    setAcceptsB2BOrders(previous);
+    Alert.alert('Préférence non enregistrée', result.message || 'Réessayez dans quelques instants.');
   };
 
   return (
@@ -80,6 +106,27 @@ export default function SettingsPage() {
               onValueChange={setVibrationEnabled}
               trackColor={{ false: '#E5E7EB', true: '#8B5CF6' }}
               thumbColor={vibrationEnabled ? '#FFFFFF' : '#9CA3AF'}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Commandes B2B</Text>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingInfo}>
+              <Ionicons name="briefcase" size={24} color="#8B5CF6" />
+              <View style={styles.settingText}>
+                <Text style={styles.settingTitle}>Recevoir le B2B</Text>
+                <Text style={styles.settingSubtitle}>Commandes partenaires et livreur attitré</Text>
+              </View>
+            </View>
+            <Switch
+              value={acceptsB2BOrders}
+              disabled={savingB2BPreference}
+              onValueChange={handleB2BToggle}
+              trackColor={{ false: '#E5E7EB', true: '#8B5CF6' }}
+              thumbColor={acceptsB2BOrders ? '#FFFFFF' : '#9CA3AF'}
             />
           </View>
         </View>
@@ -162,4 +209,3 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
-

@@ -31,6 +31,7 @@ export type QRScanErrorCode =
   | 'DRIVER_NOT_ASSIGNED'
   | 'ORDER_STATUS_INVALID'
   | 'QR_ALREADY_SCANNED'
+  | 'QR_ORDER_MISMATCH'
   | 'SCAN_SERVER_ERROR';
 
 export interface QRCodeScanResult {
@@ -164,7 +165,8 @@ export class QRCodeService {
     qrCodeString: string,
     scannedBy: string,
     location?: { latitude: number; longitude: number },
-    deviceInfo?: { platform?: string; model?: string }
+    deviceInfo?: { platform?: string; model?: string },
+    expectedOrderId?: string
   ): Promise<QRCodeScanResult> {
     try {
       // Parser le QR code
@@ -196,6 +198,16 @@ export class QRCodeService {
           isValid: false,
           code: 'QR_MALFORMED',
           error: 'QR incomplet ou corrompu. Vérifiez que le client affiche le bon code de livraison.',
+        };
+      }
+
+      if (expectedOrderId && qrCodeData.orderId !== expectedOrderId) {
+        await this.recordInvalidScan(qrCodeData.orderId, scannedBy, `QR scanné pour une autre commande: attendu ${expectedOrderId}`, location, deviceInfo);
+        return {
+          success: false,
+          isValid: false,
+          code: 'QR_ORDER_MISMATCH',
+          error: 'Ce QR correspond à un autre arrêt de la tournée. Validez chaque livraison depuis sa propre ligne.',
         };
       }
 
@@ -282,7 +294,7 @@ export class QRCodeService {
       }
 
       // Enregistrer le scan valide
-      await this.recordValidScan(qrCodeData.orderId, scannedBy, location, deviceInfo);
+      await this.recordValidScan(qrCodeData.orderId, scannedBy, location, deviceInfo, 'qr_scan');
 
       // Mettre à jour la commande
       await pool.query(
@@ -329,22 +341,25 @@ export class QRCodeService {
     orderId: string,
     scannedBy: string,
     location?: { latitude: number; longitude: number },
-    deviceInfo?: { platform?: string; model?: string }
+    deviceInfo?: { platform?: string; model?: string },
+    qrCodeType: 'delivery' | 'qr_scan' | 'manual_code' | 'photo_signature' | 'batch_driver_confirmation' = 'delivery'
   ): Promise<void> {
     try {
       await pool.query(
         `INSERT INTO qr_code_scans 
          (order_id, qr_code_type, scanned_by, location, device_info, is_valid)
-         VALUES ($1, 'delivery', $2, $3, $4, true)
+         VALUES ($1, $2, $3, $4, $5, true)
          ON CONFLICT (order_id, scanned_by) 
          DO UPDATE SET 
            scanned_at = NOW(),
            location = EXCLUDED.location,
            device_info = EXCLUDED.device_info,
+           qr_code_type = EXCLUDED.qr_code_type,
            is_valid = true,
            validation_error = NULL`,
         [
           orderId,
+          qrCodeType,
           scannedBy,
           location ? JSON.stringify(location) : null,
           deviceInfo ? JSON.stringify(deviceInfo) : null,
@@ -562,7 +577,7 @@ export class QRCodeService {
         return { success: false, isValid: false, code: 'QR_SIGNATURE_INVALID', error: 'Code incorrect. Vérifiez le code affiché sur l\'écran du client.' };
       }
 
-      await this.recordValidScan(resolvedOrderId, driverId, location, deviceInfo);
+      await this.recordValidScan(resolvedOrderId, driverId, location, deviceInfo, 'manual_code');
 
       await pool.query(
         `UPDATE orders

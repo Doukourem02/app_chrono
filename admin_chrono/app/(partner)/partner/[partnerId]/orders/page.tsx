@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import { Plus, Search, Package } from 'lucide-react'
+import { Plus, Search, Package, ShieldCheck } from 'lucide-react'
 import { partnerApiService } from '@/lib/partnerApiService'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
@@ -14,6 +14,23 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   in_progress: { label: 'En cours',   color: themeColors.purplePrimary,  bg: themeColors.purpleLight },
   completed:   { label: 'Livrée',      color: themeColors.greenPrimary,  bg: themeColors.greenLight },
   cancelled:   { label: 'Annulée',     color: themeColors.redPrimary,    bg: themeColors.redLight },
+}
+
+const proofLabel = (method?: unknown) => {
+  switch (method) {
+    case 'qr_scan':
+      return 'QR validé'
+    case 'manual_code':
+      return 'Code validé'
+    case 'photo_signature':
+      return 'Preuve alternative'
+    case 'batch_driver_confirmation':
+      return 'Confirmation livreur'
+    case 'delivery':
+      return 'QR classique'
+    default:
+      return 'À valider'
+  }
 }
 
 export default function PartnerOrdersPage() {
@@ -94,7 +111,7 @@ export default function PartnerOrdersPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                {['N° commande', 'Destination', 'Statut', 'Prix', 'Date'].map(h => (
+                {['N° commande', 'Destination', 'Statut', 'Preuve', 'Prix', 'Date'].map(h => (
                   <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary }}>{h}</th>
                 ))}
               </tr>
@@ -115,6 +132,24 @@ export default function PartnerOrdersPage() {
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, backgroundColor: st.bg, color: st.color }}>
                         {st.label}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          padding: '3px 9px',
+                          borderRadius: 20,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          backgroundColor: o.delivery_proof_method ? themeColors.greenLight : themeColors.yellowLight,
+                          color: o.delivery_proof_method ? themeColors.greenPrimary : themeColors.yellowPrimary,
+                        }}
+                      >
+                        <ShieldCheck size={13} />
+                        {proofLabel(o.delivery_proof_method)}
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: themeColors.textPrimary }}>

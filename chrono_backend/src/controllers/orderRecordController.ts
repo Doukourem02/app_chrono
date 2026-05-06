@@ -7,6 +7,7 @@ import { computeB2BCommission, incrementPartnerUsage } from '../services/b2bComm
 import pool from '../config/db.js';
 import { notifyDriversForOrder } from '../sockets/orderSocket.js';
 import { haversineDistanceKm } from '../services/priceCalculator.js';
+import qrCodeService from '../services/qrCodeService.js';
 
 type AuthenticatedRequest = Request & {
   body: {
@@ -23,6 +24,7 @@ type AuthenticatedRequest = Request & {
     recipient?: { name?: string; phone?: string };
     notes?: string;
     notifyDrivers?: boolean;
+    preferred_driver_id?: string | null;
   };
   user?: JWTPayload;
 };
@@ -116,6 +118,7 @@ async function updateB2BOrderMetadata(
     partnerId: string;
     recipient?: { name?: string; phone?: string };
     notes?: string;
+    preferredDriverId?: string | null;
   }
 ): Promise<void> {
   const columns = await getOrderColumns();
@@ -131,6 +134,9 @@ async function updateB2BOrderMetadata(
 
   if (columns.has('partner_id')) addValue('partner_id', params.partnerId);
   if (columns.has('is_b2b_order')) addValue('is_b2b_order', true);
+  if (columns.has('preferred_driver_id') && params.preferredDriverId) {
+    addValue('preferred_driver_id', params.preferredDriverId);
+  }
   if (columns.has('recipient') && params.recipient) {
     addValue('recipient', JSON.stringify(params.recipient));
   }
@@ -212,6 +218,7 @@ async function notifyB2BDrivers(
     distanceKm: number;
     recipient?: { name?: string; phone?: string };
     notes?: string;
+    preferredDriverId?: string | null;
   }
 ): Promise<void> {
   const io = req.app.get('io');
@@ -258,6 +265,7 @@ async function notifyB2BDrivers(
     status: 'pending',
     createdAt: new Date(),
     is_b2b_order: true,
+    ...(params.preferredDriverId ? { preferred_driver_id: params.preferredDriverId } : {}),
     payment_method_type: 'deferred',
     payment_status: 'delayed',
     payment_payer: 'client',
@@ -323,8 +331,18 @@ export const listOrderRecords = async (
     const result = await (pool as any).query(
       `SELECT id, user_id, partner_id, status, pickup_address, dropoff_address,
               delivery_method, price_cfa, distance_km, created_at, updated_at,
-              is_b2b_order
+              is_b2b_order,
+              delivery_qr_scanned_at,
+              latest_proof.qr_code_type as delivery_proof_method,
+              latest_proof.scanned_at as delivery_proof_validated_at
          FROM orders
+         LEFT JOIN LATERAL (
+           SELECT qr_code_type, scanned_at
+           FROM qr_code_scans
+           WHERE order_id = orders.id AND is_valid = true
+           ORDER BY scanned_at DESC
+           LIMIT 1
+         ) latest_proof ON true
         WHERE ${where.join(' AND ')}
         ORDER BY created_at DESC
         LIMIT $${index} OFFSET $${index + 1}`,
@@ -383,6 +401,7 @@ export const createOrderRecord = async (
       recipient,
       notes,
       notifyDrivers,
+      preferred_driver_id,
     } = req.body;
     const isB2BRecord = Boolean(partner_id && typeof partner_id === 'string');
 
@@ -527,7 +546,31 @@ export const createOrderRecord = async (
           partnerId: partner_id,
           recipient,
           notes: typeof notes === 'string' && notes.trim() ? notes.trim() : undefined,
+          preferredDriverId:
+            typeof preferred_driver_id === 'string' && preferred_driver_id.trim()
+              ? preferred_driver_id.trim()
+              : null,
         });
+
+        try {
+          const recipientName =
+            recipient?.name?.trim() ||
+            (recipient?.phone ? `Destinataire (${recipient.phone})` : 'Destinataire');
+          const recipientPhone = recipient?.phone?.trim() || '';
+          const creator = await loadClientForOrder(userId);
+          await qrCodeService.generateDeliveryQRCode(
+            orderId,
+            `CMD-${orderId.substring(0, 8).toUpperCase()}`,
+            recipientName,
+            recipientPhone,
+            creator.name || 'Client B2B'
+          );
+        } catch (qrErr: any) {
+          logger.warn('[orders/record] Échec génération QR B2B', {
+            orderId,
+            message: qrErr?.message,
+          });
+        }
 
         // Incrémenter le quota mensuel
         await incrementPartnerUsage(partner_id);
@@ -543,6 +586,10 @@ export const createOrderRecord = async (
             distanceKm: effectiveDistanceKm,
             recipient,
             notes: typeof notes === 'string' && notes.trim() ? notes.trim() : undefined,
+            preferredDriverId:
+              typeof preferred_driver_id === 'string' && preferred_driver_id.trim()
+                ? preferred_driver_id.trim()
+                : null,
           });
         }
 

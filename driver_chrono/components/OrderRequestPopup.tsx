@@ -232,7 +232,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
       case 'moto': return require('../assets/images/motoo.png');
       case 'vehicule': return require('../assets/images/carrss.png');
       case 'cargo': return require('../assets/images/ccargo.png');
-      default: return require('../assets/images/carrss.png');
+      default: return require('../assets/images/motoo.png');
     }
   };
 
@@ -241,7 +241,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
       case 'moto': return 'Moto';
       case 'vehicule': return 'Véhicule';
       case 'cargo': return 'Cargo';
-      default: return 'Véhicule';
+      default: return 'Moto';
     }
   };
 

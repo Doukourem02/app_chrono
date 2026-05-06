@@ -11,10 +11,8 @@ import { logger } from '../utils/logger';
 import { getPhoneValidationError } from '../utils/phoneValidation';
 import { useRecentPhoneNumbers } from '../hooks/useRecentPhoneNumbers';
 import type { RouteMetricsSource } from '../utils/routePricingLabels';
-import {
-  distanceMetricCaption,
-  durationMetricCaption,
-} from '../utils/routePricingLabels';
+import {distanceMetricCaption,durationMetricCaption,} from '../utils/routePricingLabels';
+import { getEffectiveClientDeliveryMethod } from '../constants/clientDeliveryMethods';
 
 interface AddressDetails {
   phone?: string;
@@ -70,6 +68,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
   onBack,
   onConfirm,
 }) => {
+  const selectedMethodData = getEffectiveClientDeliveryMethod(selectedMethod);
   const [pickupDetails, setPickupDetails] = useState<AddressDetails>({
     phone: '',
     entrance: '',
@@ -450,7 +449,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
             <View style={styles.headerLeft}>
               <View style={styles.methodBadge}>
                 <Ionicons name="cube-outline" size={16} color="#8B5CF6" />
-                <Text style={styles.methodText}>{selectedMethod === 'moto' ? 'Livraison à moto' : selectedMethod === 'vehicule' ? 'Livraison en voiture' : 'Express Cargo'}</Text>
+                <Text style={styles.methodText}>{selectedMethodData.name}</Text>
               </View>
               <TouchableOpacity onPress={onBack} style={styles.backButton}>
                 <Ionicons name="arrow-forward" size={24} color="#000" />
@@ -1060,4 +1059,3 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
-

@@ -1,21 +1,20 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  Linking,
-} from 'react-native';
+import {View,Text,TouchableOpacity,StyleSheet,ScrollView,ActivityIndicator,Alert,Linking,Modal,TextInput,KeyboardAvoidingView,Platform,} from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { useBatchStore, type BatchStop } from '../../store/useBatchStore';
 import { getBatch, validateBatchOrder } from '../../services/batchApiService';
+import { qrCodeService } from '../../services/qrCodeService';
+import { QRCodeScanner } from '../../components/QRCodeScanner';
+import { QRCodeScanResult } from '../../components/QRCodeScanResult';
+import { getQRScanErrorAlert } from '../../utils/qrScanUserMessage';
 import { logger } from '../../utils/logger';
+
+type ProofMethod = NonNullable<BatchStop['proofMethod']>;
 
 export default function BatchScreen() {
   const { batchId } = useLocalSearchParams<{ batchId: string }>();
@@ -25,8 +24,52 @@ export default function BatchScreen() {
   const [isLoadingFull, setIsLoadingFull] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
   const [allDone, setAllDone] = useState(false);
+  const [scanStop, setScanStop] = useState<BatchStop | null>(null);
+  const [scanResult, setScanResult] = useState<{
+    recipientName: string;
+    recipientPhone: string;
+    creatorName: string;
+    orderNumber: string;
+  } | null>(null);
+  const [scanProof, setScanProof] = useState<{ orderId: string; method: ProofMethod } | null>(null);
+  const [manualStop, setManualStop] = useState<BatchStop | null>(null);
+  const [manualCode, setManualCode] = useState('');
+  const [alternativeStop, setAlternativeStop] = useState<BatchStop | null>(null);
+  const [signatureName, setSignatureName] = useState('');
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoReady, setPhotoReady] = useState(false);
 
   const batch = activeBatch?.id === batchId ? activeBatch : null;
+
+  const getCurrentLocation = useCallback(async () => {
+    try {
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      return {
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      };
+    } catch (err) {
+      logger.warn('[BatchScreen] location unavailable', 'BatchScreen', err);
+      return undefined;
+    }
+  }, []);
+
+  const proofLabel = (method?: BatchStop['proofMethod'] | null) => {
+    switch (method) {
+      case 'qr_scan':
+        return 'QR validé';
+      case 'manual_code':
+        return 'Code validé';
+      case 'photo_signature':
+        return 'Preuve alternative';
+      case 'batch_driver_confirmation':
+        return 'Confirmation livreur';
+      default:
+        return 'À valider';
+    }
+  };
 
   const loadBatch = useCallback(async () => {
     if (!batchId) return;
@@ -56,18 +99,138 @@ export default function BatchScreen() {
     }
   }, [batch]);
 
-  const handleValidate = async (stop: BatchStop) => {
+  const finalizeProofDelivery = async (stop: BatchStop, method: ProofMethod, extra?: {
+    location?: { latitude: number; longitude: number };
+    alternativeProof?: {
+      photoBase64?: string | null;
+      signatureName?: string | null;
+      timestamp?: string;
+    };
+  }) => {
     if (!batchId || validatingId) return;
     setValidatingId(stop.orderId);
     try {
-      await validateBatchOrder(batchId, stop.orderId, 'completed');
-      updateStop(stop.orderId, 'completed');
+      await validateBatchOrder(batchId, stop.orderId, 'completed', {
+        proofMethod: method,
+        ...extra,
+      });
+      updateStop(stop.orderId, 'completed', {
+        proofMethod: method,
+        proofValidatedAt: new Date().toISOString(),
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (err: any) {
       Alert.alert('Erreur', err?.message ?? 'Impossible de valider la livraison.');
     } finally {
       setValidatingId(null);
     }
+  };
+
+  const handleScanQRCode = async (qrCodeData: string) => {
+    if (!scanStop) return;
+    try {
+      const location = await getCurrentLocation();
+      const result = await qrCodeService.scanQRCode(qrCodeData, location, scanStop.orderId);
+      if (result.success && result.isValid && result.data) {
+        const { orderId, ...scanData } = result.data;
+        if (orderId !== scanStop.orderId) {
+          Alert.alert('Mauvais arrêt', 'Ce QR correspond à une autre commande de la tournée.');
+          return;
+        }
+        setScanProof({ orderId, method: 'qr_scan' });
+        setScanResult(scanData);
+        setScanStop(null);
+      } else {
+        const { title, message } = getQRScanErrorAlert(result.code, result.error);
+        Alert.alert(title, message);
+      }
+    } catch (error: any) {
+      const { title, message } = getQRScanErrorAlert('SCAN_UNKNOWN', error?.message);
+      Alert.alert(title, message);
+    }
+  };
+
+  const handleManualSubmit = async () => {
+    if (!manualStop) return;
+    const code = manualCode.trim();
+    if (!/^\d{6}$/.test(code)) {
+      Alert.alert('Code invalide', 'Entrez les 6 chiffres affichés sur l’écran du destinataire.');
+      return;
+    }
+    setValidatingId(manualStop.orderId);
+    try {
+      const location = await getCurrentLocation();
+      const result = await qrCodeService.manualVerify(manualStop.orderId, code, location);
+      if (result.success && result.isValid && result.data) {
+        const { orderId, ...scanData } = result.data;
+        setManualStop(null);
+        setManualCode('');
+        setScanProof({ orderId, method: 'manual_code' });
+        setScanResult(scanData);
+      } else {
+        const { title, message } = getQRScanErrorAlert(result.code, result.error);
+        Alert.alert(title, message);
+      }
+    } catch (error: any) {
+      const { title, message } = getQRScanErrorAlert('SCAN_UNKNOWN', error?.message);
+      Alert.alert(title, message);
+    } finally {
+      setValidatingId(null);
+    }
+  };
+
+  const handleConfirmDeliveryProof = async () => {
+    if (!scanProof || !batch) return;
+    const stop = batch.stops.find((item) => item.orderId === scanProof.orderId);
+    if (!stop) return;
+    setScanResult(null);
+    await finalizeProofDelivery(stop, scanProof.method, {
+      location: await getCurrentLocation(),
+    });
+    setScanProof(null);
+  };
+
+  const resetAlternativeProof = () => {
+    setAlternativeStop(null);
+    setSignatureName('');
+    setPhotoBase64(null);
+    setPhotoReady(false);
+  };
+
+  const handleTakeProofPhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Caméra requise', 'Autorisez la caméra pour joindre une photo de remise.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      base64: true,
+      quality: 0.45,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]?.base64) {
+      setPhotoBase64(result.assets[0].base64);
+      setPhotoReady(true);
+    }
+  };
+
+  const handleAlternativeSubmit = async () => {
+    if (!alternativeStop) return;
+    const trimmedSignature = signatureName.trim();
+    if (!photoBase64 || !trimmedSignature) {
+      Alert.alert('Preuve incomplète', 'Ajoutez une photo et le nom/signature du destinataire.');
+      return;
+    }
+    const location = await getCurrentLocation();
+    await finalizeProofDelivery(alternativeStop, 'photo_signature', {
+      location,
+      alternativeProof: {
+        photoBase64,
+        signatureName: trimmedSignature,
+        timestamp: new Date().toISOString(),
+      },
+    });
+    resetAlternativeProof();
   };
 
   const handleCancel = (stop: BatchStop) => {
@@ -194,6 +357,31 @@ export default function BatchScreen() {
                   {stop.notes ? (
                     <Text style={styles.notesText}>{stop.notes}</Text>
                   ) : null}
+                  <View style={[
+                    styles.proofBadge,
+                    stop.proofMethod && styles.proofBadgeValid,
+                    stop.proofMethod === 'photo_signature' && styles.proofBadgeAlternative,
+                  ]}>
+                    <Ionicons
+                      name={
+                        stop.proofMethod === 'qr_scan'
+                          ? 'qr-code-outline'
+                          : stop.proofMethod === 'manual_code'
+                          ? 'keypad-outline'
+                          : stop.proofMethod === 'photo_signature'
+                          ? 'camera-outline'
+                          : 'shield-checkmark-outline'
+                      }
+                      size={13}
+                      color={stop.proofMethod ? '#047857' : '#92400E'}
+                    />
+                    <Text style={[
+                      styles.proofBadgeText,
+                      stop.proofMethod && styles.proofBadgeTextValid,
+                    ]}>
+                      {proofLabel(stop.proofMethod)}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Actions droite */}
@@ -208,16 +396,43 @@ export default function BatchScreen() {
                       </TouchableOpacity>
                     ) : null}
                     <TouchableOpacity
-                      style={[styles.validateBtn, isValidating && styles.validateBtnDisabled]}
-                      onPress={() => handleValidate(stop)}
-                      onLongPress={() => handleCancel(stop)}
+                      style={[styles.actionBtn, styles.scanBtn, isValidating && styles.validateBtnDisabled]}
+                      onPress={() => setScanStop(stop)}
                       disabled={!!validatingId}
                     >
                       {isValidating ? (
                         <ActivityIndicator size="small" color="#FFF" />
                       ) : (
-                        <Text style={styles.validateBtnText}>Livré ✓</Text>
+                        <>
+                          <Ionicons name="qr-code-outline" size={14} color="#FFF" />
+                          <Text style={styles.validateBtnText}>Scanner QR</Text>
+                        </>
                       )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.codeBtn]}
+                      onPress={() => {
+                        setManualStop(stop);
+                        setManualCode('');
+                      }}
+                      disabled={!!validatingId}
+                    >
+                      <Ionicons name="keypad-outline" size={14} color="#4C1D95" />
+                      <Text style={styles.codeBtnText}>Entrer le code</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.altBtn]}
+                      onPress={() => {
+                        setAlternativeStop(stop);
+                        setSignatureName(stop.recipientName === 'Destinataire' ? '' : stop.recipientName);
+                        setPhotoBase64(null);
+                        setPhotoReady(false);
+                      }}
+                      onLongPress={() => handleCancel(stop)}
+                      disabled={!!validatingId}
+                    >
+                      <Ionicons name="camera-outline" size={14} color="#065F46" />
+                      <Text style={styles.altBtnText}>Preuve alternative</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -237,10 +452,83 @@ export default function BatchScreen() {
           })}
 
           <Text style={styles.hint}>
-            Appui long sur « Livré ✓ » pour annuler une livraison.
+            Chaque arrêt doit avoir sa propre preuve. Appui long sur « Preuve alternative » pour annuler une livraison.
           </Text>
         </ScrollView>
       )}
+
+      <QRCodeScanner
+        visible={!!scanStop}
+        onScan={handleScanQRCode}
+        onClose={() => setScanStop(null)}
+      />
+
+      <QRCodeScanResult
+        visible={!!scanResult}
+        data={scanResult}
+        onConfirm={handleConfirmDeliveryProof}
+        onClose={() => {
+          setScanResult(null);
+          setScanProof(null);
+        }}
+      />
+
+      <Modal visible={!!manualStop} transparent animationType="slide" onRequestClose={() => setManualStop(null)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Code de livraison</Text>
+            <Text style={styles.modalSubtitle}>{manualStop?.recipientName}</Text>
+            <TextInput
+              style={styles.codeInput}
+              value={manualCode}
+              onChangeText={(text) => setManualCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="_ _ _ _ _ _"
+              placeholderTextColor="#9CA3AF"
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setManualStop(null)}>
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleManualSubmit}>
+                <Text style={styles.modalConfirmText}>Valider</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={!!alternativeStop} transparent animationType="slide" onRequestClose={resetAlternativeProof}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Preuve alternative</Text>
+            <Text style={styles.modalSubtitle}>{alternativeStop?.recipientName}</Text>
+            <TouchableOpacity style={[styles.photoBtn, photoReady && styles.photoBtnReady]} onPress={handleTakeProofPhoto}>
+              <Ionicons name={photoReady ? 'checkmark-circle-outline' : 'camera-outline'} size={18} color={photoReady ? '#047857' : '#6D28D9'} />
+              <Text style={[styles.photoBtnText, photoReady && styles.photoBtnTextReady]}>
+                {photoReady ? 'Photo ajoutée' : 'Prendre une photo'}
+              </Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.signatureInput}
+              value={signatureName}
+              onChangeText={setSignatureName}
+              placeholder="Nom / signature du destinataire"
+              placeholderTextColor="#9CA3AF"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={resetAlternativeProof}>
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleAlternativeSubmit}>
+                <Text style={styles.modalConfirmText}>Enregistrer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -362,7 +650,7 @@ const styles = StyleSheet.create({
   },
   stopCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 14,
@@ -433,6 +721,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 6,
     flexShrink: 0,
+    width: 132,
   },
   callBtn: {
     width: 34,
@@ -457,6 +746,61 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  actionBtn: {
+    minHeight: 34,
+    borderRadius: 9,
+    paddingVertical: 7,
+    paddingHorizontal: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 5,
+    width: '100%',
+  },
+  scanBtn: {
+    backgroundColor: '#8B5CF6',
+  },
+  codeBtn: {
+    backgroundColor: '#EDE9FE',
+  },
+  codeBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4C1D95',
+  },
+  altBtn: {
+    backgroundColor: '#D1FAE5',
+  },
+  altBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  proofBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#FEF3C7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  proofBadgeValid: {
+    backgroundColor: '#D1FAE5',
+  },
+  proofBadgeAlternative: {
+    backgroundColor: '#DBEAFE',
+  },
+  proofBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  proofBadgeTextValid: {
+    color: '#047857',
   },
   doneTag: {
     backgroundColor: '#D1FAE5',
@@ -486,5 +830,100 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 24, 39, 0.55)',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  codeInput: {
+    height: 54,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: 4,
+  },
+  signatureInput: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: '#111827',
+  },
+  photoBtn: {
+    minHeight: 46,
+    borderRadius: 12,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  photoBtnReady: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  photoBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6D28D9',
+  },
+  photoBtnTextReady: {
+    color: '#047857',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  modalConfirmText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

@@ -988,9 +988,20 @@ export default function MapPage() {
     // Utilise le prix dynamique serveur si disponible, sinon calcul local
     const price = dynamicPrice > 0
       ? dynamicPrice
-      : calculatePrice(distance, selectedMethod as "moto" | "vehicule" | "cargo");
+      : calculatePrice(
+          distance,
+          selectedMethod as "moto" | "vehicule" | "cargo",
+          deliverySpeedOptionId
+        );
     return { price, estimatedTime };
-  }, [pickupCoords, dropoffCoords, selectedMethod, routeSnapshot, dynamicPrice]);
+  }, [
+    pickupCoords,
+    dropoffCoords,
+    selectedMethod,
+    routeSnapshot,
+    dynamicPrice,
+    deliverySpeedOptionId,
+  ]);
 
   const orderRouteSummary = useMemo(() => {
     if (!pickupCoords || !dropoffCoords || !selectedMethod) return null;

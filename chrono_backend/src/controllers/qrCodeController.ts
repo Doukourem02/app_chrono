@@ -156,7 +156,7 @@ export const scanQRCode = async (req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
-    const { qrCode, location, deviceInfo } = req.body;
+    const { qrCode, location, deviceInfo, expectedOrderId } = req.body;
 
     if (!qrCode) {
       res.status(400).json({
@@ -172,7 +172,8 @@ export const scanQRCode = async (req: AuthenticatedRequest, res: Response): Prom
       qrCode,
       userId,
       location,
-      deviceInfo
+      deviceInfo,
+      typeof expectedOrderId === 'string' ? expectedOrderId : undefined
     );
 
     if (!result.success || !result.isValid) {

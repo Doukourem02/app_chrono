@@ -34,7 +34,8 @@ class QRCodeService {
    */
   async scanQRCode(
     qrCodeData: string,
-    location?: { latitude: number; longitude: number }
+    location?: { latitude: number; longitude: number },
+    expectedOrderId?: string
   ): Promise<QRCodeScanResult> {
     try {
       const token = this.getAccessToken();
@@ -84,6 +85,7 @@ class QRCodeService {
           qrCode: qrCodeData,
           location: scanLocation,
           deviceInfo,
+          expectedOrderId,
         }),
       });
 

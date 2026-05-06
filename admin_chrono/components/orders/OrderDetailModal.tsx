@@ -19,6 +19,8 @@ interface OrderDetailData {
   deliveryMethod?: string
   distance?: number
   delivery_qr_scanned_at?: string | null
+  delivery_proof_method?: string | null
+  delivery_proof_location?: unknown
   delivery_qr_scanned_by?: { id: string; name: string } | null
   driver?: { id: string; name: string; phone?: string; email?: string } | null
   client?: { id: string; name: string; phone?: string; email?: string } | null
@@ -52,6 +54,23 @@ const statusConfig: Record<string, { label: string; backgroundColor: string; col
   completed: { label: 'Livraison terminée', backgroundColor: '#D1FAE5', color: '#16A34A' },
   cancelled: { label: 'Annulé', backgroundColor: '#FEE2E2', color: '#DC2626' },
   declined: { label: 'Refusé', backgroundColor: '#FEE2E2', color: '#DC2626' },
+}
+
+const proofMethodLabel = (method?: string | null) => {
+  switch (method) {
+    case 'qr_scan':
+      return 'QR scanné'
+    case 'manual_code':
+      return 'Code manuel'
+    case 'photo_signature':
+      return 'Photo + signature'
+    case 'batch_driver_confirmation':
+      return 'Confirmation livreur'
+    case 'delivery':
+      return 'QR classique'
+    default:
+      return 'Preuve enregistrée'
+  }
 }
 
 const formatDateTime = (isoString?: string | null, locale = 'fr-FR') => {
@@ -283,6 +302,9 @@ export default function OrderDetailModal({
                         <> {t('ordersPage.detail.by')} <strong>{order.delivery_qr_scanned_by.name}</strong></>
                       )}
                     </div>
+                    <div style={{ fontSize: 13, color: themeColors.textSecondary, marginTop: 4 }}>
+                      Méthode : <strong>{proofMethodLabel(order.delivery_proof_method)}</strong>
+                    </div>
                     <button
                       onClick={loadScanHistory}
                       style={{
@@ -331,7 +353,7 @@ export default function OrderDetailModal({
                           }}
                         >
                           <div style={{ fontWeight: 500 }}>
-                            {scan.isValid ? `✓ ${t('ordersPage.detail.valid')}` : `✗ ${t('ordersPage.detail.invalid')}`} — {scan.scannedBy.name}
+                            {scan.isValid ? `✓ ${t('ordersPage.detail.valid')}` : `✗ ${t('ordersPage.detail.invalid')}`} — {proofMethodLabel(scan.qrCodeType)} — {scan.scannedBy.name}
                           </div>
                           <div style={{ color: themeColors.textSecondary, marginTop: 4 }}>
                             {formatDateTime(scan.scannedAt, locale)}

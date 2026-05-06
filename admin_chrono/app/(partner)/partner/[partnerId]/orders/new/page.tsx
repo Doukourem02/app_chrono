@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle } from 'lucide-react'
-import { partnerApiService } from '@/lib/partnerApiService'
+import { ArrowLeft, CheckCircle, Phone, User } from 'lucide-react'
+import { partnerApiService, type PartnerDriver } from '@/lib/partnerApiService'
 import { themeColors } from '@/utils/theme'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 
@@ -13,13 +13,14 @@ interface FormState {
   recipient_name: string
   recipient_phone: string
   notes: string
-  vehicle_type: string
+  delivery_method: 'moto'
+  course_type: 'express' | 'standard' | 'scheduled'
 }
 
-const VEHICLE_TYPES = [
-  { value: 'moto',   label: 'Moto' },
-  { value: 'velo',   label: 'Vélo' },
-  { value: 'voiture', label: 'Voiture' },
+const COURSE_TYPES = [
+  { value: 'express', label: 'Express', description: 'Course prioritaire en moto' },
+  { value: 'standard', label: 'Standard', description: 'Même service moto, rythme normal' },
+  { value: 'scheduled', label: 'Programmée', description: 'À planifier avec l’équipe Krono' },
 ]
 
 const FIELDS: Array<{ key: keyof FormState; label: string; type: string; placeholder: string; required?: boolean }> = [
@@ -38,11 +39,16 @@ export default function NewPartnerOrderPage() {
     recipient_name: '',
     recipient_phone: '',
     notes: '',
-    vehicle_type: 'moto',
+    delivery_method: 'moto',
+    course_type: 'express',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [preferredDriversEnabled, setPreferredDriversEnabled] = useState(false)
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
+  const [partnerDrivers, setPartnerDrivers] = useState<PartnerDriver[]>([])
+  const [driversLoading, setDriversLoading] = useState(false)
   const [pickupCoordinates, setPickupCoordinates] = useState<{ latitude: number; longitude: number } | undefined>(undefined)
   const [dropoffCoordinates, setDropoffCoordinates] = useState<{ latitude: number; longitude: number } | undefined>(undefined)
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
@@ -51,14 +57,39 @@ export default function NewPartnerOrderPage() {
 
   const canEstimate = !!pickupCoordinates && !!dropoffCoordinates
 
-  const estimatePrice = async (vehicleType: string, pickup?: { latitude: number; longitude: number }, dropoff?: { latitude: number; longitude: number }) => {
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      setDriversLoading(true)
+      const [details, drivers] = await Promise.all([
+        partnerApiService.getDetails(partnerId),
+        partnerApiService.getDrivers(partnerId),
+      ])
+      if (!mounted) return
+      setPreferredDriversEnabled(details.data?.use_preferred_drivers === true)
+      setPartnerDrivers(drivers.data ?? [])
+      const defaultDriver = (drivers.data ?? []).find((d) => d.is_default && d.profile.accepts_b2b_orders)
+      setSelectedDriverId(defaultDriver?.driver_user_id ?? null)
+      setDriversLoading(false)
+    }
+    void load()
+    return () => {
+      mounted = false
+    }
+  }, [partnerId])
+
+  const estimatePrice = async (
+    pickup?: { latitude: number; longitude: number },
+    dropoff?: { latitude: number; longitude: number },
+    courseType = form.course_type,
+  ) => {
     if (!pickup || !dropoff) return
     setIsEstimating(true)
-    const method = vehicleType === 'moto' ? 'moto' : vehicleType === 'velo' ? 'vehicule' : 'vehicule'
     const estimation = await partnerApiService.calculateOrderEstimate({
       pickupCoordinates: pickup,
       dropoffCoordinates: dropoff,
-      deliveryMethod: method,
+      deliveryMethod: 'moto',
+      speedOptionId: courseType,
     })
     setIsEstimating(false)
 
@@ -68,6 +99,18 @@ export default function NewPartnerOrderPage() {
     } else {
       setDistanceKm(null)
       setPriceCfa(null)
+    }
+  }
+
+  const handlePreferredDriversToggle = async (enabled: boolean) => {
+    setPreferredDriversEnabled(enabled)
+    if (!enabled) setSelectedDriverId(null)
+    const result = await partnerApiService.updatePreferences(partnerId, {
+      use_preferred_drivers: enabled,
+    })
+    if (!result.success) {
+      setPreferredDriversEnabled(!enabled)
+      setError("Impossible de mettre à jour la préférence livreur attitré.")
     }
   }
 
@@ -85,7 +128,9 @@ export default function NewPartnerOrderPage() {
       dropoff_address: form.dropoff_address.trim(),
       recipient:       { name: form.recipient_name.trim(), phone: form.recipient_phone.trim() },
       notes:           form.notes.trim() || undefined,
-      vehicle_type:    form.vehicle_type,
+      delivery_method: form.delivery_method,
+      course_type: form.course_type,
+      preferred_driver_id: preferredDriversEnabled ? selectedDriverId ?? undefined : undefined,
       pickup_coordinates: pickupCoordinates,
       dropoff_coordinates: dropoffCoordinates,
       distance_km: distanceKm ?? undefined,
@@ -139,7 +184,7 @@ export default function NewPartnerOrderPage() {
                 setDistanceKm(null)
                 setPriceCfa(null)
                 if (coordinates && dropoffCoordinates) {
-                  void estimatePrice(form.vehicle_type, coordinates, dropoffCoordinates)
+                  void estimatePrice(coordinates, dropoffCoordinates)
                 }
               }}
               placeholder="Ex: 12 rue des Almadies, Dakar"
@@ -158,7 +203,7 @@ export default function NewPartnerOrderPage() {
                 setDistanceKm(null)
                 setPriceCfa(null)
                 if (coordinates && pickupCoordinates) {
-                  void estimatePrice(form.vehicle_type, pickupCoordinates, coordinates)
+                  void estimatePrice(pickupCoordinates, coordinates)
                 }
               }}
               placeholder="Ex: Marché Sandaga, Dakar"
@@ -178,26 +223,110 @@ export default function NewPartnerOrderPage() {
             </div>
           ))}
 
-          {/* Type de véhicule */}
+          {/* Service / véhicule */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Type de véhicule</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {VEHICLE_TYPES.map(({ value, label }) => (
+            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Service disponible</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                style={{ padding: '8px 16px', borderRadius: 8, border: `2px solid ${themeColors.purplePrimary}`, backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary, fontSize: 13, fontWeight: 600, cursor: 'default' }}
+              >
+                Moto
+              </button>
+              <span style={{ fontSize: 12, color: themeColors.textSecondary }}>Voiture et cargo ne sont pas actifs côté client.</span>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>Type de course</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+              {COURSE_TYPES.map(({ value, label, description }) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => {
-                    setForm(f => ({ ...f, vehicle_type: value }))
+                    const nextCourseType = value as FormState['course_type']
+                    setForm(f => ({ ...f, course_type: nextCourseType }))
                     if (pickupCoordinates && dropoffCoordinates) {
-                      void estimatePrice(value, pickupCoordinates, dropoffCoordinates)
+                      void estimatePrice(pickupCoordinates, dropoffCoordinates, nextCourseType)
                     }
                   }}
-                  style={{ padding: '8px 16px', borderRadius: 8, border: `2px solid ${form.vehicle_type === value ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: form.vehicle_type === value ? themeColors.purpleLight : 'transparent', color: form.vehicle_type === value ? themeColors.purplePrimary : themeColors.textPrimary, fontSize: 13, fontWeight: form.vehicle_type === value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
+                  style={{ padding: '10px 12px', textAlign: 'left', borderRadius: 8, border: `2px solid ${form.course_type === value ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: form.course_type === value ? themeColors.purpleLight : 'transparent', color: form.course_type === value ? themeColors.purplePrimary : themeColors.textPrimary, fontSize: 13, fontWeight: form.course_type === value ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
                 >
-                  {label}
+                  <span style={{ display: 'block' }}>{label}</span>
+                  <span style={{ display: 'block', marginTop: 4, fontSize: 11, color: themeColors.textSecondary, fontWeight: 400 }}>{description}</span>
                 </button>
               ))}
             </div>
+          </div>
+
+          <div style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>Livreur attitré</div>
+                <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 3 }}>
+                  Prioritaire si disponible, fallback automatique sinon.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handlePreferredDriversToggle(!preferredDriversEnabled)}
+                aria-pressed={preferredDriversEnabled}
+                style={{ width: 48, height: 28, borderRadius: 999, border: 'none', padding: 3, backgroundColor: preferredDriversEnabled ? themeColors.purplePrimary : '#D1D5DB', cursor: 'pointer' }}
+              >
+                <span style={{ display: 'block', width: 22, height: 22, borderRadius: '50%', backgroundColor: '#fff', transform: preferredDriversEnabled ? 'translateX(20px)' : 'translateX(0)', transition: 'transform 0.15s' }} />
+              </button>
+            </div>
+
+            {preferredDriversEnabled && (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {driversLoading ? (
+                  <div style={{ fontSize: 13, color: themeColors.textSecondary }}>Chargement des livreurs…</div>
+                ) : partnerDrivers.length === 0 ? (
+                  <div style={{ border: `1px dashed ${themeColors.cardBorder}`, borderRadius: 8, padding: 14, color: themeColors.textSecondary, fontSize: 13 }}>
+                    Aucun livreur attitré. La commande restera en assignation automatique.
+                  </div>
+                ) : (
+                  partnerDrivers.map((driver) => {
+                    const firstName = driver.driver.first_name ?? ''
+                    const lastName = driver.driver.last_name ?? ''
+                    const name = [firstName, lastName].filter(Boolean).join(' ') || 'Livreur Krono'
+                    const canSelect = driver.profile.accepts_b2b_orders
+                    const selected = selectedDriverId === driver.driver_user_id
+                    return (
+                      <button
+                        key={driver.id}
+                        type="button"
+                        disabled={!canSelect}
+                        onClick={() => setSelectedDriverId(driver.driver_user_id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, borderRadius: 8, border: `2px solid ${selected ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: selected ? themeColors.purpleLight : '#fff', cursor: canSelect ? 'pointer' : 'not-allowed', opacity: canSelect ? 1 : 0.55, textAlign: 'left' }}
+                      >
+                        <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                          {driver.driver.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={driver.driver.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <User size={18} />
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>{name}</div>
+                          <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>
+                            {driver.profile.is_online && driver.profile.is_available ? 'Disponible' : 'Indisponible'}
+                            {!canSelect ? ' • B2B non activé' : ''}
+                          </div>
+                        </div>
+                        {driver.driver.phone && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: themeColors.textSecondary }}>
+                            <Phone size={13} /> {driver.driver.phone}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            )}
           </div>
 
           {(isEstimating || (distanceKm !== null && priceCfa !== null)) && (

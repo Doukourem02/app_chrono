@@ -155,24 +155,15 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
                 />
               </View>
 
-              <Text style={styles.sectionLabel}>Véhicule</Text>
+              <Text style={styles.sectionLabel}>Service disponible</Text>
               <View style={styles.vehicleRow}>
-                {(['moto', 'vehicule', 'cargo'] as const).map((v) => (
-                  <TouchableOpacity
-                    key={v}
-                    style={[styles.vehicleBtn, vehicleType === v && styles.vehicleBtnActive]}
-                    onPress={() => setVehicleType(v)}
-                  >
-                    <Ionicons
-                      name={v === 'moto' ? 'bicycle-outline' : v === 'vehicule' ? 'car-outline' : 'cube-outline'}
-                      size={20}
-                      color={vehicleType === v ? '#FFF' : '#6B7280'}
-                    />
-                    <Text style={[styles.vehicleBtnText, vehicleType === v && { color: '#FFF' }]}>
-                      {v === 'moto' ? 'Moto' : v === 'vehicule' ? 'Voiture' : 'Cargo'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                <TouchableOpacity
+                  style={[styles.vehicleBtn, styles.vehicleBtnActive]}
+                  onPress={() => setVehicleType('moto')}
+                >
+                  <Ionicons name="bicycle-outline" size={20} color="#FFF" />
+                  <Text style={[styles.vehicleBtnText, { color: '#FFF' }]}>Moto</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={{ height: 24 }} />
