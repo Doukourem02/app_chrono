@@ -248,7 +248,7 @@ export default function DashboardPage() {
     minHeight: '0',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   }
 
   const middleColumnTopStyle: React.CSSProperties = {
@@ -274,6 +274,9 @@ export default function DashboardPage() {
     gap: '12px',
     minWidth: 0,
     minHeight: 0,
+    height: '100%',
+    alignSelf: 'stretch',
+    overflow: 'hidden',
   }
 
   return (
@@ -385,6 +388,7 @@ export default function DashboardPage() {
               iconColor="text-blue-600"
               isLoading={ongoingDeliveriesLoading}
               index={0}
+              compact
               style={leftKpiCardStyle}
             />
             <KPICard
@@ -396,6 +400,7 @@ export default function DashboardPage() {
               iconColor="text-green-600"
               isLoading={statsLoading}
               index={1}
+              compact
               style={leftKpiCardStyle}
             />
             <KPICard
@@ -407,6 +412,7 @@ export default function DashboardPage() {
               iconColor="text-purple-600"
               isLoading={statsLoading}
               index={2}
+              compact
               style={leftKpiCardStyle}
             />
           </div>
