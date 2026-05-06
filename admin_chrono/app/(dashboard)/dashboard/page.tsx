@@ -238,8 +238,17 @@ export default function DashboardPage() {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
+    height: '100%',
     minWidth: '240px',
     maxWidth: '240px',
+  }
+
+  const leftKpiCardStyle: React.CSSProperties = {
+    flex: '1 1 0',
+    minHeight: '0',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
   }
 
   const middleColumnTopStyle: React.CSSProperties = {
@@ -382,6 +391,7 @@ export default function DashboardPage() {
               iconColor="text-blue-600"
               isLoading={ongoingDeliveriesLoading}
               index={0}
+              style={leftKpiCardStyle}
             />
             <KPICard
               title={t('dashboard.kpis.successDeliveries.title')}
@@ -392,6 +402,7 @@ export default function DashboardPage() {
               iconColor="text-green-600"
               isLoading={statsLoading}
               index={1}
+              style={leftKpiCardStyle}
             />
             <KPICard
               title={t('dashboard.kpis.revenue.title')}
@@ -402,6 +413,7 @@ export default function DashboardPage() {
               iconColor="text-purple-600"
               isLoading={statsLoading}
               index={2}
+              style={leftKpiCardStyle}
             />
           </div>
 

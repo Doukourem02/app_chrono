@@ -14,6 +14,7 @@ interface KPICardProps {
   iconColor?: string
   isLoading?: boolean
   index?: number
+  style?: React.CSSProperties
 }
 
 export default function KPICard({
@@ -25,6 +26,7 @@ export default function KPICard({
   iconColor = 'text-blue-600',
   isLoading = false,
   index = 0,
+  style,
 }: KPICardProps) {
   const isPositive = change >= 0
   const formattedValue = typeof value === 'number' 
@@ -38,6 +40,7 @@ export default function KPICard({
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     border: `1px solid ${themeColors.cardBorder}`,
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
+    ...style,
   }
 
   const headerStyle: React.CSSProperties = {
@@ -142,4 +145,3 @@ export default function KPICard({
     </AnimatedCard>
   )
 }
-
