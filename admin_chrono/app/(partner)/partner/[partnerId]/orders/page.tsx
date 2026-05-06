@@ -8,6 +8,17 @@ import { partnerApiService } from '@/lib/partnerApiService'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 
+type PartnerOrderListItem = {
+  id: string
+  orderId?: string
+  status?: string
+  pickup_address?: string
+  dropoff_address?: string
+  price_cfa?: number | null
+  created_at?: string
+  delivery_proof_method?: string | null
+}
+
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   pending:     { label: 'En attente',  color: themeColors.yellowPrimary, bg: themeColors.yellowLight },
   accepted:    { label: 'Acceptée',    color: themeColors.bluePrimary,   bg: themeColors.blueLight },
@@ -19,6 +30,12 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
   completed:   { label: 'Livrée',      color: themeColors.greenPrimary,  bg: themeColors.greenLight },
   cancelled:   { label: 'Annulée',     color: themeColors.redPrimary,    bg: themeColors.redLight },
   declined:    { label: 'Refusée',     color: themeColors.yellowPrimary, bg: themeColors.yellowLight },
+}
+
+const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'canceled', 'declined', 'delivered'])
+
+function isTrackableOrder(status?: string) {
+  return Boolean(status && !TERMINAL_STATUSES.has(status))
 }
 
 const proofLabel = (method?: unknown) => {
@@ -53,14 +70,23 @@ export default function PartnerOrdersPage() {
   })
 
   const filtered = useMemo(() => {
-    const orders = (data?.data ?? []) as Record<string, unknown>[]
+    const orders = (data?.data ?? []) as PartnerOrderListItem[]
     if (!search.trim()) return orders
     const q = search.toLowerCase()
     return orders.filter((o) =>
-      (o.dropoff_address as string ?? '').toLowerCase().includes(q) ||
-      (o.orderId as string ?? '').toLowerCase().includes(q)
+      (o.dropoff_address ?? '').toLowerCase().includes(q) ||
+      (o.orderId ?? '').toLowerCase().includes(q)
     )
   }, [data, search])
+
+  const activeOrders = useMemo(
+    () => filtered.filter((order) => isTrackableOrder(order.status)).slice(0, 3),
+    [filtered]
+  )
+
+  const openTracking = (orderId: string) => {
+    router.push(`/partner/${partnerId}/orders/${orderId}/tracking`)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -101,8 +127,75 @@ export default function PartnerOrdersPage() {
         </select>
       </div>
 
+      {!isLoading && activeOrders.length > 0 && (
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ fontSize: 15, fontWeight: 800, color: themeColors.textPrimary }}>Livraisons en cours</h2>
+              <p style={{ marginTop: 2, fontSize: 12, color: themeColors.textSecondary }}>
+                Reprendre le suivi d’une commande active.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
+            {activeOrders.map((order) => {
+              const st = STATUS_LABELS[order.status ?? 'pending'] ?? STATUS_LABELS.pending
+              return (
+                <article
+                  key={order.id}
+                  style={{
+                    border: `1px solid ${themeColors.cardBorder}`,
+                    borderRadius: 8,
+                    backgroundColor: themeColors.cardBg,
+                    padding: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <p style={{ fontSize: 13, fontWeight: 800, color: themeColors.textPrimary }}>
+                        #{(order.orderId ?? order.id).slice(0, 8).toUpperCase()}
+                      </p>
+                      <span style={{ padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700, backgroundColor: st.bg, color: st.color }}>
+                        {st.label}
+                      </span>
+                    </div>
+                    <p style={{ marginTop: 6, fontSize: 12, color: themeColors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {order.dropoff_address || 'Destination à confirmer'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => openTracking(order.id)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      flexShrink: 0,
+                      padding: '9px 12px',
+                      borderRadius: 8,
+                      border: 'none',
+                      backgroundColor: themeColors.purplePrimary,
+                      color: '#fff',
+                      fontSize: 13,
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Navigation size={15} />
+                    Suivre
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Liste */}
-      <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 12, border: `1px solid ${themeColors.cardBorder}`, overflow: 'hidden' }}>
+      <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 12, border: `1px solid ${themeColors.cardBorder}`, overflowX: 'auto', overflowY: 'hidden' }}>
         {isLoading ? (
           <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[1,2,3].map(i => <SkeletonLoader key={i} width="100%" height={64} borderRadius={8} />)}
@@ -113,25 +206,26 @@ export default function PartnerOrdersPage() {
             <p style={{ fontSize: 14 }}>Aucune commande</p>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', minWidth: 920, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
-                {['N° commande', 'Destination', 'Statut', 'Preuve', 'Prix', 'Date', 'Suivi'].map(h => (
+                {['N° commande', 'Destination', 'Statut', 'Preuve', 'Prix', 'Date', 'Action'].map(h => (
                   <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((o) => {
-                const st = STATUS_LABELS[o.status as string] ?? STATUS_LABELS['pending']
+                const st = STATUS_LABELS[o.status ?? 'pending'] ?? STATUS_LABELS.pending
+                const canTrack = isTrackableOrder(o.status)
                 return (
-                  <tr key={o.id as string} style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
+                  <tr key={o.id} style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
                     <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: themeColors.textPrimary }}>
-                      {(o.orderId as string)?.slice(0, 8) ?? '—'}
+                      {(o.orderId ?? o.id).slice(0, 8)}
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: themeColors.textPrimary, maxWidth: 220 }}>
                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {o.dropoff_address as string ?? '—'}
+                        {o.dropoff_address ?? '—'}
                       </div>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
@@ -158,19 +252,38 @@ export default function PartnerOrdersPage() {
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: themeColors.textPrimary }}>
-                      {o.price_cfa ? `${(o.price_cfa as number).toLocaleString('fr-FR')} FCFA` : '—'}
+                      {o.price_cfa ? `${o.price_cfa.toLocaleString('fr-FR')} FCFA` : '—'}
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: 13, color: themeColors.textSecondary }}>
-                      {new Date(o.created_at as string).toLocaleDateString('fr-FR')}
+                      {o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : '—'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <button
-                        onClick={() => router.push(`/partner/${partnerId}/orders/${o.id as string}/tracking`)}
-                        aria-label="Suivre la livraison"
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.background, color: themeColors.purplePrimary, cursor: 'pointer' }}
-                      >
-                        <Navigation size={16} />
-                      </button>
+                      {canTrack ? (
+                        <button
+                          onClick={() => openTracking(o.id)}
+                          aria-label="Suivre la livraison"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 7,
+                            minWidth: 112,
+                            padding: '8px 11px',
+                            borderRadius: 8,
+                            border: `1px solid ${themeColors.purplePrimary}`,
+                            backgroundColor: themeColors.purplePrimary,
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: 13,
+                            fontWeight: 800,
+                          }}
+                        >
+                          <Navigation size={15} />
+                          Suivre
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 12, color: themeColors.textSecondary }}>Terminé</span>
+                      )}
                     </td>
                   </tr>
                 )

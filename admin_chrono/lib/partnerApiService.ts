@@ -79,6 +79,18 @@ export interface PartnerOrderTracking {
   }
 }
 
+export interface PartnerOrderQRCode {
+  orderId: string
+  orderNumber?: string
+  status?: string
+  showQRCode: boolean
+  proofAlreadyValidated?: boolean
+  qrCodeImage: string | null
+  verificationCode?: string | null
+  expiresAt?: string | null
+  message?: string
+}
+
 class PartnerApiService {
   private async getToken(): Promise<string | null> {
     const { data } = await supabase.auth.getSession()
@@ -177,6 +189,17 @@ class PartnerApiService {
       return res.json()
     } catch (err) {
       logger.error('[partnerApiService] getOrderTracking:', err)
+      return { success: false }
+    }
+  }
+
+  async getOrderQRCode(partnerId: string, orderId: string): Promise<ApiResponse<PartnerOrderQRCode>> {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/orders/${orderId}/qr-code`)
+      if (!res.ok) return { success: false }
+      return res.json()
+    } catch (err) {
+      logger.error('[partnerApiService] getOrderQRCode:', err)
       return { success: false }
     }
   }

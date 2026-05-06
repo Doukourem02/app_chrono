@@ -3,6 +3,7 @@ import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { sendPartnerPortalMagicLinkEmail } from '../services/emailService.js';
+import qrCodeService from '../services/qrCodeService.js';
 import {clientHeadline,normalizeProductStatus,orderStatusDefinition,progressWithEtaCap,statusBaseProgress,} from '../utils/orderProductRules.js';
 import { realisticEtaMinutesFromAirDistance } from '../utils/ivoryCoastEta.js';
 
@@ -102,6 +103,34 @@ function parseLocationField(value: unknown): Record<string, any> {
     }
   }
   return typeof value === 'object' ? (value as Record<string, any>) : {};
+}
+
+function partnerRecipientFromOrder(row: Record<string, any>): { name: string; phone: string } {
+  const recipient = parseLocationField(row.recipient);
+  const dropoff = parseLocationField(row.dropoff_address ?? row.dropoff);
+  const details = parseLocationField(dropoff.details);
+  const phone =
+    String(recipient.phone ?? recipient.recipientPhone ?? details.phone ?? details.recipientPhone ?? '').trim();
+  const name =
+    String(
+      recipient.name ??
+        recipient.fullName ??
+        details.recipient_name ??
+        details.recipientName ??
+        details.name ??
+        dropoff.name ??
+        dropoff.label ??
+        ''
+    ).trim() || (phone ? `Destinataire (${phone})` : 'Destinataire');
+  return { name, phone };
+}
+
+function partnerCreatorName(row: Record<string, any>): string {
+  return (
+    [row.creator_first_name, row.creator_last_name].filter(Boolean).join(' ').trim() ||
+    row.creator_email ||
+    'Client B2B'
+  );
 }
 
 function toPartnerTrackingCoordinates(value: unknown): PartnerTrackingCoordinates | null {
@@ -1364,6 +1393,97 @@ export const getPartnerOrderTracking = async (req: Request, res: Response): Prom
   } catch (error: any) {
     logger.error('[partnerController] getPartnerOrderTracking error:', error);
     res.status(500).json({ success: false, message: 'Erreur lors du chargement du suivi partenaire' });
+  }
+};
+
+export const getPartnerOrderQRCode = async (req: Request, res: Response): Promise<void> => {
+  const partnerId = (req as any).partnerUser?.partnerId ?? req.params.partnerId;
+  const { orderId } = req.params;
+
+  if (!partnerId || !orderId) {
+    res.status(400).json({ success: false, message: 'partnerId et orderId requis' });
+    return;
+  }
+
+  try {
+    const result = await (pool as any).query(
+      `SELECT
+         o.id,
+         o.status,
+         o.recipient,
+         o.dropoff_address,
+         o.dropoff,
+         o.delivery_qr_code,
+         o.delivery_verification_code,
+         o.delivery_qr_scanned_at,
+         u.first_name as creator_first_name,
+         u.last_name as creator_last_name,
+         u.email as creator_email
+       FROM orders o
+       LEFT JOIN users u ON u.id = o.user_id
+       WHERE o.id = $1 AND o.partner_id = $2
+       LIMIT 1`,
+      [orderId, partnerId]
+    );
+
+    if (!result.rows?.length) {
+      res.status(404).json({ success: false, message: 'Commande introuvable pour ce partenaire' });
+      return;
+    }
+
+    const row = result.rows[0];
+    const status = normalizeProductStatus(row.status) ?? row.status;
+    const alreadyValidated = Boolean(row.delivery_qr_scanned_at);
+    const canShowQRCode =
+      !alreadyValidated && ['picked_up', 'delivering'].includes(String(status || '').toLowerCase());
+
+    if (!canShowQRCode) {
+      res.json({
+        success: true,
+        data: {
+          orderId: row.id,
+          orderNumber: `CMD-${String(row.id).substring(0, 8).toUpperCase()}`,
+          status,
+          showQRCode: false,
+          proofAlreadyValidated: alreadyValidated,
+          qrCodeImage: null,
+          verificationCode: null,
+          message: alreadyValidated
+            ? 'La preuve de livraison a déjà été validée.'
+            : 'Le QR code sera disponible après le ramassage du colis.',
+        },
+      });
+      return;
+    }
+
+    let qr = await qrCodeService.getOrderQRCode(row.id);
+    if (!qr || !qr.verificationCode) {
+      const recipient = partnerRecipientFromOrder(row);
+      qr = await qrCodeService.generateDeliveryQRCode(
+        row.id,
+        `CMD-${String(row.id).substring(0, 8).toUpperCase()}`,
+        recipient.name,
+        recipient.phone,
+        partnerCreatorName(row)
+      );
+    }
+
+    res.json({
+      success: true,
+      data: {
+        orderId: row.id,
+        orderNumber: qr.qrCodeData.orderNumber,
+        status,
+        showQRCode: true,
+        proofAlreadyValidated: false,
+        qrCodeImage: qr.qrCodeImage,
+        verificationCode: qr.verificationCode ?? null,
+        expiresAt: qr.qrCodeData.expiresAt,
+      },
+    });
+  } catch (error: any) {
+    logger.error('[partnerController] getPartnerOrderQRCode error:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors du chargement du QR de livraison' });
   }
 };
 

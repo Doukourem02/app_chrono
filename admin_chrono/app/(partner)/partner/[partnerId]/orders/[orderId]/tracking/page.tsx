@@ -1,16 +1,20 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   CheckCircle2,
   Clock3,
+  KeyRound,
   MapPin,
   Navigation,
   PackageCheck,
   Phone,
+  QrCode,
+  RefreshCw,
   Route,
   ShieldCheck,
   Truck,
@@ -121,7 +125,109 @@ function RoutePoint({ label, name, address, color }: { label: string; name?: str
   )
 }
 
-function TrackingContent({ order }: { order: PartnerOrderTracking }) {
+function DeliveryProofCard({ partnerId, order }: { partnerId: string; order: PartnerOrderTracking }) {
+  const proofValidated = Boolean(order.proof?.method || order.proof?.validatedAt)
+  const canShowQRCode = ['picked_up', 'delivering'].includes(order.status) && !proofValidated
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['partner-order-qr-code', partnerId, order.id],
+    queryFn: () => partnerApiService.getOrderQRCode(partnerId, order.id),
+    enabled: canShowQRCode,
+    staleTime: 60_000,
+    refetchInterval: false,
+  })
+  const qr = data?.data
+
+  if (proofValidated) {
+    return (
+      <div style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: 16, backgroundColor: themeColors.cardBg }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 8, backgroundColor: themeColors.greenLight, display: 'flex', alignItems: 'center', justifyContent: 'center', color: themeColors.greenPrimary }}>
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <p style={{ fontSize: 12, color: themeColors.textSecondary }}>Preuve de livraison</p>
+            <p style={{ marginTop: 2, fontSize: 14, fontWeight: 800, color: themeColors.textPrimary }}>{proofLabel(order.proof?.method)}</p>
+            {order.proof?.validatedAt && (
+              <p style={{ marginTop: 1, fontSize: 12, color: themeColors.textSecondary }}>{formatDate(order.proof.validatedAt)}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!canShowQRCode) {
+    return (
+      <div style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: 16, backgroundColor: themeColors.cardBg }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 8, backgroundColor: themeColors.grayLight, display: 'flex', alignItems: 'center', justifyContent: 'center', color: themeColors.textSecondary }}>
+            <QrCode size={20} />
+          </div>
+          <div>
+            <p style={{ fontSize: 12, color: themeColors.textSecondary }}>Preuve de livraison</p>
+            <p style={{ marginTop: 2, fontSize: 14, fontWeight: 800, color: themeColors.textPrimary }}>Disponible après ramassage</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: 16, backgroundColor: themeColors.cardBg }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 8, backgroundColor: themeColors.purpleLight, display: 'flex', alignItems: 'center', justifyContent: 'center', color: themeColors.purplePrimary }}>
+            <QrCode size={20} />
+          </div>
+          <div>
+            <p style={{ fontSize: 12, color: themeColors.textSecondary }}>Preuve de livraison</p>
+            <p style={{ marginTop: 2, fontSize: 14, fontWeight: 800, color: themeColors.textPrimary }}>QR code et code manuel</p>
+          </div>
+        </div>
+        {isError && (
+          <button
+            onClick={() => refetch()}
+            aria-label="Recharger la preuve"
+            style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.background, color: themeColors.textPrimary, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <RefreshCw size={15} />
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '116px 1fr', gap: 12, alignItems: 'center' }}>
+          <SkeletonLoader width={116} height={116} borderRadius={8} />
+          <SkeletonLoader width="100%" height={56} borderRadius={8} />
+        </div>
+      ) : isError || !data?.success ? (
+        <p style={{ fontSize: 13, lineHeight: 1.45, color: themeColors.textSecondary }}>Impossible de charger la preuve pour le moment.</p>
+      ) : qr?.showQRCode && qr.qrCodeImage ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '116px minmax(0, 1fr)', gap: 12, alignItems: 'center' }}>
+          <div style={{ width: 116, height: 116, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: '#fff', padding: 8, position: 'relative' }}>
+            <Image src={qr.qrCodeImage} alt="QR code de livraison" fill style={{ objectFit: 'contain' }} unoptimized />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: themeColors.textSecondary, fontSize: 12 }}>
+              <KeyRound size={15} />
+              <span>Code manuel</span>
+            </div>
+            <p style={{ marginTop: 6, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: 26, fontWeight: 800, color: themeColors.textPrimary }}>
+              {qr.verificationCode || '-'}
+            </p>
+            {qr.expiresAt && (
+              <p style={{ marginTop: 4, fontSize: 12, color: themeColors.textSecondary }}>Expire le {formatDate(qr.expiresAt)}</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p style={{ fontSize: 13, lineHeight: 1.45, color: themeColors.textSecondary }}>{qr?.message || 'Preuve indisponible.'}</p>
+      )}
+    </div>
+  )
+}
+
+function TrackingContent({ partnerId, order }: { partnerId: string; order: PartnerOrderTracking }) {
   const tone = statusTone[order.status] ?? { bg: themeColors.grayLight, color: themeColors.textSecondary }
   const stepIndex = currentStepIndex(order.status)
   const progress = typeof order.progress === 'number' ? Math.round(Math.max(0, Math.min(1, order.progress)) * 100) : 0
@@ -220,6 +326,8 @@ function TrackingContent({ order }: { order: PartnerOrderTracking }) {
               </a>
             )}
           </div>
+
+          <DeliveryProofCard partnerId={partnerId} order={order} />
         </aside>
       </section>
 
@@ -345,7 +453,7 @@ export default function PartnerOrderTrackingPage() {
           </p>
         </div>
       ) : (
-        <TrackingContent order={order} />
+        <TrackingContent partnerId={partnerId} order={order} />
       )}
     </div>
   )

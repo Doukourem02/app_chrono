@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyPartnerUser } from '../middleware/verifyPartnerUser.js';
-import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,markPartnerInvoicePaid,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,removePartnerUser,getPartnerDrivers,getPartnerDriversForUser,updatePartnerPreferences,getPartnerOrderTracking,} from '../controllers/partnerController.js';
+import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,markPartnerInvoicePaid,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,removePartnerUser,getPartnerDrivers,getPartnerDriversForUser,updatePartnerPreferences,getPartnerOrderTracking,getPartnerOrderQRCode,} from '../controllers/partnerController.js';
 import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
@@ -39,6 +39,7 @@ partnerPortalRouter.post('/users/invite',             verifyPartnerUser, inviteP
 partnerPortalRouter.delete('/users/:memberId',        verifyPartnerUser, removePartnerUser);
 partnerPortalRouter.get('/drivers',                   verifyPartnerUser, getPartnerDrivers);
 partnerPortalRouter.get('/orders/:orderId/tracking',  verifyPartnerUser, getPartnerOrderTracking);
+partnerPortalRouter.get('/orders/:orderId/qr-code',   verifyPartnerUser, getPartnerOrderQRCode);
 partnerPortalRouter.patch('/preferences',             verifyPartnerUser, updatePartnerPreferences);
 
 export default router;
