@@ -1707,6 +1707,16 @@ export const updateDriverB2BPreference = async (req: RequestWithUser, res: Respo
     });
   } catch (error: any) {
     logger.error('Erreur mise à jour préférence B2B livreur:', error);
+    if (error?.code === '42703') {
+      res.status(503).json({
+        success: false,
+        message:
+          'Préférence B2B indisponible sur cette base. Exécuter la migration 038_b2b_driver_preferences.sql.',
+        error: error.message,
+      });
+      return;
+    }
+
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la mise à jour de la préférence B2B',
