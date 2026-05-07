@@ -220,16 +220,23 @@ export default function DashboardPage() {
     transition: 'background-color 0.2s',
   }
 
-  // Grille commune : les lignes gauche/milieu/droite restent alignées quel que soit le zoom.
   const mainWrapperStyle: React.CSSProperties = {
     display: 'grid',
     gap: '12px',
-    gridTemplateColumns: '240px minmax(0, 1fr) 420px',
+    gridTemplateColumns: 'minmax(0, 1fr) minmax(360px, 420px)',
+    alignItems: 'start',
+    minWidth: 0,
+    overflow: 'visible',
+  }
+
+  const contentColumnStyle: React.CSSProperties = {
+    gridColumn: '1',
+    display: 'grid',
+    gap: '12px',
+    gridTemplateColumns: '240px minmax(0, 1fr)',
     gridTemplateRows: 'auto auto',
     alignItems: 'stretch',
     minWidth: 0,
-    minHeight: 0,
-    overflow: 'visible',
   }
 
   const leftColumnStyle: React.CSSProperties = {
@@ -267,15 +274,12 @@ export default function DashboardPage() {
   }
 
   const rightColumnStyle: React.CSSProperties = {
-    gridColumn: '3',
-    gridRow: '1 / 3',
+    gridColumn: '2',
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
     minWidth: 0,
-    minHeight: 0,
-    height: '100%',
-    alignSelf: 'stretch',
+    alignSelf: 'start',
     overflow: 'hidden',
   }
 
@@ -371,6 +375,7 @@ export default function DashboardPage() {
       </div>
 
       <div style={mainWrapperStyle}>
+        <div style={contentColumnStyle}>
           {/* Colonne gauche : 3 cartes KPI empilées */}
           <div style={leftColumnStyle}>
             <KPICard
@@ -426,6 +431,7 @@ export default function DashboardPage() {
           <div style={middleColumnBottomStyle}>
             <ActivityTable />
           </div>
+        </div>
 
         <div style={rightColumnStyle}>
           <TrackerCard deliveries={ongoingDeliveries} isLoading={ongoingDeliveriesLoading} />

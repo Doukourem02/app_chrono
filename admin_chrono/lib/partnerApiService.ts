@@ -217,7 +217,10 @@ class PartnerApiService {
   async getOrderQRCode(partnerId: string, orderId: string): Promise<ApiResponse<PartnerOrderQRCode>> {
     try {
       const res = await this.fetchWithAuth(`${API_BASE_URL}/api/partner/${partnerId}/orders/${orderId}/qr-code`)
-      if (!res.ok) return { success: false }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { message?: string } | null
+        return { success: false, message: body?.message }
+      }
       return res.json()
     } catch (err) {
       logger.error('[partnerApiService] getOrderQRCode:', err)

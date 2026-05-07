@@ -136,6 +136,7 @@ function DeliveryProofCard({ partnerId, order }: { partnerId: string; order: Par
     refetchInterval: false,
   })
   const qr = data?.data
+  const proofLoadFailed = isError || data?.success === false
 
   if (proofValidated) {
     return (
@@ -184,7 +185,7 @@ function DeliveryProofCard({ partnerId, order }: { partnerId: string; order: Par
             <p style={{ marginTop: 2, fontSize: 14, fontWeight: 800, color: themeColors.textPrimary }}>QR code et code manuel</p>
           </div>
         </div>
-        {isError && (
+        {proofLoadFailed && (
           <button
             onClick={() => refetch()}
             aria-label="Recharger la preuve"
@@ -200,8 +201,10 @@ function DeliveryProofCard({ partnerId, order }: { partnerId: string; order: Par
           <SkeletonLoader width={116} height={116} borderRadius={8} />
           <SkeletonLoader width="100%" height={56} borderRadius={8} />
         </div>
-      ) : isError || !data?.success ? (
-        <p style={{ fontSize: 13, lineHeight: 1.45, color: themeColors.textSecondary }}>Impossible de charger la preuve pour le moment.</p>
+      ) : proofLoadFailed ? (
+        <p style={{ fontSize: 13, lineHeight: 1.45, color: themeColors.textSecondary }}>
+          {data?.message || 'Le QR code et le code manuel n’ont pas pu être chargés. Réessayez dans un instant.'}
+        </p>
       ) : qr?.showQRCode && qr.qrCodeImage ? (
         <div style={{ display: 'grid', gridTemplateColumns: '116px minmax(0, 1fr)', gap: 12, alignItems: 'center' }}>
           <div style={{ width: 116, height: 116, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: '#fff', padding: 8, position: 'relative' }}>

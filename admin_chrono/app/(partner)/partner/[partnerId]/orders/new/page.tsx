@@ -310,21 +310,13 @@ export default function NewPartnerOrderPage() {
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>Prioriser un livreur dédié</div>
                 <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 3 }}>
-                  Livreur dédié : Krono propose d’abord la commande au livreur sélectionné pour ce partenaire. Si aucun livreur dédié n’est disponible, l’assignation automatique prend le relais.
+                  Krono propose d’abord la commande au livreur sélectionné. Sans livreur dédié disponible, l’assignation automatique prend le relais.
                 </div>
-                {!driversLoading && partnerDrivers.length === 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowDriverRequest(true)}
-                    style={{ marginTop: 8, padding: '7px 10px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Demander un livreur dédié
-                  </button>
-                )}
               </div>
               <button
                 type="button"
                 onClick={() => void handlePreferredDriversToggle(!preferredDriversEnabled)}
+                aria-label="Activer la priorisation d’un livreur dédié"
                 aria-pressed={preferredDriversEnabled}
                 style={{ width: 48, height: 28, borderRadius: 999, border: 'none', padding: 3, backgroundColor: preferredDriversEnabled ? themeColors.purplePrimary : '#D1D5DB', cursor: 'pointer' }}
               >
@@ -332,46 +324,45 @@ export default function NewPartnerOrderPage() {
               </button>
             </div>
 
-            {preferredDriversEnabled && (
-              <div style={{ display: 'grid', gap: 8 }}>
-                {driversLoading ? (
-                  <div style={{ fontSize: 13, color: themeColors.textSecondary }}>Chargement des livreurs…</div>
-                ) : partnerDrivers.length === 0 ? (
-                  <div style={{ border: `1px dashed ${themeColors.cardBorder}`, borderRadius: 8, padding: 14, color: themeColors.textSecondary, fontSize: 13 }}>
-                    <p>Aucun livreur dédié lié à ce partenaire. Les livreurs qui acceptent les commandes B2B recevront quand même la commande automatiquement.</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowDriverRequest(true)}
-                      style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Demander un livreur dédié
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDriverId(null)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, borderRadius: 8, border: `2px solid ${selectedDriverId === null ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: selectedDriverId === null ? themeColors.purpleLight : '#fff', cursor: 'pointer', textAlign: 'left' }}
-                    >
-                      <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: '#F3F4F6', color: themeColors.textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <CheckCircle size={18} />
+            <div style={{ display: 'grid', gap: 8 }}>
+              {driversLoading ? (
+                <div style={{ fontSize: 13, color: themeColors.textSecondary }}>Chargement des livreurs…</div>
+              ) : partnerDrivers.length === 0 ? (
+                <div style={{ border: `1px dashed ${themeColors.cardBorder}`, borderRadius: 8, padding: 14, color: themeColors.textSecondary, fontSize: 13 }}>
+                  <p style={{ margin: 0 }}>Aucun livreur dédié n’est encore lié à ce partenaire. L’assignation automatique reste active pour les livreurs B2B disponibles.</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowDriverRequest(true)}
+                    style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Demander un livreur dédié
+                  </button>
+                </div>
+              ) : preferredDriversEnabled ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDriverId(null)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 10, borderRadius: 8, border: `2px solid ${selectedDriverId === null ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: selectedDriverId === null ? themeColors.purpleLight : '#fff', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: '#F3F4F6', color: themeColors.textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <CheckCircle size={18} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>Assignation automatique</div>
+                      <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>
+                        Tous les livreurs B2B disponibles restent éligibles.
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>Assignation automatique</div>
-                        <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>
-                          Tous les livreurs B2B disponibles restent éligibles.
-                        </div>
-                      </div>
-                    </button>
+                    </div>
+                  </button>
 
-                    {partnerDrivers.map((driver) => {
-                      const firstName = driver.driver.first_name ?? ''
-                      const lastName = driver.driver.last_name ?? ''
-                      const name = [firstName, lastName].filter(Boolean).join(' ') || 'Livreur Krono'
-                      const canSelect = driver.profile.accepts_b2b_orders
-                      const selected = selectedDriverId === driver.driver_user_id
-                      return (
+                  {partnerDrivers.map((driver) => {
+                    const firstName = driver.driver.first_name ?? ''
+                    const lastName = driver.driver.last_name ?? ''
+                    const name = [firstName, lastName].filter(Boolean).join(' ') || 'Livreur Krono'
+                    const canSelect = driver.profile.accepts_b2b_orders
+                    const selected = selectedDriverId === driver.driver_user_id
+                    return (
                       <button
                         key={driver.id}
                         type="button"
@@ -400,12 +391,11 @@ export default function NewPartnerOrderPage() {
                           </span>
                         )}
                       </button>
-                      )
-                    })}
-                  </>
-                )}
-              </div>
-            )}
+                    )
+                  })}
+                </>
+              ) : null}
+            </div>
           </div>
 
           {(isEstimating || (distanceKm !== null && priceCfa !== null)) && (

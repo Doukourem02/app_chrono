@@ -1715,7 +1715,6 @@ export const getPartnerOrderQRCode = async (req: Request, res: Response): Promis
          o.status,
          o.recipient,
          o.dropoff_address,
-         o.dropoff,
          o.delivery_qr_code,
          o.delivery_verification_code,
          o.delivery_qr_scanned_at,
