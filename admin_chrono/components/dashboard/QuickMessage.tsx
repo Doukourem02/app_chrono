@@ -258,10 +258,10 @@ export default function QuickMessage() {
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     border: `1px solid ${themeColors.cardBorder}`,
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
-    flex: '0 0 clamp(118px, 14%, 150px)',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '118px',
+     minHeight: '150px',
+     height: '150px',
     width: '100%',
     overflow: 'hidden',
   }

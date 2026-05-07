@@ -182,10 +182,10 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     border: `1px solid ${themeColors.cardBorder}`,
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
-    flex: '0 0 auto',
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
+     height: '100%',
     width: '100%',
     overflow: 'hidden',
   }

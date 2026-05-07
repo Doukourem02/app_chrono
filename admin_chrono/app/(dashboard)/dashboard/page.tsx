@@ -275,11 +275,13 @@ export default function DashboardPage() {
 
   const rightColumnStyle: React.CSSProperties = {
     gridColumn: '2',
-    display: 'flex',
-    flexDirection: 'column',
+     display: 'grid',
+     gridTemplateRows: '1fr auto',
     gap: '12px',
     minWidth: 0,
-    alignSelf: 'start',
+     alignSelf: 'stretch',
+     height: '100%',
+     minHeight: 0,
     overflow: 'hidden',
   }
 
