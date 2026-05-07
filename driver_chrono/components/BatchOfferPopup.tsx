@@ -219,7 +219,7 @@ export const BatchOfferPopup: React.FC<BatchOfferPopupProps> = ({
               <Ionicons name={hasError ? 'alert-circle' : 'cube-outline'} size={25} color={hasError ? '#F97316' : '#7C3AED'} />
             </View>
             <View style={styles.headerText}>
-              <Text style={styles.title}>{hasError ? 'Tournée indisponible' : 'Nouvelle tournée groupée'}</Text>
+              <Text style={styles.title}>{hasError ? 'Tournée indisponible' : `Nouvelle tournée B2B - ${count} livraison${count === 1 ? '' : 's'}`}</Text>
               <Text style={styles.subtitle}>
                 {hasError ? errorMessage : `${count} livraison${count === 1 ? '' : 's'} à effectuer`}
               </Text>
@@ -253,7 +253,7 @@ export const BatchOfferPopup: React.FC<BatchOfferPopupProps> = ({
               <View style={styles.hintBox}>
                 <Ionicons name="navigate-circle-outline" size={18} color="#92400E" />
                 <Text style={styles.hintText}>
-                  Après acceptation, l&apos;application te guide étape par étape pour chaque livraison.
+                  Après acceptation, tu choisis librement le prochain arrêt depuis la liste.
                 </Text>
               </View>
             </>

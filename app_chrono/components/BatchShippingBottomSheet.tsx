@@ -109,7 +109,11 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
       });
       setBatchId(result.batchId);
       if (result.orders.length > 0) {
-        setOptimizedOrder(result.orders.map((_, i) => i));
+        setOptimizedOrder(
+          [...result.orders]
+            .sort((a, b) => a.position - b.position)
+            .map((item) => item.clientOrderIndex)
+        );
       }
       setStep('success');
     } catch (err: any) {
@@ -445,7 +449,7 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
             {batchId && <Text style={styles.successId}>#{batchId.slice(-8).toUpperCase()}</Text>}
             {batchOptimizedOrder && batchOptimizedOrder.length > 0 && (
               <View style={styles.routePreview}>
-                <Text style={styles.routeTitle}>Ordre optimisé</Text>
+                <Text style={styles.routeTitle}>Ordre conseillé</Text>
                 {batchOptimizedOrder.map((idx, pos) => {
                   const r = batchRecipients[idx];
                   if (!r) return null;

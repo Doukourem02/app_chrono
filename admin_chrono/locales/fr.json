@@ -734,7 +734,8 @@
     "roles": {
       "client": "Client",
       "driver": "Livreur",
-      "admin": "Admin"
+      "admin": "Admin",
+      "super_admin": "Super admin"
     },
     "table": {
       "lastName": "Nom",

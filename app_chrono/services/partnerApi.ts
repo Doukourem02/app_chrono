@@ -127,34 +127,8 @@ export interface CreateBatchParams {
   orders: BatchOrderItem[];
 }
 
-export async function createBatch(params: CreateBatchParams): Promise<{ batchId: string; orders: { orderId: string }[] }> {
+export async function createBatch(params: CreateBatchParams): Promise<{ batchId: string; orders: { orderId: string; position: number; clientOrderIndex: number }[] }> {
   const headers = await authHeader();
-
-  // 1. Créer chaque commande individuellement et récupérer les orderIds
-  const createdOrders: { orderId: string; lat?: number; lng?: number }[] = [];
-  for (const item of params.orders) {
-    try {
-      const result = await createB2BOrder({
-        partnerId: params.partnerId,
-        userId: params.userId,
-        pickup: {
-          address: params.pickupAddress,
-          lat: params.pickupCoords?.lat,
-          lng: params.pickupCoords?.lng,
-        },
-        dropoff: { address: item.recipient.address, lat: item.lat, lng: item.lng },
-        recipient: { name: item.recipient.name, phone: item.recipient.phone },
-        vehicleType: 'moto',
-        notes: item.notes,
-        notifyDrivers: false,
-      });
-      createdOrders.push({ orderId: result.orderId, lat: item.lat, lng: item.lng });
-    } catch (err) {
-      logger.warn('[partnerApi] Erreur création commande dans la tournée', 'partnerApi', err);
-    }
-  }
-
-  // 2. Créer la tournée avec les orderIds
   const response = await apiFetch(`${config.apiUrl}/api/batches`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -162,20 +136,39 @@ export async function createBatch(params: CreateBatchParams): Promise<{ batchId:
       partner_id: params.partnerId,
       user_id: params.userId,
       driver_id: params.driverId ?? null,
-      orders: createdOrders.map((o) => ({
-        order_id: o.orderId,
-        lat: o.lat,
-        lng: o.lng,
+      pickup_address: params.pickupAddress,
+      pickup_coords: params.pickupCoords
+        ? { latitude: params.pickupCoords.lat, longitude: params.pickupCoords.lng }
+        : null,
+      orders: params.orders.map((item, index) => ({
+        recipient: item.recipient,
+        lat: item.lat,
+        lng: item.lng,
+        notes: item.notes,
+        client_order_index: index,
       })),
     }),
   });
 
-  const body = await response.json() as { success?: boolean; data?: { id?: string } };
+  const body = await response.json() as {
+    success?: boolean;
+    data?: {
+      id?: string;
+      orders?: { order_id?: string; position?: number; client_order_index?: number }[];
+    };
+  };
   if (!response.ok || !body.success) {
     throw new Error((body as any).message ?? 'Erreur création tournée');
   }
 
-  return { batchId: body.data?.id ?? '', orders: createdOrders };
+  return {
+    batchId: body.data?.id ?? '',
+    orders: (body.data?.orders ?? []).map((item, index) => ({
+      orderId: item.order_id ?? '',
+      position: item.position ?? index + 1,
+      clientOrderIndex: item.client_order_index ?? index,
+    })),
+  };
 }
 
 // ─── Livreurs attitrés du partenaire ─────────────────────────────────────────

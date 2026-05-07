@@ -97,10 +97,24 @@ export default function BatchScreen() {
 
   const startNavigationToStop = useCallback(async (stop: BatchStop) => {
     if (!stop.coordinates) {
-      Alert.alert(
-        'GPS manquant',
-        'Cet arrêt n’a pas encore de coordonnées GPS. Ouvre une application externe depuis l’adresse ou corrige l’adresse côté planning.'
-      );
+      if (!stop.address) {
+        Alert.alert('GPS manquant', 'Cet arrêt n’a ni coordonnées GPS ni adresse exploitable.');
+        return;
+      }
+      const encoded = encodeURIComponent(stop.address);
+      const candidates = Platform.OS === 'ios'
+        ? [`maps://?q=${encoded}`, `https://maps.apple.com/?q=${encoded}`]
+        : [`geo:0,0?q=${encoded}`, `https://www.google.com/maps/search/?api=1&query=${encoded}`];
+      let target = candidates[candidates.length - 1];
+      for (const url of candidates) {
+        if (await Linking.canOpenURL(url)) {
+          target = url;
+          break;
+        }
+      }
+      Linking.openURL(target).catch(() => {
+        Alert.alert('GPS manquant', 'Impossible d’ouvrir une application de navigation avec cette adresse.');
+      });
       return;
     }
 
@@ -366,8 +380,11 @@ export default function BatchScreen() {
   };
 
   const completedCount = batch?.stops.filter((s) => s.status === 'completed').length ?? 0;
+  const cancelledCount = batch?.stops.filter((s) => s.status === 'cancelled').length ?? 0;
+  const terminalCount = completedCount + cancelledCount;
   const totalCount = batch?.stops.length ?? 0;
-  const progress = totalCount > 0 ? completedCount / totalCount : 0;
+  const remainingCount = Math.max(totalCount - terminalCount, 0);
+  const progress = totalCount > 0 ? terminalCount / totalCount : 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -391,14 +408,15 @@ export default function BatchScreen() {
       {totalCount > 0 && (
         <View style={styles.progressContainer}>
           <View style={styles.progressRow}>
-            <Text style={styles.progressLabel}>{completedCount}/{totalCount} livraisons</Text>
+            <Text style={styles.progressLabel}>{terminalCount}/{totalCount} arrêts traités</Text>
             <Text style={[styles.progressLabel, { color: allDone ? '#10B981' : '#6B7280' }]}>
-              {allDone ? 'Tournée terminée ✓' : `${totalCount - completedCount} restante${totalCount - completedCount > 1 ? 's' : ''}`}
+              {allDone ? 'Tournée terminée ✓' : `${remainingCount} restant${remainingCount > 1 ? 's' : ''}`}
             </Text>
           </View>
           <View style={styles.progressBar}>
             <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: allDone ? '#10B981' : '#8B5CF6' }]} />
           </View>
+          <Text style={styles.orderHint}>Ordre conseillé. Choisis l’arrêt le plus logique selon le terrain.</Text>
         </View>
       )}
 
@@ -413,7 +431,9 @@ export default function BatchScreen() {
             <Ionicons name="checkmark-done" size={48} color="#10B981" />
           </View>
           <Text style={styles.doneTitle}>Tournée terminée !</Text>
-          <Text style={styles.doneSub}>{completedCount} livraison{completedCount > 1 ? 's' : ''} effectuée{completedCount > 1 ? 's' : ''}</Text>
+          <Text style={styles.doneSub}>
+            {completedCount} livrée{completedCount > 1 ? 's' : ''}{cancelledCount > 0 ? `, ${cancelledCount} annulée${cancelledCount > 1 ? 's' : ''}` : ''}
+          </Text>
           <TouchableOpacity style={styles.doneCta} onPress={() => router.replace('/(tabs)' as any)}>
             <Text style={styles.doneCtaText}>{"Retour à l'accueil"}</Text>
           </TouchableOpacity>
@@ -457,6 +477,19 @@ export default function BatchScreen() {
                     <Text style={styles.notesText}>{stop.notes}</Text>
                   ) : null}
                   <View style={[
+                    styles.statusPill,
+                    isDone && styles.statusPillDone,
+                    isCancelled && styles.statusPillCancelled,
+                  ]}>
+                    <Text style={[
+                      styles.statusPillText,
+                      isDone && styles.statusPillTextDone,
+                      isCancelled && styles.statusPillTextCancelled,
+                    ]}>
+                      {isDone ? 'Livré' : isCancelled ? 'Annulé' : 'À faire'}
+                    </Text>
+                  </View>
+                  <View style={[
                     styles.proofBadge,
                     stop.proofMethod && styles.proofBadgeValid,
                     stop.proofMethod === 'photo_signature' && styles.proofBadgeAlternative,
@@ -498,10 +531,10 @@ export default function BatchScreen() {
                       style={[
                         styles.actionBtn,
                         styles.navBtn,
-                        (!stop.coordinates || navigationStop?.orderId === stop.orderId) && styles.validateBtnDisabled,
+                        navigationStop?.orderId === stop.orderId && styles.validateBtnDisabled,
                       ]}
                       onPress={() => startNavigationToStop(stop)}
-                      disabled={!!validatingId || !stop.coordinates || navigationStop?.orderId === stop.orderId}
+                      disabled={!!validatingId || navigationStop?.orderId === stop.orderId}
                     >
                       <Ionicons name="navigate-outline" size={14} color="#FFFFFF" />
                       <Text style={styles.navBtnText}>
@@ -770,6 +803,12 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
+  orderHint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 16,
+  },
   centered: {
     flex: 1,
     alignItems: 'center',
@@ -881,6 +920,31 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontStyle: 'italic',
     marginTop: 2,
+  },
+  statusPill: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 4,
+  },
+  statusPillDone: {
+    backgroundColor: '#D1FAE5',
+  },
+  statusPillCancelled: {
+    backgroundColor: '#FEE2E2',
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  statusPillTextDone: {
+    color: '#047857',
+  },
+  statusPillTextCancelled: {
+    color: '#B91C1C',
   },
   textMuted: {
     color: '#9CA3AF',

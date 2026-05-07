@@ -1575,8 +1575,16 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Récupérer tous les utilisateurs avec leurs informations
-    const query = `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url FROM users ORDER BY created_at DESC LIMIT 2000`;
+    // Récupérer uniquement les rôles affichés par la page Utilisateurs.
+    // Les owners portail partenaire sont gérés dans l'espace partenaire et n'ont
+    // pas toujours de profil complet pour ce tableau.
+    const query = `
+      SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
+      FROM users
+      WHERE role IN ('client', 'driver', 'admin', 'super_admin')
+      ORDER BY created_at DESC
+      LIMIT 2000
+    `;
 
     logger.info('📝 [getAdminUsers] Requête SQL:', { query });
 

@@ -10,10 +10,29 @@ import type { JWTPayload } from '../types/index.js';
 import qrCodeService from '../services/qrCodeService.js';
 import { completeTransactionsForOrder } from '../utils/createTransactionForOrder.js';
 import { saveDeliveryProofRecord } from '../config/orderStorage.js';
+import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
+import { incrementPartnerUsage } from '../services/b2bCommissionService.js';
+import { haversineDistanceKm } from '../services/priceCalculator.js';
 
 const db = () => supabaseAdmin ?? supabase;
 type AuthenticatedRequest = Request & { user?: JWTPayload };
 type BatchProofMethod = 'qr_scan' | 'manual_code' | 'photo_signature' | 'batch_driver_confirmation';
+type BatchOrderInput = {
+  order_id?: string;
+  lat?: number;
+  lng?: number;
+  recipient?: { name?: string; phone?: string; address?: string };
+  notes?: string;
+  client_order_index?: number;
+};
+
+type BatchOrderDraft = {
+  order_id: string;
+  lat?: number;
+  lng?: number;
+  client_order_index: number;
+  createdByBatch: boolean;
+};
 
 function parseJsonField(value: unknown): any {
   if (!value) return null;
@@ -42,6 +61,170 @@ function recipientFromOrder(row: any): { name: string; phone: string } {
     (typeof details.recipientName === 'string' && details.recipientName.trim()) ||
     (phone ? `Destinataire (${phone})` : 'Destinataire');
   return { name, phone };
+}
+
+function toCoords(lat?: number, lng?: number): { latitude: number; longitude: number } | undefined {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  if (Math.abs(lat as number) > 90 || Math.abs(lng as number) > 180) return undefined;
+  return { latitude: lat as number, longitude: lng as number };
+}
+
+function safeAddress(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+async function canUsePartner(authUser: JWTPayload | undefined, partnerId: string): Promise<boolean> {
+  if (!authUser?.id) return false;
+  if (authUser.role === 'admin' || authUser.role === 'super_admin') return true;
+  const member = await pool.query(
+    `SELECT 1 FROM partner_users WHERE partner_id = $1 AND user_id = $2 LIMIT 1`,
+    [partnerId, authUser.id]
+  );
+  return (member.rowCount ?? 0) > 0;
+}
+
+async function getOrderColumns(): Promise<Set<string>> {
+  const result = await pool.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'orders'`
+  );
+  return new Set(result.rows.map((row) => row.column_name as string));
+}
+
+async function loadClientName(userId: string): Promise<string> {
+  const result = await pool.query(
+    `SELECT email, first_name, last_name FROM users WHERE id = $1 LIMIT 1`,
+    [userId]
+  );
+  const user = result.rows[0];
+  return [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim() || user?.email || 'Client B2B';
+}
+
+async function markOrderAsBatchB2B(
+  orderId: string,
+  partnerId: string | undefined,
+  recipient?: { name?: string; phone?: string },
+  notes?: string,
+  preferredDriverId?: string | null
+): Promise<void> {
+  const columns = await getOrderColumns();
+  const setClauses: string[] = [];
+  const values: unknown[] = [];
+  let index = 1;
+
+  const addValue = (column: string, value: unknown) => {
+    setClauses.push(`${column} = $${index}`);
+    values.push(value);
+    index += 1;
+  };
+
+  if (partnerId && columns.has('partner_id')) addValue('partner_id', partnerId);
+  if (columns.has('is_b2b_order')) addValue('is_b2b_order', true);
+  if (columns.has('payment_method_type')) addValue('payment_method_type', 'deferred');
+  if (columns.has('payment_status')) addValue('payment_status', 'delayed');
+  if (columns.has('payment_payer')) addValue('payment_payer', 'client');
+  if (preferredDriverId && columns.has('preferred_driver_id')) addValue('preferred_driver_id', preferredDriverId);
+  if (columns.has('recipient') && recipient) addValue('recipient', JSON.stringify(recipient));
+  if (columns.has('notes') && notes) addValue('notes', notes);
+
+  if (columns.has('updated_at')) setClauses.push('updated_at = now()');
+  if (!setClauses.length) return;
+
+  values.push(orderId);
+  await pool.query(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${index}`, values);
+}
+
+async function createBatchChildOrder(params: {
+  userId: string;
+  partnerId?: string;
+  driverId?: string | null;
+  pickupAddress: string;
+  pickupCoords?: { latitude: number; longitude: number };
+  input: BatchOrderInput;
+}): Promise<BatchOrderDraft> {
+  const recipientAddress = safeAddress(params.input.recipient?.address);
+  const recipientName = safeAddress(params.input.recipient?.name) || 'Destinataire';
+  const recipientPhone = safeAddress(params.input.recipient?.phone);
+  if (!recipientAddress || !recipientPhone) {
+    throw new Error('Chaque arrêt doit contenir une adresse et un téléphone destinataire.');
+  }
+
+  const dropoffCoords = toCoords(params.input.lat, params.input.lng);
+  const dropoff = {
+    address: recipientAddress,
+    ...(dropoffCoords ? { coordinates: dropoffCoords } : {}),
+    details: {
+      recipient_name: recipientName,
+      phone: recipientPhone,
+      ...(params.input.notes ? { driver_notes: params.input.notes } : {}),
+    },
+    _chrono_partner: { is_b2b_order: true },
+  };
+  const pickup = {
+    address: params.pickupAddress,
+    ...(params.pickupCoords ? { coordinates: params.pickupCoords } : {}),
+    _chrono_partner: { is_b2b_order: true },
+  };
+
+  const distanceKm = params.pickupCoords && dropoffCoords
+    ? haversineDistanceKm(params.pickupCoords, dropoffCoords)
+    : 5;
+  const dynamic = await computeDynamicDeliveryPrice({
+    distanceKm,
+    method: 'moto',
+    pickupLatitude: params.pickupCoords?.latitude,
+    pickupLongitude: params.pickupCoords?.longitude,
+    isB2BPriority: true,
+  });
+
+  const { data, error } = await db().rpc('fn_create_order', {
+    p_user_id: params.userId,
+    p_pickup: pickup,
+    p_dropoff: dropoff,
+    p_method: 'moto',
+    p_price: dynamic.totalCfa,
+    p_distance: distanceKm,
+  });
+  if (error || !data) {
+    throw new Error(error?.message || 'Erreur création commande enfant');
+  }
+
+  const orderId = String(data);
+  await markOrderAsBatchB2B(
+    orderId,
+    params.partnerId,
+    { name: recipientName, phone: recipientPhone },
+    params.input.notes,
+    params.driverId
+  );
+
+  try {
+    await qrCodeService.generateDeliveryQRCode(
+      orderId,
+      `CMD-${orderId.substring(0, 8).toUpperCase()}`,
+      recipientName,
+      recipientPhone,
+      await loadClientName(params.userId)
+    );
+  } catch (qrErr: any) {
+    logger.warn('[batchController] QR/code commande enfant non bloquant:', qrErr?.message || qrErr);
+  }
+
+  if (params.partnerId) {
+    await incrementPartnerUsage(params.partnerId).catch((usageErr: any) => {
+      logger.warn('[batchController] usage partenaire batch non bloquant:', usageErr?.message || usageErr);
+    });
+  }
+
+  return {
+    order_id: orderId,
+    lat: params.input.lat,
+    lng: params.input.lng,
+    client_order_index: params.input.client_order_index ?? 0,
+    createdByBatch: true,
+  };
 }
 
 async function ensureBatchOrderProofs(orderIds: string[]): Promise<void> {
@@ -135,13 +318,15 @@ async function saveAlternativePhoto(orderId: string, photoBase64?: string | null
 }
 
 // ─── POST /api/batches — créer une tournée ────────────────────────────────────
-// Body: { partner_id?, user_id, driver_id?, orders: [{ order_id, lat?, lng? }] }
-export const createBatch = async (req: Request, res: Response): Promise<void> => {
-  const { partner_id, user_id, driver_id, orders } = req.body as {
+// Body: { partner_id?, user_id, driver_id?, pickup_address?, pickup_coords?, orders: [{ order_id? } | { recipient, lat?, lng?, notes? }] }
+export const createBatch = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { partner_id, user_id, driver_id, orders, pickup_address, pickup_coords } = req.body as {
     partner_id?: string;
     user_id?: string;
     driver_id?: string;
-    orders: Array<{ order_id: string; lat?: number; lng?: number }>;
+    pickup_address?: string;
+    pickup_coords?: { latitude?: number; longitude?: number; lat?: number; lng?: number } | null;
+    orders: BatchOrderInput[];
   };
 
   if (!orders?.length) {
@@ -150,6 +335,23 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
   }
   if (!partner_id && !user_id) {
     res.status(400).json({ success: false, message: 'partner_id ou user_id est requis' });
+    return;
+  }
+  const needsChildOrderCreation = orders.some((order) => !order.order_id);
+  if (needsChildOrderCreation && !user_id) {
+    res.status(400).json({ success: false, message: 'user_id est requis pour créer les livraisons enfants' });
+    return;
+  }
+  if (needsChildOrderCreation && !safeAddress(pickup_address)) {
+    res.status(400).json({ success: false, message: 'pickup_address est requis pour créer une tournée' });
+    return;
+  }
+  if (user_id && req.user?.id && req.user.id !== user_id && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+    res.status(403).json({ success: false, message: 'Accès refusé pour cet utilisateur' });
+    return;
+  }
+  if (partner_id && !(await canUsePartner(req.user, partner_id))) {
+    res.status(403).json({ success: false, message: 'Accès partenaire refusé' });
     return;
   }
 
@@ -164,15 +366,55 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
     }
   }
 
+  const createdOrderIds: string[] = [];
+  let preparedOrders: BatchOrderDraft[] = [];
+  try {
+    const pickupCoords = toCoords(
+      pickup_coords?.latitude ?? pickup_coords?.lat,
+      pickup_coords?.longitude ?? pickup_coords?.lng
+    );
+    for (const [index, order] of orders.entries()) {
+      const clientIndex = Number.isFinite(order.client_order_index) ? Number(order.client_order_index) : index;
+      if (typeof order.order_id === 'string' && order.order_id.trim()) {
+        preparedOrders.push({
+          order_id: order.order_id.trim(),
+          lat: order.lat,
+          lng: order.lng,
+          client_order_index: clientIndex,
+          createdByBatch: false,
+        });
+        continue;
+      }
+
+      const created = await createBatchChildOrder({
+        userId: user_id!,
+        partnerId: partner_id,
+        driverId: assignedDriverId,
+        pickupAddress: safeAddress(pickup_address),
+        pickupCoords,
+        input: { ...order, client_order_index: clientIndex },
+      });
+      createdOrderIds.push(created.order_id);
+      preparedOrders.push(created);
+    }
+  } catch (err: any) {
+    if (createdOrderIds.length) {
+      await db().from('orders').delete().in('id', createdOrderIds);
+    }
+    logger.warn('[batchController] create child orders error:', err?.message || err);
+    res.status(400).json({ success: false, message: err?.message ?? 'Impossible de créer les commandes de la tournée' });
+    return;
+  }
+
   // Optimiser l'ordre si les coordonnées sont fournies
   let optimizedOrder: number[];
-  const hasCoords = orders.every((o) => o.lat !== undefined && o.lng !== undefined);
+  const hasCoords = preparedOrders.every((o) => o.lat !== undefined && o.lng !== undefined);
 
   if (hasCoords) {
-    const points = orders.map((o, i) => ({ lat: o.lat!, lng: o.lng!, originalIndex: i }));
+    const points = preparedOrders.map((o, i) => ({ lat: o.lat!, lng: o.lng!, originalIndex: i }));
     optimizedOrder = optimizeRouteOrder(points);
   } else {
-    optimizedOrder = orders.map((_, i) => i);
+    optimizedOrder = preparedOrders.map((_, i) => i);
   }
 
   // Créer la delivery_batch
@@ -189,6 +431,9 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
 
   if (batchErr || !batch) {
     logger.error('[batchController] createBatch error:', batchErr);
+    if (createdOrderIds.length) {
+      await db().from('orders').delete().in('id', createdOrderIds);
+    }
     res.status(500).json({ success: false, message: 'Erreur lors de la création de la tournée' });
     return;
   }
@@ -196,28 +441,34 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
   // Insérer les batch_orders avec position optimisée
   const batchOrdersPayload = optimizedOrder.map((originalIdx, position) => ({
     batch_id: (batch as any).id,
-    order_id: orders[originalIdx]!.order_id,
+    order_id: preparedOrders[originalIdx]!.order_id,
     position: position + 1,
+    client_order_index: preparedOrders[originalIdx]!.client_order_index,
   }));
 
-  const { error: boErr } = await db().from('batch_orders').insert(batchOrdersPayload);
+  const { error: boErr } = await db().from('batch_orders').insert(
+    batchOrdersPayload.map(({ batch_id, order_id, position }) => ({ batch_id, order_id, position }))
+  );
 
   if (boErr) {
     logger.error('[batchController] insert batch_orders error:', boErr);
     // Rollback batch
     await db().from('delivery_batches').delete().eq('id', (batch as any).id);
+    if (createdOrderIds.length) {
+      await db().from('orders').delete().in('id', createdOrderIds);
+    }
     res.status(500).json({ success: false, message: 'Erreur lors de l\'insertion des commandes dans la tournée' });
     return;
   }
 
-  await ensureBatchOrderProofs(orders.map((order) => order.order_id));
+  await ensureBatchOrderProofs(preparedOrders.map((order) => order.order_id));
 
   // Si un livreur est choisi explicitement, on assigne directement la tournée.
   // Sinon, la tournée part en offre aux livreurs B2B connectés : le premier qui accepte devient assigné.
   if (assignedDriverId) {
     const emitted = emitBatchAssigned(assignedDriverId, {
       batchId: (batch as any).id,
-      ordersCount: orders.length,
+      ordersCount: preparedOrders.length,
       ...(partner_id ? { partner_id } : {}),
       status: 'assigned',
     });
@@ -230,7 +481,7 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
   } else {
     const offerPayload = {
       batchId: (batch as any).id,
-      ordersCount: orders.length,
+      ordersCount: preparedOrders.length,
       ...(partner_id ? { partner_id } : {}),
       status: 'offer',
     };
@@ -246,7 +497,19 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
     }
   }
 
-  res.status(201).json({ success: true, data: { ...batch, driver_id: assignedDriverId, orders_count: orders.length } });
+  res.status(201).json({
+    success: true,
+    data: {
+      ...batch,
+      driver_id: assignedDriverId,
+      orders_count: preparedOrders.length,
+      orders: batchOrdersPayload.map((item) => ({
+        order_id: item.order_id,
+        position: item.position,
+        client_order_index: item.client_order_index,
+      })),
+    },
+  });
 };
 
 // ─── GET /api/batches/:id — détail tournée + statuts ────────────────────────

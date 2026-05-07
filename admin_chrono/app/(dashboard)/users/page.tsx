@@ -22,6 +22,8 @@ interface UserData {
   createdAt: string
 }
 
+const VISIBLE_USER_ROLES = new Set(['client', 'driver', 'admin', 'super_admin'])
+
 export default function UsersPage() {
   const router = useRouter()
   const t = useTranslation()
@@ -45,20 +47,28 @@ export default function UsersPage() {
 
   const users = React.useMemo(() => {
     if (!usersData) return []
-    return asApiArray<UserData>(usersData)
+    return asApiArray<UserData>(usersData).filter((user) => VISIBLE_USER_ROLES.has(user.role))
   }, [usersData])
-  const counts = usersData?.counts || {
-    client: 0,
-    driver: 0,
-    admin: 0,
-    total: 0,
-  }
+  const counts = React.useMemo(() => users.reduce(
+    (acc, user) => {
+      if (user.role === 'client') acc.client++
+      else if (user.role === 'driver') acc.driver++
+      else if (user.role === 'admin' || user.role === 'super_admin') acc.admin++
+      acc.total++
+      return acc
+    },
+    { client: 0, driver: 0, admin: 0, total: 0 }
+  ), [users])
 
   const filteredUsers = React.useMemo(() => {
     let filtered = users
 
     if (roleFilter !== 'all') {
-      filtered = filtered.filter((user: UserData) => user.role === roleFilter)
+      filtered = filtered.filter((user: UserData) => (
+        roleFilter === 'admin'
+          ? user.role === 'admin' || user.role === 'super_admin'
+          : user.role === roleFilter
+      ))
     }
 
     if (searchQuery) {

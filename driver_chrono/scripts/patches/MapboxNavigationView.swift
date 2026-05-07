@@ -21,25 +21,13 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
   var navigationRouteOptions: NavigationRouteOptions!
   var embedded: Bool
   var embedding: Bool
-  private var lastEmbeddedDestination: (Double, Double)?
+  private var lastEmbeddedRoute: (originLng: Double, originLat: Double, destLng: Double, destLat: Double)?
 
   @objc var origin: NSArray = [] {
-    didSet { if origin.count == 2 && destination.count == 2 { requestRoute() } }
+    didSet { handleRoutePropsChanged() }
   }
   @objc var destination: NSArray = [] {
-    didSet {
-      guard origin.count == 2 && destination.count == 2 else { return }
-      let destLng = (destination[0] as? CLLocationDegrees) ?? 0
-      let destLat = (destination[1] as? CLLocationDegrees) ?? 0
-      if embedded || embedding {
-        let last = lastEmbeddedDestination
-        if last == nil || abs(last!.0 - destLng) > 0.00001 || abs(last!.1 - destLat) > 0.00001 {
-          reEmbedWithNewDestination()
-        }
-      } else {
-        requestRoute()
-      }
-    }
+    didSet { handleRoutePropsChanged() }
   }
   @objc var shouldSimulateRoute: Bool = false
   @objc var showsEndOfRouteFeedback: Bool = false
@@ -70,7 +58,7 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     // Ne pas embed tant que la vue n'a pas de dimensions valides (évite crash "Invalid size")
     let hasValidBounds = bounds.width >= 64 && bounds.height >= 64
     if !embedding && !embedded && origin.count == 2 && destination.count == 2 && hasValidBounds {
-      embed()
+      requestRouteIfNeeded()
     } else if let vc = navViewController {
       vc.view.frame = bounds
       hideResumeButton(in: vc.view)
@@ -85,19 +73,54 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     navViewController = nil
   }
 
-  private func embed() {
-    guard origin.count == 2 && destination.count == 2 else { return }
+  private func currentRouteProps() -> (originLng: Double, originLat: Double, destLng: Double, destLat: Double)? {
+    guard origin.count == 2 && destination.count == 2 else { return nil }
+    let route = (
+      originLng: (origin[0] as? CLLocationDegrees) ?? 0,
+      originLat: (origin[1] as? CLLocationDegrees) ?? 0,
+      destLng: (destination[0] as? CLLocationDegrees) ?? 0,
+      destLat: (destination[1] as? CLLocationDegrees) ?? 0
+    )
+    guard route.originLng.isFinite,
+          route.originLat.isFinite,
+          route.destLng.isFinite,
+          route.destLat.isFinite else { return nil }
+    return route
+  }
+
+  private func isSameRoute(_ a: (originLng: Double, originLat: Double, destLng: Double, destLat: Double), _ b: (originLng: Double, originLat: Double, destLng: Double, destLat: Double)) -> Bool {
+    let tolerance = 0.00001
+    return abs(a.originLng - b.originLng) <= tolerance &&
+      abs(a.originLat - b.originLat) <= tolerance &&
+      abs(a.destLng - b.destLng) <= tolerance &&
+      abs(a.destLat - b.destLat) <= tolerance
+  }
+
+  private func handleRoutePropsChanged() {
+    guard let route = currentRouteProps() else { return }
+    if embedded {
+      if let last = lastEmbeddedRoute, isSameRoute(last, route) {
+        return
+      }
+      reEmbedWithNewRoute(route)
+      return
+    }
+    requestRouteIfNeeded(route)
+  }
+
+  private func embed(route: (originLng: Double, originLat: Double, destLng: Double, destLat: Double)? = nil) {
+    guard let route = route ?? currentRouteProps() else { return }
     guard let _ = parentViewController else { return }
 
     embedding = true
 
     let originWaypoint = Waypoint(coordinate: CLLocationCoordinate2D(
-      latitude: (origin[1] as? CLLocationDegrees) ?? 0,
-      longitude: (origin[0] as? CLLocationDegrees) ?? 0
+      latitude: route.originLat,
+      longitude: route.originLng
     ))
     let destinationWaypoint = Waypoint(coordinate: CLLocationCoordinate2D(
-      latitude: (destination[1] as? CLLocationDegrees) ?? 0,
-      longitude: (destination[0] as? CLLocationDegrees) ?? 0
+      latitude: route.destLat,
+      longitude: route.destLng
     ))
 
     let waypointsArray = [originWaypoint, destinationWaypoint]
@@ -153,10 +176,7 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
         vc.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         vc.didMove(toParent: parentVC)
         strongSelf.navViewController = vc
-        strongSelf.lastEmbeddedDestination = (
-          (strongSelf.destination[0] as? CLLocationDegrees) ?? 0,
-          (strongSelf.destination[1] as? CLLocationDegrees) ?? 0
-        )
+        strongSelf.lastEmbeddedRoute = route
 
         // Masquer les boutons natifs (boussole, recentrer) et traduire Tun pada/Atunjade en français
         strongSelf.applyFrenchTranslations(in: vc.view, vc: vc)
@@ -171,29 +191,32 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
 
       strongSelf.embedding = false
       strongSelf.embedded = true
+      if let currentRoute = strongSelf.currentRouteProps(),
+         !strongSelf.isSameRoute(route, currentRoute) {
+        strongSelf.reEmbedWithNewRoute(currentRoute)
+      }
     }
   }
 
-  private func requestRoute() {
+  private func requestRouteIfNeeded(_ route: (originLng: Double, originLat: Double, destLng: Double, destLat: Double)? = nil) {
     if embedded || embedding { return }
-    embed()
+    if bounds.width < 64 || bounds.height < 64 { return }
+    embed(route: route)
   }
 
   /// Recalcule la route quand la destination change (ex: pickup → dropoff) sans fermer la navigation
-  private func reEmbedWithNewDestination() {
+  private func reEmbedWithNewRoute(_ route: (originLng: Double, originLat: Double, destLng: Double, destLat: Double)) {
     guard embedded, let vc = navViewController else { return }
-    let destLat = (destination[1] as? CLLocationDegrees) ?? 0
-    let destLng = (destination[0] as? CLLocationDegrees) ?? 0
-    if destLat == 0 && destLng == 0 { return }
+    if route.destLat == 0 && route.destLng == 0 { return }
 
-    lastEmbeddedDestination = nil
+    lastEmbeddedRoute = nil
     vc.willMove(toParent: nil)
     vc.view.removeFromSuperview()
     vc.removeFromParent()
     navViewController = nil
     embedded = false
     embedding = false
-    embed()
+    embed(route: route)
   }
 
   /// Masque les boutons natifs Mapbox (boussole, recentrer) qui ont le cercle blanc au centre

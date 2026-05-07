@@ -54,6 +54,34 @@ function coordinatesFromLocation(value: unknown): Coordinates | undefined {
   return { latitude: lat, longitude: lng };
 }
 
+function detailsFromLocation(value: unknown): Record<string, any> {
+  const parsed = parseLocation(value);
+  const details = parsed?.details;
+  return details && typeof details === 'object' ? details as Record<string, any> : {};
+}
+
+function notesText(value: unknown): string | undefined {
+  const details = detailsFromLocation(value);
+  const raw = details.driver_notes ?? details.notes ?? details.instructions;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
+
+function recipientName(item: { recipient?: { name?: string }; dropoff_address?: unknown }): string {
+  const fromRecipient = item.recipient?.name;
+  if (typeof fromRecipient === 'string' && fromRecipient.trim()) return fromRecipient.trim();
+  const details = detailsFromLocation(item.dropoff_address);
+  const fromDetails = details.recipient_name ?? details.recipientName ?? details.name;
+  return typeof fromDetails === 'string' && fromDetails.trim() ? fromDetails.trim() : 'Destinataire';
+}
+
+function recipientPhone(item: { recipient?: { phone?: string }; dropoff_address?: unknown }): string {
+  const fromRecipient = item.recipient?.phone;
+  if (typeof fromRecipient === 'string' && fromRecipient.trim()) return fromRecipient.trim();
+  const details = detailsFromLocation(item.dropoff_address);
+  const fromDetails = details.phone ?? details.recipientPhone;
+  return typeof fromDetails === 'string' && fromDetails.trim() ? fromDetails.trim() : '';
+}
+
 export async function getBatch(batchId: string): Promise<ActiveBatch> {
   const headers = await authHeader();
   const response = await apiFetch(`${config.apiUrl}/api/batches/${encodeURIComponent(batchId)}`, {
@@ -92,10 +120,11 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
     .map((item) => ({
       orderId: item.order_id,
       position: item.position,
-      recipientName: item.orders?.recipient?.name ?? 'Destinataire',
-      phone: item.orders?.recipient?.phone ?? '',
+      recipientName: recipientName(item.orders ?? {}),
+      phone: recipientPhone(item.orders ?? {}),
       address: addressText(item.orders?.dropoff_address),
       coordinates: coordinatesFromLocation(item.orders?.dropoff_address),
+      notes: notesText(item.orders?.dropoff_address),
       status: (item.orders?.status === 'completed'
         ? 'completed'
         : item.orders?.status === 'cancelled'

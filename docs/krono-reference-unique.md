@@ -737,11 +737,13 @@ Texte de demande :
 Un partenaire B2B livre souvent plusieurs commandes en une seule sortie (ex : 8 colis confiés à un livreur). Le système :
 
 1. Crée une tournée (`delivery_batches`) regroupant les commandes
-2. Optimise automatiquement l'ordre de passage via l'algorithme nearest-neighbor (haversine)
+2. Peut proposer un ordre conseillé via l'algorithme nearest-neighbor (haversine), sans l'imposer au livreur
 3. Permet au livreur de valider chaque livraison une par une
 4. Clôture la tournée automatiquement quand toutes les commandes sont `completed` ou `cancelled`
 
 Règle centrale : **une tournée B2B = une popup, une acceptation, une assignation** ; les livraisons enfants ne déclenchent pas de popups séparées.
+
+Règle terrain : **le chauffeur choisit librement l'ordre des arrêts**. La tournée B2B est un lot business unique, mais côté conduite elle doit se comporter comme une liste de livraisons simples. Voir `docs/CHECKLIST_TOURNEES_B2B_LIBRES.md`.
 
 Notification livreur :
 - L'offre de tournée est émise au niveau `batchId` via `batch-assigned` avec `status: "offer"` et `ordersCount`.
@@ -760,6 +762,7 @@ Acceptation :
 Après acceptation :
 - L'écran `/batch/[batchId]` charge toutes les livraisons enfants via `GET /api/batches/:id`.
 - Chaque arrêt propose scan QR, saisie manuelle du code, ou preuve alternative encadrée.
+- Le livreur peut sélectionner n'importe quel arrêt restant ; aucun arrêt précédent ne doit bloquer la livraison choisie.
 - Le backend vérifie que l'arrêt appartient bien à la tournée et au livreur avant de le clôturer.
 
 ---
