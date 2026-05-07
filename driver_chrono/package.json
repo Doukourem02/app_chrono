@@ -14,7 +14,8 @@
     "android": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo run:android",
     "ios": "node scripts/fix-assets-car.js ./ios; BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo run:ios",
     "web": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo start --web",
-    "lint": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo lint"
+    "lint": "BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true expo lint",
+    "release:ios": "npx eas-cli@18.11.0 build --platform ios --profile production --auto-submit"
   },
   "dependencies": {
     "@driveapp/expo-plugin-pod-disable-paths": "^0.0.2",
