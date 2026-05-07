@@ -259,7 +259,7 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                   style={[styles.input, { marginTop: 8 }]}
                   value={draftNotes}
                   onChangeText={setDraftNotes}
-                  placeholder="Instruction personnalisée (facultatif)"
+                  placeholder="Précision libre pour le livreur (facultatif)"
                   placeholderTextColor="#9CA3AF"
                 />
                 <View style={styles.presetBlock}>

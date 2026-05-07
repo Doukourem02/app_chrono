@@ -35,7 +35,7 @@ const B2B_INSTRUCTION_PRESETS = [
 const FIELDS: Array<{ key: keyof FormState; label: string; type: string; placeholder: string; required?: boolean }> = [
   { key: 'recipient_name',   label: 'Nom du destinataire *',    type: 'text', placeholder: 'Ibrahima Diallo',               required: true },
   { key: 'recipient_phone',  label: 'Téléphone du destinataire *', type: 'tel', placeholder: '+221 77 000 00 00',          required: true },
-  { key: 'notes',            label: 'Instruction personnalisée',     type: 'text', placeholder: 'Carton fragile, code portail…' },
+  { key: 'notes',            label: 'Précisions pour le livreur',     type: 'text', placeholder: 'Ex: colis fragile, code portail…' },
 ]
 
 export default function NewPartnerOrderPage() {

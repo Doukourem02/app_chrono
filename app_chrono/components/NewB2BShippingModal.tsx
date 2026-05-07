@@ -185,12 +185,12 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
                   placeholderTextColor="#9CA3AF"
                   keyboardType="phone-pad"
                 />
-                <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Notes</Text>
+                <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Précision libre pour le livreur</Text>
                 <TextInput
                   style={[styles.input, { height: 72, textAlignVertical: 'top', paddingTop: 12 }]}
                   value={notes}
                   onChangeText={setNotes}
-                  placeholder="Instruction personnalisée pour le livreur…"
+                  placeholder="Ex: code portail, colis fragile…"
                   placeholderTextColor="#9CA3AF"
                   multiline
                 />

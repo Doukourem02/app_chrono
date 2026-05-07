@@ -882,10 +882,10 @@ export default function NewB2BShippingModal({
               {/* Notes pour le livreur */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
-                  Notes pour le livreur (optionnel)
+                  Précisions libres pour le livreur (optionnel)
                 </label>
                 <textarea
-                  placeholder="Instructions spéciales pour le livreur (ex: Appeler le client pour position exacte)..."
+                    placeholder="Précisez un détail libre pour le livreur (ex: code portail, colis fragile)..."
                   style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
                   value={driverNotes}
                   onChange={(e) => setDriverNotes(e.target.value)}
