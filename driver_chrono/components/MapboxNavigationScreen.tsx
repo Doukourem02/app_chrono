@@ -6,7 +6,7 @@
  * - Widget météo (bas droite)
  * - Vue 3D, mode nuit, full screen
  */
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -153,8 +153,14 @@ export function MapboxNavigationScreen({
     });
   }, [origin.latitude, origin.longitude, destination.latitude, destination.longitude]);
 
-  const originArr: [number, number] = [origin.longitude, origin.latitude];
-  const destArr: [number, number] = [destination.longitude, destination.latitude];
+  const originArr = useMemo<[number, number]>(
+    () => [origin.longitude, origin.latitude],
+    [origin.latitude, origin.longitude]
+  );
+  const destArr = useMemo<[number, number]>(
+    () => [destination.longitude, destination.latitude],
+    [destination.latitude, destination.longitude]
+  );
 
   const isValidCoord = (c: [number, number]) =>
     Array.isArray(c) && c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1]);

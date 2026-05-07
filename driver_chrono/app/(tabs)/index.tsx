@@ -36,6 +36,32 @@ import { speakAnnouncement } from '../../utils/speechAnnouncement';
 import { logNavigationEvent } from '../../utils/navigationTelemetry';
 import { getSafetyReminderForVehicleType } from '../../constants/driverVehicle';
 
+type Coords = { latitude: number; longitude: number };
+type NavigationPhase = 'pickup' | 'dropoff';
+type NavigationSession = {
+  orderId: string;
+  phase: NavigationPhase;
+  origin: Coords;
+  destination: Coords;
+};
+
+const navigationPhaseForStatus = (status?: string | null): NavigationPhase | null => {
+  const normalized = String(status || '');
+  if (normalized === 'accepted' || normalized === 'enroute' || normalized === 'in_progress') {
+    return 'pickup';
+  }
+  if (normalized === 'picked_up' || normalized === 'delivering') {
+    return 'dropoff';
+  }
+  return null;
+};
+
+const sameCoords = (a: Coords | null | undefined, b: Coords | null | undefined) =>
+  !!a &&
+  !!b &&
+  Math.abs(a.latitude - b.latitude) < 0.000001 &&
+  Math.abs(a.longitude - b.longitude) < 0.000001;
+
 export default function Index() {
   const { setHideTabBar } = useUIStore();
   const { 
@@ -82,7 +108,7 @@ export default function Index() {
   }, []);
   const mapRef = useRef<MapRefHandle | null>(null);
 
-  const resolveCoords = (candidate?: any) => {
+  const resolveCoords = useCallback((candidate?: any) => {
     if (!candidate) return null;
 
     const c = candidate.coordinates || candidate.coords || candidate.location || candidate;
@@ -98,7 +124,7 @@ export default function Index() {
 
     if (lat == null || lng == null) return null;
     return { latitude: Number(lat), longitude: Number(lng) };
-  };
+  }, []);
   
   const calculateDistanceToPickup = React.useCallback((order: typeof activeOrders[0]): number | null => {
     if (!location || !order?.pickup) return null;
@@ -115,7 +141,7 @@ export default function Index() {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     
     return Math.round(R * c * 10) / 10;
-  }, [location]);
+  }, [location, resolveCoords]);
 
   const sortedActiveOrdersByDistance = React.useMemo(() => {
     if (!location || activeOrders.length === 0) return activeOrders;
@@ -308,6 +334,7 @@ export default function Index() {
   
   const userClosedBottomSheetRef = useRef(false);
   const lastOrderStatusRef = useRef<string | null>(null);
+  const lastAutoNavStatusRef = useRef<string | null>(null);
   const [showRecalcOverlay, setShowRecalcOverlay] = useState(false);
   /** Phase 2 (dropoff) : Mapbox reste monté, le natif gère le rerouting via reEmbedWithNewDestination */
   /** Délai avant montage Mapbox phase 1 (évite figement au démarrage) */
@@ -316,6 +343,7 @@ export default function Index() {
   const lastEtaAnnouncedMinRef = useRef<number>(99);
   // Commande terminée mais navigation gardée ouverte : le livreur quitte quand il veut
   const [navigationCompletedOrder, setNavigationCompletedOrder] = useState<typeof currentOrder | null>(null);
+  const [navigationSession, setNavigationSession] = useState<NavigationSession | null>(null);
   const [mapboxVoiceMuted, setMapboxVoiceMuted] = useState(false);
   const [showColisRecupereButton, setShowColisRecupereButton] = useState(false);
   const [showLivraisonEffectueeButton, setShowLivraisonEffectueeButton] = useState(false);
@@ -346,37 +374,71 @@ export default function Index() {
       : '';
   }, []);
 
-  const getCurrentDestination = () => {
-    if (!currentOrder || !location) return null;
-    const status = String(currentOrder.status || '');
-    const pickupCoord = resolveCoords(currentOrder.pickup);
-    const dropoffCoord = resolveCoords(currentOrder.dropoff);
-
-    if ((status === 'accepted' || status === 'enroute' || status === 'in_progress') && pickupCoord) {
-      return pickupCoord;
-    }
-    
-    if ((status === 'picked_up' || status === 'delivering') && dropoffCoord) {
-      return dropoffCoord;
-    }
-
-    return null;
-  };
-
-  const destination = getCurrentDestination();
+  const currentPickupCoord = React.useMemo(
+    () => currentOrder ? resolveCoords(currentOrder.pickup) : null,
+    [currentOrder, resolveCoords]
+  );
+  const currentDropoffCoord = React.useMemo(
+    () => currentOrder ? resolveCoords(currentOrder.dropoff) : null,
+    [currentOrder, resolveCoords]
+  );
+  const currentNavigationPhase = navigationPhaseForStatus(currentOrder?.status);
+  const destination = React.useMemo(
+    () =>
+      currentNavigationPhase === 'pickup'
+        ? currentPickupCoord
+        : currentNavigationPhase === 'dropoff'
+          ? currentDropoffCoord
+          : null,
+    [currentDropoffCoord, currentNavigationPhase, currentPickupCoord]
+  );
   const navDisplayOrder = currentOrder || navigationCompletedOrder;
   const navDestination = destination || (navigationCompletedOrder ? resolveCoords(navigationCompletedOrder.dropoff) : null);
-  const currentPickupCoord = currentOrder ? resolveCoords(currentOrder.pickup) : null;
-  const currentDropoffCoord = currentOrder ? resolveCoords(currentOrder.dropoff) : null;
 
   /** Pendant transition pickup→dropoff : passer directement au dropoff pour éviter navigation figée */
-  const effectiveNavDestination = navDestination;
+  const effectiveNavDestination = navigationSession?.destination ?? navDestination;
 
-  /** Origine : vers dropoff le livreur part du pickup (calcul fiable). Sinon position actuelle. */
-  const navOrigin =
-    effectiveNavDestination === currentDropoffCoord && currentPickupCoord
-      ? currentPickupCoord
-      : location;
+  /** Origine verrouillée par session Mapbox pour éviter un redémarrage à chaque update GPS. */
+  const navOrigin = navigationSession?.origin ?? location;
+
+  useEffect(() => {
+    if (!currentOrder?.id || !currentNavigationPhase || !destination) {
+      if (!navigationCompletedOrder) {
+        setNavigationSession(null);
+      }
+      return;
+    }
+
+    const defaultOrigin =
+      currentNavigationPhase === 'dropoff'
+        ? currentPickupCoord ?? location
+        : location;
+    if (!defaultOrigin) return;
+
+    setNavigationSession((previous) => {
+      const sameLeg =
+        previous?.orderId === currentOrder.id &&
+        previous.phase === currentNavigationPhase;
+
+      if (sameLeg && sameCoords(previous.destination, destination)) {
+        return previous;
+      }
+
+      return {
+        orderId: currentOrder.id,
+        phase: currentNavigationPhase,
+        origin: sameLeg ? previous.origin : defaultOrigin,
+        destination,
+      };
+    });
+  }, [
+    currentOrder?.id,
+    currentNavigationPhase,
+    currentPickupCoord,
+    destination,
+    location,
+    navigationCompletedOrder,
+  ]);
 
   // Cacher la tab bar quand la navigation full-screen est active
   useEffect(() => {
@@ -386,14 +448,14 @@ export default function Index() {
   // Auto-démarrage navigation : Livreur accepte → phase 1 (pickup), Colis récupéré → phase 2 (dropoff)
   useEffect(() => {
     if (!currentOrder) {
-      lastOrderStatusRef.current = null;
+      lastAutoNavStatusRef.current = null;
       return;
     }
     if (!location || !destination) return;
 
     const status = String(currentOrder.status || '');
-    const prevStatus = lastOrderStatusRef.current;
-    lastOrderStatusRef.current = status;
+    const prevStatus = lastAutoNavStatusRef.current;
+    lastAutoNavStatusRef.current = status;
 
     // Phase 1 : transition vers accepted (ouverture avec commande acceptée)
     // Délai 400ms avant montage Mapbox pour éviter figement au démarrage
@@ -630,7 +692,7 @@ export default function Index() {
         }, 300);
       }
     }
-  }, [selectedOrderId, currentOrder?.id, currentOrder, location]);
+  }, [selectedOrderId, currentOrder?.id, currentOrder, location, resolveCoords]);
 
   const { fitToRoute, centerOnDriver } = useMapCamera(
     mapRef,
@@ -961,7 +1023,7 @@ export default function Index() {
         dropoff_resolved: resolveCoords(currentOrder.dropoff),
       });
     }
-  }, [currentOrder]);
+  }, [currentOrder, resolveCoords]);
   useEffect(() => {
     const status = String(currentOrder?.status || '');
 
@@ -1054,6 +1116,7 @@ export default function Index() {
       setShowColisRecupereButton(false);
       setShowLivraisonEffectueeButton(false);
       setLastEtaMinutes(null);
+      setNavigationSession(null);
       atPickupZoneAnnouncedRef.current = false;
       atDropoffZoneAnnouncedRef.current = false;
       setShowRecalcOverlay(false);
@@ -1282,6 +1345,7 @@ export default function Index() {
           onExpandSheet={expandOrderBottomSheet}
           onCancelOrder={() => {
             setIsNavigationActive(false);
+            setNavigationSession(null);
             orderSocketService.updateDeliveryStatus(currentOrder.id, 'cancelled', location);
           }}
         />
@@ -1326,6 +1390,7 @@ export default function Index() {
                       setShowRecalcOverlay(false);
                       setPhase1MountReady(false);
                       setNavigationCompletedOrder(null);
+                      setNavigationSession(null);
                       setIsNavigationActive(false);
                       setIsNavigationMinimized(false);
                       setShowColisRecupereButton(false);
@@ -1366,6 +1431,7 @@ export default function Index() {
             setShowRecalcOverlay(false);
             setPhase1MountReady(false);
             setNavigationCompletedOrder(null);
+            setNavigationSession(null);
             setIsNavigationActive(false);
             setIsNavigationMinimized(false);
             setShowColisRecupereButton(false);
