@@ -232,13 +232,12 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     
     const newOrders = [...state.activeOrders, mappedOrder];
     
-    // Si aucune commande n'est sélectionnée, ou si la nouvelle commande a un statut actif prioritaire,
-    // la sélectionner automatiquement pour qu'elle s'affiche immédiatement
-    const shouldSelectNewOrder = !state.selectedOrderId || 
-      mappedOrder.status === 'picked_up' || 
-      mappedOrder.status === 'delivering' || 
-      mappedOrder.status === 'enroute' || 
-      mappedOrder.status === 'in_progress';
+    // En tournée groupée, plusieurs commandes actives peuvent arriver en rafale/resync.
+    // Garder la sélection courante évite de remonter Mapbox d'une commande à l'autre.
+    const selectedOrderStillActive =
+      !!state.selectedOrderId &&
+      newOrders.some((o) => o.id === state.selectedOrderId);
+    const shouldSelectNewOrder = !selectedOrderStillActive;
     
     return {
       activeOrders: newOrders,

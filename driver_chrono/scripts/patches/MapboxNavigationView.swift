@@ -22,6 +22,7 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
   var embedded: Bool
   var embedding: Bool
   private var lastEmbeddedRoute: (originLng: Double, originLat: Double, destLng: Double, destLat: Double)?
+  private var suppressNextCancelNavigationEvent = false
 
   @objc var origin: NSArray = [] {
     didSet { handleRoutePropsChanged() }
@@ -67,10 +68,14 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
 
   override func removeFromSuperview() {
     super.removeFromSuperview()
+    suppressNextCancelNavigationEvent = true
     navViewController?.willMove(toParent: nil)
     navViewController?.view.removeFromSuperview()
     navViewController?.removeFromParent()
     navViewController = nil
+    DispatchQueue.main.async { [weak self] in
+      self?.suppressNextCancelNavigationEvent = false
+    }
   }
 
   private func currentRouteProps() -> (originLng: Double, originLat: Double, destLng: Double, destLat: Double)? {
@@ -210,6 +215,7 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     if route.destLat == 0 && route.destLng == 0 { return }
 
     lastEmbeddedRoute = nil
+    suppressNextCancelNavigationEvent = true
     vc.willMove(toParent: nil)
     vc.view.removeFromSuperview()
     vc.removeFromParent()
@@ -217,6 +223,9 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
     embedded = false
     embedding = false
     embed(route: route)
+    DispatchQueue.main.async { [weak self] in
+      self?.suppressNextCancelNavigationEvent = false
+    }
   }
 
   /// Masque les boutons natifs Mapbox (boussole, recentrer) qui ont le cercle blanc au centre
@@ -335,6 +344,10 @@ class MapboxNavigationView: UIView, NavigationViewControllerDelegate {
   func navigationViewControllerDidDismiss(
     _ navigationViewController: NavigationViewController, byCanceling canceled: Bool
   ) {
+    if suppressNextCancelNavigationEvent {
+      suppressNextCancelNavigationEvent = false
+      return
+    }
     if !canceled {
       return
     }

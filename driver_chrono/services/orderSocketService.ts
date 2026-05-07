@@ -200,8 +200,9 @@ class OrderSocketService {
               // Si elle n'est pas dans pendingOrders, l'ajouter directement comme active
               // Cela peut arriver si le serveur assigne directement une commande au driver
               store.addOrder(order as OrderRequest);
-              // Sélectionner automatiquement cette nouvelle commande
-              store.setSelectedOrder(order.id);
+              if (!store.selectedOrderId) {
+                store.setSelectedOrder(order.id);
+              }
               logger.info('Commande acceptée ajoutée directement (pas dans pending)', undefined, { orderId: order.id });
             }
           } else {
@@ -352,8 +353,9 @@ class OrderSocketService {
         )) {
           logger.info('📦 Commande active reçue via order:status:update, ajout au store', undefined, { orderId: order.id, status: order.status });
           store.addOrder(order as OrderRequest);
-          // Sélectionner automatiquement cette nouvelle commande active
-          store.setSelectedOrder(order.id);
+          if (!store.selectedOrderId) {
+            store.setSelectedOrder(order.id);
+          }
         } else if (existingOrder) {
           // Si la commande est complétée (ex: par le client, QR code, admin), la retirer du store
           if (order.status === 'completed' || order.status === 'cancelled' || order.status === 'declined') {
