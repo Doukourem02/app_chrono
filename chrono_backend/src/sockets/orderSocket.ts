@@ -220,9 +220,11 @@ async function emitPendingBatchOffersToDriver(
               db.partner_id,
               COUNT(bo.order_id)::text AS orders_count
          FROM delivery_batches db
-         LEFT JOIN batch_orders bo ON bo.batch_id = db.id
+         JOIN batch_orders bo ON bo.batch_id = db.id
+         JOIN orders o ON o.id = bo.order_id
         WHERE db.driver_id IS NULL
           AND COALESCE(db.status, 'pending') = 'pending'
+          AND o.status = 'pending'
         GROUP BY db.id, db.partner_id, db.created_at
         ORDER BY db.created_at DESC
         LIMIT 10`
@@ -752,7 +754,12 @@ async function findAllAvailableDrivers(
     );
   }
 
-  return filtered;
+  return filtered.sort((a, b) => {
+    const aConnected = connectedDrivers.has(a.driverId) ? 0 : 1;
+    const bConnected = connectedDrivers.has(b.driverId) ? 0 : 1;
+    if (aConnected !== bConnected) return aConnected - bConnected;
+    return a.distance - b.distance;
+  });
 }
 
 function prioritizePreferredDrivers(
@@ -909,6 +916,17 @@ async function notifyDriversForOrder(
         firstCandidate: selectedDrivers[0]?.driverId
           ? maskUserId(selectedDrivers[0].driverId)
           : null,
+      });
+    }
+
+    const connectedSelectedDrivers = selectedDrivers.filter((driver) => connectedDrivers.has(driver.driverId));
+    if (connectedSelectedDrivers.length > 0) {
+      selectedDrivers = connectedSelectedDrivers;
+    } else {
+      logger.warn('[notifyDriversForOrder] Aucun livreur sélectionné connecté en socket', {
+        orderId: maskOrderId(order.id),
+        candidates: selectedDrivers.length,
+        isB2BOrder,
       });
     }
 
@@ -1726,46 +1744,105 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           id: string;
           partner_id: string | null;
           driver_id: string | null;
+          status: string | null;
         }>(
-          `UPDATE delivery_batches
-              SET driver_id = $1
-            WHERE id = $2
-              AND driver_id IS NULL
-            RETURNING id, partner_id, driver_id`,
-          [driverId, batchId]
+          `SELECT id, partner_id, driver_id, status
+             FROM delivery_batches
+            WHERE id = $1
+            FOR UPDATE`,
+          [batchId]
         );
 
         if (batchResult.rowCount === 0) {
-          const existing = await client.query<{ driver_id: string | null }>(
-            `SELECT driver_id FROM delivery_batches WHERE id = $1`,
-            [batchId]
-          );
           await client.query('ROLLBACK');
           socket.emit('batch-accept-error', {
             batchId,
-            message: existing.rowCount === 0
-              ? 'Cette tournée est introuvable.'
-              : 'Cette tournée a déjà été prise par un autre livreur.',
+            message: 'Cette tournée est introuvable.',
           });
           return;
         }
 
-        const countResult = await client.query<{ count: string }>(
-          `SELECT COUNT(*)::text AS count FROM batch_orders WHERE batch_id = $1`,
+        const lockedBatch = batchResult.rows[0];
+        if (lockedBatch.driver_id && lockedBatch.driver_id !== driverId) {
+          await client.query('ROLLBACK');
+          socket.emit('batch-accept-error', {
+            batchId,
+            message: 'Cette tournée a déjà été prise par un autre livreur.',
+          });
+          return;
+        }
+        if (lockedBatch.status && lockedBatch.status !== 'pending') {
+          await client.query('ROLLBACK');
+          socket.emit('batch-accept-error', {
+            batchId,
+            message: 'Cette tournée n’est plus disponible.',
+          });
+          return;
+        }
+
+        const ordersResult = await client.query<{ order_id: string; status: string }>(
+          `SELECT bo.order_id, o.status
+             FROM batch_orders bo
+             JOIN orders o ON o.id = bo.order_id
+            WHERE bo.batch_id = $1
+            ORDER BY bo.position`,
           [batchId]
         );
-        const ordersCount = Number.parseInt(countResult.rows[0]?.count ?? '0', 10) || 0;
+        const pendingOrderIds = ordersResult.rows
+          .filter((row) => row.status === 'pending')
+          .map((row) => row.order_id);
+        const ordersCount = pendingOrderIds.length;
+
+        if (ordersCount === 0) {
+          await client.query(
+            `UPDATE delivery_batches
+                SET status = 'cancelled',
+                    driver_id = NULL
+              WHERE id = $1`,
+            [batchId]
+          );
+          await client.query('COMMIT');
+          socket.emit('batch-accept-error', {
+            batchId,
+            message: 'Cette tournée n’a plus de livraison disponible.',
+          });
+          return;
+        }
+
+        await client.query(
+          `UPDATE delivery_batches
+              SET driver_id = $1,
+                  status = 'in_progress'
+            WHERE id = $2`,
+          [driverId, batchId]
+        );
+
+        const columnInfo = await client.query<{ column_name: string }>(
+          `SELECT column_name
+             FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'orders'
+              AND column_name = ANY($1)`,
+          [['accepted_at', 'updated_at']]
+        );
+        const orderColumns = new Set(columnInfo.rows.map((row) => row.column_name));
+        const setClauses = [
+          `driver_id = $1`,
+          `status = CASE WHEN status = 'pending' THEN 'accepted' ELSE status END`,
+        ];
+        if (orderColumns.has('accepted_at')) {
+          setClauses.push(`accepted_at = COALESCE(accepted_at, NOW())`);
+        }
+        if (orderColumns.has('updated_at')) {
+          setClauses.push(`updated_at = NOW()`);
+        }
 
         await client.query(
           `UPDATE orders
-              SET driver_id = $1,
-                  status = CASE WHEN status = 'pending' THEN 'accepted' ELSE status END,
-                  accepted_at = COALESCE(accepted_at, NOW()),
-                  updated_at = NOW()
-            WHERE id IN (
-              SELECT order_id FROM batch_orders WHERE batch_id = $2
-            )`,
-          [driverId, batchId]
+              SET ${setClauses.join(', ')}
+            WHERE id = ANY($2::uuid[])
+              AND status = 'pending'`,
+          [driverId, pendingOrderIds]
         );
 
         await client.query(
@@ -1773,12 +1850,20 @@ const setupOrderSocket = (io: SocketIOServer): void => {
               SET driver_id = $1
             WHERE driver_id IS NULL
               AND order_id IN (
-                SELECT order_id FROM batch_orders WHERE batch_id = $2
+                SELECT unnest($2::uuid[])
               )`,
-          [driverId, batchId]
+          [driverId, pendingOrderIds]
         ).catch(() => {});
 
         await client.query('COMMIT');
+
+        const acceptedAt = new Date();
+        for (const orderId of pendingOrderIds) {
+          recordOrderAssignment(orderId, driverId, {
+            assignedAt: acceptedAt,
+            acceptedAt,
+          }).catch(() => {});
+        }
 
         const payload: BatchSocketPayload = {
           batchId,

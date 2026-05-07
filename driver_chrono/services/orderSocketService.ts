@@ -17,6 +17,10 @@ class OrderSocketService {
   private retryCount = 0;
   /** Incrémenté à chaque nouveau connect/disconnect pour ignorer les establishSocket obsolètes. */
   private connectGeneration = 0;
+  /** Évite plusieurs Alert.alert pour la même tournée quand le socket resynchronise. */
+  private visibleBatchOfferIds: Set<string> = new Set();
+  /** Tournées refusées/indisponibles pendant cette session: ne pas reproposer en boucle. */
+  private mutedBatchOfferIds: Set<string> = new Set();
   /** Hooks enregistrés pour déclencher un resync après un événement socket critique. */
   private refetchListeners: Set<(orderId: string) => void> = new Set();
 
@@ -403,6 +407,10 @@ class OrderSocketService {
         if (!batchId) return;
 
         if (status === 'offer') {
+          if (this.visibleBatchOfferIds.has(batchId) || this.mutedBatchOfferIds.has(batchId)) {
+            return;
+          }
+          this.visibleBatchOfferIds.add(batchId);
           void soundService.playOrderSound().catch(() => {});
           import('expo-haptics').then((Haptics) => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -415,12 +423,15 @@ class OrderSocketService {
                 text: 'Refuser',
                 style: 'cancel',
                 onPress: () => {
+                  this.visibleBatchOfferIds.delete(batchId);
+                  this.mutedBatchOfferIds.add(batchId);
                   void this.declineBatch(batchId);
                 },
               },
               {
                 text: 'Accepter',
                 onPress: () => {
+                  this.visibleBatchOfferIds.delete(batchId);
                   void this.acceptBatch(batchId);
                 },
               },
@@ -455,15 +466,27 @@ class OrderSocketService {
 
     this.socket.on('batch-accepted-confirmation', (data: { batchId?: string; message?: string }) => {
       logger.info('Tournée acceptée confirmée', undefined, data);
+      if (data?.batchId) {
+        this.visibleBatchOfferIds.delete(data.batchId);
+        this.mutedBatchOfferIds.delete(data.batchId);
+      }
     });
 
     this.socket.on('batch-accept-error', (data: { batchId?: string; message?: string }) => {
       logger.warn('Erreur acceptation tournée', undefined, data);
+      if (data?.batchId) {
+        this.visibleBatchOfferIds.delete(data.batchId);
+        this.mutedBatchOfferIds.add(data.batchId);
+      }
       Alert.alert('Tournée indisponible', data?.message ?? 'Cette tournée ne peut plus être acceptée.');
     });
 
     this.socket.on('batch-declined-confirmation', (data: { batchId?: string }) => {
       logger.info('Tournée refusée confirmée', undefined, data);
+      if (data?.batchId) {
+        this.visibleBatchOfferIds.delete(data.batchId);
+        this.mutedBatchOfferIds.add(data.batchId);
+      }
     });
   }
 
