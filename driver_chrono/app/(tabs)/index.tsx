@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusToggle } from "../../components/StatusToggle";
 import { StatsCards } from "../../components/StatsCards";
 import { OrderRequestPopup } from "../../components/OrderRequestPopup";
+import { BatchOfferPopup } from "../../components/BatchOfferPopup";
 import { OrdersListBottomSheet } from "../../components/OrdersListBottomSheet";
 import DriverOrderBottomSheet from "../../components/DriverOrderBottomSheet";
 import { useDriverLocation } from "../../hooks/useDriverLocation";
@@ -17,6 +18,7 @@ import { useOrdersListBottomSheet } from "../../hooks/useOrdersListBottomSheet";
 import { useMessageBottomSheet } from "../../hooks/useMessageBottomSheet";
 import { useDriverStore } from "../../store/useDriverStore";
 import { useOrderStore } from "../../store/useOrderStore";
+import { useBatchStore } from "../../store/useBatchStore";
 import { useUIStore } from "../../store/useUIStore";
 import { apiService } from "../../services/apiService";
 import { orderSocketService } from "../../services/orderSocketService";
@@ -59,6 +61,9 @@ export default function Index() {
   const activeOrders = useOrderStore((s) => s.activeOrders);
   const selectedOrderId = useOrderStore((s) => s.selectedOrderId);
   const setSelectedOrder = useOrderStore((s) => s.setSelectedOrder);
+  const pendingBatchOffer = useBatchStore((s) => s.pendingOffer);
+  const batchOfferError = useBatchStore((s) => s.offerError);
+  const clearBatchOfferError = useBatchStore((s) => s.clearOfferError);
   
   const pendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null;
   
@@ -716,6 +721,14 @@ export default function Index() {
     orderSocketService.declineOrder(orderId);
   };
 
+  const handleAcceptBatchOffer = useCallback((batchId: string) => {
+    void orderSocketService.acceptBatch(batchId);
+  }, []);
+
+  const handleDeclineBatchOffer = useCallback((batchId: string) => {
+    void orderSocketService.declineBatch(batchId);
+  }, []);
+
   const isTogglingRef = useRef(false);
   
   const handleToggleOnline = async (value: boolean) => {
@@ -1212,6 +1225,15 @@ export default function Index() {
         onAccept={handleAcceptOrder}
         onDecline={handleDeclineOrder}
         autoDeclineTimer={30}
+      />
+
+      <BatchOfferPopup
+        offer={pendingBatchOffer}
+        visible={!!pendingBatchOffer}
+        errorMessage={batchOfferError?.message ?? null}
+        onAccept={handleAcceptBatchOffer}
+        onDecline={handleDeclineBatchOffer}
+        onDismissError={clearBatchOfferError}
       />
 
       {/* Nouveau bottom sheet unifié pour les détails et la messagerie */}

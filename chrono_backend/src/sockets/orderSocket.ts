@@ -11,6 +11,7 @@ import { realDriverStatuses, rehydrateDriverStatusFromDb } from '../controllers/
 import { orderMatchingService } from '../utils/orderMatchingService.js';
 import { canReceiveOrders, deductCommissionAfterDelivery } from '../services/commissionService.js';
 import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
+import { notifyB2BBatchRecipientsProof } from '../services/b2bRecipientProofNotifyService.js';
 import { notifyLiveActivitiesForDriverLocation } from '../services/liveActivityApnsService.js';
 import { autoLogDeliveryMileage } from '../controllers/fleetController.js';
 import logger from '../utils/logger.js';
@@ -1763,6 +1764,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         }
 
         const lockedBatch = batchResult.rows[0];
+        const batchStatus = String(lockedBatch.status || 'pending').toLowerCase();
+        const alreadyAssignedToThisDriver = lockedBatch.driver_id === driverId;
         if (lockedBatch.driver_id && lockedBatch.driver_id !== driverId) {
           await client.query('ROLLBACK');
           socket.emit('batch-accept-error', {
@@ -1771,11 +1774,19 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           });
           return;
         }
-        if (lockedBatch.status && lockedBatch.status !== 'pending') {
+        if (!alreadyAssignedToThisDriver && batchStatus !== 'pending') {
           await client.query('ROLLBACK');
           socket.emit('batch-accept-error', {
             batchId,
             message: 'Cette tournée n’est plus disponible.',
+          });
+          return;
+        }
+        if (alreadyAssignedToThisDriver && ['completed', 'cancelled', 'declined'].includes(batchStatus)) {
+          await client.query('ROLLBACK');
+          socket.emit('batch-accept-error', {
+            batchId,
+            message: 'Cette tournée est déjà clôturée.',
           });
           return;
         }
@@ -1791,16 +1802,21 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         const pendingOrderIds = ordersResult.rows
           .filter((row) => row.status === 'pending')
           .map((row) => row.order_id);
-        const ordersCount = pendingOrderIds.length;
+        const activeOrderIds = ordersResult.rows
+          .filter((row) => !['completed', 'cancelled', 'declined'].includes(String(row.status || '').toLowerCase()))
+          .map((row) => row.order_id);
+        const ordersCount = activeOrderIds.length;
 
         if (ordersCount === 0) {
-          await client.query(
-            `UPDATE delivery_batches
-                SET status = 'cancelled',
-                    driver_id = NULL
-              WHERE id = $1`,
-            [batchId]
-          );
+          if (!alreadyAssignedToThisDriver) {
+            await client.query(
+              `UPDATE delivery_batches
+                  SET status = 'cancelled',
+                      driver_id = NULL
+                WHERE id = $1`,
+              [batchId]
+            );
+          }
           await client.query('COMMIT');
           socket.emit('batch-accept-error', {
             batchId,
@@ -1813,7 +1829,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           `UPDATE delivery_batches
               SET driver_id = $1,
                   status = 'in_progress'
-            WHERE id = $2`,
+            WHERE id = $2
+              AND (driver_id IS NULL OR driver_id = $1)`,
           [driverId, batchId]
         );
 
@@ -1879,6 +1896,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         });
         socket.emit('batch-assigned', payload);
         broadcastOrderUpdateToAdmins(io, 'batch:assigned', { batchId, driverId, ordersCount });
+        void notifyB2BBatchRecipientsProof(activeOrderIds).catch((notifyErr: any) => {
+          logger.warn('[accept-batch] notifications destinataires B2B:', notifyErr?.message || notifyErr);
+        });
       } catch (error: any) {
         await client.query('ROLLBACK').catch(() => {});
         logger.error('[accept-batch] Erreur acceptation tournée:', error);

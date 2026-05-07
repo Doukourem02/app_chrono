@@ -38,6 +38,7 @@ export function navigateFromClientPushPayload(
   }
   if (
     (type === "order_status" ||
+      type === "delivery_proof_code" ||
       type === "order_status_reminder" ||
       type === "order_rating_reminder") &&
     orderId

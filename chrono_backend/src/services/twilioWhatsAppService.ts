@@ -15,6 +15,14 @@ export function toWhatsAppAddress(phone: string): string {
   return `whatsapp:+${digits}`;
 }
 
+export function isTwilioWhatsAppConfigured(): boolean {
+  const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const token = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const from = process.env.TWILIO_WHATSAPP_FROM?.trim();
+  const messagingServiceSid = process.env.TWILIO_WHATSAPP_MESSAGING_SERVICE_SID?.trim();
+  return Boolean(sid && token && (from || messagingServiceSid));
+}
+
 export async function sendOTPWhatsApp(
   phone: string,
   otpCode: string,
@@ -112,6 +120,87 @@ export async function sendOTPWhatsApp(
     return { success: true, messageId: data.sid };
   } catch (e: any) {
     logger.error('Twilio WhatsApp fetch error:', e);
+    return { success: false, error: e.message || 'Erreur réseau Twilio' };
+  }
+}
+
+const TRANSACTIONAL_WHATSAPP_MAX = 1500;
+
+export async function sendTransactionalWhatsAppTwilio(
+  phone: string,
+  message: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const from = process.env.TWILIO_WHATSAPP_FROM?.trim();
+  const messagingServiceSid = process.env.TWILIO_WHATSAPP_MESSAGING_SERVICE_SID?.trim();
+
+  if (!accountSid || !authToken) {
+    return { success: false, error: 'TWILIO_ACCOUNT_SID ou TWILIO_AUTH_TOKEN manquant' };
+  }
+  if (!from && !messagingServiceSid) {
+    return {
+      success: false,
+      error: 'TWILIO_WHATSAPP_FROM ou TWILIO_WHATSAPP_MESSAGING_SERVICE_SID requis',
+    };
+  }
+
+  let to: string;
+  try {
+    to = toWhatsAppAddress(phone);
+  } catch (e: any) {
+    return { success: false, error: e.message || 'Numéro invalide' };
+  }
+
+  const text = message.replace(/\s+/g, ' ').trim().slice(0, TRANSACTIONAL_WHATSAPP_MAX);
+  if (!text) {
+    return { success: false, error: 'Message vide' };
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const body = new URLSearchParams();
+
+  if (messagingServiceSid) {
+    body.set('MessagingServiceSid', messagingServiceSid);
+  } else if (from) {
+    const fromNorm = from.startsWith('whatsapp:')
+      ? from
+      : `whatsapp:+${from.replace(/\D/g, '')}`;
+    body.set('From', fromNorm);
+  }
+
+  body.set('To', to);
+  body.set('Body', text);
+
+  const auth = Buffer.from(`${accountSid}:${authToken}`, 'utf8').toString('base64');
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+    });
+
+    const data = (await res.json()) as {
+      sid?: string;
+      message?: string;
+      code?: number;
+      more_info?: string;
+    };
+
+    if (!res.ok) {
+      const err = data.message || data.more_info || `Twilio HTTP ${res.status}`;
+      logger.error('Twilio WhatsApp transactionnel error:', err, data);
+      return { success: false, error: err };
+    }
+
+    logger.info(`WhatsApp transactionnel envoyé vers ${to}, sid=${data.sid}`);
+    return { success: true, messageId: data.sid };
+  } catch (e: any) {
+    logger.error('Twilio WhatsApp transactionnel fetch error:', e);
     return { success: false, error: e.message || 'Erreur réseau Twilio' };
   }
 }

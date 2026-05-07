@@ -113,8 +113,13 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const isCompleted = status === 'completed';
   // Afficher le QR code tant qu'il n'a pas été scanné (même si livreur a cliqué "colis livré" par erreur)
   const qrNotScanned = !currentOrder?.delivery_qr_scanned_at && !currentOrder?.deliveryQrScannedAt;
+  const isB2BBatchOrder = Boolean(currentOrder?.isB2BOrder || currentOrder?.batch_id);
   const showQRCodeButton =
-    status === 'enroute' || status === 'picked_up' || status === 'delivering' || (isCompleted && qrNotScanned);
+    status === 'enroute' ||
+    status === 'picked_up' ||
+    status === 'delivering' ||
+    (isB2BBatchOrder && status === 'accepted') ||
+    (isCompleted && qrNotScanned);
 
   useEffect(() => {
     if (currentOrder?.id) {

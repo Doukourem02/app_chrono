@@ -27,6 +27,8 @@ export default function DashboardPage() {
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
   const [isNewShippingModalOpen, setIsNewShippingModalOpen] = useState(false)
+  const [contentColumnHeight, setContentColumnHeight] = useState<number | null>(null)
+  const contentColumnRef = React.useRef<HTMLDivElement>(null)
   const t = useTranslation()
   const language = useLanguageStore((state) => state.language)
 
@@ -50,6 +52,28 @@ export default function DashboardPage() {
       void supabase.removeChannel(channel)
     }
   }, [queryClient])
+
+  useEffect(() => {
+    const node = contentColumnRef.current
+    if (!node || typeof ResizeObserver === 'undefined') return
+
+    const updateHeight = () => {
+      const nextHeight = Math.round(node.getBoundingClientRect().height)
+      setContentColumnHeight((previousHeight) =>
+        previousHeight === nextHeight ? previousHeight : nextHeight
+      )
+    }
+
+    updateHeight()
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(node)
+    window.addEventListener('resize', updateHeight)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateHeight)
+    }
+  }, [])
 
   const getPeriodLabel = () => {
     switch (dateFilter) {
@@ -224,7 +248,7 @@ export default function DashboardPage() {
     display: 'grid',
     gap: '12px',
     gridTemplateColumns: 'minmax(0, 1fr) minmax(360px, 420px)',
-    alignItems: 'start',
+    alignItems: 'stretch',
     minWidth: 0,
     overflow: 'visible',
   }
@@ -275,13 +299,13 @@ export default function DashboardPage() {
 
   const rightColumnStyle: React.CSSProperties = {
     gridColumn: '2',
-     display: 'grid',
-     gridTemplateRows: '1fr auto',
+    display: 'grid',
+    gridTemplateRows: 'minmax(0, 1fr) 150px',
     gap: '12px',
     minWidth: 0,
-     alignSelf: 'stretch',
-     height: '100%',
-     minHeight: 0,
+    alignSelf: 'stretch',
+    height: contentColumnHeight ? `${contentColumnHeight}px` : '100%',
+    minHeight: 0,
     overflow: 'hidden',
   }
 
@@ -377,7 +401,7 @@ export default function DashboardPage() {
       </div>
 
       <div style={mainWrapperStyle}>
-        <div style={contentColumnStyle}>
+        <div ref={contentColumnRef} style={contentColumnStyle}>
           {/* Colonne gauche : 3 cartes KPI empilées */}
           <div style={leftColumnStyle}>
             <KPICard

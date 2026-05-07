@@ -107,7 +107,7 @@ export const getQRCode = async (req: AuthenticatedRequest, res: Response): Promi
 
     // Vérifier les permissions
     const orderResult = await pool.query(
-      `SELECT user_id, driver_id FROM orders WHERE id = $1`,
+      `SELECT user_id, driver_id, recipient_user_id FROM orders WHERE id = $1`,
       [orderId]
     );
 
@@ -120,8 +120,9 @@ export const getQRCode = async (req: AuthenticatedRequest, res: Response): Promi
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
     const isOwner = order.user_id === userId;
     const isDriver = order.driver_id === userId;
+    const isRecipient = order.recipient_user_id === userId;
 
-    if (!isOwner && !isDriver && !isAdmin) {
+    if (!isOwner && !isDriver && !isAdmin && !isRecipient) {
       res.status(403).json({ success: false, message: 'Accès refusé' });
       return;
     }

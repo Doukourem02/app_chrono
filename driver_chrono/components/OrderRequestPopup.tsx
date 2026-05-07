@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import {View,Text,TouchableOpacity,StyleSheet,Animated,Dimensions,Image,StatusBar,} from 'react-native';
+import {View,Text,TouchableOpacity,StyleSheet,Animated,Image,StatusBar,ScrollView,useWindowDimensions,} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useAudioPlayer } from 'expo-audio';
 import { AdminOrderInfo } from './AdminOrderInfo';
@@ -59,7 +60,6 @@ interface OrderRequestPopupProps {
   autoDeclineTimer?: number; // secondes — aligné avec DRIVER_OFFER_RESPONSE_MS (backend) et la barre client (app_chrono)
 }
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ORDER_SOUND = require('../assets/sounds/chronopopus.wav');
 
 export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
@@ -69,7 +69,13 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   onDecline,
   autoDeclineTimer = 30,
 }) => {
-  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const { height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const reservedBottomSpace = Math.max(insets.bottom + 72, 88);
+  const popupMaxHeight = Math.max(420, screenHeight - insets.top - reservedBottomSpace - 28);
+  const scrollMaxHeight = Math.max(280, popupMaxHeight - 74);
+
+  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const timerAnim = useRef(new Animated.Value(1)).current;
@@ -83,7 +89,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   useEffect(() => {
     if (visible && order) {
       // Reset animations
-      slideAnim.setValue(SCREEN_HEIGHT);
+      slideAnim.setValue(screenHeight);
       scaleAnim.setValue(0.8);
       opacityAnim.setValue(0);
       timerAnim.setValue(1);
@@ -125,7 +131,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
         Animated.loop(
           Animated.sequence([
             Animated.timing(pulseAnim, {
-              toValue: 1.05,
+              toValue: 1.02,
               duration: 1000,
               useNativeDriver: true,
             }),
@@ -175,7 +181,7 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
   const animateOut = (callback: () => void) => {
     Animated.parallel([
       Animated.timing(slideAnim, {
-        toValue: SCREEN_HEIGHT,
+        toValue: screenHeight,
         duration: 300,
         useNativeDriver: true,
       }),
@@ -264,6 +270,10 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
         style={[
           styles.container,
           {
+            paddingTop: insets.top + 14,
+            paddingBottom: reservedBottomSpace,
+          },
+          {
             transform: [
               { translateY: slideAnim },
               { scale: scaleAnim },
@@ -292,162 +302,169 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
         <Animated.View
           style={[
             styles.content,
+            { maxHeight: popupMaxHeight },
             {
               transform: [{ scale: pulseAnim }],
             },
           ]}
         >
-          {/* Header avec avatar user */}
-          <View style={styles.header}>
-            <View style={styles.userInfo}>
-              <View style={styles.avatarContainer}>
-                {order.user.avatar ? (
-                  <Image source={{ uri: order.user.avatar }} style={styles.avatar} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarText}>
-                      {clientInitial}
+          <ScrollView
+            style={[styles.scrollContent, { maxHeight: scrollMaxHeight }]}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header avec avatar user */}
+            <View style={styles.header}>
+              <View style={styles.userInfo}>
+                <View style={styles.avatarContainer}>
+                  {order.user.avatar ? (
+                    <Image source={{ uri: order.user.avatar }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarText}>
+                        {clientInitial}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.userDetails}>
+                  <Text style={styles.userName} numberOfLines={1}>{clientDisplayName}</Text>
+                  <View style={styles.ratingContainer}>
+                    <Text style={styles.starIcon}>⭐</Text>
+                    <Text style={styles.rating}>
+                      {(order.user.rating ?? 0).toFixed(1)}
                     </Text>
                   </View>
-                )}
+                </View>
               </View>
-              <View style={styles.userDetails}>
-                <Text style={styles.userName}>{clientDisplayName}</Text>
-                <View style={styles.ratingContainer}>
-                  <Text style={styles.starIcon}>⭐</Text>
-                  <Text style={styles.rating}>
-                    {(order.user.rating ?? 0).toFixed(1)}
+              
+              <View style={styles.priceContainer}>
+                <Text style={styles.priceAmount}>{order.price} FCFA</Text>
+                <Text style={styles.priceLabel}>Prix Course</Text>
+              </View>
+            </View>
+
+            {/* Informations spéciales pour les commandes admin/téléphoniques */}
+            <AdminOrderInfo
+              isPhoneOrder={order.isPhoneOrder || false}
+              placedByAdmin={order.placedByAdmin}
+              isB2BOrder={order.isB2BOrder || false}
+              operatorCourseNotes={order.operatorCourseNotes}
+              driverNotes={order.driverNotes}
+              approximatePickupZoneLabel={order.pickup?.approximate_pickup_zone_label}
+              partner_name={order.partner_name}
+              batch_position={order.batch_position}
+              batch_total={order.batch_total}
+            />
+
+            {/* Info de livraison */}
+            <View style={styles.deliveryInfo}>
+              <View style={styles.methodContainer}>
+                <Image source={getVehicleIcon(order.deliveryMethod)} style={styles.vehicleIcon} />
+                <Text style={styles.methodText}>{getMethodLabel(order.deliveryMethod)}</Text>
+              </View>
+              
+              <View style={styles.distanceInfo}>
+                <Text style={styles.distanceText}>{order.distance.toFixed(1)} km</Text>
+                <Text style={styles.durationText}>{order.estimatedDuration}</Text>
+              </View>
+            </View>
+
+            {(() => {
+              const modeLabel = driverFacingSpeedOptionLabel(order.speedOptionId);
+              if (!order.speedOptionId) return null;
+              return (
+                <View style={styles.serviceModeBanner}>
+                  <Text style={styles.serviceModeLabel}>Mode de service</Text>
+                  <Text style={styles.serviceModeValue}>{modeLabel}</Text>
+                </View>
+              );
+            })()}
+
+            {order.payment_method_type && (
+              <View style={[
+                styles.serviceModeBanner,
+                order.payment_method_type === 'deferred' ? styles.paymentDeferredBanner : styles.paymentBanner,
+              ]}>
+                <Text style={[
+                  styles.serviceModeLabel,
+                  order.payment_method_type === 'deferred' ? styles.paymentDeferredLabel : styles.paymentLabel,
+                ]}>Mode de paiement</Text>
+                <Text style={[
+                  styles.serviceModeValue,
+                  order.payment_method_type === 'deferred' ? styles.paymentDeferredValue : styles.paymentValue,
+                ]}>
+                  {order.payment_method_type === 'deferred' ? '⏳ Paiement différé'
+                    : order.payment_method_type === 'orange_money' ? '🟠 Orange Money'
+                    : order.payment_method_type === 'wave' ? '🔵 Wave'
+                    : order.payment_method_type === 'cash' ? '💵 Espèces'
+                    : order.payment_method_type}
+                </Text>
+              </View>
+            )}
+
+            {(() => {
+              const instr = parseClientOrderInstructions(
+                order.dropoff?.details as Record<string, unknown> | undefined
+              );
+              if (!instr) return null;
+              const hasDetailMessages =
+                (instr.courierNote && instr.courierNote.length > 0) ||
+                (instr.recipientMessage && instr.recipientMessage.length > 0);
+              return (
+                <View style={styles.preAcceptHints}>
+                  {instr.thermalBag ? (
+                    <View style={styles.preAcceptRow}>
+                      <Text style={styles.preAcceptKey}>Maintien température</Text>
+                      <Text style={styles.preAcceptVal}>Oui</Text>
+                    </View>
+                  ) : null}
+                  {instr.scheduledWindowNote ? (
+                    <View style={styles.preAcceptBlock}>
+                      <Text style={styles.preAcceptKey}>Créneau souhaité</Text>
+                      <Text style={styles.preAcceptMultiline} numberOfLines={2}>
+                        {instr.scheduledWindowNote}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {hasDetailMessages ? (
+                    <Text style={styles.preAcceptFootnote}>
+                      Consignes détaillées : consultez la fiche après acceptation.
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })()}
+
+            {/* Adresses */}
+            <View style={styles.addressesContainer}>
+              <View style={styles.addressRow}>
+                <View style={styles.addressIcon}>
+                  <View style={styles.pickupDot} />
+                </View>
+                <View style={styles.addressContent}>
+                  <Text style={styles.addressLabel}>Prise en Charge</Text>
+                  <Text style={styles.addressText} numberOfLines={1}>
+                    {order.pickup.address}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.routeLine} />
+              
+              <View style={styles.addressRow}>
+                <View style={styles.addressIcon}>
+                  <View style={styles.dropoffDot} />
+                </View>
+                <View style={styles.addressContent}>
+                  <Text style={styles.addressLabel}>Destination</Text>
+                  <Text style={styles.addressText} numberOfLines={1}>
+                    {order.dropoff.address}
                   </Text>
                 </View>
               </View>
             </View>
-            
-            <View style={styles.priceContainer}>
-              <Text style={styles.priceAmount}>{order.price} FCFA</Text>
-              <Text style={styles.priceLabel}>Prix Course</Text>
-            </View>
-          </View>
-
-          {/* Informations spéciales pour les commandes admin/téléphoniques */}
-          <AdminOrderInfo
-            isPhoneOrder={order.isPhoneOrder || false}
-            placedByAdmin={order.placedByAdmin}
-            isB2BOrder={order.isB2BOrder || false}
-            operatorCourseNotes={order.operatorCourseNotes}
-            driverNotes={order.driverNotes}
-            approximatePickupZoneLabel={order.pickup?.approximate_pickup_zone_label}
-            partner_name={order.partner_name}
-            batch_position={order.batch_position}
-            batch_total={order.batch_total}
-          />
-
-          {/* Info de livraison */}
-          <View style={styles.deliveryInfo}>
-            <View style={styles.methodContainer}>
-              <Image source={getVehicleIcon(order.deliveryMethod)} style={styles.vehicleIcon} />
-              <Text style={styles.methodText}>{getMethodLabel(order.deliveryMethod)}</Text>
-            </View>
-            
-            <View style={styles.distanceInfo}>
-              <Text style={styles.distanceText}>{order.distance.toFixed(1)} km</Text>
-              <Text style={styles.durationText}>{order.estimatedDuration}</Text>
-            </View>
-          </View>
-
-          {(() => {
-            const modeLabel = driverFacingSpeedOptionLabel(order.speedOptionId);
-            if (!order.speedOptionId) return null;
-            return (
-              <View style={styles.serviceModeBanner}>
-                <Text style={styles.serviceModeLabel}>Mode de service</Text>
-                <Text style={styles.serviceModeValue}>{modeLabel}</Text>
-              </View>
-            );
-          })()}
-
-          {order.payment_method_type && (
-            <View style={[
-              styles.serviceModeBanner,
-              order.payment_method_type === 'deferred' ? styles.paymentDeferredBanner : styles.paymentBanner,
-            ]}>
-              <Text style={[
-                styles.serviceModeLabel,
-                order.payment_method_type === 'deferred' ? styles.paymentDeferredLabel : styles.paymentLabel,
-              ]}>Mode de paiement</Text>
-              <Text style={[
-                styles.serviceModeValue,
-                order.payment_method_type === 'deferred' ? styles.paymentDeferredValue : styles.paymentValue,
-              ]}>
-                {order.payment_method_type === 'deferred' ? '⏳ Paiement différé'
-                  : order.payment_method_type === 'orange_money' ? '🟠 Orange Money'
-                  : order.payment_method_type === 'wave' ? '🔵 Wave'
-                  : order.payment_method_type === 'cash' ? '💵 Espèces'
-                  : order.payment_method_type}
-              </Text>
-            </View>
-          )}
-
-          {(() => {
-            const instr = parseClientOrderInstructions(
-              order.dropoff?.details as Record<string, unknown> | undefined
-            );
-            if (!instr) return null;
-            const hasDetailMessages =
-              (instr.courierNote && instr.courierNote.length > 0) ||
-              (instr.recipientMessage && instr.recipientMessage.length > 0);
-            return (
-              <View style={styles.preAcceptHints}>
-                {instr.thermalBag ? (
-                  <View style={styles.preAcceptRow}>
-                    <Text style={styles.preAcceptKey}>Maintien température</Text>
-                    <Text style={styles.preAcceptVal}>Oui</Text>
-                  </View>
-                ) : null}
-                {instr.scheduledWindowNote ? (
-                  <View style={styles.preAcceptBlock}>
-                    <Text style={styles.preAcceptKey}>Créneau souhaité</Text>
-                    <Text style={styles.preAcceptMultiline} numberOfLines={3}>
-                      {instr.scheduledWindowNote}
-                    </Text>
-                  </View>
-                ) : null}
-                {hasDetailMessages ? (
-                  <Text style={styles.preAcceptFootnote}>
-                    Consignes détaillées (livreur / destinataire) : consultez la fiche commande après acceptation.
-                  </Text>
-                ) : null}
-              </View>
-            );
-          })()}
-
-          {/* Adresses */}
-          <View style={styles.addressesContainer}>
-            <View style={styles.addressRow}>
-              <View style={styles.addressIcon}>
-                <View style={styles.pickupDot} />
-              </View>
-              <View style={styles.addressContent}>
-                <Text style={styles.addressLabel}>Prise en Charge</Text>
-                <Text style={styles.addressText} numberOfLines={2}>
-                  {order.pickup.address}
-                </Text>
-              </View>
-            </View>
-            
-            <View style={styles.routeLine} />
-            
-            <View style={styles.addressRow}>
-              <View style={styles.addressIcon}>
-                <View style={styles.dropoffDot} />
-              </View>
-              <View style={styles.addressContent}>
-                <Text style={styles.addressLabel}>Destination</Text>
-                <Text style={styles.addressText} numberOfLines={2}>
-                  {order.dropoff.address}
-                </Text>
-              </View>
-            </View>
-          </View>
+          </ScrollView>
 
           {/* Boutons d'action */}
           <View style={styles.actionsContainer}>
@@ -520,21 +537,27 @@ const styles = StyleSheet.create({
   },
   content: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: 18,
+    padding: 18,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 380,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 20,
   },
+  scrollContent: {
+    flexShrink: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: 12,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   userInfo: {
     flexDirection: 'row',
@@ -542,31 +565,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatarContainer: {
-    marginRight: 12,
+    marginRight: 10,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#8B5CF6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 'bold',
   },
   userDetails: {
     flex: 1,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 2,
@@ -588,7 +611,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   priceAmount: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#059669',
   },
@@ -602,9 +625,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
   },
   methodContainer: {
     flexDirection: 'row',
@@ -636,9 +659,9 @@ const styles = StyleSheet.create({
   },
   serviceModeBanner: {
     backgroundColor: '#F5F3FF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#DDD6FE',
   },
@@ -651,7 +674,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   serviceModeValue: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
     color: '#4C1D95',
   },
@@ -676,7 +699,7 @@ const styles = StyleSheet.create({
     color: '#B45309',
   },
   preAcceptHints: {
-    marginBottom: 16,
+    marginBottom: 10,
   },
   preAcceptRow: {
     flexDirection: 'row',
@@ -685,8 +708,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB',
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
+    paddingVertical: 8,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: '#FDE68A',
   },
@@ -703,8 +726,8 @@ const styles = StyleSheet.create({
   preAcceptBlock: {
     backgroundColor: '#F0FDF4',
     borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
+    padding: 10,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: '#BBF7D0',
   },
@@ -721,7 +744,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   addressesContainer: {
-    marginBottom: 24,
+    marginBottom: 2,
   },
   addressRow: {
     flexDirection: 'row',
@@ -746,15 +769,15 @@ const styles = StyleSheet.create({
   },
   routeLine: {
     width: 2,
-    height: 20,
+    height: 14,
     backgroundColor: '#E5E7EB',
     marginLeft: 11,
-    marginVertical: 4,
+    marginVertical: 2,
   },
   addressContent: {
     flex: 1,
     marginLeft: 12,
-    paddingBottom: 8,
+    paddingBottom: 5,
   },
   addressLabel: {
     fontSize: 12,
@@ -765,7 +788,7 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 14,
     color: '#374151',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   clientInstructionsBox: {
     backgroundColor: '#F5F3FF',
@@ -809,12 +832,13 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     gap: 12,
+    paddingTop: 2,
   },
   declineButton: {
     flex: 1,
     backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: 10,
+    paddingVertical: 13,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -827,8 +851,8 @@ const styles = StyleSheet.create({
   acceptButton: {
     flex: 1,
     backgroundColor: '#8B5CF6',
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: 10,
+    paddingVertical: 13,
     alignItems: 'center',
   },
   acceptText: {

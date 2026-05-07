@@ -275,7 +275,16 @@ Règles :
 - Migration `022` : index unique `(order_id, scanned_by)` sur `qr_code_scans`.
 - `QR_CODE_SECRET` doit être identique sur toutes les instances backend prod.
 
-Décision ouverte : scan obligatoire avant `completed` ou preuve complémentaire seulement.
+Tournées B2B :
+
+- Une tournée peut être acceptée en bloc, mais la preuve reste individuelle : **N livraisons = N preuves**.
+- Chaque livraison enfant doit avoir son propre QR ou code sécurisé.
+- Le scan QR passe l'`expectedOrderId` côté chauffeur et le backend refuse un QR qui correspond à une autre livraison.
+- La saisie manuelle valide le code pour l'`orderId` concerné ; un code d'une autre livraison ne doit pas clôturer cet arrêt.
+- Si le QR/code n'est pas disponible, la preuve alternative doit être encadrée : photo, nom/signature, horodatage, position GPS et identité livreur.
+- Les preuves alternatives sont visibles côté admin / portail partenaire comme preuve moins forte qu'un QR ou code validé.
+
+Décision ouverte hors tournée : pour les commandes classiques, scan obligatoire avant `completed` ou preuve complémentaire seulement.
 
 ---
 
@@ -381,6 +390,7 @@ Smoke tests prod :
 | `035_orders_add_b2b_columns.sql` *(à appliquer)* | `ALTER TABLE orders ADD COLUMN partner_id` + `is_b2b_order` |
 | `036_migrate_existing_b2b_partners.sql` *(à appliquer)* | Backfill partenaires existants : crée `partners` + `partner_users` + remplit `orders.partner_id` |
 | `037_partners_add_inactive_status.sql` *(à appliquer)* | **Critique** — ajoute `inactive` au CHECK constraint de `partners.status` |
+| `041_partner_dedicated_driver_requests.sql` *(à appliquer)* | Livreurs dédiés partenaires : `partner_drivers`, demandes `partner_driver_requests`, unicité `(partner_id, driver_user_id)` et un seul défaut |
 
 Migrations SQL : voir `chrono_backend/migrations/README.md`.
 
@@ -680,7 +690,45 @@ Lambda : pas de tournée grand public pour l'instant. Hybride : pas de saisie ho
 - Tous les livreurs disponibles notifiés
 - Livreurs **internes** prioritaires sur commandes B2B
 - Paiement **différé** (`deferred`) disponible
-- Si livreur attitré défini (`partner_drivers` + choix pour la course ou tournée) → assignation directe, pas de dispatch large
+- Si livreur attitré sélectionné pour une commande unitaire → `preferred_driver_id` priorisé, puis fallback automatique si le livreur n'est pas joignable ou refuse.
+- Si livreur attitré sélectionné pour une tournée → `driver_id` explicite sur `/api/batches`, donc assignation directe au livreur choisi.
+
+### Livreurs dédiés partenaires
+
+Définitions :
+- **Livreur B2B opt-in** : livreur qui accepte de recevoir des commandes B2B (`driver_profiles.accepts_b2b_orders = true`).
+- **Livreur dédié partenaire** : livreur explicitement rattaché à un partenaire dans `partner_drivers`.
+- **Priorité douce** : Krono propose d'abord la commande au livreur dédié sélectionné, puis l'assignation automatique prend le relais si besoin.
+
+Règle produit : le partenaire peut demander ou sélectionner un livreur déjà validé, mais il ne rattache jamais directement un livreur à son compte. Le rattachement officiel reste une action admin Krono.
+
+Modèle de données :
+- `partner_drivers.partner_id` + `driver_user_id` identifie le rattachement.
+- Un même livreur peut être dédié à plusieurs partenaires ; l'unicité est seulement sur le couple `(partner_id, driver_user_id)`.
+- Un seul livreur par défaut est autorisé par partenaire (`is_default = true` unique).
+- `partner_driver_requests` couvre trois demandes : `known_driver`, `previous_krono_driver`, `general_request`.
+
+Admin Krono :
+- Liste les livreurs dédiés d'un partenaire avec nom, téléphone, disponibilité, véhicule et opt-in B2B.
+- Ajoute un livreur existant, refuse un utilisateur qui n'a pas `role = driver`, et retourne un warning si le livreur n'accepte pas encore les commandes B2B.
+- Définit le livreur par défaut en remettant les autres rattachements du partenaire à `is_default = false`.
+- Retire un livreur dédié.
+- Liste et traite les demandes partenaire : validation avec `driver_user_id` ou rejet avec note.
+
+Portail partenaire :
+- Affiche les livreurs dédiés en lecture seule.
+- Sur une nouvelle commande, propose "Assignation automatique" et les livreurs dédiés configurés ; les livreurs sans opt-in B2B sont désactivés avec un libellé clair.
+- Sélectionne automatiquement le livreur par défaut si `is_default = true` et `accepts_b2b_orders = true`.
+- Envoie `preferred_driver_id` seulement si la préférence livreur est activée.
+- Permet de demander un livreur dédié depuis l'historique d'une commande livrée par Krono, ou via une demande générale.
+
+Texte produit recommandé :
+
+> Livreur dédié : Krono propose d'abord la commande au livreur sélectionné pour ce partenaire. Si aucun livreur dédié n'est disponible, l'assignation automatique prend le relais.
+
+Texte de demande :
+
+> Vous souhaitez un livreur dédié ? Envoyez une demande à Krono. Notre équipe vérifie le livreur et l'ajoute à votre compte si tout est conforme.
 
 ---
 
@@ -692,6 +740,27 @@ Un partenaire B2B livre souvent plusieurs commandes en une seule sortie (ex : 8 
 2. Optimise automatiquement l'ordre de passage via l'algorithme nearest-neighbor (haversine)
 3. Permet au livreur de valider chaque livraison une par une
 4. Clôture la tournée automatiquement quand toutes les commandes sont `completed` ou `cancelled`
+
+Règle centrale : **une tournée B2B = une popup, une acceptation, une assignation** ; les livraisons enfants ne déclenchent pas de popups séparées.
+
+Notification livreur :
+- L'offre de tournée est émise au niveau `batchId` via `batch-assigned` avec `status: "offer"` et `ordersCount`.
+- Le message côté chauffeur doit présenter la tournée complète, par exemple "Nouvelle tournée B2B - 18 livraisons à effectuer".
+- Le livreur a deux actions principales : accepter ou refuser.
+- L'app chauffeur déduplique par `batchId` pour éviter plusieurs popups si le socket rejoue le même événement.
+- Le backend ne doit pas envoyer `new-order-request` pour chaque livraison enfant d'une tournée.
+
+Acceptation :
+- L'acceptation se fait au niveau `batchId` (`accept-batch`).
+- Si la tournée est libre, elle est assignée au livreur qui accepte.
+- Si elle est déjà assignée au même livreur, l'app ouvre la tournée sans afficher "Tournée indisponible".
+- Si elle est déjà assignée à un autre livreur, alors seulement l'app affiche l'indisponibilité.
+- Le backend verrouille la ligne `delivery_batches` pendant l'acceptation pour rendre le double clic / double événement socket idempotent.
+
+Après acceptation :
+- L'écran `/batch/[batchId]` charge toutes les livraisons enfants via `GET /api/batches/:id`.
+- Chaque arrêt propose scan QR, saisie manuelle du code, ou preuve alternative encadrée.
+- Le backend vérifie que l'arrêt appartient bien à la tournée et au livreur avant de le clôturer.
 
 ---
 
@@ -830,7 +899,8 @@ Accueil B2B → "Tournée Lots" → BatchShippingBottomSheet (3 étapes)
             → haversine nearest-neighbor → ordre optimisé [2,0,1]
             → INSERT delivery_batches + batch_orders (positions 1,2,3)
             → incrementPartnerUsage × 3
-            → emitBatchAssigned(driver_id, { batchId, ordersCount:3 })
+            → emit batch-assigned { batchId, ordersCount:3, status:"offer" } si auto
+            → ou assignation directe si driver_id explicite
   → Step 'success' : ordre optimisé affiché
 ```
 
@@ -838,19 +908,24 @@ Accueil B2B → "Tournée Lots" → BatchShippingBottomSheet (3 étapes)
 ```
 Socket "batch-assigned" reçu { batchId, ordersCount:3 }
   → son + haptic
-  → useBatchStore.setActiveBatch({ id: batchId, ordersCount:3, stops:[] })
+  → popup custom "Nouvelle tournée B2B - 3 livraisons à effectuer"
+  → [Accepter] émet accept-batch { batchId }
+  → confirmation backend → useBatchStore.setActiveBatch({ id: batchId, ordersCount:3, stops:[] })
   → router.push("/batch/batch_xyz")
 
 BatchScreen monte :
   → GET /api/batches/batch_xyz (verifyJWT) → stops ordonnés par position
   → Affiche : barre de progression 0/3 + liste ordonnée
 
-Pour chaque stop → appuie "Livré ✓" :
-  → PATCH /api/batches/:id/orders/:orderId { status:"completed" }
+Pour chaque stop :
+  → Scanner QR : POST /api/qr-codes/scan avec expectedOrderId=orderId
+  → ou Entrer le code : POST /api/qr-codes/manual avec orderId
+  → ou Preuve alternative : photo + nom/signature + GPS
+  → PATCH /api/batches/:id/orders/:orderId { status:"completed", proofMethod }
   → backend vérifie remaining → si 0 : delivery_batches.status="completed"
   → updateStop locale → progress ++
 
-Appui long "Livré ✓" → Alert annulation → PATCH status:"cancelled"
+Appui long "Preuve alternative" → confirmation annulation → PATCH status:"cancelled"
 
 Quand remaining=0 → écran "Tournée terminée !" → retour accueil
 ```
@@ -889,6 +964,12 @@ setInterval 24h → maybeRunInvoiceJob()
 | `PATCH` | `/api/partners/:id/subscriptions/:subId/activate` | Valider paiement → activer l'abonnement |
 | `GET` | `/api/partners/:id/usage` | Quota du mois courant |
 | `GET` | `/api/partners/:id/invoices` | Historique factures |
+| `GET` | `/api/partners/:id/drivers` | Lister les livreurs dédiés |
+| `POST` | `/api/partners/:id/drivers` | Rattacher un livreur dédié existant |
+| `DELETE` | `/api/partners/:id/drivers/:driverUserId` | Retirer un livreur dédié |
+| `PATCH` | `/api/partners/:id/drivers/:driverUserId/default` | Définir le livreur par défaut |
+| `GET` | `/api/partners/:id/driver-requests` | Lister les demandes de livreur dédié |
+| `PATCH` | `/api/partners/:id/driver-requests/:requestId` | Valider ou refuser une demande |
 
 **JWT standard (`verifyJWT`) — mobile partenaire + livreur**
 
@@ -905,6 +986,9 @@ setInterval 24h → maybeRunInvoiceJob()
 | `GET` | `/api/partner/:partnerId/details` | Voir sa propre fiche |
 | `GET` | `/api/partner/:partnerId/usage` | Voir son quota du mois |
 | `GET` | `/api/partner/:partnerId/invoices` | Voir ses factures |
+| `GET` | `/api/partner/:partnerId/drivers` | Voir les livreurs dédiés validés par Krono |
+| `POST` | `/api/partner/:partnerId/driver-requests` | Demander un livreur dédié |
+| `PATCH` | `/api/partner/:partnerId/preferences` | Activer/désactiver l'usage des livreurs préférés |
 
 ---
 
@@ -1036,18 +1120,22 @@ ADMIN                   BACKEND                  LIVREUR APP
 │  ████████░░░░░░░░░░░░░░░░░░░░░░░       │
 │                                        │
 │  ①  Mamadou Diallo               📞   │
-│     12 Rue des Peupliers      Livré ✓  │
-│  ②✓ Aïssa Koné          [Livré]       │
-│  ③✓ Ibrahima Sow         [Livré]      │
+│     12 Rue des Peupliers              │
+│     [Scanner QR] [Entrer code]        │
+│     [Preuve alternative]              │
+│  ②✓ Aïssa Koné          QR validé     │
+│  ③✓ Ibrahima Sow         Code validé  │
 │  ④  Fatou Traoré                 📞   │
-│     45 Ave de la Paix         Livré ✓  │
+│     45 Ave de la Paix                 │
+│     [Scanner QR] [Entrer code]        │
 │  ⑤…⑥…⑦…⑧…⑨…⑩                       │
 │                                        │
-│  Appui long sur « Livré ✓ » → annuler  │
+│  Appui long sur preuve alternative     │
+│  → annuler une livraison               │
 └────────────────────────────────────────┘
 ```
 
-Le livreur valide **stop par stop** dans l'ordre qu'il veut. Quand tout est `completed` ou `cancelled` → écran "Tournée terminée !".
+Le livreur valide **stop par stop** dans l'ordre qu'il veut. Chaque stop doit avoir sa propre preuve. Quand tout est `completed` ou `cancelled` → écran "Tournée terminée !".
 
 #### Cas 3 — Commande B2B individuelle (1 livraison d'un partenaire)
 
@@ -1071,7 +1159,7 @@ Même flux que le Cas 1, mais la popup affiche le contexte B2B :
 |---|---|---|
 | Client standard, 1 livraison | Popup d'acceptation (30s) | Géofencing + QR |
 | Partenaire B2B, 1 livraison | Popup avec badge B2B + nom partenaire | Idem |
-| Partenaire B2B, N livraisons (tournée) | 1 notification → écran liste des stops | Bouton "Livré ✓" par stop |
+| Partenaire B2B, N livraisons (tournée) | 1 popup tournée avec `ordersCount` → écran liste des stops | QR/code/preuve alternative par stop |
 
 #### Règle socket (anti-spam tournée)
 
@@ -1082,9 +1170,11 @@ Commande individuelle  → socket "new-order-request" → popup d'acceptation
 
 Les N commandes d'un batch sont créées **silencieusement** via REST. Aucune popup individuelle n'apparaît pour une commande appartenant à une tournée.
 
+Si deux événements `batch-assigned` arrivent pour le même `batchId`, l'app chauffeur garde une seule popup visible. Si le livreur refuse, ce `batchId` est mis en sourdine pour la session afin d'éviter une reproposition immédiate en boucle.
+
 ---
 
-### État d'avancement B2B (au 2026-05-04)
+### État d'avancement B2B (au 2026-05-07)
 
 | Bloc | Contenu | Statut |
 |---|---|---|
@@ -1092,13 +1182,14 @@ Les N commandes d'un batch sont créées **silencieusement** via REST. Aucune po
 | **Bloc 2** | Routes backend, `computeB2BCommission` dans `orderRecordController`, tournées, facturation, middleware | ✅ Implémenté |
 | **Bloc 3** | Interface admin : créer/gérer partenaires, activer abonnements + portail partenaire complet | ✅ Implémenté |
 | **Bloc 4** | `app_chrono` : onboarding B2B, Profil 1 (livraison client), Profil 2 (tournée), ActionCards, `setBusinessMode` pour le toggle | ✅ Implémenté |
-| **Bloc 5** | `driver_chrono` : réception tournée groupée (1 notif), vue ordonnée, validation par livraison, contexte partenaire | ✅ Implémenté |
+| **Bloc 5** | `driver_chrono` : réception tournée groupée (1 popup), déduplication par `batchId`, vue ordonnée, QR/code/preuve alternative par livraison, contexte partenaire | ✅ Implémenté |
 | **Bloc 6** | Grille tarifaire v2 (forfaits + paiement à la course) | ✅ Alignée doc + `PLAN_DEFAULTS` + `QUOTA_COMMISSION` (toute évolution : une seule source puis propagation) |
 | **Bloc 7** | Statuts, séparation agrément / mode business, sécurité portail, sync admin temps réel | ✅ Implémenté (ajustements audit voir ci-dessous) |
 | **Bloc 8** | Segmentation Starter (petit B2B) vs Pro/Business (grand B2B) : blocage portail API 403 + redirection frontend page upgrade + `b2b_tier` / `portal_eligible` exposés dans `getPartner` | ✅ Implémenté |
+| **Bloc 9** | Livreurs dédiés partenaires : gestion admin, demandes portail, sélection commande/tournée, opt-in B2B et fallback automatique | ✅ Implémenté |
 
 **Reste à faire :**
-1. Appliquer les migrations `032` → `037` sur l'environnement Supabase cible (dans l'ordre) — la `037` ajoute `inactive` au CHECK de `partners.status` (requis pour les chemins admin qui passent un partenaire en `inactive`).
+1. Appliquer les migrations `032` → `037`, puis `041` sur l'environnement Supabase cible (dans l'ordre) — la `037` ajoute `inactive` au CHECK de `partners.status`, la `041` ajoute les demandes de livreur dédié et renforce `partner_drivers`.
 2. Synchroniser `partner_id` dans `useAuthStore` lors du `validateUser` si besoin (éviter alertes « compte non lié » après onboarding sans re-login).
 3. Assouplir la condition `partner_id` dans `NewB2BShippingModal` : Profil 1 (`is_business=true`, `partner_id=null`) doit pouvoir créer des livraisons avec commission selon règle métier (voir section « Concepts fondamentaux » et grille sans abonnement).
 4. **Audit / traçabilité** (non implémenté) : journaliser désactivation, réactivation et suspension avec `user_id` / `partner_id` / `ancien_statut` / `nouveau_statut` / `timestamp` / `source` (`app` | `admin` | `portail`). Créer une table `partner_audit_logs` ou enrichir les logs backend existants.

@@ -50,6 +50,7 @@ type TrackData = {
   distance: number | null
   createdAt: string
   qrCodeImage: string | null
+  verificationCode?: string | null
   showQRCode: boolean
   webPushAvailable?: boolean
 }
@@ -462,6 +463,16 @@ export default function TrackPage() {
                   className="block"
                 />
               </div>
+              {data.verificationCode && (
+                <div className="mx-auto mt-4 max-w-xs rounded-2xl bg-violet-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-500">
+                    Code manuel
+                  </p>
+                  <p className="mt-1 text-3xl font-black tracking-[0.18em] text-violet-800">
+                    {data.verificationCode}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

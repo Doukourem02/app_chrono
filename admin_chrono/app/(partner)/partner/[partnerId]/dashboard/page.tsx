@@ -8,6 +8,21 @@ import { partnerApiService } from '@/lib/partnerApiService'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 
+const ORDER_STATUS_BADGES: Record<string, { bg: string; color: string }> = {
+  pending: { bg: themeColors.yellowLight, color: themeColors.yellowPrimary },
+  accepted: { bg: themeColors.blueLight, color: themeColors.bluePrimary },
+  assigned: { bg: themeColors.blueLight, color: themeColors.bluePrimary },
+  enroute: { bg: themeColors.blueLight, color: themeColors.bluePrimary },
+  in_progress: { bg: themeColors.purpleLight, color: themeColors.purplePrimary },
+  picked_up: { bg: themeColors.purpleLight, color: themeColors.purplePrimary },
+  delivering: { bg: themeColors.purpleLight, color: themeColors.purplePrimary },
+  completed: { bg: themeColors.greenLight, color: themeColors.greenPrimary },
+  delivered: { bg: themeColors.greenLight, color: themeColors.greenPrimary },
+  cancelled: { bg: themeColors.redLight, color: themeColors.redPrimary },
+  canceled: { bg: themeColors.redLight, color: themeColors.redPrimary },
+  declined: { bg: themeColors.yellowLight, color: themeColors.yellowPrimary },
+}
+
 export default function PartnerDashboardPage() {
   const { partnerId } = useParams<{ partnerId: string }>()
   const router = useRouter()
@@ -97,26 +112,31 @@ export default function PartnerDashboardPage() {
           <p style={{ fontSize: 13, color: themeColors.textSecondary }}>{"Aucune commande aujourd'hui."}</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {todayOrders.slice(0, 8).map((o) => (
-              <div key={o.id as string} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 8, backgroundColor: themeColors.background, border: `1px solid ${themeColors.cardBorder}` }}>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: themeColors.textPrimary }}>{o.dropoff_address as string ?? '—'}</p>
-                  <p style={{ fontSize: 12, color: themeColors.textSecondary }}>{o.orderId as string ?? o.id as string}</p>
+            {todayOrders.slice(0, 8).map((o) => {
+              const status = String(o.status ?? '')
+              const badge = ORDER_STATUS_BADGES[status] ?? { bg: themeColors.purpleLight, color: themeColors.purplePrimary }
+
+              return (
+                <div key={o.id as string} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 8, backgroundColor: themeColors.background, border: `1px solid ${themeColors.cardBorder}` }}>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: themeColors.textPrimary }}>{o.dropoff_address as string ?? '—'}</p>
+                    <p style={{ fontSize: 12, color: themeColors.textSecondary }}>{o.orderId as string ?? o.id as string}</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, backgroundColor: badge.bg, color: badge.color }}>
+                      {status}
+                    </span>
+                    <button
+                      onClick={() => router.push(`/partner/${partnerId}/orders/${o.id as string}/tracking`)}
+                      aria-label="Suivre la livraison"
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.purplePrimary, cursor: 'pointer' }}
+                    >
+                      <Navigation size={15} />
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, backgroundColor: themeColors.purpleLight, color: themeColors.purplePrimary }}>
-                    {o.status as string}
-                  </span>
-                  <button
-                    onClick={() => router.push(`/partner/${partnerId}/orders/${o.id as string}/tracking`)}
-                    aria-label="Suivre la livraison"
-                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.purplePrimary, cursor: 'pointer' }}
-                  >
-                    <Navigation size={15} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

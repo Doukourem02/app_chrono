@@ -22,10 +22,23 @@ export interface ActiveBatch {
   created_at?: string;
 }
 
+export interface BatchOffer {
+  batchId: string;
+  ordersCount: number;
+  partner_id?: string;
+  partner_name?: string;
+}
+
 interface BatchState {
   activeBatch: ActiveBatch | null;
+  pendingOffer: BatchOffer | null;
+  offerError: { batchId?: string; message: string } | null;
   isLoading: boolean;
   setActiveBatch: (batch: ActiveBatch) => void;
+  setPendingOffer: (offer: BatchOffer) => void;
+  clearPendingOffer: (batchId?: string) => void;
+  setOfferError: (error: { batchId?: string; message: string }) => void;
+  clearOfferError: () => void;
   updateStop: (
     orderId: string,
     status: 'completed' | 'cancelled',
@@ -37,9 +50,23 @@ interface BatchState {
 
 export const useBatchStore = create<BatchState>((set) => ({
   activeBatch: null,
+  pendingOffer: null,
+  offerError: null,
   isLoading: false,
 
   setActiveBatch: (batch) => set({ activeBatch: batch }),
+
+  setPendingOffer: (offer) => set({ pendingOffer: offer, offerError: null }),
+
+  clearPendingOffer: (batchId) =>
+    set((state) => {
+      if (batchId && state.pendingOffer?.batchId !== batchId) return state;
+      return { pendingOffer: null };
+    }),
+
+  setOfferError: (error) => set({ offerError: error, pendingOffer: null }),
+
+  clearOfferError: () => set({ offerError: null }),
 
   updateStop: (orderId, status, proof) =>
     set((state) => {
@@ -54,7 +81,7 @@ export const useBatchStore = create<BatchState>((set) => ({
       };
     }),
 
-  clearBatch: () => set({ activeBatch: null }),
+  clearBatch: () => set({ activeBatch: null, pendingOffer: null, offerError: null }),
 
   setLoading: (v) => set({ isLoading: v }),
 }));

@@ -1,19 +1,9 @@
 import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import qrCodeService from '../services/qrCodeService.js';
-import {
-  getWebPushPublicKey,
-  isTrackWebPushConfigured,
-  saveTrackPushSubscription,
-} from '../services/trackWebPushService.js';
+import {getWebPushPublicKey,isTrackWebPushConfigured,saveTrackPushSubscription,} from '../services/trackWebPushService.js';
 import logger from '../utils/logger.js';
-import {
-  clientHeadline,
-  normalizeProductStatus,
-  orderStatusDefinition,
-  progressWithEtaCap,
-  statusBaseProgress,
-} from '../utils/orderProductRules.js';
+import {clientHeadline,normalizeProductStatus,orderStatusDefinition,progressWithEtaCap,statusBaseProgress,} from '../utils/orderProductRules.js';
 import { realisticEtaMinutesFromAirDistance } from '../utils/ivoryCoastEta.js';
 
 type PublicCoordinates = { latitude: number; longitude: number };
@@ -95,6 +85,14 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
         o.distance_km,
         o.created_at,
         o.delivery_qr_scanned_at,
+        EXISTS (
+          SELECT 1
+          FROM batch_orders bo
+          JOIN delivery_batches db ON db.id = bo.batch_id
+          WHERE bo.order_id = o.id
+            AND db.driver_id IS NOT NULL
+            AND COALESCE(db.status, 'pending') <> 'completed'
+        ) AS active_batch_delivery,
         d.first_name as driver_first_name,
         d.last_name as driver_last_name,
         d.avatar_url as driver_avatar_url,
@@ -158,12 +156,15 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
     // Afficher le QR tant qu'il n'a pas été scanné (même si completed - livreur a cliqué trop tôt)
     const showQRCode =
       ['picked_up', 'delivering'].includes(status) ||
+      (row.active_batch_delivery === true && ['accepted', 'enroute'].includes(status)) ||
       (status === 'completed' && qrNotScanned);
     let qrCodeImage: string | null = null;
+    let verificationCode: string | null = null;
 
     if (showQRCode) {
       const qr = await qrCodeService.getOrderQRCode(row.id);
       qrCodeImage = qr?.qrCodeImage ?? null;
+      verificationCode = qr?.verificationCode ?? null;
     }
 
     const driverName =
@@ -212,6 +213,7 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
         distance: row.distance_km != null ? Number(row.distance_km) : null,
         createdAt: row.created_at,
         qrCodeImage,
+        verificationCode,
         showQRCode,
         webPushAvailable: isTrackWebPushConfigured(),
       },

@@ -260,8 +260,8 @@ export default function QuickMessage() {
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
     display: 'flex',
     flexDirection: 'column',
-     minHeight: '150px',
-     height: '150px',
+    minHeight: '150px',
+    height: '150px',
     width: '100%',
     overflow: 'hidden',
   }

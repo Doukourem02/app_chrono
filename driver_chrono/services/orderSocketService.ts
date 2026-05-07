@@ -415,32 +415,21 @@ class OrderSocketService {
           import('expo-haptics').then((Haptics) => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           });
-          Alert.alert(
-            'Nouvelle tournée B2B',
-            `${ordersCount ?? 0} livraison${ordersCount === 1 ? '' : 's'} à effectuer.`,
-            [
-              {
-                text: 'Refuser',
-                style: 'cancel',
-                onPress: () => {
-                  this.visibleBatchOfferIds.delete(batchId);
-                  this.mutedBatchOfferIds.add(batchId);
-                  void this.declineBatch(batchId);
-                },
-              },
-              {
-                text: 'Accepter',
-                onPress: () => {
-                  this.visibleBatchOfferIds.delete(batchId);
-                  void this.acceptBatch(batchId);
-                },
-              },
-            ]
-          );
+          import('../store/useBatchStore').then(({ useBatchStore }) => {
+            useBatchStore.getState().setPendingOffer({
+              batchId,
+              ordersCount: ordersCount ?? 0,
+              ...(partner_id ? { partner_id } : {}),
+              ...(partner_name ? { partner_name } : {}),
+            });
+          });
           return;
         }
 
+        this.visibleBatchOfferIds.delete(batchId);
+        this.mutedBatchOfferIds.delete(batchId);
         import('../store/useBatchStore').then(({ useBatchStore }) => {
+          useBatchStore.getState().clearPendingOffer(batchId);
           // Pré-remplir avec le minimum connu, l'écran chargera les détails complets
           useBatchStore.getState().setActiveBatch({
             id: batchId,
@@ -469,6 +458,9 @@ class OrderSocketService {
       if (data?.batchId) {
         this.visibleBatchOfferIds.delete(data.batchId);
         this.mutedBatchOfferIds.delete(data.batchId);
+        import('../store/useBatchStore').then(({ useBatchStore }) => {
+          useBatchStore.getState().clearPendingOffer(data.batchId);
+        });
       }
     });
 
@@ -478,7 +470,12 @@ class OrderSocketService {
         this.visibleBatchOfferIds.delete(data.batchId);
         this.mutedBatchOfferIds.add(data.batchId);
       }
-      Alert.alert('Tournée indisponible', data?.message ?? 'Cette tournée ne peut plus être acceptée.');
+      import('../store/useBatchStore').then(({ useBatchStore }) => {
+        useBatchStore.getState().setOfferError({
+          ...(data?.batchId ? { batchId: data.batchId } : {}),
+          message: data?.message ?? 'Cette tournée ne peut plus être acceptée.',
+        });
+      });
     });
 
     this.socket.on('batch-declined-confirmation', (data: { batchId?: string }) => {
@@ -486,6 +483,9 @@ class OrderSocketService {
       if (data?.batchId) {
         this.visibleBatchOfferIds.delete(data.batchId);
         this.mutedBatchOfferIds.add(data.batchId);
+        import('../store/useBatchStore').then(({ useBatchStore }) => {
+          useBatchStore.getState().clearPendingOffer(data.batchId);
+        });
       }
     });
   }
@@ -663,6 +663,10 @@ class OrderSocketService {
     }
 
     logger.info('Acceptation tournée', undefined, { batchId });
+    this.visibleBatchOfferIds.delete(batchId);
+    import('../store/useBatchStore').then(({ useBatchStore }) => {
+      useBatchStore.getState().clearPendingOffer(batchId);
+    });
     this.socket.emit('accept-batch', {
       batchId,
       driverId: this.driverId,
@@ -676,6 +680,11 @@ class OrderSocketService {
     }
 
     logger.info('Déclinaison tournée', undefined, { batchId });
+    this.visibleBatchOfferIds.delete(batchId);
+    this.mutedBatchOfferIds.add(batchId);
+    import('../store/useBatchStore').then(({ useBatchStore }) => {
+      useBatchStore.getState().clearPendingOffer(batchId);
+    });
     this.socket.emit('decline-batch', {
       batchId,
       driverId: this.driverId,
