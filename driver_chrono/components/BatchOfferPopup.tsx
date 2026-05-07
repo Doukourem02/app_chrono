@@ -216,7 +216,7 @@ export const BatchOfferPopup: React.FC<BatchOfferPopupProps> = ({
         <Animated.View style={[styles.content, { transform: [{ scale: pulseAnim }] }]}>
           <View style={styles.header}>
             <View style={[styles.iconBadge, hasError && styles.errorBadge]}>
-              <Ionicons name={hasError ? 'alert-circle' : 'map'} size={25} color={hasError ? '#F97316' : '#7C3AED'} />
+              <Ionicons name={hasError ? 'alert-circle' : 'cube-outline'} size={25} color={hasError ? '#F97316' : '#7C3AED'} />
             </View>
             <View style={styles.headerText}>
               <Text style={styles.title}>{hasError ? 'Tournée indisponible' : 'Nouvelle tournée groupée'}</Text>
@@ -231,7 +231,7 @@ export const BatchOfferPopup: React.FC<BatchOfferPopupProps> = ({
               <View style={styles.summaryRow}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Type</Text>
-                  <Text style={styles.summaryValue}>Tournée entreprise</Text>
+                  <Text style={styles.summaryValue}>Livraison groupée</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
@@ -243,9 +243,9 @@ export const BatchOfferPopup: React.FC<BatchOfferPopupProps> = ({
               <View style={styles.infoBox}>
                 <Ionicons name="business-outline" size={18} color="#7C3AED" />
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Client entreprise</Text>
+                  <Text style={styles.infoLabel}>Partenaire</Text>
                   <Text style={styles.infoValue} numberOfLines={1}>
-                    {offer?.partner_name || 'Krono'}
+                    {offer?.partner_name ?? ''}
                   </Text>
                 </View>
               </View>
@@ -253,7 +253,7 @@ export const BatchOfferPopup: React.FC<BatchOfferPopupProps> = ({
               <View style={styles.hintBox}>
                 <Ionicons name="navigate-circle-outline" size={18} color="#92400E" />
                 <Text style={styles.hintText}>
-                  Après acceptation, chaque livraison aura sa navigation et sa validation dans l’application.
+                  Après acceptation, l&apos;application te guide étape par étape pour chaque livraison.
                 </Text>
               </View>
             </>
