@@ -335,6 +335,17 @@ export default function Index() {
     });
   }, []);
 
+  const buildBusinessArrivalInstruction = useCallback((order: typeof currentOrder | null | undefined): string => {
+    if (!order?.isB2BOrder) return '';
+    const instructions = [order.operatorCourseNotes, order.driverNotes]
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+      .join('. ');
+    return instructions
+      ? ` Consigne: ${instructions.replace(/\n+/g, '. ').replace(/\s{2,}/g, ' ')}.`
+      : '';
+  }, []);
+
   const getCurrentDestination = () => {
     if (!currentOrder || !location) return null;
     const status = String(currentOrder.status || '');
@@ -476,7 +487,7 @@ export default function Index() {
       }
       if (!spokenDropoffArrivalRef.current) {
         spokenDropoffArrivalRef.current = true;
-        speakWithMapboxMuted('Vous êtes arrivés à destination.');
+        speakWithMapboxMuted(`Vous êtes arrivés à destination.${buildBusinessArrivalInstruction(currentOrder)}`);
       }
     },
   });
@@ -1343,7 +1354,7 @@ export default function Index() {
               }
               if (!spokenDropoffArrivalRef.current) {
                 spokenDropoffArrivalRef.current = true;
-                speakWithMapboxMuted('Vous êtes arrivés à destination.');
+                speakWithMapboxMuted(`Vous êtes arrivés à destination.${buildBusinessArrivalInstruction(order)}`);
               }
             }
           }}

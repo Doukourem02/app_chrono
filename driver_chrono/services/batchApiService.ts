@@ -3,26 +3,55 @@ import { apiFetch } from '../utils/apiFetch';
 import { apiService } from './apiService';
 import type { ActiveBatch, BatchStop } from '../store/useBatchStore';
 
+type Coordinates = { latitude: number; longitude: number };
+
 async function authHeader(): Promise<{ Authorization: string } | Record<string, never>> {
   const result = await apiService.ensureAccessToken();
   return result.token ? { Authorization: `Bearer ${result.token}` } : {};
 }
 
-function addressText(value: unknown): string {
-  if (!value) return '';
+function parseLocation(value: unknown): Record<string, any> | null {
+  if (!value) return null;
   if (typeof value === 'string') {
     try {
-      const parsed = JSON.parse(value) as { address?: unknown };
-      return typeof parsed?.address === 'string' ? parsed.address : value;
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed as Record<string, any> : { address: value };
     } catch {
-      return value;
+      return { address: value };
     }
   }
-  if (typeof value === 'object' && 'address' in value) {
-    const address = (value as { address?: unknown }).address;
-    return typeof address === 'string' ? address : '';
+  if (typeof value === 'object') {
+    return value as Record<string, any>;
   }
-  return '';
+  return null;
+}
+
+function addressText(value: unknown): string {
+  const parsed = parseLocation(value);
+  if (!parsed) return '';
+  const address = parsed.address ?? parsed.label ?? parsed.name;
+  return typeof address === 'string' ? address : '';
+}
+
+function coordinatesFromLocation(value: unknown): Coordinates | undefined {
+  const parsed = parseLocation(value);
+  if (!parsed) return undefined;
+
+  const candidate = parsed.coordinates ?? parsed.coords ?? parsed.location ?? parsed;
+  if (Array.isArray(candidate) && candidate.length >= 2) {
+    const lng = Number(candidate[0]);
+    const lat = Number(candidate[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { latitude: lat, longitude: lng };
+    }
+    return undefined;
+  }
+
+  const lat = Number(candidate.latitude ?? candidate.lat ?? candidate.Lat ?? candidate.y);
+  const lng = Number(candidate.longitude ?? candidate.lng ?? candidate.Lng ?? candidate.lon ?? candidate.x);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return undefined;
+  return { latitude: lat, longitude: lng };
 }
 
 export async function getBatch(batchId: string): Promise<ActiveBatch> {
@@ -66,6 +95,7 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
       recipientName: item.orders?.recipient?.name ?? 'Destinataire',
       phone: item.orders?.recipient?.phone ?? '',
       address: addressText(item.orders?.dropoff_address),
+      coordinates: coordinatesFromLocation(item.orders?.dropoff_address),
       status: (item.orders?.status === 'completed'
         ? 'completed'
         : item.orders?.status === 'cancelled'

@@ -23,10 +23,19 @@ const COURSE_TYPES = [
   { value: 'scheduled', label: 'Programmée', description: 'À planifier avec l’équipe Krono' },
 ]
 
+const B2B_INSTRUCTION_PRESETS = [
+  'Appeler le client avant d’arriver',
+  'Voir le responsable sur place',
+  'Déposer à l’accueil',
+  'Demander le code de livraison',
+  'Colis fragile, manipuler doucement',
+  'Compter les colis avec le client',
+]
+
 const FIELDS: Array<{ key: keyof FormState; label: string; type: string; placeholder: string; required?: boolean }> = [
   { key: 'recipient_name',   label: 'Nom du destinataire *',    type: 'text', placeholder: 'Ibrahima Diallo',               required: true },
   { key: 'recipient_phone',  label: 'Téléphone du destinataire *', type: 'tel', placeholder: '+221 77 000 00 00',          required: true },
-  { key: 'notes',            label: 'Instructions livreur',     type: 'text', placeholder: 'Carton fragile, code portail…' },
+  { key: 'notes',            label: 'Instruction personnalisée',     type: 'text', placeholder: 'Carton fragile, code portail…' },
 ]
 
 export default function NewPartnerOrderPage() {
@@ -55,6 +64,7 @@ export default function NewPartnerOrderPage() {
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [priceCfa, setPriceCfa] = useState<number | null>(null)
   const [isEstimating, setIsEstimating] = useState(false)
+  const [selectedInstructionPresets, setSelectedInstructionPresets] = useState<string[]>([])
   const [showDriverRequest, setShowDriverRequest] = useState(false)
   const [driverRequest, setDriverRequest] = useState({
     request_type: 'general_request' as PartnerDriverRequestType,
@@ -66,6 +76,21 @@ export default function NewPartnerOrderPage() {
   const [driverRequestDone, setDriverRequestDone] = useState(false)
 
   const canEstimate = !!pickupCoordinates && !!dropoffCoordinates
+  const canCreateOrder =
+    !!pickupCoordinates &&
+    !!dropoffCoordinates &&
+    form.pickup_address.trim().length > 0 &&
+    form.dropoff_address.trim().length > 0 &&
+    form.recipient_name.trim().length > 0 &&
+    form.recipient_phone.trim().length > 0
+
+  const toggleInstructionPreset = (instruction: string) => {
+    setSelectedInstructionPresets((current) =>
+      current.includes(instruction)
+        ? current.filter((item) => item !== instruction)
+        : [...current, instruction]
+    )
+  }
 
   useEffect(() => {
     if (!success) return
@@ -142,14 +167,20 @@ export default function NewPartnerOrderPage() {
     for (const f of required) {
       if (!form[f].trim()) { setError(`Le champ "${FIELDS.find(x => x.key === f)?.label.replace(' *','')}" est requis`); return }
     }
+    if (!pickupCoordinates || !dropoffCoordinates) {
+      setError('Sélectionnez le point de collecte et l’adresse du client dans les suggestions autocomplete pour fixer le quartier, la rue et le point GPS.')
+      return
+    }
     setLoading(true)
     setError('')
+
+    const combinedNotes = [...selectedInstructionPresets, form.notes.trim()].filter(Boolean).join('\n') || undefined
 
     const result = await partnerApiService.createOrder(partnerId, {
       pickup_address:  form.pickup_address.trim(),
       dropoff_address: form.dropoff_address.trim(),
       recipient:       { name: form.recipient_name.trim(), phone: form.recipient_phone.trim() },
-      notes:           form.notes.trim() || undefined,
+      notes:           combinedNotes,
       delivery_method: form.delivery_method,
       course_type: form.course_type,
       preferred_driver_id: preferredDriversEnabled ? selectedDriverId ?? undefined : undefined,
@@ -232,7 +263,7 @@ export default function NewPartnerOrderPage() {
                   void estimatePrice(coordinates, dropoffCoordinates)
                 }
               }}
-              placeholder="Ex: 12 rue des Almadies, Dakar"
+              placeholder="Ex: Rue L12, Cocody, Abidjan"
             />
           </div>
 
@@ -251,7 +282,7 @@ export default function NewPartnerOrderPage() {
                   void estimatePrice(pickupCoordinates, coordinates)
                 }
               }}
-              placeholder="Ex: Marché Sandaga, Dakar"
+              placeholder="Ex: Riviera 2, Cocody, Abidjan"
             />
           </div>
 
@@ -267,6 +298,40 @@ export default function NewPartnerOrderPage() {
               />
             </div>
           ))}
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, display: 'block', marginBottom: 8 }}>
+              Consignes pour le livreur
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {B2B_INSTRUCTION_PRESETS.map((instruction) => {
+                const selected = selectedInstructionPresets.includes(instruction)
+                return (
+                  <button
+                    key={instruction}
+                    type="button"
+                    onClick={() => toggleInstructionPreset(instruction)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: `1px solid ${selected ? themeColors.purplePrimary : themeColors.cardBorder}`,
+                      backgroundColor: selected ? themeColors.purpleLight : themeColors.background,
+                      color: selected ? themeColors.purplePrimary : themeColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {selected && <CheckCircle size={13} />}
+                    {instruction}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
           {/* Service / véhicule */}
           <div>
@@ -329,7 +394,7 @@ export default function NewPartnerOrderPage() {
                 <div style={{ fontSize: 13, color: themeColors.textSecondary }}>Chargement des livreurs…</div>
               ) : partnerDrivers.length === 0 ? (
                 <div style={{ border: `1px dashed ${themeColors.cardBorder}`, borderRadius: 8, padding: 14, color: themeColors.textSecondary, fontSize: 13 }}>
-                  <p style={{ margin: 0 }}>Aucun livreur dédié n’est encore lié à ce partenaire. L’assignation automatique reste active pour les livreurs B2B disponibles.</p>
+                  <p style={{ margin: 0 }}>Aucun livreur dédié n’est encore lié à ce partenaire. L’assignation automatique reste active pour les livreurs entreprise disponibles.</p>
                   <button
                     type="button"
                     onClick={() => setShowDriverRequest(true)}
@@ -351,7 +416,7 @@ export default function NewPartnerOrderPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>Assignation automatique</div>
                       <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>
-                        Tous les livreurs B2B disponibles restent éligibles.
+                        Tous les livreurs entreprise disponibles restent éligibles.
                       </div>
                     </div>
                   </button>
@@ -382,7 +447,7 @@ export default function NewPartnerOrderPage() {
                           <div style={{ fontSize: 13, fontWeight: 700, color: themeColors.textPrimary }}>{name}</div>
                           <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>
                             {driver.profile.is_online && driver.profile.is_available ? 'Disponible' : 'Indisponible'}
-                            {!canSelect ? ' • ne reçoit pas les commandes B2B' : ''}
+                            {!canSelect ? ' • ne reçoit pas les commandes entreprise' : ''}
                           </div>
                         </div>
                         {driver.driver.phone && (
@@ -411,7 +476,7 @@ export default function NewPartnerOrderPage() {
           {form.pickup_address && form.dropoff_address && !canEstimate && (
             <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: themeColors.redLight, border: `1px solid ${themeColors.redPrimary}` }}>
               <p style={{ fontSize: 13, color: themeColors.redPrimary }}>
-                Sélectionnez une adresse dans les suggestions pour calculer le prix correctement.
+                Sélectionnez le point de collecte et l’adresse du client dans les suggestions pour enregistrer les quartiers, rues et points GPS.
               </p>
             </div>
           )}
@@ -430,8 +495,8 @@ export default function NewPartnerOrderPage() {
 
           <button
             type="submit"
-            disabled={loading}
-            style={{ padding: '12px', borderRadius: 10, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, marginTop: 4 }}
+            disabled={loading || !canCreateOrder}
+            style={{ padding: '12px', borderRadius: 10, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading || !canCreateOrder ? 'not-allowed' : 'pointer', opacity: loading || !canCreateOrder ? 0.55 : 1, marginTop: 4 }}
           >
             {loading ? 'Création en cours…' : 'Créer la commande'}
           </button>

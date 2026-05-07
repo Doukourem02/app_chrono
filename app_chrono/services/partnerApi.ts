@@ -123,6 +123,7 @@ export interface CreateBatchParams {
   userId: string;
   driverId?: string;
   pickupAddress: string;
+  pickupCoords?: { lat: number; lng: number } | null;
   orders: BatchOrderItem[];
 }
 
@@ -136,7 +137,11 @@ export async function createBatch(params: CreateBatchParams): Promise<{ batchId:
       const result = await createB2BOrder({
         partnerId: params.partnerId,
         userId: params.userId,
-        pickup: { address: params.pickupAddress },
+        pickup: {
+          address: params.pickupAddress,
+          lat: params.pickupCoords?.lat,
+          lng: params.pickupCoords?.lng,
+        },
         dropoff: { address: item.recipient.address, lat: item.lat, lng: item.lng },
         recipient: { name: item.recipient.name, phone: item.recipient.phone },
         vehicleType: 'moto',

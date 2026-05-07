@@ -6,6 +6,7 @@ export interface BatchStop {
   recipientName: string;
   phone: string;
   address: string;
+  coordinates?: { latitude: number; longitude: number };
   notes?: string;
   status: 'pending' | 'completed' | 'cancelled';
   proofMethod?: 'qr_scan' | 'manual_code' | 'photo_signature' | 'batch_driver_confirmation' | null;

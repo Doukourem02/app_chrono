@@ -9,6 +9,15 @@ import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 
 type Step = 'recipients' | 'driver' | 'confirm' | 'success';
 
+const B2B_INSTRUCTION_PRESETS = [
+  'Appeler le client avant d’arriver',
+  'Voir le responsable sur place',
+  'Déposer à l’accueil',
+  'Demander le code de livraison',
+  'Colis fragile, manipuler doucement',
+  'Compter les colis avec le client',
+];
+
 interface BatchShippingBottomSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -17,7 +26,7 @@ interface BatchShippingBottomSheetProps {
 export default function BatchShippingBottomSheet({ visible, onClose }: BatchShippingBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const { batchPickupAddress, batchRecipients, batchDriverId, batchOptimizedOrder,
+  const { batchPickupAddress, batchPickupCoords, batchRecipients, batchDriverId, batchOptimizedOrder,
     setBatchPickup, addRecipient, removeRecipient, setBatchDriver, setOptimizedOrder, resetBatch } = useBusinessStore();
 
   const [step, setStep] = useState<Step>('recipients');
@@ -30,7 +39,17 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
   const [draftName, setDraftName] = useState('');
   const [draftPhone, setDraftPhone] = useState('');
   const [draftAddress, setDraftAddress] = useState('');
+  const [draftCoords, setDraftCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [draftInstructionPresets, setDraftInstructionPresets] = useState<string[]>([]);
   const [draftNotes, setDraftNotes] = useState('');
+
+  const toggleDraftInstruction = (instruction: string) => {
+    setDraftInstructionPresets((current) =>
+      current.includes(instruction)
+        ? current.filter((item) => item !== instruction)
+        : [...current, instruction]
+    );
+  };
 
   useEffect(() => {
     if (visible && step === 'driver' && user?.partner_id) {
@@ -46,15 +65,32 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
       Alert.alert('Champs requis', 'Nom, téléphone et adresse sont obligatoires.');
       return;
     }
-    addRecipient({ name: draftName.trim(), phone: draftPhone.trim(), address: draftAddress.trim(), notes: draftNotes.trim() || undefined });
+    if (!draftCoords) {
+      Alert.alert('Adresse à sélectionner', 'Choisissez l’adresse de livraison dans les suggestions pour fixer le point GPS.');
+      return;
+    }
+    addRecipient({
+      name: draftName.trim(),
+      phone: draftPhone.trim(),
+      address: draftAddress.trim(),
+      coords: draftCoords,
+      notes: [...draftInstructionPresets, draftNotes.trim()].filter(Boolean).join('\n') || undefined,
+    });
     setDraftName('');
     setDraftPhone('');
     setDraftAddress('');
+    setDraftCoords(null);
+    setDraftInstructionPresets([]);
     setDraftNotes('');
   };
 
   const handleSubmit = async () => {
     if (!user?.partner_id || batchRecipients.length === 0 || !batchPickupAddress) return;
+    if (!batchPickupCoords || batchRecipients.some((r) => !r.coords)) {
+      Alert.alert('Adresses à sélectionner', 'Choisissez le point de collecte et chaque adresse client dans les suggestions pour fixer les quartiers, rues et points GPS.');
+      setStep('recipients');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -63,8 +99,11 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
         userId: user.id,
         driverId: batchDriverId ?? undefined,
         pickupAddress: batchPickupAddress,
+        pickupCoords: batchPickupCoords,
         orders: batchRecipients.map((r) => ({
           recipient: { name: r.name, phone: r.phone, address: r.address },
+          lat: r.coords?.lat,
+          lng: r.coords?.lng,
           notes: r.notes,
         })),
       });
@@ -87,6 +126,8 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
     setDraftName('');
     setDraftPhone('');
     setDraftAddress('');
+    setDraftCoords(null);
+    setDraftInstructionPresets([]);
     setDraftNotes('');
     onClose();
   };
@@ -138,6 +179,7 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                       placeholder="Point de collecte commun"
                       initialValue={batchPickupAddress}
                       embedded
+                      onQueryChange={(text) => setBatchPickup(text, undefined)}
                       onPlaceSelected={(data) => {
                         const addr = data.routingAddress ?? data.description;
                         const coords = data.coords ? { lat: data.coords.latitude, lng: data.coords.longitude } : undefined;
@@ -189,24 +231,65 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                   placeholderTextColor="#9CA3AF"
                   keyboardType="phone-pad"
                 />
-                <TextInput
-                  style={[styles.input, { marginTop: 8 }]}
-                  value={draftAddress}
-                  onChangeText={setDraftAddress}
-                  placeholder="Adresse de livraison *"
-                  placeholderTextColor="#9CA3AF"
-                />
+                <View style={{ marginTop: 8 }}>
+                  <MapboxAddressAutocomplete
+                    placeholder="Adresse de livraison *"
+                    initialValue={draftAddress}
+                    embedded
+                    proximityCoords={
+                      batchPickupCoords
+                        ? { latitude: batchPickupCoords.lat, longitude: batchPickupCoords.lng }
+                        : null
+                    }
+                    onQueryChange={(text) => {
+                      setDraftAddress(text);
+                      setDraftCoords(null);
+                    }}
+                    onPlaceSelected={(data) => {
+                      const addr = data.routingAddress ?? data.description;
+                      const coords = data.coords
+                        ? { lat: data.coords.latitude, lng: data.coords.longitude }
+                        : null;
+                      setDraftAddress(addr);
+                      setDraftCoords(coords);
+                    }}
+                  />
+                </View>
                 <TextInput
                   style={[styles.input, { marginTop: 8 }]}
                   value={draftNotes}
                   onChangeText={setDraftNotes}
-                  placeholder="Notes (facultatif)"
+                  placeholder="Instruction personnalisée (facultatif)"
                   placeholderTextColor="#9CA3AF"
                 />
+                <View style={styles.presetBlock}>
+                  <Text style={styles.presetTitle}>Consignes pour le livreur</Text>
+                  <View style={styles.presetGrid}>
+                    {B2B_INSTRUCTION_PRESETS.map((instruction) => {
+                      const selected = draftInstructionPresets.includes(instruction);
+                      return (
+                        <TouchableOpacity
+                          key={instruction}
+                          style={[styles.presetChip, selected && styles.presetChipSelected]}
+                          onPress={() => toggleDraftInstruction(instruction)}
+                        >
+                          <Ionicons
+                            name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                            size={15}
+                            color={selected ? '#8B5CF6' : '#9CA3AF'}
+                          />
+                          <Text style={[styles.presetChipText, selected && styles.presetChipTextSelected]}>
+                            {instruction}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
                 <TouchableOpacity
-                  style={[styles.addBtn, (!draftName.trim() || !draftPhone.trim() || !draftAddress.trim()) && styles.addBtnDisabled]}
+                  style={[styles.addBtn, (!draftName.trim() || !draftPhone.trim() || !draftAddress.trim() || !draftCoords) && styles.addBtnDisabled]}
                   onPress={handleAddRecipient}
-                  disabled={!draftName.trim() || !draftPhone.trim() || !draftAddress.trim()}
+                  disabled={!draftName.trim() || !draftPhone.trim() || !draftAddress.trim() || !draftCoords}
                 >
                   <Ionicons name="add" size={18} color="#8B5CF6" />
                   <Text style={styles.addBtnText}>Ajouter à la tournée</Text>
@@ -216,9 +299,9 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
             </ScrollView>
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
               <TouchableOpacity
-                style={[styles.cta, (batchRecipients.length === 0 || !batchPickupAddress) && styles.ctaDisabled]}
+                style={[styles.cta, (batchRecipients.length === 0 || !batchPickupAddress || !batchPickupCoords) && styles.ctaDisabled]}
                 onPress={() => setStep('driver')}
-                disabled={batchRecipients.length === 0 || !batchPickupAddress}
+                disabled={batchRecipients.length === 0 || !batchPickupAddress || !batchPickupCoords}
               >
                 <Text style={styles.ctaText}>Suivant · {batchRecipients.length} destinataire{batchRecipients.length > 1 ? 's' : ''}</Text>
               </TouchableOpacity>
@@ -284,7 +367,7 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                           <Text style={styles.driverSub}>
                             {d.driver.phone ?? 'Contact non renseigné'}
                             {d.profile.is_online && d.profile.is_available ? ' · Disponible' : ' · Indisponible'}
-                            {!canSelect ? ' · B2B non activé' : ''}
+                            {!canSelect ? ' · tournées non activées' : ''}
                           </Text>
                         </View>
                         {selected && <Ionicons name="checkmark-circle" size={22} color="#8B5CF6" />}
@@ -535,6 +618,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 15,
     color: '#111827',
+  },
+  presetBlock: {
+    marginTop: 12,
+  },
+  presetTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  presetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  presetChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  presetChipSelected: {
+    borderColor: '#8B5CF6',
+    backgroundColor: '#F5F3FF',
+  },
+  presetChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  presetChipTextSelected: {
+    color: '#8B5CF6',
   },
   addBtn: {
     flexDirection: 'row',

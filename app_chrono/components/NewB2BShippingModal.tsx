@@ -6,6 +6,15 @@ import { useAuthStore } from '../store/useAuthStore';
 import { createB2BOrder } from '../services/partnerApi';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 
+const B2B_INSTRUCTION_PRESETS = [
+  'Appeler le client avant d’arriver',
+  'Voir le responsable sur place',
+  'Déposer à l’accueil',
+  'Demander le code de livraison',
+  'Colis fragile, manipuler doucement',
+  'Compter les colis avec le client',
+];
+
 interface NewB2BShippingModalProps {
   visible: boolean;
   onClose: () => void;
@@ -23,14 +32,32 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [selectedInstructions, setSelectedInstructions] = useState<string[]>([]);
   const [vehicleType, setVehicleType] = useState<'moto' | 'vehicule' | 'cargo'>('moto');
   const [isLoading, setIsLoading] = useState(false);
   const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
 
-  const canSubmit = pickup.length > 0 && dropoff.length > 0 && recipientName.trim().length > 0 && recipientPhone.trim().length > 0;
+  const canSubmit = pickup.length > 0
+    && !!pickupCoords
+    && dropoff.length > 0
+    && !!dropoffCoords
+    && recipientName.trim().length > 0
+    && recipientPhone.trim().length > 0;
+
+  const toggleInstruction = (instruction: string) => {
+    setSelectedInstructions((current) =>
+      current.includes(instruction)
+        ? current.filter((item) => item !== instruction)
+        : [...current, instruction]
+    );
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit || !user?.id) return;
+    if (!pickupCoords || !dropoffCoords) {
+      Alert.alert('Adresse à sélectionner', 'Choisissez le point de départ et l’adresse du client dans les suggestions pour fixer les quartiers, rues et points GPS.');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -41,7 +68,7 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
         dropoff: { address: dropoff, lat: dropoffCoords?.lat, lng: dropoffCoords?.lng },
         recipient: { name: recipientName.trim(), phone: recipientPhone.trim() },
         vehicleType,
-        notes: notes.trim() || undefined,
+        notes: [...selectedInstructions, notes.trim()].filter(Boolean).join('\n') || undefined,
       });
       setSuccessOrderId(result.orderId);
       onSuccess?.(result.orderId);
@@ -60,6 +87,7 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
     setRecipientName('');
     setRecipientPhone('');
     setNotes('');
+    setSelectedInstructions([]);
     setVehicleType('moto');
     setSuccessOrderId(null);
     onClose();
@@ -100,9 +128,13 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
                       placeholder="Adresse de départ"
                       initialValue={pickup}
                       embedded
+                      onQueryChange={(text) => {
+                        setPickup(text);
+                        setPickupCoords(null);
+                      }}
                       onPlaceSelected={(data) => {
                         setPickup(data.routingAddress ?? data.description);
-                        if (data.coords) setPickupCoords({ lat: data.coords.latitude, lng: data.coords.longitude });
+                        setPickupCoords(data.coords ? { lat: data.coords.latitude, lng: data.coords.longitude } : null);
                       }}
                     />
                   </View>
@@ -115,9 +147,18 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
                       placeholder="Adresse de livraison"
                       initialValue={dropoff}
                       embedded
+                      proximityCoords={
+                        pickupCoords
+                          ? { latitude: pickupCoords.lat, longitude: pickupCoords.lng }
+                          : null
+                      }
+                      onQueryChange={(text) => {
+                        setDropoff(text);
+                        setDropoffCoords(null);
+                      }}
                       onPlaceSelected={(data) => {
                         setDropoff(data.routingAddress ?? data.description);
-                        if (data.coords) setDropoffCoords({ lat: data.coords.latitude, lng: data.coords.longitude });
+                        setDropoffCoords(data.coords ? { lat: data.coords.latitude, lng: data.coords.longitude } : null);
                       }}
                     />
                   </View>
@@ -149,10 +190,34 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
                   style={[styles.input, { height: 72, textAlignVertical: 'top', paddingTop: 12 }]}
                   value={notes}
                   onChangeText={setNotes}
-                  placeholder="Instructions pour le livreur…"
+                  placeholder="Instruction personnalisée pour le livreur…"
                   placeholderTextColor="#9CA3AF"
                   multiline
                 />
+                <View style={styles.presetBlock}>
+                  <Text style={styles.fieldLabel}>Consignes pour le livreur</Text>
+                  <View style={styles.presetGrid}>
+                    {B2B_INSTRUCTION_PRESETS.map((instruction) => {
+                      const selected = selectedInstructions.includes(instruction);
+                      return (
+                        <TouchableOpacity
+                          key={instruction}
+                          style={[styles.presetChip, selected && styles.presetChipSelected]}
+                          onPress={() => toggleInstruction(instruction)}
+                        >
+                          <Ionicons
+                            name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+                            size={15}
+                            color={selected ? '#8B5CF6' : '#9CA3AF'}
+                          />
+                          <Text style={[styles.presetChipText, selected && styles.presetChipTextSelected]}>
+                            {instruction}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
               </View>
 
               <Text style={styles.sectionLabel}>Service disponible</Text>
@@ -270,6 +335,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 15,
     color: '#111827',
+  },
+  presetBlock: {
+    marginTop: 12,
+  },
+  presetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  presetChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  presetChipSelected: {
+    borderColor: '#8B5CF6',
+    backgroundColor: '#F5F3FF',
+  },
+  presetChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  presetChipTextSelected: {
+    color: '#8B5CF6',
   },
   vehicleRow: {
     flexDirection: 'row',

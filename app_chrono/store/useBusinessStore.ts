@@ -5,6 +5,7 @@ export interface BatchRecipient {
   name: string;
   phone: string;
   address: string;
+  coords?: { lat: number; lng: number };
   notes?: string;
 }
 

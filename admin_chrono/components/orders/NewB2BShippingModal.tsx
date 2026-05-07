@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { X, User, Search, MapPin, Package, DollarSign, Calendar, AlertTriangle } from 'lucide-react'
+import { X, User, Search, MapPin, Package, DollarSign, Calendar, AlertTriangle, CheckCircle } from 'lucide-react'
 import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
 import { useRouter } from 'next/navigation'
@@ -27,6 +27,15 @@ interface NewB2BShippingModalProps {
   scheduledDate?: Date // Date planifiée depuis le calendrier
   scheduledTime?: string // Heure planifiée (HH:mm) depuis le calendrier
 }
+
+const B2B_INSTRUCTION_PRESETS = [
+  'Appeler le client avant d’arriver',
+  'Voir le responsable sur place',
+  'Déposer à l’accueil',
+  'Demander le code de livraison',
+  'Colis fragile, manipuler doucement',
+  'Compter les colis avec le client',
+]
 
 export default function NewB2BShippingModal({
   isOpen,
@@ -56,6 +65,7 @@ export default function NewB2BShippingModal({
   const [paymentMethod, setPaymentMethod] = useState<'orange_money' | 'wave' | 'cash' | 'deferred'>('cash')
   const [driverNotes, setDriverNotes] = useState('')
   const [b2bNotes, setB2bNotes] = useState('') // Notes spécifiques B2B (détails de l'appel)
+  const [selectedB2BInstructions, setSelectedB2BInstructions] = useState<string[]>([])
   
   // Date/heure planifiée
   const [scheduledDateValue, setScheduledDateValue] = useState<string>('')
@@ -178,15 +188,29 @@ export default function NewB2BShippingModal({
   }
 
   const handlePickupNext = () => {
-    if (pickupAddress) {
-      setStep('dropoff')
+    if (!pickupAddress) return
+    if (!pickupCoordinates) {
+      alert('Sélectionnez l’adresse de pickup dans les suggestions pour enregistrer le point GPS.')
+      return
     }
+    setStep('dropoff')
   }
 
   const handleDropoffNext = () => {
-    if (dropoffAddress) {
-      setStep('details')
+    if (!dropoffAddress) return
+    if (!dropoffCoordinates) {
+      alert('Sélectionnez l’adresse de livraison dans les suggestions pour enregistrer le point GPS.')
+      return
     }
+    setStep('details')
+  }
+
+  const toggleB2BInstruction = (instruction: string) => {
+    setSelectedB2BInstructions((current) =>
+      current.includes(instruction)
+        ? current.filter((item) => item !== instruction)
+        : [...current, instruction]
+    )
   }
 
   const resetForm = useCallback(() => {
@@ -201,6 +225,7 @@ export default function NewB2BShippingModal({
     setPaymentMethod('cash')
     setDriverNotes('')
     setB2bNotes('')
+    setSelectedB2BInstructions([])
     setDistance(null)
     setPrice(null)
     setStep('client')
@@ -226,6 +251,10 @@ export default function NewB2BShippingModal({
       alert('Veuillez remplir tous les champs obligatoires')
       return
     }
+    if (!pickupCoordinates || !dropoffCoordinates) {
+      alert('Sélectionnez les adresses dans les suggestions autocomplete pour fixer les coordonnées GPS.')
+      return
+    }
 
     if (!scheduledDateValue || !scheduledTimeValue) {
       alert('Veuillez sélectionner une date et une heure pour la livraison planifiée')
@@ -247,8 +276,8 @@ export default function NewB2BShippingModal({
 
     setIsCreating(true)
     try {
-      // Combiner les notes B2B et les notes générales
-      const combinedNotes = [b2bNotes, notes].filter(Boolean).join('\n\n') || undefined
+      // Combiner les instructions B2B, les détails d'appel et les notes générales.
+      const combinedNotes = [...selectedB2BInstructions, b2bNotes, notes].filter(Boolean).join('\n\n') || undefined
 
       const result = await adminApiService.createOrder({
         userId: selectedClient.id,
@@ -286,18 +315,18 @@ export default function NewB2BShippingModal({
               : smsStatus === 'failed'
                 ? 'SMS non envoyé : donnez ce code au client par téléphone.'
                 : 'SMS non envoyé automatiquement : donnez ce code au client par téléphone.'
-          alert(`Commande B2B créée.\nCode de livraison destinataire : ${deliveryCode}\n${smsLabel}`)
+          alert(`Commande entreprise créée.\nCode de livraison destinataire : ${deliveryCode}\n${smsLabel}`)
         }
         resetForm()
         onClose()
         // Navigate to planning page to see the new B2B order
         router.push(`/planning`)
       } else {
-        alert(result.message || 'Impossible de créer la commande B2B')
+        alert(result.message || 'Impossible de créer la commande entreprise')
       }
     } catch (error) {
       logger.error('Error creating B2B order:', error)
-      alert('Une erreur est survenue lors de la création de la commande B2B')
+      alert('Une erreur est survenue lors de la création de la commande entreprise')
     } finally {
       setIsCreating(false)
     }
@@ -457,7 +486,7 @@ export default function NewB2BShippingModal({
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h2 style={titleStyle}>Nouvelle livraison B2B</h2>
+            <h2 style={titleStyle}>Nouvelle livraison entreprise</h2>
             <span style={{
               padding: '4px 8px',
               borderRadius: '6px',
@@ -466,7 +495,7 @@ export default function NewB2BShippingModal({
               fontSize: '11px',
               fontWeight: 600,
             }}>
-              B2B
+              Entreprise
             </span>
           </div>
           <button
@@ -616,7 +645,7 @@ export default function NewB2BShippingModal({
                 />
               </div>
 
-              {/* Warning pour coordonnées optionnelles */}
+              {/* Warning pour coordonnées GPS */}
               <div style={{
                 padding: '12px',
                 backgroundColor: themeColors.yellowLight,
@@ -630,10 +659,10 @@ export default function NewB2BShippingModal({
                 <AlertTriangle size={16} style={{ color: themeColors.yellowDark, marginTop: '2px', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: themeColors.yellowDark, marginBottom: '4px' }}>
-                    Commande B2B - Coordonnées GPS optionnelles
+                    Commande entreprise - Adresse autocomplete requise
                   </div>
                   <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
-                    Les coordonnées GPS peuvent être approximatives. Le livreur appellera le client pour obtenir la position exacte.
+                    Sélectionnez une suggestion pour enregistrer le point GPS et permettre la navigation livreur.
                   </div>
                 </div>
               </div>
@@ -676,7 +705,7 @@ export default function NewB2BShippingModal({
               {!isEstimating && (distance === null || price === null) && pickupAddress && dropoffAddress && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.yellowLight, borderRadius: '8px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
-                    Sélectionnez les deux adresses dans la liste pour afficher un devis. Le serveur recalculera le prix final à la création.
+                    Sélectionnez les deux adresses dans la liste pour enregistrer les coordonnées GPS et afficher un devis.
                   </div>
                 </div>
               )}
@@ -759,7 +788,7 @@ export default function NewB2BShippingModal({
               {!isEstimating && (distance === null || price === null) && pickupAddress && dropoffAddress && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.yellowLight, borderRadius: '8px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
-                    Devis indisponible côté interface. Le prix final sera recalculé côté serveur.
+                    Sélectionnez les deux adresses dans l’autocomplete pour fixer les coordonnées GPS.
                   </div>
                 </div>
               )}
@@ -795,10 +824,10 @@ export default function NewB2BShippingModal({
                 />
               </div>
 
-              {/* Notes B2B - Détails de l'appel */}
+              {/* Détails de l'appel */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
-                  Notes B2B (détails de l&apos;appel)
+                  Détails de l&apos;appel
                 </label>
                 <textarea
                   placeholder="Détails de l'appel client, volume de la commande, instructions spéciales..."
@@ -806,6 +835,38 @@ export default function NewB2BShippingModal({
                   value={b2bNotes}
                   onChange={(e) => setB2bNotes(e.target.value)}
                 />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={labelStyle}>Consignes pour le livreur</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {B2B_INSTRUCTION_PRESETS.map((instruction) => {
+                    const selected = selectedB2BInstructions.includes(instruction)
+                    return (
+                      <button
+                        key={instruction}
+                        type="button"
+                        onClick={() => toggleB2BInstruction(instruction)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          border: `1px solid ${selected ? themeColors.purplePrimary : themeColors.cardBorder}`,
+                          backgroundColor: selected ? themeColors.purpleLight : themeColors.cardBg,
+                          color: selected ? themeColors.purplePrimary : themeColors.textSecondary,
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {selected && <CheckCircle size={13} />}
+                        {instruction}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               <div style={{ marginBottom: '16px' }}>
@@ -831,7 +892,7 @@ export default function NewB2BShippingModal({
                 />
               </div>
 
-              {/* Badge B2B toujours visible */}
+              {/* Badge entreprise toujours visible */}
               <div style={{
                 padding: '12px',
                 backgroundColor: themeColors.yellowLight,
@@ -843,7 +904,7 @@ export default function NewB2BShippingModal({
               }}>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: themeColors.yellowDark }}>📞</span>
                 <span style={{ fontSize: '12px', color: themeColors.yellowDark }}>
-                  Cette commande sera marquée comme &quot;Commande téléphonique B2B&quot;. Les coordonnées GPS sont optionnelles.
+                  Cette commande sera marquée comme &quot;Commande entreprise par téléphone&quot;. Les adresses doivent venir de l’autocomplete pour activer la navigation.
                 </span>
               </div>
             </>
@@ -891,13 +952,13 @@ export default function NewB2BShippingModal({
             <button
               type="button"
               onClick={handlePickupNext}
-              disabled={!pickupAddress}
+              disabled={!pickupAddress || !pickupCoordinates}
               style={{
                 ...buttonStyle,
                 backgroundColor: themeColors.purplePrimary,
                 color: themeColors.textPrimary,
-                opacity: !pickupAddress ? 0.5 : 1,
-                cursor: !pickupAddress ? 'not-allowed' : 'pointer',
+                opacity: !pickupAddress || !pickupCoordinates ? 0.5 : 1,
+                cursor: !pickupAddress || !pickupCoordinates ? 'not-allowed' : 'pointer',
               }}
             >
               Suivant
@@ -907,13 +968,13 @@ export default function NewB2BShippingModal({
             <button
               type="button"
               onClick={handleDropoffNext}
-              disabled={!dropoffAddress}
+              disabled={!dropoffAddress || !dropoffCoordinates}
               style={{
                 ...buttonStyle,
                 backgroundColor: themeColors.purplePrimary,
                 color: themeColors.textPrimary,
-                opacity: !dropoffAddress ? 0.5 : 1,
-                cursor: !dropoffAddress ? 'not-allowed' : 'pointer',
+                opacity: !dropoffAddress || !dropoffCoordinates ? 0.5 : 1,
+                cursor: !dropoffAddress || !dropoffCoordinates ? 'not-allowed' : 'pointer',
               }}
             >
               Suivant
@@ -923,16 +984,16 @@ export default function NewB2BShippingModal({
             <button
               type="button"
               onClick={handleCreateOrder}
-              disabled={isCreating || !selectedClient || !pickupAddress || !dropoffAddress || !scheduledDateValue || !scheduledTimeValue}
+              disabled={isCreating || !selectedClient || !pickupAddress || !pickupCoordinates || !dropoffAddress || !dropoffCoordinates || !scheduledDateValue || !scheduledTimeValue}
               style={{
                 ...buttonStyle,
                 backgroundColor: themeColors.purplePrimary,
                 color: themeColors.textPrimary,
-                opacity: isCreating || !selectedClient || !pickupAddress || !dropoffAddress || !scheduledDateValue || !scheduledTimeValue ? 0.5 : 1,
-                cursor: isCreating || !selectedClient || !pickupAddress || !dropoffAddress || !scheduledDateValue || !scheduledTimeValue ? 'not-allowed' : 'pointer',
+                opacity: isCreating || !selectedClient || !pickupAddress || !pickupCoordinates || !dropoffAddress || !dropoffCoordinates || !scheduledDateValue || !scheduledTimeValue ? 0.5 : 1,
+                cursor: isCreating || !selectedClient || !pickupAddress || !pickupCoordinates || !dropoffAddress || !dropoffCoordinates || !scheduledDateValue || !scheduledTimeValue ? 'not-allowed' : 'pointer',
               }}
             >
-              {isCreating ? 'Création...' : 'Créer la commande B2B'}
+              {isCreating ? 'Création...' : 'Créer la commande entreprise'}
             </button>
           )}
         </div>
