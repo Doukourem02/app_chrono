@@ -95,6 +95,29 @@ export class QRCodeService {
     }
   }
 
+  private async canValidateDeliveryProof(orderId: string, driverId: string, status: string | null): Promise<boolean> {
+    const st = String(status || '').toLowerCase();
+    if (['picked_up', 'delivering'].includes(st)) return true;
+    if (st !== 'accepted') return false;
+
+    try {
+      const result = await pool.query(
+        `SELECT 1
+           FROM batch_orders bo
+           JOIN delivery_batches db ON db.id = bo.batch_id
+          WHERE bo.order_id = $1
+            AND db.driver_id = $2
+            AND COALESCE(db.status, 'pending') <> 'completed'
+          LIMIT 1`,
+        [orderId, driverId]
+      );
+      return (result.rowCount ?? 0) > 0;
+    } catch (err: any) {
+      logger.warn('[QRCodeService] Vérification batch ignorée:', err?.message || err);
+      return false;
+    }
+  }
+
   /**
    * Génère un QR code de livraison pour une commande
    */
@@ -267,13 +290,13 @@ export class QRCodeService {
 
       // Vérifier le statut de la commande
       const st = String(order.status || '').toLowerCase();
-      if (!['picked_up', 'delivering'].includes(st)) {
+      if (!(await this.canValidateDeliveryProof(qrCodeData.orderId, scannedBy, order.status))) {
         await this.recordInvalidScan(qrCodeData.orderId, scannedBy, `Statut invalide: ${order.status}`, location, deviceInfo);
         return {
           success: false,
           isValid: false,
           code: 'ORDER_STATUS_INVALID',
-          error: `Le scan n’est possible qu’après le ramassage du colis. Statut actuel : ${st || order.status}.`,
+          error: `Le scan n’est possible qu’après le ramassage du colis ou sur une tournée batch assignée. Statut actuel : ${st || order.status}.`,
         };
       }
 
@@ -565,8 +588,8 @@ export class QRCodeService {
       }
 
       const st = String(order.status || '').toLowerCase();
-      if (!['picked_up', 'delivering'].includes(st)) {
-        return { success: false, isValid: false, code: 'ORDER_STATUS_INVALID', error: `Le code ne peut être validé qu'après le ramassage du colis. Statut actuel : ${st}.` };
+      if (!(await this.canValidateDeliveryProof(resolvedOrderId, driverId, order.status))) {
+        return { success: false, isValid: false, code: 'ORDER_STATUS_INVALID', error: `Le code ne peut être validé qu'après le ramassage du colis ou sur une tournée batch assignée. Statut actuel : ${st}.` };
       }
 
       if (!order.delivery_verification_code) {

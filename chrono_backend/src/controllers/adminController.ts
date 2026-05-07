@@ -14,6 +14,8 @@ import { resolveApproximatePickupZone } from '../utils/abidjanApproximatePickupZ
 import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
 import { haversineDistanceKm } from '../services/priceCalculator.js';
+import { isTwilioSmsConfigured, sendTransactionalSMSTwilio } from '../services/twilioSmsService.js';
+import { publicTrackPageBaseUrl } from '../services/recipientOrderNotifyService.js';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const liveOrderStatuses = `'pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering'`;
@@ -64,6 +66,47 @@ function isUsableLatLon(value: any): value is { latitude: number; longitude: num
 function positiveNumber(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+type DeliveryCodeSmsStatus =
+  | { status: 'not_attempted'; reason: string }
+  | { status: 'sent'; messageId?: string }
+  | { status: 'failed'; error?: string };
+
+async function sendAdminOrderDeliveryCodeSms(params: {
+  phone: string;
+  verificationCode: string;
+  orderId: string;
+  trackingToken?: string | null;
+}): Promise<DeliveryCodeSmsStatus> {
+  const phone = params.phone.trim();
+  if (!phone) {
+    return { status: 'not_attempted', reason: 'recipient_phone_missing' };
+  }
+  if (!params.verificationCode) {
+    return { status: 'not_attempted', reason: 'verification_code_missing' };
+  }
+  if (!isTwilioSmsConfigured()) {
+    return { status: 'not_attempted', reason: 'sms_not_configured' };
+  }
+
+  const brand = process.env.TWILIO_SMS_BODY_BRAND?.trim() || 'Krono';
+  const orderLabel = `CMD-${params.orderId.substring(0, 8).toUpperCase()}`;
+  let body =
+    `${brand} - code de livraison ${orderLabel}: ${params.verificationCode}. ` +
+    'Donnez ce code uniquement au livreur Krono quand vous recevez le colis.';
+
+  const trackBase = publicTrackPageBaseUrl();
+  if (params.trackingToken && trackBase) {
+    body += ` Suivi: ${trackBase}/track/${encodeURIComponent(params.trackingToken)}`;
+  }
+
+  const result = await sendTransactionalSMSTwilio(phone, body);
+  if (result.success) {
+    return { status: 'sent', messageId: result.messageId };
+  }
+
+  return { status: 'failed', error: result.error };
 }
 
 const getDateRange = (startParam?: string, endParam?: string) => {
@@ -4094,6 +4137,13 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       (order as any).driver_notes = driverNotes.trim();
     }
 
+    let trackingTokenForRecipient: string | null = null;
+    let deliveryVerificationCode: string | null = null;
+    let deliveryCodeSmsStatus: DeliveryCodeSmsStatus = {
+      status: 'not_attempted',
+      reason: 'qr_not_generated_yet',
+    };
+
     // Sauvegarder la commande en base de données
     try {
       await saveOrder(order);
@@ -4104,12 +4154,28 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
         const trackingToken = await generateAndSaveTrackingToken(orderId);
         if (trackingToken) {
           (order as { trackingToken?: string }).trackingToken = trackingToken;
+          trackingTokenForRecipient = trackingToken;
         }
         const recipientName = order.recipient?.phone ? `Destinataire (${order.recipient.phone})` : (order.dropoff?.details?.phone ? `Destinataire (${order.dropoff.details.phone})` : 'Destinataire');
         const recipientPhone = order.recipient?.phone || order.dropoff?.details?.phone || '';
         const creatorName = (order.user as any)?.name || 'Client';
         if (recipientPhone) {
-          await qrCodeService.generateDeliveryQRCode(orderId, `CMD-${orderId.substring(0, 8).toUpperCase()}`, recipientName, recipientPhone, creatorName);
+          const qr = await qrCodeService.generateDeliveryQRCode(orderId, `CMD-${orderId.substring(0, 8).toUpperCase()}`, recipientName, recipientPhone, creatorName);
+          deliveryVerificationCode = qr.verificationCode;
+          deliveryCodeSmsStatus = await sendAdminOrderDeliveryCodeSms({
+            phone: recipientPhone,
+            verificationCode: qr.verificationCode,
+            orderId,
+            trackingToken: trackingTokenForRecipient,
+          });
+          if (deliveryCodeSmsStatus.status === 'sent') {
+            logger.info(`[createAdminOrder] Code livraison SMS envoyé pour ${orderId}`);
+          } else {
+            logger.warn('[createAdminOrder] Code livraison SMS non envoyé', {
+              orderId,
+              smsStatus: deliveryCodeSmsStatus,
+            });
+          }
         }
       } catch (qrErr: any) {
         logger.warn(`[createAdminOrder] Échec tracking_token/QR pour ${orderId}:`, qrErr?.message);
@@ -4197,7 +4263,13 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
 
       res.status(201).json({
         success: true,
-        data: { id: orderId },
+        data: {
+          id: orderId,
+          deliveryVerificationCode,
+          recipientDeliveryCode: deliveryVerificationCode,
+          deliveryCodeSms: deliveryCodeSmsStatus,
+          trackingToken: trackingTokenForRecipient,
+        },
         message: 'Commande créée avec succès',
       });
     } catch (dbError: any) {

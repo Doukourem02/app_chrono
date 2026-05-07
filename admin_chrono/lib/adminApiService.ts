@@ -1571,7 +1571,18 @@ class AdminApiService {
     approximatePickupZone?: string
   }): Promise<{
     success: boolean
-    data?: { id: string }
+    data?: {
+      id: string
+      deliveryVerificationCode?: string | null
+      recipientDeliveryCode?: string | null
+      deliveryCodeSms?: {
+        status: 'not_attempted' | 'sent' | 'failed'
+        reason?: string
+        messageId?: string
+        error?: string
+      }
+      trackingToken?: string | null
+    }
     message?: string
   }> {
     try {
@@ -1603,7 +1614,18 @@ class AdminApiService {
       if (isApiResponse(result) && result.data) {
         return {
           success: true,
-          data: result.data as { id: string },
+          data: result.data as {
+            id: string
+            deliveryVerificationCode?: string | null
+            recipientDeliveryCode?: string | null
+            deliveryCodeSms?: {
+              status: 'not_attempted' | 'sent' | 'failed'
+              reason?: string
+              messageId?: string
+              error?: string
+            }
+            trackingToken?: string | null
+          },
         }
       }
 

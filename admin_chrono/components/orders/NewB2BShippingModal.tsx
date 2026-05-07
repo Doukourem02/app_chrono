@@ -272,11 +272,22 @@ export default function NewB2BShippingModal({
       })
 
       if (result.success && result.data) {
+        const deliveryCode = result.data.recipientDeliveryCode || result.data.deliveryVerificationCode
+        const smsStatus = result.data.deliveryCodeSms?.status
         // Jouer le son de succès
         const { soundService } = await import('@/utils/soundService')
         soundService.playSuccess().catch((err) => {
           logger.warn('[NewB2BShippingModal] Erreur lecture son succès:', err)
         })
+        if (deliveryCode) {
+          const smsLabel =
+            smsStatus === 'sent'
+              ? 'SMS envoyé au destinataire.'
+              : smsStatus === 'failed'
+                ? 'SMS non envoyé : donnez ce code au client par téléphone.'
+                : 'SMS non envoyé automatiquement : donnez ce code au client par téléphone.'
+          alert(`Commande B2B créée.\nCode de livraison destinataire : ${deliveryCode}\n${smsLabel}`)
+        }
         resetForm()
         onClose()
         // Navigate to planning page to see the new B2B order

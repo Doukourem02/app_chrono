@@ -114,6 +114,8 @@ interface NearbyDriver {
 const activeOrders = new Map<string, Order>();
 const connectedDrivers = new Map<string, string>(); // driverId -> socketId
 const connectedUsers = new Map<string, string>(); // userId -> socketId // Limites configurable pour les commandes multiples
+const declinedBatchOffers = new Map<string, Set<string>>(); // batchId -> driverIds
+const lastBatchOfferReplayAt = new Map<string, number>(); // driverId -> timestamp
 
 let _ioInstance: SocketIOServer | null = null;
 
@@ -135,12 +137,121 @@ function emitBatchOfferToDrivers(drivers: NearbyDriver[], payload: BatchSocketPa
     const driverId = driver.driverId;
     if (!driverId || seen.has(driverId)) continue;
     seen.add(driverId);
+    const declinedDrivers = declinedBatchOffers.get(payload.batchId);
+    if (declinedDrivers?.has(driverId)) continue;
     const socketId = connectedDrivers.get(driverId);
     if (!socketId) continue;
     _ioInstance.to(socketId).emit('batch-assigned', { ...payload, status: 'offer' });
     emitted += 1;
   }
   return emitted;
+}
+
+async function emitBatchOfferToAllConnectedDrivers(payload: BatchSocketPayload): Promise<number> {
+  if (!_ioInstance) return 0;
+
+  let emitted = 0;
+  for (const [driverId, socketId] of connectedDrivers.entries()) {
+    const declinedDrivers = declinedBatchOffers.get(payload.batchId);
+    if (declinedDrivers?.has(driverId)) continue;
+    if (!(await isDriverEligibleForBatchOffer(driverId))) continue;
+
+    _ioInstance.to(socketId).emit('batch-assigned', { ...payload, status: 'offer' });
+    emitted += 1;
+  }
+
+  return emitted;
+}
+
+async function isDriverEligibleForBatchOffer(driverId: string): Promise<boolean> {
+  const memoryStatus = realDriverStatuses.get(driverId) as any;
+  if (memoryStatus && (!memoryStatus.is_online || !memoryStatus.is_available)) {
+    return false;
+  }
+
+  if (!process.env.DATABASE_URL) {
+    return true;
+  }
+
+  try {
+    const { rows } = await pool.query<{
+      vehicle_type: string | null;
+      is_online: boolean | null;
+      is_available: boolean | null;
+    }>(
+      `SELECT vehicle_type, is_online, is_available
+         FROM driver_profiles
+        WHERE user_id = $1
+        LIMIT 1`,
+      [driverId]
+    );
+    const profile = rows[0];
+    if (!profile) return true;
+    if (profile.is_online === false || profile.is_available === false) return false;
+    return driverMatchesOrderEngin(profile.vehicle_type, 'moto');
+  } catch (err: any) {
+    logger.warn('[batch-offer-replay] Vérification livreur ignorée:', err?.message || err);
+    return true;
+  }
+}
+
+async function emitPendingBatchOffersToDriver(
+  driverId: string,
+  socketId: string,
+  options: { throttleMs?: number } = {}
+): Promise<number> {
+  if (!_ioInstance || !driverId || !socketId || !process.env.DATABASE_URL) return 0;
+
+  const throttleMs = options.throttleMs ?? 5000;
+  const now = Date.now();
+  const last = lastBatchOfferReplayAt.get(driverId) ?? 0;
+  if (throttleMs > 0 && now - last < throttleMs) return 0;
+  lastBatchOfferReplayAt.set(driverId, now);
+
+  if (!(await isDriverEligibleForBatchOffer(driverId))) return 0;
+
+  try {
+    const { rows } = await pool.query<{
+      id: string;
+      partner_id: string | null;
+      orders_count: string;
+    }>(
+      `SELECT db.id,
+              db.partner_id,
+              COUNT(bo.order_id)::text AS orders_count
+         FROM delivery_batches db
+         LEFT JOIN batch_orders bo ON bo.batch_id = db.id
+        WHERE db.driver_id IS NULL
+          AND COALESCE(db.status, 'pending') = 'pending'
+        GROUP BY db.id, db.partner_id, db.created_at
+        ORDER BY db.created_at DESC
+        LIMIT 10`
+    );
+
+    let emitted = 0;
+    for (const row of rows) {
+      if (declinedBatchOffers.get(row.id)?.has(driverId)) continue;
+      _ioInstance.to(socketId).emit('batch-assigned', {
+        batchId: row.id,
+        ordersCount: Number.parseInt(row.orders_count ?? '0', 10) || 0,
+        ...(row.partner_id ? { partner_id: row.partner_id } : {}),
+        status: 'offer',
+      });
+      emitted += 1;
+    }
+
+    if (emitted > 0) {
+      logger.info('[batch-offer-replay] Tournées en attente rejouées au livreur', undefined, {
+        driverId: maskUserId(driverId),
+        count: emitted,
+      });
+    }
+
+    return emitted;
+  } catch (err: any) {
+    logger.warn('[batch-offer-replay] Relecture des tournées en attente impossible:', err?.message || err);
+    return 0;
+  }
 }
 const MAX_ACTIVE_ORDERS_PER_CLIENT = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_CLIENT || '5');
 const MAX_ACTIVE_ORDERS_PER_DRIVER = parseInt(process.env.MAX_ACTIVE_ORDERS_PER_DRIVER || '3');
@@ -886,6 +997,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       connectedDrivers.set(authUserId, socket.id);
       socket.driverId = authUserId;
       void rehydrateDriverStatusFromDb(authUserId);
+      void emitPendingBatchOffersToDriver(authUserId, socket.id).catch(() => {});
       if (DEBUG) logger.debug(`[DIAGNOSTIC] Driver auto-auth: ${maskUserId(authUserId)} (socket: ${socket.id})`);
     } else if (authUserId && authRole === 'client') {
       connectedUsers.set(authUserId, socket.id);
@@ -906,6 +1018,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       connectedDrivers.set(authUserId, socket.id);
       socket.driverId = authUserId;
       void rehydrateDriverStatusFromDb(authUserId);
+      void emitPendingBatchOffersToDriver(authUserId, socket.id).catch(() => {});
       logger.debug(`[DIAGNOSTIC] Driver connecté: ${maskUserId(authUserId)} (socket: ${socket.id})`);
       logger.debug(` - Total drivers connectés: ${connectedDrivers.size}`);
     });
@@ -1673,6 +1786,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           ...(batchResult.rows[0]?.partner_id ? { partner_id: batchResult.rows[0].partner_id } : {}),
           status: 'assigned',
         };
+        declinedBatchOffers.delete(batchId);
         socket.emit('batch-accepted-confirmation', {
           success: true,
           ...payload,
@@ -1697,6 +1811,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
       if (!driverId || authRole !== 'driver') {
         socket.emit('unauthorized', { message: 'Driver not authenticated on socket' });
         return;
+      }
+      if (data.batchId) {
+        const declinedDrivers = declinedBatchOffers.get(data.batchId) ?? new Set<string>();
+        declinedDrivers.add(driverId);
+        declinedBatchOffers.set(data.batchId, declinedDrivers);
       }
       socket.emit('batch-declined-confirmation', {
         success: true,
@@ -2661,6 +2780,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           pendingOrder: pending.length ? pending[0] : null,
           currentOrder: active.length ? active[0] : null,
         });
+        if (socket.driverId === driverId) {
+          await emitPendingBatchOffersToDriver(driverId, socket.id);
+        }
       } catch (err: any) {
         logger.error('Error handling driver-reconnect', err);
         if (DEBUG) logger.warn('Error handling driver-reconnect', err);
@@ -2688,5 +2810,5 @@ export {
   activeOrders, calculatePrice, connectedDrivers,
   connectedUsers, estimateDuration,
   findNearbyDrivers, findAllAvailableDrivers, setupOrderSocket, notifyDriversForOrder,
-  emitBatchAssigned, emitBatchOfferToDrivers,
+  emitBatchAssigned, emitBatchOfferToDrivers, emitBatchOfferToAllConnectedDrivers,
 };

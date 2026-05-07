@@ -4,7 +4,7 @@ import path from 'path';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
 import { optimizeRouteOrder } from '../utils/haversine.js';
-import { emitBatchAssigned, emitBatchOfferToDrivers, findAllAvailableDrivers } from '../sockets/orderSocket.js';
+import { emitBatchAssigned, emitBatchOfferToAllConnectedDrivers, emitBatchOfferToDrivers, findAllAvailableDrivers } from '../sockets/orderSocket.js';
 import logger from '../utils/logger.js';
 import type { JWTPayload } from '../types/index.js';
 import qrCodeService from '../services/qrCodeService.js';
@@ -228,12 +228,16 @@ export const createBatch = async (req: Request, res: Response): Promise<void> =>
       });
     }
   } else {
-    const emittedCount = emitBatchOfferToDrivers(automaticOfferDrivers, {
+    const offerPayload = {
       batchId: (batch as any).id,
       ordersCount: orders.length,
       ...(partner_id ? { partner_id } : {}),
       status: 'offer',
-    });
+    };
+    let emittedCount = emitBatchOfferToDrivers(automaticOfferDrivers, offerPayload);
+    if (emittedCount === 0) {
+      emittedCount = await emitBatchOfferToAllConnectedDrivers(offerPayload);
+    }
     if (emittedCount === 0) {
       logger.warn('[batchController] Tournée créée mais aucun livreur connecté notifié', {
         batchId: (batch as any).id,
