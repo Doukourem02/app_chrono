@@ -2,8 +2,7 @@ import pool from '../config/db.js';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import logger from '../utils/logger.js';
 
-// Taux in-quota = excess_commission_rate - 3% (écart constant récompensant le quota)
-// Starter 6%→3%, Pro 5%→2%, Business 3%→0%
+// Taux in-quota (cf. MONETISATION.md) : Starter 3%, Pro 2%, Business 0%
 const QUOTA_COMMISSION: Record<string, number> = {
   starter:  0.03,
   pro:      0.02,

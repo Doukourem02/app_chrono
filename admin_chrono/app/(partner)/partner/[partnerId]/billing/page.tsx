@@ -9,9 +9,9 @@ import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 
 const PLAN_DETAILS: Record<string, { price: number; quota: number | null; inQuotaRate: number }> = {
-  starter:  { price: 8_000,  quota: 35,  inQuotaRate: 0.05 },
-  pro:      { price: 16_000, quota: 70,  inQuotaRate: 0.03 },
-  business: { price: 29_000, quota: 110, inQuotaRate: 0.02 },
+  starter:  { price: 8_000,  quota: 35,  inQuotaRate: 0.03 },
+  pro:      { price: 16_000, quota: 70,  inQuotaRate: 0.02 },
+  business: { price: 29_000, quota: 110, inQuotaRate: 0.00 },
 }
 
 export default function PartnerBillingPage() {
