@@ -2,10 +2,11 @@ import pool from '../config/db.js';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import logger from '../utils/logger.js';
 
-// Grille tarifaire validée 2026-05-02 : taux in-quota par plan
+// Taux in-quota = excess_commission_rate - 3% (écart constant récompensant le quota)
+// Starter 6%→3%, Pro 5%→2%, Business 3%→0%
 const QUOTA_COMMISSION: Record<string, number> = {
   starter:  0.03,
-  pro:      0.03,
+  pro:      0.02,
   business: 0.00,
 };
 

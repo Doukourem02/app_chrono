@@ -514,6 +514,25 @@ export const createOrderRecord = async (
       });
     }
 
+    // ─── Commission B2B : calculer avant la création pour appliquer au prix ──
+    let b2bCommission: { rate: number; type: string; plan: string | null; amount: number } | null = null;
+    let finalPrice = serverPrice;
+    if (isB2BRecord && partner_id) {
+      try {
+        const commission = await computeB2BCommission(partner_id);
+        const commissionAmount = Math.round(serverPrice * commission.rate);
+        finalPrice = serverPrice + commissionAmount;
+        b2bCommission = {
+          rate: commission.rate,
+          type: commission.type,
+          plan: commission.plan,
+          amount: commissionAmount,
+        };
+      } catch (commErr) {
+        logger.warn('[orders/record] b2b commission pré-création non bloquante', commErr);
+      }
+    }
+
     const client = supabaseAdmin ?? supabase;
     if (!supabaseAdmin) {
       logger.warn(
@@ -526,7 +545,7 @@ export const createOrderRecord = async (
       p_pickup: pickup,
       p_dropoff: dropoff,
       p_method: method,
-      p_price: serverPrice,
+      p_price: finalPrice,
       p_distance: effectiveDistanceKm,
     });
 
@@ -547,13 +566,9 @@ export const createOrderRecord = async (
     const orderId = data as string;
     logOrderRecord('info', 'success', { orderId });
 
-    // ─── Logique B2B : commission + quota si partner_id présent ──────────────
-    let b2bCommission: { rate: number; type: string; plan: string | null } | null = null;
+    // ─── Post-création B2B : metadata, QR, quota, notifs livreurs ───────────
     if (isB2BRecord) {
       try {
-        const commission = await computeB2BCommission(partner_id);
-        b2bCommission = { rate: commission.rate, type: commission.type, plan: commission.plan };
-
         // Rattacher la commande au partenaire + marquer B2B pour cohérence côté livreur
         await updateB2BOrderMetadata(orderId, {
           partnerId: partner_id,
@@ -595,7 +610,7 @@ export const createOrderRecord = async (
             pickup,
             dropoff,
             method,
-            priceCfa: serverPrice,
+            priceCfa: finalPrice,
             distanceKm: effectiveDistanceKm,
             recipient,
             notes: typeof notes === 'string' && notes.trim() ? notes.trim() : undefined,
@@ -606,9 +621,11 @@ export const createOrderRecord = async (
           });
         }
 
-        logOrderRecord('info', 'b2b_commission_applied', { orderId, partner_id, rate: commission.rate, type: commission.type });
+        if (b2bCommission) {
+          logOrderRecord('info', 'b2b_commission_applied', { orderId, partner_id, rate: b2bCommission.rate, type: b2bCommission.type, amount: b2bCommission.amount });
+        }
       } catch (b2bErr) {
-        logger.warn('[orders/record] b2b commission non bloquante', b2bErr);
+        logger.warn('[orders/record] b2b post-création non bloquante', b2bErr);
       }
     }
 
@@ -616,7 +633,7 @@ export const createOrderRecord = async (
       success: true,
       data: {
         orderId,
-        priceCfa: serverPrice,
+        priceCfa: finalPrice,
         distanceKm: effectiveDistanceKm,
         dynamicPricing: {
           labels: dynamic.labels,

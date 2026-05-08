@@ -14,6 +14,8 @@ import { getSurgeMultiplierSync } from './surgePricing.js';
 
 export const MAX_CONTEXT_FACTOR = 1.85;
 export const B2B_PRIORITY_FACTOR = 1.15;
+/** Supplément forfaitaire fixe B2B (FCFA), appliqué après les facteurs contextuels. */
+export const B2B_FIXED_SURCHARGE_CFA = 99;
 
 /** F CFA par minute au-delà de la durée théorique (trafic / route réelle). */
 const EXTRA_MINUTE_RATES: Record<DeliveryMethod, number> = {
@@ -80,6 +82,7 @@ export interface DynamicPricingBreakdown {
   contextFactorRaw: number;
   contextFactorApplied: number;
   priorityFactor: number;
+  b2bSurchargeCfa: number;
   totalCfa: number;
   labels: string[];
 }
@@ -128,8 +131,11 @@ export async function computeDynamicDeliveryPrice(
   const contextFactorRaw = weatherFactor * surgeFactor * hourFactor * trafficFactor;
   const contextFactorApplied = Math.min(MAX_CONTEXT_FACTOR, Math.max(1, contextFactorRaw));
   const priorityFactor = input.isB2BPriority ? B2B_PRIORITY_FACTOR : 1;
+  const b2bSurchargeCfa = input.isB2BPriority ? B2B_FIXED_SURCHARGE_CFA : 0;
 
-  const totalCfa = roundToNearest25(subtotalBeforeContextCfa * contextFactorApplied * priorityFactor);
+  const totalCfa = roundToNearest25(
+    subtotalBeforeContextCfa * contextFactorApplied * priorityFactor + b2bSurchargeCfa
+  );
 
   const labels: string[] = [];
   if (weatherFactor > 1.02) labels.push('météo');
@@ -149,6 +155,7 @@ export async function computeDynamicDeliveryPrice(
     contextFactorRaw,
     contextFactorApplied,
     priorityFactor,
+    b2bSurchargeCfa,
     totalCfa,
     labels,
   };
