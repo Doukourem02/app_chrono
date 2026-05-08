@@ -221,14 +221,19 @@ export default function BatchScreen() {
     }
   }, [batch]);
 
-  // Fix 7 : restaurer la navigation active si l'app est revenue de l'arrière-plan
+  // Garder une ref stable de startNavigationToStop pour éviter que les deps GPS
+  // (driverLocation) ne re-déclenchent l'effet de restauration à chaque position update.
+  const startNavigationToStopRef = useRef(startNavigationToStop);
+  useEffect(() => { startNavigationToStopRef.current = startNavigationToStop; });
+
+  // Restaurer la navigation active si l'app est revenue de l'arrière-plan.
   useEffect(() => {
     if (!batch || batch.stops.length === 0 || navigationStop || !navigationStopOrderId) return;
     const storedStop = batch.stops.find(
       (s) => s.orderId === navigationStopOrderId && s.status === 'pending'
     );
-    if (storedStop) void startNavigationToStop(storedStop);
-  }, [batch, navigationStopOrderId, navigationStop, startNavigationToStop]);
+    if (storedStop) void startNavigationToStopRef.current(storedStop);
+  }, [batch, navigationStopOrderId, navigationStop]);
 
   const finalizeProofDelivery = async (stop: BatchStop, method: ProofMethod, extra?: {
     location?: { latitude: number; longitude: number };
@@ -479,7 +484,7 @@ export default function BatchScreen() {
         </View>
       ) : (
         <ScrollView style={styles.list} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-          {(batch?.stops ?? []).map((stop, idx) => {
+          {(batch?.stops ?? []).map((stop) => {
             const isValidating = validatingId === stop.orderId;
             const isDone = stop.status === 'completed';
             const isCancelled = stop.status === 'cancelled';

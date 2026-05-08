@@ -144,16 +144,18 @@ export default function Index() {
   }, [location, resolveCoords]);
 
   const sortedActiveOrdersByDistance = React.useMemo(() => {
-    if (!location || activeOrders.length === 0) return activeOrders;
-    
-    return [...activeOrders].sort((a, b) => {
+    // Exclure les commandes batch — gérées dans /batch/[batchId].tsx
+    const nonBatchOrders = activeOrders.filter(o => !o.batch_id);
+    if (!location || nonBatchOrders.length === 0) return nonBatchOrders;
+
+    return [...nonBatchOrders].sort((a, b) => {
       const distA = calculateDistanceToPickup(a);
       const distB = calculateDistanceToPickup(b);
-      
+
       if (distA === null && distB === null) return 0;
       if (distA === null) return 1;
       if (distB === null) return -1;
-      
+
       return distA - distB;
     });
   }, [activeOrders, location, calculateDistanceToPickup]);
@@ -199,22 +201,31 @@ export default function Index() {
 
   const currentOrder = useOrderStore((s) => {
     // Filtrer les commandes complétées/annulées et les commandes batch (gérées dans l'écran batch)
-    const validActiveOrders = s.activeOrders.filter(o => 
+    const validActiveOrders = s.activeOrders.filter(o =>
       o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined' && !o.batch_id
     );
-    
+
     if (s.selectedOrderId) {
       const selected = validActiveOrders.find(o => o.id === s.selectedOrderId);
-      // Si la commande sélectionnée est complétée/annulée, la désélectionner
-      if (!selected && s.selectedOrderId) {
-        useOrderStore.getState().setSelectedOrder(null);
-      }
       return selected || null;
     }
-    
+
     // Fallback : retourner la première commande active valide si aucune n'est sélectionnée
     return validActiveOrders[0] || null;
   });
+
+  // Nettoyer selectedOrderId quand il pointe vers une commande invalide (complétée, annulée ou batch).
+  // Ne pas faire ça dans le sélecteur Zustand : mutation d'état dans un sélecteur cause des boucles de rendu.
+  useEffect(() => {
+    const store = useOrderStore.getState();
+    if (!store.selectedOrderId) return;
+    const validActive = store.activeOrders.filter(o =>
+      o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined' && !o.batch_id
+    );
+    if (!validActive.find(o => o.id === store.selectedOrderId)) {
+      store.setSelectedOrder(null);
+    }
+  }, [activeOrders]);
 
   // Suivi temps réel : envoyer position au client (throttle 3s + distance filter 15m)
   const lastEmitRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
@@ -408,13 +419,21 @@ export default function Index() {
   const navOrigin = navigationSession?.origin ?? location;
 
   const resetNavigationUi = useCallback((suppressAutoRestart = false) => {
-    if (suppressAutoRestart && currentAutoNavKey) {
-      suppressedAutoNavKeysRef.current.add(currentAutoNavKey);
+    if (suppressAutoRestart) {
+      // Utiliser navigationSession pour construire la clé de suppression — plus fiable que
+      // currentAutoNavKey qui peut être null si currentOrder est temporairement null.
+      setNavigationSession((prev) => {
+        if (prev) {
+          suppressedAutoNavKeysRef.current.add(`${prev.orderId}:${prev.phase}`);
+        }
+        return null;
+      });
+    } else {
+      setNavigationSession(null);
     }
     setShowRecalcOverlay(false);
     setPhase1MountReady(false);
     setNavigationCompletedOrder(null);
-    setNavigationSession(null);
     setIsNavigationActive(false);
     setIsNavigationMinimized(false);
     setShowColisRecupereButton(false);
@@ -423,7 +442,7 @@ export default function Index() {
     atPickupZoneAnnouncedRef.current = false;
     atDropoffZoneAnnouncedRef.current = false;
     spokenDropoffArrivalRef.current = false;
-  }, [currentAutoNavKey]);
+  }, []);
 
   const openNavigationManually = useCallback(() => {
     if (currentAutoNavKey) {
@@ -1439,7 +1458,7 @@ export default function Index() {
             {/* Phase 1 : délai 400ms avant montage. Phase 2 : clé stable, le natif reEmbedWithNewDestination gère le rerouting */}
             {(((currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress') && phase1MountReady) || (currentOrder?.status === 'picked_up' || currentOrder?.status === 'delivering')) && (
             <MapboxNavigationScreen
-              key={`nav-${navigationSession?.orderId ?? currentOrder?.id}`}
+              key={`nav-${navigationSession?.orderId}`}
               origin={navOrigin || location!}
               destination={effectiveNavDestination}
               mute={mapboxVoiceMuted}
