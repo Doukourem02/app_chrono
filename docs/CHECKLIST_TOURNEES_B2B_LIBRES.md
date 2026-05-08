@@ -20,6 +20,31 @@
 
 ---
 
+## Bugs résolus
+
+### B0. Chevauchement des sous-orders batch dans l'app livreur ✅
+**Fichiers :** `app_chrono/services/userAppResync.ts` · `app_chrono/store/useOrderStore.ts` · `app_chrono/hooks/useMapOrderManagement.ts` · `chrono_backend/src/controllers/deliveryController.ts`
+
+**Problème :** Quand un batch avec N destinataires était créé, l'app livreur affichait N commandes distinctes simultanément. Le livreur pouvait basculer entre elles — une seule devait être visible.
+
+**Cause racine :** Un batch génère N orders en base (un par destinataire), tous avec `status: pending` → tous considérés `isDeliveryInProgressStatus = true`. Deux chemins empilaient ces sous-orders :
+
+1. **Resync API** (`syncClientOrdersFromApi`) — tous les sous-orders remontaient et étaient ajoutés à `activeOrders` car le backend ne renvoyait pas `batch_id` (pas de JOIN), impossible de les distinguer.
+2. **Cleanup au montage** (`useMapOrderManagement`) — ne nettoyait que `currentOrder` + le premier `pendingOrder`. Les autres sous-orders d'une session précédente restaient dans le store.
+
+**Fix en 4 étapes :**
+
+| Étape | Fichier | Changement |
+|---|---|---|
+| 1 | `deliveryController.ts:148` | `LEFT JOIN batch_orders bo ON bo.order_id = o.id` + `bo.batch_id` dans SELECT |
+| 2 | `useOrderStore.ts` | Ajout `batch_id?: string` dans `OrderRequest` + guard dans `addOrder` (refuse un sibling si un frère du même batch est déjà dans `activeOrders`) |
+| 3 | `userAppResync.ts` | Propagation `batch_id` dans `formatApiDeliveryRow` + déduplication dans `syncClientOrdersFromApi` via `newBatchIds: Set<string>` |
+| 4 | `useMapOrderManagement.ts` | Cleanup init : boucle sur **tous** les `activeOrders` (cancelled/declined/completed vieux/pending bloqué > 10s) |
+
+**Résultat :** Une livraison groupée = 1 seul order visible dans le tracking livreur.
+
+---
+
 ## 🔴 Bugs bloquants
 
 ### 1. Navigation qui se ferme immédiatement — loop "conduisez vers le nord"
@@ -180,3 +205,4 @@ Commandes enfants créées une par une → `delivery_batch` → `batch_orders`, 
 - [ ] Refaire le test avec un arrêt sans GPS
 - [ ] Refaire le test avec 5 arrêts en ordre différent de l'ordre affiché
 - [ ] Annuler 1 arrêt sur 3 — vérifier que la tournée passe en `partial`
+- [ ] **Créer un batch à 3 arrêts — vérifier que l'app livreur n'affiche qu'1 seul order actif (pas 3)**

@@ -226,7 +226,9 @@ export function useMapOrderManagement({
     setDeliveryLocation,
   ]);
 
-  // Initialisation : nettoyer les commandes terminées au montage
+  // Initialisation : nettoyer TOUS les orders stale au montage (pas seulement currentOrder/pendingOrder)
+  // Avant ce fix, seuls currentOrder et le premier pendingOrder étaient nettoyés : les autres
+  // sous-orders d'un batch (ou d'une session précédente) restaient et causaient le chevauchement.
   const hasInitializedRef = useRef(false);
   useEffect(() => {
     if (hasInitializedRef.current) return;
@@ -234,91 +236,51 @@ export function useMapOrderManagement({
 
     const store = useOrderStore.getState();
     const ratingStore = useRatingStore.getState();
+    const now = Date.now();
+    let didClearRoute = false;
 
-    const currentOrder = store.getCurrentOrder();
-    const pendingOrder = store.getPendingOrder();
+    const allOrders = [...store.activeOrders];
 
-    if (
-      currentOrder &&
-      (currentOrder.status === 'cancelled' || currentOrder.status === 'declined')
-    ) {
-      logger.info(
-        '🧹 Nettoyage commande terminée/annulée/refusée au montage initial',
-        'useMapOrderManagement',
-        { status: currentOrder.status }
-      );
-
-      if (ratingStore.showRatingBottomSheet) {
-        logger.info(
-          '🧹 Fermeture RatingBottomSheet au montage initial (commande terminée)',
-          'useMapOrderManagement'
-        );
-        ratingStore.resetRatingBottomSheet();
+    for (const order of allOrders) {
+      if (order.status === 'cancelled' || order.status === 'declined') {
+        if (ratingStore.showRatingBottomSheet) ratingStore.resetRatingBottomSheet();
+        store.removeOrder(order.id);
+        didClearRoute = true;
+        continue;
       }
 
-      store.removeOrder(currentOrder.id);
+      if (order.status === 'completed') {
+        const completedAt = (order as any)?.completed_at || (order as any)?.completedAt;
+        const orderAge = completedAt ? now - new Date(completedAt).getTime() : Infinity;
+        if (!ratingStore.showRatingBottomSheet && orderAge > 60000) {
+          logger.info('🧹 Nettoyage commande complétée ancienne au montage initial', 'useMapOrderManagement', { orderId: order.id, orderAge });
+          store.removeOrder(order.id);
+          didClearRoute = true;
+        }
+        continue;
+      }
 
-      try {
-        clearRoute();
-      } catch {}
+      if (order.status === 'pending') {
+        const orderAge = order.createdAt ? now - new Date(order.createdAt).getTime() : Infinity;
+        if (orderAge > 10000) {
+          logger.info('🧹 Nettoyage pendingOrder bloqué au montage initial', 'useMapOrderManagement', { orderId: order.id, orderAge });
+          store.removeOrder(order.id);
+          didClearRoute = true;
+        }
+      }
+    }
+
+    if (didClearRoute) {
+      try { clearRoute(); } catch {}
       setPickupCoords(null);
       setDropoffCoords(null);
       setPickupLocation('');
       setDeliveryLocation('');
       useShipmentStore.getState().clearAddressRoutingOverrides();
-    } else if (currentOrder && currentOrder.status === 'completed') {
-      logger.info(
-        '✅ Commande complétée au montage initial - attente du RatingBottomSheet',
-        'useMapOrderManagement',
-        {
-          hasRatingBottomSheet: ratingStore.showRatingBottomSheet,
-        }
-      );
-
-      const completedAt =
-        (currentOrder as any)?.completed_at ||
-        (currentOrder as any)?.completedAt;
-      const orderAge = completedAt
-        ? new Date().getTime() - new Date(completedAt).getTime()
-        : Infinity;
-
-      if (!ratingStore.showRatingBottomSheet && orderAge > 60000) {
-        logger.info(
-          '🧹 Nettoyage commande complétée ancienne au montage initial',
-          'useMapOrderManagement',
-          { orderAge }
-        );
-        store.removeOrder(currentOrder.id);
-        try {
-          clearRoute();
-        } catch {}
-        setPickupCoords(null);
-        setDropoffCoords(null);
-        setPickupLocation('');
-        setDeliveryLocation('');
-        useShipmentStore.getState().clearAddressRoutingOverrides();
-      }
     }
 
-    if (pendingOrder) {
-      const orderAge = pendingOrder.createdAt
-        ? new Date().getTime() - new Date(pendingOrder.createdAt).getTime()
-        : Infinity;
-
-      if (orderAge > 10000) {
-        logger.info('🧹 Nettoyage pendingOrder bloqué au montage initial', 'useMapOrderManagement', {
-          orderId: pendingOrder.id,
-          orderAge,
-        });
-        store.removeOrder(pendingOrder.id);
-      }
-    }
-
-    if (ratingStore.showRatingBottomSheet && !currentOrder) {
-      logger.info(
-        '🧹 Fermeture RatingBottomSheet au montage initial (pas de commande active)',
-        'useMapOrderManagement'
-      );
+    if (ratingStore.showRatingBottomSheet && store.activeOrders.length === 0) {
+      logger.info('🧹 Fermeture RatingBottomSheet au montage initial (pas de commande active)', 'useMapOrderManagement');
       ratingStore.resetRatingBottomSheet();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

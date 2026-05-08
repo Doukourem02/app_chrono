@@ -146,7 +146,7 @@ export const getUserDeliveries = async (
 
     // Récupérer les commandes avec les informations du driver depuis la table users
     let query = `
-      SELECT 
+      SELECT
         o.*,
         d.id as driver_user_id,
         d.email as driver_email,
@@ -160,10 +160,12 @@ export const getUserDeliveries = async (
         dp.vehicle_type as driver_vehicle_type,
         dp.vehicle_brand as driver_vehicle_brand,
         dp.vehicle_model as driver_vehicle_model,
-        dp.vehicle_color as driver_vehicle_color
+        dp.vehicle_color as driver_vehicle_color,
+        bo.batch_id as batch_id
       FROM orders o
       LEFT JOIN users d ON o.driver_id = d.id
       LEFT JOIN driver_profiles dp ON dp.user_id = o.driver_id
+      LEFT JOIN batch_orders bo ON bo.order_id = o.id
       WHERE o.user_id = $1
     `;
     let countQuery = 'SELECT COUNT(*) FROM orders WHERE user_id = $1';

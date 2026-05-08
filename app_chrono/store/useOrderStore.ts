@@ -63,7 +63,8 @@ export interface OrderRequest {
     contactId?: string; 
   };
   packageImages?: string[]; 
-  packageType?: 'standard' | 'fragile' | 'hot_sensitive'; 
+  packageType?: 'standard' | 'fragile' | 'hot_sensitive';
+  batch_id?: string;
 }
 
 function mergeOrderDriver(
@@ -132,6 +133,16 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     if (exists) {
       return state;
     }
+
+    // Un order batch : ne pas empiler les sous-orders d'un même batch en doublons.
+    // Si un frère est déjà présent dans activeOrders, on ignore ce nouvel ajout.
+    if (order.batch_id) {
+      const siblingTracked = state.activeOrders.some(
+        o => o.batch_id === order.batch_id && o.id !== order.id
+      );
+      if (siblingTracked) return state;
+    }
+
     const newOrders = [...state.activeOrders, order];
     const sel = state.selectedOrderId
       ? state.activeOrders.find((o) => o.id === state.selectedOrderId)

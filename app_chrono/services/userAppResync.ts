@@ -92,6 +92,7 @@ function formatApiDeliveryRow(order: any): OrderRequest {
     proof,
     completed_at: order.completed_at,
     cancelled_at: order.cancelled_at,
+    ...(order.batch_id ? { batch_id: order.batch_id } : {}),
     ...(order.tracking_token || order.trackingToken
       ? { trackingToken: order.tracking_token || order.trackingToken }
       : {}),
@@ -106,12 +107,25 @@ export async function syncClientOrdersFromApi(userId: string): Promise<void> {
   const result = await userApiService.getUserDeliveries(userId, { limit: 100 });
   const store = useOrderStore.getState();
   const localIds = new Set(store.activeOrders.map((o) => o.id));
+  // Pour les orders batch hors store : ne jamais ajouter plus d'un sous-order par batch_id
+  // (évite le chevauchement "2 commandes visibles" lors d'une livraison groupée).
+  const newBatchIds = new Set<string>();
 
   if (result.success && result.data?.length) {
     for (const row of result.data) {
       const st = String(row.status || "");
-      // Toujours fusionner les livraisons en cours même absentes du store (socket raté, 2e commande…).
-      if (!isDeliveryInProgressStatus(st) && !localIds.has(row.id)) continue;
+      const alreadyLocal = localIds.has(row.id);
+
+      // Ordre déjà dans le store → mise à jour toujours autorisée
+      if (!alreadyLocal) {
+        if (!isDeliveryInProgressStatus(st)) continue;
+        // Nouvel order batch : accepter le premier sous-order du batch uniquement
+        if (row.batch_id) {
+          if (newBatchIds.has(row.batch_id)) continue;
+          newBatchIds.add(row.batch_id);
+        }
+      }
+
       try {
         const formatted = formatApiDeliveryRow(row);
         useOrderStore.getState().updateFromSocket({ order: formatted as any });
