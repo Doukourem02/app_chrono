@@ -12,3 +12,7 @@
 # Swap / temp
 *.swp
 *.swo
+
+# IDEs
+.idea/
+*.iml

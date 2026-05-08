@@ -24,7 +24,7 @@ type Coords = { latitude: number; longitude: number };
 export default function BatchScreen() {
   const { batchId } = useLocalSearchParams<{ batchId: string }>();
   const insets = useSafeAreaInsets();
-  const { activeBatch, setActiveBatch, updateStop } = useBatchStore();
+  const { activeBatch, updateStop } = useBatchStore();
 
   const [isLoadingFull, setIsLoadingFull] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
@@ -52,6 +52,8 @@ export default function BatchScreen() {
   const [showArrivalActions, setShowArrivalActions] = useState(false);
   const arrivedStopIdRef = useRef<string | null>(null);
   const lastEtaAnnouncedMinRef = useRef(99);
+  const cancelledByUserRef = useRef(false);
+  const { navigationStopOrderId } = useBatchStore();
 
   const speakWithMapboxMuted = useCallback((text: string) => {
     setMapboxVoiceMuted(true);
@@ -60,11 +62,9 @@ export default function BatchScreen() {
     });
   }, []);
 
-  const getCurrentLocation = useCallback(async () => {
+  const getCurrentLocation = useCallback(async (accuracy = Location.Accuracy.Balanced) => {
     try {
-      const current = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const current = await Location.getCurrentPositionAsync({ accuracy });
       return {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
@@ -118,7 +118,7 @@ export default function BatchScreen() {
       return;
     }
 
-    const origin = driverLocation ?? await getCurrentLocation();
+    const origin = driverLocation ?? await getCurrentLocation(Location.Accuracy.High);
     if (!origin) {
       Alert.alert('Localisation indisponible', 'Impossible de récupérer votre position actuelle pour lancer la navigation.');
       return;
@@ -127,22 +127,37 @@ export default function BatchScreen() {
     arrivedStopIdRef.current = null;
     lastEtaAnnouncedMinRef.current = 99;
     setShowArrivalActions(false);
+    cancelledByUserRef.current = false;
+    setMapboxVoiceMuted(true); // Mapbox doit monter déjà muté
     setNavigationOrigin(origin);
     setNavigationStop(stop);
+    useBatchStore.getState().setNavigationStopOrderId(stop.orderId);
     const instructionText = stop.notes
       ? ` Consigne: ${stop.notes.replace(/\n+/g, '. ').replace(/\s{2,}/g, ' ')}.`
       : '';
-    speakWithMapboxMuted(`Tournée groupée, direction la livraison numéro ${stop.position}.${instructionText}`);
-  }, [driverLocation, getCurrentLocation, speakWithMapboxMuted]);
+    speakAnnouncement(`Tournée groupée, direction la livraison numéro ${stop.position}.${instructionText}`, {
+      onDone: () => setMapboxVoiceMuted(false),
+    });
+  }, [driverLocation, getCurrentLocation]);
 
   const stopNavigation = useCallback(() => {
     arrivedStopIdRef.current = null;
     lastEtaAnnouncedMinRef.current = 99;
+    cancelledByUserRef.current = false;
     setShowArrivalActions(false);
     setNavigationStop(null);
     setNavigationOrigin(null);
     setMapboxVoiceMuted(false);
+    useBatchStore.getState().setNavigationStopOrderId(null);
   }, []);
+
+  const handleMapboxCancelNavigation = useCallback(() => {
+    if (cancelledByUserRef.current) {
+      stopNavigation();
+    } else {
+      logger.warn('[BatchScreen] onCancelNavigation SDK (non-user) — ignoré', 'BatchScreen');
+    }
+  }, [stopNavigation]);
 
   const handleRouteProgressChange = useCallback(
     (event: { nativeEvent?: { durationRemaining?: number } }) => {
@@ -183,14 +198,14 @@ export default function BatchScreen() {
     setIsLoadingFull(true);
     try {
       const data = await getBatch(batchId);
-      setActiveBatch(data);
+      useBatchStore.getState().setActiveBatch(data);
     } catch (err: any) {
       logger.warn('[BatchScreen] getBatch error', 'BatchScreen', err);
       Alert.alert('Erreur', err?.message ?? 'Impossible de charger la tournée.');
     } finally {
       setIsLoadingFull(false);
     }
-  }, [batchId, setActiveBatch]);
+  }, [batchId]);
 
   useEffect(() => {
     // Charger les détails complets si les stops sont vides (arrivée depuis push/socket)
@@ -205,6 +220,15 @@ export default function BatchScreen() {
       setAllDone(remaining === 0);
     }
   }, [batch]);
+
+  // Fix 7 : restaurer la navigation active si l'app est revenue de l'arrière-plan
+  useEffect(() => {
+    if (!batch || batch.stops.length === 0 || navigationStop || !navigationStopOrderId) return;
+    const storedStop = batch.stops.find(
+      (s) => s.orderId === navigationStopOrderId && s.status === 'pending'
+    );
+    if (storedStop) void startNavigationToStop(storedStop);
+  }, [batch, navigationStopOrderId, navigationStop, startNavigationToStop]);
 
   const finalizeProofDelivery = async (stop: BatchStop, method: ProofMethod, extra?: {
     location?: { latitude: number; longitude: number };
@@ -229,6 +253,19 @@ export default function BatchScreen() {
         stopNavigation();
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      const nextStop = (batch?.stops ?? [])
+        .filter((s) => s.status === 'pending' && s.orderId !== stop.orderId)
+        .sort((a, b) => a.position - b.position)[0];
+      if (nextStop) {
+        Alert.alert(
+          'Arrêt suivant',
+          `Naviguer vers ${nextStop.recipientName} ?`,
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            { text: 'Naviguer', onPress: () => startNavigationToStop(nextStop) },
+          ]
+        );
+      }
     } catch (err: any) {
       Alert.alert('Erreur', err?.message ?? 'Impossible de valider la livraison.');
     } finally {
@@ -430,7 +467,9 @@ export default function BatchScreen() {
           <View style={styles.doneCircle}>
             <Ionicons name="checkmark-done" size={48} color="#10B981" />
           </View>
-          <Text style={styles.doneTitle}>Tournée terminée !</Text>
+          <Text style={styles.doneTitle}>
+            {cancelledCount > 0 && completedCount > 0 ? 'Tournée partiellement terminée' : 'Tournée terminée !'}
+          </Text>
           <Text style={styles.doneSub}>
             {completedCount} livrée{completedCount > 1 ? 's' : ''}{cancelledCount > 0 ? `, ${cancelledCount} annulée${cancelledCount > 1 ? 's' : ''}` : ''}
           </Text>
@@ -452,6 +491,7 @@ export default function BatchScreen() {
                   styles.stopCard,
                   isDone && styles.stopCardDone,
                   isCancelled && styles.stopCardCancelled,
+                  navigationStop?.orderId === stop.orderId && styles.stopCardNavigating,
                 ]}
               >
                 {/* Position + statut */}
@@ -461,7 +501,7 @@ export default function BatchScreen() {
                   ) : isCancelled ? (
                     <Ionicons name="close" size={16} color="#FFF" />
                   ) : (
-                    <Text style={styles.positionText}>{idx + 1}</Text>
+                    <Text style={styles.positionText}>{stop.position}</Text>
                   )}
                 </View>
 
@@ -580,6 +620,7 @@ export default function BatchScreen() {
                       <Ionicons name="camera-outline" size={14} color="#065F46" />
                       <Text style={styles.altBtnText}>Preuve alternative</Text>
                     </TouchableOpacity>
+                    <Text style={styles.altHint}>Appui long pour annuler</Text>
                   </View>
                 )}
 
@@ -611,12 +652,17 @@ export default function BatchScreen() {
             destination={navigationStop.coordinates}
             mute={mapboxVoiceMuted}
             onArrive={markArrivedAtStop}
-            onCancel={stopNavigation}
-            onBackPress={stopNavigation}
+            onCancel={handleMapboxCancelNavigation}
+            onBackPress={() => {
+              cancelledByUserRef.current = true;
+              stopNavigation();
+            }}
             onRouteProgressChange={handleRouteProgressChange}
           />
           <View style={[styles.navStopBanner, { top: insets.top + 56 }]}>
-            <Text style={styles.navStopEyebrow}>Arrêt {navigationStop.position}/{totalCount}</Text>
+            <Text style={styles.navStopEyebrow}>
+              Arrêt {navigationStop.position}/{totalCount} · {remainingCount} restant{remainingCount > 1 ? 's' : ''}
+            </Text>
             <Text style={styles.navStopTitle} numberOfLines={1}>{navigationStop.recipientName}</Text>
             <Text style={styles.navStopAddress} numberOfLines={2}>{navigationStop.address}</Text>
           </View>
@@ -881,6 +927,11 @@ const styles = StyleSheet.create({
     borderColor: '#FECACA',
     opacity: 0.7,
   },
+  stopCardNavigating: {
+    borderColor: '#2563EB',
+    borderWidth: 2,
+    backgroundColor: '#EFF6FF',
+  },
   positionBadge: {
     width: 32,
     height: 32,
@@ -1017,6 +1068,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#065F46',
+  },
+  altHint: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: -2,
   },
   proofBadge: {
     alignSelf: 'flex-start',

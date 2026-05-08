@@ -11,7 +11,7 @@ import qrCodeService from '../services/qrCodeService.js';
 import { completeTransactionsForOrder } from '../utils/createTransactionForOrder.js';
 import { saveDeliveryProofRecord } from '../config/orderStorage.js';
 import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
-import { incrementPartnerUsage } from '../services/b2bCommissionService.js';
+import { computeB2BCommission, incrementPartnerUsage } from '../services/b2bCommissionService.js';
 import { haversineDistanceKm } from '../services/priceCalculator.js';
 
 const db = () => supabaseAdmin ?? supabase;
@@ -213,6 +213,15 @@ async function createBatchChildOrder(params: {
   }
 
   if (params.partnerId) {
+    const commission = await computeB2BCommission(params.partnerId).catch(() => null);
+    if (commission) {
+      await pool.query(
+        `UPDATE orders SET commission_rate = $1, commission_type = $2 WHERE id = $3`,
+        [commission.rate, commission.type, orderId]
+      ).catch((err: any) => {
+        logger.warn('[batchController] commission_rate storage non bloquant:', err?.message || err);
+      });
+    }
     await incrementPartnerUsage(params.partnerId).catch((usageErr: any) => {
       logger.warn('[batchController] usage partenaire batch non bloquant:', usageErr?.message || usageErr);
     });
@@ -417,70 +426,66 @@ export const createBatch = async (req: AuthenticatedRequest, res: Response): Pro
     optimizedOrder = preparedOrders.map((_, i) => i);
   }
 
-  // Créer la delivery_batch
-  const { data: batch, error: batchErr } = await db()
-    .from('delivery_batches')
-    .insert({
-      partner_id: partner_id ?? null,
-      user_id: user_id ?? null,
-      driver_id: assignedDriverId,
-      status: 'pending',
-    })
-    .select()
-    .single();
+  // Créer delivery_batch + batch_orders dans une transaction atomique
+  const txClient = await pool.connect();
+  let batch: { id: string } | null = null;
+  try {
+    await txClient.query('BEGIN');
+    const { rows: batchRows } = await txClient.query<{ id: string }>(
+      `INSERT INTO delivery_batches (partner_id, user_id, driver_id, status)
+       VALUES ($1, $2, $3, 'pending') RETURNING id`,
+      [partner_id ?? null, user_id ?? null, assignedDriverId ?? null]
+    );
+    if (!batchRows[0]) throw new Error('batch insert returned no rows');
+    batch = batchRows[0];
 
-  if (batchErr || !batch) {
-    logger.error('[batchController] createBatch error:', batchErr);
+    if (preparedOrders.length > 0) {
+      const rows = optimizedOrder.map((originalIdx, pos) => [
+        batch!.id,
+        preparedOrders[originalIdx]!.order_id,
+        pos + 1,
+      ]);
+      const placeholders = rows.map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`).join(', ');
+      await txClient.query(
+        `INSERT INTO batch_orders (batch_id, order_id, position) VALUES ${placeholders}`,
+        rows.flat()
+      );
+    }
+    await txClient.query('COMMIT');
+  } catch (txErr: any) {
+    await txClient.query('ROLLBACK').catch(() => {});
     if (createdOrderIds.length) {
       await db().from('orders').delete().in('id', createdOrderIds);
     }
+    logger.error('[batchController] batch transaction error:', txErr?.message || txErr);
     res.status(500).json({ success: false, message: 'Erreur lors de la création de la tournée' });
     return;
-  }
-
-  // Insérer les batch_orders avec position optimisée
-  const batchOrdersPayload = optimizedOrder.map((originalIdx, position) => ({
-    batch_id: (batch as any).id,
-    order_id: preparedOrders[originalIdx]!.order_id,
-    position: position + 1,
-    client_order_index: preparedOrders[originalIdx]!.client_order_index,
-  }));
-
-  const { error: boErr } = await db().from('batch_orders').insert(
-    batchOrdersPayload.map(({ batch_id, order_id, position }) => ({ batch_id, order_id, position }))
-  );
-
-  if (boErr) {
-    logger.error('[batchController] insert batch_orders error:', boErr);
-    // Rollback batch
-    await db().from('delivery_batches').delete().eq('id', (batch as any).id);
-    if (createdOrderIds.length) {
-      await db().from('orders').delete().in('id', createdOrderIds);
-    }
-    res.status(500).json({ success: false, message: 'Erreur lors de l\'insertion des commandes dans la tournée' });
-    return;
+  } finally {
+    txClient.release();
   }
 
   await ensureBatchOrderProofs(preparedOrders.map((order) => order.order_id));
 
   // Si un livreur est choisi explicitement, on assigne directement la tournée.
   // Sinon, la tournée part en offre aux livreurs B2B connectés : le premier qui accepte devient assigné.
+  const batchId = batch!.id;
+
   if (assignedDriverId) {
     const emitted = emitBatchAssigned(assignedDriverId, {
-      batchId: (batch as any).id,
+      batchId,
       ordersCount: preparedOrders.length,
       ...(partner_id ? { partner_id } : {}),
       status: 'assigned',
     });
     if (!emitted) {
       logger.warn('[batchController] Tournée créée mais livreur non connecté', {
-        batchId: (batch as any).id,
+        batchId,
         driverId: assignedDriverId,
       });
     }
   } else {
     const offerPayload = {
-      batchId: (batch as any).id,
+      batchId,
       ordersCount: preparedOrders.length,
       ...(partner_id ? { partner_id } : {}),
       status: 'offer',
@@ -491,23 +496,25 @@ export const createBatch = async (req: AuthenticatedRequest, res: Response): Pro
     }
     if (emittedCount === 0) {
       logger.warn('[batchController] Tournée créée mais aucun livreur connecté notifié', {
-        batchId: (batch as any).id,
+        batchId,
         candidateDrivers: automaticOfferDrivers.length,
       });
     }
   }
 
+  const ordersResponse = optimizedOrder.map((originalIdx, pos) => ({
+    order_id: preparedOrders[originalIdx]!.order_id,
+    position: pos + 1,
+    client_order_index: preparedOrders[originalIdx]!.client_order_index,
+  }));
+
   res.status(201).json({
     success: true,
     data: {
-      ...batch,
+      id: batchId,
       driver_id: assignedDriverId,
       orders_count: preparedOrders.length,
-      orders: batchOrdersPayload.map((item) => ({
-        order_id: item.order_id,
-        position: item.position,
-        client_order_index: item.client_order_index,
-      })),
+      orders: ordersResponse,
     },
   });
 };
@@ -746,9 +753,21 @@ export const validateBatchOrder = async (req: AuthenticatedRequest, res: Respons
     .not('orders.status', 'in', '("completed","cancelled")');
 
   if (!remaining?.length) {
+    const { data: allOrders } = await db()
+      .from('batch_orders')
+      .select('orders!inner(status)')
+      .eq('batch_id', batchId);
+
+    const statuses = (allOrders ?? []).map((o: any) =>
+      Array.isArray(o.orders) ? o.orders[0]?.status : o.orders?.status
+    );
+    const hasCompleted = statuses.some((s: any) => s === 'completed');
+    const hasCancelled = statuses.some((s: any) => s === 'cancelled');
+    const batchFinalStatus = hasCompleted && hasCancelled ? 'partial' : 'completed';
+
     await db()
       .from('delivery_batches')
-      .update({ status: 'completed' })
+      .update({ status: batchFinalStatus })
       .eq('id', batchId);
   }
 

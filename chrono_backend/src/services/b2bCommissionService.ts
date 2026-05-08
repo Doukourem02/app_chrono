@@ -2,11 +2,11 @@ import pool from '../config/db.js';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import logger from '../utils/logger.js';
 
-// Grille tarifaire v2 (2026-05-04) : taux in-quota par plan
+// Grille tarifaire validée 2026-05-02 : taux in-quota par plan
 const QUOTA_COMMISSION: Record<string, number> = {
-  starter: 0.05,
-  pro:     0.03,
-  business: 0.02,
+  starter:  0.03,
+  pro:      0.03,
+  business: 0.00,
 };
 
 const db = () => supabaseAdmin ?? supabase;
