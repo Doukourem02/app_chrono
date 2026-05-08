@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { config } from '../config/index';
 import { OrderRequest, useOrderStore } from '../store/useOrderStore';
 import { useDriverStore } from '../store/useDriverStore';
+import { useBatchStore } from '../store/useBatchStore';
 import { logger } from '../utils/logger';
 import { reportSocketIssue } from '../utils/sentry';
 import { useRealtimeDegradedStore } from '../store/useRealtimeDegradedStore';
@@ -14,14 +15,11 @@ class OrderSocketService {
   private driverId: string | null = null;
   private isConnected = false;
   private lastSocketAuthToken: string | null = null;
-  private retryCount = 0;
-  /** Incrémenté à chaque nouveau connect/disconnect pour ignorer les establishSocket obsolètes. */
-  private connectGeneration = 0;
-  /** Évite plusieurs Alert.alert pour la même tournée quand le socket resynchronise. */
-  private visibleBatchOfferIds: Set<string> = new Set();
-  /** Tournées refusées/indisponibles pendant cette session: ne pas reproposer en boucle. */
-  private mutedBatchOfferIds: Set<string> = new Set();
-  /** Hooks enregistrés pour déclencher un resync après un événement socket critique. */
+  private retryCount = 0;/** Incrémenté à chaque nouveau connect/disconnect pour ignorer les establishSocket obsolètes. */
+  private connectGeneration = 0;/** Évite plusieurs Alert.alert pour la même tournée quand le socket resynchronise. */
+  private visibleBatchOfferIds: Set<string> = new Set();/** Tournées refusées/indisponibles pendant cette session: ne pas reproposer en boucle. */
+  private mutedBatchOfferIds: Set<string> = new Set();/** Évite d'empiler plusieurs fois le même écran batch (batch-assigned peut arriver N fois). */
+  private navigatedBatchIds: Set<string> = new Set();/** Hooks enregistrés pour déclencher un resync après un événement socket critique. */
   private refetchListeners: Set<(orderId: string) => void> = new Set();
 
   addRefetchListener(fn: (orderId: string) => void): () => void {
@@ -343,7 +341,18 @@ class OrderSocketService {
 
         const store = useOrderStore.getState();
         const existingOrder = store.activeOrders.find(o => o.id === order.id);
-        
+
+        // Bloquer les commandes appartenant à un batch actif, même si batch_id est absent du payload.
+        // Le serveur peut envoyer order:status:update sans batch_id ce qui causait une boucle nav.
+        const activeBatchStopIds = useBatchStore.getState().activeBatch?.stops.map(s => s.orderId) ?? [];
+        if (order.batch_id || activeBatchStopIds.includes(order.id)) {
+          // Si la commande était déjà dans activeOrders (par erreur), la retirer proprement
+          if (existingOrder) {
+            store.removeOrder(order.id);
+          }
+          return;
+        }
+
         // Si la commande n'existe pas encore dans activeOrders mais a un statut actif, l'ajouter
         // Les commandes batch sont ignorées ici (gérées par useBatchStore via batch-assigned)
         if (!existingOrder && !order.batch_id && (
@@ -432,21 +441,22 @@ class OrderSocketService {
 
         this.visibleBatchOfferIds.delete(batchId);
         this.mutedBatchOfferIds.delete(batchId);
-        import('../store/useBatchStore').then(({ useBatchStore }) => {
-          useBatchStore.getState().clearPendingOffer(batchId);
-          // Pré-remplir avec le minimum connu, l'écran chargera les détails complets
-          useBatchStore.getState().setActiveBatch({
-            id: batchId,
-            ordersCount: ordersCount ?? 0,
-            stops: [],
-            ...(partner_id ? { partner_id } : {}),
-            ...(partner_name ? { partner_name } : {}),
-          });
+        useBatchStore.getState().clearPendingOffer(batchId);
+        useBatchStore.getState().setActiveBatch({
+          id: batchId,
+          ordersCount: ordersCount ?? 0,
+          stops: [],
+          ...(partner_id ? { partner_id } : {}),
+          ...(partner_name ? { partner_name } : {}),
         });
 
-        import('expo-router').then(({ router }) => {
-          router.push(`/batch/${batchId}` as any);
-        });
+        // Naviguer vers l'écran batch une seule fois (batch-assigned peut arriver N fois).
+        if (!this.navigatedBatchIds.has(batchId)) {
+          this.navigatedBatchIds.add(batchId);
+          import('expo-router').then(({ router }) => {
+            router.push(`/batch/${batchId}` as any);
+          });
+        }
 
         void soundService.playOrderSound().catch(() => {});
         import('expo-haptics').then((Haptics) => {
@@ -544,6 +554,7 @@ class OrderSocketService {
       this.driverId = null;
     }
     this.lastSocketAuthToken = null;
+    this.navigatedBatchIds.clear();
   }
 
   /**

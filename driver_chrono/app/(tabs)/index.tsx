@@ -510,6 +510,12 @@ export default function Index() {
     if (currentOrder.batch_id) {
       return;
     }
+    // Guard secondaire : si le batch actif contient cette commande (batch_id absent du payload serveur),
+    // ne pas démarrer la navigation ici — c'est la boucle "conduisait vers le nord".
+    const activeBatch = useBatchStore.getState().activeBatch;
+    if (activeBatch?.stops.some(s => s.orderId === currentOrder.id)) {
+      return;
+    }
     if (!location || !destination) return;
 
     const status = String(currentOrder.status || '');
