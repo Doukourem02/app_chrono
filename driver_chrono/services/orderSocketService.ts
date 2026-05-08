@@ -291,8 +291,9 @@ class OrderSocketService {
         // Ajouter toutes les commandes actives (filtrer les complétées/annulées)
         if (Array.isArray(activeOrders)) {
           const validActiveOrders = activeOrders.filter((order: any) => {
-            // Filtrer strictement les commandes complétées, annulées ou déclinées
+            // Filtrer les commandes complétées/annulées et les commandes batch (gérées par useBatchStore)
             if (!order || !order.id) return false;
+            if (order.batch_id) return false;
             const status = String(order.status || '').toLowerCase();
             return status !== 'completed' && status !== 'cancelled' && status !== 'declined';
           });
@@ -344,11 +345,12 @@ class OrderSocketService {
         const existingOrder = store.activeOrders.find(o => o.id === order.id);
         
         // Si la commande n'existe pas encore dans activeOrders mais a un statut actif, l'ajouter
-        if (!existingOrder && (
-          order.status === 'accepted' || 
-          order.status === 'in_progress' || 
-          order.status === 'enroute' || 
-          order.status === 'picked_up' || 
+        // Les commandes batch sont ignorées ici (gérées par useBatchStore via batch-assigned)
+        if (!existingOrder && !order.batch_id && (
+          order.status === 'accepted' ||
+          order.status === 'in_progress' ||
+          order.status === 'enroute' ||
+          order.status === 'picked_up' ||
           order.status === 'delivering'
         )) {
           logger.info('📦 Commande active reçue via order:status:update, ajout au store', undefined, { orderId: order.id, status: order.status });

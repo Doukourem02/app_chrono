@@ -181,9 +181,14 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
     // Une commande ne peut pas être à la fois en attente et active (sinon doublon dans « Mes commandes »).
     const pendingWithoutThis = state.pendingOrders.filter((o) => o.id !== order.id);
 
+    // Les commandes batch sont gérées par useBatchStore, pas ici
+    if (order.batch_id) {
+      return { ...state, pendingOrders: pendingWithoutThis };
+    }
+
     // Normaliser le statut pour la comparaison (insensible à la casse)
     const normalizedStatus = String(order.status || '').toLowerCase();
-    
+
     // Ne pas ajouter les commandes complétées, annulées ou déclinées
     if (normalizedStatus === 'completed' || normalizedStatus === 'cancelled' || normalizedStatus === 'declined') {
       // Si la commande existe déjà et est complétée, la retirer immédiatement
@@ -284,6 +289,17 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         ...(sp !== undefined ? { speedOptionId: sp } : {}),
       };
     };
+    // Si la mise à jour apporte un batch_id, retirer la commande de activeOrders
+    if ((updates as any).batch_id) {
+      const newSelectedId = state.selectedOrderId === orderId
+        ? (state.activeOrders.find(o => o.id !== orderId)?.id ?? null)
+        : state.selectedOrderId;
+      return {
+        activeOrders: state.activeOrders.filter(o => o.id !== orderId),
+        pendingOrders: state.pendingOrders.filter(o => o.id !== orderId),
+        selectedOrderId: newSelectedId,
+      };
+    }
     const updatedActive = state.activeOrders.map((order) =>
       order.id === orderId ? applyPatch(order) : order
     );
