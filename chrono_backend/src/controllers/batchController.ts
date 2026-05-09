@@ -357,6 +357,19 @@ export const confirmBatchPickup = async (req: AuthenticatedRequest, res: Respons
     return;
   }
 
+  // Mettre à jour les commandes de la tournée à picked_up pour que le client voie "Colis récupéré"
+  await pool.query(
+    `UPDATE orders o
+        SET status = 'picked_up', updated_at = NOW()
+       FROM batch_orders bo
+      WHERE bo.batch_id = $1
+        AND bo.order_id = o.id
+        AND o.status IN ('accepted', 'enroute', 'in_progress')`,
+    [batchId]
+  ).catch((err: any) => {
+    logger.warn('[batchController] confirmBatchPickup order status update warning:', err?.message);
+  });
+
   res.json({ success: true });
 };
 

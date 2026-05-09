@@ -142,7 +142,14 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
   const pickupAddress = firstOrderPickup ? addressText(firstOrderPickup) : undefined;
   const pickupCoordinates = firstOrderPickup ? coordinatesFromLocation(firstOrderPickup) : undefined;
   const batchStatus = raw.status as ActiveBatch['status'] | undefined;
-  const pickedUp = batchStatus === 'in_progress' || batchStatus === 'completed' || batchStatus === 'partial';
+  // pickedUp est vrai uniquement si au moins un order a dépassé le statut 'accepted'
+  // (picked_up, delivering, completed, cancelled). Le batch passe à 'in_progress' dès
+  // l'acceptation, donc on ne peut pas se baser sur batchStatus seul.
+  const anyOrderPickedUp = (raw.orders ?? []).some((item) => {
+    const s = (item.orders?.status ?? '').toLowerCase();
+    return ['picked_up', 'delivering', 'completed', 'cancelled'].includes(s);
+  });
+  const pickedUp = anyOrderPickedUp || batchStatus === 'completed' || batchStatus === 'partial';
 
   return {
     id: raw.id,
