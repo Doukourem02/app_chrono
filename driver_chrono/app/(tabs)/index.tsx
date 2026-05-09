@@ -360,6 +360,13 @@ export default function Index() {
   const [mapboxVoiceMuted, setMapboxVoiceMuted] = useState(false);
   const [showColisRecupereButton, setShowColisRecupereButton] = useState(false);
   const [showLivraisonEffectueeButton, setShowLivraisonEffectueeButton] = useState(false);
+  const colisRecupereLabel = React.useMemo(() => {
+    const pickupPhaseOrders = activeOrders.filter(o =>
+      !o.batch_id &&
+      (o.status === 'accepted' || o.status === 'enroute' || o.status === 'in_progress')
+    );
+    return pickupPhaseOrders.length > 1 ? 'Tous les colis récupérés' : 'Colis récupéré';
+  }, [activeOrders]);
   const atPickupZoneAnnouncedRef = useRef(false);
   const atDropoffZoneAnnouncedRef = useRef(false);
   /** Annonce « arrivée à destination » une seule fois (géofence et/ou Mapbox peuvent arriver dans n’importe quel ordre). */
@@ -376,16 +383,6 @@ export default function Index() {
     });
   }, []);
 
-  const buildBusinessArrivalInstruction = useCallback((order: typeof currentOrder | null | undefined): string => {
-    if (!order?.isB2BOrder) return '';
-    const instructions = [order.operatorCourseNotes, order.driverNotes]
-      .map((item) => (typeof item === 'string' ? item.trim() : ''))
-      .filter(Boolean)
-      .join('. ');
-    return instructions
-      ? ` Consigne: ${instructions.replace(/\n+/g, '. ').replace(/\s{2,}/g, ' ')}.`
-      : '';
-  }, []);
 
   const currentPickupCoord = React.useMemo(
     () => currentOrder ? resolveCoords(currentOrder.pickup) : null,
@@ -633,7 +630,7 @@ export default function Index() {
       }
       if (!spokenDropoffArrivalRef.current) {
         spokenDropoffArrivalRef.current = true;
-        speakWithMapboxMuted(`Vous êtes arrivés à destination.${buildBusinessArrivalInstruction(currentOrder)}`);
+        speakWithMapboxMuted('Vous êtes arrivés à destination.');
       }
     },
   });
@@ -841,12 +838,24 @@ export default function Index() {
   }, [user?.id, isOnline]);
 
   const handleColisRecupere = useCallback(() => {
-    if (!currentOrder || !location) return;
+    if (!location) return;
+    const ordersToPickup = activeOrders.filter(o =>
+      !o.batch_id &&
+      (o.status === 'accepted' || o.status === 'enroute' || o.status === 'in_progress')
+    );
+    if (ordersToPickup.length === 0) return;
     setShowColisRecupereButton(false);
     atPickupZoneAnnouncedRef.current = false;
-    orderSocketService.updateDeliveryStatus(currentOrder.id, 'picked_up', location);
-    speakWithMapboxMuted('Colis pris en charge. Nous pouvons entamer la course.');
-  }, [currentOrder, location, speakWithMapboxMuted]);
+    ordersToPickup.forEach(order => {
+      orderSocketService.updateDeliveryStatus(order.id, 'picked_up', location);
+    });
+    const isGrouped = ordersToPickup.length > 1;
+    speakWithMapboxMuted(
+      isGrouped
+        ? 'Tous les colis pris en charge. Nous pouvons entamer la course.'
+        : 'Colis pris en charge. Nous pouvons entamer la course.'
+    );
+  }, [activeOrders, location, speakWithMapboxMuted]);
 
   const handleAcceptOrder = (orderId: string) => {
     // Mise à jour optimiste : afficher la commande et ouvrir la navigation immédiatement
@@ -860,8 +869,10 @@ export default function Index() {
       .trim()
       .toLowerCase();
     const safety = getSafetyReminderForVehicleType(vehicleForSafety);
+    const allNonBatchActive = useOrderStore.getState().activeOrders.filter(o => !o.batch_id);
+    const isGroupedAccept = allNonBatchActive.length > 1;
     speakWithMapboxMuted(
-      `Course acceptée, en route pour récupérer le colis. ${safety}`
+      `Course acceptée, en route pour récupérer ${isGroupedAccept ? 'les colis' : 'le colis'}. ${safety}`
     );
     setIsNavigationActive(true);
     // Émettre immédiatement la position pour que le client voie la route dès l'acceptation
@@ -1490,12 +1501,13 @@ export default function Index() {
               }
               if (!spokenDropoffArrivalRef.current) {
                 spokenDropoffArrivalRef.current = true;
-                speakWithMapboxMuted(`Vous êtes arrivés à destination.${buildBusinessArrivalInstruction(order)}`);
+                speakWithMapboxMuted('Vous êtes arrivés à destination.');
               }
             }
           }}
           showColisRecupereButton={showColisRecupereButton}
           onColisRecupere={handleColisRecupere}
+          colisRecupereLabel={colisRecupereLabel}
           showLivraisonEffectueeButton={showLivraisonEffectueeButton}
           onLivraisonEffectuee={handleLivraisonEffectuee}
           onCancel={() => {
@@ -1531,7 +1543,7 @@ export default function Index() {
                 activeOpacity={0.8}
               >
                 <Ionicons name="cube" size={24} color="#fff" />
-                <Text style={styles.reprendreNavText}>Colis récupéré</Text>
+                <Text style={styles.reprendreNavText}>{colisRecupereLabel}</Text>
               </TouchableOpacity>
             )}
             {showLivraisonEffectueeButton && (

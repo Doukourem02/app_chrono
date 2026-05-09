@@ -128,16 +128,9 @@ export default function BatchScreen() {
     lastEtaAnnouncedMinRef.current = 99;
     setShowArrivalActions(false);
     cancelledByUserRef.current = false;
-    setMapboxVoiceMuted(true); // Mapbox doit monter déjà muté
     setNavigationOrigin(origin);
     setNavigationStop(stop);
     useBatchStore.getState().setNavigationStopOrderId(stop.orderId);
-    const instructionText = stop.notes
-      ? ` Consigne: ${stop.notes.replace(/\n+/g, '. ').replace(/\s{2,}/g, ' ')}.`
-      : '';
-    speakAnnouncement(`Tournée groupée, direction la livraison numéro ${stop.position}.${instructionText}`, {
-      onDone: () => setMapboxVoiceMuted(false),
-    });
   }, [driverLocation, getCurrentLocation]);
 
   const stopNavigation = useCallback(() => {
@@ -167,12 +160,9 @@ export default function BatchScreen() {
       const minsRemaining = Math.ceil(durationRemaining / 60);
       const last = lastEtaAnnouncedMinRef.current;
 
-      if (minsRemaining <= 2 && last > 2) {
-        lastEtaAnnouncedMinRef.current = 2;
-        speakWithMapboxMuted(`Tu arrives à la livraison numéro ${navigationStop.position} dans environ deux minutes.`);
-      } else if (minsRemaining <= 1 && last > 1) {
+      if (minsRemaining <= 1 && last > 1) {
         lastEtaAnnouncedMinRef.current = 1;
-        speakWithMapboxMuted(`Tu arrives à la livraison numéro ${navigationStop.position} dans environ une minute.`);
+        speakWithMapboxMuted('Tu arrives à destination dans environ une minute.');
       }
     },
     [navigationStop, speakWithMapboxMuted]

@@ -47,6 +47,7 @@ interface MapboxNavigationScreenProps {
   /** Afficher le bouton "Colis récupéré" (livreur dans la zone de pickup) */
   showColisRecupereButton?: boolean;
   onColisRecupere?: () => void;
+  colisRecupereLabel?: string;
   /** Afficher le bouton "Livraison effectuée" (livreur dans la zone de dropoff) */
   showLivraisonEffectueeButton?: boolean;
   onLivraisonEffectuee?: () => void;
@@ -78,6 +79,7 @@ export function MapboxNavigationScreen({
   mute = false,
   showColisRecupereButton = false,
   onColisRecupere,
+  colisRecupereLabel = 'Colis récupéré',
   showLivraisonEffectueeButton = false,
   onLivraisonEffectuee,
 }: MapboxNavigationScreenProps) {
@@ -292,7 +294,7 @@ export function MapboxNavigationScreen({
           activeOpacity={0.8}
         >
           <Ionicons name="cube" size={24} color="#fff" />
-          <Text style={styles.colisRecupereButtonText}>Colis récupéré</Text>
+          <Text style={styles.colisRecupereButtonText}>{colisRecupereLabel}</Text>
         </TouchableOpacity>
       )}
 
