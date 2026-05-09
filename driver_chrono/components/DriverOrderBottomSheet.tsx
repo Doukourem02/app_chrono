@@ -13,6 +13,7 @@ import { normalizeDropoffDetails, parseClientOrderInstructions } from '../utils/
 import { driverFacingSpeedOptionLabel } from '../utils/speedOptionLabel';
 import { OperatorCourseNotesBlock, OperatorDriverNotesBlock } from './AdminOrderInfo';
 import { router } from 'expo-router';
+import { useBatchStore } from '../store/useBatchStore';
 
 const NAV_BAR_HEIGHT = 80;
 const NAV_BAR_BOTTOM = 25;
@@ -153,14 +154,17 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   // - accepted → "Je pars" (obligatoire pour activer le géofencing)
   // - Colis récupéré, Terminé → détection auto par géofencing (zone pickup/dropoff)
   // - Scanner QR : optionnel à l'arrivée (gardé pour preuve de livraison)
+  const activeBatchStopIds = useBatchStore((s) => s.activeBatch?.stops.map((stop) => stop.orderId) ?? []);
+  const isBatchStop = activeBatchStopIds.includes(currentOrder?.id ?? '');
+
   const availableActions = useMemo(() => {
     if (!currentOrder) return [];
     const status = String(currentOrder.status);
     const actions = [];
 
     // Seul bouton manuel : "Je pars" (Départ) — obligatoire pour passer à enroute
-    // Sans ça, le géofencing reste désactivé (évite validation prématurée)
-    if (status === 'accepted') {
+    // Masqué pour les stops batch : la navigation est gérée dans l'écran batch
+    if (status === 'accepted' && !isBatchStop) {
       actions.push({
         id: 'enroute',
         label: 'Je pars',
@@ -185,7 +189,7 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
     }
 
     return actions;
-  }, [currentOrder, onUpdateStatus]);
+  }, [currentOrder, onUpdateStatus, isBatchStop]);
 
   const clientInstructions = useMemo(
     () =>

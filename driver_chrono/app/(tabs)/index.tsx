@@ -90,6 +90,7 @@ export default function Index() {
   const pendingBatchOffer = useBatchStore((s) => s.pendingOffer);
   const batchOfferError = useBatchStore((s) => s.offerError);
   const clearBatchOfferError = useBatchStore((s) => s.clearOfferError);
+  const activeBatch = useBatchStore((s) => s.activeBatch);
   
   const pendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null;
   
@@ -352,6 +353,8 @@ export default function Index() {
   /** Phase 2 (dropoff) : Mapbox reste monté, le natif gère le rerouting via reEmbedWithNewDestination */
   /** Délai avant montage Mapbox phase 1 (évite figement au démarrage) */
   const [phase1MountReady, setPhase1MountReady] = useState(false);
+  const [navStuckSince, setNavStuckSince] = useState<number | null>(null);
+  const [showNavStuckEscape, setShowNavStuckEscape] = useState(false);
   const hasValidatedViaMapboxRef = useRef<Set<string>>(new Set());
   const lastEtaAnnouncedMinRef = useRef<number>(99);
   // Commande terminée mais navigation gardée ouverte : le livreur quitte quand il veut
@@ -507,12 +510,9 @@ export default function Index() {
     if (currentOrder.batch_id) {
       return;
     }
-    // Guard secondaire : si le batch actif contient cette commande (batch_id absent du payload serveur),
-    // ne pas démarrer la navigation ici — c'est la boucle "conduisait vers le nord".
-    const activeBatch = useBatchStore.getState().activeBatch;
-    if (activeBatch?.stops.some(s => s.orderId === currentOrder.id)) {
-      return;
-    }
+    // Guard secondaire : si un batch est actif, bloquer toute navigation depuis index.tsx
+    // (même si batch_id absent du payload — évite la boucle resync/navigation)
+    if (useBatchStore.getState().activeBatch) return;
     if (!location || !destination) return;
 
     const status = String(currentOrder.status || '');
@@ -593,11 +593,29 @@ export default function Index() {
   }, [showRecalcOverlay]);
 
   // Réinitialiser la transition quand la commande change
+  // Ne pas reset si la navigation est déjà active : évite la boucle resync qui débloque phase1MountReady
   useEffect(() => {
-    if (!currentOrder?.id) {
+    if (!currentOrder?.id && !isNavigationActive) {
       setPhase1MountReady(false);
     }
-  }, [currentOrder?.id]);
+  }, [currentOrder?.id, isNavigationActive]);
+
+  // Détection navigation bloquée : navigation active mais phase1MountReady jamais passé à true
+  useEffect(() => {
+    if (isNavigationActive && !phase1MountReady) {
+      setNavStuckSince(Date.now());
+    } else {
+      setNavStuckSince(null);
+      setShowNavStuckEscape(false);
+    }
+  }, [isNavigationActive, phase1MountReady]);
+
+  // Après 4s bloqué → afficher le bouton de sortie
+  useEffect(() => {
+    if (!navStuckSince) return;
+    const t = setTimeout(() => setShowNavStuckEscape(true), 4000);
+    return () => clearTimeout(t);
+  }, [navStuckSince]);
 
   // Géofencing : détection automatique d'arrivée
   // CRITIQUE : Désactiver le géofencing si le statut est 'accepted'
@@ -1336,11 +1354,24 @@ export default function Index() {
         onOpenLocationSettings={hasLocationBanner ? openAppLocationSettings : undefined}
       />
 
-      <StatsCards 
+      <StatsCards
         todayDeliveries={driverStats.todayDeliveries || todayStats.deliveries}
         totalRevenue={driverStats.totalRevenue || profile?.total_earnings || 0}
         isOnline={isOnline}
       />
+
+      {activeBatch && !isNavigationActive && (
+        <TouchableOpacity
+          style={styles.batchReturnFab}
+          onPress={() => router.push(`/batch/${activeBatch.id}` as any)}
+          accessibilityLabel="Retour à la tournée groupée"
+        >
+          <Ionicons name="list-outline" size={18} color="#fff" />
+          <Text style={styles.batchReturnFabText}>
+            Tournée · {activeBatch.stops.filter(s => s.status === 'pending').length} restant(s)
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {activeOrders.length > 1 && !ordersListIsExpanded && (
         <View style={styles.multipleOrdersIndicator}>
@@ -1522,13 +1553,21 @@ export default function Index() {
             )}
           {/* Overlay phase 1 : lancement (évite figement). Phase 2 : recalcul pickup→dropoff */}
           {((!phase1MountReady && (currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress')) || showRecalcOverlay) && (
-            <View style={styles.recalcOverlay} pointerEvents="none">
+            <View style={styles.recalcOverlay} pointerEvents="box-none">
               <ActivityIndicator size="large" color="#fff" />
               <Text style={styles.recalcOverlayText}>
                 {showRecalcOverlay
                   ? "Recalcul de l'itinéraire vers la livraison..."
                   : "Lancement de la navigation..."}
               </Text>
+              {showNavStuckEscape && (
+                <TouchableOpacity
+                  style={styles.navStuckEscapeBtn}
+                  onPress={() => resetNavigationUi(true)}
+                >
+                  <Text style={styles.navStuckEscapeText}>Annuler</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -1718,5 +1757,41 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontSize: 15,
     fontWeight: '600',
+  },
+  navStuckEscapeBtn: {
+    marginTop: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  navStuckEscapeText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  batchReturnFab: {
+    position: 'absolute',
+    top: 80,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 1000,
+  },
+  batchReturnFabText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
