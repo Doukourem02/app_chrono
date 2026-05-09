@@ -9,13 +9,9 @@ import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 
 type Step = 'recipients' | 'driver' | 'confirm' | 'success';
 
-const B2B_INSTRUCTION_PRESETS = [
-  'Appeler le client avant d’arriver',
-  'Voir le responsable sur place',
-  'Déposer à l’accueil',
-  'Demander le code de livraison',
-  'Colis fragile, manipuler doucement',
-  'Compter les colis avec le client',
+const B2B_INSTRUCTION_PRESETS: string[] = [
+  `Demander le code de livraison`,
+  `Appeler le client avant d'arriver`,
 ];
 
 interface BatchShippingBottomSheetProps {

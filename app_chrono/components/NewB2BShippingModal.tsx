@@ -6,13 +6,9 @@ import { useAuthStore } from '../store/useAuthStore';
 import { createB2BOrder } from '../services/partnerApi';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
 
-const B2B_INSTRUCTION_PRESETS = [
-  'Appeler le client avant d’arriver',
-  'Voir le responsable sur place',
-  'Déposer à l’accueil',
-  'Demander le code de livraison',
-  'Colis fragile, manipuler doucement',
-  'Compter les colis avec le client',
+const B2B_INSTRUCTION_PRESETS: string[] = [
+  `Demander le code de livraison`,
+  `Appeler le client avant d'arriver`,
 ];
 
 interface NewB2BShippingModalProps {
@@ -55,7 +51,7 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
   const handleSubmit = async () => {
     if (!canSubmit || !user?.id) return;
     if (!pickupCoords || !dropoffCoords) {
-      Alert.alert('Adresse à sélectionner', 'Choisissez le point de départ et l’adresse du client dans les suggestions pour fixer les quartiers, rues et points GPS.');
+      Alert.alert('Adresse à sélectionner', `Choisissez le point de départ et l'adresse du client dans les suggestions pour fixer les quartiers, rues et points GPS.`);
       return;
     }
 
