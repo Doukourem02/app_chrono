@@ -679,6 +679,22 @@ export default function Index() {
     }
   }, [activeBatch, activeBatch?.pickedUp]);
 
+  // Fallback : si le batch n'a pas de coordonnées de collecte, le géofencing
+  // reste désactivé indéfiniment. On affiche le bouton directement dès que
+  // le batch est chargé (stops > 0) et non encore collecté.
+  useEffect(() => {
+    if (
+      activeBatch &&
+      !activeBatch.pickedUp &&
+      activeBatch.stops.length > 0 &&
+      !activeBatch.pickupCoordinates &&
+      !batchPickupGeoRef.current
+    ) {
+      batchPickupGeoRef.current = true;
+      setShowBatchPickupBtn(true);
+    }
+  }, [activeBatch, activeBatch?.pickedUp, activeBatch?.pickupCoordinates, activeBatch?.stops.length]);
+
   // Réinitialiser quand le livreur sort de la zone pickup (pour réafficher le bouton s'il revient)
   useEffect(() => {
     if (!isInZone && (currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress')) {
