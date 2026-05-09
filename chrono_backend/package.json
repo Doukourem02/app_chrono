@@ -67,6 +67,9 @@
     "web-push": "^3.6.7",
     "winston": "^3.18.3"
   },
+  "overrides": {
+    "iconv-lite": "0.6.3"
+  },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/supertest": "^6.0.2",
