@@ -387,14 +387,14 @@ La carte principale (`index.tsx`) reste **visible en arrière-plan** (map) mais 
 
 ## 4. Récapitulatif — Ordre de priorité des corrections
 
-| Priorité | Bug | Fix | Risque |
-|---|---|---|---|
-| 🔴 P0 | Nav bloquée indéfiniment (Bug 3) | Escape hatch 4s + reset `phase1MountReady` corrigé | Faible |
-| 🔴 P0 | Guard auto-nav contre les batchs actifs (Bug 3) | Ajouter `if (activeBatch) return;` | Faible |
-| 🟠 P1 | Bouton retour vers la tournée (Bug 1) | FAB flottant sur la carte principale | Faible |
-| 🟠 P1 | Bouton "Je pars" ne doit pas apparaître (Bug 2) | Cacher si stop batch | Faible |
-| 🟡 P2 | Backend : `batch_id` dans `order:status:update` | Modifier payload serveur | Moyen |
-| 🟡 P2 | Backend : batch orders dans resync | Ajouter au resync OU persister `activeBatch` | Moyen |
+| Priorité | Bug | Fix | Risque | Statut |
+|---|---|---|---|---|
+| 🔴 P0 | Nav bloquée indéfiniment (Bug 3) | Escape hatch 4s + reset `phase1MountReady` corrigé | Faible | ✅ Implémenté |
+| 🔴 P0 | Guard auto-nav contre les batchs actifs (Bug 3) | `if (activeBatch) return;` | Faible | ✅ Implémenté |
+| 🟠 P1 | Bouton retour vers la tournée (Bug 1) | FAB flottant sur la carte principale | Faible | ✅ Implémenté |
+| 🟠 P1 | Bouton "Je pars" ne doit pas apparaître (Bug 2) | Cacher si stop batch | Faible | ✅ Implémenté |
+| 🟡 P2 | Backend : `batch_id` dans `order:status:update` | Modifier payload serveur | Moyen | ⏳ À faire |
+| 🟡 P2 | Backend : batch orders dans resync | Ajouter au resync OU persister `activeBatch` | Moyen | ⏳ À faire |
 
 ---
 
@@ -410,3 +410,156 @@ La carte principale (`index.tsx`) reste **visible en arrière-plan** (map) mais 
 
 - Handler `order:status:update` → toujours inclure `batch_id` si l'ordre appartient à un batch
 - Handler `driver-reconnect` / `resync-order-state` → inclure les commandes batch actives du driver (ou leur identifiant batchId) pour restaurer `activeBatch` côté client
+
+---
+
+## 6. Journal des modifications — Frontend
+
+_Modifications appliquées le 2026-05-09 dans `driver_chrono`._
+
+---
+
+### 6.1 `app/(tabs)/index.tsx`
+
+#### Selector réactif `activeBatch` (l. ~93)
+Ajout d'un selector Zustand au niveau du composant pour que le FAB et les gardes réagissent aux changements de store sans lecture impérative.
+
+```typescript
+const activeBatch = useBatchStore((s) => s.activeBatch);
+```
+
+#### États de détection de blocage (l. ~355)
+```typescript
+const [navStuckSince, setNavStuckSince] = useState<number | null>(null);
+const [showNavStuckEscape, setShowNavStuckEscape] = useState(false);
+```
+
+#### Guard auto-nav renforcé (l. ~511)
+**Avant :**
+```typescript
+const activeBatch = useBatchStore.getState().activeBatch;
+if (activeBatch?.stops.some(s => s.orderId === currentOrder.id)) {
+  return;
+}
+```
+**Après :**
+```typescript
+if (useBatchStore.getState().activeBatch) return;
+```
+> Raison : l'ancien guard échouait quand `activeBatch.stops` était `[]` (juste après `batch-assigned`, avant que `getBatch` ait chargé les stops). Le guard large bloque toute auto-nav dès qu'un batch est actif, quelle que soit la liste de stops.
+
+#### Fix `phase1MountReady` — protection contre les resync (l. ~598)
+**Avant :**
+```typescript
+useEffect(() => {
+  if (!currentOrder?.id) {
+    setPhase1MountReady(false);
+  }
+}, [currentOrder?.id]);
+```
+**Après :**
+```typescript
+useEffect(() => {
+  if (!currentOrder?.id && !isNavigationActive) {
+    setPhase1MountReady(false);
+  }
+}, [currentOrder?.id, isNavigationActive]);
+```
+> Raison : le resync socket vidait `activeOrders` momentanément → `currentOrder` devenait null → `phase1MountReady` remis à `false` → boucle infinie de démarrage nav.
+
+#### useEffects — détection de blocage et escape hatch (l. ~603)
+```typescript
+useEffect(() => {
+  if (isNavigationActive && !phase1MountReady) {
+    setNavStuckSince(Date.now());
+  } else {
+    setNavStuckSince(null);
+    setShowNavStuckEscape(false);
+  }
+}, [isNavigationActive, phase1MountReady]);
+
+useEffect(() => {
+  if (!navStuckSince) return;
+  const t = setTimeout(() => setShowNavStuckEscape(true), 4000);
+  return () => clearTimeout(t);
+}, [navStuckSince]);
+```
+
+#### Bouton Annuler dans l'overlay de lancement (l. ~1543)
+Ajout d'un bouton de sortie visible après 4s de blocage. `pointerEvents` passe de `"none"` à `"box-none"` pour permettre l'interaction avec le bouton tout en laissant les touches traverser l'overlay.
+
+```tsx
+{showNavStuckEscape && (
+  <TouchableOpacity
+    style={styles.navStuckEscapeBtn}
+    onPress={() => resetNavigationUi(true)}
+  >
+    <Text style={styles.navStuckEscapeText}>Annuler</Text>
+  </TouchableOpacity>
+)}
+```
+
+#### FAB flottant retour à la tournée (l. ~1360)
+Affiché dès que `activeBatch` est non-null et que la navigation solo n'est pas active. Disparaît pendant la navigation solo.
+
+```tsx
+{activeBatch && !isNavigationActive && (
+  <TouchableOpacity
+    style={styles.batchReturnFab}
+    onPress={() => router.push(`/batch/${activeBatch.id}` as any)}
+    accessibilityLabel="Retour à la tournée groupée"
+  >
+    <Ionicons name="list-outline" size={18} color="#fff" />
+    <Text style={styles.batchReturnFabText}>
+      Tournée · {activeBatch.stops.filter(s => s.status === 'pending').length} restant(s)
+    </Text>
+  </TouchableOpacity>
+)}
+```
+
+#### Styles ajoutés
+`navStuckEscapeBtn`, `navStuckEscapeText`, `batchReturnFab`, `batchReturnFabText`.
+
+---
+
+### 6.2 `components/DriverOrderBottomSheet.tsx`
+
+#### Import `useBatchStore`
+```typescript
+import { useBatchStore } from '../store/useBatchStore';
+```
+
+#### Masquage du bouton "Je pars" pour les stops batch
+```typescript
+const activeBatchStopIds = useBatchStore((s) => s.activeBatch?.stops.map((stop) => stop.orderId) ?? []);
+const isBatchStop = activeBatchStopIds.includes(currentOrder?.id ?? '');
+
+// Dans availableActions :
+if (status === 'accepted' && !isBatchStop) {
+  actions.push({ id: 'enroute', label: 'Je pars', ... });
+}
+```
+> Raison : le bouton "Je pars" apparaissait sur la carte principale pour les commandes batch quand `batch_id` était absent du payload `order:status:update`. Cette vérification couvre les deux cas (avec ou sans `batch_id`).
+
+---
+
+## 7. Diagnostic — Crash observé en production (2026-05-09)
+
+### Symptôme
+Écran "Une erreur est survenue" (ErrorBoundary racine) immédiatement après acceptation d'une tournée groupée. Logs Better Stack :
+- `[driver-reconnect] Resync : 0 pending, 2 active` → socket déconnecte dans la foulée
+- `Toutes les transactions annulées pour commande X` (×2, ~30s après)
+
+### Cause identifiée
+C'est le Bug 3 en conditions de reconnexion rapide :
+
+1. Livreur accepte → `accept-batch` émis → socket déconnecte immédiatement
+2. Reconnexion → serveur rejoue `batch-assigned` → `setActiveBatch({ stops: [] })` + `router.push('/batch/...')`
+3. Le resync envoie `order:status:update` pour les 2 commandes du batch
+4. **Ancien guard** : `activeBatchStopIds` vaut `[]` (stops pas encore chargés) → guard `stops.some(...)` échoue → commandes ajoutées à `activeOrders`
+5. Auto-nav démarre dans `index.tsx` pour ces commandes batch en parallèle du BatchScreen
+6. Double navigation simultanée → crash root ErrorBoundary
+7. Backend rollback les transactions (driver injoignable)
+
+### Résolution
+Le Fix C (guard large `if (activeBatch) return;`) couvre exactement ce cas car il bloque l'auto-nav dès que `activeBatch` est non-null, indépendamment du contenu de `stops`. **Déploiement requis.**
