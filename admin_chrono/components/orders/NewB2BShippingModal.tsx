@@ -28,13 +28,9 @@ interface NewB2BShippingModalProps {
   scheduledTime?: string // Heure planifiée (HH:mm) depuis le calendrier
 }
 
-const B2B_INSTRUCTION_PRESETS = [
-  'Appeler le client avant d’arriver',
-  'Voir le responsable sur place',
-  'Déposer à l’accueil',
-  'Demander le code de livraison',
-  'Colis fragile, manipuler doucement',
-  'Compter les colis avec le client',
+const B2B_INSTRUCTION_PRESETS: string[] = [
+  `Demander le code de livraison`,
+  `Appeler le client avant d'arriver`,
 ]
 
 export default function NewB2BShippingModal({
