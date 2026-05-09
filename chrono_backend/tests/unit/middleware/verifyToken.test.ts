@@ -5,13 +5,18 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 
 const mockVerifyAccessToken = jest.fn();
+const mockGetUser = jest.fn().mockResolvedValue({ data: { user: null }, error: new Error('mock') });
 
-await jest.unstable_mockModule('../../../src/utils/jwt.js', () => {
-  return {
-    __esModule: true,
-    verifyAccessToken: mockVerifyAccessToken,
-  };
-});
+await jest.unstable_mockModule('../../../src/utils/jwt.js', () => ({
+  __esModule: true,
+  verifyAccessToken: mockVerifyAccessToken,
+}));
+
+await jest.unstable_mockModule('../../../src/config/supabase.js', () => ({
+  __esModule: true,
+  supabase: { auth: { getUser: mockGetUser } },
+  supabaseAdmin: null,
+}));
 
 const { verifyJWT } = await import('../../../src/middleware/verifyToken.js');
 
@@ -125,7 +130,7 @@ describe('verifyJWT Middleware', () => {
       expect(nextFunction).not.toHaveBeenCalled();
     });
 
-    it('should reject request with expired token', () => {
+    it('should reject request with expired token', async () => {
       const expiredToken = 'expired-token';
 
       mockRequest.headers = {
@@ -136,7 +141,7 @@ describe('verifyJWT Middleware', () => {
         throw new Error('Token expiré');
       });
 
-      verifyJWT(mockRequest as Request, mockResponse as Response, nextFunction);
+      await verifyJWT(mockRequest as Request, mockResponse as Response, nextFunction);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.json).toHaveBeenCalledWith({
@@ -147,7 +152,7 @@ describe('verifyJWT Middleware', () => {
       expect(nextFunction).not.toHaveBeenCalled();
     });
 
-    it('should reject request with invalid token', () => {
+    it('should reject request with invalid token', async () => {
       const invalidToken = 'invalid-token';
 
       mockRequest.headers = {
@@ -158,7 +163,7 @@ describe('verifyJWT Middleware', () => {
         throw new Error('Token invalide');
       });
 
-      verifyJWT(mockRequest as Request, mockResponse as Response, nextFunction);
+      await verifyJWT(mockRequest as Request, mockResponse as Response, nextFunction);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.json).toHaveBeenCalledWith({
@@ -169,7 +174,7 @@ describe('verifyJWT Middleware', () => {
       expect(nextFunction).not.toHaveBeenCalled();
     });
 
-    it('should handle other errors with generic message', () => {
+    it('should handle other errors with generic message', async () => {
       const token = 'some-token';
 
       mockRequest.headers = {
@@ -180,7 +185,7 @@ describe('verifyJWT Middleware', () => {
         throw new Error('Unexpected error');
       });
 
-      verifyJWT(mockRequest as Request, mockResponse as Response, nextFunction);
+      await verifyJWT(mockRequest as Request, mockResponse as Response, nextFunction);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.json).toHaveBeenCalledWith({

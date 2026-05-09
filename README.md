@@ -8,12 +8,12 @@ Plateforme de livraison en temps réel connectant clients, chauffeurs **et admin
 - `driver_chrono/` → App mobile chauffeur (Expo / React Native)
 
 ```
-PROJET_CHRONO/
+PROJET_KRONO/
 ├── chrono_backend/
 ├── admin_chrono/
 ├── app_chrono/
 ├── driver_chrono/
-├── docs/                 # 2 docs vivants : actions + référence projet
+├── docs/                 # Docs vivants : actions + référence projet
 ├── supabase/             # SQL / RLS (selon usage)
 ├── scripts/              # IP locale, utilitaires repo
 └── README.md
@@ -37,12 +37,12 @@ PROJET_CHRONO/
 
 ## 🏗️ Architecture
 
-| Composant         | Stack                                     | Description                              |
-| ----------------- | ----------------------------------------- | ---------------------------------------- |
-| `chrono_backend/` | Node.js + Express + Socket.IO             | API REST, WebSocket, migrations SQL      |
-| `admin_chrono/`   | Next.js 16, React Query, Socket.IO client | Dashboard web pour les ops/admin         |
-| `app_chrono/`     | Expo, React Native, Expo Router           | Application client (commande / tracking) |
-| `driver_chrono/`  | Expo, React Native                        | Application chauffeur                    |
+| Composant         | Stack                                     | Description                                              |
+| ----------------- | ----------------------------------------- | -------------------------------------------------------- |
+| `chrono_backend/` | Node.js + Express + Socket.IO             | API REST, WebSocket, migrations SQL                      |
+| `admin_chrono/`   | Next.js 16, React Query, Socket.IO client | Dashboard ops/admin + portail partenaire B2B             |
+| `app_chrono/`     | Expo, React Native, Expo Router           | Application client (commande / tracking)                 |
+| `driver_chrono/`  | Expo, React Native                        | Application chauffeur (livraisons, revenus, gamification)|
 
 ---
 
@@ -63,7 +63,7 @@ PROJET_CHRONO/
 
 ```bash
 git clone <repo>
-cd PROJET_CHRONO
+cd PROJET_KRONO
 
 # Backend
 cd chrono_backend && npm install && cd -
@@ -346,11 +346,87 @@ app_chrono/
 - `POST /api/multi-delivery/optimize` - Optimiser route
 - `GET /api/multi-delivery/zones` - Zones avec commandes
 
-### Prévision de demande (`/api/demand-forecast/*`)
+### Prévision de demande (`/api/forecast/*`)
 
-- `GET /api/demand-forecast/demand` - Prévision demande
-- `GET /api/demand-forecast/peaks` - Heures de pointe
-- `GET /api/demand-forecast/recommendations` - Recommandations zones
+- `GET /api/forecast/demand` - Prévision demande
+- `GET /api/forecast/peaks` - Heures de pointe
+- `GET /api/forecast/recommendations` - Recommandations zones
+
+### Flotte (`/api/fleet/*`)
+
+- `GET /api/fleet/vehicles` - Liste des véhicules
+- `GET /api/fleet/vehicles/:plate` - Détails véhicule
+- `POST /api/fleet/vehicles` - Créer un véhicule
+- `PUT /api/fleet/vehicles/:plate` - Mettre à jour un véhicule
+- `POST /api/fleet/vehicles/:plate/fuel` - Ajouter un plein carburant
+- `GET /api/fleet/vehicles/:plate/fuel` - Historique carburant
+- `POST /api/fleet/vehicles/:plate/maintenance` - Créer une maintenance
+- `PUT /api/fleet/maintenance/:id` - Mettre à jour une maintenance
+- `GET /api/fleet/vehicles/:plate/maintenance` - Historique maintenance
+- `POST /api/fleet/vehicles/:plate/documents/upload` - Upload document véhicule
+- `POST /api/fleet/vehicles/:plate/documents` - Sauvegarder document
+- `GET /api/fleet/vehicles/:plate/documents` - Documents d'un véhicule
+- `GET /api/fleet/documents/expiring` - Documents proches d'expiration
+- `GET /api/fleet/vehicles/:plate/financial-summary` - Résumé financier
+- `GET /api/fleet/vehicles/:plate/mileage` - Historique kilométrage
+
+### Partenaires (`/api/partners/*`)
+
+- `POST /api/partners/register` - S'inscrire comme partenaire
+- `POST /api/partners/deregister` - Se désinscrire
+- `PATCH /api/partners/business-mode` - Activer/désactiver mode business
+- `POST /api/partners/` - Créer un partenaire (admin)
+- `GET /api/partners/` - Lister les partenaires (admin)
+- `GET /api/partners/:id` - Détails d'un partenaire
+- `POST /api/partners/:id/subscriptions` - Créer un abonnement
+- `PATCH /api/partners/:id/subscriptions/:subId/activate` - Activer un abonnement
+- `PATCH /api/partners/:id/activate` - Activer un partenaire
+- `PATCH /api/partners/:id/status` - Mettre à jour le statut
+- `DELETE /api/partners/:id` - Supprimer un partenaire
+- `GET /api/partners/:id/drivers` - Chauffeurs d'un partenaire
+- `POST /api/partners/:id/drivers` - Ajouter un chauffeur partenaire
+- `DELETE /api/partners/:id/drivers/:driverUserId` - Retirer un chauffeur
+- `PATCH /api/partners/:id/drivers/:driverUserId/default` - Définir chauffeur par défaut
+- `GET /api/partners/:id/driver-requests` - Demandes de chauffeurs
+- `PATCH /api/partners/:id/driver-requests/:requestId` - Valider/refuser une demande
+- `GET /api/partners/:id/usage` - Usage et quota
+- `GET /api/partners/:id/invoices` - Factures
+- `PATCH /api/partners/:id/invoices/:invoiceId/pay` - Marquer facture comme payée
+
+### Portail partenaire (`/api/partner/:partnerId/*`)
+
+Routes dédiées au tableau de bord partenaire (accès restreint par JWT partenaire).
+
+### Commandes en lot (`/api/batches/*`)
+
+- `POST /api/batches/` - Créer un lot de commandes
+- `GET /api/batches/:id` - Récupérer un lot
+- `PATCH /api/batches/:id/orders/:orderId` - Valider une commande du lot
+
+### Enregistrement de commandes (`/api/orders/*`)
+
+- `GET /api/orders/` - Lister les enregistrements
+- `POST /api/orders/record` - Enregistrer une commande
+
+### Notifications push (`/api/push/*`)
+
+- `POST /api/push/register` - Enregistrer un token push
+- `DELETE /api/push/register` - Désabonner un token push
+- `POST /api/push/live-activity/register` - Enregistrer un token Live Activity (iOS)
+- `POST /api/push/live-activity/end` - Terminer une Live Activity
+
+### Géocodage Mapbox (`/api/mapbox/*`)
+
+- `GET /api/mapbox/geocode` - Géocodage d'une adresse
+- `GET /api/mapbox/reverse` - Géocodage inverse (coordonnées → adresse)
+- `GET /api/mapbox/directions` - Calcul d'itinéraire
+- `GET /api/mapbox/search/suggest` - Suggestions de recherche
+- `GET /api/mapbox/search/retrieve/:mapboxId` - Récupérer un lieu par ID Mapbox
+
+### Synchronisation (`/api/sync/*`)
+
+- `POST /api/sync/sync-users` - Synchroniser utilisateurs depuis Supabase Auth (admin)
+- `GET /api/sync/sync-status` - Statut de la synchronisation
 
 ### WebSocket Events
 
@@ -389,7 +465,7 @@ app_chrono/
 
 ### Dashboard (`admin_chrono`)
 
-- **Framework:** Next.js 16 (App Router)
+- **Framework:** Next.js 16 (App Router) + React 19
 - **State Management:** React Query (TanStack Query) + Zustand
 - **WebSocket:** Socket.IO client
 - **Cartes:** Mapbox GL JS (`mapbox-gl`)
@@ -397,8 +473,10 @@ app_chrono/
 - **Export:** jsPDF, xlsx
 - **Animations:** Framer Motion
 - **UI:** Tailwind CSS 4, Lucide React
-- **Sécurité:** Content Security Policy (CSP) configuré dynamiquement
-- **Authentification:** Supabase Auth Helpers
+- **i18n:** système de traduction maison (`/locales`)
+- **Sécurité:** CSP configuré dynamiquement dans `next.config.ts`
+- **Authentification:** Supabase Auth Helpers (rôles admin/super_admin)
+- **Tests:** Vitest (utilitaires purs)
 
 ### Apps mobiles
 
@@ -437,6 +515,7 @@ npm run dev              # Développement
 npm run build            # Build production
 npm run start            # Production
 npm run lint             # Linter
+npm run test             # Tests Vitest
 npm run create-admin     # Créer un admin
 npm run create-avatars-bucket # Créer bucket avatars
 
@@ -454,34 +533,26 @@ npm run update-ip        # Mettre à jour l'IP dans .env
 
 ### Dashboard Admin (`admin_chrono`)
 
-- 📊 **Tableau de bord** avec statistiques en temps réel (KPIs, revenus, livraisons)
-- 🗺️ **Suivi des livraisons** en direct sur carte **Mapbox**
+- 📊 **Tableau de bord** (`/dashboard`) - KPIs, revenus et livraisons en temps réel
+- 🗺️ **Tracking live** (`/tracking`) - Suivi des chauffeurs et livraisons en cours sur carte Mapbox
+- 📦 **Commandes** (`/orders`) - Vue et gestion de toutes les commandes
 - 👥 **Gestion des utilisateurs** :
-  - `/users` - Vue globale de tous les utilisateurs (clients, livreurs, admins)
-    - Gestion administrative (création, modification, suppression)
-    - Recherche globale par nom, email, téléphone
-    - Filtres par rôle
-  - `/drivers` - Vue spécialisée pour les livreurs avec gestion opérationnelle
-    - Distinction Partenaire/Interne avec badges visuels
-    - Gestion des soldes commission avec alertes (vert/orange/rouge)
-    - Statut opérationnel (Actif/Suspendu selon solde)
-    - Statistiques de performance (livraisons, rating)
-    - Recharge et suspension des commissions
-    - Rafraîchissement automatique toutes les 30 secondes
-  - **Note :** Voir `admin_chrono/docs/DIFFERENCE_USERS_VS_DRIVERS.md` pour plus de détails
-- 📈 **Analytics** (`/analytics`) - Analyses détaillées et KPIs
+  - `/users` - Vue globale (clients, livreurs, admins) — création, modification, recherche par nom/email/téléphone
+  - `/drivers` - Vue opérationnelle des livreurs : badge Partenaire/Interne, solde commission (alertes vert/orange/rouge), statut Actif/Suspendu, recharge et suspension, rafraîchissement automatique toutes les 30 s
+  - Voir `admin_chrono/docs/DIFFERENCE_USERS_VS_DRIVERS.md` pour le détail
+- 🤝 **Portail partenaires** (`/partners`) - Gestion des partenaires B2B, abonnements, chauffeurs affiliés, factures, quota d'usage
+- 🚗 **Flotte** (`/maintenance`) - Véhicules, carburant, maintenance, documents réglementaires, suivi financier et kilométrique
+- 📈 **Analytics** (`/analytics`) - KPIs temps réel, données de performance, export
 - 📋 **Rapports** (`/reports`) - Rapports exportables (livraisons, revenus, clients, chauffeurs, paiements)
-- 💰 **Finances** (`/finances`, `/commissions`) :
-  - Transactions clients
-  - Commissions livreurs
-  - Statistiques financières
-- 💬 **Messagerie** (`/message`) - Système de messagerie intégré
-- ⭐ **Évaluations** (`/ratings`) - Gestion des notes et avis
+- 💰 **Finances** (`/finances`, `/commissions`) - Transactions, commissions livreurs, statistiques financières
+- 💬 **Messagerie** (`/message`) - Conversations en temps réel avec chauffeurs et clients
+- ⭐ **Évaluations** (`/ratings`) - Notes et avis, suppression
 - 🎁 **Codes promo** (`/promo-codes`) - Création et gestion
-- ⚠️ **Réclamations** (`/disputes`) - Gestion des réclamations
+- ⚠️ **Réclamations** (`/disputes`) - Gestion et résolution
 - 📅 **Planning** (`/planning`) - Planification des livraisons
-- 🏆 **Gamification** (`/gamification`) - Performance et classements
-- 🔐 **Authentification** sécurisée avec Supabase (rôles admin/super_admin)
+- 🏆 **Gamification** (`/gamification`) - Badges, classements, scores chauffeurs
+- 🔧 **Espace de travail** (`/workspace`) - Configuration et outils internes
+- 🔐 **Authentification** sécurisée avec Supabase (rôles `admin` / `super_admin`)
 - ⚙️ **Paramètres** (`/settings`) - Configuration système
 - 👤 **Profil** (`/profile`) - Gestion du profil admin
 
@@ -530,26 +601,85 @@ npm run update-ip        # Mettre à jour l'IP dans .env
   - Historique des transactions
   - Recharges
 
-## 🔧 Améliorations récentes
+## 🔧 Fonctionnalités notables
 
-### Corrections importantes
+- **Portail partenaire B2B** — espace dédié aux entreprises partenaires : abonnements, quota de livraisons, chauffeurs affiliés, facturation
+- **Gestion de flotte** — suivi des véhicules (carburant, maintenance, documents réglementaires, kilométrage, résumé financier)
+- **Commissions chauffeurs** — solde, recharge, suspension, historique des transactions ; alertes visuelles (vert/orange/rouge) dans le dashboard
+- **Commandes en lot (batch)** — création et validation groupée de livraisons
+- **Live Activity iOS** — mise à jour du statut de livraison en temps réel sur l'écran verrouillé
+- **Notifications push** — tokens Expo Push + Live Activity, dé-duplication côté serveur
+- **Géocodage Mapbox backend** — proxy sécurisé pour geocode, reverse, directions, search (clé cachée côté serveur)
+- **Prévision de demande** — analyse des heures de pointe et recommandations de zones
+- **Synchronisation Supabase** — sync utilisateurs Auth → PostgreSQL
+- **Tracking public** — page de suivi partageable sans authentification (`/track/:token`)
 
-1. **Content Security Policy (CSP)** - Configuration dynamique pour autoriser le backend
-2. **Gestion des erreurs cartes (Mapbox)** - Détection et messages d'erreur améliorés
-3. **Protection contre les crashes** - Gestion améliorée des appels multiples à `createOrder()`
-4. **Nettoyage des sockets** - Prévention des listeners dupliqués
-5. **Scanner QR code** - Gestion gracieuse de l'absence du module natif
-6. **Système de commissions** - Gestion complète pour livreurs partenaires
-7. **Gamification** - Badges, classements et scores pour les chauffeurs
-8. **Analytics avancés** - KPIs en temps réel et rapports exportables
-9. **Multi-livraison** - Optimisation de routes pour plusieurs commandes
-10. **Prévision de demande** - Analyse des heures de pointe et recommandations
-11. **Support client** - Système de tickets et FAQ
-12. **Météo intégrée** - Données météo pour planification des livraisons
+## 🧪 Tests & CI
 
-## 🧪 Tests
+### État des tests par paquet
 
-Tests automatisés à venir (TODO commun aux 4 projets).
+| Paquet | Framework | Commande | Couverture |
+|--------|-----------|----------|------------|
+| `chrono_backend` | Jest (unit + intégration) | `npm test` | ~14 % (seuil configuré, CI obligatoire) |
+| `admin_chrono` | Vitest | `npm test` | utils purs (phone, ETA, formatId, statuts) |
+| `app_chrono` | — | — | pas encore de tests unitaires |
+| `driver_chrono` | — | — | pas encore de tests unitaires |
+
+### Lancer les tests
+
+```bash
+# Backend (unit + intégration, coverage)
+cd chrono_backend
+npm test                 # tous les tests
+npm run test:coverage    # avec rapport de couverture
+npm run test:unit        # tests unitaires seulement
+npm run test:integration # tests d'intégration seulement
+
+# Dashboard admin
+cd admin_chrono
+npm test                 # 35 tests Vitest sur les utilitaires
+
+# Apps Expo (lint uniquement pour l'instant)
+cd app_chrono && npm run lint
+cd driver_chrono && npm run lint
+```
+
+### Pipeline CI (`.github/workflows/ci.yml`)
+
+| Job | Déclencheur | Bloque la PR |
+|-----|------------|--------------|
+| Backend — Build & Test | push/PR → main, develop | oui |
+| Backend — Lint & TypeScript | push/PR | oui |
+| Security Scan (audit + TruffleHog) | push/PR | oui |
+| Admin — Lint, TypeScript & Build | push/PR | oui |
+| Expo — Lint (app_chrono, driver_chrono) | push/PR | oui |
+
+> **Note sécurité :** `jsPDF` et `xlsx` dans `admin_chrono` ont des vulnérabilités sans correctif disponible (pas de version patchée publiée). Ils sont tracés et l'audit CI passe en mode informatif pour ces dépendances.
+
+### Procédure nouveau développeur
+
+```bash
+git clone <repo>
+cd PROJET_KRONO
+
+# 1. Backend
+cd chrono_backend
+cp .env.example .env        # remplir DATABASE_URL, SUPABASE_*, JWT_SECRET, TWILIO_*
+npm install
+# Appliquer les migrations (voir chrono_backend/migrations/README.md pour l'ordre)
+npm run dev                  # http://localhost:4000
+
+# 2. Admin
+cd ../admin_chrono
+cp .env.local.example .env.local  # remplir NEXT_PUBLIC_API_URL, SUPABASE_*, MAPBOX_TOKEN
+npm install
+npm run dev                  # http://localhost:3000
+
+# 3. Apps mobiles
+cd ../app_chrono && cp .env.example .env && npm install
+cd ../driver_chrono && cp .env.example .env && npm install
+npx expo start               # scanner QR avec Expo Go ou npm run android/ios
+```
 
 ---
 
@@ -624,10 +754,9 @@ npx expo run:android
 ### Structure des docs
 
 ```
-PROJET_CHRONO/
+PROJET_KRONO/
 ├── docs/
-│   ├── krono-reference-unique.md      # Référence projet, contrat produit, décisions
-│   └── krono-reference-unique.md        # Référence projet + carte de fichiers
+│   └── krono-reference-unique.md      # Référence projet, contrat produit, décisions
 ├── admin_chrono/docs/
 │   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers
 │   ├── NOTIFICATIONS_BEHAVIOR.md       # Comportement des notifications

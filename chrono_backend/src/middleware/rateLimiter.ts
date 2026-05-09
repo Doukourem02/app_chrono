@@ -1,8 +1,11 @@
 import rateLimit, { RateLimitRequestHandler } from 'express-rate-limit';
 
+const skipInTest = () => process.env.NODE_ENV === 'test';
+
 export const authLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  skip: skipInTest,
   message: {
     success: false,
     message: 'Trop de tentatives de connexion, réessayez dans 15 minutes'
@@ -14,6 +17,7 @@ export const authLimiter: RateLimitRequestHandler = rateLimit({
 export const otpLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 60 * 1000,
   max: 3,
+  skip: skipInTest,
   message: {
     success: false,
     message: 'Trop de demandes OTP, attendez 1 minute'
@@ -25,6 +29,7 @@ export const otpLimiter: RateLimitRequestHandler = rateLimit({
 export const apiLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  skip: skipInTest,
   message: {
     success: false,
     message: 'Trop de requêtes, réessayez plus tard'
@@ -36,6 +41,7 @@ export const apiLimiter: RateLimitRequestHandler = rateLimit({
 export const registerLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
+  skip: skipInTest,
   message: {
     success: false,
     message: 'Trop de tentatives d\'inscription, réessayez dans 1 heure'
@@ -47,6 +53,7 @@ export const registerLimiter: RateLimitRequestHandler = rateLimit({
 export const orderLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
+  skip: skipInTest,
   message: {
     success: false,
     message: 'Trop de commandes créées, réessayez dans 1 heure'

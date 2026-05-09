@@ -9,6 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "create-admin": "node scripts/create-admin.js",
     "create-avatars-bucket": "node scripts/create-avatars-bucket.js",
     "add-avatar-column": "node scripts/add-avatar-url-column.js",
@@ -46,6 +48,7 @@
     "eslint": "^9",
     "eslint-config-next": "^16.2.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   }
 }

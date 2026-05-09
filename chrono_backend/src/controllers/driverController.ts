@@ -607,6 +607,15 @@ export const getOnlineDrivers = async (req: Request, res: Response): Promise<voi
     const longitude = req.query.longitude as string | undefined;
     const radius = parseInt(req.query.radius as string) || 10;
 
+    if (latitude !== undefined && (isNaN(Number(latitude)) || Number(latitude) < -90 || Number(latitude) > 90)) {
+      res.status(400).json({ success: false, message: 'Paramètre latitude invalide' });
+      return;
+    }
+    if (longitude !== undefined && (isNaN(Number(longitude)) || Number(longitude) < -180 || Number(longitude) > 180)) {
+      res.status(400).json({ success: false, message: 'Paramètre longitude invalide' });
+      return;
+    }
+
     logger.debug('Récupération chauffeurs online:', {
       userPosition: latitude && longitude ? `${latitude}, ${longitude}` : 'Non fournie',
       radius: `${radius}km`

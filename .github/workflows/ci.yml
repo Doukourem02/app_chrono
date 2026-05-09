@@ -11,11 +11,13 @@ on:
       - develop
 
 jobs:
-  # Job 1: Build & Test
+  # ────────────────────────────────────────────────
+  # Job 1 : Backend — build, tests, couverture
+  # ────────────────────────────────────────────────
   build-and-test:
-    name: Build & Test
+    name: Backend — Build & Test
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:14
@@ -50,7 +52,7 @@ jobs:
         working-directory: ./chrono_backend
         run: npm run build
 
-      - name: Run tests
+      - name: Run tests with coverage
         working-directory: ./chrono_backend
         env:
           NODE_ENV: test
@@ -60,7 +62,7 @@ jobs:
           SUPABASE_URL: https://test.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
           LOG_LEVEL: error
-        run: npm test
+        run: npm run test:ci
 
       - name: Upload test coverage
         if: always()
@@ -70,7 +72,9 @@ jobs:
           path: chrono_backend/coverage/
           retention-days: 7
 
-  # Job 2: Security Scan
+  # ────────────────────────────────────────────────
+  # Job 2 : Sécurité backend (audit obligatoire)
+  # ────────────────────────────────────────────────
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -86,50 +90,26 @@ jobs:
           cache: 'npm'
           cache-dependency-path: chrono_backend/package-lock.json
 
-      - name: Install dependencies
+      - name: Install backend dependencies
         working-directory: ./chrono_backend
         run: npm ci
 
-      - name: Run npm audit
+      - name: npm audit backend (échoue sur high/critical)
         working-directory: ./chrono_backend
-        run: npm audit --audit-level=moderate || true
-        continue-on-error: true
+        run: npm audit --audit-level=high
 
-      - name: Check for secrets
+      - name: TruffleHog — détection de secrets
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
 
-  # Job 3: Dependencies Check
-  dependencies-check:
-    name: Dependencies Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: chrono_backend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: ./chrono_backend
-        run: npm ci
-
-      - name: Check outdated packages
-        working-directory: ./chrono_backend
-        run: npm outdated || true
-        continue-on-error: true
-
-  # Job 4: Lint & Type Check (optional)
+  # ────────────────────────────────────────────────
+  # Job 3 : TypeScript backend
+  # ────────────────────────────────────────────────
   lint-and-type-check:
-    name: Lint & Type Check
+    name: Backend — Lint & TypeScript
     runs-on: ubuntu-latest
 
     steps:
@@ -151,14 +131,55 @@ jobs:
         working-directory: ./chrono_backend
         run: npx tsc --noEmit
 
-  # Job 5: Frontend Build & Lint
-  frontend-build:
-    name: Frontend Build & Lint
+  # ────────────────────────────────────────────────
+  # Job 4 : Admin (Next.js) — lint + tsc + build stricts
+  # ────────────────────────────────────────────────
+  admin-build:
+    name: Admin — Lint, TypeScript & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: admin_chrono/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./admin_chrono
+        run: npm ci
+
+      - name: Lint
+        working-directory: ./admin_chrono
+        run: npm run lint
+
+      - name: TypeScript type check
+        working-directory: ./admin_chrono
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: ./admin_chrono
+        run: npm run build
+
+      - name: npm audit admin (informationnel — jsPDF et xlsx sans fix disponible)
+        working-directory: ./admin_chrono
+        run: npm audit --audit-level=critical || true
+
+  # ────────────────────────────────────────────────
+  # Job 5 : Apps Expo — lint obligatoire
+  # ────────────────────────────────────────────────
+  expo-lint:
+    name: Expo — Lint (${{ matrix.project }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        project: [admin_chrono, app_chrono, driver_chrono]
-    
+        project: [app_chrono, driver_chrono]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -176,21 +197,4 @@ jobs:
 
       - name: Lint
         working-directory: ./${{ matrix.project }}
-        run: npm run lint || echo "Linting not configured"
-        continue-on-error: true
-
-      - name: TypeScript type check
-        working-directory: ./${{ matrix.project }}
-        run: npx tsc --noEmit || echo "TypeScript not configured"
-        continue-on-error: true
-
-      - name: Build
-        working-directory: ./${{ matrix.project }}
-        run: |
-          if [ "${{ matrix.project }}" = "admin_chrono" ]; then
-            npm run build
-          else
-            echo "Build skipped for ${{ matrix.project }} (Expo apps)"
-          fi
-        continue-on-error: true
-
+        run: npm run lint
