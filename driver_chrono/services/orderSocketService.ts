@@ -423,6 +423,12 @@ class OrderSocketService {
           if (this.visibleBatchOfferIds.has(batchId) || this.mutedBatchOfferIds.has(batchId)) {
             return;
           }
+          // Après reconnexion le serveur peut renvoyer batch-offer alors que le livreur
+          // a déjà accepté. On ignore si la tournée est déjà dans activeBatch.
+          if (useBatchStore.getState().activeBatch?.id === batchId) {
+            logger.info('[socket] batch-offer ignoré — tournée déjà active', undefined, { batchId });
+            return;
+          }
           this.visibleBatchOfferIds.add(batchId);
           void soundService.playOrderSound().catch(() => {});
           import('expo-haptics').then((Haptics) => {

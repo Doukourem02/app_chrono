@@ -1373,7 +1373,7 @@ export default function Index() {
         </TouchableOpacity>
       )}
 
-      {activeOrders.length > 1 && !ordersListIsExpanded && (
+      {activeOrders.length > 1 && !ordersListIsExpanded && !activeBatch && (
         <View style={styles.multipleOrdersIndicator}>
           <TouchableOpacity 
             style={styles.multipleOrdersButton}

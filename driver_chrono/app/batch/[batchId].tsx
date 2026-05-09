@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useBatchStore, type BatchStop } from '../../store/useBatchStore';
+import { useOrderStore, type OrderRequest } from '../../store/useOrderStore';
 import { getBatch, validateBatchOrder } from '../../services/batchApiService';
 import { qrCodeService } from '../../services/qrCodeService';
 import { QRCodeScanner } from '../../components/QRCodeScanner';
@@ -25,6 +26,7 @@ export default function BatchScreen() {
   const { batchId } = useLocalSearchParams<{ batchId: string }>();
   const insets = useSafeAreaInsets();
   const { activeBatch, updateStop } = useBatchStore();
+  const getOrderById = useOrderStore((s) => s.getOrderById);
 
   const [isLoadingFull, setIsLoadingFull] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
@@ -43,6 +45,7 @@ export default function BatchScreen() {
   const [signatureName, setSignatureName] = useState('');
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [photoReady, setPhotoReady] = useState(false);
+  const [ficheData, setFicheData] = useState<{ order: OrderRequest | null; stop: BatchStop } | null>(null);
 
   const batch = activeBatch?.id === batchId ? activeBatch : null;
   const { location: driverLocation } = useDriverLocation(true);
@@ -549,6 +552,13 @@ export default function BatchScreen() {
                       {proofLabel(stop.proofMethod)}
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    style={styles.ficheBtn}
+                    onPress={() => setFicheData({ order: getOrderById(stop.orderId) ?? null, stop })}
+                  >
+                    <Ionicons name="information-circle-outline" size={14} color="#6B7280" />
+                    <Text style={styles.ficheBtnText}>Fiche</Text>
+                  </TouchableOpacity>
                 </View>
 
                 {/* Actions droite */}
@@ -654,13 +664,6 @@ export default function BatchScreen() {
             }}
             onRouteProgressChange={handleRouteProgressChange}
           />
-          <View style={[styles.navStopBanner, { top: insets.top + 56 }]}>
-            <Text style={styles.navStopEyebrow}>
-              Arrêt {navigationStop.position}/{totalCount} · {remainingCount} restant{remainingCount > 1 ? 's' : ''}
-            </Text>
-            <Text style={styles.navStopTitle} numberOfLines={1}>{navigationStop.recipientName}</Text>
-            <Text style={styles.navStopAddress} numberOfLines={2}>{navigationStop.address}</Text>
-          </View>
           {showArrivalActions ? (
             <View style={[styles.arrivalActions, { paddingBottom: Math.max(insets.bottom, 14) }]}>
               <TouchableOpacity
@@ -771,6 +774,135 @@ export default function BatchScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={!!ficheData}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFicheData(null)}
+      >
+        <View style={styles.ficheModal}>
+          <View style={[styles.ficheSheet, { paddingBottom: Math.max(insets.bottom + 16, 32) }]}>
+            <View style={styles.ficheHandle} />
+            <View style={styles.ficheHeaderRow}>
+              <Text style={styles.ficheTitle} numberOfLines={1}>
+                {ficheData?.stop.recipientName ?? '—'}
+              </Text>
+              <TouchableOpacity style={styles.ficheCloseBtn} onPress={() => setFicheData(null)}>
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {!ficheData?.order && (
+              <View style={styles.ficheFallbackBadge}>
+                <Ionicons name="warning-outline" size={13} color="#92400E" />
+                <Text style={styles.ficheFallbackText}>Données limitées — commande non chargée</Text>
+              </View>
+            )}
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Notes opérateur */}
+              {(ficheData?.order?.operatorCourseNotes || ficheData?.order?.dropoff?.details?.operator_course_notes) ? (
+                <>
+                  <View style={styles.ficheSection}>
+                    <Text style={styles.ficheSectionLabel}>Notes opérateur</Text>
+                    <Text style={styles.ficheSectionValue}>
+                      {ficheData.order?.operatorCourseNotes ?? ficheData.order?.dropoff?.details?.operator_course_notes}
+                    </Text>
+                  </View>
+                  <View style={styles.ficheDivider} />
+                </>
+              ) : null}
+
+              {/* Notes livreur */}
+              {(ficheData?.order?.driverNotes || ficheData?.order?.dropoff?.details?.driver_notes) ? (
+                <>
+                  <View style={styles.ficheSection}>
+                    <Text style={styles.ficheSectionLabel}>Notes livreur</Text>
+                    <Text style={styles.ficheSectionValue}>
+                      {ficheData.order?.driverNotes ?? ficheData.order?.dropoff?.details?.driver_notes}
+                    </Text>
+                  </View>
+                  <View style={styles.ficheDivider} />
+                </>
+              ) : null}
+
+              {/* Notes générales */}
+              {ficheData?.order?.notes ? (
+                <>
+                  <View style={styles.ficheSection}>
+                    <Text style={styles.ficheSectionLabel}>Notes</Text>
+                    <Text style={styles.ficheSectionValue}>{ficheData.order.notes}</Text>
+                  </View>
+                  <View style={styles.ficheDivider} />
+                </>
+              ) : null}
+
+              {/* Consignes client */}
+              {(ficheData?.order?.dropoff?.details?.courier_note ||
+                ficheData?.order?.dropoff?.details?.thermal_bag ||
+                ficheData?.order?.dropoff?.details?.scheduled_window_note ||
+                ficheData?.order?.dropoff?.details?.recipient_message) ? (
+                <>
+                  <View style={styles.ficheSection}>
+                    <Text style={styles.ficheSectionLabel}>Consignes client</Text>
+                    {ficheData.order?.dropoff?.details?.thermal_bag ? (
+                      <Text style={styles.ficheSectionValue}>• Sac thermique requis</Text>
+                    ) : null}
+                    {ficheData.order?.dropoff?.details?.scheduled_window_note ? (
+                      <Text style={styles.ficheSectionValue}>• Créneau : {ficheData.order.dropoff.details.scheduled_window_note}</Text>
+                    ) : null}
+                    {ficheData.order?.dropoff?.details?.courier_note ? (
+                      <Text style={styles.ficheSectionValue}>• {ficheData.order.dropoff.details.courier_note}</Text>
+                    ) : null}
+                    {ficheData.order?.dropoff?.details?.recipient_message ? (
+                      <Text style={styles.ficheSectionValue}>• Message destinataire : {ficheData.order.dropoff.details.recipient_message}</Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.ficheDivider} />
+                </>
+              ) : null}
+
+              {/* Mode de service */}
+              {ficheData?.order?.speedOptionId ? (
+                <>
+                  <View style={styles.ficheSection}>
+                    <Text style={styles.ficheSectionLabel}>Mode de service</Text>
+                    <Text style={styles.ficheSectionValue}>{ficheData.order.speedOptionId}</Text>
+                  </View>
+                  <View style={styles.ficheDivider} />
+                </>
+              ) : null}
+
+              {/* Partenaire B2B */}
+              {ficheData?.order?.partner_name ? (
+                <>
+                  <View style={styles.ficheSection}>
+                    <Text style={styles.ficheSectionLabel}>Partenaire</Text>
+                    <Text style={styles.ficheSectionValue}>{ficheData.order.partner_name}</Text>
+                  </View>
+                  <View style={styles.ficheDivider} />
+                </>
+              ) : null}
+
+              {/* Fallback : données BatchStop */}
+              {ficheData?.stop.notes ? (
+                <View style={styles.ficheSection}>
+                  <Text style={styles.ficheSectionLabel}>Consignes (depuis tournée)</Text>
+                  <Text style={styles.ficheSectionValue}>{ficheData.stop.notes}</Text>
+                </View>
+              ) : null}
+
+              {!ficheData?.order &&
+                !ficheData?.stop.notes && (
+                  <Text style={[styles.ficheSectionValue, { color: '#9CA3AF', fontStyle: 'italic' }]}>
+                    Aucune information complémentaire disponible.
+                  </Text>
+                )}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1290,5 +1422,89 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  ficheBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  ficheBtnText: {
+    fontSize: 11,
+    color: '#6B7280',
+  },
+  ficheModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  ficheSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    maxHeight: '80%',
+  },
+  ficheHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  ficheHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  ficheTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    flex: 1,
+  },
+  ficheCloseBtn: {
+    padding: 4,
+  },
+  ficheSection: {
+    marginBottom: 14,
+  },
+  ficheSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8B5CF6',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+  ficheSectionValue: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  ficheDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 10,
+  },
+  ficheFallbackBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  ficheFallbackText: {
+    fontSize: 11,
+    color: '#92400E',
   },
 });
