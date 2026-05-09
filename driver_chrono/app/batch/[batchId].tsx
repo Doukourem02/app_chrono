@@ -8,7 +8,7 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useBatchStore, type BatchStop } from '../../store/useBatchStore';
 import { useOrderStore, type OrderRequest } from '../../store/useOrderStore';
-import { getBatch, validateBatchOrder } from '../../services/batchApiService';
+import { getBatch, validateBatchOrder, confirmBatchPickup } from '../../services/batchApiService';
 import { qrCodeService } from '../../services/qrCodeService';
 import { QRCodeScanner } from '../../components/QRCodeScanner';
 import { QRCodeScanResult } from '../../components/QRCodeScanResult';
@@ -58,6 +58,15 @@ export default function BatchScreen() {
   const cancelledByUserRef = useRef(false);
   const { navigationStopOrderId } = useBatchStore();
 
+  // Phase collecte (pickup)
+  const [pickupNavActive, setPickupNavActive] = useState(false);
+  const [pickupNavOrigin, setPickupNavOrigin] = useState<Coords | null>(null);
+  const [showPickupArrivalBtn, setShowPickupArrivalBtn] = useState(false);
+  const [isConfirmingPickup, setIsConfirmingPickup] = useState(false);
+  const arrivedAtPickupRef = useRef(false);
+  const pickupNavCancelledRef = useRef(false);
+  const lastPickupEtaAnnouncedMinRef = useRef(99);
+
   const speakWithMapboxMuted = useCallback((text: string) => {
     setMapboxVoiceMuted(true);
     speakAnnouncement(text, {
@@ -101,7 +110,7 @@ export default function BatchScreen() {
   const startNavigationToStop = useCallback(async (stop: BatchStop) => {
     if (!stop.coordinates) {
       if (!stop.address) {
-        Alert.alert('GPS manquant', 'Cet arrêt n’a ni coordonnées GPS ni adresse exploitable.');
+        Alert.alert('GPS manquant', "Cet arrêt n'a ni coordonnées GPS ni adresse exploitable.");
         return;
       }
       const encoded = encodeURIComponent(stop.address);
@@ -116,7 +125,7 @@ export default function BatchScreen() {
         }
       }
       Linking.openURL(target).catch(() => {
-        Alert.alert('GPS manquant', 'Impossible d’ouvrir une application de navigation avec cette adresse.');
+        Alert.alert('GPS manquant', "Impossible d'ouvrir une application de navigation avec cette adresse.");
       });
       return;
     }
@@ -154,6 +163,65 @@ export default function BatchScreen() {
       logger.warn('[BatchScreen] onCancelNavigation SDK (non-user) — ignoré', 'BatchScreen');
     }
   }, [stopNavigation]);
+
+  const startPickupNavigation = useCallback(async () => {
+    if (!batch?.pickupCoordinates) return;
+    const origin = driverLocation ?? await getCurrentLocation(Location.Accuracy.High);
+    if (!origin) {
+      Alert.alert('Localisation indisponible', 'Impossible de récupérer votre position actuelle.');
+      return;
+    }
+    arrivedAtPickupRef.current = false;
+    pickupNavCancelledRef.current = false;
+    lastPickupEtaAnnouncedMinRef.current = 99;
+    setShowPickupArrivalBtn(false);
+    setPickupNavOrigin(origin);
+    setPickupNavActive(true);
+  }, [batch?.pickupCoordinates, driverLocation, getCurrentLocation]);
+
+  const stopPickupNavigation = useCallback(() => {
+    setPickupNavActive(false);
+    setPickupNavOrigin(null);
+    setShowPickupArrivalBtn(false);
+    arrivedAtPickupRef.current = false;
+    lastPickupEtaAnnouncedMinRef.current = 99;
+  }, []);
+
+  const markArrivedAtPickup = useCallback(() => {
+    if (arrivedAtPickupRef.current) return;
+    arrivedAtPickupRef.current = true;
+    setShowPickupArrivalBtn(true);
+    speakWithMapboxMuted('Vous êtes arrivés au point de collecte. Récupérez tous les colis.');
+  }, [speakWithMapboxMuted]);
+
+  const handlePickupRouteProgressChange = useCallback(
+    (event: { nativeEvent?: { durationRemaining?: number } }) => {
+      const durationRemaining = event?.nativeEvent?.durationRemaining;
+      if (durationRemaining == null || durationRemaining <= 0) return;
+      const minsRemaining = Math.ceil(durationRemaining / 60);
+      if (minsRemaining <= 1 && lastPickupEtaAnnouncedMinRef.current > 1) {
+        lastPickupEtaAnnouncedMinRef.current = 1;
+        speakWithMapboxMuted('Tu arrives au point de collecte dans environ une minute.');
+      }
+    },
+    [speakWithMapboxMuted]
+  );
+
+  const handleConfirmPickup = useCallback(async () => {
+    if (!batchId || isConfirmingPickup) return;
+    setIsConfirmingPickup(true);
+    try {
+      await confirmBatchPickup(batchId);
+      useBatchStore.getState().setPickedUp(batchId);
+      stopPickupNavigation();
+      speakWithMapboxMuted('Tous les colis pris en charge. Vous pouvez commencer vos livraisons.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (err: any) {
+      Alert.alert('Erreur', err?.message ?? 'Impossible de confirmer la collecte.');
+    } finally {
+      setIsConfirmingPickup(false);
+    }
+  }, [batchId, isConfirmingPickup, stopPickupNavigation, speakWithMapboxMuted]);
 
   const handleRouteProgressChange = useCallback(
     (event: { nativeEvent?: { durationRemaining?: number } }) => {
@@ -299,7 +367,7 @@ export default function BatchScreen() {
     if (!manualStop) return;
     const code = manualCode.trim();
     if (!/^\d{6}$/.test(code)) {
-      Alert.alert('Code invalide', 'Entrez les 6 chiffres affichés sur l’écran du destinataire.');
+      Alert.alert('Code invalide', "Entrez les 6 chiffres affichés sur l'écran du destinataire.");
       return;
     }
     setValidatingId(manualStop.orderId);
@@ -439,8 +507,8 @@ export default function BatchScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Barre de progression */}
-      {totalCount > 0 && (
+      {/* Barre de progression — phase livraison uniquement */}
+      {!isLoadingFull && batch?.pickedUp && totalCount > 0 && (
         <View style={styles.progressContainer}>
           <View style={styles.progressRow}>
             <Text style={styles.progressLabel}>{terminalCount}/{totalCount} arrêts traités</Text>
@@ -451,7 +519,9 @@ export default function BatchScreen() {
           <View style={styles.progressBar}>
             <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: allDone ? '#10B981' : '#8B5CF6' }]} />
           </View>
-          <Text style={styles.orderHint}>Ordre conseillé. Choisis l’arrêt le plus logique selon le terrain.</Text>
+          <Text style={styles.orderHint}>
+            {"Ordre conseillé. Choisis l'arrêt le plus logique selon le terrain."}
+          </Text>
         </View>
       )}
 
@@ -460,6 +530,53 @@ export default function BatchScreen() {
           <ActivityIndicator size="large" color="#8B5CF6" />
           <Text style={styles.loadingText}>Chargement de la tournée…</Text>
         </View>
+      ) : batch && batch.stops.length > 0 && !batch.pickedUp ? (
+        <ScrollView style={styles.list} showsVerticalScrollIndicator={false} contentContainerStyle={styles.pickupContent}>
+          <View style={styles.pickupHeader}>
+            <View style={styles.pickupIconCircle}>
+              <Ionicons name="cube-outline" size={36} color="#8B5CF6" />
+            </View>
+            <Text style={styles.pickupTitle}>Point de collecte</Text>
+            <Text style={styles.pickupSub}>
+              Récupérez tous les colis avant de démarrer les livraisons ({batch.ordersCount} colis).
+            </Text>
+          </View>
+
+          <View style={styles.pickupAddressCard}>
+            <Ionicons name="location-outline" size={18} color="#6B7280" />
+            <Text style={styles.pickupAddressText} numberOfLines={3}>
+              {batch.pickupAddress || batch.partner_name || 'Point de collecte partenaire'}
+            </Text>
+          </View>
+
+          {batch.pickupCoordinates ? (
+            <TouchableOpacity style={styles.pickupNavBtn} onPress={startPickupNavigation}>
+              <Ionicons name="navigate-outline" size={17} color="#FFFFFF" />
+              <Text style={styles.pickupNavBtnText}>Naviguer vers le point de collecte</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          <View style={styles.pickupDivider} />
+
+          <TouchableOpacity
+            style={[styles.pickupConfirmBtn, isConfirmingPickup && styles.validateBtnDisabled]}
+            onPress={handleConfirmPickup}
+            disabled={isConfirmingPickup}
+          >
+            {isConfirmingPickup ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.pickupConfirmBtnText}>Tous les colis récupérés</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <Text style={styles.pickupHint}>
+            Appuyez une fois tous les colis récupérés au point de collecte.
+          </Text>
+        </ScrollView>
       ) : allDone ? (
         <View style={styles.centered}>
           <View style={styles.doneCircle}>
@@ -649,7 +766,7 @@ export default function BatchScreen() {
         </ScrollView>
       )}
 
-      {navigationStop && navigationOrigin && navigationStop.coordinates ? (
+      {batch?.pickedUp && navigationStop && navigationOrigin && navigationStop.coordinates ? (
         <View style={StyleSheet.absoluteFill}>
           <MapboxNavigationScreen
             key={`batch-nav-${navigationStop.orderId}`}
@@ -697,6 +814,42 @@ export default function BatchScreen() {
               >
                 <Ionicons name="camera-outline" size={17} color="#065F46" />
                 <Text style={styles.arrivalProofText}>Preuve</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {pickupNavActive && pickupNavOrigin && batch?.pickupCoordinates ? (
+        <View style={StyleSheet.absoluteFill}>
+          <MapboxNavigationScreen
+            key="batch-pickup-nav"
+            origin={pickupNavOrigin}
+            destination={batch.pickupCoordinates}
+            mute={mapboxVoiceMuted}
+            onArrive={markArrivedAtPickup}
+            onCancel={stopPickupNavigation}
+            onBackPress={() => {
+              pickupNavCancelledRef.current = true;
+              stopPickupNavigation();
+            }}
+            onRouteProgressChange={handlePickupRouteProgressChange}
+          />
+          {showPickupArrivalBtn ? (
+            <View style={[styles.arrivalActions, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+              <TouchableOpacity
+                style={[styles.arrivalButton, styles.arrivalScanButton, { flex: 1 }]}
+                onPress={handleConfirmPickup}
+                disabled={isConfirmingPickup}
+              >
+                {isConfirmingPickup ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={17} color="#FFF" />
+                    <Text style={styles.arrivalScanText}>Tous les colis récupérés</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           ) : null}
@@ -1506,5 +1659,93 @@ const styles = StyleSheet.create({
   ficheFallbackText: {
     fontSize: 11,
     color: '#92400E',
+  },
+  pickupContent: {
+    paddingBottom: 32,
+  },
+  pickupHeader: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+  },
+  pickupIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EDE9FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  pickupTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  pickupSub: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  pickupAddressCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  pickupAddressText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  pickupNavBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingVertical: 13,
+    marginBottom: 16,
+  },
+  pickupNavBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  pickupDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 16,
+  },
+  pickupConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#10B981',
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginBottom: 12,
+  },
+  pickupConfirmBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  pickupHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 17,
   },
 });

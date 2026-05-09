@@ -91,6 +91,9 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
     success?: boolean;
     data?: {
       id: string;
+      status?: string;
+      partner_id?: string;
+      partner_name?: string;
       orders_count?: number;
       orders?: {
         position: number;
@@ -98,6 +101,7 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
         orders?: {
           id: string;
           status: string;
+          pickup_address?: unknown;
           dropoff_address?: unknown;
           recipient?: { name?: string; phone?: string };
           price_cfa?: number;
@@ -134,11 +138,38 @@ export async function getBatch(batchId: string): Promise<ActiveBatch> {
       proofValidatedAt: item.orders?.proof?.validated_at ?? item.orders?.delivery_qr_scanned_at ?? null,
     }));
 
+  const firstOrderPickup = raw.orders?.[0]?.orders?.pickup_address;
+  const pickupAddress = firstOrderPickup ? addressText(firstOrderPickup) : undefined;
+  const pickupCoordinates = firstOrderPickup ? coordinatesFromLocation(firstOrderPickup) : undefined;
+  const batchStatus = raw.status as ActiveBatch['status'] | undefined;
+  const pickedUp = batchStatus === 'in_progress' || batchStatus === 'completed' || batchStatus === 'partial';
+
   return {
     id: raw.id,
     ordersCount: stops.length,
     stops,
+    status: batchStatus,
+    pickedUp,
+    pickupAddress: pickupAddress || undefined,
+    pickupCoordinates,
+    partner_id: raw.partner_id,
+    partner_name: raw.partner_name,
   };
+}
+
+export async function confirmBatchPickup(batchId: string): Promise<void> {
+  const headers = await authHeader();
+  const response = await apiFetch(
+    `${config.apiUrl}/api/batches/${encodeURIComponent(batchId)}/pickup`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers },
+    }
+  );
+  const body = await response.json() as { success?: boolean };
+  if (!response.ok || !body.success) {
+    throw new Error((body as any).message ?? 'Erreur confirmation collecte');
+  }
 }
 
 export async function validateBatchOrder(

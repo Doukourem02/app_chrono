@@ -20,6 +20,9 @@ export interface ActiveBatch {
   partner_id?: string;
   partner_name?: string;
   status?: 'pending' | 'in_progress' | 'completed' | 'partial';
+  pickedUp?: boolean;
+  pickupAddress?: string;
+  pickupCoordinates?: { latitude: number; longitude: number };
   created_at?: string;
 }
 
@@ -46,6 +49,7 @@ interface BatchState {
     status: 'completed' | 'cancelled',
     proof?: Pick<BatchStop, 'proofMethod' | 'proofValidatedAt'>
   ) => void;
+  setPickedUp: (batchId: string) => void;
   setNavigationStopOrderId: (orderId: string | null) => void;
   clearBatch: () => void;
   setLoading: (v: boolean) => void;
@@ -81,6 +85,18 @@ export const useBatchStore = create<BatchState>((set) => ({
           stops: state.activeBatch.stops.map((s) =>
             s.orderId === orderId ? { ...s, status, ...(proof ?? {}) } : s
           ),
+        },
+      };
+    }),
+
+  setPickedUp: (batchId) =>
+    set((state) => {
+      if (!state.activeBatch || state.activeBatch.id !== batchId) return state;
+      return {
+        activeBatch: {
+          ...state.activeBatch,
+          pickedUp: true,
+          status: 'in_progress',
         },
       };
     }),
