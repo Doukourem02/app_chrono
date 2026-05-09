@@ -155,7 +155,10 @@ const DriverOrderBottomSheet: React.FC<DriverOrderBottomSheetProps> = ({
   // - Colis récupéré, Terminé → détection auto par géofencing (zone pickup/dropoff)
   // - Scanner QR : optionnel à l'arrivée (gardé pour preuve de livraison)
   const activeBatch = useBatchStore((s) => s.activeBatch);
-  const activeBatchStopIds = useBatchStore((s) => s.activeBatch?.stops.map((stop) => stop.orderId) ?? []);
+  const activeBatchStopIds = useMemo(
+    () => activeBatch?.stops.map((stop) => stop.orderId) ?? [],
+    [activeBatch]
+  );
   const isBatchStop =
     !!currentOrder?.batch_id ||
     activeBatchStopIds.includes(currentOrder?.id ?? '') ||
