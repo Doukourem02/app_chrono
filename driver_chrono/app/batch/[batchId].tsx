@@ -177,7 +177,8 @@ export default function BatchScreen() {
     setShowPickupArrivalBtn(false);
     setPickupNavOrigin(origin);
     setPickupNavActive(true);
-  }, [batch?.pickupCoordinates, driverLocation, getCurrentLocation]);
+    speakWithMapboxMuted('Commande B2B prise en charge, nous pouvons entamer la tournée.');
+  }, [batch?.pickupCoordinates, driverLocation, getCurrentLocation, speakWithMapboxMuted]);
 
   const stopPickupNavigation = useCallback(() => {
     setPickupNavActive(false);
@@ -700,7 +701,7 @@ export default function BatchScreen() {
                     >
                       <Ionicons name="navigate-outline" size={14} color="#FFFFFF" />
                       <Text style={styles.navBtnText}>
-                        {!stop.coordinates ? 'GPS absent' : navigationStop?.orderId === stop.orderId ? 'En navigation' : 'Naviguer'}
+                        {!stop.coordinates ? 'GPS absent' : navigationStop?.orderId === stop.orderId ? 'En cours' : 'Démarrer'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity

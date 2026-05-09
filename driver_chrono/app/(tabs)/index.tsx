@@ -33,6 +33,7 @@ import MessageBottomSheet from "../../components/MessageBottomSheet";
 import { MapboxNavigationScreen } from "../../components/MapboxNavigationScreen";
 import { formatUserName } from '../../utils/formatName';
 import { speakAnnouncement } from '../../utils/speechAnnouncement';
+import { confirmBatchPickup } from '../../services/batchApiService';
 import { logNavigationEvent } from '../../utils/navigationTelemetry';
 import { getSafetyReminderForVehicleType } from '../../constants/driverVehicle';
 
@@ -363,6 +364,9 @@ export default function Index() {
   const [mapboxVoiceMuted, setMapboxVoiceMuted] = useState(false);
   const [showColisRecupereButton, setShowColisRecupereButton] = useState(false);
   const [showLivraisonEffectueeButton, setShowLivraisonEffectueeButton] = useState(false);
+  const [showBatchPickupBtn, setShowBatchPickupBtn] = useState(false);
+  const [isConfirmingBatchPickup, setIsConfirmingBatchPickup] = useState(false);
+  const batchPickupGeoRef = useRef(false);
   const colisRecupereLabel = React.useMemo(() => {
     const pickupPhaseOrders = activeOrders.filter(o =>
       !o.batch_id &&
@@ -621,11 +625,12 @@ export default function Index() {
   // CRITIQUE : Désactiver le géofencing si le statut est 'accepted'
   // Le livreur doit d'abord cliquer sur "Je pars" pour passer à 'enroute'
   // Sinon, le géofencing valide automatiquement et fait disparaître le menu "Je pars"
-  const shouldEnableGeofencing = isOnline && 
-    !!currentOrder && 
-    !!destination && 
+  const shouldEnableGeofencing = isOnline &&
+    !!currentOrder &&
+    !!destination &&
     !!location &&
-    currentOrder.status !== 'accepted'; // Désactiver si statut est 'accepted'
+    currentOrder.status !== 'accepted' &&
+    !activeBatch;
   
   const { isInZone } = useGeofencing({
     driverPosition: location,
@@ -652,6 +657,27 @@ export default function Index() {
       }
     },
   });
+
+  // Géofencing batch : collecte des colis au point de pickup (uniquement quand batch actif et non collecté)
+  useGeofencing({
+    driverPosition: location,
+    targetPosition: activeBatch && !activeBatch.pickedUp && activeBatch.pickupCoordinates ? activeBatch.pickupCoordinates : null,
+    orderId: activeBatch?.id ?? null,
+    orderStatus: activeBatch && !activeBatch.pickedUp ? 'enroute' : null,
+    enabled: !!activeBatch && !activeBatch.pickedUp && !!location && !!(activeBatch.pickupCoordinates),
+    onEnteredPickupZone: () => {
+      if (batchPickupGeoRef.current) return;
+      batchPickupGeoRef.current = true;
+      setShowBatchPickupBtn(true);
+    },
+  });
+
+  useEffect(() => {
+    if (!activeBatch || activeBatch.pickedUp) {
+      setShowBatchPickupBtn(false);
+      batchPickupGeoRef.current = false;
+    }
+  }, [activeBatch, activeBatch?.pickedUp]);
 
   // Réinitialiser quand le livreur sort de la zone pickup (pour réafficher le bouton s'il revient)
   useEffect(() => {
@@ -874,6 +900,23 @@ export default function Index() {
         : 'Colis pris en charge. Nous pouvons entamer la course.'
     );
   }, [activeOrders, location, speakWithMapboxMuted]);
+
+  const handleBatchPickupConfirmOnMap = useCallback(async () => {
+    if (!activeBatch?.id || isConfirmingBatchPickup) return;
+    setIsConfirmingBatchPickup(true);
+    try {
+      await confirmBatchPickup(activeBatch.id);
+      useBatchStore.getState().setPickedUp(activeBatch.id);
+      setShowBatchPickupBtn(false);
+      batchPickupGeoRef.current = false;
+      speakWithMapboxMuted('Tous les colis pris en charge. Vous pouvez commencer vos livraisons.');
+      router.push(`/batch/${activeBatch.id}` as any);
+    } catch (err: any) {
+      Alert.alert('Erreur', err?.message ?? 'Impossible de confirmer la collecte.');
+    } finally {
+      setIsConfirmingBatchPickup(false);
+    }
+  }, [activeBatch?.id, isConfirmingBatchPickup, speakWithMapboxMuted]);
 
   const handleAcceptOrder = (orderId: string) => {
     // Mise à jour optimiste : afficher la commande et ouvrir la navigation immédiatement
@@ -1360,7 +1403,7 @@ export default function Index() {
         isOnline={isOnline}
       />
 
-      {activeBatch && !isNavigationActive && (
+      {activeBatch && (
         <TouchableOpacity
           style={styles.batchReturnFab}
           onPress={() => router.push(`/batch/${activeBatch.id}` as any)}
@@ -1370,6 +1413,24 @@ export default function Index() {
           <Text style={styles.batchReturnFabText}>
             Tournée · {activeBatch.stops.filter(s => s.status === 'pending').length} restant(s)
           </Text>
+        </TouchableOpacity>
+      )}
+
+      {showBatchPickupBtn && (
+        <TouchableOpacity
+          style={styles.batchPickupConfirmBar}
+          onPress={handleBatchPickupConfirmOnMap}
+          disabled={isConfirmingBatchPickup}
+          activeOpacity={0.85}
+        >
+          {isConfirmingBatchPickup ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={styles.batchReturnFabText}>Tous les colis récupérés</Text>
+            </>
+          )}
         </TouchableOpacity>
       )}
 
@@ -1437,7 +1498,7 @@ export default function Index() {
       />
 
       {/* Nouveau bottom sheet unifié pour les détails et la messagerie */}
-      {currentOrder && (
+      {currentOrder && !activeBatch && (
         <DriverOrderBottomSheet
           currentOrder={currentOrder}
           panResponder={orderBottomSheetPanResponder}
@@ -1771,6 +1832,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
+  },
+  batchPickupConfirmBar: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#10B981',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    zIndex: 2000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 8,
   },
   batchReturnFab: {
     position: 'absolute',
