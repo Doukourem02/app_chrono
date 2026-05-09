@@ -326,6 +326,40 @@ async function saveAlternativePhoto(orderId: string, photoBase64?: string | null
   return filepath;
 }
 
+// ─── PATCH /api/batches/:id/pickup — confirmer la collecte de tous les colis ──
+export const confirmBatchPickup = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { id: batchId } = req.params;
+
+  const { data: batch, error } = await db()
+    .from('delivery_batches')
+    .select('id, driver_id, status')
+    .eq('id', batchId)
+    .single();
+
+  if (error || !batch) {
+    res.status(404).json({ success: false, message: 'Tournée introuvable' });
+    return;
+  }
+
+  if (req.user?.id && batch.driver_id && batch.driver_id !== req.user.id) {
+    res.status(403).json({ success: false, message: 'Cette tournée ne vous est pas assignée' });
+    return;
+  }
+
+  const { error: updateError } = await db()
+    .from('delivery_batches')
+    .update({ status: 'in_progress' })
+    .eq('id', batchId);
+
+  if (updateError) {
+    logger.error('[batchController] confirmBatchPickup update error:', updateError);
+    res.status(500).json({ success: false, message: 'Erreur lors de la confirmation de la collecte' });
+    return;
+  }
+
+  res.json({ success: true });
+};
+
 // ─── POST /api/batches — créer une tournée ────────────────────────────────────
 // Body: { partner_id?, user_id, driver_id?, pickup_address?, pickup_coords?, orders: [{ order_id? } | { recipient, lat?, lng?, notes? }] }
 export const createBatch = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -375,44 +409,48 @@ export const createBatch = async (req: AuthenticatedRequest, res: Response): Pro
     }
   }
 
-  const createdOrderIds: string[] = [];
   let preparedOrders: BatchOrderDraft[] = [];
-  try {
-    const pickupCoords = toCoords(
-      pickup_coords?.latitude ?? pickup_coords?.lat,
-      pickup_coords?.longitude ?? pickup_coords?.lng
-    );
-    for (const [index, order] of orders.entries()) {
-      const clientIndex = Number.isFinite(order.client_order_index) ? Number(order.client_order_index) : index;
-      if (typeof order.order_id === 'string' && order.order_id.trim()) {
-        preparedOrders.push({
-          order_id: order.order_id.trim(),
-          lat: order.lat,
-          lng: order.lng,
-          client_order_index: clientIndex,
-          createdByBatch: false,
+  const pickupCoords = toCoords(
+    pickup_coords?.latitude ?? pickup_coords?.lat,
+    pickup_coords?.longitude ?? pickup_coords?.lng
+  );
+  {
+    const settlements = await Promise.allSettled(
+      orders.map(async (order, index) => {
+        const clientIndex = Number.isFinite(order.client_order_index) ? Number(order.client_order_index) : index;
+        if (typeof order.order_id === 'string' && order.order_id.trim()) {
+          return {
+            order_id: order.order_id.trim(),
+            lat: order.lat,
+            lng: order.lng,
+            client_order_index: clientIndex,
+            createdByBatch: false,
+          } as BatchOrderDraft;
+        }
+        return createBatchChildOrder({
+          userId: user_id!,
+          partnerId: partner_id,
+          driverId: assignedDriverId,
+          pickupAddress: safeAddress(pickup_address),
+          pickupCoords,
+          input: { ...order, client_order_index: clientIndex },
         });
-        continue;
+      })
+    );
+    const createdIds = settlements
+      .filter((s): s is PromiseFulfilledResult<BatchOrderDraft> => s.status === 'fulfilled' && s.value.createdByBatch)
+      .map((s) => s.value.order_id);
+    const firstFailure = settlements.find((s): s is PromiseRejectedResult => s.status === 'rejected');
+    if (firstFailure) {
+      if (createdIds.length) {
+        await db().from('orders').delete().in('id', createdIds);
       }
-
-      const created = await createBatchChildOrder({
-        userId: user_id!,
-        partnerId: partner_id,
-        driverId: assignedDriverId,
-        pickupAddress: safeAddress(pickup_address),
-        pickupCoords,
-        input: { ...order, client_order_index: clientIndex },
-      });
-      createdOrderIds.push(created.order_id);
-      preparedOrders.push(created);
+      const errMsg = firstFailure.reason?.message ?? 'Impossible de créer les commandes de la tournée';
+      logger.warn('[batchController] create child orders error:', errMsg);
+      res.status(400).json({ success: false, message: errMsg });
+      return;
     }
-  } catch (err: any) {
-    if (createdOrderIds.length) {
-      await db().from('orders').delete().in('id', createdOrderIds);
-    }
-    logger.warn('[batchController] create child orders error:', err?.message || err);
-    res.status(400).json({ success: false, message: err?.message ?? 'Impossible de créer les commandes de la tournée' });
-    return;
+    preparedOrders = settlements.map((s) => (s as PromiseFulfilledResult<BatchOrderDraft>).value);
   }
 
   // Optimiser l'ordre si les coordonnées sont fournies
@@ -452,11 +490,43 @@ export const createBatch = async (req: AuthenticatedRequest, res: Response): Pro
       );
     }
     await txClient.query('COMMIT');
+
+    // Émettre le socket immédiatement après le COMMIT — la liste de priorité
+    // (B2B d'abord → fallback tous livreurs) est déjà calculée avant cette transaction.
+    const batchId = batch!.id;
+    if (assignedDriverId) {
+      const emitted = emitBatchAssigned(assignedDriverId, {
+        batchId,
+        ordersCount: preparedOrders.length,
+        ...(partner_id ? { partner_id } : {}),
+        status: 'assigned',
+      });
+      if (!emitted) {
+        logger.warn('[batchController] Tournée créée mais livreur non connecté', {
+          batchId,
+          driverId: assignedDriverId,
+        });
+      }
+    } else {
+      const offerPayload = {
+        batchId,
+        ordersCount: preparedOrders.length,
+        ...(partner_id ? { partner_id } : {}),
+        status: 'offer',
+      };
+      let emittedCount = emitBatchOfferToDrivers(automaticOfferDrivers, offerPayload);
+      if (emittedCount === 0) {
+        void emitBatchOfferToAllConnectedDrivers(offerPayload);
+      }
+      if (emittedCount === 0) {
+        logger.warn('[batchController] Tournée créée mais aucun livreur connecté notifié', {
+          batchId,
+          candidateDrivers: automaticOfferDrivers.length,
+        });
+      }
+    }
   } catch (txErr: any) {
     await txClient.query('ROLLBACK').catch(() => {});
-    if (createdOrderIds.length) {
-      await db().from('orders').delete().in('id', createdOrderIds);
-    }
     logger.error('[batchController] batch transaction error:', txErr?.message || txErr);
     res.status(500).json({ success: false, message: 'Erreur lors de la création de la tournée' });
     return;
@@ -464,43 +534,8 @@ export const createBatch = async (req: AuthenticatedRequest, res: Response): Pro
     txClient.release();
   }
 
-  await ensureBatchOrderProofs(preparedOrders.map((order) => order.order_id));
-
-  // Si un livreur est choisi explicitement, on assigne directement la tournée.
-  // Sinon, la tournée part en offre aux livreurs B2B connectés : le premier qui accepte devient assigné.
-  const batchId = batch!.id;
-
-  if (assignedDriverId) {
-    const emitted = emitBatchAssigned(assignedDriverId, {
-      batchId,
-      ordersCount: preparedOrders.length,
-      ...(partner_id ? { partner_id } : {}),
-      status: 'assigned',
-    });
-    if (!emitted) {
-      logger.warn('[batchController] Tournée créée mais livreur non connecté', {
-        batchId,
-        driverId: assignedDriverId,
-      });
-    }
-  } else {
-    const offerPayload = {
-      batchId,
-      ordersCount: preparedOrders.length,
-      ...(partner_id ? { partner_id } : {}),
-      status: 'offer',
-    };
-    let emittedCount = emitBatchOfferToDrivers(automaticOfferDrivers, offerPayload);
-    if (emittedCount === 0) {
-      emittedCount = await emitBatchOfferToAllConnectedDrivers(offerPayload);
-    }
-    if (emittedCount === 0) {
-      logger.warn('[batchController] Tournée créée mais aucun livreur connecté notifié', {
-        batchId,
-        candidateDrivers: automaticOfferDrivers.length,
-      });
-    }
-  }
+  // Génération QR de secours en arrière-plan — ne bloque pas la réponse ni le socket.
+  ensureBatchOrderProofs(preparedOrders.map((order) => order.order_id)).catch(() => {});
 
   const ordersResponse = optimizedOrder.map((originalIdx, pos) => ({
     order_id: preparedOrders[originalIdx]!.order_id,
@@ -511,7 +546,7 @@ export const createBatch = async (req: AuthenticatedRequest, res: Response): Pro
   res.status(201).json({
     success: true,
     data: {
-      id: batchId,
+      id: batch!.id,
       driver_id: assignedDriverId,
       orders_count: preparedOrders.length,
       orders: ordersResponse,
