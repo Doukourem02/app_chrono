@@ -67,6 +67,7 @@
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/react": "~19.2.10",
+    "babel-preset-expo": "^55.0.21",
     "baseline-browser-mapping": "^2.9.2",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~55.0.0",
@@ -77,13 +78,25 @@
   "jest": {
     "testEnvironment": "node",
     "transform": {
-      "^.+\\.[jt]sx?$": ["babel-jest", { "presets": ["babel-preset-expo"] }]
+      "^.+\\.[jt]sx?$": [
+        "babel-jest",
+        {
+          "presets": [
+            "babel-preset-expo"
+          ]
+        }
+      ]
     },
     "testMatch": [
       "**/__tests__/**/*.test.ts",
       "**/__tests__/**/*.test.tsx"
     ],
-    "moduleFileExtensions": ["ts", "tsx", "js", "jsx"]
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx"
+    ]
   },
   "private": true,
   "engines": {
