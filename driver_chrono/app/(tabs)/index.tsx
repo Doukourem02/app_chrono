@@ -1,7 +1,7 @@
 import "../../mapboxInit";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator, InteractionManager, Linking } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
 import type { MapRefHandle } from "../../hooks/useMapCamera";
 import { DriverMapView } from "../../components/DriverMapView";
@@ -695,6 +695,20 @@ export default function Index() {
       setShowBatchPickupBtn(true);
     }
   }, [activeBatch, activeBatch?.pickedUp, activeBatch?.pickupCoordinates, activeBatch?.stops.length]);
+
+  // Nettoyage de sécurité : vider le store dès que l'accueil reprend le focus et que la
+  // tournée est terminée (0 stops pending + livraisons démarrées). Couvre tous les chemins
+  // de navigation (swipe iOS, back gesture, etc.) sans interférer avec l'écran batch actif.
+  useFocusEffect(
+    useCallback(() => {
+      const batch = useBatchStore.getState().activeBatch;
+      if (!batch || !batch.pickedUp || batch.stops.length === 0) return;
+      const pending = batch.stops.filter((s) => s.status === 'pending').length;
+      if (pending === 0) {
+        useBatchStore.getState().clearBatch();
+      }
+    }, [])
+  );
 
   // Réinitialiser quand le livreur sort de la zone pickup (pour réafficher le bouton s'il revient)
   useEffect(() => {

@@ -1791,8 +1791,8 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           return;
         }
 
-        const ordersResult = await client.query<{ order_id: string; status: string }>(
-          `SELECT bo.order_id, o.status
+        const ordersResult = await client.query<{ order_id: string; status: string; user_id: string }>(
+          `SELECT bo.order_id, o.status, o.user_id
              FROM batch_orders bo
              JOIN orders o ON o.id = bo.order_id
             WHERE bo.batch_id = $1
@@ -1802,6 +1802,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         const pendingOrderIds = ordersResult.rows
           .filter((row) => row.status === 'pending')
           .map((row) => row.order_id);
+        const pendingOrdersWithPayer = ordersResult.rows
+          .filter((row) => row.status === 'pending')
+          .map((row) => ({ orderId: row.order_id, payerUserId: row.user_id }));
         const activeOrderIds = ordersResult.rows
           .filter((row) => !['completed', 'cancelled', 'declined'].includes(String(row.status || '').toLowerCase()))
           .map((row) => row.order_id);
@@ -1899,6 +1902,17 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         void notifyB2BBatchRecipientsProof(activeOrderIds).catch((notifyErr: any) => {
           logger.warn('[accept-batch] notifications destinataires B2B:', notifyErr?.message || notifyErr);
         });
+
+        // Notifier chaque commande (pending→accepted) : push payeur + destinataire + SMS fallback
+        for (const { orderId: batchOrderId, payerUserId } of pendingOrdersWithPayer) {
+          void notifyAllForOrderStatus({
+            orderId: batchOrderId,
+            status: 'accepted',
+            payerUserId,
+          }).catch((e: unknown) => {
+            logger.warn('[accept-batch] notify accepted per order:', e instanceof Error ? e.message : String(e));
+          });
+        }
       } catch (error: any) {
         await client.query('ROLLBACK').catch(() => {});
         logger.error('[accept-batch] Erreur acceptation tournée:', error);

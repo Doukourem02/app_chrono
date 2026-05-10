@@ -42,6 +42,7 @@ export default function BatchScreen() {
   const [scanProof, setScanProof] = useState<{ orderId: string; method: ProofMethod } | null>(null);
   const [manualStop, setManualStop] = useState<BatchStop | null>(null);
   const [manualCode, setManualCode] = useState('');
+  const [manualError, setManualError] = useState<string | null>(null);
   const [alternativeStop, setAlternativeStop] = useState<BatchStop | null>(null);
   const [signatureName, setSignatureName] = useState('');
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
@@ -179,8 +180,7 @@ export default function BatchScreen() {
     setShowPickupArrivalBtn(false);
     setPickupNavOrigin(origin);
     setPickupNavActive(true);
-    speakWithMapboxMuted('Commande groupée prise en charge, nous pouvons entamer la course.');
-  }, [batch?.pickupCoordinates, driverLocation, getCurrentLocation, speakWithMapboxMuted]);
+  }, [batch?.pickupCoordinates, driverLocation, getCurrentLocation]);
 
   const stopPickupNavigation = useCallback(() => {
     setPickupNavActive(false);
@@ -219,7 +219,7 @@ export default function BatchScreen() {
       await confirmBatchPickup(batchId);
       useBatchStore.getState().setPickedUp(batchId);
       stopPickupNavigation();
-      speakWithMapboxMuted('Tous les colis pris en charge. Vous pouvez commencer vos livraisons.');
+      speakWithMapboxMuted('Commande groupée prise en charge. Nous pouvons entamer la course.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (err: any) {
       Alert.alert('Erreur', err?.message ?? 'Impossible de confirmer la collecte.');
@@ -397,7 +397,7 @@ export default function BatchScreen() {
     if (!manualStop) return;
     const code = manualCode.trim();
     if (!/^\d{6}$/.test(code)) {
-      Alert.alert('Code invalide', "Entrez les 6 chiffres affichés sur l'écran du destinataire.");
+      setManualError("Entrez les 6 chiffres affichés sur l'écran du destinataire.");
       return;
     }
     setValidatingId(manualStop.orderId);
@@ -408,15 +408,16 @@ export default function BatchScreen() {
         const { orderId, ...scanData } = result.data;
         setManualStop(null);
         setManualCode('');
+        setManualError(null);
         setScanProof({ orderId, method: 'manual_code' });
         setScanResult(scanData);
       } else {
-        const { title, message } = getQRScanErrorAlert(result.code, result.error);
-        Alert.alert(title, message);
+        const { message } = getQRScanErrorAlert(result.code, result.error);
+        setManualError(message);
       }
     } catch (error: any) {
-      const { title, message } = getQRScanErrorAlert('SCAN_UNKNOWN', error?.message);
-      Alert.alert(title, message);
+      const { message } = getQRScanErrorAlert('SCAN_UNKNOWN', error?.message);
+      setManualError(message);
     } finally {
       setValidatingId(null);
     }
@@ -879,23 +880,39 @@ export default function BatchScreen() {
         }}
       />
 
-      <Modal visible={!!manualStop} transparent animationType="slide" onRequestClose={() => setManualStop(null)}>
+      <Modal
+        visible={!!manualStop}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setManualStop(null); setManualCode(''); setManualError(null); }}
+      >
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Code de livraison</Text>
             <Text style={styles.modalSubtitle}>{manualStop?.recipientName}</Text>
             <TextInput
-              style={styles.codeInput}
+              style={[styles.codeInput, manualError ? { borderColor: '#EF4444', borderWidth: 2 } : undefined]}
               value={manualCode}
-              onChangeText={(text) => setManualCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+              onChangeText={(text) => {
+                setManualCode(text.replace(/[^0-9]/g, '').slice(0, 6));
+                if (manualError) setManualError(null);
+              }}
               keyboardType="number-pad"
               maxLength={6}
               placeholder="_ _ _ _ _ _"
               placeholderTextColor="#9CA3AF"
               autoFocus
             />
+            {manualError ? (
+              <Text style={{ color: '#EF4444', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+                {manualError}
+              </Text>
+            ) : null}
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setManualStop(null)}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => { setManualStop(null); setManualCode(''); setManualError(null); }}
+              >
                 <Text style={styles.modalCancelText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleManualSubmit}>

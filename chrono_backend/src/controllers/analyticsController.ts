@@ -777,12 +777,12 @@ export const exportAnalytics = async (req: Request, res: Response): Promise<void
       [startDate]
     );
 
-    // Générer le deliveryId officiel (format: CHLV–YYMMDD-XXXX) et order_number (format: CMD-XXXXXXXX)
+    // Générer le deliveryId officiel (format: KRLV–YYMMDD-XXXX) et order_number (format: CMD-XXXXXXXX)
     const formattedResults = result.rows.map((row: any) => {
-      const deliveryId = formatDeliveryId(row.id, row.created_at); // Format officiel CHLV–YYMMDD-XXXX
+      const deliveryId = formatDeliveryId(row.id, row.created_at); // Format officiel KRLV–YYMMDD-XXXX
       return {
         ...row,
-        delivery_id: deliveryId, // Format officiel CHLV–YYMMDD-XXXX
+        delivery_id: deliveryId, // Format officiel KRLV–YYMMDD-XXXX
         id_livraison: deliveryId, // Alias pour plus de clarté
         order_number: `CMD-${row.id.substring(0, 8).toUpperCase()}`, // Format simplifié pour compatibilité
       };
@@ -812,7 +812,7 @@ export const exportAnalytics = async (req: Request, res: Response): Promise<void
 
         const values = [
           escapeCSV(row.id),
-          escapeCSV(row.delivery_id), // Format officiel CHLV–YYMMDD-XXXX
+          escapeCSV(row.delivery_id), // Format officiel KRLV–YYMMDD-XXXX
           escapeCSV(row.order_number), // Format simplifié CMD-XXXXXXXX
           escapeCSV(row.status),
           escapeCSV(row.price),

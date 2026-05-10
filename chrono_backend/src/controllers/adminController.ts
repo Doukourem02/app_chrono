@@ -599,7 +599,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     const trimmedQuery = query.trim().toLowerCase();
 
     // Détection intelligente du type de recherche
-    const isOrderSearch = upperQuery.startsWith('CHL');
+    const isOrderSearch = upperQuery.startsWith('KRLV');
     const isPhoneSearch = /^[\d\s\+\-\(\)]+$/.test(query.trim());
     const isEmailSearch = trimmedQuery.includes('@');
     const isVehicleTypeSearch = ['moto', 'vehicule', 'cargo', 'véhicule'].includes(trimmedQuery);
@@ -610,12 +610,12 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     if (isOrderSearch) {
       deliveryIdCondition = `
         OR (
-          'CHLV' || '–' || 
+          'KRLV' || '–' || 
           TO_CHAR(o.created_at, 'YYMMDD') || '-' || 
           UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), -4))
         ) ILIKE $1
         OR (
-          'CHLV' || '–' || 
+          'KRLV' || '–' || 
           TO_CHAR(o.created_at, 'YYMMDD') || '-' || 
           UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), -4))
         ) ILIKE $4
@@ -683,7 +683,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
           WHEN LOWER(o.id::text) = LOWER($2) THEN 1
           WHEN LOWER(REPLACE(o.id::text, '-', '')) LIKE LOWER($3) THEN 2
           ${isOrderSearch ? `WHEN (
-            'CHLV' || '–' || 
+            'KRLV' || '–' || 
             TO_CHAR(o.created_at, 'YYMMDD') || '-' || 
             UPPER(SUBSTRING(REPLACE(o.id::text, '-', ''), -4))
           ) ILIKE $4 THEN 2` : ''}

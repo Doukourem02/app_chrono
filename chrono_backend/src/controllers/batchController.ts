@@ -5,6 +5,7 @@ import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
 import { optimizeRouteOrder } from '../utils/haversine.js';
 import { emitBatchAssigned, emitBatchOfferToAllConnectedDrivers, emitBatchOfferToDrivers, findAllAvailableDrivers } from '../sockets/orderSocket.js';
+import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
 import logger from '../utils/logger.js';
 import type { JWTPayload } from '../types/index.js';
 import qrCodeService from '../services/qrCodeService.js';
@@ -357,18 +358,33 @@ export const confirmBatchPickup = async (req: AuthenticatedRequest, res: Respons
     return;
   }
 
-  // Mettre à jour les commandes de la tournée à picked_up pour que le client voie "Colis récupéré"
-  await pool.query(
+  // Mettre à jour les commandes de la tournée à picked_up + récupérer les IDs pour notifier
+  const pickedUpResult = await pool.query<{ id: string; user_id: string }>(
     `UPDATE orders o
         SET status = 'picked_up', updated_at = NOW()
        FROM batch_orders bo
       WHERE bo.batch_id = $1
         AND bo.order_id = o.id
-        AND o.status IN ('accepted', 'enroute', 'in_progress')`,
+        AND o.status IN ('accepted', 'enroute', 'in_progress')
+   RETURNING o.id, o.user_id`,
     [batchId]
   ).catch((err: any) => {
     logger.warn('[batchController] confirmBatchPickup order status update warning:', err?.message);
+    return null;
   });
+
+  // Notifier chaque commande : push "Colis récupéré" → payeur + destinataire + SMS fallback
+  if (pickedUpResult?.rows?.length) {
+    for (const row of pickedUpResult.rows) {
+      void notifyAllForOrderStatus({
+        orderId: row.id,
+        status: 'picked_up',
+        payerUserId: row.user_id,
+      }).catch((e: any) => {
+        logger.warn('[batchController] notify picked_up per order:', e?.message);
+      });
+    }
+  }
 
   res.json({ success: true });
 };

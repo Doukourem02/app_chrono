@@ -4,23 +4,7 @@ import React from 'react'
 import Image from 'next/image'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Clock3,
-  KeyRound,
-  MapPin,
-  Navigation,
-  PackageCheck,
-  Phone,
-  QrCode,
-  RefreshCw,
-  Route,
-  ShieldCheck,
-  Truck,
-  UserRound,
-  Wallet,
-} from 'lucide-react'
+import {ArrowLeft,Clock3,KeyRound,MapPin,PackageCheck,Phone,QrCode,RefreshCw,Route,ShieldCheck,Truck,UserRound,Wallet,} from 'lucide-react'
 import PublicTrackMap from '@/components/track/PublicTrackMap'
 import { partnerApiService, type PartnerOrderTracking } from '@/lib/partnerApiService'
 import { PUBLIC_TRACK_FLOW_STEPS, publicTrackStatusTitle } from '@/lib/orderProductRules'
@@ -353,33 +337,74 @@ function TrackingContent({ partnerId, order }: { partnerId: string; order: Partn
 
         <div style={{ border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: 18, backgroundColor: themeColors.cardBg }}>
           <h2 style={{ fontSize: 16, fontWeight: 800, color: themeColors.textPrimary, marginBottom: 16 }}>Progression</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <style>{`
+            @keyframes krono-step-in {
+              from { opacity: 0; transform: translateY(8px); }
+              to   { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {PUBLIC_TRACK_FLOW_STEPS.map((step, index) => {
               const done = order.status === 'completed' || index < stepIndex
               const active = index === stepIndex && !TERMINAL_STATUSES.has(order.status)
-              const Icon = done ? CheckCircle2 : active ? Navigation : Clock3
+              const dotColor = done
+                ? themeColors.greenPrimary
+                : active
+                ? tone.color
+                : themeColors.grayMedium
+              const isLast = index === PUBLIC_TRACK_FLOW_STEPS.length - 1
               return (
-                <div key={step.status} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: 8,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: done || active ? tone.bg : themeColors.grayLight,
-                      color: done || active ? tone.color : themeColors.textSecondary,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon size={16} />
+                <div
+                  key={step.status}
+                  style={{
+                    display: 'flex',
+                    gap: 14,
+                    animation: 'krono-step-in 0.35s ease-out both',
+                    animationDelay: `${index * 70}ms`,
+                  }}
+                >
+                  {/* dot + connecting line */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                    <div
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        backgroundColor: dotColor,
+                        marginTop: 3,
+                        boxShadow: active ? `0 0 0 3px ${tone.bg}` : undefined,
+                        transition: 'background-color 0.3s',
+                      }}
+                    />
+                    {!isLast && (
+                      <div
+                        style={{
+                          width: 2,
+                          flex: 1,
+                          minHeight: 18,
+                          backgroundColor: done ? themeColors.greenPrimary : themeColors.cardBorder,
+                          marginTop: 3,
+                          marginBottom: 3,
+                          transition: 'background-color 0.3s',
+                        }}
+                      />
+                    )}
                   </div>
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 14, fontWeight: 800, color: active ? tone.color : themeColors.textPrimary }}>
+                  {/* content */}
+                  <div style={{ paddingBottom: isLast ? 0 : 14, minWidth: 0 }}>
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: active ? tone.color : done ? themeColors.textPrimary : themeColors.textSecondary,
+                        lineHeight: 1.3,
+                      }}
+                    >
                       {step.title}
                     </p>
-                    <p style={{ marginTop: 2, fontSize: 13, color: themeColors.textSecondary, lineHeight: 1.45 }}>{step.body}</p>
+                    <p style={{ marginTop: 2, fontSize: 12, color: themeColors.textSecondary }}>
+                      {done ? 'Terminé' : active ? 'En cours' : 'À venir'}
+                    </p>
                   </div>
                 </div>
               )
