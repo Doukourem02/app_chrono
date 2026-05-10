@@ -92,6 +92,7 @@ export default function Index() {
   const batchOfferError = useBatchStore((s) => s.offerError);
   const clearBatchOfferError = useBatchStore((s) => s.clearOfferError);
   const activeBatch = useBatchStore((s) => s.activeBatch);
+  const batchLastEtaMinutes = useBatchStore((s) => s.lastEtaMinutes);
   
   const pendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null;
   
@@ -1428,6 +1429,7 @@ export default function Index() {
           <Ionicons name="list-outline" size={18} color="#fff" />
           <Text style={styles.batchReturnFabText}>
             Tournée · {activeBatch.stops.filter(s => s.status === 'pending').length} restant(s)
+            {batchLastEtaMinutes != null ? ` · ${batchLastEtaMinutes} min` : ''}
           </Text>
         </TouchableOpacity>
       )}

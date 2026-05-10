@@ -244,6 +244,8 @@ export function MapboxNavigationScreen({
         origin={originArr}
         destination={destArr}
         mute={mute}
+        language="fr"
+        locale="fr"
         showsEndOfRouteFeedback={false}
         hideStatusView={true}
         onLocationChange={handleLocationChange}

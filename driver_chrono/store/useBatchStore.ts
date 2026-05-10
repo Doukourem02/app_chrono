@@ -39,6 +39,7 @@ interface BatchState {
   offerError: { batchId?: string; message: string } | null;
   isLoading: boolean;
   navigationStopOrderId: string | null;
+  lastEtaMinutes: number | null;
   setActiveBatch: (batch: ActiveBatch) => void;
   setPendingOffer: (offer: BatchOffer) => void;
   clearPendingOffer: (batchId?: string) => void;
@@ -51,6 +52,7 @@ interface BatchState {
   ) => void;
   setPickedUp: (batchId: string) => void;
   setNavigationStopOrderId: (orderId: string | null) => void;
+  setLastEtaMinutes: (m: number | null) => void;
   clearBatch: () => void;
   setLoading: (v: boolean) => void;
 }
@@ -61,6 +63,7 @@ export const useBatchStore = create<BatchState>((set) => ({
   offerError: null,
   isLoading: false,
   navigationStopOrderId: null,
+  lastEtaMinutes: null,
 
   setActiveBatch: (batch) => set({ activeBatch: batch }),
 
@@ -103,7 +106,9 @@ export const useBatchStore = create<BatchState>((set) => ({
 
   setNavigationStopOrderId: (orderId) => set({ navigationStopOrderId: orderId }),
 
-  clearBatch: () => set({ activeBatch: null, pendingOffer: null, offerError: null, navigationStopOrderId: null }),
+  setLastEtaMinutes: (m) => set({ lastEtaMinutes: m }),
+
+  clearBatch: () => set({ activeBatch: null, pendingOffer: null, offerError: null, navigationStopOrderId: null, lastEtaMinutes: null }),
 
   setLoading: (v) => set({ isLoading: v }),
 }));
