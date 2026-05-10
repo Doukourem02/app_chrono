@@ -58,6 +58,7 @@ interface DriverMapViewProps {
   currentDropoffCoord: Coordinates | null;
   activeOrders: {
     id: string;
+    batch_id?: string | null;
     pickup?: unknown;
     dropoff?: unknown;
     status?: string;
@@ -128,8 +129,9 @@ export const DriverMapView: React.FC<DriverMapViewProps> = ({
   const defaultZoom = 14;
 
   const ordersForMarkers = React.useMemo(() => {
-    const ids = new Set(activeOrders.map((o) => o.id));
-    return [...activeOrders, ...pendingOrders.filter((p) => !ids.has(p.id))];
+    const nonBatch = activeOrders.filter((o) => !o.batch_id);
+    const ids = new Set(nonBatch.map((o) => o.id));
+    return [...nonBatch, ...pendingOrders.filter((p) => !ids.has(p.id))];
   }, [activeOrders, pendingOrders]);
 
   if (Platform.OS === 'web') {

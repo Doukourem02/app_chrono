@@ -391,6 +391,8 @@ export default function MapboxAddressAutocomplete({
   const lastAppliedSavedFingerprintRef = useRef<string>('');
   /** Invalide les réponses Mapbox arrivées après un changement de requête (courses au clavier). */
   const suggestFetchGenRef = useRef(0);
+  /** Vrai pendant que l'utilisateur a le focus sur le champ — empêche initialValue de réécrire la saisie en cours. */
+  const isFocusedRef = useRef(false);
   const accessToken = config.mapboxAccessToken;
 
   const refCoords = useMemo(() => {
@@ -405,6 +407,7 @@ export default function MapboxAddressAutocomplete({
   }, [proximityCoords, proximity]);
 
   useEffect(() => {
+    if (isFocusedRef.current) return;
     setQuery(sanitizeGeocodeDisplayString(singleLineAddressInput(initialValue)));
   }, [initialValue]);
 
@@ -851,10 +854,14 @@ export default function MapboxAddressAutocomplete({
           multiline={false}
           blurOnSubmit={false}
           onFocus={() => {
+            isFocusedRef.current = true;
             setSuppressSuggestionList(false);
             onFocus?.();
           }}
-          onBlur={handleTextInputBlur}
+          onBlur={() => {
+            isFocusedRef.current = false;
+            handleTextInputBlur();
+          }}
           onSubmitEditing={handleTextInputSubmit}
           returnKeyType="done"
         />

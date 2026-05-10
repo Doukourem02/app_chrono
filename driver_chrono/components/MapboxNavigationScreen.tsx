@@ -291,7 +291,7 @@ export function MapboxNavigationScreen({
       {/* Bouton Colis récupéré (visible quand livreur dans zone pickup) */}
       {showColisRecupereButton && onColisRecupere && (
         <TouchableOpacity
-          style={[styles.colisRecupereButton, { bottom: insets.bottom + 100 }]}
+          style={[styles.colisRecupereButton, { bottom: insets.bottom + 200 }]}
           onPress={onColisRecupere}
           activeOpacity={0.8}
         >
@@ -303,7 +303,7 @@ export function MapboxNavigationScreen({
       {/* Bouton Livraison effectuée (visible quand livreur dans zone dropoff) */}
       {showLivraisonEffectueeButton && onLivraisonEffectuee && (
         <TouchableOpacity
-          style={[styles.colisRecupereButton, styles.livraisonEffectueeButton, { bottom: insets.bottom + 100 }]}
+          style={[styles.colisRecupereButton, styles.livraisonEffectueeButton, { bottom: insets.bottom + 200 }]}
           onPress={onLivraisonEffectuee}
           activeOpacity={0.8}
         >

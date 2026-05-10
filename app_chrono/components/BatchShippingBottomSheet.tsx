@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useBusinessStore } from '../store/useBusinessStore';
 import { createBatch, getPartnerDrivers, type PartnerDriver } from '../services/partnerApi';
 import MapboxAddressAutocomplete from './MapboxAddressAutocomplete';
+import { locationService } from '../services/locationService';
 
 type Step = 'recipients' | 'driver' | 'confirm' | 'success';
 
@@ -46,6 +47,24 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
         : [...current, instruction]
     );
   };
+
+  // Auto-remplissage du point de collecte avec la position actuelle à l'ouverture
+  useEffect(() => {
+    if (!visible || batchPickupAddress) return;
+    void (async () => {
+      try {
+        const coords = await locationService.getCurrentPosition();
+        if (!coords) return;
+        const address = await locationService.reverseGeocode({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          timestamp: Date.now(),
+        });
+        const label = address ?? `Ma position (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`;
+        setBatchPickup(label, { lat: coords.latitude, lng: coords.longitude });
+      } catch {}
+    })();
+  }, [visible, batchPickupAddress, setBatchPickup]);
 
   useEffect(() => {
     if (visible && step === 'driver' && user?.partner_id) {
