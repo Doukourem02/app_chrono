@@ -31,6 +31,7 @@ export default function BatchScreen() {
   const [isLoadingFull, setIsLoadingFull] = useState(false);
   const [validatingId, setValidatingId] = useState<string | null>(null);
   const [allDone, setAllDone] = useState(false);
+  const allDoneRef = useRef(false);
   const [scanStop, setScanStop] = useState<BatchStop | null>(null);
   const [scanResult, setScanResult] = useState<{
     recipientName: string;
@@ -283,9 +284,21 @@ export default function BatchScreen() {
   useEffect(() => {
     if (batch && batch.stops.length > 0) {
       const remaining = batch.stops.filter((s) => s.status === 'pending').length;
-      setAllDone(remaining === 0);
+      const done = remaining === 0;
+      setAllDone(done);
+      allDoneRef.current = done;
     }
   }, [batch]);
+
+  // Si le livreur revient via la flèche "retour" sans passer par "Retour à l'accueil",
+  // on vide quand même le store pour que le FAB et les tracés disparaissent.
+  useEffect(() => {
+    return () => {
+      if (allDoneRef.current) {
+        useBatchStore.getState().clearBatch();
+      }
+    };
+  }, []);
 
   // Garder une ref stable de startNavigationToStop pour éviter que les deps GPS
   // (driverLocation) ne re-déclenchent l'effet de restauration à chaque position update.
@@ -832,7 +845,7 @@ export default function BatchScreen() {
           />
           {showPickupArrivalBtn ? (
             <TouchableOpacity
-              style={[styles.pickupFloatingBtn, { bottom: Math.max(insets.bottom + 20, 34) }]}
+              style={[styles.pickupFloatingBtn, { bottom: Math.max(insets.bottom + 110, 130) }]}
               onPress={handleConfirmPickup}
               disabled={isConfirmingPickup}
               activeOpacity={0.85}

@@ -152,11 +152,12 @@ async function notifyOneRecipient(row: NotifyOrderRow): Promise<void> {
     void sendCampaignPushToUser({
       userId: recipientUserId,
       appRole: 'client',
-      title: 'Code de réception Krono',
-      body: `Votre code de réception est ${verificationCode}. Montrez le QR ou le code au livreur.`,
+      title: `Code de livraison : ${verificationCode}`,
+      body: 'Votre livreur Krono est en chemin. Montrez ce code à la réception.',
       data: {
         type: 'delivery_proof_code',
         orderId: row.id,
+        code: verificationCode,
         ...(trackUrl ? { trackUrl } : {}),
       },
     }).catch((e: unknown) => {

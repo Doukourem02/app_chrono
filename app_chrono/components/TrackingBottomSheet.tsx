@@ -19,6 +19,7 @@ interface TrackingBottomSheetProps {
   onNewOrder?: () => void;
   onMessage?: () => void;
   activeOrdersCount?: number;
+  openQRFromPush?: boolean;
 }
 
 async function shareTrackMessage(trackUrl: string): Promise<void> {
@@ -43,12 +44,14 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   onNewOrder,
   onMessage,
   activeOrdersCount = 0,
+  openQRFromPush = false,
 }) => {
   const insets = useSafeAreaInsets();
   
   const [orderRating, setOrderRating] = useState<{ rating: number; comment: string | null } | null>(null);
   const [isLoadingRating, setIsLoadingRating] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
+  const openedQRFromPushRef = useRef(false);
   const [qrCodeData, setQrCodeData] = useState<{
     qrCodeImage: string;
     verificationCode?: string;
@@ -71,6 +74,14 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const getDriverAvatar = useCallback(() => {
     return currentOrder?.driver?.avatar_url || currentOrder?.driver?.profile_image_url || currentOrder?.driver?.avatar || null;
   }, [currentOrder?.driver]);
+
+  // Tap sur notif delivery_proof_code → ouvre le QR automatiquement une seule fois
+  useEffect(() => {
+    if (!openQRFromPush || openedQRFromPushRef.current) return;
+    openedQRFromPushRef.current = true;
+    const t = setTimeout(() => setShowQRCode(true), 400);
+    return () => clearTimeout(t);
+  }, [openQRFromPush]);
 
   const loadOrderRating = useCallback(async () => {
     if (!currentOrder?.id) {

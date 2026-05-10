@@ -55,3 +55,18 @@ export function ensureMapboxAccessToken(): void {
 }
 
 ensureMapboxAccessToken();
+
+// Tente de configurer la langue FR au niveau du SDK Navigation natif.
+// Le prop language="fr"/locale="fr" sur MapboxNavigation couvre la voix guidée,
+// mais certains bandeaux système (ex: "Adjust Volume") viennent du bundle natif.
+// Ce bloc essaie l'API globale si elle est exposée par le module JS.
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const nav = require('@fleetbase/react-native-mapbox-navigation');
+  const setLocale = nav?.setLocale ?? nav?.default?.setLocale;
+  if (typeof setLocale === 'function') {
+    setLocale('fr');
+  }
+} catch {
+  // Module absent (Expo Go) — ignoré
+}

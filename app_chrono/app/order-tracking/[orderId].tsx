@@ -23,11 +23,13 @@ import { formatUserName } from '../../utils/formatName';
 
 export default function OrderTrackingPage() {
   const { requireAuth } = useRequireAuth();
-  const params = useLocalSearchParams<{ orderId: string; openChat?: string }>();
+  const params = useLocalSearchParams<{ orderId: string; openChat?: string; openQR?: string }>();
   const { user } = useAuthStore();
   const orderId = params.orderId;
   const openChatFromPush =
     params.openChat === '1' || params.openChat === 'true';
+  const openQRFromPush =
+    params.openQR === '1' || params.openQR === 'true';
   
   const storeOrder = useOrderStore((state) => 
     orderId ? state.activeOrders.find(o => o.id === orderId) : null
@@ -676,6 +678,7 @@ export default function OrderTrackingPage() {
           onToggle={toggleBottomSheet}
           onCancel={() => handleCancelOrder(currentOrder.id)}
           onMessage={handleOpenMessage}
+          openQRFromPush={openQRFromPush}
           onNewOrder={() => {
             const o = useOrderStore.getState();
             o.setSelectedOrder(null);
