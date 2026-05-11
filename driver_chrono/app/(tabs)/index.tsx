@@ -1,1011 +1,55 @@
-import "../../mapboxInit";
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert, Text, ActivityIndicator, InteractionManager, Linking } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import { View, StyleSheet, Alert, Linking } from "react-native";
 import * as Location from "expo-location";
-import type { MapRefHandle } from "../../hooks/useMapCamera";
-import { DriverMapView } from "../../components/DriverMapView";
-import { Ionicons } from "@expo/vector-icons";
-import { StatusToggle } from "../../components/StatusToggle";
-import { StatsCards } from "../../components/StatsCards";
-import { OrderRequestPopup } from "../../components/OrderRequestPopup";
-import { BatchOfferPopup } from "../../components/BatchOfferPopup";
-import { OrdersListBottomSheet } from "../../components/OrdersListBottomSheet";
-import DriverOrderBottomSheet from "../../components/DriverOrderBottomSheet";
-import { useDriverLocation } from "../../hooks/useDriverLocation";
-import { useBottomSheet } from "../../hooks/useBottomSheet";
-import { useOrdersListBottomSheet } from "../../hooks/useOrdersListBottomSheet";
-import { useMessageBottomSheet } from "../../hooks/useMessageBottomSheet";
+import { router } from "expo-router";
 import { useDriverStore } from "../../store/useDriverStore";
-import { useOrderStore } from "../../store/useOrderStore";
-import { useBatchStore } from "../../store/useBatchStore";
-import { useUIStore } from "../../store/useUIStore";
+import { useDriverLocation } from "../../hooks/useDriverLocation";
 import { apiService } from "../../services/apiService";
 import { orderSocketService } from "../../services/orderSocketService";
 import { requestBackgroundLocationPermissionForDuty } from "../../services/driverBackgroundLocation";
 import { driverMessageSocketService } from "../../services/driverMessageSocketService";
 import { logger } from '../../utils/logger';
-import { useMapCamera } from '../../hooks/useMapCamera';
-import { useAnimatedRoute } from '../../hooks/useAnimatedRoute';
-import { useAnimatedPosition } from '../../hooks/useAnimatedPosition';
-import { useGeofencing } from '../../hooks/useGeofencing';
-import MessageBottomSheet from "../../components/MessageBottomSheet";
-import { MapboxNavigationScreen } from "../../components/MapboxNavigationScreen";
-import { formatUserName } from '../../utils/formatName';
-import { speakAnnouncement } from '../../utils/speechAnnouncement';
-import { confirmBatchPickup } from '../../services/batchApiService';
-import { logNavigationEvent } from '../../utils/navigationTelemetry';
-import { getSafetyReminderForVehicleType } from '../../constants/driverVehicle';
-
-type Coords = { latitude: number; longitude: number };
-type NavigationPhase = 'pickup' | 'dropoff';
-type NavigationSession = {
-  orderId: string;
-  phase: NavigationPhase;
-  origin: Coords;
-  destination: Coords;
-};
-
-const navigationPhaseForStatus = (status?: string | null): NavigationPhase | null => {
-  const normalized = String(status || '');
-  if (normalized === 'accepted' || normalized === 'enroute' || normalized === 'in_progress') {
-    return 'pickup';
-  }
-  if (normalized === 'picked_up' || normalized === 'delivering') {
-    return 'dropoff';
-  }
-  return null;
-};
-
-const sameCoords = (a: Coords | null | undefined, b: Coords | null | undefined) =>
-  !!a &&
-  !!b &&
-  Math.abs(a.latitude - b.latitude) < 0.000001 &&
-  Math.abs(a.longitude - b.longitude) < 0.000001;
+import { StatusToggle } from "../../components/StatusToggle";
+import { StatsCards } from "../../components/StatsCards";
+import ClassicDeliveryFlow from "../../components/ClassicDeliveryFlow";
+import BatchDeliveryFlow from "../../components/BatchDeliveryFlow";
 
 export default function Index() {
-  const { setHideTabBar } = useUIStore();
-  const { 
-    isOnline: storeIsOnline, 
-    setOnlineStatus, 
+  const {
+    isOnline: storeIsOnline,
+    setOnlineStatus,
     setLocation,
     todayStats,
     updateTodayStats,
     user,
     profile,
-    isAuthenticated
+    isAuthenticated,
   } = useDriverStore();
-  
+
   const [driverStats, setDriverStats] = useState<{
     todayDeliveries: number;
     totalRevenue: number;
-  }>({
-    todayDeliveries: 0,
-    totalRevenue: 0,
-  });
-  
-  const pendingOrders = useOrderStore((s) => s.pendingOrders);
-  const activeOrders = useOrderStore((s) => s.activeOrders);
-  const selectedOrderId = useOrderStore((s) => s.selectedOrderId);
-  const setSelectedOrder = useOrderStore((s) => s.setSelectedOrder);
-  const pendingBatchOffer = useBatchStore((s) => s.pendingOffer);
-  const batchOfferError = useBatchStore((s) => s.offerError);
-  const clearBatchOfferError = useBatchStore((s) => s.clearOfferError);
-  const activeBatch = useBatchStore((s) => s.activeBatch);
-  const batchLastEtaMinutes = useBatchStore((s) => s.lastEtaMinutes);
-  
-  const pendingOrder = pendingOrders.length > 0 ? pendingOrders[0] : null;
-  
-  const isOnline = storeIsOnline;
+  }>({ todayDeliveries: 0, totalRevenue: 0 });
 
+  const isOnline = storeIsOnline;
   const { location: rawGpsLocation, error, loading, permissionDenied } = useDriverLocation(isOnline);
   const storeLocation = useDriverStore((s) => s.currentLocation);
-  /** Position affichée / sync : GPS live ou dernière position enregistrée au passage en ligne. */
   const location = isOnline ? (rawGpsLocation ?? storeLocation ?? null) : null;
+
   const hasLocationBanner =
-    permissionDenied ||
-    (isOnline && !loading && !location && !!error);
+    permissionDenied || (isOnline && !loading && !location && !!error);
 
   const openAppLocationSettings = useCallback(() => {
     void Linking.openSettings();
   }, []);
-  const mapRef = useRef<MapRefHandle | null>(null);
-
-  const resolveCoords = useCallback((candidate?: any) => {
-    if (!candidate) return null;
-
-    const c = candidate.coordinates || candidate.coords || candidate.location || candidate;
-    // GeoJSON : [lng, lat]
-    if (Array.isArray(c) && c.length >= 2) {
-      const lng = Number(c[0]);
-      const lat = Number(c[1]);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) return { latitude: lat, longitude: lng };
-      return null;
-    }
-    const lat = c?.latitude ?? c?.lat ?? c?.Lat ?? c?.y;
-    const lng = c?.longitude ?? c?.lng ?? c?.Lng ?? c?.x;
-
-    if (lat == null || lng == null) return null;
-    return { latitude: Number(lat), longitude: Number(lng) };
-  }, []);
-  
-  const calculateDistanceToPickup = React.useCallback((order: typeof activeOrders[0]): number | null => {
-    if (!location || !order?.pickup) return null;
-    const pickupCoord = resolveCoords(order.pickup);
-    if (!pickupCoord) return null;
-
-    const R = 6371;
-    const dLat = (pickupCoord.latitude - location.latitude) * Math.PI / 180;
-    const dLon = (pickupCoord.longitude - location.longitude) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(location.latitude * Math.PI / 180) * Math.cos(pickupCoord.latitude * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    
-    return Math.round(R * c * 10) / 10;
-  }, [location, resolveCoords]);
-
-  const sortedActiveOrdersByDistance = React.useMemo(() => {
-    // Exclure les commandes batch — gérées dans /batch/[batchId].tsx
-    const nonBatchOrders = activeOrders.filter(o => !o.batch_id);
-    if (!location || nonBatchOrders.length === 0) return nonBatchOrders;
-
-    return [...nonBatchOrders].sort((a, b) => {
-      const distA = calculateDistanceToPickup(a);
-      const distB = calculateDistanceToPickup(b);
-
-      if (distA === null && distB === null) return 0;
-      if (distA === null) return 1;
-      if (distB === null) return -1;
-
-      return distA - distB;
-    });
-  }, [activeOrders, location, calculateDistanceToPickup]);
-
-  // Sélection automatique de la commande la plus prioritaire si aucune n'est sélectionnée
-  useEffect(() => {
-    const store = useOrderStore.getState();
-    
-    // Si une commande est déjà sélectionnée et existe toujours, ne rien faire
-    if (store.selectedOrderId) {
-      const selectedOrderExists = store.activeOrders.some(o => o.id === store.selectedOrderId);
-      if (selectedOrderExists) {
-        return;
-    }
-    }
-    
-    // Sinon, sélectionner automatiquement la commande la plus prioritaire
-    if (location && sortedActiveOrdersByDistance.length > 0) {
-      const inProgressOrder = sortedActiveOrdersByDistance.find(o => 
-        o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
-      );
-      
-      const orderToSelect = inProgressOrder || sortedActiveOrdersByDistance[0];
-      if (orderToSelect) {
-        store.setSelectedOrder(orderToSelect.id);
-        return;
-      }
-    }
-    
-    const priorityOrder = store.activeOrders.find(o => 
-      o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
-    );
-    if (priorityOrder) {
-      store.setSelectedOrder(priorityOrder.id);
-      return;
-    }
-    
-    const firstOrder = store.activeOrders[0];
-    if (firstOrder) {
-      store.setSelectedOrder(firstOrder.id);
-    }
-  }, [activeOrders, sortedActiveOrdersByDistance, location]);
-
-  const currentOrder = useOrderStore((s) => {
-    // Filtrer les commandes complétées/annulées et les commandes batch (gérées dans l'écran batch)
-    const validActiveOrders = s.activeOrders.filter(o =>
-      o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined' && !o.batch_id
-    );
-
-    if (s.selectedOrderId) {
-      const selected = validActiveOrders.find(o => o.id === s.selectedOrderId);
-      return selected || null;
-    }
-
-    // Fallback : retourner la première commande active valide si aucune n'est sélectionnée
-    return validActiveOrders[0] || null;
-  });
-
-  // Nettoyer selectedOrderId quand il pointe vers une commande invalide (complétée, annulée ou batch).
-  // Ne pas faire ça dans le sélecteur Zustand : mutation d'état dans un sélecteur cause des boucles de rendu.
-  useEffect(() => {
-    const store = useOrderStore.getState();
-    if (!store.selectedOrderId) return;
-    const validActive = store.activeOrders.filter(o =>
-      o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'declined' && !o.batch_id
-    );
-    if (!validActive.find(o => o.id === store.selectedOrderId)) {
-      store.setSelectedOrder(null);
-    }
-  }, [activeOrders]);
-
-  // Suivi temps réel : envoyer position au client (throttle 3s + distance filter 15m)
-  const lastEmitRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
-  const latestNavigationProgressRef = useRef<{
-    orderId: string;
-    phase: 'pickup' | 'dropoff';
-    durationRemainingSec: number;
-    distanceRemainingM?: number;
-    ts: number;
-  } | null>(null);
-  useEffect(() => {
-    const status = String(currentOrder?.status || '');
-    const needsTracking = ['accepted', 'enroute', 'picked_up', 'delivering', 'in_progress'].includes(status);
-    if (!currentOrder?.id || !location || !needsTracking) return;
-
-    const distMeters = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
-      const R = 6371000;
-      const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
-      const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
-      const x = Math.sin(dLat / 2) ** 2 + Math.cos((a.latitude * Math.PI) / 180) * Math.cos((b.latitude * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-      return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-    };
-
-    const maybeEmit = () => {
-      const now = Date.now();
-      const last = lastEmitRef.current;
-      const shouldEmit = !last ||
-        now - last.ts >= 3000 ||
-        distMeters(location, { latitude: last.lat, longitude: last.lng }) >= 15;
-
-      if (shouldEmit) {
-        const currentPhase =
-          status === 'accepted' || status === 'enroute' || status === 'in_progress'
-            ? 'pickup'
-            : status === 'picked_up' || status === 'delivering'
-              ? 'dropoff'
-              : null;
-        const navProgress =
-          latestNavigationProgressRef.current?.orderId === currentOrder.id &&
-          latestNavigationProgressRef.current.phase === currentPhase &&
-          now - latestNavigationProgressRef.current.ts <= 10_000
-            ? latestNavigationProgressRef.current
-            : null;
-        orderSocketService.emitDriverLocation(currentOrder.id, {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          ...(rawGpsLocation?.heading != null ? { heading: rawGpsLocation.heading } : {}),
-          ...(navProgress
-            ? {
-                navigationDurationRemainingSec: navProgress.durationRemainingSec,
-                navigationDistanceRemainingM: navProgress.distanceRemainingM,
-              }
-            : {}),
-        });
-        lastEmitRef.current = { lat: location.latitude, lng: location.longitude, ts: now };
-      }
-    };
-
-    maybeEmit();
-    const iv = setInterval(maybeEmit, 3000);
-    return () => clearInterval(iv);
-  }, [currentOrder?.id, currentOrder?.status, location, rawGpsLocation?.heading]);
-
-  // Bottom sheet pour les détails de la commande (remplace RecipientDetailsSheet)
-  const {
-    animatedHeight: orderBottomSheetAnimatedHeight,
-    panResponder: orderBottomSheetPanResponder,
-    isExpanded: orderBottomSheetIsExpanded,
-    expand: expandOrderBottomSheet,
-    collapse: collapseOrderBottomSheet,
-    toggle: toggleOrderBottomSheet,
-  } = useBottomSheet();
-
-  const {
-    animatedHeight: ordersListAnimatedHeight,
-    isExpanded: ordersListIsExpanded,
-    panResponder: ordersListPanResponder,
-    collapse: collapseOrdersListSheet,
-    toggle: toggleOrdersListSheet,
-  } = useOrdersListBottomSheet();
-
-  // Bottom sheet pour la messagerie
-  const {
-    animatedHeight: messageAnimatedHeight,
-    panResponder: messagePanResponder,
-    isExpanded: messageIsExpanded,
-    expand: expandMessageBottomSheet,
-    collapse: collapseMessageBottomSheet,
-    toggle: toggleMessageBottomSheet,
-  } = useMessageBottomSheet();
-
-  const [showMessageBottomSheet, setShowMessageBottomSheet] = useState(false);
-  const [isNavigationActive, setIsNavigationActive] = useState(false);
-  /** Mode minimisé : Mapbox reste monté (ETA continue), on affiche la carte avec bouton "Reprendre" */
-  const [isNavigationMinimized, setIsNavigationMinimized] = useState(false);
-  const [lastEtaMinutes, setLastEtaMinutes] = useState<number | null>(null);
-
-  const handleOpenMessage = () => {
-    if (!currentOrder || !currentOrder.user || !currentOrder.user.id) {
-      return;
-    }
-    
-    setShowMessageBottomSheet(true);
-    setHideTabBar(true); // Cacher la barre de navigation
-    setTimeout(() => {
-      expandMessageBottomSheet();
-    }, 300);
-  };
-
-  const handleCloseMessage = () => {
-    collapseMessageBottomSheet();
-    setHideTabBar(false); // Afficher la barre de navigation
-    setTimeout(() => {
-      setShowMessageBottomSheet(false);
-    }, 300);
-  };
-  
-  const userClosedBottomSheetRef = useRef(false);
-  const lastOrderStatusRef = useRef<string | null>(null);
-  const lastAutoNavStatusRef = useRef<string | null>(null);
-  const lastAutoNavKeyRef = useRef<string | null>(null);
-  const suppressedAutoNavKeysRef = useRef<Set<string>>(new Set());
-  const [showRecalcOverlay, setShowRecalcOverlay] = useState(false);
-  /** Phase 2 (dropoff) : Mapbox reste monté, le natif gère le rerouting via reEmbedWithNewDestination */
-  /** Délai avant montage Mapbox phase 1 (évite figement au démarrage) */
-  const [phase1MountReady, setPhase1MountReady] = useState(false);
-  const [navStuckSince, setNavStuckSince] = useState<number | null>(null);
-  const [showNavStuckEscape, setShowNavStuckEscape] = useState(false);
-  const hasValidatedViaMapboxRef = useRef<Set<string>>(new Set());
-  const lastEtaAnnouncedMinRef = useRef<number>(99);
-  // Commande terminée mais navigation gardée ouverte : le livreur quitte quand il veut
-  const [navigationCompletedOrder, setNavigationCompletedOrder] = useState<typeof currentOrder | null>(null);
-  const [navigationSession, setNavigationSession] = useState<NavigationSession | null>(null);
-  const [mapboxVoiceMuted, setMapboxVoiceMuted] = useState(false);
-  const [showColisRecupereButton, setShowColisRecupereButton] = useState(false);
-  const [showLivraisonEffectueeButton, setShowLivraisonEffectueeButton] = useState(false);
-  const [showBatchPickupBtn, setShowBatchPickupBtn] = useState(false);
-  const [isConfirmingBatchPickup, setIsConfirmingBatchPickup] = useState(false);
-  const batchPickupGeoRef = useRef(false);
-  const colisRecupereLabel = React.useMemo(() => {
-    const pickupPhaseOrders = activeOrders.filter(o =>
-      !o.batch_id &&
-      (o.status === 'accepted' || o.status === 'enroute' || o.status === 'in_progress')
-    );
-    return pickupPhaseOrders.length > 1 ? 'Tous les colis récupérés' : 'Colis récupéré';
-  }, [activeOrders]);
-  const atPickupZoneAnnouncedRef = useRef(false);
-  const atDropoffZoneAnnouncedRef = useRef(false);
-  /** Annonce « arrivée à destination » une seule fois (géofence et/ou Mapbox peuvent arriver dans n’importe quel ordre). */
-  const spokenDropoffArrivalRef = useRef(false);
-
-  /** Annonce vocale en mutant Mapbox pour éviter les doublons (ex: "tournez à droite" + notre annonce) */
-  const speakWithMapboxMuted = useCallback((text: string, onDone?: () => void) => {
-    setMapboxVoiceMuted(true);
-    speakAnnouncement(text, {
-      onDone: () => {
-        setMapboxVoiceMuted(false);
-        onDone?.();
-      },
-    });
-  }, []);
-
-
-  const currentPickupCoord = React.useMemo(
-    () => currentOrder ? resolveCoords(currentOrder.pickup) : null,
-    [currentOrder, resolveCoords]
-  );
-  const currentDropoffCoord = React.useMemo(
-    () => currentOrder ? resolveCoords(currentOrder.dropoff) : null,
-    [currentOrder, resolveCoords]
-  );
-  const currentNavigationPhase = navigationPhaseForStatus(currentOrder?.status);
-  const currentAutoNavKey =
-    currentOrder?.id && currentNavigationPhase
-      ? `${currentOrder.id}:${currentNavigationPhase}`
-      : null;
-  const destination = React.useMemo(
-    () =>
-      currentNavigationPhase === 'pickup'
-        ? currentPickupCoord
-        : currentNavigationPhase === 'dropoff'
-          ? currentDropoffCoord
-          : null,
-    [currentDropoffCoord, currentNavigationPhase, currentPickupCoord]
-  );
-  const navDisplayOrder = currentOrder || navigationCompletedOrder;
-  const navDestination = destination || (navigationCompletedOrder ? resolveCoords(navigationCompletedOrder.dropoff) : null);
-
-  /** Pendant transition pickup→dropoff : passer directement au dropoff pour éviter navigation figée */
-  const effectiveNavDestination = navigationSession?.destination ?? navDestination;
-
-  /** Origine verrouillée par session Mapbox pour éviter un redémarrage à chaque update GPS. */
-  const navOrigin = navigationSession?.origin ?? location;
-
-  const resetNavigationUi = useCallback((suppressAutoRestart = false) => {
-    if (suppressAutoRestart) {
-      // Utiliser navigationSession pour construire la clé de suppression — plus fiable que
-      // currentAutoNavKey qui peut être null si currentOrder est temporairement null.
-      setNavigationSession((prev) => {
-        if (prev) {
-          suppressedAutoNavKeysRef.current.add(`${prev.orderId}:${prev.phase}`);
-        }
-        return null;
-      });
-    } else {
-      setNavigationSession(null);
-    }
-    setShowRecalcOverlay(false);
-    setPhase1MountReady(false);
-    setNavigationCompletedOrder(null);
-    setIsNavigationActive(false);
-    setIsNavigationMinimized(false);
-    setShowColisRecupereButton(false);
-    setShowLivraisonEffectueeButton(false);
-    setLastEtaMinutes(null);
-    atPickupZoneAnnouncedRef.current = false;
-    atDropoffZoneAnnouncedRef.current = false;
-    spokenDropoffArrivalRef.current = false;
-  }, []);
-
-  const openNavigationManually = useCallback(() => {
-    if (currentAutoNavKey) {
-      suppressedAutoNavKeysRef.current.delete(currentAutoNavKey);
-    }
-    if (currentNavigationPhase === 'pickup') {
-      setPhase1MountReady(true);
-    }
-    setIsNavigationMinimized(false);
-    setIsNavigationActive(true);
-  }, [currentAutoNavKey, currentNavigationPhase]);
-
-  useEffect(() => {
-    if (!currentOrder?.id || !currentNavigationPhase || !destination) {
-      if (!navigationCompletedOrder) {
-        setNavigationSession(null);
-      }
-      return;
-    }
-
-    const defaultOrigin =
-      currentNavigationPhase === 'dropoff'
-        ? currentPickupCoord ?? location
-        : location;
-    if (!defaultOrigin) return;
-
-    setNavigationSession((previous) => {
-      const sameLeg =
-        previous?.orderId === currentOrder.id &&
-        previous.phase === currentNavigationPhase;
-
-      if (sameLeg && sameCoords(previous.destination, destination)) {
-        return previous;
-      }
-
-      return {
-        orderId: currentOrder.id,
-        phase: currentNavigationPhase,
-        origin: sameLeg ? previous.origin : defaultOrigin,
-        destination,
-      };
-    });
-  }, [
-    currentOrder?.id,
-    currentNavigationPhase,
-    currentPickupCoord,
-    destination,
-    location,
-    navigationCompletedOrder,
-  ]);
-
-  // Cacher la tab bar quand la navigation full-screen est active
-  useEffect(() => {
-    setHideTabBar(isNavigationActive);
-  }, [isNavigationActive, setHideTabBar]);
-
-  // Auto-démarrage navigation : Livreur accepte → phase 1 (pickup), Colis récupéré → phase 2 (dropoff)
-  useEffect(() => {
-    if (!currentOrder) {
-      lastAutoNavStatusRef.current = null;
-      lastAutoNavKeyRef.current = null;
-      return;
-    }
-    // Skip navigation for batch orders - handled in batch screen
-    if (currentOrder.batch_id) {
-      return;
-    }
-    // Guard secondaire : si un batch est actif, bloquer toute navigation depuis index.tsx
-    // (même si batch_id absent du payload — évite la boucle resync/navigation)
-    if (useBatchStore.getState().activeBatch) return;
-    if (!location || !destination) return;
-
-    const status = String(currentOrder.status || '');
-    const prevStatus = lastAutoNavStatusRef.current;
-    lastAutoNavStatusRef.current = status;
-    const autoNavKey = currentAutoNavKey;
-    const isAutoRestartSuppressed =
-      !!autoNavKey && suppressedAutoNavKeysRef.current.has(autoNavKey);
-    const hasAutoStartedThisLeg =
-      !!autoNavKey && lastAutoNavKeyRef.current === autoNavKey;
-
-    // Phase 1 : transition vers accepted (ouverture avec commande acceptée)
-    // Délai 400ms avant montage Mapbox pour éviter figement au démarrage
-    let phase1FallbackId: ReturnType<typeof setTimeout> | null = null;
-    if (
-      autoNavKey &&
-      !isAutoRestartSuppressed &&
-      !hasAutoStartedThisLeg &&
-      status === 'accepted' &&
-      prevStatus !== 'accepted'
-    ) {
-      lastAutoNavKeyRef.current = autoNavKey;
-      logger.info('Auto-démarrage navigation phase 1 (point de collecte)', 'driver-index');
-      logNavigationEvent('nav_phase_pickup_start', {
-        orderId: currentOrder.id,
-        status,
-      });
-      setPhase1MountReady(false);
-      setIsNavigationActive(true);
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => setPhase1MountReady(true), 400);
-      });
-      // Fallback : débloquer après 2 s si InteractionManager ne se déclenche pas
-      phase1FallbackId = setTimeout(() => setPhase1MountReady(true), 2000);
-      if (location) {
-        setTimeout(() => {
-          orderSocketService.updateDeliveryStatus(currentOrder.id, 'enroute', location);
-        }, 600);
-      }
-    }
-    // Phase 2 : transition vers picked_up (colis récupéré → navigation vers livraison)
-    // Ne PAS unmount/remount : le natif reEmbedWithNewDestination gère le changement pickup→dropoff
-    // L'unmount/remount causait un figement obligeant à quitter l'app
-    if (
-      autoNavKey &&
-      !isAutoRestartSuppressed &&
-      !hasAutoStartedThisLeg &&
-      (status === 'picked_up' || status === 'delivering') &&
-      (prevStatus === 'enroute' || prevStatus === 'in_progress')
-    ) {
-      lastAutoNavKeyRef.current = autoNavKey;
-      logger.info('Auto-démarrage navigation phase 2 (adresse de livraison)', 'driver-index');
-      logNavigationEvent('nav_phase_dropoff_reroute', {
-        orderId: currentOrder.id,
-        status,
-        previousStatus: prevStatus,
-      });
-      lastEtaAnnouncedMinRef.current = 99;
-      setShowRecalcOverlay(true);
-      setIsNavigationMinimized(false);
-      setIsNavigationActive(true);
-      if (status === 'picked_up' && location) {
-        setTimeout(() => {
-          orderSocketService.updateDeliveryStatus(currentOrder.id, 'delivering', location);
-        }, 400);
-      }
-    }
-    return () => {
-      if (phase1FallbackId) clearTimeout(phase1FallbackId);
-    };
-  }, [currentOrder?.id, currentOrder?.status, currentOrder, location, destination, currentAutoNavKey]);
-
-  // Masquer l'overlay "Recalcul..." après 5 s (fallback si transition lente)
-  useEffect(() => {
-    if (!showRecalcOverlay) return;
-    const t = setTimeout(() => setShowRecalcOverlay(false), 5000);
-    return () => clearTimeout(t);
-  }, [showRecalcOverlay]);
-
-  // Réinitialiser la transition quand la commande change
-  // Ne pas reset si la navigation est déjà active : évite la boucle resync qui débloque phase1MountReady
-  useEffect(() => {
-    if (!currentOrder?.id && !isNavigationActive) {
-      setPhase1MountReady(false);
-    }
-  }, [currentOrder?.id, isNavigationActive]);
-
-  // Détection navigation bloquée : navigation active mais phase1MountReady jamais passé à true
-  useEffect(() => {
-    if (isNavigationActive && !phase1MountReady) {
-      setNavStuckSince(Date.now());
-    } else {
-      setNavStuckSince(null);
-      setShowNavStuckEscape(false);
-    }
-  }, [isNavigationActive, phase1MountReady]);
-
-  // Après 4s bloqué → afficher le bouton de sortie
-  useEffect(() => {
-    if (!navStuckSince) return;
-    const t = setTimeout(() => setShowNavStuckEscape(true), 4000);
-    return () => clearTimeout(t);
-  }, [navStuckSince]);
-
-  // Géofencing : détection automatique d'arrivée
-  // CRITIQUE : Désactiver le géofencing si le statut est 'accepted'
-  // Le livreur doit d'abord cliquer sur "Je pars" pour passer à 'enroute'
-  // Sinon, le géofencing valide automatiquement et fait disparaître le menu "Je pars"
-  const shouldEnableGeofencing = isOnline &&
-    !!currentOrder &&
-    !!destination &&
-    !!location &&
-    currentOrder.status !== 'accepted' &&
-    !activeBatch;
-  
-  const { isInZone } = useGeofencing({
-    driverPosition: location,
-    targetPosition: destination,
-    orderId: currentOrder?.id || null,
-    orderStatus: currentOrder?.status || null,
-    enabled: shouldEnableGeofencing,
-    onEnteredZone: () => {
-      logger.info('Vous êtes arrivé dans la zone', 'geofencing');
-    },
-    onEnteredPickupZone: () => {
-      if (atPickupZoneAnnouncedRef.current) return;
-      atPickupZoneAnnouncedRef.current = true;
-      setShowColisRecupereButton(true);
-    },
-    onEnteredDropoffZone: () => {
-      if (!atDropoffZoneAnnouncedRef.current) {
-        atDropoffZoneAnnouncedRef.current = true;
-        setShowLivraisonEffectueeButton(true);
-      }
-      if (!spokenDropoffArrivalRef.current) {
-        spokenDropoffArrivalRef.current = true;
-        speakWithMapboxMuted('Vous êtes arrivés à destination.');
-      }
-    },
-  });
-
-  // Géofencing batch : collecte des colis au point de pickup (uniquement quand batch actif et non collecté)
-  useGeofencing({
-    driverPosition: location,
-    targetPosition: activeBatch && !activeBatch.pickedUp && activeBatch.pickupCoordinates ? activeBatch.pickupCoordinates : null,
-    orderId: activeBatch?.id ?? null,
-    orderStatus: activeBatch && !activeBatch.pickedUp ? 'enroute' : null,
-    enabled: !!activeBatch && !activeBatch.pickedUp && !!location && !!(activeBatch.pickupCoordinates),
-    onEnteredPickupZone: () => {
-      if (batchPickupGeoRef.current) return;
-      batchPickupGeoRef.current = true;
-      setShowBatchPickupBtn(true);
-    },
-  });
-
-  useEffect(() => {
-    if (!activeBatch || activeBatch.pickedUp) {
-      setShowBatchPickupBtn(false);
-      batchPickupGeoRef.current = false;
-    }
-  }, [activeBatch, activeBatch?.pickedUp]);
-
-  // Fallback : si le batch n'a pas de coordonnées de collecte, le géofencing
-  // reste désactivé indéfiniment. On affiche le bouton directement dès que
-  // le batch est chargé (stops > 0) et non encore collecté.
-  useEffect(() => {
-    if (
-      activeBatch &&
-      !activeBatch.pickedUp &&
-      activeBatch.stops.length > 0 &&
-      !activeBatch.pickupCoordinates &&
-      !batchPickupGeoRef.current
-    ) {
-      batchPickupGeoRef.current = true;
-      setShowBatchPickupBtn(true);
-    }
-  }, [activeBatch, activeBatch?.pickedUp, activeBatch?.pickupCoordinates, activeBatch?.stops.length]);
-
-  // Nettoyage de sécurité : vider le store dès que l'accueil reprend le focus et que la
-  // tournée est terminée (0 stops pending + livraisons démarrées). Couvre tous les chemins
-  // de navigation (swipe iOS, back gesture, etc.) sans interférer avec l'écran batch actif.
-  useFocusEffect(
-    useCallback(() => {
-      const batch = useBatchStore.getState().activeBatch;
-      if (!batch || !batch.pickedUp || batch.stops.length === 0) return;
-      const pending = batch.stops.filter((s) => s.status === 'pending').length;
-      if (pending === 0) {
-        useBatchStore.getState().clearBatch();
-      }
-    }, [])
-  );
-
-  // Réinitialiser quand le livreur sort de la zone pickup (pour réafficher le bouton s'il revient)
-  useEffect(() => {
-    if (!isInZone && (currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress')) {
-      atPickupZoneAnnouncedRef.current = false;
-      setShowColisRecupereButton(false);
-    }
-  }, [isInZone, currentOrder?.status]);
-
-  // Réinitialiser quand le livreur sort de la zone dropoff (pour réafficher le bouton s'il revient)
-  useEffect(() => {
-    if (!isInZone && (currentOrder?.status === 'picked_up' || currentOrder?.status === 'delivering')) {
-      atDropoffZoneAnnouncedRef.current = false;
-      spokenDropoffArrivalRef.current = false;
-      setShowLivraisonEffectueeButton(false);
-    }
-  }, [isInZone, currentOrder?.status]);
-
-  useEffect(() => {
-    latestNavigationProgressRef.current = null;
-    if (!currentOrder?.id) {
-      hasValidatedViaMapboxRef.current.clear();
-      lastEtaAnnouncedMinRef.current = 99;
-      atPickupZoneAnnouncedRef.current = false;
-      atDropoffZoneAnnouncedRef.current = false;
-      spokenDropoffArrivalRef.current = false;
-      setShowColisRecupereButton(false);
-      setShowLivraisonEffectueeButton(false);
-      setLastEtaMinutes(null);
-    }
-  }, [currentOrder?.id]);
-
-  // Masquer le bouton Colis récupéré quand on passe à picked_up
-  useEffect(() => {
-    if (currentOrder?.status === 'picked_up' || currentOrder?.status === 'delivering') {
-      setShowColisRecupereButton(false);
-      atPickupZoneAnnouncedRef.current = false;
-    }
-  }, [currentOrder?.status]);
-
-  const handleLivraisonEffectuee = useCallback(() => {
-    if (!currentOrder || !location) return;
-    setShowLivraisonEffectueeButton(false);
-    atDropoffZoneAnnouncedRef.current = true;
-    hasValidatedViaMapboxRef.current.add(currentOrder.id);
-    orderSocketService.updateDeliveryStatus(currentOrder.id, 'completed', location);
-    setNavigationCompletedOrder(currentOrder);
-  }, [currentOrder, location]);
-
-  // Annonces pré-arrivée livraison : ~2 min et ~1 min (Mapbox)
-  // Stocke aussi lastEtaMinutes pour la barre "Reprendre la navigation"
-  const handleRouteProgressChange = useCallback(
-    (event: {
-      nativeEvent?: { durationRemaining?: number; distanceRemaining?: number };
-      durationRemaining?: number;
-      distanceRemaining?: number;
-    }) => {
-    const durationRemaining =
-      event?.nativeEvent?.durationRemaining ?? event?.durationRemaining;
-    const distanceRemaining =
-      event?.nativeEvent?.distanceRemaining ?? event?.distanceRemaining;
-    const status = String(currentOrder?.status || '');
-
-    if (durationRemaining != null && durationRemaining > 0) {
-      if (currentOrder?.id) {
-        const phase =
-          status === 'accepted' || status === 'enroute' || status === 'in_progress'
-            ? 'pickup'
-            : status === 'picked_up' || status === 'delivering'
-              ? 'dropoff'
-              : null;
-        latestNavigationProgressRef.current = {
-          orderId: currentOrder.id,
-          phase: phase ?? 'dropoff',
-          durationRemainingSec: durationRemaining,
-          ...(distanceRemaining != null && distanceRemaining >= 0
-            ? { distanceRemainingM: distanceRemaining }
-            : {}),
-          ts: Date.now(),
-        };
-      }
-      setLastEtaMinutes(Math.ceil(durationRemaining / 60));
-    }
-
-    if (status !== 'picked_up' && status !== 'delivering') return;
-
-    if (durationRemaining == null || durationRemaining <= 0) return;
-
-    const minsRemaining = Math.ceil(durationRemaining / 60);
-    const last = lastEtaAnnouncedMinRef.current;
-
-    if (minsRemaining <= 2 && last > 2) {
-      lastEtaAnnouncedMinRef.current = 2;
-      speakWithMapboxMuted('Arrivée à destination dans environ deux minutes.');
-    } else if (minsRemaining <= 1 && last > 1) {
-      lastEtaAnnouncedMinRef.current = 1;
-      speakWithMapboxMuted('Arrivée à destination dans environ une minute.');
-    }
-  },
-  [currentOrder?.id, currentOrder?.status, speakWithMapboxMuted]
-  );
-
-  // Route animée vers la destination
-  const animatedRoute = useAnimatedRoute({
-    origin: location,
-    destination: destination,
-    enabled: isOnline && !!currentOrder && !!destination && !!location,
-  });
-
-  const orderFullRoute = useAnimatedRoute({
-    origin: currentPickupCoord,
-    destination: currentDropoffCoord,
-    enabled: !!currentOrder && !!currentPickupCoord && !!currentDropoffCoord,
-  });
-
-  useEffect(() => {
-    if (currentOrder && location) {
-      const pickupCoord = resolveCoords(currentOrder.pickup);
-      const dropoffCoord = resolveCoords(currentOrder.dropoff);
-      const status = String(currentOrder.status || '');
-      
-      let targetCoord = null;
-      if ((status === 'accepted' || status === 'enroute' || status === 'in_progress') && pickupCoord) {
-        targetCoord = pickupCoord;
-      } else if ((status === 'picked_up' || status === 'delivering') && dropoffCoord) {
-        targetCoord = dropoffCoord;
-      }
-      
-      if (targetCoord && mapRef.current) {
-        setTimeout(() => {
-          mapRef.current?.animateToRegion({
-            latitude: targetCoord!.latitude,
-            longitude: targetCoord!.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }, 500);
-        }, 300);
-      }
-    }
-  }, [selectedOrderId, currentOrder?.id, currentOrder, location, resolveCoords]);
-
-  const { fitToRoute, centerOnDriver } = useMapCamera(
-    mapRef,
-    location,
-    animatedRoute.routeCoordinates.length > 0 ? { coordinates: animatedRoute.routeCoordinates } : null,
-    currentOrder,
-    isOnline
-  );
-
-  // Garder une trace de la position précédente pour l'animation fluide
-  const previousLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
-  
-  // Animation fluide de la position du driver
-  const animatedDriverPosition = useAnimatedPosition({
-    currentPosition: location,
-    previousPosition: previousLocationRef.current,
-    animationDuration: 5000, // 5 secondes (fréquence GPS)
-  });
-  
-  // Mettre à jour la position précédente quand la position actuelle change
-  useEffect(() => {
-    if (location) {
-      previousLocationRef.current = location;
-    }
-  }, [location]);
-  
-  const polyPulseIntervalRef = useRef<number | null>(null);
-  const animationTimeoutsRef = useRef<number[]>([]);
-
-  useEffect(() => {
-    return () => {
-      if (polyPulseIntervalRef.current) clearInterval(polyPulseIntervalRef.current);
-      animationTimeoutsRef.current.forEach(id => clearTimeout(id));
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isOnline && user?.id) {
-      orderSocketService.connect(user.id);
-    } else {
-      orderSocketService.disconnect();
-    }
-
-    return () => {
-      orderSocketService.disconnect();
-    };
-  }, [isOnline, user?.id]);
-
-  // Messagerie : léger décalage après le socket commandes pour éviter deux handshakes Engine.IO en parallèle (400 sid / timeout).
-  useEffect(() => {
-    if (!user?.id || !isOnline) {
-      driverMessageSocketService.disconnect();
-      return;
-    }
-    const t = setTimeout(() => {
-      driverMessageSocketService.connect(user.id);
-    }, 450);
-    return () => {
-      clearTimeout(t);
-      driverMessageSocketService.disconnect();
-    };
-  }, [user?.id, isOnline]);
-
-  const handleColisRecupere = useCallback(() => {
-    if (!location) return;
-    const ordersToPickup = activeOrders.filter(o =>
-      !o.batch_id &&
-      (o.status === 'accepted' || o.status === 'enroute' || o.status === 'in_progress')
-    );
-    if (ordersToPickup.length === 0) return;
-    setShowColisRecupereButton(false);
-    atPickupZoneAnnouncedRef.current = false;
-    ordersToPickup.forEach(order => {
-      orderSocketService.updateDeliveryStatus(order.id, 'picked_up', location);
-    });
-    const isGrouped = ordersToPickup.length > 1;
-    speakWithMapboxMuted(
-      isGrouped
-        ? 'Tous les colis pris en charge. Nous pouvons entamer la course.'
-        : 'Colis pris en charge. Nous pouvons entamer la course.'
-    );
-  }, [activeOrders, location, speakWithMapboxMuted]);
-
-  const handleBatchPickupConfirmOnMap = useCallback(async () => {
-    if (!activeBatch?.id || isConfirmingBatchPickup) return;
-    setIsConfirmingBatchPickup(true);
-    try {
-      await confirmBatchPickup(activeBatch.id);
-      useBatchStore.getState().setPickedUp(activeBatch.id);
-      setShowBatchPickupBtn(false);
-      batchPickupGeoRef.current = false;
-      speakWithMapboxMuted('Tous les colis pris en charge. Vous pouvez commencer vos livraisons.');
-      router.push(`/batch/${activeBatch.id}` as any);
-    } catch (err: any) {
-      Alert.alert('Erreur', err?.message ?? 'Impossible de confirmer la collecte.');
-    } finally {
-      setIsConfirmingBatchPickup(false);
-    }
-  }, [activeBatch?.id, isConfirmingBatchPickup, speakWithMapboxMuted]);
-
-  const handleAcceptOrder = (orderId: string) => {
-    // Mise à jour optimiste : afficher la commande et ouvrir la navigation immédiatement
-    useOrderStore.getState().acceptOrder(orderId, user?.id || '');
-    orderSocketService.acceptOrder(orderId);
-    const accepted = useOrderStore.getState().getOrderById(orderId);
-    const profileVt = useDriverStore.getState().profile?.vehicle_type;
-    const vehicleForSafety = String(
-      profileVt || accepted?.deliveryMethod || ''
-    )
-      .trim()
-      .toLowerCase();
-    const safety = getSafetyReminderForVehicleType(vehicleForSafety);
-    const allNonBatchActive = useOrderStore.getState().activeOrders.filter(o => !o.batch_id);
-    const isGroupedAccept = allNonBatchActive.length > 1;
-    speakWithMapboxMuted(
-      `Course acceptée, en route pour récupérer ${isGroupedAccept ? 'les colis' : 'le colis'}. ${safety}`
-    );
-    setIsNavigationActive(true);
-    // Émettre immédiatement la position pour que le client voie la route dès l'acceptation
-    if (location) {
-      orderSocketService.emitDriverLocation(orderId, {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        ...(rawGpsLocation?.heading != null ? { heading: rawGpsLocation.heading } : {}),
-      });
-    }
-  };
-
-  const handleDeclineOrder = (orderId: string) => {
-    orderSocketService.declineOrder(orderId);
-  };
-
-  const handleAcceptBatchOffer = useCallback((batchId: string) => {
-    void orderSocketService.acceptBatch(batchId);
-  }, []);
-
-  const handleDeclineBatchOffer = useCallback((batchId: string) => {
-    void orderSocketService.declineBatch(batchId);
-  }, []);
 
   const isTogglingRef = useRef(false);
-  
+  const sessionExpiredRef = useRef(false);
+
   const handleToggleOnline = async (value: boolean) => {
-    if (isTogglingRef.current) {
-      if (__DEV__) {
-        logger.debug('Toggle déjà en cours, ignoré');
-      }
-      return;
-    }
-    
-    if (value === isOnline) {
-      if (__DEV__) {
-        logger.debug('Statut déjà à', undefined, { value, isOnline });
-      }
-      return;
-    }
-    
+    if (isTogglingRef.current) return;
+    if (value === isOnline) return;
+
     if (value && permissionDenied) {
       Alert.alert(
         "Erreur de localisation",
@@ -1014,10 +58,8 @@ export default function Index() {
       );
       return;
     }
-    
-    isTogglingRef.current = true;
 
-    /** GPS serveur : obligatoire pour le matching client ; on ne passe pas en ligne sans coords API. */
+    isTogglingRef.current = true;
     let coordsForApi: { latitude: number; longitude: number } | null =
       rawGpsLocation ?? useDriverStore.getState().currentLocation ?? null;
 
@@ -1027,28 +69,15 @@ export default function Index() {
           const perm = await Location.requestForegroundPermissionsAsync();
           if (perm.status !== Location.PermissionStatus.GRANTED) {
             isTogglingRef.current = false;
-            Alert.alert(
-              'Localisation',
-              'Autorisez la localisation pour que les clients puissent vous trouver.',
-              [{ text: 'Fermer' }]
-            );
+            Alert.alert('Localisation', 'Autorisez la localisation pour que les clients puissent vous trouver.', [{ text: 'Fermer' }]);
             return;
           }
-          const pos = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          coordsForApi = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          };
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          coordsForApi = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
           setLocation(coordsForApi);
         } catch {
           isTogglingRef.current = false;
-          Alert.alert(
-            'Localisation',
-            'Impossible d’obtenir votre position. Réessayez.',
-            [{ text: 'Fermer' }]
-          );
+          Alert.alert('Localisation', "Impossible d'obtenir votre position. Réessayez.", [{ text: 'Fermer' }]);
           return;
         }
       }
@@ -1057,35 +86,26 @@ export default function Index() {
     if (value && user?.id) {
       const prof = useDriverStore.getState().profile;
       const hasEngin =
-        prof?.vehicle_type &&
-        String(prof.vehicle_type).trim() !== "" &&
-        prof?.vehicle_plate &&
-        String(prof.vehicle_plate).trim() !== "";
+        prof?.vehicle_type && String(prof.vehicle_type).trim() !== "" &&
+        prof?.vehicle_plate && String(prof.vehicle_plate).trim() !== "";
       if (!hasEngin) {
         isTogglingRef.current = false;
         Alert.alert(
           "Mon véhicule",
-          "Renseignez le type d’engin (moto, véhicule ou cargo) et la plaque dans Profil → Mon véhicule. Sans cela, le serveur n’associe pas les bonnes courses.",
+          "Renseignez le type d'engin (moto, véhicule ou cargo) et la plaque dans Profil → Mon véhicule. Sans cela, le serveur n'associe pas les bonnes courses.",
           [
             { text: "Plus tard", style: "cancel" },
-            {
-              text: "Ouvrir",
-              onPress: () => router.push("/profile/vehicle" as const),
-            },
+            { text: "Ouvrir", onPress: () => router.push("/profile/vehicle" as const) },
           ]
         );
         return;
       }
     }
-    
+
     setOnlineStatus(value);
 
     if (user?.id) {
-      const statusData: any = {
-        is_online: value,
-        is_available: value
-      };
-
+      const statusData: any = { is_online: value, is_available: value };
       if (value && coordsForApi) {
         statusData.current_latitude = coordsForApi.latitude;
         statusData.current_longitude = coordsForApi.longitude;
@@ -1093,53 +113,25 @@ export default function Index() {
 
       apiService.updateDriverStatus(user.id, statusData).then((result) => {
         isTogglingRef.current = false;
-        
         if (!result.success) {
-          if (__DEV__) {
-            logger.warn('Échec synchronisation:', result.message);
-          }
-          
-          // Si la session est expirée, le logout() a déjà été appelé
-          // Le système de redirection gérera la navigation vers la page de connexion
           if (result.message?.includes('Session expirée')) {
             sessionExpiredRef.current = true;
-            // Ne pas afficher d'alerte, laisser le système de redirection faire son travail
             return;
           }
-          
-          // Rollback du changement de statut en cas d'erreur (sauf erreur réseau)
           if (result.message && !result.message.includes('réseau') && !result.message.includes('connexion')) {
             setOnlineStatus(!value);
-            Alert.alert(
-              "Erreur de synchronisation",
-              result.message || "Impossible de synchroniser votre statut avec le serveur.",
-              [{ text: "Fermer" }]
-            );
+            Alert.alert("Erreur de synchronisation", result.message || "Impossible de synchroniser votre statut avec le serveur.", [{ text: "Fermer" }]);
           }
         } else {
           sessionExpiredRef.current = false;
-          if (value) {
-            void requestBackgroundLocationPermissionForDuty();
-          }
+          if (value) void requestBackgroundLocationPermissionForDuty();
         }
       }).catch((error) => {
         isTogglingRef.current = false;
-        
-        if (__DEV__) {
-          logger.error('Erreur updateDriverStatus:', error);
-        }
-        
-        // Rollback en cas d'erreur
         setOnlineStatus(!value);
-        
-        // Ne pas afficher d'erreur si c'est une session expirée (déjà géré par logout)
         const errorMessage = error instanceof Error ? error.message : '';
         if (!errorMessage.includes('Session expirée')) {
-          Alert.alert(
-            "Erreur",
-            "Impossible de synchroniser votre statut avec le serveur.",
-            [{ text: "Fermer" }]
-          );
+          Alert.alert("Erreur", "Impossible de synchroniser votre statut avec le serveur.", [{ text: "Fermer" }]);
         }
       });
     } else {
@@ -1147,279 +139,92 @@ export default function Index() {
     }
   };
 
-  const sessionExpiredRef = useRef(false);
-  
+  // Socket commandes
   useEffect(() => {
-    if (sessionExpiredRef.current) {
-      return;
+    if (isOnline && user?.id) {
+      orderSocketService.connect(user.id);
+    } else {
+      orderSocketService.disconnect();
     }
+    return () => { orderSocketService.disconnect(); };
+  }, [isOnline, user?.id]);
 
-    // Ne pas synchroniser si l'utilisateur n'est pas authentifié
-    if (!isAuthenticated || !user?.id) {
+  // Socket messagerie (léger décalage pour éviter deux handshakes simultanés)
+  useEffect(() => {
+    if (!user?.id || !isOnline) {
+      driverMessageSocketService.disconnect();
       return;
     }
+    const t = setTimeout(() => { driverMessageSocketService.connect(user.id); }, 450);
+    return () => { clearTimeout(t); driverMessageSocketService.disconnect(); };
+  }, [user?.id, isOnline]);
+
+  // Heartbeat position serveur
+  useEffect(() => {
+    if (sessionExpiredRef.current || !isAuthenticated || !user?.id) return;
 
     const syncLocation = async () => {
-      if (isOnline && location && user?.id && isAuthenticated && !sessionExpiredRef.current) {
-        try {
-          // Réaffirmer is_online / is_available à chaque battement : le toggle ne s’exécute qu’une fois ;
-          // sans ça, la base peut diverger (ex. ancienne logique socket, autre instance, admin) alors que l’UI reste « en ligne ».
-          const result = await apiService.updateDriverStatus(user.id, {
-            is_online: true,
-            is_available: true,
-            current_latitude: location.latitude,
-            current_longitude: location.longitude,
-            ...(rawGpsLocation?.heading != null
-              ? { heading_degrees: rawGpsLocation.heading }
-              : {}),
-          });
-
-          if (!result.success && result.message?.includes('Session expirée')) {
-            sessionExpiredRef.current = true;
-            if (__DEV__) {
-              logger.debug('Session expirée - arrêt de la synchronisation automatique de la position');
-            }
-            return;
-          }
-
-          if (result.success) {
-            sessionExpiredRef.current = false;
-          }
-        } catch (error) {
-          if (__DEV__) {
-            logger.debug('Erreur sync position:', undefined, error);
-          }
+      if (!isOnline || !location || !user?.id || !isAuthenticated || sessionExpiredRef.current) return;
+      try {
+        const result = await apiService.updateDriverStatus(user.id, {
+          is_online: true,
+          is_available: true,
+          current_latitude: location.latitude,
+          current_longitude: location.longitude,
+          ...(rawGpsLocation?.heading != null ? { heading_degrees: rawGpsLocation.heading } : {}),
+        });
+        if (!result.success && result.message?.includes('Session expirée')) {
+          sessionExpiredRef.current = true;
+          return;
         }
+        if (result.success) sessionExpiredRef.current = false;
+      } catch (error) {
+        if (__DEV__) logger.debug('Erreur sync position:', undefined, error);
       }
     };
 
     const timeoutId = setTimeout(syncLocation, 1500);
-    const heartbeatInterval = setInterval(syncLocation, 10 * 1000); // 10 s : matching client utilise la position serveur
-    return () => {
-      clearTimeout(timeoutId);
-      clearInterval(heartbeatInterval);
-    };
+    const heartbeatInterval = setInterval(syncLocation, 10 * 1000);
+    return () => { clearTimeout(timeoutId); clearInterval(heartbeatInterval); };
   }, [location, rawGpsLocation?.heading, isOnline, user?.id, isAuthenticated]);
 
-  useEffect(() => {
-    if (currentOrder) {
-      logger.debug('DEBUG currentOrder', 'driverIndex', {
-        id: currentOrder.id,
-        status: currentOrder.status,
-        pickup_resolved: resolveCoords(currentOrder.pickup),
-        dropoff_resolved: resolveCoords(currentOrder.dropoff),
-      });
-    }
-  }, [currentOrder, resolveCoords]);
-  useEffect(() => {
-    const status = String(currentOrder?.status || '');
-
-    if (!currentOrder || status === 'completed') {
-      // Animation gérée par useAnimatedPosition
-
-      if (polyPulseIntervalRef.current) {
-        clearInterval(polyPulseIntervalRef.current);
-        polyPulseIntervalRef.current = null;
-      }
-
-      animationTimeoutsRef.current.forEach(id => clearTimeout(id));
-      animationTimeoutsRef.current = [];
-
-      const remainingActiveOrders = useOrderStore.getState().activeOrders.filter(o => !o.batch_id);
-      if (remainingActiveOrders.length === 0) {
-        if (isOnline && location) {
-          setTimeout(() => {
-            centerOnDriver();
-          }, 300);
-        }
-      } else {
-        if (location) {
-          const sortedRemaining = [...remainingActiveOrders].sort((a, b) => {
-            const distA = calculateDistanceToPickup(a);
-            const distB = calculateDistanceToPickup(b);
-            
-            if (distA === null && distB === null) return 0;
-            if (distA === null) return 1;
-            if (distB === null) return -1;
-            
-            return distA - distB;
-          });
-          
-          const inProgressOrder = sortedRemaining.find(o => 
-            o.status === 'picked_up' || o.status === 'delivering' || o.status === 'enroute' || o.status === 'in_progress'
-          );
-          
-          const nextOrder = inProgressOrder || sortedRemaining[0];
-          if (nextOrder) {
-            setTimeout(() => {
-              useOrderStore.getState().setSelectedOrder(nextOrder.id);
-              logger.info('Commande terminée, sélection automatique de la prochaine', 'driver-index', {
-                nextOrderId: nextOrder.id,
-                distance: calculateDistanceToPickup(nextOrder),
-                remainingCount: remainingActiveOrders.length,
-              });
-            }, 500);
-          }
-        } else {
-          logger.info('Commande terminée, autres commandes actives disponibles', 'driver-index', {
-            remainingCount: remainingActiveOrders.length,
-            nextSelectedId: useOrderStore.getState().selectedOrderId,
-          });
-        }
-      }
-    }
-  }, [currentOrder?.status, currentOrder, location, isOnline, centerOnDriver, calculateDistanceToPickup]);
-
-  useEffect(() => {
-    const status = String(currentOrder?.status || '');
-    const lastStatus = lastOrderStatusRef.current;
-    const isTransitioningToAccepted =
-      status === 'accepted' && lastStatus !== status && lastStatus !== 'accepted';
-    const isTransitioningToPickedUp =
-      (status === 'picked_up' || status === 'delivering') &&
-      lastStatus !== status &&
-      lastStatus !== 'picked_up' &&
-      lastStatus !== 'delivering';
-
-    lastOrderStatusRef.current = status;
-    if (currentOrder && (isTransitioningToAccepted || isTransitioningToPickedUp) && !userClosedBottomSheetRef.current) {
-      userClosedBottomSheetRef.current = false;
-      setTimeout(() => {
-        expandOrderBottomSheet();
-      }, isTransitioningToAccepted ? 300 : 500);
-    } else if (status === 'completed' || !currentOrder) {
-      userClosedBottomSheetRef.current = false;
-      collapseOrderBottomSheet();
-    }
-  }, [currentOrder?.status, currentOrder, expandOrderBottomSheet, collapseOrderBottomSheet]);
-
-  // CRITIQUE : Fermer la navigation quand la livraison est terminée et plus aucune commande active
-  // Évite que le livreur reste bloqué en mode "en position d'aller livrer" après finalisation
-  useEffect(() => {
-    if (!currentOrder && activeOrders.length === 0 && navigationCompletedOrder) {
-      setNavigationCompletedOrder(null);
-      setIsNavigationActive(false);
-      setIsNavigationMinimized(false);
-      setShowColisRecupereButton(false);
-      setShowLivraisonEffectueeButton(false);
-      setLastEtaMinutes(null);
-      setNavigationSession(null);
-      atPickupZoneAnnouncedRef.current = false;
-      atDropoffZoneAnnouncedRef.current = false;
-      setShowRecalcOverlay(false);
-      setPhase1MountReady(false);
-    }
-  }, [currentOrder, activeOrders.length, navigationCompletedOrder]);
-
-  useEffect(() => {
-    if (!orderBottomSheetIsExpanded && currentOrder) {
-      const status = String(currentOrder?.status || '');
-      if (status === 'picked_up' || status === 'delivering') {
-        userClosedBottomSheetRef.current = true;
-      }
-    } else if (orderBottomSheetIsExpanded) {
-      userClosedBottomSheetRef.current = false;
-    }
-  }, [orderBottomSheetIsExpanded, currentOrder]);
-
+  // Stats
   useEffect(() => {
     const loadStats = async () => {
-      // Vérifier que l'utilisateur est toujours authentifié
-      if (!isAuthenticated || !user?.id) {
-        if (__DEV__) {
-          logger.debug('[Index] Pas de user.id ou utilisateur non authentifié pour charger les stats');
-        }
-        return;
-      }
-
+      if (!isAuthenticated || !user?.id) return;
       try {
         const todayResult = await apiService.getTodayStats(user.id);
-        
         if (todayResult.success && todayResult.data) {
-          if (__DEV__) {
-            logger.debug('[Index] getTodayStats réussi:', undefined, {
-              deliveries: todayResult.data.deliveries,
-              earnings: todayResult.data.earnings
-            });
-          }
           updateTodayStats(todayResult.data);
-          setDriverStats(prev => ({
-            ...prev,
-            todayDeliveries: todayResult.data?.deliveries || 0,
-          }));
-        } else {
-          if (__DEV__) {
-            logger.warn('[Index] getTodayStats échoué ou pas de données');
-          }
+          setDriverStats(prev => ({ ...prev, todayDeliveries: todayResult.data?.deliveries || 0 }));
         }
         const statsResult = await apiService.getDriverStatistics(user.id);
-        
         if (statsResult.success && statsResult.data) {
-          if (__DEV__) {
-            logger.debug('[Index] getDriverStatistics réussi:', undefined, {
-              completedDeliveries: statsResult.data.completedDeliveries,
-              totalEarnings: statsResult.data.totalEarnings
-            });
-          }
-          setDriverStats(prev => ({
-            ...prev,
-            totalRevenue: statsResult.data?.totalEarnings || 0,
-          }));
-        } else {
-          if (__DEV__) {
-            logger.warn('[Index] getDriverStatistics échoué ou pas de données');
-          }
+          setDriverStats(prev => ({ ...prev, totalRevenue: statsResult.data?.totalEarnings || 0 }));
         }
       } catch (err) {
-        if (__DEV__) {
-          logger.error('[Index] Erreur chargement stats:', undefined, err);
-        }
+        if (__DEV__) logger.error('[Index] Erreur chargement stats:', undefined, err);
       }
     };
 
-    // Ne charger les stats que si l'utilisateur est authentifié
     if (isAuthenticated && user?.id) {
       loadStats();
       const interval = setInterval(loadStats, isOnline ? 30000 : 60000);
-      return () => {
-        if (interval) clearInterval(interval);
-      };
+      return () => { if (interval) clearInterval(interval); };
     }
   }, [user?.id, isAuthenticated, isOnline, updateTodayStats]);
 
-  const orderFullRouteCoords =
-    currentPickupCoord && currentDropoffCoord
-      ? orderFullRoute.routeCoordinates.length > 0
-        ? orderFullRoute.routeCoordinates
-        : [currentPickupCoord, currentDropoffCoord]
-      : [];
-
-  const animatedRouteCoords =
-    isOnline && location && currentOrder && animatedRoute.animatedCoordinates.length > 0
-      ? [animatedDriverPosition || location, ...animatedRoute.animatedCoordinates.slice(1)]
-      : [];
-
   return (
     <View style={styles.container}>
-      <DriverMapView
-        mapRef={mapRef}
+      <ClassicDeliveryFlow
         location={location}
-        animatedDriverPosition={animatedDriverPosition || null}
-        animatedRouteCoords={animatedRouteCoords}
-        orderFullRouteCoords={orderFullRouteCoords}
-        currentPickupCoord={currentPickupCoord}
-        currentDropoffCoord={currentDropoffCoord}
-        activeOrders={activeOrders}
-        pendingOrders={pendingOrders}
-        resolveCoords={resolveCoords}
-        calculateDistanceToPickup={calculateDistanceToPickup as (order: unknown) => number | null}
-        setSelectedOrder={(orderId) => {
-          setSelectedOrder(orderId);
-          logger.info('Commande sélectionnée depuis marqueur', 'driver-index', { orderId });
-        }}
-        isOnline={!!isOnline}
+        rawGpsLocation={rawGpsLocation}
+        isOnline={isOnline}
       />
-
+      <BatchDeliveryFlow
+        location={location}
+        isOnline={isOnline}
+      />
       <StatusToggle
         isOnline={isOnline}
         onToggle={handleToggleOnline}
@@ -1427,484 +232,15 @@ export default function Index() {
         disableSwitch={false}
         onOpenLocationSettings={hasLocationBanner ? openAppLocationSettings : undefined}
       />
-
       <StatsCards
         todayDeliveries={driverStats.todayDeliveries || todayStats.deliveries}
         totalRevenue={driverStats.totalRevenue || profile?.total_earnings || 0}
         isOnline={isOnline}
       />
-
-      {activeBatch && (
-        <TouchableOpacity
-          style={styles.batchReturnFab}
-          onPress={() => router.push(`/batch/${activeBatch.id}` as any)}
-          accessibilityLabel="Retour à la tournée groupée"
-        >
-          <Ionicons name="list-outline" size={18} color="#fff" />
-          <Text style={styles.batchReturnFabText}>
-            Tournée · {activeBatch.stops.filter(s => s.status === 'pending').length} restant(s)
-            {batchLastEtaMinutes != null ? ` · ${batchLastEtaMinutes} min` : ''}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {showBatchPickupBtn && (
-        <TouchableOpacity
-          style={styles.batchPickupConfirmBar}
-          onPress={handleBatchPickupConfirmOnMap}
-          disabled={isConfirmingBatchPickup}
-          activeOpacity={0.85}
-        >
-          {isConfirmingBatchPickup ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="checkmark-circle" size={22} color="#fff" />
-              <Text style={styles.batchReturnFabText}>Tous les colis récupérés</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      )}
-
-      {activeOrders.length > 1 && !ordersListIsExpanded && !activeBatch && (
-        <View style={styles.multipleOrdersIndicator}>
-          <TouchableOpacity 
-            style={styles.multipleOrdersButton}
-            onPress={toggleOrdersListSheet}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="cube" size={16} color="#8B5CF6" />
-            <Text style={styles.multipleOrdersText}>
-              {activeOrders.length} commande{activeOrders.length > 1 ? 's' : ''} active{activeOrders.length > 1 ? 's' : ''}
-            </Text>
-            <Ionicons name="chevron-up" size={16} color="#8B5CF6" />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Menu Carte/Liste : uniquement quand il y a des commandes actives (évite apparition confuse après fin de course) */}
-      {activeOrders.length > 0 && (
-      <View style={styles.floatingMenu}>
-        <TouchableOpacity 
-          style={[styles.menuButton, !ordersListIsExpanded && styles.activeButton]}
-          onPress={() => {
-            if (ordersListIsExpanded) {
-              collapseOrdersListSheet();
-            }
-          }}
-        >
-          <Ionicons name="map" size={22} color={ordersListIsExpanded ? "#8B5CF6" : "#fff"} />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.menuButton, ordersListIsExpanded && styles.activeButton]}
-          onPress={toggleOrdersListSheet}
-        >
-          <Ionicons name="list" size={22} color={ordersListIsExpanded ? "#fff" : "#8B5CF6"} />
-          {activeOrders.length > 0 && (
-            <View style={styles.menuBadge}>
-              <Text style={styles.menuBadgeText}>{activeOrders.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-      )}
-
-      {/* Les actions sont maintenant dans le DriverOrderBottomSheet */}
-
-      <OrderRequestPopup
-        order={pendingOrder}
-        visible={!!pendingOrder}
-        onAccept={handleAcceptOrder}
-        onDecline={handleDeclineOrder}
-        autoDeclineTimer={30}
-      />
-
-      <BatchOfferPopup
-        offer={pendingBatchOffer}
-        visible={!!pendingBatchOffer}
-        errorMessage={batchOfferError?.message ?? null}
-        onAccept={handleAcceptBatchOffer}
-        onDecline={handleDeclineBatchOffer}
-        onDismissError={clearBatchOfferError}
-      />
-
-      {/* Nouveau bottom sheet unifié pour les détails et la messagerie */}
-      {currentOrder && !activeBatch && (
-        <DriverOrderBottomSheet
-          currentOrder={currentOrder}
-          panResponder={orderBottomSheetPanResponder}
-          animatedHeight={orderBottomSheetAnimatedHeight}
-          isExpanded={orderBottomSheetIsExpanded}
-          onToggle={toggleOrderBottomSheet}
-          onUpdateStatus={async (status: string) => {
-            if (status === 'picked_up') {
-              const dropoffCoord = resolveCoords(currentOrder.dropoff);
-              await orderSocketService.updateDeliveryStatus(currentOrder.id, status, location);
-              if (location && dropoffCoord) {
-                setTimeout(() => {
-                  animatedRoute.refetch();
-                  fitToRoute();
-                }, 500);
-              }
-            } else {
-              await orderSocketService.updateDeliveryStatus(currentOrder.id, status, location);
-            }
-          }}
-          location={location}
-          onMessage={handleOpenMessage}
-          onStartNavigation={
-            currentOrder && location && destination
-              ? openNavigationManually
-              : undefined
-          }
-          isNavigationMinimized={isNavigationMinimized}
-          onResumeNavigation={() => setIsNavigationMinimized(false)}
-          lastEtaMinutes={lastEtaMinutes}
-          onExpandSheet={expandOrderBottomSheet}
-          onCancelOrder={() => {
-            setIsNavigationActive(false);
-            setNavigationSession(null);
-            orderSocketService.updateDeliveryStatus(currentOrder.id, 'cancelled', location);
-          }}
-        />
-      )}
-
-      {ordersListIsExpanded && (
-        <OrdersListBottomSheet
-          animatedHeight={ordersListAnimatedHeight}
-          panResponder={ordersListPanResponder}
-          isExpanded={ordersListIsExpanded}
-          onToggle={toggleOrdersListSheet}
-          onOrderSelect={(orderId) => {
-            logger.info('Commande sélectionnée', 'driver-index', { orderId });
-          }}
-        />
-      )}
-
-      {/* Navigation intégrée Mapbox (style Yango) - full screen */}
-      {/* Reste affichée après livraison (navDisplayOrder) jusqu'à fermeture manuelle par le livreur */}
-      {/* En mode minimisé : Mapbox reste monté (opacity 0) pour garder ETA et annonces, carte visible */}
-      {isNavigationActive && navDisplayOrder && (location || navOrigin) && effectiveNavDestination && (
-        <>
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                opacity: isNavigationMinimized ? 0 : 1,
-                pointerEvents: isNavigationMinimized ? 'none' : 'auto',
-              },
-            ]}
-          >
-            {/* Phase 1 : délai 400ms avant montage. Phase 2 : clé stable, le natif reEmbedWithNewDestination gère le rerouting */}
-            {(((currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress') && phase1MountReady) || (currentOrder?.status === 'picked_up' || currentOrder?.status === 'delivering')) && (
-            <MapboxNavigationScreen
-              key={`nav-${navigationSession?.orderId}`}
-              origin={navOrigin || location!}
-              destination={effectiveNavDestination}
-              mute={mapboxVoiceMuted}
-              onBackPress={
-                navigationCompletedOrder
-                  ? () => resetNavigationUi(false)
-                  : () => setIsNavigationMinimized(true)
-              }
-          onArrive={() => {
-            const order = navDisplayOrder;
-            if (!order) return;
-            const status = String(order.status || '');
-            // Phase 1 : arrivée au point de collecte → annonce + bouton "Colis récupéré" (pas de validation auto)
-            if (status === 'accepted' || status === 'enroute' || status === 'in_progress') {
-              if (atPickupZoneAnnouncedRef.current) return;
-              atPickupZoneAnnouncedRef.current = true;
-              setShowColisRecupereButton(true);
-            }
-            else if (status === 'picked_up' || status === 'delivering') {
-              if (!atDropoffZoneAnnouncedRef.current) {
-                atDropoffZoneAnnouncedRef.current = true;
-                setShowLivraisonEffectueeButton(true);
-              }
-              if (!spokenDropoffArrivalRef.current) {
-                spokenDropoffArrivalRef.current = true;
-                speakWithMapboxMuted('Vous êtes arrivés à destination.');
-              }
-            }
-          }}
-          showColisRecupereButton={showColisRecupereButton}
-          onColisRecupere={handleColisRecupere}
-          colisRecupereLabel={colisRecupereLabel}
-          showLivraisonEffectueeButton={showLivraisonEffectueeButton}
-          onLivraisonEffectuee={handleLivraisonEffectuee}
-          onCancel={() => {
-            resetNavigationUi(true);
-          }}
-          onRouteProgressChange={handleRouteProgressChange}
-          onMessagePress={() => setShowMessageBottomSheet(true)}
-          onSettingsPress={() => {
-            // Paramètres navigation - pourrait ouvrir un modal
-          }}
-        />
-            )}
-          {/* Overlay phase 1 : lancement (évite figement). Phase 2 : recalcul pickup→dropoff */}
-          {((!phase1MountReady && (currentOrder?.status === 'accepted' || currentOrder?.status === 'enroute' || currentOrder?.status === 'in_progress')) || showRecalcOverlay) && (
-            <View style={styles.recalcOverlay} pointerEvents="box-none">
-              <ActivityIndicator size="large" color="#fff" />
-              <Text style={styles.recalcOverlayText}>
-                {showRecalcOverlay
-                  ? "Recalcul de l'itinéraire vers la livraison..."
-                  : "Lancement de la navigation..."}
-              </Text>
-              {showNavStuckEscape && (
-                <TouchableOpacity
-                  style={styles.navStuckEscapeBtn}
-                  onPress={() => resetNavigationUi(true)}
-                >
-                  <Text style={styles.navStuckEscapeText}>Annuler</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Boutons Colis récupéré / Livraison effectuée quand minimisé (le bouton Navigation est dans le bottom sheet) */}
-        {isNavigationMinimized && (
-          <>
-            {showColisRecupereButton && (
-              <TouchableOpacity
-                style={[styles.reprendreNavBar, { bottom: 100 }]}
-                onPress={handleColisRecupere}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="cube" size={24} color="#fff" />
-                <Text style={styles.reprendreNavText}>{colisRecupereLabel}</Text>
-              </TouchableOpacity>
-            )}
-            {showLivraisonEffectueeButton && (
-              <TouchableOpacity
-                style={[styles.reprendreNavBar, { bottom: 100, backgroundColor: '#16A34A' }]}
-                onPress={handleLivraisonEffectuee}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="checkmark-circle" size={24} color="#fff" />
-                <Text style={styles.reprendreNavText}>Livraison effectuée</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-        </>
-      )}
-
-      {/* Message Bottom Sheet - Rendu en dernier pour être au-dessus */}
-      {showMessageBottomSheet && currentOrder && currentOrder.user && currentOrder.user.id && (
-        <MessageBottomSheet
-          orderId={currentOrder.id}
-          clientId={currentOrder.user.id}
-          clientName={formatUserName(currentOrder.user, 'Client')}
-          clientAvatar={currentOrder.user.avatar}
-          panResponder={messagePanResponder}
-          animatedHeight={messageAnimatedHeight}
-          isExpanded={messageIsExpanded}
-          onToggle={toggleMessageBottomSheet}
-          onClose={handleCloseMessage}
-        />
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  floatingMenu: {
-    position: "absolute",
-    bottom: 30,
-    alignSelf: "center",
-    backgroundColor: "#fff",
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: 120,
-    paddingVertical: 10,
-    borderRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  menuButton: {
-    backgroundColor: "#fff",
-    width: 45,
-    height: 45,
-    borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
-    position: 'relative',
-  },
-  activeButton: {
-    backgroundColor: "#8B5CF6",
-  },
-  menuBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  menuBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  multipleOrdersIndicator: {
-    position: 'absolute',
-    top: 120,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  multipleOrdersButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    gap: 8,
-  },
-  multipleOrdersText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8B5CF6',
-  },
-  orderActionsContainer: {
-    position: 'absolute',
-    bottom: 100,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    gap: 10,
-    zIndex: 1300,
-  },
-  actionButton: {
-    backgroundColor: '#8B5CF6',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  recalcOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
-  recalcOverlayText: {
-    color: '#fff',
-    fontSize: 16,
-    marginTop: 16,
-    textAlign: 'center',
-    paddingHorizontal: 24,
-  },
-  reprendreNavBar: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#8B5CF6',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    zIndex: 2000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  reprendreNavText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  reprendreNavEta: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  navStuckEscapeBtn: {
-    marginTop: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-  },
-  navStuckEscapeText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  batchPickupConfirmBar: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#10B981',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    zIndex: 2000,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  batchReturnFab: {
-    position: 'absolute',
-    top: 80,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#7C3AED',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
-    zIndex: 1000,
-  },
-  batchReturnFabText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
 });
