@@ -11,22 +11,22 @@ Attendre le feu vert avant chaque tâche. Ne pas modifier la logique, uniquement
   - Extrait en : `ClassicDeliveryFlow.tsx` + `BatchDeliveryFlow.tsx` + orchestrateur `index.tsx`
   - Bug corrigé au passage : `!activeBatch` dans `shouldEnableGeofencing` (bouton "colis récupéré" disparu)
 
+- [x] `src/controllers/adminController.ts` — **5 017 lignes**
+  - Extrait en 7 fichiers : `adminControllerUtils.ts` + `adminDashboardController.ts` + `adminOrderController.ts` + `adminFinanceController.ts` + `adminDriverController.ts` + `adminUserController.ts` + `adminModerationController.ts`
+  - `adminRoutes.ts` mis à jour — TypeScript passe sans erreur
+
 ---
 
-## 🔴 À faire — Backend (`chrono_backend`)
+## ✅ Terminé (suite)
 
-- [ ] `src/controllers/adminController.ts` — **5 017 lignes**
-  - Mélange : dashboard admin + filtrage commandes + requêtes SQL + envoi SMS + tarification dynamique + reporting
-  - Plan : extraire `AdminOrderService` / `AdminAnalyticsService` / `AdminReportingService` / `SmsService`
+- [x] `chrono_backend/src/sockets/orderSocket.ts` — **2 933 lignes**
+  - Extrait en modules dédiés : `orderSocketState.ts`, `orderSocketTypes.ts`, `orderSocketUtils.ts`, `orderSocketBatch.ts`, `orderSocketDriverPresence.ts`, `orderSocketMatching.ts`, `orderSocketNotify.ts`
+  - Correctif appliqué pendant l’intégration : import dynamique `driverController` dans `orderSocketMatching.ts`
 
-- [ ] `src/controllers/orderSocket.ts` — **2 933 lignes**
-  - Mélange : événements WebSocket + cycle de vie commandes + création paiements + tracking position + preuves de livraison + notifications
-  - Plan : extraire `OrderEventHandler` / `DeliveryProofHandler` / `PaymentSocketService` / `DriverNotificationService`
+- [x] `admin_chrono/lib/adminApiService.ts` — **2 715 lignes**
+  - Extrait en hiérarchie : `adminApiBase.ts` + `adminDashboardApi.ts` + `adminFinanceApi.ts` + `adminDriverApi.ts` + `adminOrderApi.ts` + `adminFleetApi.ts` + `adminPartnerApi.ts`
+  - `adminApiService.ts` devient le point d’assemblage (singleton), avec imports inter-modules corrigés
 
-- [ ] `src/services/adminApiService.ts` — **2 715 lignes**
-  - Mélange : client HTTP + pagination + filtrage + cache + gestion erreurs — tout dans un seul service générique
-  - Plan : extraire `OrderApiClient` / `FleetApiClient` / `UserApiClient` / `AnalyticsApiClient`
-
-- [ ] `src/controllers/partnerController.ts` — **1 995 lignes**
-  - Mélange : gestion partenaires B2B + traitement paiements + demandes livreurs + création commandes
-  - Plan : extraire `PartnerOrderService` / `PartnerPaymentService`
+- [x] `chrono_backend/src/controllers/partnerController.ts` — **1 995 lignes**
+  - Extrait en : `partnerControllerUtils.ts`, `partnerCrudController.ts`, `partnerSubscriptionController.ts`, `partnerUserController.ts`, `partnerDriverController.ts`
+  - `partnerRoutes.ts` mis à jour pour consommer les nouveaux contrôleurs (tracking/QR gardés via contrôleur central pour compatibilité)

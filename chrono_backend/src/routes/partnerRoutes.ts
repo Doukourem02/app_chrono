@@ -1,7 +1,44 @@
 import express, { Router } from 'express';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyPartnerUser } from '../middleware/verifyPartnerUser.js';
-import {createPartner,listPartners,getPartner,createSubscription,activateSubscription,getPartnerUsage,getPartnerInvoices,markPartnerInvoicePaid,invitePartnerUser,registerAsPartner,activatePartner,deregisterAsPartner,updatePartnerStatus,getPartnerUsers,invitePortalUser,deletePartner,setBusinessMode,removePartnerUser,getPartnerDrivers,addPartnerDriver,removePartnerDriver,setDefaultPartnerDriver,createPartnerDriverRequest,listPartnerDriverRequests,reviewPartnerDriverRequest,updatePartnerPreferences,getPartnerOrderTracking,getPartnerOrderQRCode,} from '../controllers/partnerController.js';
+import {
+  createPartner,
+  listPartners,
+  getPartner,
+  activatePartner,
+  updatePartnerStatus,
+  deletePartner,
+  registerAsPartner,
+  deregisterAsPartner,
+  setBusinessMode,
+  updatePartnerPreferences,
+} from '../controllers/partnerCrudController.js';
+import {
+  createSubscription,
+  activateSubscription,
+  getPartnerUsage,
+  getPartnerInvoices,
+  markPartnerInvoicePaid,
+} from '../controllers/partnerSubscriptionController.js';
+import {
+  invitePartnerUser,
+  getPartnerUsers,
+  invitePortalUser,
+  removePartnerUser,
+} from '../controllers/partnerUserController.js';
+import {
+  getPartnerDrivers,
+  addPartnerDriver,
+  removePartnerDriver,
+  setDefaultPartnerDriver,
+  createPartnerDriverRequest,
+  listPartnerDriverRequests,
+  reviewPartnerDriverRequest,
+} from '../controllers/partnerDriverController.js';
+import {
+  getPartnerOrderTracking,
+  getPartnerOrderQRCode,
+} from '../controllers/partnerController.js';
 import verifyJWT from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();

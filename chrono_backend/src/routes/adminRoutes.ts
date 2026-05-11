@@ -1,5 +1,10 @@
 import express, { Router } from 'express';
-import { cancelAdminOrder, createAdminOrder, createAdminPromoCode, deleteAdminRating, getAdminAdminDetails, getAdminClientDetails, getAdminClientStatistics, getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminDisputes, getAdminDriverDetails, getAdminDriverFullDetails, getAdminDrivers, getAdminFinancialStats, getAdminGlobalSearch, getAdminOngoingDeliveries, getAdminOrderById, getAdminOrderQRScans, getAdminOrdersByStatus, getAdminPromoCodes, getAdminRatings, getAdminRecentActivities, getAdminReportClients, getAdminReportDeliveries, getAdminReportDrivers, getAdminReportPayments, getAdminReportRevenues, getAdminTransactions, getAdminUsers, rechargeAdminDriverCommission, suspendAdminDriverCommission, updateAdminDispute, updateAdminDriverCommissionRate, updateAdminDriverStatus, getAdminDriverCommissionTransactions } from '../controllers/adminController.js';
+import { getAdminDashboardStats, getAdminDeliveryAnalytics, getAdminRecentActivities, getAdminGlobalSearch } from '../controllers/adminDashboardController.js';
+import { getAdminOngoingDeliveries, getAdminOrdersByStatus, getAdminOrderById, getAdminOrderQRScans, createAdminOrder, cancelAdminOrder } from '../controllers/adminOrderController.js';
+import { getAdminFinancialStats, getAdminTransactions, getAdminReportDeliveries, getAdminReportRevenues, getAdminReportClients, getAdminReportDrivers, getAdminReportPayments } from '../controllers/adminFinanceController.js';
+import { getAdminDriverDetails, updateAdminDriverStatus, getAdminDrivers, getAdminDriverFullDetails, rechargeAdminDriverCommission, suspendAdminDriverCommission, updateAdminDriverCommissionRate, getAdminDriverCommissionTransactions } from '../controllers/adminDriverController.js';
+import { getAdminUsers, getAdminClientDetails, getAdminClientStatistics, getAdminAdminDetails } from '../controllers/adminUserController.js';
+import { getAdminRatings, deleteAdminRating, getAdminPromoCodes, createAdminPromoCode, getAdminDisputes, updateAdminDispute } from '../controllers/adminModerationController.js';
 import { createConversation, getConversationById, getConversations, getMessages, getUnreadCount, markMessagesAsRead, sendMessage } from '../controllers/messageController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 
