@@ -56,9 +56,7 @@ interface Props {
 
 export default function ClassicDeliveryFlow({ location, rawGpsLocation, isOnline }: Props) {
   const { setHideTabBar } = useUIStore();
-  const { user } = useDriverStore((s) => ({
-    user: s.user,
-  }));
+  const user = useDriverStore((s) => s.user);
 
   const pendingOrders = useOrderStore((s) => s.pendingOrders);
   const activeOrders = useOrderStore((s) => s.activeOrders);
