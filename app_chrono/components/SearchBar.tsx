@@ -2,7 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 
-export default function SearchBar() {
+interface SearchBarProps {
+  onScanPress?: () => void;
+}
+
+export default function SearchBar({ onScanPress }: SearchBarProps) {
   return (
     <View style={styles.searchContainer}>
       <View style={styles.searchBox}>
@@ -15,8 +19,10 @@ export default function SearchBar() {
       </View>
       <TouchableOpacity
         style={styles.scanButton}
-        accessibilityLabel="Scanner un code"
+        accessibilityLabel="Afficher le QR code de livraison"
+        accessibilityRole="button"
         activeOpacity={0.85}
+        onPress={onScanPress}
       >
         <Ionicons name="scan-outline" size={22} color="#374151" />
       </TouchableOpacity>

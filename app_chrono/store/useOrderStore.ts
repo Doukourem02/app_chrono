@@ -51,6 +51,8 @@ export interface OrderRequest {
   createdAt?: string | Date;
   completed_at?: string;
   cancelled_at?: string;
+  delivery_qr_scanned_at?: string;
+  deliveryQrScannedAt?: string;
   proof?: {
     uploadedAt?: string | Date;
     url?: string;
@@ -65,6 +67,7 @@ export interface OrderRequest {
   packageImages?: string[]; 
   packageType?: 'standard' | 'fragile' | 'hot_sensitive';
   batch_id?: string;
+  isB2BOrder?: boolean;
 }
 
 function mergeOrderDriver(
