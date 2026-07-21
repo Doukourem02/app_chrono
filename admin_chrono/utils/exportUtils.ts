@@ -1,5 +1,5 @@
-import jsPDF from 'jspdf'
-import * as XLSX from 'xlsx'
+import { jsPDF } from 'jspdf'
+import ExcelJS from 'exceljs'
 import { logger } from './logger'
 
 export interface ExportData {
@@ -66,42 +66,47 @@ export const exportToPDF = async (data: ExportData) => {
 /**
  * Exporte des données en Excel
  */
-export const exportToExcel = (data: ExportData) => {
-  // Créer un workbook
-  const wb = XLSX.utils.book_new()
-  
-  // Créer une feuille avec les données
-  const ws = XLSX.utils.aoa_to_sheet([
-    [data.title],
-    [`Exporté le ${new Date().toLocaleDateString('fr-FR')}`],
-    [], // Ligne vide
-    data.headers,
-    ...data.rows,
-  ])
-  
-  // Définir la largeur des colonnes
-  const colWidths = data.headers.map((_, index) => {
+export const exportToExcel = async (data: ExportData) => {
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('Données')
+
+  // Titre
+  ws.addRow([data.title])
+  ws.getCell('A1').font = { bold: true, size: 16 }
+
+  // Date d'export
+  ws.addRow([`Exporté le ${new Date().toLocaleDateString('fr-FR')}`])
+  ws.addRow([])
+
+  // En-têtes
+  const headerRow = ws.addRow(data.headers)
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8B5CF6' } }
+  })
+
+  // Données
+  data.rows.forEach((row) => ws.addRow(row))
+
+  // Largeur des colonnes
+  data.headers.forEach((_, index) => {
     const maxLength = Math.max(
       data.headers[index].length,
-      ...data.rows.map((row) => String(row[index] || '').length)
+      ...data.rows.map((row) => String(row[index] ?? '').length)
     )
-    return { wch: Math.min(Math.max(maxLength + 2, 10), 50) }
+    ws.getColumn(index + 1).width = Math.min(Math.max(maxLength + 2, 10), 50)
   })
-  ws['!cols'] = colWidths
-  
-  // Style du titre
-  if (!ws['A1']) ws['A1'] = { t: 's', v: data.title }
-  if (!ws['A1'].s) ws['A1'].s = {}
-  ws['A1'].s.font = { bold: true, sz: 16 }
-  
-  // Ajouter la feuille au workbook
-  XLSX.utils.book_append_sheet(wb, ws, 'Données')
-  
-  // Nom du fichier
+
   const filename = data.filename || `${data.title.toLowerCase().replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
-  
-  // Télécharger
-  XLSX.writeFile(wb, filename)
+
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 /**
@@ -277,7 +282,10 @@ export const exportData = (data: ExportData, format?: 'pdf' | 'excel') => {
       alert('Erreur lors de l\'export PDF. Veuillez réessayer.')
     })
   } else if (format === 'excel') {
-    exportToExcel(data)
+    exportToExcel(data).catch((error) => {
+      logger.error('Erreur lors de l\'export Excel:', error)
+      alert('Erreur lors de l\'export Excel. Veuillez réessayer.')
+    })
   } else {
     // Afficher le menu de sélection
     showExportMenu(data, (selectedFormat) => {
@@ -287,7 +295,10 @@ export const exportData = (data: ExportData, format?: 'pdf' | 'excel') => {
           alert('Erreur lors de l\'export PDF. Veuillez réessayer.')
         })
       } else {
-        exportToExcel(data)
+        exportToExcel(data).catch((error) => {
+          logger.error('Erreur lors de l\'export Excel:', error)
+          alert('Erreur lors de l\'export Excel. Veuillez réessayer.')
+        })
       }
     })
   }

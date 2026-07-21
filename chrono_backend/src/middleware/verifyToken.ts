@@ -42,9 +42,15 @@ export const verifyJWT = async (
       const { data: { user }, error } = await authClient.auth.getUser(token);
 
       if (!error && user?.id) {
+        const { data: userData } = await (supabaseAdmin ?? supabase)
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
         (req as any).user = {
           id: user.id,
-          role: 'client',
+          role: userData?.role ?? 'client',
           type: 'access',
         };
         next();

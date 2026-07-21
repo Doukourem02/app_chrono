@@ -6,9 +6,9 @@ import { orderLimiter } from '../middleware/rateLimiter.js';
 
 const router: Router = express.Router();
 
-router.post('/', orderLimiter, validateCreateOrder, createDelivery);
-router.get('/:userId', getUserDeliveries);
-router.get('/:userId/statistics', getUserStatistics);
+router.post('/', verifyJWT, orderLimiter, validateCreateOrder, createDelivery);
+router.get('/:userId', verifyJWT, getUserDeliveries);
+router.get('/:userId/statistics', verifyJWT, getUserStatistics);
 router.post('/:orderId/cancel', verifyJWT, cancelOrder);
 router.post('/:orderId/status', verifyJWT, validateDeliveryStatus, updateDeliveryStatus);
 router.post('/:orderId/proof', verifyJWT, uploadDeliveryProof);

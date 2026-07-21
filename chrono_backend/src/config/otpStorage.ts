@@ -1,6 +1,24 @@
 import pool from './db.js';
 import { OTP_TTL_MS } from './otpTtl.js';
 import logger from '../utils/logger.js';
+import { createClient, RedisClientType } from 'redis';
+
+let redisOtpClient: RedisClientType | null = null;
+
+async function getRedisOtpClient(): Promise<RedisClientType | null> {
+  if (redisOtpClient?.isOpen) return redisOtpClient;
+  const url = process.env.REDIS_URL?.trim();
+  if (!url || /^https?:\/\//i.test(url)) return null;
+  try {
+    redisOtpClient = createClient({ url }) as RedisClientType;
+    redisOtpClient.on('error', () => { redisOtpClient = null; });
+    await redisOtpClient.connect();
+    return redisOtpClient;
+  } catch {
+    redisOtpClient = null;
+    return null;
+  }
+}
 
 interface OTPEntry {
   code: string;
@@ -54,7 +72,7 @@ const setMemoryOTP = (
 ): void => {
   const key = createKey(email, phone, role);
   memoryOTPStore.set(key, { code, expiresAt });
-  logger.debug(`Code OTP stocké en mémoire - Key: ${key}, Code: ${code}, Expire: ${expiresAt}`);
+  logger.debug(`Code OTP stocké en mémoire - Key: ${key}, Expire: ${expiresAt}`);
 };
 
 const popMemoryOTP = (
@@ -65,7 +83,7 @@ const popMemoryOTP = (
 ): boolean => {
   const key = createKey(email, phone, role);
   const entry = memoryOTPStore.get(key);
-  logger.debug(`Recherche OTP en mémoire - Key: ${key}, Entry existe: ${!!entry}, Code reçu: ${code}`);
+  logger.debug(`Recherche OTP en mémoire - Key: ${key}, Entry existe: ${!!entry}`);
   
   if (!entry) {
     logger.warn(`Code OTP non trouvé en mémoire pour ${email}`);
@@ -81,7 +99,7 @@ const popMemoryOTP = (
   }
   
   if (entry.code !== code) {
-    logger.warn(`Code OTP incorrect pour ${email} - Attendu: ${entry.code}, Reçu: ${code}`);
+    logger.warn(`Code OTP incorrect pour ${email}`);
     return false;
   }
   
@@ -138,27 +156,33 @@ export async function storeOTP(
   code: string
 ): Promise<{ storage: string; fallback: boolean }> {
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
-  const poolAvailable =
-    DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb;
+  const ttlSeconds = Math.ceil(OTP_TTL_MS / 1000);
+  const key = `otp:${createKey(email, phone, role)}`;
 
+  // 1. Redis — partagé entre toutes les instances, prioritaire sur la mémoire
+  const redis = await getRedisOtpClient();
+  if (redis) {
+    try {
+      await redis.set(key, code, { EX: ttlSeconds });
+      logger.info('OTP stocké dans Redis');
+      return { storage: 'redis', fallback: false };
+    } catch (redisErr: any) {
+      logger.warn('Échec stockage OTP Redis, fallback DB/mémoire:', redisErr?.message);
+    }
+  }
+
+  // 2. Base de données PostgreSQL
+  const poolAvailable = DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb;
   if (!poolAvailable) {
     logger.warn('Base de données non disponible, utilisation du stockage mémoire');
-    return fallbackToMemory(
-      'Base de données OTP indisponible',
-      null,
-      email,
-      phone,
-      role,
-      code,
-      expiresAt
-    );
+    return fallbackToMemory('Base de données OTP indisponible', null, email, phone, role, code, expiresAt);
   }
 
   try {
     const result = await (pool as any).query(
-      `INSERT INTO otp_codes (email, phone, role, code, expires_at) 
+      `INSERT INTO otp_codes (email, phone, role, code, expires_at)
        VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (email, phone, role) 
+       ON CONFLICT (email, phone, role)
        DO UPDATE SET code = $4, expires_at = $5, created_at = NOW()`,
       [normalizeEmail(email), normalizePhoneForOtp(phone), role, code, expiresAt]
     ) as any;
@@ -168,29 +192,13 @@ export async function storeOTP(
       return { storage: 'database', fallback: false };
     } else {
       logger.warn('Requête DB retournée vide, fallback vers mémoire');
-      return fallbackToMemory(
-        'Requête DB vide (probable mock ou connexion échouée)',
-        null,
-        email,
-        phone,
-        role,
-        code,
-        expiresAt
-      );
+      return fallbackToMemory('Requête DB vide', null, email, phone, role, code, expiresAt);
     }
   } catch (error: any) {
     markOtpTableMissing(error);
     const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
     logger.error('Erreur lors du stockage OTP:', { error: errorMessage, code: error?.code });
-    return fallbackToMemory(
-      'Erreur stockage OTP en base',
-      error,
-      email,
-      phone,
-      role,
-      code,
-      expiresAt
-    );
+    return fallbackToMemory('Erreur stockage OTP en base', error, email, phone, role, code, expiresAt);
   }
 }
 
@@ -200,16 +208,36 @@ export async function verifyOTP(
   role: string,
   code: string
 ): Promise<boolean> {
-  const poolAvailable =
-    DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb;
+  const key = `otp:${createKey(email, phone, role)}`;
 
+  // 1. Redis — vérification atomique GET + DEL
+  const redis = await getRedisOtpClient();
+  if (redis) {
+    try {
+      const stored = await redis.get(key);
+      if (stored !== null) {
+        if (stored === code) {
+          await redis.del(key);
+          logger.info('Code OTP vérifié et supprimé de Redis');
+          return true;
+        }
+        logger.warn(`Code OTP incorrect pour ${email}`);
+        return false;
+      }
+    } catch (redisErr: any) {
+      logger.warn('Échec vérification OTP Redis, fallback DB/mémoire:', redisErr?.message);
+    }
+  }
+
+  // 2. Base de données PostgreSQL
+  const poolAvailable = DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb;
   if (poolAvailable) {
     try {
       const result = await (pool as any).query(
-        `DELETE FROM otp_codes 
-         WHERE email = $1 AND phone = $2 AND role = $3 
-         AND code = $4 AND expires_at > NOW() 
-         RETURNING *`,
+        `DELETE FROM otp_codes
+         WHERE email = $1 AND phone = $2 AND role = $3
+         AND code = $4 AND expires_at > NOW()
+         RETURNING id`,
         [normalizeEmail(email), normalizePhoneForOtp(phone), role, code]
       ) as any;
 
@@ -221,14 +249,9 @@ export async function verifyOTP(
       markOtpTableMissing(error);
       const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
       if (error?.code === '42P01') {
-        logger.warn(
-          'Table otp_codes absente — vérification OTP en mémoire. Lancez : npm run migrate:otp'
-        );
+        logger.warn('Table otp_codes absente — vérification OTP en mémoire. Lancez : npm run migrate:otp');
       } else {
-        logger.error('Erreur lors de la vérification OTP:', {
-          error: errorMessage,
-          code: error?.code,
-        });
+        logger.error('Erreur lors de la vérification OTP:', { error: errorMessage, code: error?.code });
       }
     }
   }
@@ -244,10 +267,10 @@ export async function getOTP(
   if (DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb) {
     try {
       const result = await (pool as any).query(
-        `SELECT * FROM otp_codes 
-         WHERE email = $1 AND phone = $2 AND role = $3 
-         AND expires_at > NOW() 
-         ORDER BY created_at DESC 
+        `SELECT code, expires_at FROM otp_codes
+         WHERE email = $1 AND phone = $2 AND role = $3
+         AND expires_at > NOW()
+         ORDER BY created_at DESC
          LIMIT 1`,
         [normalizeEmail(email), normalizePhoneForOtp(phone), role]
       ) as any;
@@ -286,7 +309,7 @@ export async function cleanupExpiredOTP(): Promise<number> {
 
   try {
     const result = await (pool as any).query(
-      `DELETE FROM otp_codes WHERE expires_at < NOW() RETURNING *`
+      `DELETE FROM otp_codes WHERE expires_at < NOW() RETURNING id`
     ) as any;
 
     if (result.rows && result.rows.length > 0) {

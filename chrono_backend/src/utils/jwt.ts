@@ -1,8 +1,9 @@
 import jwt, { type SignOptions } from 'jsonwebtoken';
+import crypto from 'crypto';
 import pool from '../config/db.js';
+import { supabaseAdmin } from '../config/supabase.js';
 import logger from './logger.js';
 import { JWTPayload, User } from '../types/index.js';
-
 
 const JWT_SECRET_ENV = process.env.JWT_SECRET;
 
@@ -19,21 +20,18 @@ if (JWT_SECRET_ENV.length < 32) {
   );
 }
 
-
 const JWT_SECRET: string = JWT_SECRET_ENV;
-const JWT_EXPIRES_IN = '15m'; // 15 minutes — court volontairement si le jeton fuit
+const JWT_EXPIRES_IN = '15m';
+const REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '90d') as SignOptions['expiresIn'];
+const REFRESH_EXPIRES_MS = 90 * 24 * 60 * 60 * 1000;
 
-/**
- * Refresh token : longue durée pour coller au comportement « rester connecté tant que je ne me déconnecte pas ».
- * La déconnexion dans l'app efface les tokens en local ; une révocation serveur fine = évolution future (blacklist / table sessions).
- * Surcharge optionnelle : variable d'environnement JWT_REFRESH_EXPIRES_IN (syntaxe jsonwebtoken, ex. 365d, 2y).
- */
-const REFRESH_EXPIRES_IN = (process.env.JWT_REFRESH_EXPIRES_IN || '3650d') as SignOptions['expiresIn'];
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
-
-export function generateTokens(
+export async function generateTokens(
   user: User | { id: string; role?: string }
-): { accessToken: string; refreshToken: string } {
+): Promise<{ accessToken: string; refreshToken: string }> {
   if (!user || !user.id) {
     throw new Error('User data is required to generate tokens');
   }
@@ -49,44 +47,50 @@ export function generateTokens(
   );
 
   const refreshToken = jwt.sign(
-    {
-      id: user.id,
-      type: 'refresh',
-    },
+    { id: user.id, type: 'refresh' },
     JWT_SECRET,
     { expiresIn: REFRESH_EXPIRES_IN }
   );
 
+  // Stocker le hash en base pour permettre la révocation
+  const tokenHash = hashToken(refreshToken);
+  const expiresAt = new Date(Date.now() + REFRESH_EXPIRES_MS);
+
+  try {
+    const client = supabaseAdmin;
+    if (client) {
+      await client.from('refresh_tokens').insert({
+        user_id: user.id,
+        token_hash: tokenHash,
+        expires_at: expiresAt.toISOString(),
+      });
+    }
+  } catch (err) {
+    logger.error('[jwt] Erreur stockage refresh token:', err);
+  }
+
   return { accessToken, refreshToken };
 }
-
 
 export function verifyAccessToken(token: string): JWTPayload {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as unknown as JWTPayload;
 
-    // Vérifier que c'est bien un token d'accès
     if (decoded.type && decoded.type !== 'access') {
       throw new Error("Ce n'est pas un token d'accès valide");
     }
 
     return decoded;
   } catch (error: any) {
-    if (error.name === 'TokenExpiredError') {
-      throw new Error('Token expiré');
-    }
-    if (error.name === 'JsonWebTokenError') {
-      throw new Error('Token invalide');
-    }
+    if (error.name === 'TokenExpiredError') throw new Error('Token expiré');
+    if (error.name === 'JsonWebTokenError') throw new Error('Token invalide');
     throw error;
   }
 }
 
-
 export function verifyToken(token: string): JWTPayload {
   return verifyAccessToken(token);
 }
-
 
 export async function refreshAccessToken(
   refreshToken: string
@@ -96,6 +100,30 @@ export async function refreshAccessToken(
 
     if (decoded.type !== 'refresh') {
       throw new Error("Token invalide: ce n'est pas un refresh token");
+    }
+
+    // Vérifier que le token existe en base (non révoqué)
+    const tokenHash = hashToken(refreshToken);
+    const client = supabaseAdmin;
+
+    if (client) {
+      const { data, error } = await client
+        .from('refresh_tokens')
+        .select('id, expires_at')
+        .eq('token_hash', tokenHash)
+        .single();
+
+      if (error || !data) {
+        throw new Error('Refresh token révoqué ou invalide');
+      }
+
+      if (new Date(data.expires_at) < new Date()) {
+        await client.from('refresh_tokens').delete().eq('token_hash', tokenHash);
+        throw new Error('Refresh token expiré');
+      }
+
+      // Rotation : supprimer l'ancien token (one-time use)
+      await client.from('refresh_tokens').delete().eq('token_hash', tokenHash);
     }
 
     const result = await pool.query<{ id: string; role: string }>(
@@ -108,7 +136,6 @@ export async function refreshAccessToken(
     }
 
     const user = result.rows[0];
-
     const accessToken = jwt.sign(
       { id: user.id, role: user.role, type: 'access' },
       JWT_SECRET,
@@ -121,9 +148,26 @@ export async function refreshAccessToken(
   }
 }
 
+export async function revokeRefreshToken(refreshToken: string): Promise<void> {
+  const tokenHash = hashToken(refreshToken);
+  const client = supabaseAdmin;
+  if (client) {
+    await client.from('refresh_tokens').delete().eq('token_hash', tokenHash);
+  }
+}
+
+export async function revokeAllUserTokens(userId: string): Promise<void> {
+  const client = supabaseAdmin;
+  if (client) {
+    await client.from('refresh_tokens').delete().eq('user_id', userId);
+  }
+}
+
 export default {
   generateTokens,
   verifyToken,
   verifyAccessToken,
   refreshAccessToken,
+  revokeRefreshToken,
+  revokeAllUserTokens,
 };

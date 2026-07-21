@@ -110,7 +110,7 @@ const createDriverProfile = async (
 
     const { data: existingProfile } = await clientForInsert
       .from('driver_profiles')
-      .select('*')
+      .select('id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -139,7 +139,7 @@ const createDriverProfile = async (
           total_deliveries: 0,
         },
       ])
-      .select()
+      .select('id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders')
       .single();
 
     if (insertError) {
@@ -251,7 +251,7 @@ const registerUserWithPostgreSQL = async (
             created_at: new Date().toISOString(),
           },
         ])
-        .select()
+        .select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name')
         .single();
 
       if (dbError) {
@@ -349,7 +349,7 @@ const checkUserInPostgreSQL = async (
 
     const { data: users, error } = await supabase
       .from('users')
-      .select('*')
+      .select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name')
       .eq('email', email)
       .limit(1);
 
@@ -407,7 +407,7 @@ const checkUserByIdInPostgreSQL = async (
 
     const { data: users, error } = await supabase
       .from('users')
-      .select('*')
+      .select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name')
       .eq('id', userId)
       .limit(1);
 
@@ -524,7 +524,7 @@ const loginUserWithPostgreSQL = async (
 
     const client = await pool.connect();
     try {
-      const userQuery = `SELECT * FROM users WHERE id = $1`;
+      const userQuery = `SELECT id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name FROM users WHERE id = $1`;
       const userResult = await (client.query(userQuery, [authUser.user.id]) as any);
 
       if (userResult.rows.length === 0) {
@@ -543,7 +543,7 @@ const loginUserWithPostgreSQL = async (
         req.resetAttempts();
       }
 
-      const { accessToken, refreshToken } = generateTokens(user);
+      const { accessToken, refreshToken } = await generateTokens(user);
 
       res.json({
         success: true,
@@ -728,7 +728,7 @@ async function syncAuthUserToPostgresFromVerify(
         created_at: existingAuthUser.created_at || new Date().toISOString(),
       },
     ])
-    .select()
+    .select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name')
     .single();
 
   let userData: any;
@@ -740,7 +740,7 @@ async function syncAuthUserToPostgresFromVerify(
     if (isUniqueConflict) {
       const { data: byId } = await clientForInsert
         .from('users')
-        .select('*')
+        .select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name')
         .eq('id', existingAuthUser.id)
         .maybeSingle();
       if (byId) {
@@ -749,7 +749,7 @@ async function syncAuthUserToPostgresFromVerify(
       } else if (phoneStr?.trim()) {
         const { data: byPhone } = await clientForInsert
           .from('users')
-          .select('*')
+          .select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name')
           .eq('phone', phoneStr.trim())
           .maybeSingle();
         if (byPhone) {
@@ -861,14 +861,14 @@ const verifyOTPCode = async (
     let checkError: any = null;
 
     if (contactEmail) {
-      const r = await supabase.from('users').select('*').eq('email', contactEmail).limit(1);
+      const r = await supabase.from('users').select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name').eq('email', contactEmail).limit(1);
       checkError = r.error;
       if (r.data?.length) {
         existingUsers = r.data;
       }
     }
     if ((!existingUsers || existingUsers.length === 0) && phoneStr.trim()) {
-      const r2 = await supabase.from('users').select('*').eq('phone', phoneStr.trim()).limit(1);
+      const r2 = await supabase.from('users').select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name').eq('phone', phoneStr.trim()).limit(1);
       if (r2.error && !checkError) {
         checkError = r2.error;
       }
@@ -918,7 +918,7 @@ const verifyOTPCode = async (
           const clientForSelect = supabaseAdmin || supabase;
           const { data: existingProfile } = await clientForSelect
             .from('driver_profiles')
-            .select('*')
+            .select('id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders')
             .eq('user_id', userData.id)
             .single();
           if (existingProfile) {
@@ -942,7 +942,7 @@ const verifyOTPCode = async (
           const clientForSelect = supabaseAdmin || supabase;
           const { data: existingProfile } = await clientForSelect
             .from('driver_profiles')
-            .select('*')
+            .select('id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders')
             .eq('user_id', userData.id)
             .single();
           if (existingProfile) {
@@ -1097,7 +1097,7 @@ const verifyOTPCode = async (
             created_at: new Date().toISOString(),
           },
         ])
-        .select()
+        .select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name')
         .single();
 
       if (insertError) {
@@ -1177,7 +1177,7 @@ const verifyOTPCode = async (
         const clientForSelect = supabaseAdmin || supabase;
         const { data: existingProfile } = await clientForSelect
           .from('driver_profiles')
-          .select('*')
+          .select('id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders')
           .eq('user_id', userData.id)
           .single();
         if (existingProfile) {
@@ -1188,7 +1188,7 @@ const verifyOTPCode = async (
       }
     }
 
-    const { accessToken, refreshToken } = generateTokens(userData);
+    const { accessToken, refreshToken } = await generateTokens(userData);
 
     res.json({
       success: true,

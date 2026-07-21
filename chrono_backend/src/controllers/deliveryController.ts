@@ -39,7 +39,13 @@ export const createDelivery = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { userId, pickup, delivery, method } = req.body as CreateDeliveryBody;
+    const { pickup, delivery, method } = req.body as CreateDeliveryBody;
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: 'Non autorisé' });
+      return;
+    }
 
     const result = await (pool as any).query(
       'INSERT INTO deliveries(user_id, pickup, delivery, method, status) VALUES($1,$2,$3,$4,$5) RETURNING *',
@@ -441,7 +447,7 @@ export const cancelOrder = async (
     const order = activeOrders.get(orderId);
     if (!order) {
       const dbResult = await (pool as any).query(
-        'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
+        'SELECT id, status FROM orders WHERE id = $1 AND user_id = $2',
         [orderId, userId]
       );
 

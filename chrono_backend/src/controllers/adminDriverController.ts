@@ -28,7 +28,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
     let driverProfile: any = null;
     try {
       const profileResult = await (pool as any).query(
-        `SELECT * FROM driver_profiles WHERE user_id = $1`, [driverId]
+        `SELECT id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders FROM driver_profiles WHERE user_id = $1`, [driverId]
       );
       if (profileResult.rows.length > 0) {
         driverProfile = profileResult.rows[0];
@@ -534,7 +534,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
     let driverProfile: any = null;
     try {
       const profileResult = await (pool as any).query(
-        `SELECT * FROM driver_profiles WHERE user_id = $1`, [driverId]
+        `SELECT id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders FROM driver_profiles WHERE user_id = $1`, [driverId]
       );
       if (profileResult.rows.length > 0) {
         driverProfile = profileResult.rows[0];

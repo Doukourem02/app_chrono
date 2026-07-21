@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { z } from 'zod'
 import { logger } from '@/utils/logger'
+
+const UpdateAvatarSchema = z.object({
+  avatarUrl: z.string().url().max(2048),
+})
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -46,16 +51,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Récupérer les données
-    const body = await request.json()
-    const { avatarUrl } = body
-
-    if (!avatarUrl) {
+    // Récupérer et valider les données
+    const parseResult = UpdateAvatarSchema.safeParse(await request.json())
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: 'avatarUrl is required' },
+        { error: 'Invalid request body', details: parseResult.error.issues.map(i => ({ path: i.path, message: i.message })) },
         { status: 400 }
       )
     }
+    const { avatarUrl } = parseResult.data
 
     // Vérifier si l'utilisateur existe dans la table users
     const { data: existingUser, error: checkError } = await supabaseAdmin
@@ -69,82 +73,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (checkError && checkError.code === 'PGRST116') {
-      if (process.env.NODE_ENV === 'development') {
-        logger.debug(' User does not exist, creating...')
-      }
-      // L'utilisateur n'existe pas, le créer
-      // D'abord, vérifier si la colonne avatar_url existe en essayant de l'insérer
-      const insertData: {
-        id: string
-        email: string
-        role: string
-        created_at: string
-        avatar_url?: string
-      } = {
-        id: user.id,
-        email: user.email || '',
-        role: 'admin',
-        created_at: new Date().toISOString(),
-      }
-      
-      // Essayer d'ajouter avatar_url seulement si la colonne existe
-      // Sinon, on utilisera une requête SQL directe
-      try {
-        insertData.avatar_url = avatarUrl
-        const { error: insertError } = await supabaseAdmin
-          .from('users')
-          .insert([insertData])
-
-        if (insertError) {
-          // Si l'erreur est due à la colonne manquante, créer l'utilisateur sans avatar_url
-          if (insertError.message.includes('avatar_url') || insertError.message.includes('column')) {
-            delete insertData.avatar_url
-            const { error: insertError2 } = await supabaseAdmin
-              .from('users')
-              .insert([insertData])
-            
-            if (insertError2) {
-              if (process.env.NODE_ENV === 'development') {
-                logger.error('Error creating user profile:', insertError2)
-              }
-              return NextResponse.json(
-                { 
-                  error: process.env.NODE_ENV === 'production' 
-                    ? 'Error creating user profile'
-                    : (insertError2.message || 'Error creating user profile'),
-                  hint: process.env.NODE_ENV === 'development' 
-                    ? 'La colonne avatar_url n\'existe peut-être pas dans la table users. Exécutez le script SQL dans migrations/add_avatar_url_to_users.sql'
-                    : undefined
-                },
-                { status: 500 }
-              )
-            }
-          } else {
-            if (process.env.NODE_ENV === 'development') {
-              logger.error('Error creating user profile:', insertError)
-            }
-            return NextResponse.json(
-              { 
-                error: process.env.NODE_ENV === 'production'
-                  ? 'Error creating user profile'
-                  : (insertError.message || 'Error creating user profile')
-              },
-              { status: 500 }
-            )
-          }
-        }
-      } catch (err) {
-        if (process.env.NODE_ENV === 'development') {
-          logger.error('Error in insert:', err)
-        }
-        const errorMessage = process.env.NODE_ENV === 'production'
-          ? 'Error creating user profile'
-          : (err instanceof Error ? err.message : 'Error creating user profile')
-        return NextResponse.json(
-          { error: errorMessage },
-          { status: 500 }
-        )
-      }
+      // L'utilisateur n'existe pas dans users — refuser plutôt qu'auto-créer avec role:'admin'.
+      // Seul le flux d'inscription normal doit créer l'entrée dans users.
+      return NextResponse.json(
+        { error: 'User profile not found. Please complete registration first.' },
+        { status: 403 }
+      )
     } else if (checkError) {
       if (process.env.NODE_ENV === 'development') {
         logger.error('Error checking user profile:', checkError)

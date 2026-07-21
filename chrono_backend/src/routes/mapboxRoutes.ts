@@ -10,6 +10,7 @@ import {
   searchSuggest,
   searchRetrieve,
 } from '../utils/mapboxService.js';
+import { verifyJWT } from '../middleware/verifyToken.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ const router = Router();
  * GET /api/mapbox/geocode?address=...
  * Forward geocoding : adresse → coordonnées
  */
-router.get('/geocode', async (req: Request, res: Response): Promise<void> => {
+router.get('/geocode', verifyJWT, async (req: Request, res: Response): Promise<void> => {
   const address = req.query.address as string;
   if (!address?.trim()) {
     res.status(400).json({ error: 'Paramètre address requis' });
@@ -41,7 +42,7 @@ router.get('/geocode', async (req: Request, res: Response): Promise<void> => {
  * GET /api/mapbox/reverse?latitude=...&longitude=...
  * Reverse geocoding : coordonnées → adresse
  */
-router.get('/reverse', async (req: Request, res: Response): Promise<void> => {
+router.get('/reverse', verifyJWT, async (req: Request, res: Response): Promise<void> => {
   const lat = parseFloat(String(req.query.latitude));
   const lng = parseFloat(String(req.query.longitude));
 
@@ -64,7 +65,7 @@ router.get('/reverse', async (req: Request, res: Response): Promise<void> => {
  * GET /api/mapbox/directions?origin=lat,lng&destination=lat,lng
  * ou origin_lat, origin_lng, dest_lat, dest_lng
  */
-router.get('/directions', async (req: Request, res: Response): Promise<void> => {
+router.get('/directions', verifyJWT, async (req: Request, res: Response): Promise<void> => {
   let origin: { lat: number; lng: number };
   let destination: { lat: number; lng: number };
 
@@ -109,7 +110,7 @@ router.get('/directions', async (req: Request, res: Response): Promise<void> => 
  * GET /api/mapbox/search/suggest?q=...
  * Search Box - suggestions (autocomplete)
  */
-router.get('/search/suggest', async (req: Request, res: Response): Promise<void> => {
+router.get('/search/suggest', verifyJWT, async (req: Request, res: Response): Promise<void> => {
   const q = (req.query.q as string)?.trim();
   if (!q || q.length < 2) {
     res.status(400).json({ error: 'Paramètre q requis (min 2 caractères)' });
@@ -130,7 +131,7 @@ router.get('/search/suggest', async (req: Request, res: Response): Promise<void>
  * GET /api/mapbox/search/retrieve/:mapboxId
  * Search Box - récupérer les coordonnées d'une suggestion
  */
-router.get('/search/retrieve/:mapboxId', async (req: Request, res: Response): Promise<void> => {
+router.get('/search/retrieve/:mapboxId', verifyJWT, async (req: Request, res: Response): Promise<void> => {
   const mapboxId = req.params.mapboxId;
   if (!mapboxId) {
     res.status(400).json({ error: 'mapboxId requis' });

@@ -6,13 +6,13 @@ import { verifyJWT } from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
 
-router.put('/:userId/status', verifyJWTOptional, validateDriverStatus, updateDriverStatus);
-router.get('/online', getOnlineDrivers);
-router.get('/:driverId/details', getDriverDetails);
-router.get('/:userId/revenues', getDriverRevenues);
-router.get('/:userId/statistics', getDriverStatistics);
-router.get('/:userId/work-time', verifyJWTOptional, getDriverWorkTime);
-router.put('/:userId/work-time', verifyJWTOptional, updateDriverWorkTime);
+router.put('/:userId/status', verifyJWT, validateDriverStatus, updateDriverStatus);
+router.get('/online', verifyJWT, getOnlineDrivers);
+router.get('/:driverId/details', verifyJWT, getDriverDetails);
+router.get('/:userId/revenues', verifyJWT, getDriverRevenues);
+router.get('/:userId/statistics', verifyJWT, getDriverStatistics);
+router.get('/:userId/work-time', verifyJWT, getDriverWorkTime);
+router.put('/:userId/work-time', verifyJWT, updateDriverWorkTime);
 router.put('/:userId/vehicle', verifyJWT, updateDriverVehicle);
 router.put('/:userId/driver-type', verifyJWT, updateDriverType);
 router.put('/:userId/b2b-preference', verifyJWT, updateDriverB2BPreference);

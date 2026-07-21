@@ -154,7 +154,8 @@ module.exports = {
       betterStackSourceToken:
         process.env.EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN || process.env.EXPO_PUBLIC_LOGTAIL_SOURCE_TOKEN || '',
       betterStackIngestUrl: process.env.EXPO_PUBLIC_BETTER_STACK_INGEST_URL || '',
-      EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN: process.env.EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN || '',
+      // EXPO_PUBLIC_BETTER_STACK_SOURCE_TOKEN intentionnellement absent ici —
+      // déjà accessible via process.env dans le bundle, pas besoin de le doubler dans extra.
     }
   }
 };

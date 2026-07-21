@@ -90,7 +90,8 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'admin-auth-storage',
-      partialize: (state) => ({ user: state.user, isAdmin: state.isAdmin }),
+      // isAdmin exclu intentionnellement — ne jamais persister un flag de privilege en localStorage
+      partialize: (state) => ({ user: state.user }),
     }
   )
 )

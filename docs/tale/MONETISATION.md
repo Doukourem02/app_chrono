@@ -1,7 +1,7 @@
 # Monétisation KRONO — Documentation complète
 
 > Fichier de référence unique sur tous les flux d'argent de la plateforme.
-> Mis à jour : 2026-05-08
+> Mis à jour : 2026-05-15
 
 ---
 
@@ -22,26 +22,35 @@
    - 6.1 Sans abonnement
    - 6.2 Avec abonnement (plans)
    - 6.3 Quota mensuel
-7. [Commission livreur](#7-commission-livreur)
-   - 7.1 Livreur interne
-   - 7.2 Livreur partenaire (prépayé)
+   - 6.4 Ce que vend vraiment le forfait B2B
+   - 6.5 Acquisition B2B : pourquoi payer Krono ?
+7. [Rémunération des livreurs](#7-rémunération-des-livreurs)
+   - 7.1 Principe : revenu Krono ≠ gain livreur
+   - 7.2 Livreur externe avec moto personnelle
+   - 7.3 Livreur équipé par une moto Krono
+   - 7.4 B2B, tournées et hors-ligne
+   - 7.5 Partenaire avec livreur de confiance
 8. [Formule complète du prix final](#8-formule-complète-du-prix-final)
 9. [Exemples chiffrés](#9-exemples-chiffrés)
-10. [Fichiers sources](#10-fichiers-sources)
+10. [Décisions finales et implémentation](#10-décisions-finales-et-implémentation)
+11. [Fichiers sources](#11-fichiers-sources)
 
 ---
 
 ## 1. Vue d'ensemble
 
-KRONO génère ses revenus via **deux flux principaux** :
+KRONO génère ses revenus et rémunère les livreurs via plusieurs flux distincts. Il faut séparer **ce que le client paie**, **ce que Krono garde**, et **ce que le livreur gagne réellement**.
 
 | Flux | Qui paie | Qui perçoit | Mécanisme |
 |---|---|---|---|
-| **Prix livraison client** | Client final (B2C ou B2B) | KRONO | Tarif dynamique au km |
-| **Commission partenaire B2B** | Partenaire (entreprise) | KRONO | % ajouté au prix livraison |
-| **Commission livreur partenaire** | Livreur partenaire | KRONO | Prélèvement sur solde prépayé |
+| **Prix livraison client** | Client final ou partenaire B2B | KRONO | Tarif dynamique au km, puis partage entre livreur et Krono selon le type de livreur |
+| **Abonnement B2B** | Partenaire | KRONO | Forfait mensuel Starter / Pro / Business |
+| **Frais de service B2B** | Partenaire | KRONO | % ajouté au prix livraison selon plan et quota |
+| **Mode gestion interne B2B** | Partenaire | KRONO | Le partenaire utilise son propre livreur, Krono vend la traçabilité, le portail et les preuves |
+| **Commission livreur externe** | Livreur avec sa propre moto | KRONO | Prélèvement sur solde prépayé |
+| **Part Krono sur moto Krono** | Incluse dans le prix livraison | KRONO | Reste après paiement de la part livreur |
 
-Les livreurs **internes** KRONO ne paient pas de commission — ils sont salariés ou rémunérés autrement.
+Décision importante : un livreur peut générer du chiffre d'affaires pour Krono sans être salarié. Dans ce cas, il est payé **à la course**. Le salariat mensuel reste un modèle futur, pas le modèle de démarrage.
 
 ---
 
@@ -239,7 +248,9 @@ type = 'no_subscription'
 
 ### 6.2 Avec abonnement (plans)
 
-Trois plans d'abonnement, deux paliers de taux chacun :
+#### État technique actuel
+
+Le backend actuel applique trois plans d'abonnement, avec deux paliers de taux chacun :
 
 | Plan | Taux in-quota | Taux excess (hors quota) |
 |---|---|---|
@@ -252,6 +263,28 @@ Trois plans d'abonnement, deux paliers de taux chacun :
 
 **Le taux in-quota = excess_commission_rate − 3%** (écart constant qui récompense le quota).
 
+Point critique : cette grille actuelle crée un écart trop faible sur les petites courses. Sur une livraison à 1 725 FCFA, quelques points de pourcentage ne suffisent pas toujours à convaincre un partenaire de passer à Pro ou Business. Elle est donc considérée comme **ancienne grille technique**, à remplacer.
+
+#### Grille commerciale cible validée
+
+| Plan | In-quota | Hors quota | Lecture commerciale |
+|---|---:|---:|---|
+| Paiement à la course | 12% + 150 FCFA | idem | Test sans engagement, mais coût unitaire élevé |
+| Starter | 8% + 100 FCFA | 12% + 100 FCFA | Petit volume, premier niveau structuré |
+| Pro | 5% + 50 FCFA | 8% + 50 FCFA | Usage régulier, portail et équipe |
+| Business | 0% | 5% | Fort volume, meilleur coût unitaire |
+
+Simulation sur une course B2B à 1 725 FCFA, in-quota :
+
+| Plan | Frais | Total payé |
+|---|---:|---:|
+| Paiement à la course | 357 FCFA | 2 082 FCFA |
+| Starter | 238 FCFA | 1 963 FCFA |
+| Pro | 136 FCFA | 1 861 FCFA |
+| Business | 0 FCFA | 1 725 FCFA |
+
+Cette version rend la différence plus visible, surtout sur les petites courses. C'est la grille à implémenter dans le backend, l'app client, l'admin et le portail partenaire.
+
 ### 6.3 Quota mensuel
 
 Le quota est compté par mois calendaire (1er du mois). À chaque commande B2B créée avec succès, le compteur est incrémenté de manière **atomique** (upsert SQL sans race condition) :
@@ -263,26 +296,78 @@ ON CONFLICT (partner_id, month)
 DO UPDATE SET deliveries_count = partner_usage.deliveries_count + 1
 ```
 
-**Exemple complet — partenaire plan Starter, excess à 6%, quota 100 commandes :**
+**Exemple cible — partenaire plan Starter, quota 35 commandes :**
 
 | Statut | Taux | Prix livraison | Commission | Prix final |
 |---|---|---|---|---|
-| 50ème commande (in-quota) | 3% | 1 725 FCFA | 52 FCFA | 1 777 FCFA |
-| 101ème commande (excess) | 6% | 1 725 FCFA | 104 FCFA | 1 829 FCFA |
+| 30ème commande (in-quota) | 8% + 100 | 1 725 FCFA | 238 FCFA | 1 963 FCFA |
+| 36ème commande (hors quota) | 12% + 100 | 1 725 FCFA | 307 FCFA | 2 032 FCFA |
+
+### 6.4 Ce que vend vraiment le forfait B2B
+
+Le forfait B2B ne doit pas être présenté comme "payer pour payer plus cher". Il vend d'abord un **système de gestion de livraison**, puis seulement ensuite une réduction des frais de service.
+
+Le partenaire paie toujours le transport quand Krono effectue la livraison. Le quota du forfait signifie : nombre de livraisons du mois où le partenaire bénéficie du taux B2B réduit. Il ne signifie pas "livraisons gratuites".
+
+| Élément | Sans Krono | Avec Krono |
+|---|---|---|
+| Suivi client | Appels WhatsApp, captures, incertitude | Tracking, statuts, lien public, historique |
+| Preuve de livraison | Dépend du livreur | QR code, code de livraison, preuve horodatée |
+| Gestion livreurs | Informelle, difficile à contrôler | Livreurs dédiés, opt-in B2B, fallback automatique |
+| Facturation | Carnet, Excel, conversations | Factures, quota, historique commandes |
+| Litiges | Parole contre parole | Trace commande, heure, destinataire, preuve |
+| Continuité service | Si le livreur perso est absent, tout bloque | Krono peut prendre le relais avec ses livreurs |
+
+Donc la promesse commerciale n'est pas seulement "Krono livre". La promesse est :
+
+> Krono transforme les livraisons du partenaire en activité traçable, pilotable et présentable au client final.
+
+### 6.5 Acquisition B2B : pourquoi payer Krono ?
+
+Problème terrain : beaucoup de commerçants à Abidjan livrent déjà avec leurs propres moyens. Ils peuvent payer 1 500 à 3 000 FCFA selon la commune, sans abonnement ni logiciel. Si Krono ajoute seulement un abonnement + une commission, l'intérêt n'est pas évident.
+
+Il faut donc vendre Krono en trois portes d'entrée :
+
+| Offre d'entrée | Cible | Ce que le partenaire comprend |
+|---|---|---|
+| **Découverte sans abonnement** | Petit e-commerce, volume irrégulier | Je paie à la course, je teste Krono sans engagement |
+| **Gestion interne** | B2B avec son propre livreur | Je garde mon livreur, mais Krono me donne tracking, preuve, historique, portail |
+| **Krono Backup** | B2B avec pics ou absence livreur | Si mon livreur est indisponible, Krono trouve un livreur et facture le transport |
+
+Recommandation commerciale MVP :
+- Offrir 14 à 30 jours d'essai portail pour les B2B sérieux.
+- Offrir les frais de service sur les 10 premières livraisons, mais jamais le prix transport si Krono livre.
+- Laisser le partenaire ajouter ou demander son propre livreur dédié.
+- Mettre en avant le coût caché de son système actuel : appels, pertes, litiges, absence de preuve, client qui demande "mon colis est où ?".
+- Vendre Starter comme "test structuré", Pro comme "gestion quotidienne", Business comme "fort volume + meilleure traçabilité + meilleur taux".
+
+Point de cohérence produit : le backend actuel applique Starter **3%**, Pro **2%**, Business **0%** en quota. Certains écrans/docs affichent encore Starter **5%**, Pro **3%**, Business **2%**. La source de vérité finale devient la **grille commerciale cible validée** ci-dessus.
 
 ---
 
-## 7. Commission livreur
+## 7. Rémunération des livreurs
 
-Source : `chrono_backend/src/services/commissionService.ts`
+Sources actuelles :
+- `chrono_backend/src/services/commissionService.ts` pour le modèle livreur externe prépayé
+- `chrono_backend/src/controllers/driverController.ts` et `driver_chrono/app/(tabs)/revenus.tsx` pour l'affichage des gains
+- modèle moto Krono : **décision produit à implémenter** (pas encore persistée comme gain net réel)
 
-### 7.1 Livreur interne
+### 7.1 Principe : revenu Krono ≠ gain livreur
 
-- **Aucune commission** prélevée.
-- Accès illimité aux commandes.
-- Gestion salariale / externe à la plateforme.
+Le prix d'une livraison ne doit pas être confondu avec le revenu du livreur.
 
-### 7.2 Livreur partenaire (prépayé)
+```
+prix_course = montant payé par le client ou le partenaire
+gain_livreur = part calculée selon le type de livreur
+marge_krono_course = prix_course - gain_livreur
+revenu_krono_total = marge_krono_course + abonnements_B2B + frais_service_B2B + commissions_livreurs_externes
+```
+
+Aujourd'hui, certains écrans additionnent encore le prix complet des commandes comme "gains" du livreur. C'est utile pour un brouillon opérationnel, mais ce n'est pas suffisant pour la comptabilité réelle. Il faudra stocker un vrai `driver_earning_cfa` par commande complétée.
+
+### 7.2 Livreur externe avec moto personnelle
+
+Ce modèle existe déjà dans le code.
 
 Les livreurs partenaires alimentent un **solde prépayé** (`commission_balance`). À chaque livraison complétée, la commission est **déduite automatiquement** de ce solde via la fonction SQL `deduct_commission`.
 
@@ -291,14 +376,131 @@ Les livreurs partenaires alimentent un **solde prépayé** (`commission_balance`
 - Solde ≤ 1 000 FCFA → alerte "solde très faible"
 - Solde ≤ 3 000 FCFA → alerte "solde faible"
 
-**Taux de commission livreur :** défini par `commission_rate` dans `commission_balance`, initialisé à **10%** par défaut à la création du profil.
+**Taux de commission livreur actuel :** défini par `commission_rate` dans `commission_balance`, initialisé à **10%** par défaut à la création du profil.
+
+Décision recommandée : passer le taux cible à **12%** pour rester acceptable pour les livreurs externes tout en améliorant légèrement la marge Krono. Le taux technique actuel de 10% peut rester temporairement pour le lancement, puis évoluer vers 12%.
 
 ```
 commissionAmount = round(orderPrice × commissionRate)
+driverNetEarning = orderPrice - commissionAmount
 newBalance = balance - commissionAmount
 ```
 
 Si le solde devient insuffisant : la livraison n'est **pas bloquée** (non-bloquant) mais le compte est suspendu pour les commandes suivantes.
+
+**Exemple :**
+- Course à 1 400 FCFA
+- Commission Krono recommandée 12% = 168 FCFA
+- Gain net économique du livreur = 1 232 FCFA
+- Krono gagne 168 FCFA sur cette course via la commission livreur
+
+### 7.3 Livreur équipé par une moto Krono
+
+Ce modèle répond au cas de démarrage : Krono achète des motos, les confie à des travailleurs, mais ne verse pas encore de salaire mensuel fixe.
+
+Le livreur équipé Krono est payé **à la course**, sur une part du prix livraison. Il ne recharge pas un solde commission comme le livreur externe ; au contraire, Krono lui doit une part de chaque livraison complétée.
+
+**Hypothèse MVP recommandée :**
+
+| Type de course | Base de calcul | Part livreur | Part Krono |
+|---|---:|---:|---:|
+| Livraison classique B2C | `totalCfa` | 35% | 65% |
+| Livraison hors-ligne admin | `totalCfa` | 35% | 65% |
+| B2B individuel | `serverPrice` avant frais de service B2B | 35% | 65% + frais B2B |
+| Tournée B2B groupée | Somme des `serverPrice` des commandes du batch | 30% | 70% + frais B2B |
+
+La part Krono sert à absorber : achat/amortissement moto, assurance, entretien lourd, support, risque d'impayé, outils, marge. La part livreur doit couvrir son effort de livraison et, selon la politique retenue, son carburant quotidien.
+
+Le taux livreur est donc volontairement inférieur à la part Krono quand la moto appartient à Krono. Si le livreur vient avec sa propre moto, le modèle inverse s'applique : le livreur garde l'essentiel et Krono prélève seulement une commission.
+
+**Option de démarrage conseillée :**
+- Krono fournit la moto, les papiers et l'entretien lourd.
+- Le livreur prend en charge le carburant courant avec sa part.
+- Si Krono prend aussi en charge le carburant, la part livreur doit être plus basse ou un budget carburant doit être tracé séparément.
+
+Formule :
+
+```
+payoutBase = prix transport partageable
+driverEarning = round(payoutBase × driverShareRate)
+kronoDeliveryMargin = payoutBase - driverEarning
+```
+
+Exemple B2C :
+
+```
+totalCfa = 1 400
+driverShareRate = 35%
+driverEarning = 490 FCFA
+kronoDeliveryMargin = 910 FCFA
+```
+
+Exemple B2B Starter :
+
+```
+serverPrice = 1 725
+fraisServiceB2B = 52
+finalPricePartenaire = 1 777
+driverEarning = round(1 725 × 35%) = 604 FCFA
+kronoDeliveryMargin = 1 121 FCFA
+revenuKronoSurCommande = 1 121 + 52 = 1 173 FCFA
+```
+
+Les abonnements B2B mensuels ne sont pas partagés avec le livreur. Ils rémunèrent l'accès au portail, le quota, la facturation, la priorité et le service partenaire.
+
+Important : "Business = 0%" veut dire **0% de frais de service B2B ajouté à la course dans le quota**, pas "0 FCFA pour Krono". Krono conserve toujours sa part sur le prix transport, puis ajoute le revenu de l'abonnement mensuel.
+
+### 7.4 B2B, tournées et hors-ligne
+
+**B2B portail partenaire :** le livreur gagne de l'argent comme sur une course normale : une part du prix transport. L'abonnement Starter / Pro / Business et les frais de service B2B restent des revenus Krono.
+
+**Tournées B2B groupées :** le livreur ne doit pas être payé comme s'il faisait un seul petit trajet. Le calcul doit partir de la somme des commandes du batch, avec un taux de partage dédié ou un minimum garanti par tournée. Exemple :
+
+```
+batchPayoutBase = somme(serverPrice des commandes du batch)
+driverBatchEarning = round(batchPayoutBase × 30%)
+```
+
+**Hors-ligne / opérateur admin :** si la commande est créée par l'admin sans `partner_id`, elle doit être traitée comme une livraison classique pour la rémunération livreur. Si c'est une vraie commande B2B hors-ligne, il faut la rattacher à un `partner_id` pour appliquer abonnement, quota, frais B2B et reporting partenaire.
+
+**Point produit à corriger :** dans le flux admin actuel, `isB2BOrder` marque la commande comme B2B pour l'affichage livreur, mais ne suffit pas à déclencher toute la logique abonnement/quota si aucun `partner_id` n'est rattaché.
+
+### 7.5 Partenaire avec livreur de confiance
+
+C'est un cas stratégique pour différencier Krono de Yango : le partenaire peut venir avec un livreur qu'il connaît déjà, qui a l'habitude de faire ses livraisons et en qui il a confiance.
+
+Le terme "livreur personnel" ne veut pas forcément dire "salarié du partenaire payé hors Krono". Il peut simplement vouloir dire : livreur recommandé / habituel / prioritaire pour ce partenaire.
+
+| Cas | Sens métier | Ce que paie le partenaire | Qui paie le livreur ? |
+|---|---|---|---|
+| **Livreur recommandé intégré Krono** | Le partenaire connaît le livreur, Krono le vérifie et le rattache au compte | Prix transport + frais B2B selon plan | Krono, via le modèle livreur correspondant |
+| **Livreur payé hors Krono** | Le partenaire utilise Krono seulement comme outil de suivi/preuve | Abonnement + frais plateforme/preuve selon quota | Le partenaire, hors Krono |
+| **Fallback Krono** | Le livreur recommandé est indisponible, Krono cherche un autre livreur | Prix transport + frais B2B selon plan | Krono, selon le livreur qui exécute |
+
+Règle métier recommandée :
+- Si la course est créée, suivie et encaissée dans Krono, le livreur qui exécute doit avoir une rémunération dans Krono, même s'il a été recommandé par le partenaire.
+- Si ce livreur vient avec sa propre moto, il suit le modèle **livreur externe** : il garde l'essentiel de la course et Krono prélève une commission.
+- Si Krono lui fournit une moto, il suit le modèle **moto Krono** : partage de revenus à la course.
+- Si le partenaire paie réellement le livreur hors Krono, alors Krono ne vend pas le transport ; Krono vend seulement le portail, la preuve, le tracking et l'historique.
+
+Formule livreur recommandé intégré Krono :
+
+```
+prixTransport = prix livraison payé dans Krono
+gainLivreur = calculé selon son type (externe avec moto perso, ou moto Krono)
+revenuKrono = marge transport + frais B2B + abonnement éventuel
+```
+
+Formule mode suivi seul, si le partenaire paie le livreur hors Krono :
+
+```
+prixTransportKrono = 0 si le livreur personnel exécute la livraison
+fraisPlateforme = inclus dans le forfait jusqu'au quota, puis petit frais fixe ou % faible
+revenuKrono = abonnement + fraisPlateforme éventuels
+gainLivreurKrono = 0, car le livreur est payé par le partenaire
+```
+
+Ce mode peut être le meilleur argument commercial : "Gardez votre livreur de confiance, mais donnez à vos clients un suivi professionnel et gardez des preuves."
 
 ---
 
@@ -328,6 +530,63 @@ Si le solde devient insuffisant : la livraison n'est **pas bloquée** (non-bloqu
 
 > `round25` = arrondi au multiple de 25 FCFA le plus proche (arrondi psychologique).
 
+### Payout livreur cible
+
+```
+1. payoutBase          = totalCfa B2C/hors-ligne, ou serverPrice B2B avant frais service
+2. driverShareRate     = taux selon type livreur et type de course
+3. driverEarningCfa    = round(payoutBase × driverShareRate)
+4. kronoDeliveryMargin = payoutBase - driverEarningCfa
+```
+
+Pour un livreur externe avec moto personnelle, le modèle reste différent :
+
+```
+commissionAmount = round(orderPrice × commissionRate)
+driverNetEarning = orderPrice - commissionAmount
+```
+
+### Wallet cash / mobile money
+
+Le wallet livreur doit gérer deux sens d'argent différents.
+
+**Paiement cash :**
+```
+client paie le livreur en espèces
+livreur garde physiquement le cash
+walletLivreur -= partKronoOuCommission
+```
+
+Exemple livreur externe, course 1 500 FCFA, commission Krono 12% :
+```
+client paie cash au livreur = 1 500
+commission Krono = 180
+gain net livreur = 1 320
+walletLivreur = walletLivreur - 180
+```
+
+Exemple moto Krono, course 1 500 FCFA, part Krono 65% :
+```
+client paie cash au livreur = 1 500
+gain livreur = 525
+part Krono = 975
+walletLivreur = walletLivreur - 975
+```
+
+**Paiement mobile money :**
+```
+client paie Krono dans l'app
+Krono garde sa part
+walletLivreur += gainLivreur
+```
+
+Exemple moto Krono, course 1 500 FCFA :
+```
+Krono encaisse = 1 500
+Krono garde = 975
+walletLivreur = walletLivreur + 525
+```
+
 ---
 
 ## 9. Exemples chiffrés
@@ -347,13 +606,13 @@ contextFactor = 1.06 (heure) × 1.08 (pluie) × 1.00 × 1.00 = 1.1448
 totalCfa      = round25(1 400 × 1.1448) = round25(1 603) = 1 600 FCFA
 ```
 
-**Scénario 3 — Partenaire B2B plan Starter in-quota, moto express, 5 km, conditions normales**
+**Scénario 3 — Partenaire B2B plan Starter cible in-quota, moto express, 5 km, conditions normales**
 ```
 lineSubtotal  = 1 400 FCFA
 contextFactor = 1.00
 serverPrice   = round25(1 400 × 1.00 × 1.15 + 99) = round25(1 709) = 1 725 FCFA
-commission    = round(1 725 × 0.03) = 52 FCFA
-finalPrice    = 1 725 + 52 = 1 777 FCFA
+commission    = round(1 725 × 0.08) + 100 = 238 FCFA
+finalPrice    = 1 725 + 238 = 1 963 FCFA
 ```
 
 **Scénario 4 — Partenaire B2B plan Business in-quota, moto express, 5 km, forte demande**
@@ -366,9 +625,97 @@ commission    = round(2 275 × 0.00) = 0 FCFA  ← Business = 0%
 finalPrice    = 2 275 FCFA
 ```
 
+**Scénario 5 — Livreur équipé Krono, course B2C à 1 400 FCFA**
+```
+payoutBase          = 1 400 FCFA
+driverShareRate     = 35%
+driverEarningCfa    = round(1 400 × 0.35) = 490 FCFA
+kronoDeliveryMargin = 910 FCFA
+```
+
+**Scénario 6 — Livreur équipé Krono, B2B Starter cible à 1 963 FCFA final**
+```
+serverPrice         = 1 725 FCFA
+commissionB2B       = 238 FCFA
+finalPrice          = 1 963 FCFA
+driverEarningCfa    = round(1 725 × 0.35) = 604 FCFA
+kronoDeliveryMargin = 1 725 - 604 = 1 121 FCFA
+revenuKronoTotal    = 1 121 + 238 = 1 359 FCFA
+```
+
 ---
 
-## 10. Fichiers sources
+## 10. Décisions finales et implémentation
+
+### Décisions métier actées
+
+| Sujet | Décision |
+|---|---|
+| Livreur externe avec moto personnelle | Commission Krono cible **12%** |
+| Livreur moto Krono, course solo | **35% livreur / 65% Krono** |
+| Livreur moto Krono, tournée B2B | **30% livreur / 70% Krono** |
+| B2B Business dans quota | **0% de frais B2B**, mais le prix transport reste payé |
+| B2B avec livreur de confiance | Le livreur est payé par Krono si la course passe et est encaissée dans Krono |
+| B2B suivi seul | Si le partenaire paie réellement le livreur hors Krono, Krono vend seulement portail, tracking, preuve, historique |
+| Cash | Le livreur encaisse, son wallet doit la part Krono |
+| Mobile money | Krono encaisse, puis crédite le gain livreur |
+
+### À implémenter dans le produit
+
+1. Ajouter un vrai calcul de gain livreur par commande :
+```
+driver_earning_cfa
+krono_delivery_margin_cfa
+b2b_fee_cfa
+driver_payout_model
+```
+
+2. Séparer les modèles livreurs :
+```
+external_own_vehicle       -> commission 12%
+krono_vehicle             -> 35% solo / 30% tournée
+partner_trusted_external  -> commission 12% si moto personnelle
+partner_paid_off_platform -> pas de payout Krono, seulement frais plateforme
+```
+
+3. Mettre à jour le wallet :
+```
+cash         -> débit de la part Krono
+mobile_money -> crédit du gain livreur
+```
+
+4. Remplacer l'ancienne grille B2B dans le backend et les écrans :
+```
+pay_per_delivery = 12% + 150
+starter          = 8% + 100 in-quota, 12% + 100 hors quota
+pro              = 5% + 50 in-quota, 8% + 50 hors quota
+business         = 0% in-quota, 5% hors quota
+```
+
+5. Corriger le flux admin B2B :
+```
+isB2BOrder seul = affichage
+partner_id requis = abonnement, quota, frais B2B, reporting
+```
+
+6. Mettre à jour les libellés commerciaux :
+```
+Le quota réduit les frais B2B.
+Le quota ne rend pas les livraisons gratuites.
+```
+
+### Conclusion
+
+Le modèle final est cohérent si Krono garde ces règles :
+- le transport est toujours payé quand Krono livre ;
+- les forfaits B2B réduisent les frais de service, pas le prix transport ;
+- les livreurs externes sont attractifs avec 12% de commission ;
+- les motos Krono restent rentables avec une part Krono majoritaire ;
+- le wallet devient le point central pour solder cash, mobile money et gains livreurs.
+
+---
+
+## 11. Fichiers sources
 
 | Fichier | Rôle |
 |---|---|
@@ -378,6 +725,7 @@ finalPrice    = 2 275 FCFA
 | `chrono_backend/src/services/surgePricing.ts` | Facteur surge (tension live socket) |
 | `chrono_backend/src/services/b2bCommissionService.ts` | Commission partenaire B2B, gestion quota |
 | `chrono_backend/src/services/commissionService.ts` | Commission livreur partenaire (solde prépayé) |
+| `chrono_backend/src/controllers/driverController.ts` | Statistiques/gains livreur actuels (à faire évoluer vers gains nets) |
 | `chrono_backend/src/controllers/orderRecordController.ts` | Orchestration complète : calcul + création commande |
 
 ---
@@ -386,5 +734,6 @@ finalPrice    = 2 275 FCFA
 > - `B2B_PRIORITY_FACTOR` = **1.15** (×15% sur le subtotal B2B)
 > - `B2B_FIXED_SURCHARGE_CFA` = **99 FCFA** (forfait fixe B2B)
 > - `MAX_CONTEXT_FACTOR` = **1.85** (plafond tous facteurs combinés)
-> - Commission Starter in-quota = **3%**, Pro = **2%**, Business = **0%**
-> - Commission livreur partenaire = **10%** par défaut
+> - Grille B2B cible = paiement à la course **12% + 150**, Starter **8% + 100**, Pro **5% + 50**, Business **0%** in-quota
+> - Commission livreur partenaire = **10%** par défaut technique actuel, **12% cible**
+> - Part livreur moto Krono cible = **35%** solo, **30%** tournée B2B groupée
