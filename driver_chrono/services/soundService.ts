@@ -79,11 +79,11 @@ class SoundService {
   async cleanup() {
     try {
       if (this.orderAssignPlayer) {
-        this.orderAssignPlayer.release();
+        this.orderAssignPlayer.remove();
         this.orderAssignPlayer = null;
       }
       if (this.orderCompletedPlayer) {
-        this.orderCompletedPlayer.release();
+        this.orderCompletedPlayer.remove();
         this.orderCompletedPlayer = null;
       }
       this.isInitialized = false;
