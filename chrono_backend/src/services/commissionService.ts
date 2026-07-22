@@ -1,6 +1,7 @@
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { maskUserId, maskAmount } from '../utils/maskSensitiveData.js';
+import { sendCampaignPushToUser } from './expoPushService.js';
 
 /**
  * Service de gestion de la commission prépayée pour les livreurs partenaires.
@@ -223,13 +224,31 @@ export async function checkAndSendAlerts(
     if (balance <= 0) {
       // Suspension automatique déjà gérée par la fonction SQL
       logger.warn(`⚠️ Compte suspendu pour ${maskUserId(driverId)}: solde = ${maskAmount(balance)} FCFA`);
-      // TODO: Envoyer notification push au livreur
+      await sendCampaignPushToUser({
+        userId: driverId,
+        appRole: 'driver',
+        title: 'Compte suspendu',
+        body: 'Votre solde commission est épuisé. Rechargez maintenant pour continuer à recevoir des courses.',
+        data: { type: 'commission_balance_suspended' },
+      }).catch((e: unknown) => logger.warn('[commission-alert] push suspendu:', e instanceof Error ? e.message : String(e)));
     } else if (balance <= 1000) {
       logger.warn(`⚠️ Solde très faible pour ${maskUserId(driverId)}: ${maskAmount(balance)} FCFA`);
-      // TODO: Envoyer notification push "Solde très faible, rechargez maintenant"
+      await sendCampaignPushToUser({
+        userId: driverId,
+        appRole: 'driver',
+        title: 'Solde très faible',
+        body: 'Votre solde commission est très faible, rechargez maintenant pour ne pas être suspendu.',
+        data: { type: 'commission_balance_critical' },
+      }).catch((e: unknown) => logger.warn('[commission-alert] push critique:', e instanceof Error ? e.message : String(e)));
     } else if (balance <= 3000) {
       logger.info(`💡 Solde faible pour ${maskUserId(driverId)}: ${maskAmount(balance)} FCFA`);
-      // TODO: Envoyer notification push "Solde faible, pensez à recharger"
+      await sendCampaignPushToUser({
+        userId: driverId,
+        appRole: 'driver',
+        title: 'Solde faible',
+        body: 'Pensez à recharger votre solde commission bientôt.',
+        data: { type: 'commission_balance_low' },
+      }).catch((e: unknown) => logger.warn('[commission-alert] push faible:', e instanceof Error ? e.message : String(e)));
     }
   } catch (error: any) {
     logger.error('Erreur checkAndSendAlerts:', error);

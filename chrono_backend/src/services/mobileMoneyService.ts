@@ -1,6 +1,14 @@
 import logger from '../utils/logger.js';
 import { maskPhoneNumber } from '../utils/maskSensitiveData.js';
 
+/**
+ * STUB — aucune des fonctions initiate*Payment ci-dessous n'appelle une API
+ * Orange Money / Wave / MTN Money réelle : elles génèrent un providerTransactionId
+ * fictif et renvoient toujours `status: 'pending'`. checkPaymentStatus ne vérifie
+ * rien non plus. Tant que ce fichier n'est pas remplacé par de vrais appels HTTP
+ * + webhooks de confirmation, ce service ne doit jamais tourner en production
+ * (voir garde-fou dans initiateMobileMoneyPayment).
+ */
 export type MobileMoneyProvider = 'orange_money' | 'wave' | 'mtn_money';
 
 export type PaymentStatus = 'pending' | 'paid' | 'refused' | 'failed';
@@ -245,6 +253,22 @@ export async function initiateMobileMoneyPayment(
   params: MobileMoneyPaymentParams
 ): Promise<MobileMoneyPaymentResponse> {
   const { provider } = params;
+
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.MOBILE_MONEY_REAL_INTEGRATION_ENABLED !== 'true'
+  ) {
+    logger.error(
+      `Tentative de paiement Mobile Money (${provider}) bloquée en production : intégration réelle non branchée (stub).`,
+      { orderId: params.orderId }
+    );
+    return {
+      success: false,
+      status: 'failed',
+      error:
+        'Mobile Money indisponible : intégration provider non finalisée. Contactez le support.',
+    };
+  }
 
   switch (provider) {
     case 'orange_money':

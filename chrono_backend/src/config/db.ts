@@ -109,11 +109,18 @@ if (process.env.DATABASE_URL) {
 
   } catch (error: any) {
     const errorMessage = error?.message || (error instanceof Error ? error.message : String(error));
-    logger.warn(' Erreur lors de la création du pool PostgreSQL:', { error: errorMessage, code: error?.code });
+    logger.error(' Erreur lors de la création du pool PostgreSQL:', { error: errorMessage, code: error?.code });
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('FATAL: pool PostgreSQL non créé en production. Arrêt du process.');
+      process.exit(1);
+    }
     pool = null;
   }
+} else if (process.env.NODE_ENV === 'production') {
+  logger.error('FATAL: DATABASE_URL non configuré en production. Arrêt du process pour éviter un service silencieux sans persistance.');
+  process.exit(1);
 } else {
-  logger.warn(' DATABASE_URL non configuré. Les fonctionnalités de base de données PostgreSQL seront désactivées.');
+  logger.warn(' DATABASE_URL non configuré. Les fonctionnalités de base de données PostgreSQL seront désactivées (mock, non-production uniquement).');
 }
 
 const mockPool = {

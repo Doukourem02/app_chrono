@@ -209,6 +209,23 @@ Règles :
 - Résolution destinataire par téléphone : `recipient_user_id` si compte client unique.
 - Anti-doublon statut par commande : `order_status_push_sent` si migration `026` appliquée.
 
+### Canaux disponibles (repris de `docs/notification/notifications_krono_spec.md`, supprimé le 2026-07-22)
+
+| Canal | Destinataire | Condition |
+|---|---|---|
+| Push Expo (app) | Client ou destinataire avec app Krono | Token Expo enregistré |
+| SMS Twilio | Destinataire sans app | Pas de compte Krono + numéro valide |
+| WhatsApp Twilio | Destinataire B2B | Configuré côté serveur (voir section 17 — non validé bout-en-bout) |
+| Web Push | Visiteur page `/track` | Abonné aux notifications web |
+| Live Activity (iOS) | Client avec app iOS | Token APNs actif |
+| Socket temps réel | Client ou livreur connecté | Session active dans l'app |
+
+**Livreur : aucun push Expo pour les offres ou statuts, tout passe par socket** — `new-order-request` (offre B2C, 30s pour répondre), `batch-assigned`/`batch-offer-replay` (offre tournée), `order:status:update`, `order-cancelled`, `driver:geofence:event`. Seule la push `batch_assigned` existe en fallback si le livreur est hors ligne au moment du socket (voir section 16).
+
+**B2B — code de livraison à l'acceptation du batch** : pour chaque commande du batch, `notifyB2BBatchRecipientsProof()` envoie le code au destinataire — push `Code de livraison : {code}` si compte Krono, sinon WhatsApp en priorité (`Krono - code de réception {label} : {code}...`) avec repli SMS si WhatsApp échoue. Le tap sur la notif doit ouvrir `/order-tracking/{orderId}?openQR=1` (modal QR auto).
+
+**Admin** : événements persistés dans `admin_notification_feed` (commande créée, assignée, annulée, statut mis à jour) — affichés dans le dashboard, pas de push.
+
 ### Types de notifications
 
 | Type | Exemple | Règle |
@@ -258,6 +275,10 @@ Travail hors code en premier :
 - Webhooks signés, retries, idempotence.
 - KYC, litiges, remboursements.
 - Branchement backend : `paymentController`, `commissionController`, transactions.
+
+**État actuel (2026-07-22)** : `chrono_backend/src/services/mobileMoneyService.ts` est un **stub explicite** — `initiateOrangeMoneyPayment`/`initiateWavePayment`/`initiateMtnMoneyPayment`/`checkPaymentStatus` ne font aucun appel API réel, ils renvoient `status: 'pending'` avec un ID fictif. Un garde-fou bloque désormais tout paiement en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas explicitement à `true` (impossible de l'activer par accident). Reste à faire : intégrer réellement Orange Money CI et Wave, ajouter le webhook de confirmation (ne pas se baser sur l'initiation seule).
+
+**Alertes solde commission livreur** : `commissionService.ts` (`checkAndSendAlerts`) envoie un vrai push (`expoPushService.sendCampaignPushToUser`) aux trois seuils — suspendu (solde ≤ 0), très faible (≤ 1 000 FCFA), faible (≤ 3 000 FCFA). Pas encore vérifié sur un vrai appareil.
 
 ---
 
@@ -322,6 +343,10 @@ Règles :
 - Les logs peuvent contenir des identifiants techniques, mais pas de données sensibles inutiles.
 - Toute nouvelle surface publique doit être relue avec la question : "est-ce que cette information aide vraiment à livrer ?"
 
+**Routes deliveries/drivers (audit 2026-07-22)** : toutes les routes de `deliveryRoutes.ts` et `driverRoutes.ts` (historique commandes, statistiques, revenus livreur, détails livreur, liste livreurs en ligne) sont protégées par `verifyJWT` **et** un contrôle d'ownership (`req.user.id !== userId` → 403) dans les contrôleurs. Un utilisateur ne peut lire que ses propres données. Reste à faire : auditer les routes backend hors delivery/driver pour confirmer qu'aucune n'a été oubliée.
+
+**Backend fail-fast en production** : `chrono_backend/src/config/db.ts` fait `process.exit(1)` avec un log `FATAL` si `DATABASE_URL` est absent ou si la création du pool échoue, **quand `NODE_ENV=production`**. Le `mockPool` (réponses vides silencieuses) reste utilisable seulement en dev/test — plus de risque de service "up" sans base réelle en prod.
+
 ---
 
 ## 11. Support / diagnostic rapide
@@ -378,6 +403,8 @@ Smoke tests prod :
 
 ## 13. Migrations importantes
 
+**Régénérées le 2026-07-22** : les fichiers 016, 017, 020, 021, 022, 024 (commission, QR, driver_type, tracking_token, driver_locations/admin_notification_feed, profiles/payment_methods/transactions/invoices/order_status_history/conversations/messages, index qr_code_scans, users.first_name/last_name/avatar_url) étaient absents du disque bien que le schéma existe en prod — ils ont été reconstruits par introspection directe de la base Supabase réelle (`chrono_delivery`) et sont maintenant sur le disque. 018 (gamification) et 019 (support) n'ont **jamais** été appliqués en prod (`driver_badges`/`support_tickets` n'existent pas) — aucun fichier recréé pour ces deux-là, ce n'est pas un oubli. Détail complet et ordre exact d'application : `chrono_backend/migrations/README.md`. Reste à faire : tester le chemin "base Supabase vide → 001 à 041" de bout en bout (nécessite une branche Supabase payante, pas encore lancée).
+
 | Migration | Sujet |
 
 | `023_create_push_tokens.sql` | `push_tokens` Expo push client / driver |
@@ -393,6 +420,45 @@ Smoke tests prod :
 | `041_partner_dedicated_driver_requests.sql` *(à appliquer)* | Livreurs dédiés partenaires : `partner_drivers`, demandes `partner_driver_requests`, unicité `(partner_id, driver_user_id)` et un seul défaut |
 
 Migrations SQL : voir `chrono_backend/migrations/README.md`.
+
+### Catalogue des tables (rôle de chaque table)
+
+Repris de l'ancien `docs/tables/TABLES_SUPABASE.md` (supprimé le 2026-07-22, snapshot de comptage de lignes du 2026-05-04 jugé trop périmé pour être conservé tel quel — seul le rôle durable de chaque table est gardé ici).
+
+| Domaine | Table | Rôle |
+|---|---|---|
+| Commandes | `orders` | Table centrale — chaque commande (client, adresse, prix, statut, driver assigné) |
+| Commandes | `order_assignments` | Historique des assignations d'une commande à un livreur |
+| Commandes | `order_status_history` | Log immuable des changements de statut |
+| Commandes | `order_status_push_sent` | Anti-doublon notifications par `(order_id, status)` |
+| Batch | `delivery_batches` | Header d'une tournée groupée (partner ou user + driver assigné) |
+| Batch | `batch_orders` | Liaison `delivery_batches` ↔ `orders` avec position optimisée |
+| Batch | `delivery_mileage_logs` | Kilométrage par livraison (collecte GPS pas encore activée en prod) |
+| Utilisateurs | `users` | Comptes de base (email, téléphone, rôle) |
+| Utilisateurs | `profiles` | Profil étendu (nom, avatar, préférences) |
+| Utilisateurs | `otp_codes` | Codes OTP temporaires, supprimés après validation |
+| Livreurs | `driver_profiles` | Profil métier (`driver_type`, véhicule, disponibilité) |
+| Livreurs | `driver_locations` | Positions GPS temps réel |
+| Livreurs | `driver_payouts` | Virements Krono → livreurs (Orange Money/Wave/bancaire) — **module pas encore activé, table à garder** pour son rôle futur |
+| Commissions | `commission_balance` | Solde prépayé livreur `partner`, suspension si < minimum |
+| Commissions | `commission_transactions` | Historique recharges/déductions (`recharge_commission_balance`, `deduct_commission`) |
+| Partners B2B | `partners`, `partner_users`, `partner_drivers`, `partner_subscriptions`, `partner_usage`, `partner_invoices` | Voir section 16 (schéma B2B complet) |
+| Paiements | `transactions` | Transactions financières (paiements, remboursements) |
+| Paiements | `invoices` | Factures client par commande |
+| Paiements | `payment_methods` | Méthodes de paiement enregistrées |
+| Paiements | `payment_disputes` | Litiges de paiement |
+| Flotte | `fleet_vehicles`, `vehicle_documents`, `vehicle_maintenance`, `vehicle_fuel_logs`, `vehicle_financial_summary` | Gestion flotte (véhicules, documents légaux, maintenance, carburant, résumé financier) — module existe mais peu alimenté depuis l'admin |
+| Notifications | `push_tokens` | Tokens Expo Push par appareil |
+| Notifications | `live_activity_tokens` | Tokens APNs iOS Live Activity |
+| Notifications | `track_web_push_subscriptions` | Web Push tracking navigateur (destinataires) |
+| Notifications | `admin_notification_feed` | Fil de notifications admin |
+| Notifications | `notification_campaign_deliveries` | Suivi des envois de campagnes marketing push |
+| Notifications | ~~`notifications`~~ | **Inutilisée** — remplacée par Expo Push direct (`push_tokens` + `expoPushService.ts`). Candidate à suppression si confirmé inutile ailleurs |
+| Messagerie | `conversations`, `messages` | Fils de discussion client ↔ livreur liés à une commande |
+| Divers | `ratings` | Notes/avis client après livraison |
+| Divers | `qr_code_scans` | Historique des scans QR (preuve de remise) |
+
+**Tables supprimées (2026-05-04)** : `driver_wallets` et `driver_wallet_transactions` — orphelines, aucune référence backend. Les gains livreurs sont calculés depuis `orders`, les commissions via `commission_balance`. **Ne pas les recréer** sans une vraie raison produit (voir aussi la persistance `driver_earning_cfa` cible en section 17).
 
 ---
 
@@ -1228,7 +1294,24 @@ Le commissionnaire est une feature **B2C** distincte : le livreur agit à la pla
 
 ---
 
-## 17. Documents vivants
+## 17. Stabilisation App Store — reste à faire
+
+Issu de l'audit de stabilisation pré-App Store (`docs/recommandation/recommandation.md`, supprimé le 2026-07-22 une fois son contenu utile intégré ici). Les points déjà résolus de cet audit sont documentés dans leurs sections respectives ci-dessus (10, 7, 13). Ce qui suit reste ouvert.
+
+| Sujet | Blocage | Détail |
+|---|---|---|
+| **Documents légaux** (confidentialité, CGU) | Nécessite des infos réelles sur l'entreprise (identité responsable de traitement, adresse, contact DPO) que seul l'utilisateur peut fournir | `admin_chrono/app/legal/confidentialite/page.tsx` et `.../cgu/page.tsx` sont des placeholders explicites — Apple refuse une app sans politique de confidentialité réelle et hébergée sur une URL stable |
+| **Grille B2B officielle** | Décision de séquencement à prendre par l'utilisateur | 3 grilles trouvées en conflit : technique actuelle in-quota Starter 3%/Pro 2%/Business 0% (`b2bCommissionService.ts` + portail billing), doc `krono-reference-unique.md` (section 16) 5%/3%/2%, grille commerciale **cible validée** dans `docs/tale/MONETISATION.md` (%+frais fixe FCFA, ex. Starter 8%+100 in-quota). La cible validée est identifiée mais pas implémentée (touche backend, app client, admin, portail). Décision : tout implémenter maintenant vs stopgap simple d'abord |
+| **Gain livreur réel / marge Krono persistés** | Dépend de la décision grille B2B ci-dessus (même formule de prix final) | `docs/tale/MONETISATION.md` section 7/10 : ajouter `driver_earning_cfa`, `krono_delivery_margin_cfa`, `b2b_fee_cfa`, `driver_payout_model` par commande ; aujourd'hui certains écrans confondent encore prix de course et gain livreur |
+| **WhatsApp non validé bout-en-bout** | Nécessite un numéro WhatsApp Business réel approuvé Meta | `twilioWhatsAppService.ts` est bien écrit (fallback SMS, templates) mais l'état réel en prod (variables renseignées ? templates approuvés ?) n'est pas documenté |
+| **Écrans paiement/promo incomplets** | Aucun — juste pas encore fait | `app_chrono/app/profile/payment-methods.tsx` (`setDefault`/`deleteMethod` non câblés), `driver_chrono/app/profile/payments.tsx` (page vide), `app_chrono/app/profile/promo-codes.tsx` (code promo non validé via API) — soit câbler, soit masquer les boutons |
+| **Tournées B2B pas totalement stabilisées** | Aucun — investigation à faire | Notifications intermédiaires non reçues en test (seul `completed` a été notifié, 3×). Pistes à vérifier dans l'ordre : (A) `confirmBatchPickup()` dans `batchController.ts` (~lignes 330-374) — vérifier que le passage en `picked_up` déclenche `notifyAllForOrderStatus()` pour **chaque** commande, pas juste un UPDATE SQL silencieux ; (B) `accept-batch` dans `orderSocket.ts` (~ligne 1899) — vérifier que le statut `accepted` est notifié par commande, pas seulement le code de livraison via `notifyB2BBatchRecipientsProof()` ; (C) déduplication `order_status_push_sent` potentiellement trop agressive si un test précédent a déjà consommé ces statuts. Autres points : ETA Dynamic Island non alimenté par la tournée, store batch non réinitialisé au retour accueil |
+| **Divergence versions mobiles** | Décision de roadmap — upgrader une app mobile en prod est risqué | `app_chrono` Expo 55/RN 0.83 vs `driver_chrono` Expo 54/RN 0.81 — décider si volontaire (documenter) ou aligner progressivement |
+| **Tests d'intégration insuffisants** | Aucun — effort à planifier | Zones prioritaires : auth/ownership, transitions de statut, paiement différé, commission, pricing B2B, batch/tournée, QR/preuve, anti-doublon notifications |
+
+---
+
+## 18. Documents vivants
 
 Il doit rester un fichier principal de référence dans `docs/` :
 
