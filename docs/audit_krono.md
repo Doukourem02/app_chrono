@@ -21,7 +21,7 @@ Les fondamentaux étaient solides (pas de secrets en dur, `.env` bien ignorés p
 | 7 | Pas de révocation de session | ✅ corrigé (route `/logout` ajoutée) |
 | 8 | Rate-limit OTP contournable par IP | ✅ corrigé |
 | 9 | RLS absente sur tables B2B | ✅ faux positif — RLS déjà en place, voir note |
-| 10 | Statuts de commande incohérents entre apps | ⏳ en attente — chantier dédié à planifier |
+| 10 | Statuts de commande incohérents entre apps | 📄 plan documenté, voir `docs/plan_unification_statuts_commande.md` — implémentation non lancée |
 | 11 | Client Redis OTP mal fermé | ✅ corrigé |
 | 12 | Comparaison OTP non constant-time | ✅ corrigé |
 | 13 | Code mort `otpService.ts` | ✅ corrigé (supprimé) |
@@ -87,7 +87,7 @@ Fichier supprimé (confirmé non importé nulle part).
 Ces points sont indépendants de l'intégration mobile money, mais leur ampleur/risque de régression justifie une passe dédiée plutôt qu'un correctif rapide mêlé aux autres.
 
 ### 10. Statuts de commande incohérents entre les 4 apps
-Backend, `admin_chrono`, `app_chrono` et `driver_chrono` ont chacun un vocabulaire de statut différent (`accepted` vs `assigned`, `completed` vs `delivered`, etc.). Unifier ça touche potentiellement des dizaines de fichiers dans 4 projets et mérite d'être planifié à part.
+Plan documenté dans `docs/plan_unification_statuts_commande.md`, avec vérité terrain confirmée directement en base : l'enum réel `order_status` a **11 valeurs**, aucune des 4 apps ne les couvre. Risque concret identifié : `app_chrono/app/summary.tsx` compare le statut à `confirmed`/`delivered`, des valeurs absentes de l'enum DB (`accepted`/`completed` sont les vraies) — à vérifier en priorité. Implémentation non lancée, en attente de validation du plan.
 
 ### 14. Écart de version Expo/React Native entre `app_chrono` (Expo 55) et `driver_chrono` (Expo 54)
 Un bump de SDK Expo touche le code natif (iOS/Android, Pods, config plugins) des deux apps — trop risqué pour être fait en passant, à traiter comme son propre chantier avec tests de build dédiés.
