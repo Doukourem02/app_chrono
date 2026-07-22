@@ -63,7 +63,9 @@ export default function PhoneAuthScreen() {
           );
         }
 
-        setTempData('', phoneE164, 'sms');
+        // Le backend peut basculer automatiquement vers WhatsApp (Orange CI) : on reflète la méthode réellement utilisée.
+        const usedMethod: 'sms' | 'whatsapp' = data?.data?.method === 'whatsapp' ? 'whatsapp' : 'sms';
+        setTempData('', phoneE164, usedMethod);
         router.push('/(auth)/verification' as any);
       } catch (fetchError: any) {
         clearTimeout(timeoutId);

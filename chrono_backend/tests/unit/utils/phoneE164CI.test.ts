@@ -7,6 +7,7 @@ import {
   phoneDigitsKey,
   buildPhoneLookupDigitKeys,
   buildPhoneLookupDigitSuffixKeys,
+  detectCarrierCI,
 } from '../../../src/utils/phoneE164CI.js';
 
 describe('toE164CI', () => {
@@ -117,5 +118,29 @@ describe('buildPhoneLookupDigitSuffixKeys', () => {
     ]);
     const unique = new Set(result);
     expect(result.length).toBe(unique.size);
+  });
+});
+
+describe('detectCarrierCI', () => {
+  it('détecte Orange (préfixe 07)', () => {
+    expect(detectCarrierCI('+2250708090001')).toBe('orange');
+    expect(detectCarrierCI('0708090001')).toBe('orange');
+  });
+
+  it('détecte MTN (préfixe 05)', () => {
+    expect(detectCarrierCI('+2250512345678')).toBe('mtn');
+  });
+
+  it('détecte Moov (préfixe 01)', () => {
+    expect(detectCarrierCI('+2250123456789')).toBe('moov');
+  });
+
+  it('retourne unknown pour un préfixe non mobile CI', () => {
+    expect(detectCarrierCI('+2250312345678')).toBe('unknown');
+  });
+
+  it('retourne unknown pour un numéro invalide', () => {
+    expect(detectCarrierCI('abcdefghij')).toBe('unknown');
+    expect(detectCarrierCI('')).toBe('unknown');
   });
 });

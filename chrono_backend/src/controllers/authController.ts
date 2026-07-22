@@ -3,7 +3,8 @@ import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
 import { sendOTPSMS } from '../services/emailService.js';
 import { sendOTPWhatsApp } from '../services/twilioWhatsAppService.js';
-import {storeOTP,verifyOTP,resolveOtpEmailForStorage,syntheticEmailFromPhone,} from '../config/otpStorage.js';
+import { detectCarrierCI } from '../utils/phoneE164CI.js';
+import {storeOTP,verifyOTP,getOTP,resolveOtpEmailForStorage,syntheticEmailFromPhone,} from '../config/otpStorage.js';
 import { OTP_TTL_MINUTES } from '../config/otpTtl.js';
 import { generateTokens, refreshAccessToken, revokeRefreshToken } from '../utils/jwt.js';
 import logger from '../utils/logger.js';
@@ -602,12 +603,32 @@ const sendOTPCode = async (
     const { email, phone, otpMethod = 'sms', role = 'client' } = req.body;
     const phoneStr = phone || '';
     const otpEmail = resolveOtpEmailForStorage(email, phoneStr);
-    logger.info(`Envoi OTP pour ${maskPhone(phoneStr)} via ${otpMethod} avec rôle ${role}`);
+
+    // Orange CI : SMS jugé non fiable (route A2P non confirmée côté agrégateur) -> WhatsApp exclusif,
+    // quelle que soit la méthode demandée par le client. MTN/Moov gardent le SMS par défaut.
+    const carrier = detectCarrierCI(phoneStr);
+    let effectiveMethod = carrier === 'orange' ? 'whatsapp' : otpMethod;
+
+    // Orchestration 100% backend : si un OTP non expiré existe déjà pour ce numéro (l'utilisateur a
+    // cliqué sur "Renvoyer" via le flux normal), c'est que le premier envoi SMS n'a probablement pas
+    // abouti -> on bascule automatiquement sur WhatsApp, sans action ni bouton dédié côté client.
+    let isResend = false;
+    if (effectiveMethod === 'sms') {
+      const previousOtp = await getOTP(otpEmail, phoneStr, role);
+      isResend = !!previousOtp;
+      if (isResend) {
+        effectiveMethod = 'whatsapp';
+      }
+    }
+
+    logger.info(
+      `Envoi OTP pour ${maskPhone(phoneStr)} via ${effectiveMethod} (opérateur détecté: ${carrier}, demandé: ${otpMethod}, renvoi: ${isResend}) avec rôle ${role}`
+    );
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     await storeOTP(otpEmail, phoneStr, role, otpCode);
 
-    if (otpMethod === 'sms') {
+    if (effectiveMethod === 'sms') {
       logger.info(`Code OTP ${otpCode} pour SMS au ${maskPhone(phoneStr)} (Twilio/Vonage)`);
       // Attendre l’API SMS : évite un 200 alors que Twilio/Vonage a refusé ; la livraison opérateur peut encore prendre du retard.
       const smsResult = await sendOTPSMS(phoneStr, otpCode, role);
@@ -621,14 +642,16 @@ const sendOTPCode = async (
         return;
       }
       logger.info('SMS OTP envoyé avec succès !');
-    } else if (otpMethod === 'whatsapp') {
-      logger.info(`Code OTP envoyé par WhatsApp au ${phone}`);
+    } else if (effectiveMethod === 'whatsapp') {
+      logger.info(`Code OTP envoyé par WhatsApp au ${maskPhone(phoneStr)}`);
       const waResult = await sendOTPWhatsApp(phoneStr, otpCode, role);
       if (!waResult.success) {
         logger.error('Échec envoi WhatsApp:', waResult.error);
         res.status(503).json({
           success: false,
-          message: "Impossible d'envoyer le code par WhatsApp",
+          message: carrier === 'orange' || isResend
+            ? "Impossible d'envoyer le code par WhatsApp. Vérifiez que WhatsApp est installé et actif sur ce numéro."
+            : "Impossible d'envoyer le code par WhatsApp",
           error: process.env.NODE_ENV === 'development' ? waResult.error : undefined,
         });
         return;
@@ -638,9 +661,10 @@ const sendOTPCode = async (
 
     res.json({
       success: true,
-      message: `Code OTP envoyé par ${otpMethod}`,
+      message: `Code OTP envoyé par ${effectiveMethod}`,
       data: {
-        method: otpMethod,
+        method: effectiveMethod,
+        carrier,
         email: email?.trim() || undefined,
         phone: phoneStr,
         role,

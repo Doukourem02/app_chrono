@@ -3,6 +3,24 @@
  */
 const MOBILE_PREFIXES = ['01', '05', '07'] as const;
 
+export type CarrierCI = 'orange' | 'mtn' | 'moov' | 'unknown';
+
+/** Plan de numérotation CI (post-2021, 10 chiffres) : 01 = Moov, 05 = MTN, 07 = Orange. */
+const PREFIX_TO_CARRIER: Record<string, CarrierCI> = {
+  '01': 'moov',
+  '05': 'mtn',
+  '07': 'orange',
+};
+
+/** Détecte l'opérateur mobile ivoirien à partir d'un numéro E.164 ou brut ; 'unknown' si non identifiable. */
+export function detectCarrierCI(phone: string): CarrierCI {
+  const e164 = toE164CI(phone);
+  const digits = phoneDigitsKey(e164 || phone || '');
+  const national = digits.startsWith('225') ? digits.slice(3) : digits;
+  const prefix = national.slice(0, 2);
+  return PREFIX_TO_CARRIER[prefix] || 'unknown';
+}
+
 function digitsOnly(phone: string): string {
   return phone.replace(/\D/g, '');
 }
