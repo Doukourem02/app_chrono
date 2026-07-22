@@ -6,7 +6,7 @@ Audit de sécurité et de cohérence du monorepo (backend Node/TS, admin_chrono,
 
 Les fondamentaux étaient solides (pas de secrets en dur, `.env` bien ignorés par git, JWT correct, CORS/helmet actifs, RLS présente sur les tables cœur, calculs financiers en `NUMERIC`), mais deux failles critiques permettaient de manipuler de l'argent réel dans le flux commission/paiement, et un taux de commission en code contredisait une décision déjà validée.
 
-**Mise à jour 2026-07-22 (même jour)** : tous les points indépendants de l'intégration mobile money ont été corrigés, y compris #10 (statuts de commande) et #15 (types driver_chrono). Il ne reste ouvert que ce qui dépend de l'intégration réelle des opérateurs économiques (#1/#2/#3), plus #14 (alignement Expo).
+**Mise à jour 2026-07-22 (même jour)** : tous les points indépendants de l'intégration mobile money ont été corrigés, y compris #10 (statuts de commande), #15 (types driver_chrono) et #14 (alignement Expo, sur branche séparée — voir note). Il ne reste ouvert que ce qui dépend de l'intégration réelle des opérateurs économiques (#1/#2/#3), plus la validation manuelle Android/device de #14 avant merge.
 
 ## Statut en un coup d'œil
 
@@ -25,7 +25,7 @@ Les fondamentaux étaient solides (pas de secrets en dur, `.env` bien ignorés p
 | 11 | Client Redis OTP mal fermé | ✅ corrigé |
 | 12 | Comparaison OTP non constant-time | ✅ corrigé |
 | 13 | Code mort `otpService.ts` | ✅ corrigé (supprimé) |
-| 14 | Écart de version Expo entre apps | ⏳ en attente — chantier dédié à planifier |
+| 14 | Écart de version Expo entre apps | 🟡 fait sur branche séparée, **non mergée sur main** — voir note |
 | 15 | Pas de dossier `types/` dans driver_chrono | ✅ corrigé (fait avec #10) |
 
 Type-check (`tsc --noEmit`) et suite de tests (`npm test`, 234 tests) passés après tous les correctifs, sans régression.
@@ -88,10 +88,22 @@ Créé à l'occasion du point #10, `OrderStatus`/`OrderRequest` déplacés depui
 
 ---
 
-## ⏳ En attente
+## 🟡 Fait, mais volontairement pas sur `main` — nécessite validation manuelle
 
 ### 14. Écart de version Expo/React Native entre `app_chrono` (Expo 55) et `driver_chrono` (Expo 54)
-Un bump de SDK Expo touche le code natif (iOS/Android, Pods, config plugins) des deux apps.
+`driver_chrono` mis à jour vers Expo 55 sur la branche **`chore/align-expo-driver-chrono-55`** (poussée sur le remote, PR pas encore ouverte). Détails complets dans le message du commit `afbf357`.
+
+Vérifié et propre :
+- `tsc --noEmit`, `jest` (25/25), `expo-doctor` (19/19)
+- `expo prebuild --clean` + installation CocoaPods **complète** côté iOS (122 dépendances, 142 pods), y compris les patches natifs custom (Mapbox turn-by-turn Fleetbase, patch Swift, patch Android RNMapbox) qui se sont réappliqués sans erreur
+
+Corrections nécessaires découvertes en cours de route (gaps préexistants, pas causés par le bump lui-même) :
+- `dotenv` et `babel-preset-expo` ajoutés en dépendances explicites — `app.config.js`/`babel.config.js` les requièrent directement mais ils n'étaient fournis que transitivement, le reinstall les a fait disparaître
+- `expo-modules-core` ajouté en dépendance explicite — sans lui, Node/tsc ne le trouvent pas (imbriqué uniquement sous `expo/node_modules`), alors que Metro le résout via son propre mécanisme ; ça cassait silencieusement le typage d'`expo-notifications`/`expo-audio`
+- `app.config.js` : 5 plugins désormais requis explicitement en SDK 55, `edgeToEdgeEnabled` retiré (obsolète, Android 16 l'impose nativement)
+- `soundService.ts` : `AudioPlayer.release()` renommé `.remove()` dans la nouvelle API `expo-audio`
+
+**Non vérifié : build Android complet.** Bloqué localement par une erreur de résolution du toolchain Gradle/JDK (`JvmVendorSpec.IBM_SEMERU` introuvable), qui survient avant même que Gradle touche aux dépendances du projet — y compris avec un `GRADLE_USER_HOME` propre et vide. Ça ressemble à un problème d'environnement sur cette machine (Gradle 9 + JDK 21 installé), pas à une régression du bump, mais ça n'a pas pu être confirmé faute d'un second JDK à tester. **À vérifier avant tout merge** : build Android réel (device/émulateur ou `eas build`), plus un test manuel de la navigation turn-by-turn Mapbox sur device (zone la plus fragile, patches natifs custom).
 
 ---
 
@@ -110,6 +122,6 @@ Un bump de SDK Expo touche le code natif (iOS/Android, Pods, config plugins) des
 
 ## Prochaines étapes suggérées
 
-1. Chantier #14 (alignement Expo) en cours.
+1. Tester la branche `chore/align-expo-driver-chrono-55` sur un vrai build Android + device (navigation Mapbox en particulier) avant de merger sur `main`.
 2. Revenir sur #1/#2/#3 au moment de démarrer l'intégration réelle d'un opérateur mobile money.
 3. Dette technique repérée mais volontairement non traitée : `app_chrono/app/summary.tsx` + `useShipmentStore` (code mort inatteignable) — candidat à suppression sur demande explicite (voir section 8 de `docs/plan_unification_statuts_commande.md`).
