@@ -16,7 +16,7 @@ Les fondamentaux étaient solides (pas de secrets en dur, `.env` bien ignorés p
 | 2 | Dette marquée payée sans confirmation | ⏳ bloqué — intégration opérateur requise |
 | 3 | Aucun webhook mobile money | ⏳ bloqué — intégration opérateur requise |
 | 4 | Taux de commission B2B incohérent | ✅ corrigé |
-| 5 | Pas de verrou sur déduction commission | ✅ corrigé (migration écrite, **à appliquer manuellement**) |
+| 5 | Pas de verrou sur déduction commission | ✅ corrigé et **appliqué en base** (2026-07-22) |
 | 6 | IDOR routes `/check` | ✅ corrigé |
 | 7 | Pas de révocation de session | ✅ corrigé (route `/logout` ajoutée) |
 | 8 | Rate-limit OTP contournable par IP | ✅ corrigé |
@@ -57,7 +57,7 @@ Nouvelle migration `chrono_backend/migrations/042_commission_deduction_lock_idem
 - `deduct_commission()` verrouille désormais la ligne (`FOR UPDATE`) avant de lire/modifier le solde.
 - Contrainte unique `commission_transactions_order_deduction_uidx` empêchant deux déductions pour la même commande.
 
-**⚠️ Cette migration n'a pas été appliquée à la base.** À exécuter manuellement (SQL Editor Supabase ou `psql`), comme toutes les migrations de ce dossier (voir `migrations/README.md`). Si des doublons de déduction existent déjà en prod, la création de l'index unique échouera — une requête de diagnostic est fournie en commentaire dans le fichier de migration.
+**✅ Appliquée en base le 2026-07-22** (projet Supabase `chrono_delivery`). Vérifié après coup : aucun doublon de déduction préexistant (la requête de diagnostic n'a rien remonté), index unique et verrou `FOR UPDATE` confirmés présents sur la fonction en production.
 
 ### 6. IDOR sur `/check/:email` et `/check-by-id/:userId`
 `chrono_backend/src/controllers/authController.ts` — ajout du même contrôle d'ownership que sur `updateUserProfile`/`getUserProfile` : un utilisateur ne peut consulter que son propre compte (sauf rôle admin/super_admin).
@@ -112,6 +112,6 @@ Conséquence directe du point #10 — à traiter dans le même chantier.
 
 ## Prochaines étapes suggérées
 
-1. Appliquer manuellement la migration `042_commission_deduction_lock_idempotency.sql` (point #5).
-2. Planifier séparément les chantiers #10 (statuts de commande) et #14 (alignement Expo).
+1. Valider le plan `docs/plan_unification_statuts_commande.md` (#10) avant de lancer l'implémentation.
+2. Planifier séparément le chantier #14 (alignement Expo).
 3. Revenir sur #1/#2/#3 au moment de démarrer l'intégration réelle d'un opérateur mobile money.
