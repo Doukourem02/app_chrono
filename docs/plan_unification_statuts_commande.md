@@ -1,6 +1,24 @@
 # Plan — Unification des statuts de commande (#10 de audit_krono.md)
 
-Statut : **document de planification, rien n'est implémenté**. À valider avant de lancer l'exécution.
+Statut : **implémenté le 2026-07-22.**
+
+## 0. Ce qui a été fait (résumé)
+
+Investigation approfondie avant modification : le risque initialement identifié (`app_chrono/app/summary.tsx` comparant le statut à des valeurs absentes de l'enum DB) s'est révélé être un **faux problème** — cet écran (`/summary`) et son store associé (`useShipmentStore`) ne sont référencés par aucune navigation dans l'app (`router.push`/`href`), c'est du code mort inatteignable. Le vrai type utilisé en production côté app_chrono (`store/useOrderStore.ts`) avait déjà les bonnes valeurs.
+
+Décision sur les 11 valeurs de l'enum DB : **9 retenues comme canon applicatif** (`pending, accepted, enroute, in_progress, picked_up, delivering, completed, declined, cancelled`). `draft` et `searching_driver` existent dans l'enum Postgres mais aucun code (backend ou front, vérifié par grep) ne les produit ni ne les consomme actuellement — les ajouter partout aurait été de la validation pour un cas qui ne peut pas arriver. Elles restent documentées ici si jamais elles doivent être activées plus tard.
+
+Changements effectués :
+- `chrono_backend/src/types/index.ts` : `OrderStatus` étendu de 7 à 9 valeurs (ajout `in_progress`, `delivering`, qui existaient déjà en DB depuis la migration 031 mais manquaient du type TS).
+- `admin_chrono/types/index.ts` : `Order.status` corrigé sur les 9 valeurs canoniques (typo `canceled`→`cancelled` corrigée, `assigned`/`delivered`/`on_hold` retirés — aucun n'était utilisé nulle part, ce type n'est importé par aucun fichier).
+- `driver_chrono/types/index.ts` (nouveau fichier, point #15) : `OrderStatus`/`OrderRequest` extraits de `store/useOrderStore.ts` vers un dossier `types/` dédié, comme les 3 autres apps. Le store réexporte les deux types pour ne casser aucun des 6 imports existants ailleurs dans l'app.
+- `app_chrono` : **aucun changement** — le type réellement utilisé (`store/useOrderStore.ts`) avait déjà les 9 bonnes valeurs. Le vieux type `ShipmentStatus`/`Shipment` dans `types/index.ts` reste en l'état (code mort, voir section 8).
+
+Type-check (`tsc --noEmit`) et suites de tests passés sans régression sur les 3 projets touchés (backend, admin_chrono, driver_chrono).
+
+---
+
+## Contenu original du plan (avant investigation)
 
 ## 1. Constat
 
@@ -49,8 +67,12 @@ Distribution réelle actuelle (`SELECT status, COUNT(*) FROM orders GROUP BY sta
 4. Mettre à jour chaque app front une par une, avec tests manuels du flux de suivi de commande à chaque étape (statut affiché correctement à chaque transition pending → accepted → enroute/picked_up → delivering → completed, et cancelled/declined).
 5. Ajouter un dossier `types/` centralisé dans `driver_chrono` (point #15) à cette occasion.
 
-## 7. Questions ouvertes pour toi
+## 7. Questions ouvertes — tranchées le 2026-07-22
 
-- Confirmer que `on_hold` et `assigned` (admin_chrono) sont bien des reliquats à supprimer et pas une fonctionnalité prévue mais jamais branchée.
-- Le statut `draft` et `searching_driver` de l'enum DB : sont-ils réellement utilisés quelque part (créés mais jamais lus par un des fronts) ? Ni `app_chrono` ni `driver_chrono` ni `admin_chrono` ne les mentionnent actuellement.
-- Priorité : veut-on traiter ça en une seule passe sur les 4 apps, ou app par app à des moments différents ?
+- `on_hold`/`assigned` (admin_chrono) : confirmés reliquats sans usage réel (grep exhaustif, seule occurrence = la déclaration de type elle-même) → retirés.
+- `draft`/`searching_driver` (enum DB) : confirmés non produits par le backend actuel (`draft` trouvé une fois dans le code mais sur `invoices.status`, une autre table sans rapport) → exclus du type applicatif, juste documentés ici en section 0.
+- Priorité : tout fait en une seule passe (backend + admin_chrono + driver_chrono ; app_chrono n'avait rien à changer).
+
+## 8. Dette technique identifiée mais non traitée (hors périmètre #10)
+
+`app_chrono/types/index.ts` (`ShipmentStatus`, interface `Shipment`) et `app_chrono/store/useShipmentStore.ts` forment un système de statut parallèle à `store/useOrderStore.ts`, utilisé uniquement par l'écran `app/summary.tsx` — lui-même inatteignable (aucune navigation ne pointe dessus). Candidat à suppression complète dans un futur nettoyage de code mort, mais ce n'est pas une correction de sécurité/cohérence : à ne faire que sur demande explicite, car supprimer un écran est une décision produit, pas juste technique.

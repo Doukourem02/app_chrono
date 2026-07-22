@@ -6,7 +6,7 @@ Audit de sécurité et de cohérence du monorepo (backend Node/TS, admin_chrono,
 
 Les fondamentaux étaient solides (pas de secrets en dur, `.env` bien ignorés par git, JWT correct, CORS/helmet actifs, RLS présente sur les tables cœur, calculs financiers en `NUMERIC`), mais deux failles critiques permettaient de manipuler de l'argent réel dans le flux commission/paiement, et un taux de commission en code contredisait une décision déjà validée.
 
-**Mise à jour 2026-07-22 (même jour)** : tous les points indépendants de l'intégration mobile money ont été corrigés (voir statuts ci-dessous). Il ne reste ouvert que ce qui dépend de l'intégration réelle des opérateurs économiques, plus deux chantiers volontairement mis de côté car trop larges pour un correctif ponctuel (#10, #14).
+**Mise à jour 2026-07-22 (même jour)** : tous les points indépendants de l'intégration mobile money ont été corrigés, y compris #10 (statuts de commande) et #15 (types driver_chrono). Il ne reste ouvert que ce qui dépend de l'intégration réelle des opérateurs économiques (#1/#2/#3), plus #14 (alignement Expo).
 
 ## Statut en un coup d'œil
 
@@ -21,12 +21,12 @@ Les fondamentaux étaient solides (pas de secrets en dur, `.env` bien ignorés p
 | 7 | Pas de révocation de session | ✅ corrigé (route `/logout` ajoutée) |
 | 8 | Rate-limit OTP contournable par IP | ✅ corrigé |
 | 9 | RLS absente sur tables B2B | ✅ faux positif — RLS déjà en place, voir note |
-| 10 | Statuts de commande incohérents entre apps | 📄 plan documenté, voir `docs/plan_unification_statuts_commande.md` — implémentation non lancée |
+| 10 | Statuts de commande incohérents entre apps | ✅ corrigé, voir `docs/plan_unification_statuts_commande.md` |
 | 11 | Client Redis OTP mal fermé | ✅ corrigé |
 | 12 | Comparaison OTP non constant-time | ✅ corrigé |
 | 13 | Code mort `otpService.ts` | ✅ corrigé (supprimé) |
 | 14 | Écart de version Expo entre apps | ⏳ en attente — chantier dédié à planifier |
-| 15 | Pas de dossier `types/` dans driver_chrono | ⏳ en attente — lié à #10 |
+| 15 | Pas de dossier `types/` dans driver_chrono | ✅ corrigé (fait avec #10) |
 
 Type-check (`tsc --noEmit`) et suite de tests (`npm test`, 234 tests) passés après tous les correctifs, sans régression.
 
@@ -80,20 +80,18 @@ Vérification faite : la RLS **est** activée sur `commission_balance`, `commiss
 ### 13. Code mort `otpService.ts`
 Fichier supprimé (confirmé non importé nulle part).
 
+### 10. Statuts de commande incohérents entre les 4 apps
+Détail complet dans `docs/plan_unification_statuts_commande.md`. Vérité terrain confirmée directement en base : l'enum réel `order_status` a 11 valeurs ; 9 retenues comme canon applicatif (`draft`/`searching_driver` jamais produites, exclues volontairement). Le risque initialement identifié (`app_chrono/app/summary.tsx`) s'est révélé être un faux problème : cet écran et son store sont du code mort inatteignable (aucune navigation ne pointe dessus). Corrections faites : `chrono_backend/src/types/index.ts` (`OrderStatus` 7→9 valeurs), `admin_chrono/types/index.ts` (typo + valeurs mortes retirées), `driver_chrono/types/index.ts` créé (point #15).
+
+### 15. Dossier `types/` centralisé dans `driver_chrono`
+Créé à l'occasion du point #10, `OrderStatus`/`OrderRequest` déplacés depuis `store/useOrderStore.ts`, réexportés pour ne casser aucun import existant.
+
 ---
 
-## ⏳ En attente — chantiers plus larges, non traités dans cette passe
-
-Ces points sont indépendants de l'intégration mobile money, mais leur ampleur/risque de régression justifie une passe dédiée plutôt qu'un correctif rapide mêlé aux autres.
-
-### 10. Statuts de commande incohérents entre les 4 apps
-Plan documenté dans `docs/plan_unification_statuts_commande.md`, avec vérité terrain confirmée directement en base : l'enum réel `order_status` a **11 valeurs**, aucune des 4 apps ne les couvre. Risque concret identifié : `app_chrono/app/summary.tsx` compare le statut à `confirmed`/`delivered`, des valeurs absentes de l'enum DB (`accepted`/`completed` sont les vraies) — à vérifier en priorité. Implémentation non lancée, en attente de validation du plan.
+## ⏳ En attente
 
 ### 14. Écart de version Expo/React Native entre `app_chrono` (Expo 55) et `driver_chrono` (Expo 54)
-Un bump de SDK Expo touche le code natif (iOS/Android, Pods, config plugins) des deux apps — trop risqué pour être fait en passant, à traiter comme son propre chantier avec tests de build dédiés.
-
-### 15. Pas de dossier `types/` centralisé dans `driver_chrono`
-Conséquence directe du point #10 — à traiter dans le même chantier.
+Un bump de SDK Expo touche le code natif (iOS/Android, Pods, config plugins) des deux apps.
 
 ---
 
@@ -112,6 +110,6 @@ Conséquence directe du point #10 — à traiter dans le même chantier.
 
 ## Prochaines étapes suggérées
 
-1. Valider le plan `docs/plan_unification_statuts_commande.md` (#10) avant de lancer l'implémentation.
-2. Planifier séparément le chantier #14 (alignement Expo).
-3. Revenir sur #1/#2/#3 au moment de démarrer l'intégration réelle d'un opérateur mobile money.
+1. Chantier #14 (alignement Expo) en cours.
+2. Revenir sur #1/#2/#3 au moment de démarrer l'intégration réelle d'un opérateur mobile money.
+3. Dette technique repérée mais volontairement non traitée : `app_chrono/app/summary.tsx` + `useShipmentStore` (code mort inatteignable) — candidat à suppression sur demande explicite (voir section 8 de `docs/plan_unification_statuts_commande.md`).

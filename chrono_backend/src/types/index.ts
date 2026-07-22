@@ -36,8 +36,10 @@ export interface DriverProfile {
   updated_at?: Date;
 } 
 
-// Order Status
-export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'picked_up' | 'completed' | 'declined' | 'cancelled'; export type DeliveryMethod = 'moto' | 'vehicule' | 'cargo'; export interface Coordinates { latitude: number; longitude: number;
+// Order Status — aligné sur l'enum Postgres `order_status`. `draft` et `searching_driver`
+// existent dans l'enum DB mais ne sont jamais produits par le flux applicatif actuel
+// (vérifié 2026-07-22, cf. docs/plan_unification_statuts_commande.md) — omis ici.
+export type OrderStatus = 'pending' | 'accepted' | 'enroute' | 'in_progress' | 'picked_up' | 'delivering' | 'completed' | 'declined' | 'cancelled'; export type DeliveryMethod = 'moto' | 'vehicule' | 'cargo'; export interface Coordinates { latitude: number; longitude: number;
 }
 
 // Address

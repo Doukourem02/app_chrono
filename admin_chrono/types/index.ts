@@ -1,7 +1,10 @@
 export interface Order {
   id: string
   orderId: string
-  status: 'pending' | 'assigned' | 'in_progress' | 'delivered' | 'canceled' | 'on_hold'
+  // Aligné sur l'enum Postgres `order_status` (cf. docs/plan_unification_statuts_commande.md).
+  // 'assigned'/'delivered'/'canceled'/'on_hold' n'existent pas côté DB — ce type n'était importé
+  // nulle part (vérifié 2026-07-22), corrigé pour éviter toute confusion si réutilisé un jour.
+  status: 'pending' | 'accepted' | 'enroute' | 'in_progress' | 'picked_up' | 'delivering' | 'completed' | 'declined' | 'cancelled'
   pickup_address: string
   dropoff_address: string
   pickup_coords: { lat: number; lng: number }
