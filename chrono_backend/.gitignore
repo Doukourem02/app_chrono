@@ -43,6 +43,7 @@ backups-test/
 !migrations/039_b2b_subscription_payment_records.sql
 !migrations/040_qr_code_scans_allow_delivery_proof_types.sql
 !migrations/041_partner_dedicated_driver_requests.sql
+!migrations/042_commission_deduction_lock_idempotency.sql
 *.sql.gz
 *.json.backup
 backup_metadata.json

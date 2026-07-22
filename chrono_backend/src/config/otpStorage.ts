@@ -2,6 +2,7 @@ import pool from './db.js';
 import { OTP_TTL_MS } from './otpTtl.js';
 import logger from '../utils/logger.js';
 import { createClient, RedisClientType } from 'redis';
+import crypto from 'crypto';
 
 let redisOtpClient: RedisClientType | null = null;
 
@@ -10,14 +11,29 @@ async function getRedisOtpClient(): Promise<RedisClientType | null> {
   const url = process.env.REDIS_URL?.trim();
   if (!url || /^https?:\/\//i.test(url)) return null;
   try {
-    redisOtpClient = createClient({ url }) as RedisClientType;
-    redisOtpClient.on('error', () => { redisOtpClient = null; });
-    await redisOtpClient.connect();
-    return redisOtpClient;
+    const client = createClient({ url }) as RedisClientType;
+    client.on('error', () => {
+      // Ne coupe la référence module que si elle pointe toujours vers ce client
+      // (évite d'écraser un client plus récent créé entre-temps), et ferme
+      // proprement l'ancien client pour ne pas laisser de connexion orpheline.
+      if (redisOtpClient === client) redisOtpClient = null;
+      client.quit().catch(() => client.disconnect().catch(() => {}));
+    });
+    redisOtpClient = client;
+    await client.connect();
+    return client;
   } catch {
     redisOtpClient = null;
     return null;
   }
+}
+
+/** Comparaison à temps constant pour éviter une attaque de timing sur le code OTP. */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 interface OTPEntry {
@@ -98,7 +114,7 @@ const popMemoryOTP = (
     return false;
   }
   
-  if (entry.code !== code) {
+  if (!timingSafeEqualStr(entry.code, code)) {
     logger.warn(`Code OTP incorrect pour ${email}`);
     return false;
   }
@@ -216,7 +232,7 @@ export async function verifyOTP(
     try {
       const stored = await redis.get(key);
       if (stored !== null) {
-        if (stored === code) {
+        if (timingSafeEqualStr(stored, code)) {
           await redis.del(key);
           logger.info('Code OTP vérifié et supprimé de Redis');
           return true;
@@ -233,15 +249,16 @@ export async function verifyOTP(
   const poolAvailable = DATABASE_AVAILABLE && pool !== null && !otpTableMissingInDb;
   if (poolAvailable) {
     try {
-      const result = await (pool as any).query(
-        `DELETE FROM otp_codes
-         WHERE email = $1 AND phone = $2 AND role = $3
-         AND code = $4 AND expires_at > NOW()
-         RETURNING id`,
-        [normalizeEmail(email), normalizePhoneForOtp(phone), role, code]
+      const found = await (pool as any).query(
+        `SELECT id, code FROM otp_codes
+         WHERE email = $1 AND phone = $2 AND role = $3 AND expires_at > NOW()
+         ORDER BY created_at DESC LIMIT 1`,
+        [normalizeEmail(email), normalizePhoneForOtp(phone), role]
       ) as any;
 
-      if (result.rows && result.rows.length > 0) {
+      const row = found.rows?.[0];
+      if (row && timingSafeEqualStr(row.code, code)) {
+        await (pool as any).query(`DELETE FROM otp_codes WHERE id = $1`, [row.id]);
         logger.info('Code OTP vérifié et supprimé de la base de données');
         return true;
       }

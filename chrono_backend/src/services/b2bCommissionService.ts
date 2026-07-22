@@ -2,11 +2,11 @@ import pool from '../config/db.js';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import logger from '../utils/logger.js';
 
-// Taux in-quota (cf. MONETISATION.md) : Starter 3%, Pro 2%, Business 0%
+// Taux in-quota (grille v2, cf. docs/krono-reference-unique.md) : Starter 5%, Pro 3%, Business 2%
 const QUOTA_COMMISSION: Record<string, number> = {
-  starter:  0.03,
-  pro:      0.02,
-  business: 0.00,
+  starter:  0.05,
+  pro:      0.03,
+  business: 0.02,
 };
 
 const db = () => supabaseAdmin ?? supabase;

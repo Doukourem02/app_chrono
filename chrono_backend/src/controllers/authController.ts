@@ -5,7 +5,7 @@ import { sendOTPSMS } from '../services/emailService.js';
 import { sendOTPWhatsApp } from '../services/twilioWhatsAppService.js';
 import {storeOTP,verifyOTP,resolveOtpEmailForStorage,syntheticEmailFromPhone,} from '../config/otpStorage.js';
 import { OTP_TTL_MINUTES } from '../config/otpTtl.js';
-import { generateTokens, refreshAccessToken } from '../utils/jwt.js';
+import { generateTokens, refreshAccessToken, revokeRefreshToken } from '../utils/jwt.js';
 import logger from '../utils/logger.js';
 import { maskEmail, maskPhone, maskUserId } from '../utils/maskSensitiveData.js';
 import { createDefaultPaymentMethods } from '../utils/createDefaultPaymentMethods.js';
@@ -347,6 +347,14 @@ const checkUserInPostgreSQL = async (
   try {
     const { email } = req.params;
 
+    // SÉCURITÉ: empêcher les accès IDOR (un user ne doit pouvoir vérifier que son propre compte)
+    const authUser = (req as any).user as { id?: string; role?: string } | undefined;
+    if (!authUser?.id) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+    const isAdmin = authUser.role === 'admin' || authUser.role === 'super_admin';
+
     const { data: users, error } = await supabase
       .from('users')
       .select('id, email, phone, role, created_at, updated_at, avatar_url, first_name, last_name, is_business, company_name')
@@ -360,6 +368,11 @@ const checkUserInPostgreSQL = async (
         message: 'Erreur lors de la vérification',
         error: error.message,
       });
+      return;
+    }
+
+    if (users && users.length > 0 && !isAdmin && users[0].id !== authUser.id) {
+      res.status(403).json({ success: false, message: 'Accès refusé' });
       return;
     }
 
@@ -402,6 +415,18 @@ const checkUserByIdInPostgreSQL = async (
         message: 'Identifiant utilisateur invalide',
         user: null,
       });
+      return;
+    }
+
+    // SÉCURITÉ: empêcher les accès IDOR (un user ne doit pouvoir vérifier que son propre compte)
+    const authUser = (req as any).user as { id?: string; role?: string } | undefined;
+    if (!authUser?.id) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+    const isAdmin = authUser.role === 'admin' || authUser.role === 'super_admin';
+    if (!isAdmin && authUser.id !== userId) {
+      res.status(403).json({ success: false, message: 'Accès refusé' });
       return;
     }
 
@@ -1266,6 +1291,37 @@ const refreshToken = async (
     res.status(500).json({
       success: false,
       message: 'Erreur lors du rafraîchissement du token',
+      error: error.message,
+    });
+  }
+};
+
+export const logoutUser = async (
+  req: Request<{}, {}, RefreshTokenBody>,
+  res: Response
+): Promise<void> => {
+  try {
+    const { refreshToken: token } = req.body;
+
+    if (!token) {
+      res.status(400).json({
+        success: false,
+        message: 'Refresh token requis',
+      });
+      return;
+    }
+
+    await revokeRefreshToken(token);
+
+    res.json({
+      success: true,
+      message: 'Déconnexion réussie',
+    });
+  } catch (error: any) {
+    logger.error('Erreur logout:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la déconnexion',
       error: error.message,
     });
   }

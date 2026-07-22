@@ -24,10 +24,14 @@ async function getRedis(): Promise<RedisClientType | null> {
   const url = process.env.REDIS_URL?.trim();
   if (!url || /^https?:\/\//i.test(url)) return null;
   try {
-    redisClient = createClient({ url }) as RedisClientType;
-    redisClient.on('error', () => { redisClient = null; });
-    await redisClient.connect();
-    return redisClient;
+    const client = createClient({ url }) as RedisClientType;
+    client.on('error', () => {
+      if (redisClient === client) redisClient = null;
+      client.quit().catch(() => client.disconnect().catch(() => {}));
+    });
+    redisClient = client;
+    await client.connect();
+    return client;
   } catch {
     redisClient = null;
     return null;
@@ -120,8 +124,13 @@ export const bruteForceProtection = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  // Priorité au téléphone/e-mail visé (identité réellement attaquée en cas d'OTP),
+  // sinon l'IP seule permet de contourner le verrou en changeant d'IP.
+  const phone = (req.body?.phone as string)?.replace(/\D/g, '');
+  const email = (req.body?.email as string)?.trim().toLowerCase();
   const identifier =
-    (req.body?.email as string) ||
+    (phone && phone.length >= 6 ? `phone:${phone}` : '') ||
+    (email ? `email:${email}` : '') ||
     req.ip ||
     (req.headers['x-forwarded-for'] as string) ||
     'unknown';
