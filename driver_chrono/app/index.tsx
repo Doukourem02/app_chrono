@@ -51,11 +51,7 @@ export default function RootIndex() {
 
         if (cancelled) return;
 
-        if (
-          validationResult === true ||
-          validationResult === null ||
-          validationResult === "not_found"
-        ) {
+        if (validationResult === true || validationResult === null) {
           // Recharger le profil depuis le backend pour s'assurer qu'on a les données à jour
           // (le profil persisté pourrait être obsolète)
           let freshProfile = null;

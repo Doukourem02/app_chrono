@@ -19,6 +19,7 @@ import {
   getMileageHistory,
 } from '../controllers/fleetController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
+import { verifyJWT } from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
 
@@ -60,7 +61,7 @@ router.post('/vehicles/:vehiclePlate/calculate-financial-summary', verifyAdminSu
 // ============================================
 // KILOMÉTRAGE
 // ============================================
-router.post('/delivery-mileage', logDeliveryMileage); // Pas besoin d'auth admin, appelé automatiquement après livraison
+router.post('/delivery-mileage', verifyJWT, logDeliveryMileage); // Appelé après livraison ; auth requise (pas besoin d'être admin)
 router.get('/vehicles/:vehiclePlate/mileage', verifyAdminSupabase, getMileageHistory);
 
 export default router;

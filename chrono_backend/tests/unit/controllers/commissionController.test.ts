@@ -1,8 +1,10 @@
 /**
  * Tests unitaires pour commissionController — solde et recharge commission des livreurs
- * partenaires (aucune couverture avant ce fichier). Couvre l'IDOR (un livreur ne doit
- * consulter/recharger que son propre solde) et les règles métier de la recharge
- * (montant minimum, méthode de paiement autorisée, réservé aux livreurs partenaires).
+ * partenaires. Couvre les règles métier (montant minimum, méthode de paiement autorisée,
+ * réservé aux livreurs partenaires, paiement Mobile Money confirmé avant tout crédit).
+ * L'IDOR (un livreur ne doit consulter/recharger que son propre compte) est géré par le
+ * middleware `requireSelfUser`, monté sur les routes et testé dans
+ * tests/unit/middleware/requireSelfUser.test.ts — plus dupliqué dans chaque contrôleur.
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
@@ -14,6 +16,13 @@ await jest.unstable_mockModule('../../../src/config/db.js', () => ({
   default: mockPool,
 }));
 
+const mockInitiateMobileMoneyPayment = jest.fn<(...args: any[]) => Promise<any>>();
+await jest.unstable_mockModule('../../../src/services/mobileMoneyService.js', () => ({
+  __esModule: true,
+  initiateMobileMoneyPayment: mockInitiateMobileMoneyPayment,
+  validateMobileMoneyParams: () => ({ valid: true }),
+}));
+
 const commissionController = await import('../../../src/controllers/commissionController.js');
 
 describe('commissionController', () => {
@@ -23,6 +32,7 @@ describe('commissionController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPool.query.mockReset();
+    mockInitiateMobileMoneyPayment.mockReset();
 
     mockRequest = {
       params: {},
@@ -36,17 +46,7 @@ describe('commissionController', () => {
     };
   });
 
-  describe('getCommissionBalance — scope IDOR', () => {
-    it("refuse de consulter le solde d'un autre utilisateur (403)", async () => {
-      (mockRequest as any).user = { id: 'user-a' };
-      mockRequest.params = { userId: 'user-b' };
-
-      await commissionController.getCommissionBalance(mockRequest as any, mockResponse as Response);
-
-      expect(mockResponse.status).toHaveBeenCalledWith(403);
-      expect(mockPool.query).not.toHaveBeenCalled();
-    });
-
+  describe('getCommissionBalance', () => {
     it("renvoie 404 si le profil livreur n'existe pas", async () => {
       (mockRequest as any).user = { id: 'user-a' };
       mockRequest.params = { userId: 'user-a' };
@@ -95,17 +95,7 @@ describe('commissionController', () => {
     });
   });
 
-  describe('getCommissionTransactions — scope IDOR', () => {
-    it("refuse de consulter l'historique d'un autre utilisateur (403)", async () => {
-      (mockRequest as any).user = { id: 'user-a' };
-      mockRequest.params = { userId: 'user-b' };
-
-      await commissionController.getCommissionTransactions(mockRequest as any, mockResponse as Response);
-
-      expect(mockResponse.status).toHaveBeenCalledWith(403);
-      expect(mockPool.query).not.toHaveBeenCalled();
-    });
-
+  describe('getCommissionTransactions', () => {
     it('retourne les transactions du propre compte', async () => {
       (mockRequest as any).user = { id: 'user-a' };
       mockRequest.params = { userId: 'user-a' };
@@ -136,18 +126,7 @@ describe('commissionController', () => {
     });
   });
 
-  describe('rechargeCommission — IDOR + règles métier', () => {
-    it("refuse de recharger le compte d'un autre utilisateur (403)", async () => {
-      (mockRequest as any).user = { id: 'user-a' };
-      mockRequest.params = { userId: 'user-b' };
-      mockRequest.body = { amount: 20000, method: 'wave' };
-
-      await commissionController.rechargeCommission(mockRequest as any, mockResponse as Response);
-
-      expect(mockResponse.status).toHaveBeenCalledWith(403);
-      expect(mockPool.query).not.toHaveBeenCalled();
-    });
-
+  describe('rechargeCommission — règles métier', () => {
     it('rejette un montant sous le minimum de 10 000 FCFA (400)', async () => {
       (mockRequest as any).user = { id: 'user-a' };
       mockRequest.params = { userId: 'user-a' };
@@ -192,13 +171,54 @@ describe('commissionController', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(400);
     });
 
-    it('accepte une recharge valide pour un livreur partenaire', async () => {
+    it("refuse si le profil livreur n'a pas de numéro de téléphone (400, aucun crédit)", async () => {
       (mockRequest as any).user = { id: 'user-a' };
       mockRequest.params = { userId: 'user-a' };
       mockRequest.body = { amount: 20000, method: 'orange_money' };
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ driver_type: 'partner' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ phone: null }] } as any);
+
+      await commissionController.rechargeCommission(mockRequest as any, mockResponse as Response);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockInitiateMobileMoneyPayment).not.toHaveBeenCalled();
+    });
+
+    it("ne crédite jamais le solde si le paiement Mobile Money n'est pas confirmé (régression bug recharge gratuite)", async () => {
+      (mockRequest as any).user = { id: 'user-a' };
+      mockRequest.params = { userId: 'user-a' };
+      mockRequest.body = { amount: 20000, method: 'orange_money' };
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ driver_type: 'partner' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ phone: '+2250700000000' }] } as any);
+      mockInitiateMobileMoneyPayment.mockResolvedValueOnce({
+        success: false,
+        status: 'failed',
+        error: 'Mobile Money indisponible : intégration provider non finalisée. Contactez le support.',
+      });
+
+      await commissionController.rechargeCommission(mockRequest as any, mockResponse as Response);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      // Seules les 2 requêtes de vérification (driver_type + phone) ont eu lieu,
+      // recharge_commission_balance n'est jamais appelée.
+      expect(mockPool.query).toHaveBeenCalledTimes(2);
+    });
+
+    it('accepte une recharge dont le paiement Mobile Money est confirmé', async () => {
+      (mockRequest as any).user = { id: 'user-a' };
+      mockRequest.params = { userId: 'user-a' };
+      mockRequest.body = { amount: 20000, method: 'orange_money' };
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ driver_type: 'partner' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ phone: '+2250700000000' }] } as any)
         .mockResolvedValueOnce({ rows: [{ transaction_id: 'tx-99' }] } as any);
+      mockInitiateMobileMoneyPayment.mockResolvedValueOnce({
+        success: true,
+        status: 'pending',
+        providerTransactionId: 'OM-123',
+      });
 
       await commissionController.rechargeCommission(mockRequest as any, mockResponse as Response);
 

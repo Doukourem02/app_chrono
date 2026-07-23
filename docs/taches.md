@@ -6,6 +6,22 @@ Paiement / mobile money : fichier dédié `docs/integration_paiement_en_ligne.md
 
 ---
 
+## 🔴 Urgent — actions issues de l'audit 2026-07-23
+
+Détails complets, code exact, scénarios de défaillance : `docs/audit_2026-07-23.md`. Rien corrigé, juste documenté — décision à prendre avant tout code.
+
+- **[Haute] Ajouter l'auth manquante sur `POST /api/fleet/delivery-mileage`** (`fleetRoutes.ts:237`).
+- **[Haute] Brancher le rate limiting sur le vrai formulaire de login admin** (`admin_chrono/app/login/LoginForm.tsx`) — actuellement contourné, route rate-limitée jamais appelée.
+- **[Haute] Retirer la persistance en clair du `refreshToken`** dans AsyncStorage, présente à l'identique dans `app_chrono/store/useAuthStore.ts` et `driver_chrono/store/useDriverStore.ts`.
+- **[Haute] Corriger `validateUserExists` (driver_chrono)** : ajouter le header d'auth manquant pour que la détection de compte supprimé fonctionne réellement.
+- **[Moyenne] Factoriser la clause IDOR dupliquée** (≥7 endroits backend) en middleware `requireSelfOrAdmin`.
+- **[Moyenne] Passer `admin_chrono/lib/rateLimit.ts` sur un store partagé (Redis)** avant toute prod serverless multi-instances.
+- **[Moyenne] Uniformiser les options du client Supabase** dans les routes API admin (`persistSession: false`).
+- **[Basse] Nettoyer le code mort listé dans l'audit** : route `leaderboard` (admin_chrono), 7 composants + hook + store + `analytics.ts` + `bearingCalculator.ts` (app_chrono), `LeaderboardCard.tsx`/`BadgesDisplay.tsx` (driver_chrono).
+- **[Basse] Réduire la limite d'upload avatar** (`admin_chrono/app/api/upload-avatar/route.ts`) de 50MB à une valeur raisonnable.
+
+---
+
 ## 🔴 Urgent — rotation de secrets compromis (action manuelle, pas du code)
 
 - **`SUPABASE_ACCESS_TOKEN`** potentiellement compromis (était dans un fichier local) : aller sur `supabase.com/dashboard/account/tokens`, le révoquer, en générer un nouveau si besoin.

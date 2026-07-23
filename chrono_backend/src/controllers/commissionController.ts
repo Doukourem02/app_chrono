@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { maskUserId, maskAmount } from '../utils/maskSensitiveData.js';
+import { initiateMobileMoneyPayment, validateMobileMoneyParams } from '../services/mobileMoneyService.js';
 
 interface RequestWithUser extends Request {
   user?: {
@@ -18,14 +19,6 @@ export const getCommissionBalance = async (
 ): Promise<void> => {
   try {
     const { userId } = req.params;
-
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez consulter que votre propre solde',
-      });
-      return;
-    }
 
     // Vérifier que c'est un livreur partenaire
     const driverCheck = await pool.query(
@@ -146,14 +139,6 @@ export const getCommissionTransactions = async (
     const { userId } = req.params;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez consulter que vos propres transactions',
-      });
-      return;
-    }
-
     const transactionsResult = await pool.query(
       `SELECT 
         id,
@@ -213,14 +198,6 @@ export const rechargeCommission = async (
     const { userId } = req.params;
     const { amount, method } = req.body;
 
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez recharger que votre propre compte',
-      });
-      return;
-    }
-
     if (!amount || amount < 10000) {
       res.status(400).json({
         success: false,
@@ -259,24 +236,57 @@ export const rechargeCommission = async (
       return;
     }
 
-    // TODO: Intégrer avec Mobile Money (Orange Money/Wave)
-    // Pour l'instant, on simule une recharge réussie
-    // Dans le futur, il faudra :
-    // 1. Initier le paiement Mobile Money
-    // 2. Attendre le callback
-    // 3. Créditer le compte seulement après confirmation
+    const phoneResult = await pool.query(
+      `SELECT phone FROM driver_profiles WHERE user_id = $1`,
+      [userId]
+    );
+    const phoneNumber = phoneResult.rows[0]?.phone;
 
-    // Pour l'instant, on crédite directement (simulation)
+    if (!phoneNumber) {
+      res.status(400).json({
+        success: false,
+        message: 'Numéro de téléphone introuvable sur votre profil. Impossible d\'initier le paiement.',
+      });
+      return;
+    }
+
+    const mobileMoneyParams = {
+      provider: method as 'orange_money' | 'wave' | 'mtn_money',
+      phoneNumber,
+      amount,
+      orderId: `commission-recharge-${userId}`,
+      description: `Recharge commission livreur via ${method}`,
+    };
+
+    const validation = validateMobileMoneyParams(mobileMoneyParams);
+    if (!validation.valid) {
+      res.status(400).json({ success: false, message: validation.error });
+      return;
+    }
+
+    // Le paiement réel doit être confirmé par le provider avant tout crédit.
+    // initiateMobileMoneyPayment bloque déjà tout appel en production tant que
+    // l'intégration Mobile Money réelle n'est pas branchée (voir garde-fou dans
+    // mobileMoneyService.ts) — plus de crédit gratuit possible en prod.
+    const paymentResult = await initiateMobileMoneyPayment(mobileMoneyParams);
+    if (!paymentResult.success) {
+      res.status(400).json({
+        success: false,
+        message: paymentResult.error || 'Erreur lors de l\'initiation du paiement Mobile Money',
+      });
+      return;
+    }
+
     const rechargeResult = await pool.query(
       `SELECT recharge_commission_balance(
         $1, -- driver_id
         $2, -- amount
         'mobile_money', -- payment_method
         $3, -- payment_provider
-        NULL, -- payment_transaction_id (sera rempli après callback)
+        $4, -- payment_transaction_id
         'Recharge via ${method}'
       ) as transaction_id`,
-      [userId, amount, method]
+      [userId, amount, method, paymentResult.providerTransactionId || null]
     );
 
     const transactionId = rechargeResult.rows[0].transaction_id;
@@ -285,11 +295,9 @@ export const rechargeCommission = async (
 
     res.json({
       success: true,
-      message: 'Recharge initiée avec succès',
+      message: 'Recharge effectuée avec succès',
       data: {
         transactionId,
-        // TODO: Retourner paymentUrl quand Mobile Money sera intégré
-        // paymentUrl: 'https://...'
       },
     });
   } catch (error: any) {

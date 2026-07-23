@@ -52,7 +52,7 @@ export default function RootIndex() {
 
         if (cancelled) return;
 
-        if (validationResult === true || validationResult === null || validationResult === 'not_found') {
+        if (validationResult === true || validationResult === null) {
           const { user: freshUser } = useAuthStore.getState();
           const hasCompletedProfile = !!(freshUser?.first_name && freshUser?.last_name);
           const hasChosenMode = freshUser?.is_business === true || freshUser?.is_business === false;

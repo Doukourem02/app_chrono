@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Vérifier la taille (max 50MB)
-    const maxSize = 50 * 1024 * 1024 // 50MB
+    // Vérifier la taille (max 5MB, largement suffisant pour un avatar)
+    const maxSize = 5 * 1024 * 1024 // 5MB
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size is 50MB.' },
+        { error: 'File too large. Maximum size is 5MB.' },
         { status: 400 }
       )
     }

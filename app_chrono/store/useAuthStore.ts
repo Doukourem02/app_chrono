@@ -30,7 +30,7 @@ interface AuthState {
   setTokens: (tokens: { accessToken: string | null; refreshToken: string | null }) => void;
   setTokensAndWait: (tokens: { accessToken: string | null; refreshToken: string | null }) => Promise<void>;
   hydrateTokens: () => Promise<void>;
-  validateUser: () => Promise<boolean | 'not_found' | null>;
+  validateUser: () => Promise<boolean | null>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -110,7 +110,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       validateUser: async () => {
-        const { user } = get();
+        const { user, accessToken } = get();
         if (!user?.id && !user?.email?.trim()) {
           return null;
         }
@@ -121,10 +121,13 @@ export const useAuthStore = create<AuthState>()(
           : `${base}/api/auth-simple/check/${encodeURIComponent(user.email!.trim())}`;
 
         try {
-          const response = await fetch(url);
+          const response = await fetch(url, {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+          });
           const data = await response.json();
 
           if (!response.ok) {
+            // Token invalide/expiré ou erreur serveur : on ne peut pas conclure, on garde la session.
             return null;
           }
 
@@ -142,7 +145,8 @@ export const useAuthStore = create<AuthState>()(
             return true;
           }
 
-          return 'not_found';
+          // Réponse OK mais utilisateur introuvable en base : compte supprimé côté backend.
+          return false;
         } catch {
           // Ignorer les erreurs de validation
           return null;
@@ -152,11 +156,12 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      // Persister l'identité + refreshToken pour survivre au hot reload (SecureStore peut être vide)
+      // Persister uniquement l'identité — le refreshToken vit exclusivement en SecureStore
+      // (Keychain/Keystore chiffré), rechargé au démarrage via hydrateTokens(). Ne jamais
+      // dupliquer un credential longue durée en clair dans AsyncStorage.
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
-        refreshToken: state.refreshToken,
       }),
     }
   )

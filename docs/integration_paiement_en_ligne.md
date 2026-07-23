@@ -4,11 +4,11 @@ Remplace `docs/audit_krono.md` (audit du 2026-07-22, terminé — contenu utile 
 
 **Pourquoi ces 3 points sont ouverts** : le code actuel est un stub/simulation volontaire — garde-fou explicite dans `mobileMoneyService.ts:257-271` qui bloque le mobile money réel en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas mis à `true`. Non corrigeables avant l'intégration ; à reprendre à ce moment-là.
 
-## 1. Recharge de commission sans paiement
+## 1. Recharge de commission sans paiement — trou de sécurité fermé le 2026-07-23
 
-`chrono_backend/src/controllers/commissionController.ts:262-282` — `POST /commission/:userId/recharge` crédite le solde directement sans jamais vérifier un paiement mobile money réel.
+`chrono_backend/src/controllers/commissionController.ts` — `POST /commission/:userId/recharge` créditait le solde directement **sans jamais appeler** `initiateMobileMoneyPayment`, donc sans jamais passer par le garde-fou de production décrit ci-dessus. C'était un vrai trou exploitable en prod (contrairement aux points #2 et #3, correctement protégés par le garde-fou), pas juste une limitation du stub — corrigé : l'endpoint appelle maintenant `initiateMobileMoneyPayment` avant tout crédit, donc bloqué en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas activé, comme le reste du système de paiement.
 
-À faire au moment de l'intégration : appeler l'API réelle de l'opérateur et ne créditer qu'après confirmation.
+Reste à faire au moment de l'intégration réelle (comme les points #2 et #3) : appeler l'API réelle de l'opérateur et ne créditer qu'après confirmation du callback/webhook — actuellement le crédit a lieu dès que `initiateMobileMoneyPayment` renvoie `success: true`, ce qui n'arrivera qu'en dev/test tant que l'intégration réelle n'est pas branchée.
 
 ## 2. Dette marquée "payée" sans confirmation réelle
 

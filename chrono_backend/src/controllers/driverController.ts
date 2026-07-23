@@ -83,16 +83,8 @@ const mockDrivers: any[] = [];
 export const updateDriverStatus = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
-    
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez modifier que votre propre statut'
-      });
-      return;
-    }
 
-    const { 
+    const {
       is_online, 
       is_available, 
       current_latitude, 
@@ -857,14 +849,6 @@ export const getDriverWorkTime = async (req: RequestWithUser, res: Response): Pr
   try {
     const { userId } = req.params;
 
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez consulter que votre propre temps de travail'
-      });
-      return;
-    }
-
     const result = await pool.query(
       `SELECT 
         daily_work_hours,
@@ -952,14 +936,6 @@ export const getDriverWorkTime = async (req: RequestWithUser, res: Response): Pr
 export const updateDriverWorkTime = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
-    
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez modifier que votre propre temps de travail'
-      });
-      return;
-    }
 
     const { hours, kilometers, startWork } = req.body;
 
@@ -1355,14 +1331,6 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
       license_number,
     } = req.body;
 
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez modifier que votre propre véhicule',
-      });
-      return;
-    }
-
     // Vérifier que le profil driver existe
     const profileResult = await pool.query(
       'SELECT id FROM driver_profiles WHERE user_id = $1',
@@ -1590,14 +1558,6 @@ export const updateDriverType = async (req: RequestWithUser, res: Response): Pro
     const { userId } = req.params;
     const { driver_type } = req.body;
 
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez modifier que votre propre type de livreur',
-      });
-      return;
-    }
-
     if (!driver_type || !['internal', 'partner'].includes(driver_type)) {
       res.status(400).json({
         success: false,
@@ -1697,14 +1657,6 @@ export const updateDriverB2BPreference = async (req: RequestWithUser, res: Respo
   try {
     const { userId } = req.params;
     const { accepts_b2b_orders } = req.body as { accepts_b2b_orders?: boolean };
-
-    if (req.user && req.user.id !== userId) {
-      res.status(403).json({
-        success: false,
-        message: 'Vous ne pouvez modifier que vos propres préférences B2B',
-      });
-      return;
-    }
 
     if (typeof accepts_b2b_orders !== 'boolean') {
       res.status(400).json({

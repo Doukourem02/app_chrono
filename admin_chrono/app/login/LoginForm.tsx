@@ -37,27 +37,48 @@ export default function LoginForm() {
     setError('')
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       })
 
-      if (signInError) throw signInError
+      const result = await response.json()
 
-      if (data.user) {
-        setUser(data.user)
-        const isAdmin = await checkAdminRole()
-
-        if (!isAdmin) {
-          await supabase.auth.signOut()
-          setError('Accès refusé. Vous devez être administrateur.')
-          setUser(null)
-          return
+      if (!response.ok) {
+        if (response.status === 429) {
+          const retryAfter = Number(response.headers.get('Retry-After') || 0)
+          setError(
+            retryAfter > 0
+              ? `Trop de tentatives de connexion. Réessayez dans ${Math.ceil(retryAfter / 60)} min.`
+              : 'Trop de tentatives de connexion. Réessayez plus tard.'
+          )
+        } else {
+          setError(result.error || 'Une erreur est survenue lors de la connexion')
         }
-
-        const redirect = searchParams.get('redirect') || '/dashboard'
-        router.push(redirect)
+        return
       }
+
+      if (!result.session?.access_token || !result.session?.refresh_token || !result.session?.user) {
+        setError('Une erreur est survenue lors de la connexion')
+        return
+      }
+
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
+      })
+
+      if (sessionError) {
+        setError('Une erreur est survenue lors de la connexion')
+        return
+      }
+
+      setUser(result.session.user)
+      await checkAdminRole()
+
+      const redirect = searchParams.get('redirect') || '/dashboard'
+      router.push(redirect)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue lors de la connexion'
       setError(errorMessage)

@@ -195,11 +195,11 @@ export default function SettingsPage() {
       return
     }
 
-    // Vérifier la taille (max 50MB pour correspondre au bucket Supabase)
-    const maxSize = 50 * 1024 * 1024 // 50MB
+    // Vérifier la taille (max 5MB, alignée sur la limite serveur d'app/api/upload-avatar)
+    const maxSize = 5 * 1024 * 1024 // 5MB
     if (file.size > maxSize) {
       const sizeInMB = (file.size / (1024 * 1024)).toFixed(2)
-      alert(`L'image est trop grande (${sizeInMB}MB). Taille maximale: 50MB. Veuillez choisir une image plus petite.`)
+      alert(`L'image est trop grande (${sizeInMB}MB). Taille maximale: 5MB. Veuillez choisir une image plus petite.`)
       return
     }
 

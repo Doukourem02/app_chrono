@@ -58,7 +58,7 @@ interface DriverStore {
   /** Comme app_chrono : attendre SecureStore avant navigation (évite session perdue si l’app se ferme tout de suite). */
   setTokensAndWait: (tokens: { accessToken: string; refreshToken: string }) => Promise<void>;
   logout: () => void;
-  validateUserExists: () => Promise<boolean | 'not_found' | null>;
+  validateUserExists: () => Promise<boolean | null>;
   hydrateTokens: () => Promise<void>;
 
   // Actions driver
@@ -163,7 +163,7 @@ export const useDriverStore = create<DriverStore>()(
       },
 
       validateUserExists: async () => {
-        const { user } = get();
+        const { user, accessToken } = get();
         if (!user?.id && !user?.email?.trim()) {
           return null;
         }
@@ -173,10 +173,13 @@ export const useDriverStore = create<DriverStore>()(
           : `${config.apiUrl}/api/auth-simple/check/${encodeURIComponent(user.email!.trim())}`;
 
         try {
-          const response = await fetch(url);
+          const response = await fetch(url, {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+          });
           const data = await response.json();
 
           if (!response.ok) {
+            // Token invalide/expiré ou erreur serveur : on ne peut pas conclure, on garde la session.
             return null;
           }
 
@@ -184,7 +187,8 @@ export const useDriverStore = create<DriverStore>()(
             return true;
           }
 
-          return 'not_found';
+          // Réponse OK mais utilisateur introuvable en base : compte supprimé côté backend.
+          return false;
         } catch {
           // En cas d'erreur réseau, retourner null pour indiquer l'impossibilité de vérifier
           return null;
@@ -272,14 +276,14 @@ export const useDriverStore = create<DriverStore>()(
     {
       name: 'driver-store',
       storage: createJSONStorage(() => AsyncStorage),
-      // Ne pas persister la localisation et le statut online
-      // Persister refreshToken pour survivre au hot reload (comme app_chrono)
+      // Ne pas persister la localisation et le statut online.
+      // Le refreshToken vit exclusivement en SecureStore (Keychain/Keystore chiffré),
+      // rechargé au démarrage via hydrateTokens() — jamais dupliqué en clair dans AsyncStorage.
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         user: state.user,
         profile: state.profile,
         todayStats: state.todayStats,
-        refreshToken: state.refreshToken,
       }),
     }
   )

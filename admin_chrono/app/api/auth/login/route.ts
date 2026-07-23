@@ -7,7 +7,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABAS
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
   : null
 
 /**
@@ -24,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     // Rate limiting : 5 tentatives par 15 minutes par IP
     const identifier = getRateLimitIdentifier(request)
-    const limitResult = rateLimit(identifier, 5, 15 * 60)
+    const limitResult = await rateLimit(identifier, 5, 15 * 60)
 
     if (!limitResult.success) {
       return NextResponse.json(
