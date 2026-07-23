@@ -76,6 +76,23 @@ doc supprimé — absorbé ici). 7 critères sur 20 restent plafonnés parce qu'
 
 **Nécessite mon autorisation explicite avant de lancer le simulateur.**
 
+**Pourquoi c'est repoussé à après le WhatsApp OTP (voir "OTP / Auth (Orange CI)" ci-dessus)** :
+actuellement l'app est considérée comme pointant en production. Lancer le simulateur pour
+tester ces critères implique de passer par l'authentification (OTP), ce qui déclencherait un
+vrai envoi SMS/WhatsApp via Twilio (coût réel / quota consommé) — inacceptable tant que le
+template WhatsApp n'est pas validé.
+
+Vérifié dans le code (2026-07-23) — la parade technique existe déjà, à utiliser le moment
+venu plutôt qu'à réinventer :
+- `emailService.ts` (SMS) : si aucune config Twilio/Vonage n'est présente en environnement
+  non-production, l'envoi est **simulé** (code loggué + renvoyé dans `debug_code` de la
+  réponse API) — zéro coût.
+- `twilioWhatsAppService.ts` (WhatsApp) : **pas** de simulation — si les clés Twilio sont
+  présentes, un vrai envoi est tenté. C'est le chemin forcé pour tout numéro détecté Orange CI.
+- Donc pour tester sans frais une fois prêt : lancer l'app contre un **backend local** (pas
+  Render prod) avec un **numéro de test MTN/Moov** (pas Orange) → passe par le chemin SMS
+  simulé, code recyclable directement depuis la réponse API/les logs, aucun envoi réel.
+
 ## Bugs mineurs repérés (audit accessibilité 2026-07-23)
 
 - `app_chrono/app/profile/support.tsx` **et** `driver_chrono/app/profile/support.tsx` : items
