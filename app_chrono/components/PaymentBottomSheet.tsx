@@ -200,7 +200,12 @@ export default function PaymentBottomSheet({
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Paiement</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            accessibilityRole="button"
+            accessibilityLabel="Fermer"
+          >
             <Ionicons name="close" size={24} color="#000" />
           </TouchableOpacity>
         </View>
@@ -289,6 +294,13 @@ export default function PaymentBottomSheet({
             style={[styles.payButton, (isProcessing || !selectedMethodType) && styles.payButtonDisabled]}
             onPress={handlePay}
             disabled={isProcessing || !selectedMethodType}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isPartial && partialAmount
+                ? `Payer ${parseFloat(partialAmount || '0').toLocaleString()} XOF`
+                : `Payer ${price.toLocaleString()} XOF`
+            }
+            accessibilityState={{ disabled: isProcessing || !selectedMethodType }}
           >
             {isProcessing ? (
               <ActivityIndicator size="small" color="#FFF" />

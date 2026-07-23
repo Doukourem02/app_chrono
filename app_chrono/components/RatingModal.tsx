@@ -120,6 +120,9 @@ export const RatingModal: React.FC<RatingModalProps> = ({
             onPress={() => handleStarPress(starValue)}
             disabled={isSubmitting}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`${starValue} étoile${starValue > 1 ? 's' : ''}`}
+            accessibilityState={{ selected: starValue <= rating, disabled: isSubmitting }}
           >
             <Ionicons
               name={starValue <= rating ? 'star' : 'star-outline'}
@@ -154,7 +157,14 @@ export const RatingModal: React.FC<RatingModalProps> = ({
                 <Text style={styles.title}>
                   {existingRating ? 'Modifier votre évaluation' : 'Évaluer votre livreur'}
                 </Text>
-                <TouchableOpacity onPress={handleClose} disabled={isSubmitting} style={styles.closeButton}>
+                <TouchableOpacity
+                  onPress={handleClose}
+                  disabled={isSubmitting}
+                  style={styles.closeButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
+                  accessibilityState={{ disabled: isSubmitting }}
+                >
                   <Ionicons name="close" size={24} color="#6B7280" />
                 </TouchableOpacity>
               </View>
@@ -192,6 +202,9 @@ export const RatingModal: React.FC<RatingModalProps> = ({
                   style={[styles.button, styles.cancelButton]}
                   onPress={handleClose}
                   disabled={isSubmitting}
+                  accessibilityRole="button"
+                  accessibilityLabel="Annuler"
+                  accessibilityState={{ disabled: isSubmitting }}
                 >
                   <Text style={styles.cancelButtonText}>Annuler</Text>
                 </TouchableOpacity>
@@ -199,6 +212,9 @@ export const RatingModal: React.FC<RatingModalProps> = ({
                   style={[styles.button, styles.submitButton, rating === 0 && styles.submitButtonDisabled]}
                   onPress={handleSubmit}
                   disabled={isSubmitting || rating === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={existingRating ? 'Modifier l’évaluation' : 'Soumettre l’évaluation'}
+                  accessibilityState={{ disabled: isSubmitting || rating === 0 }}
                 >
                   {isSubmitting ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />

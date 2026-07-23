@@ -128,10 +128,13 @@ export const CommissionBalanceCard: React.FC<CommissionBalanceCardProps> = ({
 
   return (
     <>
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={handleCardPress}
         activeOpacity={0.7}
         disabled={!isOnline}
+        accessibilityRole="button"
+        accessibilityLabel={`Solde commission : ${formatCurrency(balance)}`}
+        accessibilityState={{ disabled: !isOnline }}
       >
         {CardContent}
       </TouchableOpacity>

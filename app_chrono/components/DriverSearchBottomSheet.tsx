@@ -253,6 +253,8 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
                   style={styles.headerActionButton}
                   onPress={onDetails}
                   activeOpacity={0.82}
+                  accessibilityRole="button"
+                  accessibilityLabel="Voir le suivi en direct"
                 >
                   <Ionicons name="navigate-outline" size={18} color="#374151" />
                 </TouchableOpacity>
@@ -261,6 +263,8 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
                     style={[styles.headerActionButton, styles.headerActionButtonPrimary]}
                     onPress={openCall}
                     activeOpacity={0.82}
+                    accessibilityRole="button"
+                    accessibilityLabel="Appeler le livreur"
                   >
                     <Ionicons name="call" size={18} color="#FFFFFF" />
                   </TouchableOpacity>
@@ -345,6 +349,8 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
                 style={styles.actionButtonSecondary}
                 onPress={onDetails}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Suivi en direct"
               >
                 <View style={styles.actionButtonLeading}>
                   <Ionicons name="navigate" size={18} color="#6D28D9" />
@@ -389,14 +395,26 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
         </View>
 
         <View style={styles.searchActionsRow}>
-          <TouchableOpacity style={styles.searchActionBtn} onPress={onCancel} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.searchActionBtn}
+            onPress={onCancel}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Annuler la recherche"
+          >
             <View style={[styles.searchActionIconWrap, styles.searchActionIconCancel]}>
               <Ionicons name="close" size={22} color="#4B5563" />
             </View>
             <Text style={styles.searchActionLabel}>Annuler</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.searchActionBtn} onPress={onDetails} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.searchActionBtn}
+            onPress={onDetails}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Détails"
+          >
             <View style={[styles.searchActionIconWrap, styles.searchActionIconDetails]}>
               <Ionicons name="menu" size={22} color="#4B5563" />
             </View>

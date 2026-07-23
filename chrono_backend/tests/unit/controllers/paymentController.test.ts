@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import type { Request, Response } from 'express';
 
 // Mock dependencies
-const mockPool = { query: jest.fn() };
+const mockPool = { query: jest.fn<(...args: any[]) => Promise<any>>() };
 await jest.unstable_mockModule('../../../src/config/db.js', () => ({
   __esModule: true,
   default: mockPool,

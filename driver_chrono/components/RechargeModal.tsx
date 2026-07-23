@@ -101,7 +101,12 @@ export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }
         <View style={styles.modalContainer}>
           <View style={styles.header}>
             <Text style={styles.title}>Recharger mon compte</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButton}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+            >
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
@@ -146,6 +151,9 @@ export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }
                       amount === quickAmount.toString() && styles.quickAmountButtonActive
                     ]}
                     onPress={() => setAmount(quickAmount.toString())}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${new Intl.NumberFormat('fr-FR').format(quickAmount)} FCFA`}
+                    accessibilityState={{ selected: amount === quickAmount.toString() }}
                   >
                     <Text
                       style={[
@@ -170,6 +178,9 @@ export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }
                   selectedMethod === 'orange_money' && styles.paymentMethodButtonActive
                 ]}
                 onPress={() => setSelectedMethod('orange_money')}
+                accessibilityRole="radio"
+                accessibilityLabel="Orange Money"
+                accessibilityState={{ checked: selectedMethod === 'orange_money' }}
               >
                 <View style={styles.paymentMethodContent}>
                   <View style={[
@@ -190,6 +201,9 @@ export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }
                   selectedMethod === 'wave' && styles.paymentMethodButtonActive
                 ]}
                 onPress={() => setSelectedMethod('wave')}
+                accessibilityRole="radio"
+                accessibilityLabel="Wave"
+                accessibilityState={{ checked: selectedMethod === 'wave' }}
               >
                 <View style={styles.paymentMethodContent}>
                   <View style={[
@@ -212,10 +226,13 @@ export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }
               style={[styles.button, styles.cancelButton]}
               onPress={onClose}
               disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Annuler"
+              accessibilityState={{ disabled: isLoading }}
             >
               <Text style={styles.cancelButtonText}>Annuler</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[
                 styles.button,
@@ -224,6 +241,9 @@ export const RechargeModal: React.FC<RechargeModalProps> = ({ visible, onClose }
               ]}
               onPress={handleRecharge}
               disabled={!amount || !selectedMethod || isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Recharger"
+              accessibilityState={{ disabled: !amount || !selectedMethod || isLoading }}
             >
               {isLoading ? (
                 <ActivityIndicator color="#fff" />

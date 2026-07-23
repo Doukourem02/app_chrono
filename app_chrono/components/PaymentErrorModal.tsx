@@ -138,9 +138,11 @@ export const PaymentErrorModal: React.FC<PaymentErrorModalProps> = ({
           style={styles.overlayTouchable}
           activeOpacity={1}
           onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
         >
           <Animated.View style={[styles.modalContainer, modalStyle]}>
-            <TouchableOpacity activeOpacity={1}>
+            <TouchableOpacity activeOpacity={1} accessible={false}>
               {/* Header avec icône animée */}
               <View style={styles.header}>
                 <Animated.View
@@ -160,6 +162,8 @@ export const PaymentErrorModal: React.FC<PaymentErrorModalProps> = ({
                   onPress={onClose}
                   style={styles.closeButton}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
                 >
                   <Ionicons name="close" size={24} color="#6B7280" />
                 </TouchableOpacity>
@@ -206,6 +210,8 @@ export const PaymentErrorModal: React.FC<PaymentErrorModalProps> = ({
                     style={[styles.button, styles.secondaryButton]}
                     onPress={onAction}
                     activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={actionLabel}
                   >
                     <Ionicons name="help-circle-outline" size={20} color="#8B5CF6" />
                     <Text style={styles.secondaryButtonText}>{actionLabel}</Text>
@@ -215,6 +221,8 @@ export const PaymentErrorModal: React.FC<PaymentErrorModalProps> = ({
                   style={[styles.button, styles.primaryButton]}
                   onPress={onClose}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="J'ai compris"
                 >
                   <Text style={styles.primaryButtonText}>J&apos;ai compris</Text>
                 </TouchableOpacity>

@@ -56,7 +56,12 @@ export const OrdersListBottomSheet: React.FC<OrdersListBottomSheetProps> = ({
       ]}
     >
       {/* Handle */}
-      <TouchableOpacity onPress={onToggle} style={styles.dragIndicator}>
+      <TouchableOpacity
+        onPress={onToggle}
+        style={styles.dragIndicator}
+        accessibilityRole="button"
+        accessibilityLabel={isExpanded ? 'Réduire la liste des commandes' : 'Développer la liste des commandes'}
+      >
         <View style={styles.dragHandle} />
       </TouchableOpacity>
 

@@ -789,6 +789,8 @@ export default function MapboxAddressAutocomplete({
           style={styles.suggestionItem}
           onPress={() => handleSelectSuggestion(s)}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={showSubtext ? `${title}, ${subtext}` : title}
         >
           <View style={styles.suggestionIcon}>
             <Ionicons name="location" size={20} color="#8B5CF6" />
@@ -878,8 +880,14 @@ export default function MapboxAddressAutocomplete({
             <Pressable
               style={styles.modalBackdrop}
               onPress={dismissSuggestionUi}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer les suggestions"
             >
-              <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              <Pressable
+                style={styles.modalContent}
+                onPress={(e) => e.stopPropagation()}
+                accessible={false}
+              >
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
                   style={styles.modalScroll}

@@ -128,12 +128,16 @@ export function SupportChat({ userId }: { userId: string }) {
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
               onPress={() => setShowTicketForm(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Annuler"
             >
               <Text style={styles.cancelButtonText}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.submitButton}
               onPress={handleCreateTicket}
+              accessibilityRole="button"
+              accessibilityLabel="Envoyer le ticket de support"
             >
               <Ionicons name="send" style={styles.submitIcon} />
               <Text style={styles.submitButtonText}>Envoyer</Text>
@@ -144,6 +148,8 @@ export function SupportChat({ userId }: { userId: string }) {
         <TouchableOpacity
           style={styles.createTicketButton}
           onPress={() => setShowTicketForm(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Créer un ticket de support"
         >
           <Ionicons name="chatbox" style={styles.createTicketIcon} />
           <Text style={styles.createTicketText}>Créer un ticket de support</Text>

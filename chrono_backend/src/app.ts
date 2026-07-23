@@ -2,7 +2,6 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import userRoutes from './routes/userRoutes.js';
 import deliveryRoutes from './routes/deliveryRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import driverRoutes from './routes/driverRoutes.js';
@@ -135,7 +134,6 @@ if (process.env.NODE_ENV !== 'production') {
   setupSwagger(app);
 }
 
-app.use('/api/users', userRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/auth-simple', authRoutes);
 app.use('/api/drivers', driverRoutes);

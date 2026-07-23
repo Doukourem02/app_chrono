@@ -125,7 +125,12 @@ export function ContactPicker({ visible, onClose, onSelect }: ContactPickerProps
         <View style={styles.modal}>
           <View style={styles.header}>
             <Text style={styles.title}>Choisir un contact</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+            >
               <Ionicons name="close" size={24} color="#374151" />
             </TouchableOpacity>
           </View>
@@ -139,7 +144,12 @@ export function ContactPicker({ visible, onClose, onSelect }: ContactPickerProps
             <View style={styles.center}>
               <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryBtn} onPress={() => setRetryKey((k) => k + 1)}>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => setRetryKey((k) => k + 1)}
+                accessibilityRole="button"
+                accessibilityLabel="Réessayer"
+              >
                 <Text style={styles.retryText}>Réessayer</Text>
               </TouchableOpacity>
             </View>
@@ -164,6 +174,8 @@ export function ContactPicker({ visible, onClose, onSelect }: ContactPickerProps
                     style={styles.contactRow}
                     onPress={() => handleSelect(item)}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.name}, ${item.phone}`}
                   >
                     <View style={styles.avatar}>
                       <Text style={styles.avatarText}>

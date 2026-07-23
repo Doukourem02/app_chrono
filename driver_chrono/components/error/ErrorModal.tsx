@@ -119,6 +119,8 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
           style={styles.overlayTouchable}
           activeOpacity={1}
           onPress={closeOnBackdrop ? error.onClose : undefined}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
         >
           <Animated.View style={[styles.modalContainer, modalStyle]}>
             <TouchableOpacity activeOpacity={1}>
@@ -136,6 +138,8 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
                 <TouchableOpacity
                   onPress={error.onClose}
                   style={styles.closeButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
                 >
                   <Ionicons name="close" size={24} color="#6B7280" />
                 </TouchableOpacity>
@@ -156,6 +160,8 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
                   <TouchableOpacity
                     style={[styles.button, styles.primaryButton]}
                     onPress={error.onClose}
+                    accessibilityRole="button"
+                    accessibilityLabel="J'ai compris"
                   >
                     <Text style={styles.primaryButtonText}>
                       J&apos;ai compris

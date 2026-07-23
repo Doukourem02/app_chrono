@@ -52,7 +52,12 @@ export default function AddAddressPage() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Nouvelle adresse</Text>
@@ -78,6 +83,9 @@ export default function AddAddressPage() {
                 style={[styles.presetChip, label === p.label && styles.presetChipActive]}
                 onPress={() => setLabel(p.label)}
                 activeOpacity={0.8}
+                accessibilityRole="radio"
+                accessibilityLabel={p.label}
+                accessibilityState={{ checked: label === p.label }}
               >
                 <Text
                   style={[styles.presetChipText, label === p.label && styles.presetChipTextActive]}
@@ -124,6 +132,9 @@ export default function AddAddressPage() {
             onPress={handleSave}
             disabled={!label.trim() || !addressLine || !coords}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Enregistrer l'adresse"
+            accessibilityState={{ disabled: !label.trim() || !addressLine || !coords }}
           >
             <Text style={styles.saveButtonText}>Enregistrer</Text>
           </TouchableOpacity>

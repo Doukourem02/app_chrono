@@ -73,6 +73,9 @@ export const ActiveOrdersList: React.FC<ActiveOrdersListProps> = ({ onOrderSelec
             style={[styles.orderCard, isSelected && styles.selectedCard]}
             onPress={() => handleOrderPress(order.id)}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Commande ${formatDeliveryId(order.id, order.createdAt)}, ${getStatusLabel(order.status)}`}
+            accessibilityState={{ selected: isSelected }}
           >
             <View style={styles.orderHeader}>
               <View style={styles.orderInfo}>

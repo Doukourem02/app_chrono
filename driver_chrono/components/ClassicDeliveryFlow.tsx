@@ -810,6 +810,8 @@ export default function ClassicDeliveryFlow({ location, rawGpsLocation, isOnline
             style={styles.multipleOrdersButton}
             onPress={toggleOrdersListSheet}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`${activeOrders.length} commandes actives, ouvrir la liste`}
           >
             <Ionicons name="cube" size={16} color="#8B5CF6" />
             <Text style={styles.multipleOrdersText}>
@@ -825,12 +827,18 @@ export default function ClassicDeliveryFlow({ location, rawGpsLocation, isOnline
           <TouchableOpacity
             style={[styles.menuButton, !ordersListIsExpanded && styles.activeButton]}
             onPress={() => { if (ordersListIsExpanded) collapseOrdersListSheet(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Afficher la carte"
+            accessibilityState={{ selected: !ordersListIsExpanded }}
           >
             <Ionicons name="map" size={22} color={ordersListIsExpanded ? "#8B5CF6" : "#fff"} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.menuButton, ordersListIsExpanded && styles.activeButton]}
             onPress={toggleOrdersListSheet}
+            accessibilityRole="button"
+            accessibilityLabel="Afficher la liste des commandes"
+            accessibilityState={{ selected: ordersListIsExpanded }}
           >
             <Ionicons name="list" size={22} color={ordersListIsExpanded ? "#fff" : "#8B5CF6"} />
             {activeOrders.length > 0 && (
@@ -955,7 +963,12 @@ export default function ClassicDeliveryFlow({ location, rawGpsLocation, isOnline
                   {showRecalcOverlay ? "Recalcul de l'itinéraire vers la livraison..." : "Lancement de la navigation..."}
                 </Text>
                 {showNavStuckEscape && (
-                  <TouchableOpacity style={styles.navStuckEscapeBtn} onPress={() => resetNavigationUi(true)}>
+                  <TouchableOpacity
+                    style={styles.navStuckEscapeBtn}
+                    onPress={() => resetNavigationUi(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Annuler la navigation"
+                  >
                     <Text style={styles.navStuckEscapeText}>Annuler</Text>
                   </TouchableOpacity>
                 )}
@@ -970,6 +983,8 @@ export default function ClassicDeliveryFlow({ location, rawGpsLocation, isOnline
                   style={[styles.reprendreNavBar, { bottom: 100 }]}
                   onPress={handleColisRecupere}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={colisRecupereLabel}
                 >
                   <Ionicons name="cube" size={24} color="#fff" />
                   <Text style={styles.reprendreNavText}>{colisRecupereLabel}</Text>
@@ -980,6 +995,8 @@ export default function ClassicDeliveryFlow({ location, rawGpsLocation, isOnline
                   style={[styles.reprendreNavBar, { bottom: 100, backgroundColor: '#16A34A' }]}
                   onPress={handleLivraisonEffectuee}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Livraison effectuée"
                 >
                   <Ionicons name="checkmark-circle" size={24} color="#fff" />
                   <Text style={styles.reprendreNavText}>Livraison effectuée</Text>

@@ -207,10 +207,12 @@ export default function ShipmentCard({
   const CardComponent = isClickable ? TouchableOpacity : View;
   
   return (
-    <CardComponent 
-      style={[styles.card, { backgroundColor }]} 
+    <CardComponent
+      style={[styles.card, { backgroundColor }]}
       onPress={isClickable ? handleCardPress : undefined}
       activeOpacity={isClickable ? 0.7 : 1}
+      accessibilityRole={isClickable ? 'button' : undefined}
+      accessibilityLabel={isClickable ? `Voir le suivi de la livraison vers ${location}` : undefined}
     >
       {/* HEADER */}
       <View style={styles.header}>

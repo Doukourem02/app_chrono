@@ -552,6 +552,8 @@ export default function OrderTrackingPage() {
               router.replace('/profile/order-history');
             }
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -567,7 +569,7 @@ export default function OrderTrackingPage() {
     if (showError) {
       return (
         <View style={styles.container}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => {
               if (router.canGoBack()) {
@@ -576,22 +578,26 @@ export default function OrderTrackingPage() {
                 router.replace('/profile/order-history');
               }
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
           >
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
             <Text style={styles.errorText}>Commande introuvable</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButtonText}
               onPress={() => {
                 loadOrderFromAPI();
                 setShowError(false);
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Réessayer"
             >
               <Text style={styles.backButtonTextLabel}>Réessayer</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.backButtonText, { marginTop: 12, backgroundColor: '#F3F4F6' }]}
               onPress={() => {
                 if (router.canGoBack()) {
@@ -600,6 +606,8 @@ export default function OrderTrackingPage() {
                   router.replace('/profile/order-history');
                 }
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Retour"
             >
               <Text style={[styles.backButtonTextLabel, { color: '#666' }]}>Retour</Text>
             </TouchableOpacity>
@@ -619,6 +627,8 @@ export default function OrderTrackingPage() {
               router.replace('/profile/order-history');
             }
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -632,7 +642,7 @@ export default function OrderTrackingPage() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.backButton}
         onPress={() => {
           if (router.canGoBack()) {
@@ -641,6 +651,8 @@ export default function OrderTrackingPage() {
             router.replace('/(tabs)');
           }
         }}
+        accessibilityRole="button"
+        accessibilityLabel="Retour"
       >
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>

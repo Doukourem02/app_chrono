@@ -210,10 +210,9 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
         {type === 'pickup' && (
-          <TouchableOpacity style={styles.senderButton}>
+          <View style={styles.senderButton}>
             <Text style={styles.senderText}>{pickupSender}</Text>
-            <Ionicons name="chevron-forward" size={16} color="#666" />
-          </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -226,6 +225,8 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       <TouchableOpacity
         style={styles.attachmentButton}
         onPress={() => pickImage(type)}
+        accessibilityRole="button"
+        accessibilityLabel="Ajouter une pièce jointe"
       >
         <View style={styles.attachmentButtonContent}>
           <Ionicons name="attach-outline" size={20} color="#8B5CF6" />
@@ -249,6 +250,8 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
                   const newPhotos = details.photos?.filter((_, i) => i !== index) || [];
                   updateDetails('photos', newPhotos);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="Supprimer cette photo"
               >
                 <Ionicons name="close-circle" size={20} color="#fff" />
               </TouchableOpacity>
@@ -270,6 +273,8 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
                     style={styles.recentPhoneChip}
                     onPress={() => updateDetails('phone', phone)}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Utiliser le numéro récent ${formatForDisplay(phone)}`}
                   >
                     <Ionicons name="time-outline" size={14} color="#8B5CF6" />
                     <Text style={styles.recentPhoneChipText}>{formatForDisplay(phone)}</Text>
@@ -290,6 +295,8 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
               <TouchableOpacity
                 style={styles.contactPickerButton}
                 onPress={() => setShowContactPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Choisir dans les contacts"
               >
                 <Ionicons name="people-outline" size={22} color="#8B5CF6" />
               </TouchableOpacity>
@@ -304,6 +311,9 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       <TouchableOpacity
         style={styles.optionalToggle}
         onPress={() => type === 'pickup' ? setShowPickupOptional(!showPickupOptional) : setShowDropoffOptional(!showDropoffOptional)}
+        accessibilityRole="button"
+        accessibilityLabel="Afficher ou masquer les détails optionnels"
+        accessibilityState={{ expanded: type === 'pickup' ? showPickupOptional : showDropoffOptional }}
       >
         <Text style={styles.optionalToggleText}>
           {type === 'pickup' ? (showPickupOptional ? 'Masquer' : 'Afficher') : (showDropoffOptional ? 'Masquer' : 'Afficher')} les détails (optionnel)
@@ -427,7 +437,13 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
         style={styles.dragIndicatorContainer}
         {...customPanResponder.panHandlers}
       >
-        <TouchableOpacity style={styles.dragIndicator} onPress={onToggle}>
+        <TouchableOpacity
+          style={styles.dragIndicator}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityLabel={isExpanded ? 'Réduire le panneau' : 'Agrandir le panneau'}
+          accessibilityState={{ expanded: isExpanded }}
+        >
           <View style={styles.dragHandle} />
         </TouchableOpacity>
       </View>
@@ -451,7 +467,12 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
                 <Ionicons name="cube-outline" size={16} color="#8B5CF6" />
                 <Text style={styles.methodText}>{selectedMethodData.name}</Text>
               </View>
-              <TouchableOpacity onPress={onBack} style={styles.backButton}>
+              <TouchableOpacity
+                onPress={onBack}
+                style={styles.backButton}
+                accessibilityRole="button"
+                accessibilityLabel="Retour"
+              >
                 <Ionicons name="arrow-forward" size={24} color="#000" />
               </TouchableOpacity>
             </View>
@@ -515,6 +536,9 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
                     payerType === 'client' && styles.payerOptionSelected,
                   ]}
                   onPress={() => setPayerType('client')}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Moi (client)"
+                  accessibilityState={{ selected: payerType === 'client' }}
                 >
                   <Ionicons
                     name={payerType === 'client' ? 'radio-button-on' : 'radio-button-off'}
@@ -540,6 +564,9 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
                     setPayerType('recipient');
                     setIsPartialPayment(false); // Désactiver le paiement partiel si le destinataire paie
                   }}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Destinataire"
+                  accessibilityState={{ selected: payerType === 'recipient' }}
                 >
                   <Ionicons
                     name={payerType === 'recipient' ? 'radio-button-on' : 'radio-button-off'}
@@ -623,7 +650,12 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
 
 
           {/* Confirm button */}
-          <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={handleConfirm}
+            accessibilityRole="button"
+            accessibilityLabel={`Commander, ${price} FCFA`}
+          >
             <View style={styles.confirmButtonContent}>
               <Text style={styles.confirmButtonText}>Commander</Text>
               <Text style={styles.confirmButtonPrice}>{price} FCFA</Text>
@@ -631,7 +663,12 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
           </TouchableOpacity>
         </ScrollView>
       ) : (
-        <TouchableOpacity style={styles.peekContainer} onPress={onToggle}>
+        <TouchableOpacity
+          style={styles.peekContainer}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityLabel="Saisir les informations de livraison"
+        >
           <Text style={styles.peekText} numberOfLines={1}>
             Saisir les informations de livraison
           </Text>

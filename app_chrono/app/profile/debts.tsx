@@ -126,6 +126,8 @@ export default function DebtsPage() {
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
           >
             <Ionicons name="arrow-back" size={24} color="#1F2937" />
           </TouchableOpacity>
@@ -145,11 +147,18 @@ export default function DebtsPage() {
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
         >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mes dettes</Text>
-        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+        <TouchableOpacity
+          onPress={handleRefresh}
+          style={styles.refreshButton}
+          accessibilityRole="button"
+          accessibilityLabel="Actualiser"
+        >
           <Ionicons name="refresh" size={24} color="#1F2937" />
         </TouchableOpacity>
       </View>
@@ -326,6 +335,8 @@ export default function DebtsPage() {
                   <TouchableOpacity
                     style={styles.payButton}
                     onPress={() => openRepayModal(debt)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Régler la dette de ${debt.amount?.toLocaleString() ?? '0'} FCFA`}
                   >
                     <Text style={styles.payButtonText}>Régler</Text>
                   </TouchableOpacity>
@@ -351,6 +362,9 @@ export default function DebtsPage() {
               <TouchableOpacity
                 style={[styles.methodBtn, repayMethod === 'orange_money' && styles.methodBtnActive]}
                 onPress={() => setRepayMethod('orange_money')}
+                accessibilityRole="radio"
+                accessibilityLabel="Orange Money"
+                accessibilityState={{ checked: repayMethod === 'orange_money' }}
               >
                 <Text style={[styles.methodBtnText, repayMethod === 'orange_money' && styles.methodBtnTextActive]}>
                   Orange Money
@@ -359,6 +373,9 @@ export default function DebtsPage() {
               <TouchableOpacity
                 style={[styles.methodBtn, repayMethod === 'wave' && styles.methodBtnActive]}
                 onPress={() => setRepayMethod('wave')}
+                accessibilityRole="radio"
+                accessibilityLabel="Wave"
+                accessibilityState={{ checked: repayMethod === 'wave' }}
               >
                 <Text style={[styles.methodBtnText, repayMethod === 'wave' && styles.methodBtnTextActive]}>
                   Wave
@@ -383,6 +400,9 @@ export default function DebtsPage() {
                 style={styles.cancelBtn}
                 onPress={() => setRepayModal({ visible: false, debt: null })}
                 disabled={isRepaying}
+                accessibilityRole="button"
+                accessibilityLabel="Annuler"
+                accessibilityState={{ disabled: isRepaying }}
               >
                 <Text style={styles.cancelBtnText}>Annuler</Text>
               </TouchableOpacity>
@@ -390,6 +410,9 @@ export default function DebtsPage() {
                 style={[styles.confirmBtn, isRepaying && styles.confirmBtnDisabled]}
                 onPress={handleRepay}
                 disabled={isRepaying}
+                accessibilityRole="button"
+                accessibilityLabel="Confirmer le paiement"
+                accessibilityState={{ disabled: isRepaying }}
               >
                 {isRepaying ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />

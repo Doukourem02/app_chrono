@@ -350,6 +350,8 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
           style={styles.overlayTouchable}
           activeOpacity={1}
           onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer la messagerie"
         />
       </Animated.View>
 
@@ -396,15 +398,22 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
           </View>
 
           {/* Bouton Appel à droite */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.callButton}
             onPress={handleCall}
+            accessibilityRole="button"
+            accessibilityLabel="Appeler le livreur"
           >
             <Ionicons name="call-outline" size={22} color="#FFFFFF" />
           </TouchableOpacity>
 
           {/* Bouton Close à droite après le bouton appel */}
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            accessibilityRole="button"
+            accessibilityLabel="Fermer"
+          >
             <Ionicons name="close" size={20} color="#6B7280" />
           </TouchableOpacity>
         </View>
@@ -441,6 +450,9 @@ const MessageBottomSheet: React.FC<MessageBottomSheetProps> = ({
             style={[styles.sendButton, (!messageText.trim() || isSending) && styles.sendButtonDisabled]}
             onPress={handleSendMessage}
             disabled={!messageText.trim() || isSending || !currentConversation}
+            accessibilityRole="button"
+            accessibilityLabel="Envoyer le message"
+            accessibilityState={{ disabled: !messageText.trim() || isSending || !currentConversation }}
           >
             {isSending ? (
               <ActivityIndicator size="small" color="#FFFFFF" />

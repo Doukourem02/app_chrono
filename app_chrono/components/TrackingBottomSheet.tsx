@@ -322,7 +322,13 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
         },
       ]}
       >
-      <TouchableOpacity onPress={onToggle} style={styles.dragIndicator}>
+      <TouchableOpacity
+        onPress={onToggle}
+        style={styles.dragIndicator}
+        accessibilityRole="button"
+        accessibilityLabel={isExpanded ? 'Réduire le panneau de suivi' : 'Agrandir le panneau de suivi'}
+        accessibilityState={{ expanded: isExpanded }}
+      >
         <View style={styles.dragHandle} />
       </TouchableOpacity>
 
@@ -357,32 +363,40 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                   {status === 'pending' || status === 'accepted' ? (
                     <>
                       {canCancel && (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={[styles.iconCircle, styles.cancelIconCircle]}
                           onPress={onCancel}
+                          accessibilityRole="button"
+                          accessibilityLabel="Annuler la commande"
                         >
                           <Ionicons name="close-circle" size={20} color="#fff" />
                         </TouchableOpacity>
                       )}
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.iconCircle}
                         onPress={onMessage}
+                        accessibilityRole="button"
+                        accessibilityLabel="Envoyer un message"
                       >
                         <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
                       </TouchableOpacity>
                     </>
                   ) : (
                     <>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.iconCircle}
                         onPress={onMessage}
+                        accessibilityRole="button"
+                        accessibilityLabel="Envoyer un message"
                       >
                         <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
                       </TouchableOpacity>
                       {showQRCodeButton && (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={styles.iconCircle}
                           onPress={() => setShowQRCode(true)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Afficher le QR code"
                         >
                           <Ionicons name="qr-code-outline" size={20} color="#fff" />
                         </TouchableOpacity>
@@ -487,6 +501,8 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
               {(currentOrder?.trackingToken || currentOrder?.tracking_token) && (
                 <TouchableOpacity
                   style={styles.shareLinkButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Partager le lien de suivi au destinataire"
                   onPress={async () => {
                     const token = currentOrder?.trackingToken || currentOrder?.tracking_token;
                     const raw = (config.trackBaseUrl || '').trim();
@@ -547,6 +563,8 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
                 <TouchableOpacity
                   style={styles.showQRCodeButton}
                   onPress={() => setShowQRCode(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Afficher le QR code pour le livreur"
                 >
                   <Ionicons name="qr-code-outline" size={22} color="#7C3AED" />
                   <Text style={styles.showQRCodeButtonText}>
@@ -712,9 +730,11 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
 
           {/* Afficher le bouton "Nouvelle commande" uniquement pour les commandes en cours */}
           {onNewOrder && !isCompleted && status !== 'cancelled' && status !== 'declined' && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.newOrderButton}
               onPress={onNewOrder}
+              accessibilityRole="button"
+              accessibilityLabel="Passer une nouvelle commande"
             >
               <Ionicons name="add-circle-outline" size={20} color="#7C3AED" />
               <Text style={styles.newOrderButtonText}>

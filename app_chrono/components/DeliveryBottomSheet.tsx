@@ -122,10 +122,13 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
       {...panResponder.panHandlers}
     >
   
-      <TouchableOpacity 
-        style={styles.dragIndicator} 
-        onPress={onToggle} 
+      <TouchableOpacity
+        style={styles.dragIndicator}
+        onPress={onToggle}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={isExpanded ? 'Réduire le panneau de livraison' : 'Agrandir le panneau de livraison'}
+        accessibilityState={{ expanded: isExpanded }}
       >
         <View style={styles.dragHandle} />
       </TouchableOpacity>
@@ -201,6 +204,9 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
                       onMethodSelected(method.id as 'moto' | 'vehicule' | 'cargo');
                     }}
                     activeOpacity={enabled ? 0.7 : 1}
+                    accessibilityRole="radio"
+                    accessibilityLabel={enabled ? method.shortName : `${method.shortName}, bientôt disponible`}
+                    accessibilityState={{ selected: selectedMethod === method.id && enabled, disabled: !enabled }}
                   >
                     <Image
                       source={method.icon}
@@ -232,16 +238,22 @@ export const DeliveryBottomSheet: React.FC<DeliveryBottomSheetProps> = ({
             ]}
             disabled={!pickupLocation || !deliveryLocation}
             onPress={handleConfirm}
+            accessibilityRole="button"
+            accessibilityLabel="Choisir le type de course"
+            accessibilityState={{ disabled: !pickupLocation || !deliveryLocation }}
           >
             <Text style={styles.chooseButtonText}>Choisir le type de course</Text>
           </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       ) : (
-        <TouchableOpacity 
-          style={styles.peekContainer} 
-          onPress={onToggle} 
+        <TouchableOpacity
+          style={styles.peekContainer}
+          onPress={onToggle}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Agrandir le panneau de livraison"
+          accessibilityState={{ expanded: isExpanded }}
         >
           <View>
             <Text style={styles.peekText} numberOfLines={1}>

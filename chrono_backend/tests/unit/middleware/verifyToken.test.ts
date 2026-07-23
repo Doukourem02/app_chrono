@@ -5,7 +5,9 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 
 const mockVerifyAccessToken = jest.fn();
-const mockGetUser = jest.fn().mockResolvedValue({ data: { user: null }, error: new Error('mock') });
+const mockGetUser = jest
+  .fn<(...args: any[]) => Promise<any>>()
+  .mockResolvedValue({ data: { user: null }, error: new Error('mock') });
 
 await jest.unstable_mockModule('../../../src/utils/jwt.js', () => ({
   __esModule: true,

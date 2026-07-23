@@ -221,6 +221,9 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
             onPress={() => handleStarPress(starValue)}
             disabled={isSubmitting}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`${starValue} étoile${starValue > 1 ? 's' : ''}`}
+            accessibilityState={{ selected: starValue <= rating, disabled: isSubmitting }}
           >
             <Ionicons
               name={starValue <= rating ? 'star' : 'star-outline'}
@@ -249,7 +252,13 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
       ]}
     >
       {/* Handle */}
-      <TouchableOpacity onPress={onToggle} style={styles.dragIndicator}>
+      <TouchableOpacity
+        onPress={onToggle}
+        style={styles.dragIndicator}
+        accessibilityRole="button"
+        accessibilityLabel={isExpanded ? 'Réduire le panneau d’évaluation' : 'Agrandir le panneau d’évaluation'}
+        accessibilityState={{ expanded: isExpanded }}
+      >
         <View style={styles.dragHandle} />
       </TouchableOpacity>
 
@@ -297,6 +306,9 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
                       onPress={handleClose}
                       disabled={isSubmitting}
                       style={styles.closeButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Fermer"
+                      accessibilityState={{ disabled: isSubmitting }}
                     >
                       <Ionicons name="close" size={24} color="#6B7280" />
                     </TouchableOpacity>
@@ -333,6 +345,9 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
                       style={[styles.button, styles.cancelButton]}
                       onPress={handleClose}
                       disabled={isSubmitting}
+                      accessibilityRole="button"
+                      accessibilityLabel="Annuler"
+                      accessibilityState={{ disabled: isSubmitting }}
                     >
                       <Text style={styles.cancelButtonText}>Annuler</Text>
                     </TouchableOpacity>
@@ -344,6 +359,9 @@ const RatingBottomSheet: React.FC<RatingBottomSheetProps> = ({
                       ]}
                       onPress={handleSubmit}
                       disabled={isSubmitting || rating === 0}
+                      accessibilityRole="button"
+                      accessibilityLabel={existingRating ? 'Modifier l’évaluation' : 'Soumettre l’évaluation'}
+                      accessibilityState={{ disabled: isSubmitting || rating === 0 }}
                     >
                       {isSubmitting ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />

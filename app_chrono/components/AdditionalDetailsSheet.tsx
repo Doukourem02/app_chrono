@@ -91,6 +91,9 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
         style={styles.dragIndicator}
         onPress={onToggle}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={isExpanded ? 'Réduire le panneau de détails' : 'Agrandir le panneau de détails'}
+        accessibilityState={{ expanded: isExpanded }}
       >
         <View style={styles.dragHandle} />
       </TouchableOpacity>
@@ -104,6 +107,8 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
           <TouchableOpacity
             style={styles.backButton}
             onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
           >
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
@@ -133,6 +138,9 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
                   selectedContactId === contact.id && styles.contactItemSelected,
                 ]}
                 onPress={() => handleContactSelect(contact)}
+                accessibilityRole="radio"
+                accessibilityLabel={`${contact.name}, ${contact.phone}`}
+                accessibilityState={{ selected: selectedContactId === contact.id }}
               >
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactName}>{contact.name}</Text>
@@ -157,6 +165,8 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
             <TouchableOpacity
               style={styles.addImageButton}
               onPress={pickImage}
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter des photos du colis"
             >
               <Ionicons name="camera-outline" size={24} color="#8B5CF6" />
               <Text style={styles.addImageText}>Ajouter des photos</Text>
@@ -170,6 +180,8 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
                     <TouchableOpacity
                       style={styles.removeImageButton}
                       onPress={() => removeImage(index)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Supprimer cette photo"
                     >
                       <Ionicons name="close-circle" size={24} color="#fff" />
                     </TouchableOpacity>
@@ -186,6 +198,9 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
             ]}
             disabled={!recipientPhone.trim()}
             onPress={handleConfirm}
+            accessibilityRole="button"
+            accessibilityLabel="Confirmer les détails de la livraison"
+            accessibilityState={{ disabled: !recipientPhone.trim() }}
           >
             <Text style={styles.confirmButtonText}>
               Saisir les détails de la livraison
@@ -197,6 +212,9 @@ export const AdditionalDetailsSheet: React.FC<AdditionalDetailsSheetProps> = ({
           style={styles.peekContainer}
           onPress={onToggle}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Agrandir le panneau de détails"
+          accessibilityState={{ expanded: isExpanded }}
         >
           <Text style={styles.peekText} numberOfLines={1}>
             Détails supplémentaires

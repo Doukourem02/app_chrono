@@ -76,13 +76,17 @@ export const QRCodeScanResult: React.FC<QRCodeScanResultProps> = ({
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
               onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Annuler"
             >
               <Text style={styles.cancelButtonText}>Annuler</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.button, styles.confirmButton]}
               onPress={onConfirm}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmer la livraison"
             >
               <Ionicons name="checkmark" size={20} color="#fff" />
               <Text style={styles.confirmButtonText}>Confirmer la livraison</Text>

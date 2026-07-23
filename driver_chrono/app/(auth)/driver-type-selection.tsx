@@ -105,6 +105,9 @@ export default function DriverTypeSelectionScreen() {
           ]}
           onPress={() => setSelectedType('partner')}
           activeOpacity={0.7}
+          accessibilityRole="radio"
+          accessibilityLabel="Livreur Partenaire Indépendant"
+          accessibilityState={{ selected: selectedType === 'partner' }}
         >
           <View style={styles.optionHeader}>
             <View
@@ -175,6 +178,9 @@ export default function DriverTypeSelectionScreen() {
           ]}
           onPress={() => setSelectedType('internal')}
           activeOpacity={0.7}
+          accessibilityRole="radio"
+          accessibilityLabel="Livreur interne Krono pro"
+          accessibilityState={{ selected: selectedType === 'internal' }}
         >
           <View style={styles.optionHeader}>
             <View
@@ -246,6 +252,9 @@ export default function DriverTypeSelectionScreen() {
           ]}
           onPress={handleContinue}
           disabled={!selectedType || isLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Continuer"
+          accessibilityState={{ disabled: !selectedType || isLoading }}
         >
           <Text style={styles.continueButtonText}>
             {isLoading ? 'Mise à jour...' : 'Continuer'}

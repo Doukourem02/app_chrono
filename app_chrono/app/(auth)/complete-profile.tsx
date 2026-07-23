@@ -117,6 +117,9 @@ export default function CompleteProfileScreen() {
           style={[styles.cta, isLoading && styles.ctaDisabled]}
           onPress={handleContinue}
           disabled={isLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Continuer"
+          accessibilityState={{ disabled: isLoading }}
         >
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" />

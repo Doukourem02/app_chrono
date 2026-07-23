@@ -296,10 +296,13 @@ export default function ProfilePage() {
                 <Ionicons name="person" size={40} color="#8B5CF6" />
               </View>
             )}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.cameraButton}
               onPress={handleAvatarPress}
               disabled={uploadingAvatar}
+              accessibilityRole="button"
+              accessibilityLabel="Changer la photo de profil"
+              accessibilityState={{ disabled: uploadingAvatar }}
             >
               {uploadingAvatar ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -320,9 +323,11 @@ export default function ProfilePage() {
             </Text>
             <Text style={styles.userPhone}>{user?.phone}</Text>
             {!(user?.first_name || user?.last_name || profile?.first_name || profile?.last_name) && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.completeProfileButton}
                 onPress={() => router.push('/profile/personal-info')}
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter votre nom et prénom"
               >
                 <Text style={styles.completeProfileText}>
                   Ajouter votre nom et prénom
@@ -420,6 +425,8 @@ export default function ProfilePage() {
             key={index}
             style={styles.menuItem}
             onPress={item.onPress}
+            accessibilityRole="button"
+            accessibilityLabel={item.title}
           >
             <View style={styles.menuItemLeft}>
               <View style={styles.menuIcon}>
@@ -439,7 +446,12 @@ export default function ProfilePage() {
       </View>
 
       {/* Bouton déconnexion */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={handleLogout}
+        accessibilityRole="button"
+        accessibilityLabel="Se déconnecter"
+      >
         <Ionicons name="log-out-outline" size={24} color="#EF4444" />
         <Text style={styles.logoutText}>Se déconnecter</Text>
       </TouchableOpacity>

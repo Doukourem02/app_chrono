@@ -261,15 +261,33 @@ export const BatchOfferPopup: React.FC<BatchOfferPopupProps> = ({
 
           <View style={styles.actionsContainer}>
             {hasError ? (
-              <TouchableOpacity style={styles.acceptButton} onPress={handleDismissError} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.acceptButton}
+                onPress={handleDismissError}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="OK"
+              >
                 <Text style={styles.acceptText}>OK</Text>
               </TouchableOpacity>
             ) : (
               <>
-                <TouchableOpacity style={styles.declineButton} onPress={handleDecline} activeOpacity={0.85}>
+                <TouchableOpacity
+                  style={styles.declineButton}
+                  onPress={handleDecline}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Refuser la tournée"
+                >
                   <Text style={styles.declineText}>Refuser</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.acceptButton} onPress={handleAccept} activeOpacity={0.85}>
+                <TouchableOpacity
+                  style={styles.acceptButton}
+                  onPress={handleAccept}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Accepter la tournée"
+                >
                   <Text style={styles.acceptText}>Accepter</Text>
                 </TouchableOpacity>
               </>

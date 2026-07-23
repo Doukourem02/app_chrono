@@ -93,7 +93,12 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#FFF' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+          <TouchableOpacity
+            onPress={handleClose}
+            style={styles.closeBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Fermer"
+          >
             <Ionicons name="close" size={20} color="#374151" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Livraison client</Text>
@@ -108,7 +113,12 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
             <Text style={styles.successTitle}>Commande envoyée !</Text>
             <Text style={styles.successSub}>La livraison a été créée avec succès.</Text>
             <Text style={styles.successId}>#{successOrderId.slice(-8).toUpperCase()}</Text>
-            <TouchableOpacity style={styles.cta} onPress={handleClose}>
+            <TouchableOpacity
+              style={styles.cta}
+              onPress={handleClose}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+            >
               <Text style={styles.ctaText}>Fermer</Text>
             </TouchableOpacity>
           </View>
@@ -200,6 +210,9 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
                           key={instruction}
                           style={[styles.presetChip, selected && styles.presetChipSelected]}
                           onPress={() => toggleInstruction(instruction)}
+                          accessibilityRole="checkbox"
+                          accessibilityLabel={instruction}
+                          accessibilityState={{ checked: selected }}
                         >
                           <Ionicons
                             name={selected ? 'checkmark-circle' : 'ellipse-outline'}
@@ -221,6 +234,9 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
                 <TouchableOpacity
                   style={[styles.vehicleBtn, styles.vehicleBtnActive]}
                   onPress={() => setVehicleType('moto')}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Moto"
+                  accessibilityState={{ selected: vehicleType === 'moto' }}
                 >
                   <Ionicons name="bicycle-outline" size={20} color="#FFF" />
                   <Text style={[styles.vehicleBtnText, { color: '#FFF' }]}>Moto</Text>
@@ -235,6 +251,9 @@ export default function NewB2BShippingModal({ visible, onClose, onSuccess }: New
                 style={[styles.cta, (!canSubmit || isLoading) && styles.ctaDisabled]}
                 onPress={handleSubmit}
                 disabled={!canSubmit || isLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Envoyer la commande"
+                accessibilityState={{ disabled: !canSubmit || isLoading }}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#FFF" />

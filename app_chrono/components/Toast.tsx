@@ -85,7 +85,12 @@ export const Toast: React.FC<ToastProps> = ({
     >
       <Ionicons name={iconName} size={24} color="white" />
       <Text style={styles.message}>{message}</Text>
-      <TouchableOpacity onPress={hideToast} style={styles.closeButton}>
+      <TouchableOpacity
+        onPress={hideToast}
+        style={styles.closeButton}
+        accessibilityRole="button"
+        accessibilityLabel="Fermer la notification"
+      >
         <Ionicons name="close" size={20} color="white" />
       </TouchableOpacity>
     </Animated.View>

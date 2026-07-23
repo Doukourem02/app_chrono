@@ -524,7 +524,12 @@ export default function BatchScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => { if (allDoneRef.current) useBatchStore.getState().clearBatch(); router.back(); }} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => { if (allDoneRef.current) useBatchStore.getState().clearBatch(); router.back(); }}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -533,7 +538,12 @@ export default function BatchScreen() {
             <Text style={styles.headerSub}>#{batchId.slice(-8).toUpperCase()}</Text>
           )}
         </View>
-        <TouchableOpacity onPress={loadBatch} style={styles.refreshBtn}>
+        <TouchableOpacity
+          onPress={loadBatch}
+          style={styles.refreshBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Actualiser la tournée"
+        >
           <Ionicons name="refresh-outline" size={20} color="#6B7280" />
         </TouchableOpacity>
       </View>
@@ -572,7 +582,12 @@ export default function BatchScreen() {
           <Text style={styles.doneSub}>
             {completedCount} livrée{completedCount > 1 ? 's' : ''}{cancelledCount > 0 ? `, ${cancelledCount} annulée${cancelledCount > 1 ? 's' : ''}` : ''}
           </Text>
-          <TouchableOpacity style={styles.doneCta} onPress={() => { useBatchStore.getState().clearBatch(); router.replace('/(tabs)' as any); }}>
+          <TouchableOpacity
+            style={styles.doneCta}
+            onPress={() => { useBatchStore.getState().clearBatch(); router.replace('/(tabs)' as any); }}
+            accessibilityRole="button"
+            accessibilityLabel="Retour à l'accueil"
+          >
             <Text style={styles.doneCtaText}>{"Retour à l'accueil"}</Text>
           </TouchableOpacity>
         </View>
@@ -591,6 +606,9 @@ export default function BatchScreen() {
                 style={[styles.pickupConfirmBtn, isConfirmingPickup && styles.validateBtnDisabled]}
                 onPress={handleConfirmPickup}
                 disabled={isConfirmingPickup}
+                accessibilityRole="button"
+                accessibilityLabel="Tous les colis récupérés"
+                accessibilityState={{ disabled: isConfirmingPickup }}
               >
                 {isConfirmingPickup ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -681,6 +699,8 @@ export default function BatchScreen() {
                   <TouchableOpacity
                     style={styles.ficheBtn}
                     onPress={() => setFicheData({ order: getOrderById(stop.orderId) ?? null, stop })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Voir la fiche de ${stop.recipientName}`}
                   >
                     <Ionicons name="information-circle-outline" size={14} color="#6B7280" />
                     <Text style={styles.ficheBtnText}>Fiche</Text>
@@ -694,6 +714,8 @@ export default function BatchScreen() {
                       <TouchableOpacity
                         style={styles.callBtn}
                         onPress={() => handleCall(stop.phone)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Appeler ${stop.recipientName}`}
                       >
                         <Ionicons name="call-outline" size={18} color="#8B5CF6" />
                       </TouchableOpacity>
@@ -706,6 +728,11 @@ export default function BatchScreen() {
                       ]}
                       onPress={() => startNavigationToStop(stop)}
                       disabled={!!validatingId || navigationStop?.orderId === stop.orderId}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        !stop.coordinates ? 'GPS absent' : navigationStop?.orderId === stop.orderId ? 'Navigation en cours' : `Démarrer la navigation vers ${stop.recipientName}`
+                      }
+                      accessibilityState={{ disabled: !!validatingId || navigationStop?.orderId === stop.orderId }}
                     >
                       <Ionicons name="navigate-outline" size={14} color="#FFFFFF" />
                       <Text style={styles.navBtnText}>
@@ -716,6 +743,9 @@ export default function BatchScreen() {
                       style={[styles.actionBtn, styles.scanBtn, isValidating && styles.validateBtnDisabled]}
                       onPress={() => setScanStop(stop)}
                       disabled={!!validatingId}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Scanner le QR code de ${stop.recipientName}`}
+                      accessibilityState={{ disabled: !!validatingId }}
                     >
                       {isValidating ? (
                         <ActivityIndicator size="small" color="#FFF" />
@@ -733,6 +763,9 @@ export default function BatchScreen() {
                         setManualCode('');
                       }}
                       disabled={!!validatingId}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Entrer le code de livraison de ${stop.recipientName}`}
+                      accessibilityState={{ disabled: !!validatingId }}
                     >
                       <Ionicons name="keypad-outline" size={14} color="#4C1D95" />
                       <Text style={styles.codeBtnText}>Entrer le code</Text>
@@ -747,6 +780,9 @@ export default function BatchScreen() {
                       }}
                       onLongPress={() => handleCancel(stop)}
                       disabled={!!validatingId}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Preuve alternative pour ${stop.recipientName}. Appui long pour annuler la livraison`}
+                      accessibilityState={{ disabled: !!validatingId }}
                     >
                       <Ionicons name="camera-outline" size={14} color="#065F46" />
                       <Text style={styles.altBtnText}>Preuve alternative</Text>
@@ -796,6 +832,9 @@ export default function BatchScreen() {
                 style={[styles.arrivalButton, styles.arrivalScanButton]}
                 onPress={() => setScanStop(navigationStop)}
                 disabled={!!validatingId}
+                accessibilityRole="button"
+                accessibilityLabel="Scanner le QR code"
+                accessibilityState={{ disabled: !!validatingId }}
               >
                 <Ionicons name="qr-code-outline" size={17} color="#FFFFFF" />
                 <Text style={styles.arrivalScanText}>Scanner QR</Text>
@@ -807,6 +846,9 @@ export default function BatchScreen() {
                   setManualCode('');
                 }}
                 disabled={!!validatingId}
+                accessibilityRole="button"
+                accessibilityLabel="Entrer le code de livraison"
+                accessibilityState={{ disabled: !!validatingId }}
               >
                 <Ionicons name="keypad-outline" size={17} color="#4C1D95" />
                 <Text style={styles.arrivalCodeText}>Code</Text>
@@ -820,6 +862,9 @@ export default function BatchScreen() {
                   setPhotoReady(false);
                 }}
                 disabled={!!validatingId}
+                accessibilityRole="button"
+                accessibilityLabel="Preuve alternative de livraison"
+                accessibilityState={{ disabled: !!validatingId }}
               >
                 <Ionicons name="camera-outline" size={17} color="#065F46" />
                 <Text style={styles.arrivalProofText}>Preuve</Text>
@@ -850,6 +895,9 @@ export default function BatchScreen() {
               onPress={handleConfirmPickup}
               disabled={isConfirmingPickup}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Tous les colis récupérés"
+              accessibilityState={{ disabled: isConfirmingPickup }}
             >
               {isConfirmingPickup ? (
                 <ActivityIndicator size="small" color="#FFF" />
@@ -912,10 +960,17 @@ export default function BatchScreen() {
               <TouchableOpacity
                 style={styles.modalCancelBtn}
                 onPress={() => { setManualStop(null); setManualCode(''); setManualError(null); }}
+                accessibilityRole="button"
+                accessibilityLabel="Annuler la saisie du code"
               >
                 <Text style={styles.modalCancelText}>Annuler</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleManualSubmit}>
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={handleManualSubmit}
+                accessibilityRole="button"
+                accessibilityLabel="Valider le code de livraison"
+              >
                 <Text style={styles.modalConfirmText}>Valider</Text>
               </TouchableOpacity>
             </View>
@@ -928,7 +983,12 @@ export default function BatchScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Preuve alternative</Text>
             <Text style={styles.modalSubtitle}>{alternativeStop?.recipientName}</Text>
-            <TouchableOpacity style={[styles.photoBtn, photoReady && styles.photoBtnReady]} onPress={handleTakeProofPhoto}>
+            <TouchableOpacity
+              style={[styles.photoBtn, photoReady && styles.photoBtnReady]}
+              onPress={handleTakeProofPhoto}
+              accessibilityRole="button"
+              accessibilityLabel={photoReady ? 'Photo ajoutée, reprendre une photo' : 'Prendre une photo de preuve'}
+            >
               <Ionicons name={photoReady ? 'checkmark-circle-outline' : 'camera-outline'} size={18} color={photoReady ? '#047857' : '#6D28D9'} />
               <Text style={[styles.photoBtnText, photoReady && styles.photoBtnTextReady]}>
                 {photoReady ? 'Photo ajoutée' : 'Prendre une photo'}
@@ -942,10 +1002,20 @@ export default function BatchScreen() {
               placeholderTextColor="#9CA3AF"
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={resetAlternativeProof}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={resetAlternativeProof}
+                accessibilityRole="button"
+                accessibilityLabel="Annuler la preuve alternative"
+              >
                 <Text style={styles.modalCancelText}>Annuler</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleAlternativeSubmit}>
+              <TouchableOpacity
+                style={styles.modalConfirmBtn}
+                onPress={handleAlternativeSubmit}
+                accessibilityRole="button"
+                accessibilityLabel="Enregistrer la preuve alternative"
+              >
                 <Text style={styles.modalConfirmText}>Enregistrer</Text>
               </TouchableOpacity>
             </View>
@@ -966,7 +1036,12 @@ export default function BatchScreen() {
               <Text style={styles.ficheTitle} numberOfLines={1}>
                 {ficheData?.stop.recipientName ?? '—'}
               </Text>
-              <TouchableOpacity style={styles.ficheCloseBtn} onPress={() => setFicheData(null)}>
+              <TouchableOpacity
+                style={styles.ficheCloseBtn}
+                onPress={() => setFicheData(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Fermer la fiche"
+              >
                 <Ionicons name="close" size={22} color="#6B7280" />
               </TouchableOpacity>
             </View>

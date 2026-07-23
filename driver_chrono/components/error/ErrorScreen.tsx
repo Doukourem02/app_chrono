@@ -140,6 +140,8 @@ export default function ErrorScreen({
                 style={[styles.button, styles.primaryButton]}
                 onPress={handleRetry}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Réessayer"
               >
                 <Ionicons name="refresh" size={20} color="#FFFFFF" />
                 <Text style={styles.primaryButtonText}>Réessayer</Text>
@@ -150,6 +152,8 @@ export default function ErrorScreen({
               style={[styles.button, styles.secondaryButton]}
               onPress={handleGoBack}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Retour"
             >
               <Ionicons name="arrow-back" size={20} color="#374151" />
               <Text style={styles.secondaryButtonText}>Retour</Text>
@@ -160,6 +164,8 @@ export default function ErrorScreen({
                 style={[styles.button, styles.secondaryButton]}
                 onPress={handleGoHome}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Accueil"
               >
                 <Ionicons name="home" size={20} color="#374151" />
                 <Text style={styles.secondaryButtonText}>Accueil</Text>

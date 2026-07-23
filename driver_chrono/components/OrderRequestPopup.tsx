@@ -472,14 +472,18 @@ export const OrderRequestPopup: React.FC<OrderRequestPopupProps> = ({
               style={styles.declineButton}
               onPress={handleDecline}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Décliner la course"
             >
               <Text style={styles.declineText}>Décliner</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={styles.acceptButton}
               onPress={handleAccept}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Accepter la course"
             >
               <Text style={styles.acceptText}>Accepter</Text>
             </TouchableOpacity>

@@ -58,7 +58,7 @@ describe('twilioSmsService', () => {
       process.env.TWILIO_AUTH_TOKEN = 'token';
       process.env.TWILIO_SMS_FROM = '+15551234567';
 
-      const fetchMock = jest.fn().mockResolvedValue({
+      const fetchMock = jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue({
         ok: true,
         json: async () => ({ sid: 'SMabc123' }),
       });

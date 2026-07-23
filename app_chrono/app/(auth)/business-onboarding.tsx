@@ -140,7 +140,12 @@ export default function BusinessOnboardingScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <TouchableOpacity onPress={() => setStep('company')} style={styles.back}>
+          <TouchableOpacity
+            onPress={() => setStep('company')}
+            style={styles.back}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+          >
             <Ionicons name="arrow-back" size={22} color="#8B5CF6" />
           </TouchableOpacity>
 
@@ -160,6 +165,9 @@ export default function BusinessOnboardingScreen() {
                 style={[styles.planCard, isSelected && styles.planCardSelected]}
                 onPress={() => setSelectedPlan(plan.key)}
                 activeOpacity={0.8}
+                accessibilityRole="radio"
+                accessibilityLabel={`${plan.label}, ${plan.price}`}
+                accessibilityState={{ checked: isSelected }}
               >
                 <View style={styles.planHeader}>
                   <View style={[styles.planIconCircle, isSelected && styles.planIconCircleSelected]}>
@@ -212,6 +220,9 @@ export default function BusinessOnboardingScreen() {
             style={[styles.cta, (!selectedPlan || isLoading) && styles.ctaDisabled]}
             onPress={handleActivateBusiness}
             disabled={!selectedPlan || isLoading}
+            accessibilityRole="button"
+            accessibilityLabel="Envoyer ma demande"
+            accessibilityState={{ disabled: !selectedPlan || isLoading }}
           >
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -240,7 +251,12 @@ export default function BusinessOnboardingScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={[styles.inner, { paddingTop: insets.top + 24 }]}>
-          <TouchableOpacity onPress={() => setStep('question')} style={styles.back}>
+          <TouchableOpacity
+            onPress={() => setStep('question')}
+            style={styles.back}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+          >
             <Ionicons name="arrow-back" size={22} color="#8B5CF6" />
           </TouchableOpacity>
 
@@ -271,6 +287,9 @@ export default function BusinessOnboardingScreen() {
             style={[styles.cta, !companyName.trim() && styles.ctaDisabled]}
             onPress={handleCompanyNext}
             disabled={!companyName.trim()}
+            accessibilityRole="button"
+            accessibilityLabel="Continuer"
+            accessibilityState={{ disabled: !companyName.trim() }}
           >
             <Text style={styles.ctaText}>Continuer</Text>
           </TouchableOpacity>
@@ -304,7 +323,12 @@ export default function BusinessOnboardingScreen() {
               : 'Si tu es e-commerce, boutique ou professionnel, active le mode business pour gérer tes livraisons en lot et bénéficier de tarifs partenaires.'}
           </Text>
 
-          <TouchableOpacity style={styles.optionCard} onPress={handleYes}>
+          <TouchableOpacity
+            style={styles.optionCard}
+            onPress={handleYes}
+            accessibilityRole="button"
+            accessibilityLabel={isUpdate ? 'Oui, activité professionnelle' : 'Oui, pour mon activité pro'}
+          >
             <View style={styles.optionIcon}>
               <Ionicons name="storefront-outline" size={26} color="#8B5CF6" />
             </View>
@@ -321,7 +345,12 @@ export default function BusinessOnboardingScreen() {
             <Ionicons name="chevron-forward" size={18} color="#9CA3AF" style={styles.optionChevron} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionCard, styles.optionCardMuted]} onPress={handleNo}>
+          <TouchableOpacity
+            style={[styles.optionCard, styles.optionCardMuted]}
+            onPress={handleNo}
+            accessibilityRole="button"
+            accessibilityLabel={isUpdate ? 'Non, usage personnel' : 'Non, pour un usage perso'}
+          >
             <View style={[styles.optionIcon, styles.optionIconMuted]}>
               <Ionicons name="person-outline" size={26} color="#6B7280" />
             </View>

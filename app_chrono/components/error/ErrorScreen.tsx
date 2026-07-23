@@ -140,6 +140,8 @@ export default function ErrorScreen({
                 style={[styles.button, styles.primaryButton]}
                 onPress={handleRetry}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Réessayer"
               >
                 <Ionicons name="refresh" size={20} color="#FFFFFF" />
                 <Text style={styles.primaryButtonText}>Réessayer</Text>
@@ -150,6 +152,8 @@ export default function ErrorScreen({
               style={[styles.button, styles.secondaryButton]}
               onPress={router.canGoBack() ? handleGoBack : handleGoHome}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={router.canGoBack() ? 'Retour' : 'Accueil'}
             >
               <Ionicons 
                 name={router.canGoBack() ? "arrow-back" : "home"} 

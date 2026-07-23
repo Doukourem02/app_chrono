@@ -110,13 +110,20 @@ export default function PaymentMethodsPage() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Moyens de paiement</Text>
         <TouchableOpacity
           onPress={() => router.push('/profile/add-payment-method' as any)}
           style={styles.addButton}
+          accessibilityRole="button"
+          accessibilityLabel="Ajouter un moyen de paiement"
         >
           <Ionicons name="add" size={24} color="#8B5CF6" />
         </TouchableOpacity>
@@ -134,6 +141,8 @@ export default function PaymentMethodsPage() {
             <TouchableOpacity
               style={styles.addFirstButton}
               onPress={() => router.push('/profile/add-payment-method' as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter une méthode de paiement"
             >
               <Text style={styles.addFirstButtonText}>Ajouter une méthode</Text>
             </TouchableOpacity>
@@ -167,6 +176,8 @@ export default function PaymentMethodsPage() {
                 <TouchableOpacity
                   onPress={() => handleDelete(method.id)}
                   style={styles.deleteButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Supprimer ${getMethodLabel(method.method_type)}`}
                 >
                   <Ionicons name="trash-outline" size={20} color="#EF4444" />
                 </TouchableOpacity>
@@ -175,6 +186,8 @@ export default function PaymentMethodsPage() {
                 <TouchableOpacity
                   style={styles.setDefaultButton}
                   onPress={() => handleSetDefault(method.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Définir ${getMethodLabel(method.method_type)} par défaut`}
                 >
                   <Text style={styles.setDefaultButtonText}>Définir par défaut</Text>
                 </TouchableOpacity>

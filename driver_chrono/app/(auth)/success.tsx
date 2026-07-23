@@ -79,6 +79,8 @@ export default function SuccessScreen() {
           <TouchableOpacity
             style={styles.continueButton}
             onPress={handleContinue}
+            accessibilityRole="button"
+            accessibilityLabel={isNewUser ? 'Commencer à livrer' : 'Accéder au tableau de bord'}
           >
             <Text style={styles.continueButtonText}>
               {isNewUser ? 'Commencer à livrer' : 'Accéder au tableau de bord'}

@@ -51,7 +51,7 @@ describe('driverController — ownership checks', () => {
     });
 
     it('should allow an admin to view any driver\'s revenues', async () => {
-      mockRequest.user = { id: 'admin-id', role: 'admin' } as any;
+      (mockRequest as any).user = { id: 'admin-id', role: 'admin' };
       mockRequest.params = { userId: 'another-driver-id' };
       (pool as any).query = (jest.fn() as any).mockResolvedValue({ rows: [{ count: '0' }] });
 
@@ -99,7 +99,7 @@ describe('driverController — ownership checks', () => {
     });
 
     it('should include email/phone/total_earnings when the driver views their own profile', async () => {
-      mockRequest.user = { id: 'another-driver-id' } as any;
+      (mockRequest as any).user = { id: 'another-driver-id' };
       mockRequest.params = { driverId: 'another-driver-id' };
 
       await driverController.getDriverDetails(mockRequest as any, mockResponse as Response);

@@ -168,7 +168,12 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
         }}
         {...customPanResponder.panHandlers}
       >
-        <TouchableOpacity style={styles.dragIndicator} onPress={onToggle}>
+        <TouchableOpacity
+          style={styles.dragIndicator}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityLabel={isExpanded ? 'Réduire les informations destinataire' : 'Développer les informations destinataire'}
+        >
           <View style={styles.dragHandle} />
         </TouchableOpacity>
       </View>
@@ -191,13 +196,15 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
                 <Text style={styles.headerSubtitle}>Détails de livraison</Text>
               </View>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.closeButton}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onToggle();
               }}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
             >
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
@@ -217,10 +224,12 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
               <Text style={styles.addressText}>{order.dropoff.address}</Text>
             </View>
 
-            <TouchableOpacity 
-              style={styles.actionButton} 
+            <TouchableOpacity
+              style={styles.actionButton}
               onPress={handleNavigate}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Ouvrir la navigation"
             >
               <LinearGradient
                 colors={['#8B5CF6', '#7C3AED']}
@@ -249,10 +258,12 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
                 <Text style={styles.phoneText}>{recipientPhone}</Text>
               </View>
 
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.callButton]} 
+              <TouchableOpacity
+                style={[styles.actionButton, styles.callButton]}
                 onPress={handleCall}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Appeler maintenant"
               >
                 <LinearGradient
                   colors={['#10B981', '#059669']}
@@ -354,6 +365,8 @@ export const RecipientDetailsSheet: React.FC<RecipientDetailsSheetProps> = ({
           style={styles.peekContainer}
           onPress={onToggle}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Développer les informations destinataire"
         >
           <Text style={styles.peekText} numberOfLines={1}>
             Informations destinataire

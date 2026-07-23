@@ -48,9 +48,11 @@ export default function ValidateScreen() {
         </Animated.View>
 
         <Animated.View style={[styles.buttonContainer, { opacity: fadeAnim }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.continueButton}
             onPress={handleContinue}
+            accessibilityRole="button"
+            accessibilityLabel="Continuer"
           >
             <Text style={styles.continueButtonText}>Continue</Text>
           </TouchableOpacity>

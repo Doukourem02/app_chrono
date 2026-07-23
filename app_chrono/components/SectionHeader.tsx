@@ -16,7 +16,11 @@ return (
     <View style={styles.sectionHeader}>
     <Text style={styles.sectionTitle}>{title}</Text>
     {showSeeMore && (
-        <TouchableOpacity onPress={onSeeMorePress}>
+        <TouchableOpacity
+        onPress={onSeeMorePress}
+        accessibilityRole="button"
+        accessibilityLabel={`Voir plus : ${title}`}
+        >
         <Text style={styles.viewMore}>Voir plus</Text>
         </TouchableOpacity>
     )}

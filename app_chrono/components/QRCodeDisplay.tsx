@@ -86,7 +86,12 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>QR Code de livraison</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButton}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+            >
               <Ionicons name="close" size={24} color="#1F2937" />
             </TouchableOpacity>
           </View>
@@ -142,6 +147,8 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
             {__DEV__ && fullQrCodeData && (
               <TouchableOpacity
                 style={[styles.button, styles.copyTestButton]}
+                accessibilityRole="button"
+                accessibilityLabel="Partager les données pour test"
                 onPress={async () => {
                   const json = JSON.stringify(fullQrCodeData);
                   try {
@@ -158,6 +165,8 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
             <TouchableOpacity
               style={[styles.button, styles.shareButton]}
               onPress={handleShare}
+              accessibilityRole="button"
+              accessibilityLabel="Partager le QR code"
             >
               <Ionicons name="share-outline" size={20} color="#6366F1" />
               <Text style={styles.shareButtonText}>Partager</Text>

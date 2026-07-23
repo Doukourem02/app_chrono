@@ -188,6 +188,9 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSelected, onPress }) => 
       style={[styles.orderCard, isSelected && styles.selectedCard]}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`Commande #${order.id.slice(0, 8)}, ${getStatusLabel(order.status)}`}
+      accessibilityState={{ selected: isSelected }}
     >
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>

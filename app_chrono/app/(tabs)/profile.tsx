@@ -330,6 +330,9 @@ export default function ProfilePage() {
                 style={styles.cameraButton}
                 onPress={handleAvatarPress}
                 disabled={uploadingAvatar}
+                accessibilityRole="button"
+                accessibilityLabel="Changer la photo de profil"
+                accessibilityState={{ disabled: uploadingAvatar }}
               >
                 {uploadingAvatar ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -408,6 +411,8 @@ export default function ProfilePage() {
               key={index}
               style={styles.menuItem}
               onPress={item.onPress}
+              accessibilityRole="button"
+              accessibilityLabel={item.title}
             >
               <View style={styles.menuItemLeft}>
                 <View
@@ -430,7 +435,12 @@ export default function ProfilePage() {
         </View>
 
         {/* Bouton déconnexion */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          accessibilityRole="button"
+          accessibilityLabel="Se déconnecter"
+        >
           <Ionicons name="log-out-outline" size={24} color="#EF4444" />
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </TouchableOpacity>

@@ -162,6 +162,8 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
           <TouchableOpacity
             onPress={step === 'recipients' ? handleClose : () => setStep(step === 'driver' ? 'recipients' : step === 'confirm' ? 'driver' : 'recipients')}
             style={styles.closeBtn}
+            accessibilityRole="button"
+            accessibilityLabel={step === 'recipients' || step === 'success' ? 'Fermer' : 'Retour'}
           >
             <Ionicons name={step === 'recipients' || step === 'success' ? 'close' : 'arrow-back'} size={20} color="#374151" />
           </TouchableOpacity>
@@ -223,7 +225,12 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                         <Text style={styles.recipientSub}>{r.phone} · {r.address}</Text>
                         {r.notes ? <Text style={styles.recipientNotes}>{r.notes}</Text> : null}
                       </View>
-                      <TouchableOpacity onPress={() => removeRecipient(r.id)} style={styles.removeBtn}>
+                      <TouchableOpacity
+                        onPress={() => removeRecipient(r.id)}
+                        style={styles.removeBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Retirer ${r.name} de la tournée`}
+                      >
                         <Ionicons name="trash-outline" size={16} color="#EF4444" />
                       </TouchableOpacity>
                     </View>
@@ -291,6 +298,9 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                           key={instruction}
                           style={[styles.presetChip, selected && styles.presetChipSelected]}
                           onPress={() => toggleDraftInstruction(instruction)}
+                          accessibilityRole="checkbox"
+                          accessibilityLabel={instruction}
+                          accessibilityState={{ checked: selected }}
                         >
                           <Ionicons
                             name={selected ? 'checkmark-circle' : 'ellipse-outline'}
@@ -309,6 +319,9 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                   style={[styles.addBtn, (!draftName.trim() || !draftPhone.trim() || !draftAddress.trim() || !draftCoords) && styles.addBtnDisabled]}
                   onPress={handleAddRecipient}
                   disabled={!draftName.trim() || !draftPhone.trim() || !draftAddress.trim() || !draftCoords}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ajouter à la tournée"
+                  accessibilityState={{ disabled: !draftName.trim() || !draftPhone.trim() || !draftAddress.trim() || !draftCoords }}
                 >
                   <Ionicons name="add" size={18} color="#8B5CF6" />
                   <Text style={styles.addBtnText}>Ajouter à la tournée</Text>
@@ -321,6 +334,9 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                 style={[styles.cta, (batchRecipients.length === 0 || !batchPickupAddress || !batchPickupCoords) && styles.ctaDisabled]}
                 onPress={() => setStep('driver')}
                 disabled={batchRecipients.length === 0 || !batchPickupAddress || !batchPickupCoords}
+                accessibilityRole="button"
+                accessibilityLabel={`Suivant, ${batchRecipients.length} destinataire${batchRecipients.length > 1 ? 's' : ''}`}
+                accessibilityState={{ disabled: batchRecipients.length === 0 || !batchPickupAddress || !batchPickupCoords }}
               >
                 <Text style={styles.ctaText}>Suivant · {batchRecipients.length} destinataire{batchRecipients.length > 1 ? 's' : ''}</Text>
               </TouchableOpacity>
@@ -346,6 +362,9 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                   <TouchableOpacity
                     style={[styles.driverCard, batchDriverId === null && styles.driverCardActive]}
                     onPress={() => setBatchDriver(null)}
+                    accessibilityRole="radio"
+                    accessibilityLabel="Assignation automatique, premier livreur disponible"
+                    accessibilityState={{ selected: batchDriverId === null }}
                   >
                     <View style={[styles.driverAvatar, { backgroundColor: '#F3F4F6' }]}>
                       <Ionicons name="flash-outline" size={20} color="#6B7280" />
@@ -371,6 +390,9 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                         ]}
                         disabled={!canSelect}
                         onPress={() => setBatchDriver(d.driver_user_id)}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`${name}${!canSelect ? ', tournées non activées' : ''}`}
+                        accessibilityState={{ selected, disabled: !canSelect }}
                       >
                         <View style={styles.driverAvatar}>
                           {d.driver.avatar_url ? (
@@ -398,7 +420,12 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
               <View style={{ height: 24 }} />
             </ScrollView>
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-              <TouchableOpacity style={styles.cta} onPress={() => setStep('confirm')}>
+              <TouchableOpacity
+                style={styles.cta}
+                onPress={() => setStep('confirm')}
+                accessibilityRole="button"
+                accessibilityLabel="Suivant"
+              >
                 <Text style={styles.ctaText}>Suivant</Text>
               </TouchableOpacity>
             </View>
@@ -442,6 +469,9 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                 style={[styles.cta, isSubmitting && styles.ctaDisabled]}
                 onPress={handleSubmit}
                 disabled={isSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel="Lancer la tournée"
+                accessibilityState={{ disabled: isSubmitting }}
               >
                 {isSubmitting ? (
                   <ActivityIndicator color="#FFF" />
@@ -477,7 +507,12 @@ export default function BatchShippingBottomSheet({ visible, onClose }: BatchShip
                 })}
               </View>
             )}
-            <TouchableOpacity style={[styles.cta, { marginTop: 32, width: '100%' }]} onPress={handleClose}>
+            <TouchableOpacity
+              style={[styles.cta, { marginTop: 32, width: '100%' }]}
+              onPress={handleClose}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+            >
               <Text style={styles.ctaText}>Fermer</Text>
             </TouchableOpacity>
           </View>

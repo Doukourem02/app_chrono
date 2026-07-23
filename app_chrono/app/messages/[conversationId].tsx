@@ -203,7 +203,12 @@ export default function MessagePage() {
     return (
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+          >
             <Ionicons name="arrow-back" size={24} color="#1F2937" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Messages</Text>
@@ -278,7 +283,12 @@ export default function MessagePage() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
@@ -315,6 +325,9 @@ export default function MessagePage() {
           style={[styles.sendButton, (!messageText.trim() || isSending) && styles.sendButtonDisabled]}
           onPress={handleSendMessage}
           disabled={!messageText.trim() || isSending}
+          accessibilityRole="button"
+          accessibilityLabel="Envoyer le message"
+          accessibilityState={{ disabled: !messageText.trim() || isSending }}
         >
           {isSending ? (
             <Ionicons name="hourglass-outline" size={20} color="#FFFFFF" />

@@ -13,7 +13,12 @@ export default function PaymentsPage() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Paiements</Text>
@@ -31,6 +36,8 @@ export default function PaymentsPage() {
           <TouchableOpacity
             style={styles.addFirstButton}
             onPress={() => router.push('/(tabs)/revenus' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Voir mes revenus"
           >
             <Text style={styles.addFirstButtonText}>Voir mes revenus</Text>
           </TouchableOpacity>

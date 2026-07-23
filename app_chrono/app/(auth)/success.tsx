@@ -54,9 +54,11 @@ export default function SuccessScreen() {
 
         {/* Bouton Continue */}
         <Animated.View style={[styles.buttonContainer, { opacity: fadeAnim }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.continueButton}
             onPress={handleContinue}
+            accessibilityRole="button"
+            accessibilityLabel="Continuer"
           >
             <Text style={styles.continueButtonText}>Continue</Text>
           </TouchableOpacity>

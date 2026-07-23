@@ -124,9 +124,11 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
           style={styles.overlayTouchable}
           activeOpacity={1}
           onPress={closeOnBackdrop ? handleClose : undefined}
+          accessibilityRole={closeOnBackdrop ? 'button' : undefined}
+          accessibilityLabel={closeOnBackdrop ? 'Fermer' : undefined}
         >
           <Animated.View style={[styles.modalContainer, modalStyle]}>
-            <TouchableOpacity activeOpacity={1}>
+            <TouchableOpacity activeOpacity={1} accessible={false}>
               {/* Header avec icône animée */}
               <View style={styles.header}>
                 <Animated.View
@@ -146,6 +148,8 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
                   onPress={handleClose}
                   style={styles.closeButton}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
                 >
                   <Ionicons name="close" size={24} color="#6B7280" />
                 </TouchableOpacity>
@@ -206,6 +210,8 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
                       style={[styles.button, styles.secondaryButton]}
                       onPress={error?.onAction}
                       activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel={error?.actionLabel || 'Aide'}
                     >
                       <Ionicons name="help-circle-outline" size={20} color="#8B5CF6" />
                       <Text style={styles.secondaryButtonText}>
@@ -217,6 +223,8 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
                     style={[styles.button, styles.primaryButton]}
                     onPress={handleClose}
                     activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="J'ai compris"
                   >
                     <Text style={styles.primaryButtonText}>J&apos;ai compris</Text>
                   </TouchableOpacity>

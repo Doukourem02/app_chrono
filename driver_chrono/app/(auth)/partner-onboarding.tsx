@@ -146,6 +146,9 @@ export default function PartnerOnboardingScreen() {
             <TouchableOpacity
               style={styles.checkboxContainer}
               onPress={() => setAcceptedTerms(!acceptedTerms)}
+              accessibilityRole="checkbox"
+              accessibilityLabel="J'accepte les conditions de commission prépayée"
+              accessibilityState={{ checked: acceptedTerms }}
             >
               <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
                 {acceptedTerms && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
@@ -189,6 +192,9 @@ export default function PartnerOnboardingScreen() {
                     setVehicleType(type);
                   }}
                   activeOpacity={enabled ? 0.7 : 1}
+                  accessibilityRole="radio"
+                  accessibilityLabel={type === 'moto' ? 'Moto' : type === 'vehicule' ? 'Véhicule' : 'Cargo'}
+                  accessibilityState={{ selected: selected && enabled, disabled: !enabled }}
                 >
                   <Ionicons
                     name={type === 'moto' ? 'bicycle' : type === 'vehicule' ? 'car' : 'cube'}
@@ -276,6 +282,9 @@ export default function PartnerOnboardingScreen() {
           style={[styles.submitButton, (!acceptedTerms || isLoading) && styles.submitButtonDisabled]}
           onPress={handleComplete}
           disabled={!acceptedTerms || isLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Compléter mon profil"
+          accessibilityState={{ disabled: !acceptedTerms || isLoading }}
         >
           <Text style={styles.submitButtonText}>
             {isLoading ? 'Enregistrement...' : 'Compléter mon profil'}

@@ -59,6 +59,8 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
           style={[styles.card, styles.cardAction]}
           onPress={() => router.push('/(auth)/driver-type-selection' as any)}
           activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Choisir le type de livreur, interne ou partenaire"
         >
           <Ionicons name="person-outline" size={24} color="#8B5CF6" />
           <View style={{ marginLeft: 8, flex: 1 }}>

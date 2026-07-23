@@ -88,7 +88,12 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           <ActivityIndicator size="large" color="#6366F1" />
           <Text style={styles.permissionText}>Chargement des permissions...</Text>
         </View>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer le scanner"
+        >
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -107,17 +112,26 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           <TouchableOpacity
             style={styles.permissionButton}
             onPress={requestPermission}
+            accessibilityRole="button"
+            accessibilityLabel="Réessayer la demande de permission caméra"
           >
             <Text style={styles.permissionButtonText}>Réessayer</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.permissionButton, { marginTop: 12, backgroundColor: '#374151' }]}
             onPress={() => Linking.openSettings().catch(() => {})}
+            accessibilityRole="button"
+            accessibilityLabel="Ouvrir les réglages de l'appareil"
           >
             <Text style={styles.permissionButtonText}>Ouvrir les réglages</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer le scanner"
+        >
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -168,7 +182,12 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 
       {/* Bouton saisie manuelle */}
       {onManualEntry && (
-        <TouchableOpacity style={styles.manualButton} onPress={() => setShowManualInput(true)}>
+        <TouchableOpacity
+          style={styles.manualButton}
+          onPress={() => setShowManualInput(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Saisie manuelle du code"
+        >
           <Ionicons name="keypad-outline" size={18} color="#fff" />
           <Text style={styles.manualButtonText}>Saisie manuelle</Text>
         </TouchableOpacity>
@@ -198,10 +217,20 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
               autoFocus
             />
             <View style={styles.manualActions}>
-              <TouchableOpacity style={styles.manualCancelBtn} onPress={() => { setShowManualInput(false); setManualCode(''); }}>
+              <TouchableOpacity
+                style={styles.manualCancelBtn}
+                onPress={() => { setShowManualInput(false); setManualCode(''); }}
+                accessibilityRole="button"
+                accessibilityLabel="Annuler"
+              >
                 <Text style={styles.manualCancelText}>Annuler</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.manualConfirmBtn} onPress={handleManualSubmit}>
+              <TouchableOpacity
+                style={styles.manualConfirmBtn}
+                onPress={handleManualSubmit}
+                accessibilityRole="button"
+                accessibilityLabel="Valider le code"
+              >
                 <Text style={styles.manualConfirmText}>Valider</Text>
               </TouchableOpacity>
             </View>

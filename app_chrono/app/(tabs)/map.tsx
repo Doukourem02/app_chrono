@@ -1241,6 +1241,8 @@ export default function MapPage() {
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => router.push("/(tabs)")}
+        accessibilityRole="button"
+        accessibilityLabel="Retour"
       >
         <Ionicons name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
@@ -1259,6 +1261,8 @@ export default function MapPage() {
               );
             }
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Centrer sur ma position"
         >
           <Ionicons name="locate" size={22} color="#8B5CF6" />
         </TouchableOpacity>
@@ -1271,6 +1275,8 @@ export default function MapPage() {
           Haptics.selectionAsync();
           zoomOutToFit();
         }}
+        accessibilityRole="button"
+        accessibilityLabel="Dézoomer pour voir l'ensemble du trajet"
       >
         <Ionicons name="expand-outline" size={22} color="#8B5CF6" />
       </TouchableOpacity>
@@ -1283,6 +1289,8 @@ export default function MapPage() {
           const idx = MAP_STYLES.indexOf(mapStyle);
           setMapStyle(MAP_STYLES[(idx + 1) % MAP_STYLES.length]);
         }}
+        accessibilityRole="button"
+        accessibilityLabel="Changer le style de carte"
       >
         <Ionicons
           name={mapStyle === 'dark' ? 'moon' : mapStyle === 'light' ? 'sunny' : 'layers'}
@@ -1337,8 +1345,10 @@ export default function MapPage() {
       {(isSearchingDriver ||
         (currentOrder?.status === "accepted" && currentOrder?.driver)) &&
         !isCreatingNewOrder && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.driverSearchBackButton}
+          accessibilityRole="button"
+          accessibilityLabel="Annuler la recherche et créer une nouvelle commande"
           onPress={async () => {
               // Permettre la création d'une nouvelle commande sans supprimer les commandes en cours
               logger.info("🆕 Préparation pour nouvelle commande (sans supprimer les commandes en cours)", "map.tsx");

@@ -343,7 +343,8 @@ export const confirmBatchPickup = async (req: AuthenticatedRequest, res: Respons
     return;
   }
 
-  if (req.user?.id && batch.driver_id && batch.driver_id !== req.user.id) {
+  const isAdminPickup = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+  if (!isAdminPickup && (!req.user?.id || batch.driver_id !== req.user.id)) {
     res.status(403).json({ success: false, message: 'Cette tournée ne vous est pas assignée' });
     return;
   }
@@ -615,8 +616,15 @@ export const getBatch = async (req: AuthenticatedRequest, res: Response): Promis
     return;
   }
 
-  if (req.user?.id && (batch as any).driver_id && (batch as any).driver_id !== req.user.id) {
-    res.status(403).json({ success: false, message: 'Cette tournée ne vous est pas assignée' });
+  const isAdminBatch = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+  const isAssignedDriver = !!req.user?.id && (batch as any).driver_id === req.user.id;
+  const isBatchOwner = !!req.user?.id && (batch as any).user_id === req.user.id;
+  const isBatchPartnerMember = (batch as any).partner_id
+    ? await canUsePartner(req.user, (batch as any).partner_id)
+    : false;
+
+  if (!isAdminBatch && !isAssignedDriver && !isBatchOwner && !isBatchPartnerMember) {
+    res.status(403).json({ success: false, message: 'Accès refusé à cette tournée' });
     return;
   }
 
@@ -702,7 +710,8 @@ export const validateBatchOrder = async (req: AuthenticatedRequest, res: Respons
   const batchDriverId = Array.isArray((batchOrder as any).delivery_batches)
     ? (batchOrder as any).delivery_batches[0]?.driver_id
     : (batchOrder as any).delivery_batches?.driver_id;
-  if (req.user?.id && batchDriverId && batchDriverId !== req.user.id) {
+  const isAdminValidate = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+  if (!isAdminValidate && (!req.user?.id || batchDriverId !== req.user.id)) {
     res.status(403).json({ success: false, message: 'Cette tournée ne vous est pas assignée' });
     return;
   }
@@ -716,7 +725,7 @@ export const validateBatchOrder = async (req: AuthenticatedRequest, res: Respons
     res.status(404).json({ success: false, message: 'Commande introuvable' });
     return;
   }
-  if (req.user?.id && orderRow.driver_id && orderRow.driver_id !== req.user.id) {
+  if (!isAdminValidate && (!req.user?.id || orderRow.driver_id !== req.user.id)) {
     res.status(403).json({ success: false, message: 'Cette commande ne vous est pas assignée' });
     return;
   }

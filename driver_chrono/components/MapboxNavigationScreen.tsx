@@ -174,7 +174,12 @@ export function MapboxNavigationScreen({
         <Text style={styles.fallbackText}>
           L&apos;origine ou la destination n&apos;a pas de coordonnées GPS valides.
         </Text>
-        <TouchableOpacity style={styles.backButton} onPress={onCancel}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onCancel}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#fff" />
           <Text style={styles.backButtonText}>Retour</Text>
         </TouchableOpacity>
@@ -215,11 +220,18 @@ export function MapboxNavigationScreen({
         <TouchableOpacity
           style={[styles.backButton, styles.externalNavigationButton]}
           onPress={handleOpenExternalNavigation}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir la navigation externe"
         >
           <Ionicons name="navigate" size={24} color="#fff" />
           <Text style={styles.backButtonText}>Ouvrir la navigation</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.backButton} onPress={onCancel}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onCancel}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#fff" />
           <Text style={styles.backButtonText}>Retour</Text>
         </TouchableOpacity>
@@ -260,6 +272,8 @@ export function MapboxNavigationScreen({
         style={[styles.overlayBack, { top: insets.top + 8 }]}
         onPress={() => (onBackPress ?? onCancel)()}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel="Retour"
       >
         <Ionicons name="arrow-back" size={24} color="#fff" />
       </TouchableOpacity>
@@ -283,6 +297,8 @@ export function MapboxNavigationScreen({
           style={[styles.floatingButton, styles.singleMessageButton, { top: insets.top + 70 }]}
           onPress={onMessagePress}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir la messagerie"
         >
           <Ionicons name="chatbubble-outline" size={22} color="#fff" />
         </TouchableOpacity>
@@ -294,6 +310,8 @@ export function MapboxNavigationScreen({
           style={[styles.colisRecupereButton, { bottom: insets.bottom + 200 }]}
           onPress={onColisRecupere}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={colisRecupereLabel}
         >
           <Ionicons name="cube" size={24} color="#fff" />
           <Text style={styles.colisRecupereButtonText}>{colisRecupereLabel}</Text>
@@ -306,6 +324,8 @@ export function MapboxNavigationScreen({
           style={[styles.colisRecupereButton, styles.livraisonEffectueeButton, { bottom: insets.bottom + 200 }]}
           onPress={onLivraisonEffectuee}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Livraison effectuée"
         >
           <Ionicons name="checkmark-circle" size={24} color="#fff" />
           <Text style={styles.colisRecupereButtonText}>Livraison effectuée</Text>

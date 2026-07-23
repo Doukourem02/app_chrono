@@ -35,13 +35,20 @@ export default function AddressesPage() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mes adresses</Text>
         <TouchableOpacity
           onPress={() => router.push('/profile/add-address' as any)}
           style={styles.addButton}
+          accessibilityRole="button"
+          accessibilityLabel="Ajouter une adresse"
         >
           <Ionicons name="add" size={24} color="#8B5CF6" />
         </TouchableOpacity>
@@ -59,6 +66,8 @@ export default function AddressesPage() {
             <TouchableOpacity
               style={styles.addFirstButton}
               onPress={() => router.push('/profile/add-address' as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter une adresse"
             >
               <Text style={styles.addFirstButtonText}>Ajouter une adresse</Text>
             </TouchableOpacity>
@@ -78,6 +87,8 @@ export default function AddressesPage() {
                 <TouchableOpacity
                   onPress={() => handleDelete(address)}
                   style={styles.actionButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Supprimer l'adresse ${address.label}`}
                 >
                   <Ionicons name="trash-outline" size={20} color="#EF4444" />
                 </TouchableOpacity>
@@ -87,6 +98,8 @@ export default function AddressesPage() {
                 <TouchableOpacity
                   style={styles.setDefaultButton}
                   onPress={() => handleSetDefault(address.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Définir ${address.label} par défaut`}
                 >
                   <Text style={styles.setDefaultButtonText}>Définir par défaut</Text>
                 </TouchableOpacity>

@@ -27,7 +27,12 @@ export default function PromoCodesPage() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Codes promo</Text>
@@ -49,7 +54,12 @@ export default function PromoCodesPage() {
               autoCapitalize="characters"
               editable={false}
             />
-            <TouchableOpacity style={styles.applyButton} onPress={handleApplyCode}>
+            <TouchableOpacity
+              style={styles.applyButton}
+              onPress={handleApplyCode}
+              accessibilityRole="button"
+              accessibilityLabel="Appliquer le code promo"
+            >
               <Text style={styles.applyButtonText}>Appliquer</Text>
             </TouchableOpacity>
           </View>

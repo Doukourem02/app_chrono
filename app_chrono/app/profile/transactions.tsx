@@ -186,6 +186,9 @@ export default function TransactionsPage() {
         <TouchableOpacity
           style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
           onPress={() => setFilter('all')}
+          accessibilityRole="button"
+          accessibilityLabel="Toutes les transactions"
+          accessibilityState={{ selected: filter === 'all' }}
         >
           <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
             Toutes
@@ -194,6 +197,9 @@ export default function TransactionsPage() {
         <TouchableOpacity
           style={[styles.filterButton, filter === 'paid' && styles.filterButtonActive]}
           onPress={() => setFilter('paid')}
+          accessibilityRole="button"
+          accessibilityLabel="Transactions payées"
+          accessibilityState={{ selected: filter === 'paid' }}
         >
           <Text style={[styles.filterText, filter === 'paid' && styles.filterTextActive]}>
             Payées
@@ -202,6 +208,9 @@ export default function TransactionsPage() {
         <TouchableOpacity
           style={[styles.filterButton, filter === 'refused' && styles.filterButtonActive]}
           onPress={() => setFilter('refused')}
+          accessibilityRole="button"
+          accessibilityLabel="Transactions refusées"
+          accessibilityState={{ selected: filter === 'refused' }}
         >
           <Text style={[styles.filterText, filter === 'refused' && styles.filterTextActive]}>
             Refusées
@@ -210,6 +219,9 @@ export default function TransactionsPage() {
         <TouchableOpacity
           style={[styles.filterButton, filter === 'refunded' && styles.filterButtonActive]}
           onPress={() => setFilter('refunded')}
+          accessibilityRole="button"
+          accessibilityLabel="Transactions remboursées"
+          accessibilityState={{ selected: filter === 'refunded' }}
         >
           <Text style={[styles.filterText, filter === 'refunded' && styles.filterTextActive]}>
             Remboursées
@@ -286,6 +298,8 @@ export default function TransactionsPage() {
                 <TouchableOpacity
                   style={styles.disputeButton}
                   onPress={() => handleDispute(transaction)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Contester cette transaction"
                 >
                   <Ionicons name="alert-circle-outline" size={18} color="#EF4444" />
                   <Text style={styles.disputeButtonText}>Contester cette transaction</Text>
@@ -310,6 +324,8 @@ export default function TransactionsPage() {
               <TouchableOpacity
                 onPress={() => setShowDisputeModal(false)}
                 style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Fermer"
               >
                 <Ionicons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
@@ -338,6 +354,9 @@ export default function TransactionsPage() {
                         disputeType === type && styles.radioButtonActive,
                       ]}
                       onPress={() => setDisputeType(type)}
+                      accessibilityRole="radio"
+                      accessibilityLabel={getDisputeTypeLabel(type)}
+                      accessibilityState={{ checked: disputeType === type }}
                     >
                       <View
                         style={[
@@ -383,6 +402,9 @@ export default function TransactionsPage() {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowDisputeModal(false)}
                 disabled={isSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel="Annuler"
+                accessibilityState={{ disabled: isSubmitting }}
               >
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
@@ -390,6 +412,9 @@ export default function TransactionsPage() {
                 style={[styles.modalButton, styles.submitButton]}
                 onPress={handleSubmitDispute}
                 disabled={isSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel="Envoyer la réclamation"
+                accessibilityState={{ disabled: isSubmitting }}
               >
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />

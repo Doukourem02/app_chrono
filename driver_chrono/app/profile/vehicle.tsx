@@ -280,7 +280,12 @@ export default function VehiclePage() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mon véhicule</Text>
@@ -314,6 +319,9 @@ export default function VehiclePage() {
                       setFormData({ ...formData, vehicleType: type });
                     }}
                     activeOpacity={enabled ? 0.7 : 1}
+                    accessibilityRole="button"
+                    accessibilityLabel={type === 'moto' ? 'Moto' : type === 'vehicule' ? 'Véhicule' : 'Cargo'}
+                    accessibilityState={{ selected: selected && enabled, disabled: !enabled }}
                   >
                     <Text
                       style={[
@@ -434,6 +442,9 @@ export default function VehiclePage() {
                 style={styles.uploadButton}
                 onPress={() => handlePickDocumentImage('carte_grise')}
                 disabled={documents.carte_grise.is_uploading}
+                accessibilityRole="button"
+                accessibilityLabel={documents.carte_grise.document_url ? 'Photo enregistrée, reprendre une photo' : 'Prendre ou choisir une photo de la carte grise'}
+                accessibilityState={{ disabled: documents.carte_grise.is_uploading }}
               >
                 {documents.carte_grise.is_uploading ? (
                   <ActivityIndicator color="#8B5CF6" />
@@ -460,6 +471,8 @@ export default function VehiclePage() {
               <TouchableOpacity
                 style={styles.saveDocumentButton}
                 onPress={() => handleSaveDocument('carte_grise')}
+                accessibilityRole="button"
+                accessibilityLabel="Enregistrer la carte grise"
               >
                 <Text style={styles.saveDocumentButtonText}>Enregistrer</Text>
               </TouchableOpacity>
@@ -516,6 +529,9 @@ export default function VehiclePage() {
                 style={styles.uploadButton}
                 onPress={() => handlePickDocumentImage('assurance')}
                 disabled={documents.assurance.is_uploading}
+                accessibilityRole="button"
+                accessibilityLabel={documents.assurance.document_url ? 'Photo enregistrée, reprendre une photo' : "Prendre ou choisir une photo de l'assurance"}
+                accessibilityState={{ disabled: documents.assurance.is_uploading }}
               >
                 {documents.assurance.is_uploading ? (
                   <ActivityIndicator color="#8B5CF6" />
@@ -542,6 +558,8 @@ export default function VehiclePage() {
               <TouchableOpacity
                 style={styles.saveDocumentButton}
                 onPress={() => handleSaveDocument('assurance')}
+                accessibilityRole="button"
+                accessibilityLabel="Enregistrer l'assurance"
               >
                 <Text style={styles.saveDocumentButtonText}>Enregistrer</Text>
               </TouchableOpacity>
@@ -570,6 +588,9 @@ export default function VehiclePage() {
                   style={styles.uploadButton}
                   onPress={() => handlePickDocumentImage('controle_technique')}
                   disabled={documents.controle_technique.is_uploading}
+                  accessibilityRole="button"
+                  accessibilityLabel={documents.controle_technique.document_url ? 'Photo enregistrée, reprendre une photo' : 'Prendre ou choisir une photo du contrôle technique'}
+                  accessibilityState={{ disabled: documents.controle_technique.is_uploading }}
                 >
                   {documents.controle_technique.is_uploading ? (
                     <ActivityIndicator color="#8B5CF6" />
@@ -596,6 +617,8 @@ export default function VehiclePage() {
                 <TouchableOpacity
                   style={styles.saveDocumentButton}
                   onPress={() => handleSaveDocument('controle_technique')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Enregistrer le contrôle technique"
                 >
                   <Text style={styles.saveDocumentButtonText}>Enregistrer</Text>
                 </TouchableOpacity>
@@ -627,6 +650,9 @@ export default function VehiclePage() {
                 style={styles.uploadButton}
                 onPress={() => handlePickDocumentImage('permis_conduire')}
                 disabled={documents.permis_conduire.is_uploading}
+                accessibilityRole="button"
+                accessibilityLabel={documents.permis_conduire.document_url ? 'Photo enregistrée, reprendre une photo' : 'Prendre ou choisir une photo du permis de conduire'}
+                accessibilityState={{ disabled: documents.permis_conduire.is_uploading }}
               >
                 {documents.permis_conduire.is_uploading ? (
                   <ActivityIndicator color="#8B5CF6" />
@@ -653,6 +679,8 @@ export default function VehiclePage() {
               <TouchableOpacity
                 style={styles.saveDocumentButton}
                 onPress={() => handleSaveDocument('permis_conduire')}
+                accessibilityRole="button"
+                accessibilityLabel="Enregistrer le permis de conduire"
               >
                 <Text style={styles.saveDocumentButtonText}>Enregistrer</Text>
               </TouchableOpacity>
@@ -664,6 +692,9 @@ export default function VehiclePage() {
           style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
           onPress={handleSave}
           disabled={isLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Enregistrer les informations du véhicule"
+          accessibilityState={{ disabled: isLoading }}
         >
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" />

@@ -71,6 +71,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
         style={[style, animatedStyle]}
         onPress={onPress}
         activeOpacity={0.7}
+        accessibilityRole="button"
       >
         {children}
       </AnimatedTouchable>

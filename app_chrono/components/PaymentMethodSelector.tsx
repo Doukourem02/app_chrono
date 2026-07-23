@@ -119,6 +119,9 @@ export default function PaymentMethodSelector({
                 ]}
                 onPress={() => handleSelect(method.type)}
                 disabled={isDisabled}
+                accessibilityRole="radio"
+                accessibilityLabel={method.name}
+                accessibilityState={{ selected: isSelected, disabled: isDisabled }}
               >
                 <View style={[styles.iconContainer, { backgroundColor: `${method.color}20` }]}>
                   {method.useImage && method.image ? (
@@ -185,7 +188,12 @@ export default function PaymentMethodSelector({
       </View>
 
       {showAddNew && onAddNew && (
-        <TouchableOpacity style={styles.addButton} onPress={onAddNew}>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={onAddNew}
+          accessibilityRole="button"
+          accessibilityLabel="Ajouter une méthode de paiement"
+        >
           <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
           <Text style={styles.addButtonText}>Ajouter une méthode de paiement</Text>
         </TouchableOpacity>

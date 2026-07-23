@@ -50,7 +50,12 @@ export default function SupportPage() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Aide et support</Text>
@@ -65,6 +70,9 @@ export default function SupportPage() {
             style={[styles.contactItem, styles.supportChatItem]}
             onPress={handleContactSupport}
             disabled={isCreatingConversation}
+            accessibilityRole="button"
+            accessibilityLabel="Contacter le support"
+            accessibilityState={{ disabled: isCreatingConversation }}
           >
             <Ionicons name="chatbubble-ellipses" size={24} color="#8B5CF6" />
             <View style={styles.contactInfo}>
@@ -81,6 +89,8 @@ export default function SupportPage() {
           <TouchableOpacity
             style={styles.contactItem}
             onPress={() => handleContact('email')}
+            accessibilityRole="button"
+            accessibilityLabel="Contacter par email"
           >
             <Ionicons name="mail" size={24} color="#8B5CF6" />
             <View style={styles.contactInfo}>
@@ -93,6 +103,8 @@ export default function SupportPage() {
           <TouchableOpacity
             style={styles.contactItem}
             onPress={() => handleContact('phone')}
+            accessibilityRole="button"
+            accessibilityLabel="Appeler le support"
           >
             <Ionicons name="call" size={24} color="#10B981" />
             <View style={styles.contactInfo}>
@@ -105,6 +117,8 @@ export default function SupportPage() {
           <TouchableOpacity
             style={styles.contactItem}
             onPress={() => handleContact('whatsapp')}
+            accessibilityRole="button"
+            accessibilityLabel="Contacter via WhatsApp"
           >
             <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
             <View style={styles.contactInfo}>

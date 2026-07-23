@@ -60,6 +60,34 @@ Paiement / mobile money : fichier dédié `docs/integration_paiement_en_ligne.md
 - [ ] Publicité et analytics (Axe 6)
 - [ ] Séparation `partner_chrono` en app indépendante si nécessaire
 
+## Évaluation qualité — critères nécessitant le simulateur (nécessite mon feu vert)
+
+Suite à l'audit `docs/evaluation_krono_2026-07-23.md` (backend et accessibilité terminés,
+doc supprimé — absorbé ici). 7 critères sur 20 restent plafonnés parce qu'ils ne peuvent pas
+être jugés depuis le code seul, il faut lancer l'app sur simulateur/device (skill `run`) :
+
+- Design UI
+- UX (parcours réels : OTP, commande, paiement, tournée)
+- Performance/fluidité perçue
+- Optimisation ressources (profiling mémoire/CPU)
+- Animations/micro-interactions
+- Temps de chargement/réactivité
+- Standards iOS/Android (HIG/Material)
+
+**Nécessite mon autorisation explicite avant de lancer le simulateur.**
+
+## Bugs mineurs repérés (audit accessibilité 2026-07-23)
+
+- `app_chrono/app/profile/support.tsx` **et** `driver_chrono/app/profile/support.tsx` : items
+  FAQ en accordéon (chevron d'expansion) sans aucune action — fonctionnalité inachevée,
+  identique dans les 2 apps. Laissé de côté pour l'instant sur demande explicite.
+- `app_chrono/components/NewB2BShippingModal.tsx` : confirmé jamais importé nulle part
+  (composant mort, déjà repéré une fois avant).
+- Note technique mineure : `currentShipment`/`updateShipmentStatus` dans
+  `store/useShipmentStore.ts` ne sont plus lus nulle part depuis la suppression de
+  `app/summary.tsx` (seul `createShipment()` est encore appelé, depuis
+  `DeliveryBottomSheet.tsx`) — état mort inoffensif, pas traité (hors scope).
+
 ## Tournées B2B (driver_chrono)
 
 - **Patch Android navigation en français à valider sur un vrai build** : voir `krono-reference-unique.md` section 16 (Tournées, "Langue de navigation") — appliqué le 2026-07-23 mais non testé, build Android local bloqué.
