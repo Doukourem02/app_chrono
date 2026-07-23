@@ -1372,7 +1372,7 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
     }
 
     // Vérifier que l'utilisateur existe
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       'SELECT id FROM users WHERE id = $1',
       [userId]
     );
@@ -1438,7 +1438,7 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
       RETURNING id, email, phone, first_name, last_name, avatar_url, role, created_at, updated_at
     `;
 
-    const result = await (pool as any).query(updateQuery, values);
+    const result = await pool.query(updateQuery, values);
 
     logger.info(`Profil utilisateur mis à jour pour ${maskUserId(userId)}`, {
       first_name: first_name !== undefined,
@@ -1470,7 +1470,7 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
         if (dpSets.length > 0) {
           dpSets.push('updated_at = NOW()');
           dpVals.push(userId);
-          await (pool as any).query(
+          await pool.query(
             `UPDATE driver_profiles SET ${dpSets.join(', ')} WHERE user_id = $${n}`,
             dpVals
           );
@@ -1526,7 +1526,7 @@ export const getUserProfile = async (req: Request, res: Response): Promise<void>
 
     await ensureUsersProfileColumns(pool);
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       'SELECT id, email, phone, first_name, last_name, avatar_url, role, created_at, updated_at FROM users WHERE id = $1',
       [userId]
     );
@@ -1593,7 +1593,7 @@ export const uploadAvatar = async (req: Request, res: Response): Promise<void> =
     }
 
     // Vérifier que l'utilisateur existe
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       'SELECT id FROM users WHERE id = $1',
       [userId]
     );
@@ -1660,7 +1660,7 @@ export const uploadAvatar = async (req: Request, res: Response): Promise<void> =
       .getPublicUrl(filePath);
 
     // Mettre à jour le profil utilisateur avec l'URL de l'avatar
-    const updateResult = await (pool as any).query(
+    const updateResult = await pool.query(
       `UPDATE users 
        SET avatar_url = $1, updated_at = NOW()
        WHERE id = $2

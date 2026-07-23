@@ -42,7 +42,7 @@ export async function canReceiveOrders(driverId: string): Promise<{
 }> {
   try {
     // Vérifier que c'est un livreur partenaire
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
       [driverId]
     );
@@ -68,7 +68,7 @@ export async function canReceiveOrders(driverId: string): Promise<{
 
     // Pour les partenaires, vérifier le solde
     if (driverType === 'partner') {
-      const balanceResult = await (pool as any).query(
+      const balanceResult = await pool.query(
         `SELECT balance, is_suspended 
          FROM commission_balance 
          WHERE driver_id = $1`,
@@ -122,7 +122,7 @@ export async function deductCommissionAfterDelivery(
 }> {
   try {
     // Vérifier que c'est un livreur partenaire
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
       [driverId]
     );
@@ -144,7 +144,7 @@ export async function deductCommissionAfterDelivery(
 
     // Pour les partenaires, prélever la commission
     if (driverType === 'partner') {
-      const deductResult = await (pool as any).query(
+      const deductResult = await pool.query(
         `SELECT deduct_commission($1, $2, $3, NULL) as transaction_id`,
         [driverId, orderId, orderPrice]
       );
@@ -152,7 +152,7 @@ export async function deductCommissionAfterDelivery(
       const transactionId = deductResult.rows[0].transaction_id;
 
       // Récupérer les détails de la transaction
-      const transactionDetails = await (pool as any).query(
+      const transactionDetails = await pool.query(
         `SELECT amount, balance_after 
          FROM commission_transactions 
          WHERE id = $1`,
@@ -206,7 +206,7 @@ export async function checkAndSendAlerts(
     // Récupérer le solde actuel si non fourni
     let balance = currentBalance;
     if (balance === undefined) {
-      const balanceResult = await (pool as any).query(
+      const balanceResult = await pool.query(
         `SELECT balance, is_suspended 
          FROM commission_balance 
          WHERE driver_id = $1`,
@@ -264,7 +264,7 @@ export async function initializeCommissionAccount(
   commissionRate: number = 10.0
 ): Promise<boolean> {
   try {
-    await (pool as any).query(
+    await pool.query(
       `SELECT initialize_commission_balance($1, $2)`,
       [driverId, commissionRate]
     );

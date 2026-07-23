@@ -8,11 +8,11 @@ import { resolveRecipientUserIdForOrder } from '../utils/resolveRecipientUserIdB
 export async function generateAndSaveTrackingToken(orderId: string): Promise<string | null> {
   try {
     const token = crypto.randomBytes(16).toString('hex');
-    const colCheck = await (pool as any).query(
+    const colCheck = await pool.query(
       `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'tracking_token'`
     );
     if (!colCheck.rows?.length) return null;
-    await (pool as any).query(`UPDATE orders SET tracking_token = $1 WHERE id = $2`, [token, orderId]);
+    await pool.query(`UPDATE orders SET tracking_token = $1 WHERE id = $2`, [token, orderId]);
     logger.info(`Token de suivi généré pour commande ${maskOrderId(orderId)}`);
     return token;
   } catch (err: any) {
@@ -137,7 +137,7 @@ function buildHistoryDetail(detail: any = {}): Record<string, any> {
 
 async function recordStatusHistory(orderId: string, status: string, detail: any = {}): Promise<void> {
   try {
-    await (pool as any).query(
+    await pool.query(
       `INSERT INTO order_status_history (order_id, status, detail) VALUES ($1, $2, $3)`, [orderId, status, Object.keys(detail).length ? JSON.stringify(detail) : null] );
   } catch (error: any) {
   logger.warn('Impossible d\'enregistrer l\'historique du statut:', error.message); }
@@ -149,12 +149,12 @@ async function recordStatusHistory(orderId: string, status: string, detail: any 
 
   try {
   
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS ( SELECT FROM information_schema.tables
       WHERE table_schema = 'public' AND table_name = 'order_assignments' )` ); const hasOrderAssignments = tableCheck.rows[0]?.exists === true; if (!hasOrderAssignments) { return;
     }
 
-    const idColumnCheck = await (pool as any).query(
+    const idColumnCheck = await pool.query(
       `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'order_assignments' AND column_name = 'id'` ); const hasIdColumn = idColumnCheck.rows.length > 0; const assigned = coerceDate(timestamps.assignedAt) || new Date(); const accepted = coerceDate(timestamps.acceptedAt); const declined = coerceDate(timestamps.declinedAt);
 
     const updateQuery = hasIdColumn
@@ -164,14 +164,14 @@ async function recordStatusHistory(orderId: string, status: string, detail: any 
         WHERE order_id = $1 AND driver_id = $2
       RETURNING id` : `UPDATE order_assignments SET assigned_at = COALESCE($3, assigned_at), accepted_at = COALESCE($4, accepted_at),
               declined_at = COALESCE($5, declined_at)
-      WHERE order_id = $1 AND driver_id = $2`; const updateResult = await (pool as any).query(updateQuery, [orderId, driverId, assigned, accepted, declined]);
+      WHERE order_id = $1 AND driver_id = $2`; const updateResult = await pool.query(updateQuery, [orderId, driverId, assigned, accepted, declined]);
 
     if (updateResult.rowCount === 0) {
       if (hasIdColumn) {
-        await (pool as any).query(
+        await pool.query(
           `INSERT INTO order_assignments (id, order_id, driver_id, assigned_at, accepted_at, declined_at) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`, [orderId, driverId, assigned, accepted, declined] );
       } else {
-        await (pool as any).query(
+        await pool.query(
           `INSERT INTO order_assignments (order_id, driver_id, assigned_at, accepted_at, declined_at) VALUES ($1, $2, $3, $4, $5)`, [orderId, driverId, assigned, accepted, declined] );
       }
     }
@@ -203,7 +203,7 @@ export async function saveOrder(order: Order): Promise<boolean> {
     const driverId = order.driverId || order.driver?.id || null;
     const etaMinutes = parseDurationToMinutes(order.estimatedDuration);
 
-    const columnsInfo = await (pool as any).query(
+    const columnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = ANY($1)`,
       [['pickup', 'pickup_address', 'dropoff', 'dropoff_address', 'driver_id', 'price', 'price_cfa', 'distance', 'distance_km', 'accepted_at', 'completed_at', 'cancelled_at', 'updated_at', 'recipient', 'package_images', 'payment_method_id', 'payment_method_type', 'payment_status', 'payment_payer', 'client_paid_amount', 'recipient_user_id', 'recipient_is_registered', 'recipient_paid_amount', 'recipient_payment_status', 'recipient_payment_method_type']]
     );
@@ -452,7 +452,7 @@ export async function saveOrder(order: Order): Promise<boolean> {
       updateClauses.push(`cancelled_at = EXCLUDED.cancelled_at`);
     }
     
-    await (pool as any).query(
+    await pool.query(
       `INSERT INTO orders (${columns.join(', ')}) VALUES (${placeholders.join(', ')}) ON CONFLICT (id) DO UPDATE SET ${updateClauses.join(', ')}`,
       values
     );
@@ -479,7 +479,7 @@ export async function updateOrderStatus(
 ): Promise<boolean> {
   try {
     // Note: 'delivering' et 'in_progress' sont des statuts valides en DB depuis migration 031
-    const columnsInfo = await (pool as any).query(
+    const columnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = ANY($1)`,
       [['driver_id', 'accepted_at', 'completed_at', 'cancelled_at', 'updated_at']]
@@ -505,7 +505,7 @@ export async function updateOrderStatus(
     // Si driver_id n'est pas fourni mais que la colonne existe, essayer de le récupérer depuis order_assignments
     if (hasDriverColumn && !driverId && status === 'completed') {
       try {
-        const existingOrderQuery = await (pool as any).query(
+        const existingOrderQuery = await pool.query(
           `SELECT driver_id FROM orders WHERE id = $1`,
           [orderId]
         );
@@ -514,7 +514,7 @@ export async function updateOrderStatus(
           logger.debug(`driver_id récupéré depuis orders pour order ${maskOrderId(orderId)}: ${maskUserId(driverId)}`);
         } else {
           // Essayer de récupérer depuis order_assignments
-          const assignmentQuery = await (pool as any).query(
+          const assignmentQuery = await pool.query(
             `SELECT driver_id FROM order_assignments 
             WHERE order_id = $1 AND accepted_at IS NOT NULL 
             ORDER BY accepted_at DESC LIMIT 1`,
@@ -582,7 +582,7 @@ export async function updateOrderStatus(
       paramIndex++;
     }
 
-    const updateResult = await (pool as any).query(
+    const updateResult = await pool.query(
       `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $1`,
       values
     );
@@ -597,7 +597,7 @@ export async function updateOrderStatus(
     } else {
       // Vérifier le statut réel dans la DB après la mise à jour
       try {
-        const verifyResult = await (pool as any).query(
+        const verifyResult = await pool.query(
           'SELECT status FROM orders WHERE id = $1',
           [orderId]
         );
@@ -652,7 +652,7 @@ export async function updateOrderStatus(
 
 export async function getOrderById(orderId: string): Promise<any | null> {
   try {
-    const result = await (pool as any).query(
+    const result = await pool.query(
      `SELECT * FROM orders WHERE id = $1`, [orderId] ); if (!result.rows || result.rows.length === 0) {
       return null;
     }
@@ -673,7 +673,7 @@ export async function getOrderById(orderId: string): Promise<any | null> {
   logger.error('Erreur lors de la récupération de la commande:', error); throw error; }
 } export async function getActiveOrdersByUser(userId: string): Promise<any[]> {
   try {
-    const result = await (pool as any).query(
+    const result = await pool.query(
      `SELECT * FROM orders 
       WHERE user_id = $1 
     AND status IN ('pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering')
@@ -689,7 +689,7 @@ export async function getOrderById(orderId: string): Promise<any | null> {
   logger.error('Erreur lors de la récupération des commandes actives:', error); throw error; }
 } export async function getActiveOrdersByDriver(driverId: string): Promise<any[]> {
   try {
-    const result = await (pool as any).query(
+    const result = await pool.query(
      `SELECT * FROM orders 
       WHERE driver_id = $1 
     AND status IN ('accepted', 'enroute', 'in_progress', 'picked_up', 'delivering')
@@ -711,7 +711,7 @@ export async function getOrderById(orderId: string): Promise<any | null> {
  */
 export async function getPendingOfferOrdersForDriver(driverId: string): Promise<any[]> {
   try {
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'order_assignments'
@@ -721,7 +721,7 @@ export async function getPendingOfferOrdersForDriver(driverId: string): Promise<
       return [];
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT o.*
        FROM orders o
        INNER JOIN order_assignments oa ON oa.order_id = o.id AND oa.driver_id = $1
@@ -756,7 +756,7 @@ export async function getPendingOfferOrdersForDriver(driverId: string): Promise<
   logger.error('Erreur lors de la finalisation de la commande:', error); throw error; }
 } export async function saveDeliveryProofRecord(record: DeliveryProofRecord): Promise<void> {
   try {
-    await (pool as any).query(
+    await pool.query(
     `INSERT INTO delivery_proofs (id, order_id, driver_id, proof_type, file_url, otp_code, notes, metadata)
       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)`,
       [

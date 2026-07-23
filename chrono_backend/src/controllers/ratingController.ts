@@ -45,7 +45,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
     }
 
     try {
-      const driverColumnCheck = await (pool as any).query(
+      const driverColumnCheck = await pool.query(
         `SELECT column_name FROM information_schema.columns 
          WHERE table_schema = 'public' 
          AND table_name = 'orders' 
@@ -54,7 +54,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
       const hasDriverColumn = driverColumnCheck.rows.length > 0;
 
       const driverSelect = hasDriverColumn ? 'driver_id' : 'NULL as driver_id';
-      const orderResult = await (pool as any).query(
+      const orderResult = await pool.query(
         `SELECT id, user_id, ${driverSelect}, status 
          FROM orders 
          WHERE id = $1`,
@@ -91,7 +91,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
       
       if (!driverId) {
         try {
-          const assignmentCheck = await (pool as any).query(
+          const assignmentCheck = await pool.query(
             `SELECT EXISTS (
                SELECT FROM information_schema.tables
                WHERE table_schema = 'public' AND table_name = 'order_assignments'
@@ -100,7 +100,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
           const hasOrderAssignments = assignmentCheck.rows[0]?.exists === true;
 
           if (hasOrderAssignments) {
-            const assignmentResult = await (pool as any).query(
+            const assignmentResult = await pool.query(
               `SELECT driver_id FROM order_assignments 
                WHERE order_id = $1 
                LIMIT 1`,
@@ -124,7 +124,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
       }
 
       try {
-        const tableCheck = await (pool as any).query(
+        const tableCheck = await pool.query(
           `SELECT EXISTS (
              SELECT FROM information_schema.tables
              WHERE table_schema = 'public' AND table_name = 'ratings'
@@ -141,7 +141,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
           return;
         }
 
-        const columnCheck = await (pool as any).query(
+        const columnCheck = await pool.query(
           `SELECT EXISTS (
              SELECT FROM information_schema.columns
              WHERE table_schema = 'public' 
@@ -163,7 +163,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
         logger.error('Erreur vérification table ratings:', checkError);
       }
 
-      const existingRatingResult = await (pool as any).query(
+      const existingRatingResult = await pool.query(
         `SELECT id FROM ratings 
          WHERE order_id = $1 AND user_id = $2`,
         [orderId, userId]
@@ -180,7 +180,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
         });
 
         try {
-          await (pool as any).query(
+          await pool.query(
             `UPDATE ratings 
              SET rating = $1, comment = $2, updated_at = NOW()
              WHERE id = $3`,
@@ -209,7 +209,7 @@ export const submitRating = async (req: RequestWithUser, res: Response): Promise
         });
 
         try {
-          const insertResult = await (pool as any).query(
+          const insertResult = await pool.query(
             `INSERT INTO ratings (order_id, user_id, driver_id, rating, comment)
              VALUES ($1, $2, $3, $4, $5)
              RETURNING id`,
@@ -293,7 +293,7 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
     }
 
     try {
-      const ratingsResult = await (pool as any).query(
+      const ratingsResult = await pool.query(
         `SELECT
           r.id,
           r.order_id,
@@ -308,7 +308,7 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
         [driverId, limit, offset]
       );
 
-      const countResult = await (pool as any).query(
+      const countResult = await pool.query(
         `SELECT COUNT(*) as count FROM ratings WHERE driver_id = $1`,
         [driverId]
       );
@@ -389,7 +389,7 @@ export const getOrderRating = async (req: RequestWithUser, res: Response): Promi
     }
 
     try {
-      const ratingResult = await (pool as any).query(
+      const ratingResult = await pool.query(
         `SELECT id, rating, comment, created_at, updated_at
          FROM ratings
          WHERE order_id = $1 AND user_id = $2`,

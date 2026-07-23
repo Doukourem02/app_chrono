@@ -37,7 +37,7 @@ export async function recordDriverLocationThrottled(
   lastInsertByDriver.set(driverId, now);
 
   try {
-    await (pool as any).query(
+    await pool.query(
       `INSERT INTO public.driver_locations (driver_id, latitude, longitude)
        VALUES ($1, $2, $3)`,
       [driverId, latitude, longitude]

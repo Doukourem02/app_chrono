@@ -61,7 +61,7 @@ class OrderMatchingService {
         FROM driver_profiles
         WHERE user_id = $1
       `;
-      const driverTypeResult = await (pool as any).query(driverTypeQuery, [driverId]);
+      const driverTypeResult = await pool.query(driverTypeQuery, [driverId]);
       const driverType = (driverTypeResult.rows[0]?.driver_type || 'partner') as 'internal' | 'partner';
 
       // Calculer le taux d'acceptation
@@ -73,7 +73,7 @@ class OrderMatchingService {
         WHERE driver_id = $1
       `;
       
-      const acceptanceResult = await (pool as any).query(acceptanceQuery, [driverId]);
+      const acceptanceResult = await pool.query(acceptanceQuery, [driverId]);
       const acceptanceRate =
         acceptanceResult.rows[0]?.total_assigned > 0
           ? (acceptanceResult.rows[0].accepted / acceptanceResult.rows[0].total_assigned)
@@ -90,7 +90,7 @@ class OrderMatchingService {
           AND assigned_at >= NOW() - INTERVAL '${this.FAIRNESS_PERIOD_HOURS} hours'
       `;
       
-      const recentOrdersResult = await (pool as any).query(recentOrdersQuery, [driverId]);
+      const recentOrdersResult = await pool.query(recentOrdersQuery, [driverId]);
       const recentOrdersCount = parseInt(recentOrdersResult.rows[0]?.count || '0', 10);
 
       return {
@@ -265,7 +265,7 @@ class OrderMatchingService {
               FROM driver_profiles
               WHERE user_id = $1
             `;
-            const driverTypeResult = await (pool as any).query(driverTypeQuery, [driver.driverId]);
+            const driverTypeResult = await pool.query(driverTypeQuery, [driver.driverId]);
             const driverType = (driverTypeResult.rows[0]?.driver_type || 'partner') as 'internal' | 'partner';
             if (driverType === 'internal') {
               priorityScore += 1000;

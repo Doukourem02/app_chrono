@@ -69,7 +69,7 @@ export const getFleetVehicles = async (req: Request, res: Response): Promise<voi
 
     query += ` ORDER BY fv.created_at DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     res.json({
       success: true,
@@ -108,7 +108,7 @@ export const getFleetVehicleDetails = async (req: Request, res: Response): Promi
       WHERE fv.vehicle_plate = $1
     `;
 
-    const vehicleResult = await (pool as any).query(vehicleQuery, [vehiclePlate]);
+    const vehicleResult = await pool.query(vehicleQuery, [vehiclePlate]);
 
     if (vehicleResult.rows.length === 0) {
       res.status(404).json({
@@ -127,7 +127,7 @@ export const getFleetVehicleDetails = async (req: Request, res: Response): Promi
       ORDER BY period_end DESC
       LIMIT 1
     `;
-    const financialResult = await (pool as any).query(financialQuery, [vehiclePlate]);
+    const financialResult = await pool.query(financialQuery, [vehiclePlate]);
 
     // Récupérer les documents
     const documentsQuery = `
@@ -135,7 +135,7 @@ export const getFleetVehicleDetails = async (req: Request, res: Response): Promi
       WHERE vehicle_plate = $1
       ORDER BY document_type, expiry_date
     `;
-    const documentsResult = await (pool as any).query(documentsQuery, [vehiclePlate]);
+    const documentsResult = await pool.query(documentsQuery, [vehiclePlate]);
 
     // Récupérer les maintenances récentes
     const maintenanceQuery = `
@@ -144,7 +144,7 @@ export const getFleetVehicleDetails = async (req: Request, res: Response): Promi
       ORDER BY scheduled_date DESC, created_at DESC
       LIMIT 10
     `;
-    const maintenanceResult = await (pool as any).query(maintenanceQuery, [vehiclePlate]);
+    const maintenanceResult = await pool.query(maintenanceQuery, [vehiclePlate]);
 
     // Récupérer les ravitaillements récents
     const fuelQuery = `
@@ -153,7 +153,7 @@ export const getFleetVehicleDetails = async (req: Request, res: Response): Promi
       ORDER BY created_at DESC
       LIMIT 10
     `;
-    const fuelResult = await (pool as any).query(fuelQuery, [vehiclePlate]);
+    const fuelResult = await pool.query(fuelQuery, [vehiclePlate]);
 
     res.json({
       success: true,
@@ -204,7 +204,7 @@ export const createFleetVehicle = async (req: RequestWithUser, res: Response): P
 
     // Vérifier si le véhicule existe déjà
     const checkQuery = 'SELECT id FROM fleet_vehicles WHERE vehicle_plate = $1';
-    const checkResult = await (pool as any).query(checkQuery, [vehicle_plate]);
+    const checkResult = await pool.query(checkQuery, [vehicle_plate]);
 
     if (checkResult.rows.length > 0) {
       res.status(409).json({
@@ -223,7 +223,7 @@ export const createFleetVehicle = async (req: RequestWithUser, res: Response): P
       RETURNING *
     `;
 
-    const result = await (pool as any).query(insertQuery, [
+    const result = await pool.query(insertQuery, [
       vehicle_plate,
       vehicle_type,
       vehicle_brand || null,
@@ -303,7 +303,7 @@ export const updateFleetVehicle = async (req: RequestWithUser, res: Response): P
       RETURNING *
     `;
 
-    const result = await (pool as any).query(updateQuery, values);
+    const result = await pool.query(updateQuery, values);
 
     if (result.rows.length === 0) {
       res.status(404).json({
@@ -371,7 +371,7 @@ export const addFuelLog = async (req: RequestWithUser, res: Response): Promise<v
       RETURNING *
     `;
 
-    const result = await (pool as any).query(insertQuery, [
+    const result = await pool.query(insertQuery, [
       vehiclePlate,
       driver_id || null,
       fuel_type,
@@ -427,7 +427,7 @@ export const getFuelLogs = async (req: Request, res: Response): Promise<void> =>
       LIMIT $2
     `;
 
-    const result = await (pool as any).query(query, [vehiclePlate, limit]);
+    const result = await pool.query(query, [vehiclePlate, limit]);
 
     res.json({
       success: true,
@@ -484,7 +484,7 @@ export const createMaintenance = async (req: RequestWithUser, res: Response): Pr
       RETURNING *
     `;
 
-    const result = await (pool as any).query(insertQuery, [
+    const result = await pool.query(insertQuery, [
       vehiclePlate,
       maintenance_type,
       description || null,
@@ -575,7 +575,7 @@ export const updateMaintenance = async (req: RequestWithUser, res: Response): Pr
       RETURNING *
     `;
 
-    const result = await (pool as any).query(updateQuery, values);
+    const result = await pool.query(updateQuery, values);
 
     if (result.rows.length === 0) {
       res.status(404).json({
@@ -627,7 +627,7 @@ export const getMaintenanceHistory = async (req: Request, res: Response): Promis
 
     query += ` ORDER BY scheduled_date DESC, created_at DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     res.json({
       success: true,
@@ -844,7 +844,7 @@ export const upsertVehicleDocument = async (req: RequestWithUser, res: Response)
       RETURNING *
     `;
 
-    const result = await (pool as any).query(upsertQuery, [
+    const result = await pool.query(upsertQuery, [
       vehiclePlate,
       document_type,
       document_number || null,
@@ -888,7 +888,7 @@ export const getVehicleDocuments = async (req: Request, res: Response): Promise<
       ORDER BY document_type, expiry_date
     `;
 
-    const result = await (pool as any).query(query, [vehiclePlate]);
+    const result = await pool.query(query, [vehiclePlate]);
 
     res.json({
       success: true,
@@ -926,7 +926,7 @@ export const getExpiringDocuments = async (req: Request, res: Response): Promise
       ORDER BY vd.expiry_date ASC
     `;
 
-    const result = await (pool as any).query(query);
+    const result = await pool.query(query);
 
     res.json({
       success: true,
@@ -978,7 +978,7 @@ export const getVehicleFinancialSummary = async (req: Request, res: Response): P
 
     query += ` ORDER BY period_end DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     res.json({
       success: true,
@@ -1023,7 +1023,7 @@ export const calculateFinancialSummary = async (req: RequestWithUser, res: Respo
         AND o.completed_at <= $3
     `;
 
-    const revenueResult = await (pool as any).query(revenueQuery, [
+    const revenueResult = await pool.query(revenueQuery, [
       vehiclePlate,
       periodStart,
       periodEnd,
@@ -1041,7 +1041,7 @@ export const calculateFinancialSummary = async (req: RequestWithUser, res: Respo
         AND created_at <= $3
     `;
 
-    const fuelCostResult = await (pool as any).query(fuelCostQuery, [
+    const fuelCostResult = await pool.query(fuelCostQuery, [
       vehiclePlate,
       periodStart,
       periodEnd,
@@ -1059,7 +1059,7 @@ export const calculateFinancialSummary = async (req: RequestWithUser, res: Respo
         AND completed_date <= $3
     `;
 
-    const maintenanceCostResult = await (pool as any).query(maintenanceCostQuery, [
+    const maintenanceCostResult = await pool.query(maintenanceCostQuery, [
       vehiclePlate,
       periodStart,
       periodEnd,
@@ -1076,7 +1076,7 @@ export const calculateFinancialSummary = async (req: RequestWithUser, res: Respo
         AND created_at <= $3
     `;
 
-    const distanceResult = await (pool as any).query(distanceQuery, [
+    const distanceResult = await pool.query(distanceQuery, [
       vehiclePlate,
       periodStart,
       periodEnd,
@@ -1110,7 +1110,7 @@ export const calculateFinancialSummary = async (req: RequestWithUser, res: Respo
       RETURNING *
     `;
 
-    const result = await (pool as any).query(upsertQuery, [
+    const result = await pool.query(upsertQuery, [
       vehiclePlate,
       periodStart,
       periodEnd,
@@ -1166,7 +1166,7 @@ export const autoLogDeliveryMileage = async (
     }
 
     // Récupérer le profil du livreur pour avoir vehicle_plate
-    const driverProfileQuery = await (pool as any).query(
+    const driverProfileQuery = await pool.query(
       `SELECT vehicle_plate FROM driver_profiles WHERE user_id = $1 AND vehicle_plate IS NOT NULL`,
       [driverId]
     );
@@ -1179,7 +1179,7 @@ export const autoLogDeliveryMileage = async (
     const vehiclePlate = driverProfileQuery.rows[0].vehicle_plate;
 
     // Récupérer le kilométrage actuel du véhicule
-    const vehicleQuery = await (pool as any).query(
+    const vehicleQuery = await pool.query(
       `SELECT current_odometer FROM fleet_vehicles WHERE vehicle_plate = $1`,
       [vehiclePlate]
     );
@@ -1192,7 +1192,7 @@ export const autoLogDeliveryMileage = async (
     const newOdometer = currentOdometer + distanceKm;
 
     // Vérifier si un enregistrement existe déjà pour cette commande
-    const existingQuery = await (pool as any).query(
+    const existingQuery = await pool.query(
       `SELECT id FROM delivery_mileage_logs WHERE order_id = $1`,
       [orderId]
     );
@@ -1212,7 +1212,7 @@ export const autoLogDeliveryMileage = async (
       RETURNING *
     `;
 
-    const result = await (pool as any).query(insertQuery, [
+    const result = await pool.query(insertQuery, [
       orderId,
       vehiclePlate,
       driverId,
@@ -1272,7 +1272,7 @@ export const logDeliveryMileage = async (req: Request, res: Response): Promise<v
       RETURNING *
     `;
 
-    const result = await (pool as any).query(insertQuery, [
+    const result = await pool.query(insertQuery, [
       order_id,
       vehicle_plate,
       driver_id || null,
@@ -1326,7 +1326,7 @@ export const getMileageHistory = async (req: Request, res: Response): Promise<vo
       LIMIT $2
     `;
 
-    const result = await (pool as any).query(query, [vehiclePlate, limit]);
+    const result = await pool.query(query, [vehiclePlate, limit]);
 
     res.json({
       success: true,

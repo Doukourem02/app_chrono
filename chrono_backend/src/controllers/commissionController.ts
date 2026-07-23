@@ -28,7 +28,7 @@ export const getCommissionBalance = async (
     }
 
     // Vérifier que c'est un livreur partenaire
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
       [userId]
     );
@@ -51,7 +51,7 @@ export const getCommissionBalance = async (
     }
 
     // Récupérer ou initialiser le solde
-    const balanceResult = await (pool as any).query(
+    const balanceResult = await pool.query(
       `SELECT 
         id,
         balance,
@@ -70,7 +70,7 @@ export const getCommissionBalance = async (
     if (!balanceResult.rows || balanceResult.rows.length === 0) {
       // Initialiser le solde si n'existe pas
       try {
-        const initResult = await (pool as any).query(
+        const initResult = await pool.query(
           `SELECT initialize_commission_balance($1, 10.00) as balance_id`,
           [userId]
         );
@@ -80,7 +80,7 @@ export const getCommissionBalance = async (
         }
 
         // Récupérer le solde initialisé
-        const newBalanceResult = await (pool as any).query(
+        const newBalanceResult = await pool.query(
           `SELECT 
             id,
             balance,
@@ -154,7 +154,7 @@ export const getCommissionTransactions = async (
       return;
     }
 
-    const transactionsResult = await (pool as any).query(
+    const transactionsResult = await pool.query(
       `SELECT 
         id,
         transaction_type,
@@ -238,7 +238,7 @@ export const rechargeCommission = async (
     }
 
     // Vérifier que c'est un livreur partenaire
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
       [userId]
     );
@@ -267,7 +267,7 @@ export const rechargeCommission = async (
     // 3. Créditer le compte seulement après confirmation
 
     // Pour l'instant, on crédite directement (simulation)
-    const rechargeResult = await (pool as any).query(
+    const rechargeResult = await pool.query(
       `SELECT recharge_commission_balance(
         $1, -- driver_id
         $2, -- amount

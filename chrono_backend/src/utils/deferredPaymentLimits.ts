@@ -77,7 +77,7 @@ export async function calculateAnnualCreditUsed(
     const startOfYear = new Date(currentYear, 0, 1);
     const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT COALESCE(SUM(t.amount), 0) as total
        FROM transactions t
        INNER JOIN orders o ON t.order_id = o.id
@@ -123,7 +123,7 @@ export async function calculateMonthlyCreditUsed(
       59
     );
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT COALESCE(SUM(t.amount), 0) as total
        FROM transactions t
        INNER JOIN orders o ON t.order_id = o.id
@@ -168,7 +168,7 @@ export async function getDeferredPaymentUsageCount(
       59
     );
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT COUNT(*) as count
        FROM transactions t
        INNER JOIN orders o ON t.order_id = o.id
@@ -201,7 +201,7 @@ export async function getLastDeferredPaymentDate(
   userId: string
 ): Promise<Date | null> {
   try {
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT MAX(t.created_at) as last_date
        FROM transactions t
        INNER JOIN orders o ON t.order_id = o.id
@@ -249,7 +249,7 @@ export async function checkLatePayments(
     const sevenDaysAgo = new Date(currentDate);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE t.created_at >= $1) as count_30_days,
          COUNT(*) FILTER (WHERE t.created_at >= $2) as count_90_days,
@@ -275,7 +275,7 @@ export async function checkLatePayments(
     // Si bloqué, calculer la date de fin de blocage (3 mois après le dernier retard)
     let blockEndDate: Date | undefined;
     if (isBlocked) {
-      const lastLatePaymentResult = await (pool as any).query(
+      const lastLatePaymentResult = await pool.query(
         `SELECT MAX(t.created_at) as last_late_date
          FROM transactions t
          INNER JOIN orders o ON t.order_id = o.id

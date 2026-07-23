@@ -82,13 +82,13 @@ export const createPaymentMethod = async (req: RequestWithUser, res: Response): 
     }
 
     if (isDefault) {
-      await (pool as any).query(
+      await pool.query(
         'UPDATE payment_methods SET is_default = false WHERE user_id = $1',
         [userId]
       );
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `INSERT INTO payment_methods (user_id, method_type, provider_account, provider_name, is_default, metadata) 
       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING *`,
@@ -118,7 +118,7 @@ export const getPaymentMethods = async (req: RequestWithUser, res: Response): Pr
       return;
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       'SELECT * FROM payment_methods WHERE user_id = $1 AND is_active = true ORDER BY is_default DESC, created_at DESC',
       [userId]
     );
@@ -143,7 +143,7 @@ export const setDefaultPaymentMethod = async (req: RequestWithUser, res: Respons
 
     const { methodId } = req.params;
 
-    const owned = await (pool as any).query(
+    const owned = await pool.query(
       'SELECT id FROM payment_methods WHERE id = $1 AND user_id = $2 AND is_active = true',
       [methodId, userId]
     );
@@ -152,11 +152,11 @@ export const setDefaultPaymentMethod = async (req: RequestWithUser, res: Respons
       return;
     }
 
-    await (pool as any).query(
+    await pool.query(
       'UPDATE payment_methods SET is_default = false WHERE user_id = $1',
       [userId]
     );
-    const result = await (pool as any).query(
+    const result = await pool.query(
       'UPDATE payment_methods SET is_default = true WHERE id = $1 RETURNING *',
       [methodId]
     );
@@ -178,7 +178,7 @@ export const deletePaymentMethod = async (req: RequestWithUser, res: Response): 
 
     const { methodId } = req.params;
 
-    const owned = await (pool as any).query(
+    const owned = await pool.query(
       'SELECT id, is_default FROM payment_methods WHERE id = $1 AND user_id = $2 AND is_active = true',
       [methodId, userId]
     );
@@ -187,14 +187,14 @@ export const deletePaymentMethod = async (req: RequestWithUser, res: Response): 
       return;
     }
 
-    await (pool as any).query(
+    await pool.query(
       'UPDATE payment_methods SET is_active = false, is_default = false WHERE id = $1',
       [methodId]
     );
 
     // Si c'était la méthode par défaut, promouvoir la plus récente restante.
     if (owned.rows[0].is_default) {
-      await (pool as any).query(
+      await pool.query(
         `UPDATE payment_methods SET is_default = true
          WHERE id = (
            SELECT id FROM payment_methods
@@ -345,7 +345,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       recipientPhone,
     } = req.body as InitiatePaymentBody;
 
-    const orderResult = await (pool as any).query(
+    const orderResult = await pool.query(
       'SELECT * FROM orders WHERE id = $1',
       [orderId]
     );
@@ -372,7 +372,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
 
     let paymentMethod: any = null;
     if (paymentMethodId) {
-      const methodResult = await (pool as any).query(
+      const methodResult = await pool.query(
         'SELECT * FROM payment_methods WHERE id = $1 AND user_id = $2',
         [paymentMethodId, userId]
       );
@@ -454,7 +454,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
 
     const payerUserId = payerType === 'client' ? userId : recipientUserId || userId;
 
-    const transactionResult = await (pool as any).query(
+    const transactionResult = await pool.query(
       `INSERT INTO transactions (
         order_id, user_id, payment_method_id, payment_method_type,
         amount, status, provider_transaction_id, provider_response,
@@ -481,7 +481,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
 
     if (payerType === 'client') {
       if (isPartial && partialAmount) {
-        await (pool as any).query(
+        await pool.query(
           `UPDATE orders 
            SET payment_method_type = $1, payment_status = $2,
               client_paid_amount = $3, payment_payer = 'client' 
@@ -489,7 +489,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
           [paymentMethodType, 'pending', amountToPay, orderId]
         );
       } else {
-        await (pool as any).query(
+        await pool.query(
           `UPDATE orders 
            SET payment_method_type = $1, payment_status = $2,
               payment_payer = 'client' 
@@ -500,7 +500,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
     } else if (payerType === 'recipient') {
       let recipientIsRegistered = false;
       if (recipientUserId) {
-        const recipientCheck = await (pool as any).query(
+        const recipientCheck = await pool.query(
           'SELECT id FROM auth.users WHERE id = $1',
           [recipientUserId]
         );
@@ -510,7 +510,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       if (recipientIsRegistered && paymentMethodType === 'deferred') {
         const deadline = new Date();
         deadline.setDate(deadline.getDate() + 7);
-        await (pool as any).query(
+        await pool.query(
           `UPDATE orders 
            SET recipient_user_id = $1, recipient_is_registered = true,
               recipient_payment_method_type = $2, recipient_payment_status = 'delayed', 
@@ -519,7 +519,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
           [recipientUserId, paymentMethodType, deadline, orderId]
         );
       } else {
-        await (pool as any).query(
+        await pool.query(
           `UPDATE orders 
            SET recipient_payment_method_type = $1, recipient_payment_status = $2,
               recipient_paid_amount = $3, payment_payer = 'recipient', 
@@ -536,7 +536,7 @@ export const initiatePayment = async (req: RequestWithUser, res: Response): Prom
       }
     }
 
-    const invoiceResult = await (pool as any).query(
+    const invoiceResult = await pool.query(
       `INSERT INTO invoices (
         order_id, transaction_id, user_id, driver_id,
         subtotal, total, distance, price_per_km, urgency_fee
@@ -584,7 +584,7 @@ export const checkPayment = async (req: RequestWithUser, res: Response): Promise
 
     const { transactionId } = req.params;
 
-    const transactionResult = await (pool as any).query(
+    const transactionResult = await pool.query(
       'SELECT * FROM transactions WHERE id = $1 AND user_id = $2',
       [transactionId, userId]
     );
@@ -608,12 +608,12 @@ export const checkPayment = async (req: RequestWithUser, res: Response): Promise
         );
 
         if (statusCheck.status !== transaction.status) {
-          await (pool as any).query(
+          await pool.query(
             'UPDATE transactions SET status = $1, updated_at = NOW() WHERE id = $2',
             [statusCheck.status, transactionId]
           );
 
-          await (pool as any).query(
+          await pool.query(
             'UPDATE orders SET payment_status = $1 WHERE id = $2',
             [statusCheck.status, transaction.order_id]
           );
@@ -668,7 +668,7 @@ export const getTransactions = async (req: RequestWithUser, res: Response): Prom
     query += ` ORDER BY t.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     let countQuery = 'SELECT COUNT(*) FROM transactions WHERE user_id = $1';
     const countParams: any[] = [userId];
@@ -678,7 +678,7 @@ export const getTransactions = async (req: RequestWithUser, res: Response): Prom
       countParams.push(status);
     }
 
-    const countResult = await (pool as any).query(countQuery, countParams);
+    const countResult = await pool.query(countQuery, countParams);
     const total = parseInt(countResult.rows[0]?.count || '0');
 
     res.json({
@@ -707,7 +707,7 @@ export const createDispute = async (req: RequestWithUser, res: Response): Promis
 
     const { transactionId, disputeType, reason, description, attachments } = req.body as CreateDisputeBody;
 
-    const transactionResult = await (pool as any).query(
+    const transactionResult = await pool.query(
       'SELECT * FROM transactions WHERE id = $1 AND user_id = $2',
       [transactionId, userId]
     );
@@ -719,7 +719,7 @@ export const createDispute = async (req: RequestWithUser, res: Response): Promis
 
     const transaction = transactionResult.rows[0];
 
-    const disputeResult = await (pool as any).query(
+    const disputeResult = await pool.query(
       `INSERT INTO payment_disputes (
         transaction_id, order_id, user_id, dispute_type, reason, description, attachments
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -792,7 +792,7 @@ export const getDeferredDebts = async (req: RequestWithUser, res: Response): Pro
 
     // Récupérer toutes les transactions avec paiement différé non payées
     // Inclure 'delayed' et 'pending' au cas où certaines transactions auraient été créées avec 'pending'
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT 
         t.id,
         t.order_id,
@@ -885,7 +885,7 @@ export const repayDeferred = async (req: RequestWithUser, res: Response): Promis
     }
 
     // Vérifier que la transaction appartient au client et est bien en attente
-    const txResult = await (pool as any).query(
+    const txResult = await pool.query(
       `SELECT t.*, o.id as order_id_check
        FROM transactions t
        LEFT JOIN orders o ON t.order_id = o.id
@@ -922,7 +922,7 @@ export const repayDeferred = async (req: RequestWithUser, res: Response): Promis
     }
 
     // Marquer la transaction comme payée
-    await (pool as any).query(
+    await pool.query(
       `UPDATE transactions
        SET status = 'paid',
            updated_at = NOW()
@@ -931,7 +931,7 @@ export const repayDeferred = async (req: RequestWithUser, res: Response): Promis
     );
 
     // Mettre à jour le statut de paiement de la commande si toutes les dettes sont soldées
-    const remainingDebts = await (pool as any).query(
+    const remainingDebts = await pool.query(
       `SELECT COUNT(*) as count
        FROM transactions
        WHERE order_id = $1
@@ -941,7 +941,7 @@ export const repayDeferred = async (req: RequestWithUser, res: Response): Promis
     );
 
     if (parseInt(remainingDebts.rows[0].count) === 0) {
-      await (pool as any).query(
+      await pool.query(
         `UPDATE orders SET payment_status = 'paid', updated_at = NOW() WHERE id = $1`,
         [transaction.order_id]
       );

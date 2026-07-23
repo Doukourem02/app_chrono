@@ -47,7 +47,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     const hasCustomRange = !!(customStart && customEnd);
     const financialStatsWarnings: string[] = [];
 
-    const orderColumnsInfo = await (pool as any).query(
+    const orderColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
@@ -111,7 +111,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
 
     let revenueResult: any = { rows: [{}] };
     try {
-      revenueResult = await (pool as any).query(revenueQuery, revenueParams);
+      revenueResult = await pool.query(revenueQuery, revenueParams);
     } catch (err: any) {
       logger.error('[financial-stats] Erreur revenueQuery:', err.message);
       financialStatsWarnings.push('revenue');
@@ -119,7 +119,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
 
     const transactionsByMethod: Record<string, number> = { orange_money: 0, wave: 0, cash: 0, deferred: 0 };
     try {
-      const transactionsByMethodResult = await (pool as any).query(`
+      const transactionsByMethodResult = await pool.query(`
         SELECT t.payment_method_type, COALESCE(SUM(t.amount), 0) as total
         FROM transactions t
         LEFT JOIN orders o ON t.order_id = o.id
@@ -138,7 +138,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
 
     const paymentStatus: Record<string, number> = { pending: 0, paid: 0, refused: 0, delayed: 0 };
     try {
-      const paymentStatusResult = await (pool as any).query(`
+      const paymentStatusResult = await pool.query(`
         SELECT t.status, t.payment_method_type, COUNT(*) as count
         FROM transactions t
         LEFT JOIN orders o ON t.order_id = o.id
@@ -196,7 +196,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         WHERE (o.delivery_qr_code IS NOT NULL OR o.delivery_verification_code IS NOT NULL)
           AND (o.created_at >= $4 OR ${orderLossDateExpression} >= $4)
       `;
-      const qrScannedResult = await (pool as any).query(qrScannedQuery, periodParams);
+      const qrScannedResult = await pool.query(qrScannedQuery, periodParams);
       const qr = qrScannedResult.rows[0] || {};
       const makeQrPeriod = (suffix: string) => ({
         scanned: parseInt(qr[`scanned_${suffix}`] || '0'),
@@ -261,8 +261,8 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         ) deferred_losses
       `;
       const [cancelledStatsResult, cancelledDeferredResult] = await Promise.all([
-        (pool as any).query(cancelledStatsQuery, periodParams),
-        (pool as any).query(cancelledDeferredQuery, periodParams),
+        pool.query(cancelledStatsQuery, periodParams),
+        pool.query(cancelledDeferredQuery, periodParams),
       ]);
       const cs = cancelledStatsResult.rows[0] || {};
       const cd = cancelledDeferredResult.rows[0] || {};
@@ -286,7 +286,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
 
     let revenueByDriverRows: any[] = [];
     try {
-      const revenueByDriverResult = await (pool as any).query(`
+      const revenueByDriverResult = await pool.query(`
         SELECT o.driver_id, COUNT(*) as deliveries, COALESCE(SUM(${priceColumn}), 0) as revenue
         FROM orders o
         WHERE o.status = 'completed' AND o.completed_at >= $1 AND o.driver_id IS NOT NULL
@@ -299,7 +299,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
 
     const revenueByDeliveryType: Record<string, number> = { moto: 0, vehicule: 0, cargo: 0 };
     try {
-      const revenueByDeliveryTypeResult = await (pool as any).query(`
+      const revenueByDeliveryTypeResult = await pool.query(`
         SELECT delivery_method, COALESCE(SUM(${priceColumn}), 0) as revenue
         FROM orders WHERE status = 'completed' AND completed_at >= $1
         GROUP BY delivery_method
@@ -410,8 +410,8 @@ export const getAdminTransactions = async (req: Request, res: Response): Promise
     query += ` ORDER BY t.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
-    const countResult = await (pool as any).query(countQuery, params.slice(0, -2));
+    const result = await pool.query(query, params);
+    const countResult = await pool.query(countQuery, params.slice(0, -2));
     const total = parseInt(countResult.rows[0]?.count || '0');
 
     res.json({
@@ -476,7 +476,7 @@ export const getAdminReportDeliveries = async (req: Request, res: Response): Pro
 
     query += ` ORDER BY o.created_at DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows || [] });
   } catch (error: any) {
     logger.error('Erreur getAdminReportDeliveries:', error);
@@ -498,7 +498,7 @@ export const getAdminReportRevenues = async (req: Request, res: Response): Promi
       return;
     }
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
@@ -531,7 +531,7 @@ export const getAdminReportRevenues = async (req: Request, res: Response): Promi
 
     query += ` GROUP BY DATE_TRUNC('day', completed_at), delivery_method ORDER BY date DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows || [] });
   } catch (error: any) {
     logger.error('Erreur getAdminReportRevenues:', error);
@@ -568,7 +568,7 @@ export const getAdminReportClients = async (req: Request, res: Response): Promis
 
     query += ` GROUP BY u.id, u.email, u.phone, u.first_name, u.last_name, u.role, u.created_at ORDER BY total_orders DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows || [] });
   } catch (error: any) {
     logger.error('Erreur getAdminReportClients:', error);
@@ -588,7 +588,7 @@ export const getAdminReportDrivers = async (req: Request, res: Response): Promis
       return;
     }
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
@@ -615,16 +615,16 @@ export const getAdminReportDrivers = async (req: Request, res: Response): Promis
 
     query += ` GROUP BY u.id, u.email, u.phone, u.first_name, u.last_name, u.created_at ORDER BY total_revenue DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     const driversWithRatings = await Promise.all(
       result.rows.map(async (driver: any) => {
         try {
-          const ratingsTableCheck = await (pool as any).query(
+          const ratingsTableCheck = await pool.query(
             `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ratings')`
           );
           if (ratingsTableCheck.rows[0]?.exists) {
-            const ratingResult = await (pool as any).query(
+            const ratingResult = await pool.query(
               `SELECT COALESCE(AVG(rating)::numeric, 5.0) as avg_rating, COUNT(*) as count FROM ratings WHERE driver_id = $1`,
               [driver.id]
             );
@@ -696,7 +696,7 @@ export const getAdminReportPayments = async (req: Request, res: Response): Promi
       ORDER BY normalized.date DESC
     `;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows || [] });
   } catch (error: any) {
     logger.error('Erreur getAdminReportPayments:', error);

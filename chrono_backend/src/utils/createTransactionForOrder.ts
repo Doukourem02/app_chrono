@@ -50,7 +50,7 @@ export async function createTransactionForOrder(
 
     const status = paymentStatus || initialStatus;
 
-    const transactionResult = await (pool as any).query(
+    const transactionResult = await pool.query(
       `INSERT INTO transactions (
         order_id,
         user_id,
@@ -123,7 +123,7 @@ export async function createInvoiceForOrder(
   urgencyFee: number = 0
 ): Promise<string | null> {
   try {
-    const invoiceResult = await (pool as any).query(
+    const invoiceResult = await pool.query(
       `INSERT INTO invoices (
         order_id,
         transaction_id,
@@ -226,7 +226,7 @@ export async function createTransactionAndInvoiceForOrder(
 
 export async function cancelDeferredTransactionForOrder(orderId: string): Promise<void> {
   try {
-    await (pool as any).query(
+    await pool.query(
       `UPDATE transactions
        SET status = 'cancelled', updated_at = NOW()
        WHERE order_id = $1
@@ -241,7 +241,7 @@ export async function cancelDeferredTransactionForOrder(orderId: string): Promis
 
 export async function completeTransactionsForOrder(orderId: string): Promise<void> {
   try {
-    await (pool as any).query(
+    await pool.query(
       `UPDATE transactions
        SET status = 'paid', updated_at = NOW()
        WHERE order_id = $1

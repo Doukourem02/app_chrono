@@ -87,7 +87,7 @@ export async function incrementPartnerUsage(partnerId: string): Promise<void> {
   const monthStr = month.toISOString().slice(0, 10);
 
   try {
-    await (pool as any).query(
+    await pool.query(
       `INSERT INTO partner_usage (partner_id, month, deliveries_count)
        VALUES ($1, $2, 1)
        ON CONFLICT (partner_id, month)

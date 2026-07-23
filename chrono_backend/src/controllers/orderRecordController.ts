@@ -103,7 +103,7 @@ function normalizeLocation(value: unknown): { address?: string; coordinates?: Co
 }
 
 async function getOrderColumns(): Promise<Set<string>> {
-  const result = await (pool as any).query(
+  const result = await pool.query(
     `SELECT column_name
        FROM information_schema.columns
       WHERE table_schema = 'public'
@@ -148,7 +148,7 @@ async function updateB2BOrderMetadata(
       : null;
 
   if (dropoffColumn && (params.recipient?.phone || params.recipient?.name || params.notes)) {
-    const current = await (pool as any).query(
+    const current = await pool.query(
       `SELECT ${dropoffColumn} AS dropoff FROM orders WHERE id = $1`,
       [orderId]
     );
@@ -168,7 +168,7 @@ async function updateB2BOrderMetadata(
   if (!setClauses.length) return;
 
   values.push(orderId);
-  await (pool as any).query(
+  await pool.query(
     `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${index}`,
     values
   );
@@ -183,7 +183,7 @@ async function loadClientForOrder(userId: string): Promise<{
   phone?: string;
   avatar?: string;
 }> {
-  const result = await (pool as any).query(
+  const result = await pool.query(
     `SELECT id, email, phone, first_name, last_name, avatar_url
        FROM users
       WHERE id = $1
@@ -277,11 +277,11 @@ async function notifyB2BDrivers(
 
 async function canUsePartner(authUser: JWTPayload, partnerId: string): Promise<boolean> {
   if (authUser.role === 'admin' || authUser.role === 'super_admin') return true;
-  const member = await (pool as any).query(
+  const member = await pool.query(
     `SELECT 1 FROM partner_users WHERE partner_id = $1 AND user_id = $2 LIMIT 1`,
     [partnerId, authUser.id]
   );
-  return member.rowCount > 0;
+  return (member.rowCount ?? 0) > 0;
 }
 
 export const listOrderRecords = async (
@@ -328,7 +328,7 @@ export const listOrderRecords = async (
     }
 
     values.push(limit, offset);
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT orders.id, orders.user_id, orders.partner_id, orders.status, orders.pickup_address, orders.dropoff_address,
               orders.delivery_method, orders.price_cfa, orders.distance_km, orders.created_at, orders.updated_at,
               orders.driver_id,

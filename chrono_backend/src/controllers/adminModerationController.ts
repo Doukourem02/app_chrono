@@ -20,7 +20,7 @@ export const getAdminRatings = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const ratingsTableCheck = await (pool as any).query(
+    const ratingsTableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'ratings'
@@ -60,8 +60,8 @@ export const getAdminRatings = async (req: Request, res: Response): Promise<void
     query += ` ORDER BY r.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
-    const countResult = await (pool as any).query(countQuery, params.slice(0, -2));
+    const result = await pool.query(query, params);
+    const countResult = await pool.query(countQuery, params.slice(0, -2));
     const total = parseInt(countResult.rows[0]?.count || '0');
 
     res.json({
@@ -85,7 +85,7 @@ export const deleteAdminRating = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const ratingsTableCheck = await (pool as any).query(
+    const ratingsTableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'ratings'
@@ -97,7 +97,7 @@ export const deleteAdminRating = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const deleteResult = await (pool as any).query(`DELETE FROM ratings WHERE id = $1 RETURNING *`, [ratingId]);
+    const deleteResult = await pool.query(`DELETE FROM ratings WHERE id = $1 RETURNING *`, [ratingId]);
 
     if (deleteResult.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Évaluation non trouvée' });
@@ -120,7 +120,7 @@ export const getAdminPromoCodes = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'promo_codes'
@@ -132,7 +132,7 @@ export const getAdminPromoCodes = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    const result = await (pool as any).query(`SELECT * FROM promo_codes ORDER BY created_at DESC`);
+    const result = await pool.query(`SELECT * FROM promo_codes ORDER BY created_at DESC`);
     res.json({ success: true, data: result.rows || [] });
   } catch (error: any) {
     logger.error('Erreur getAdminPromoCodes:', error);
@@ -150,7 +150,7 @@ export const createAdminPromoCode = async (req: Request, res: Response): Promise
       return;
     }
 
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'promo_codes'
@@ -158,7 +158,7 @@ export const createAdminPromoCode = async (req: Request, res: Response): Promise
     );
 
     if (!tableCheck.rows[0]?.exists) {
-      await (pool as any).query(`
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS promo_codes (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           code VARCHAR(50) UNIQUE NOT NULL,
@@ -175,7 +175,7 @@ export const createAdminPromoCode = async (req: Request, res: Response): Promise
       `);
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `INSERT INTO promo_codes (code, discount_type, discount_value, max_uses, valid_from, valid_until, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
@@ -203,7 +203,7 @@ export const getAdminDisputes = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'payment_disputes'
@@ -235,8 +235,8 @@ export const getAdminDisputes = async (req: Request, res: Response): Promise<voi
     query += ` ORDER BY d.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
-    const countResult = await (pool as any).query(countQuery, params.slice(0, -2));
+    const result = await pool.query(query, params);
+    const countResult = await pool.query(countQuery, params.slice(0, -2));
     const total = parseInt(countResult.rows[0]?.count || '0');
 
     res.json({
@@ -262,7 +262,7 @@ export const updateAdminDispute = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'payment_disputes'
@@ -289,7 +289,7 @@ export const updateAdminDispute = async (req: Request, res: Response): Promise<v
     updateFields.push(`updated_at = NOW()`);
     params.push(disputeId);
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `UPDATE payment_disputes SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
       params
     );

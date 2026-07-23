@@ -307,7 +307,7 @@ export const getDriverRevenues = async (req: RequestWithUser, res: Response): Pr
       return;
     }
     
-    const allCompletedQuery = await (pool as any).query(
+    const allCompletedQuery = await pool.query(
       `SELECT COUNT(*) as count FROM orders WHERE status = 'completed'`
     );
     const allCompletedCount = parseInt(allCompletedQuery.rows[0]?.count || 0);
@@ -352,7 +352,7 @@ export const getDriverRevenues = async (req: RequestWithUser, res: Response): Pr
 
     logger.debug('queryDate:', queryDate);
 
-    const allColumnsResult = await (pool as any).query(
+    const allColumnsResult = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        ORDER BY ordinal_position`
@@ -360,7 +360,7 @@ export const getDriverRevenues = async (req: RequestWithUser, res: Response): Pr
     const allColumns = allColumnsResult.rows.map(row => row.column_name);
     logger.debug('Colonnes disponibles dans orders:', allColumns.join(', '));
 
-    const columnsInfo = await (pool as any).query(
+    const columnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -402,7 +402,7 @@ export const getDriverRevenues = async (req: RequestWithUser, res: Response): Pr
     let hasOrderAssignments = false;
     if (!driverColumn) {
       try {
-        const tableCheck = await (pool as any).query(
+        const tableCheck = await pool.query(
           `SELECT EXISTS (
              SELECT FROM information_schema.tables 
              WHERE table_schema = 'public' AND table_name = 'order_assignments'
@@ -420,14 +420,14 @@ export const getDriverRevenues = async (req: RequestWithUser, res: Response): Pr
       if (driverColumn) {
         logger.debug(`Requête avec ${driverColumn} pour userId:`, maskUserId(userId));
 
-        const withDriverQuery = await (pool as any).query(
+        const withDriverQuery = await pool.query(
           `SELECT COUNT(*) as count FROM orders 
            WHERE ${driverColumn} IS NOT NULL AND status = 'completed'`
         );
         const withDriverCount = parseInt(withDriverQuery.rows[0]?.count || 0);
         logger.debug(`Commandes completed avec ${driverColumn} défini:`, withDriverCount);
 
-        const forThisDriverQuery = await (pool as any).query(
+        const forThisDriverQuery = await pool.query(
           `SELECT COUNT(*) as count FROM orders 
            WHERE ${driverColumn} = $1 AND status = 'completed'`,
           [userId]
@@ -475,12 +475,12 @@ export const getDriverRevenues = async (req: RequestWithUser, res: Response): Pr
         }
         
         unionQuery += ` ORDER BY completed_at DESC`;
-        result = await (pool as any).query(unionQuery, unionParams);
+        result = await pool.query(unionQuery, unionParams);
         logger.debug('Résultat requête avec driverColumn (et order_assignments si disponible):', result.rows.length, 'lignes');
       } else if (hasOrderAssignments) {
         logger.debug('Requête via order_assignments pour userId:', maskUserId(userId));
 
-        const viaAssignmentsQuery = await (pool as any).query(
+        const viaAssignmentsQuery = await pool.query(
           `SELECT COUNT(DISTINCT o.id) as count 
            FROM orders o
            INNER JOIN order_assignments oa ON oa.order_id = o.id
@@ -502,7 +502,7 @@ export const getDriverRevenues = async (req: RequestWithUser, res: Response): Pr
             AND o.status = 'completed' ${queryDate}
           ORDER BY o.completed_at DESC
         `;
-        result = await (pool as any).query(query, dateParams);
+        result = await pool.query(query, dateParams);
         logger.info('Résultat requête via order_assignments:', result.rows.length, 'lignes');
       } else {
         logger.info('Impossible de calculer les revenus: ni driver_id, ni order_assignments');
@@ -783,7 +783,7 @@ export const getDriverDetails = async (req: RequestWithUser, res: Response): Pro
     // Utiliser PostgreSQL (pool) - driver_profiles est dans la DB principale (comme getAdminDriverDetails)
     let driver: any = null;
     try {
-      const profileResult = await (pool as any).query(
+      const profileResult = await pool.query(
         `SELECT id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders FROM driver_profiles WHERE user_id = $1`,
         [driverId]
       );
@@ -817,7 +817,7 @@ export const getDriverDetails = async (req: RequestWithUser, res: Response): Pro
     // Calculer les revenus totaux depuis les commandes complétées
     let totalEarnings = 0;
     try {
-      const earningsResult = await (pool as any).query(
+      const earningsResult = await pool.query(
         `SELECT COALESCE(SUM(price_cfa), 0) as total
          FROM orders
          WHERE driver_id = $1 AND status = 'completed'`,
@@ -865,7 +865,7 @@ export const getDriverWorkTime = async (req: RequestWithUser, res: Response): Pr
       return;
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT 
         daily_work_hours,
         max_daily_hours,
@@ -892,7 +892,7 @@ export const getDriverWorkTime = async (req: RequestWithUser, res: Response): Pr
     const lastResetDate = profile.last_work_reset_date ? new Date(profile.last_work_reset_date).toISOString().split('T')[0] : null;
 
     if (lastResetDate !== today) {
-      await (pool as any).query(
+      await pool.query(
         `UPDATE driver_profiles
          SET 
            daily_work_hours = 0,
@@ -963,7 +963,7 @@ export const updateDriverWorkTime = async (req: RequestWithUser, res: Response):
 
     const { hours, kilometers, startWork } = req.body;
 
-    const profileResult = await (pool as any).query(
+    const profileResult = await pool.query(
       'SELECT id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders FROM driver_profiles WHERE user_id = $1',
       [userId]
     );
@@ -981,7 +981,7 @@ export const updateDriverWorkTime = async (req: RequestWithUser, res: Response):
     const lastResetDate = profile.last_work_reset_date ? new Date(profile.last_work_reset_date).toISOString().split('T')[0] : null;
 
     if (lastResetDate !== today) {
-      await (pool as any).query(
+      await pool.query(
         `UPDATE driver_profiles
          SET 
            daily_work_hours = 0,
@@ -1033,7 +1033,7 @@ export const updateDriverWorkTime = async (req: RequestWithUser, res: Response):
     updateQuery += ` WHERE user_id = $${paramIndex}`;
     updateParams.push(userId);
 
-    await (pool as any).query(updateQuery, updateParams);
+    await pool.query(updateQuery, updateParams);
 
     logger.info(`Temps de travail mis à jour pour chauffeur ${maskUserId(userId)}`, {
       hours: hours !== undefined ? hours : 'non modifié',
@@ -1091,7 +1091,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
     try {
       logger.debug('DÉBUT getDriverStatistics pour userId:', maskUserId(userId));
 
-      const allColumnsResult = await (pool as any).query(
+      const allColumnsResult = await pool.query(
         `SELECT column_name FROM information_schema.columns 
          WHERE table_schema = 'public' AND table_name = 'orders' 
          ORDER BY ordinal_position`
@@ -1099,13 +1099,13 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
       const allColumns = allColumnsResult.rows.map(row => row.column_name);
       logger.debug('Colonnes disponibles dans orders:', allColumns.join(', '));
 
-      const allCompletedQuery = await (pool as any).query(
+      const allCompletedQuery = await pool.query(
         `SELECT COUNT(*) as count FROM orders WHERE status = 'completed'`
       );
       const allCompletedCount = parseInt(allCompletedQuery.rows[0]?.count || 0);
       logger.debug('Total commandes completed (sans filtre):', allCompletedCount);
 
-      const columnsInfo = await (pool as any).query(
+      const columnsInfo = await pool.query(
         `SELECT column_name FROM information_schema.columns 
          WHERE table_schema = 'public' AND table_name = 'orders' 
          AND column_name = ANY($1)`,
@@ -1117,7 +1117,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
 
       let hasOrderAssignments = false;
       try {
-        const tableCheck = await (pool as any).query(
+        const tableCheck = await pool.query(
           `SELECT EXISTS (
              SELECT FROM information_schema.tables
              WHERE table_schema = 'public' AND table_name = 'order_assignments'
@@ -1131,7 +1131,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
 
       let completedDeliveries = 0;
 
-      const checkCompletedQuery = await (pool as any).query(
+      const checkCompletedQuery = await pool.query(
         `SELECT id, status, ${driverColumn || 'NULL as driver_id'}, price_cfa 
          FROM orders WHERE status = 'completed' LIMIT 10`
       );
@@ -1140,7 +1140,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
         logger.info('Colonne driver_id/driver_uuid non trouvée dans orders');
         logger.warn(`Colonne driver_id/driver_uuid non trouvée dans orders. Essai avec order_assignments...`);
 
-        const tableCheck = await (pool as any).query(
+        const tableCheck = await pool.query(
           `SELECT EXISTS (
              SELECT FROM information_schema.tables
              WHERE table_schema = 'public' AND table_name = 'order_assignments'
@@ -1150,7 +1150,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
         logger.debug('Table order_assignments existe:', hasOrderAssignments);
 
         if (hasOrderAssignments) {
-          const deliveriesResult = await (pool as any).query(
+          const deliveriesResult = await pool.query(
             `SELECT COUNT(DISTINCT o.id) as count
              FROM orders o
              INNER JOIN order_assignments oa ON oa.order_id = o.id
@@ -1165,7 +1165,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
           logger.warn(`Table order_assignments n'existe pas non plus. Impossible de compter les livraisons.`);
         }
       } else {
-        const withDriverResult = await (pool as any).query(
+        const withDriverResult = await pool.query(
           `SELECT COUNT(*) as count FROM orders 
            WHERE ${driverColumn} IS NOT NULL AND status = 'completed'`
         );
@@ -1196,7 +1196,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
           countParams.push(userId);
         }
 
-        const deliveriesResult = await (pool as any).query(
+        const deliveriesResult = await pool.query(
           `SELECT SUM(count) as total FROM (${countQuery}) as counts`,
           countParams
         );
@@ -1212,7 +1212,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
 
       let totalEarnings = 0;
       try {
-        const priceColumnsInfo = await (pool as any).query(
+        const priceColumnsInfo = await pool.query(
           `SELECT column_name FROM information_schema.columns 
            WHERE table_schema = 'public' AND table_name = 'orders' 
            AND column_name = ANY($1)`,
@@ -1224,7 +1224,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
         if (priceColumn) {
           logger.debug('Colonne de prix trouvée:', priceColumn);
 
-          const allEarningsQuery = await (pool as any).query(
+          const allEarningsQuery = await pool.query(
             `SELECT COALESCE(SUM(${priceColumn}), 0) as total 
              FROM orders WHERE status = 'completed'`
           );
@@ -1232,7 +1232,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
           logger.debug('Total gains toutes commandes completed (sans filtre):', maskAmount(allEarningsTotal));
 
           if (driverColumn) {
-            const withDriverEarningsQuery = await (pool as any).query(
+            const withDriverEarningsQuery = await pool.query(
               `SELECT COALESCE(SUM(${priceColumn}), 0) as total 
                FROM orders WHERE ${driverColumn} IS NOT NULL AND status = 'completed'`
             );
@@ -1263,7 +1263,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
               earningsParams.push(userId);
             }
 
-            const earningsResult = await (pool as any).query(
+            const earningsResult = await pool.query(
               `SELECT COALESCE(SUM(total), 0) as total FROM (${earningsQuery}) as earnings`,
               earningsParams
             );
@@ -1274,7 +1274,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
             logger.debug(` - Total gains commandes completed avec ${driverColumn}: ${maskAmount(withDriverEarnings)}`);
             logger.debug(` - Gains pour ce livreur: ${maskAmount(totalEarnings)} (${priceColumn})`);
           } else {
-            const tableCheck = await (pool as any).query(
+            const tableCheck = await pool.query(
               `SELECT EXISTS (
                  SELECT FROM information_schema.tables
                  WHERE table_schema = 'public' AND table_name = 'order_assignments'
@@ -1283,7 +1283,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
             const hasOrderAssignments = tableCheck.rows[0]?.exists === true;
 
             if (hasOrderAssignments) {
-              const earningsResult = await (pool as any).query(
+              const earningsResult = await pool.query(
                 `SELECT COALESCE(SUM(o.${priceColumn}), 0) as total
                  FROM orders o
                  INNER JOIN order_assignments oa ON oa.order_id = o.id
@@ -1364,7 +1364,7 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
     }
 
     // Vérifier que le profil driver existe
-    const profileResult = await (pool as any).query(
+    const profileResult = await pool.query(
       'SELECT id FROM driver_profiles WHERE user_id = $1',
       [userId]
     );
@@ -1444,7 +1444,7 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
       RETURNING vehicle_type, vehicle_plate, vehicle_brand, vehicle_model, vehicle_color, license_number
     `;
 
-    const result = await (pool as any).query(updateQuery, values);
+    const result = await pool.query(updateQuery, values);
 
     // Si une plaque d'immatriculation a été fournie, créer/mettre à jour le véhicule dans fleet_vehicles
     const finalVehiclePlate = vehicle_plate || result.rows[0]?.vehicle_plate;
@@ -1453,7 +1453,7 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
     if (finalVehiclePlate && finalVehicleType) {
       try {
         // Vérifier si le véhicule existe déjà dans fleet_vehicles
-        const vehicleCheck = await (pool as any).query(
+        const vehicleCheck = await pool.query(
           'SELECT id, current_driver_id FROM fleet_vehicles WHERE vehicle_plate = $1',
           [finalVehiclePlate]
         );
@@ -1470,7 +1470,7 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
             RETURNING id
           `;
 
-          await (pool as any).query(insertVehicleQuery, [
+          await pool.query(insertVehicleQuery, [
             finalVehiclePlate,
             finalVehicleType,
             vehicle_brand || result.rows[0]?.vehicle_brand || null,
@@ -1532,7 +1532,7 @@ export const updateDriverVehicle = async (req: RequestWithUser, res: Response): 
               WHERE vehicle_plate = $${updateParamIndex}
             `;
 
-            await (pool as any).query(updateVehicleQuery, updateVehicleValues);
+            await pool.query(updateVehicleQuery, updateVehicleValues);
 
             logger.info(`Véhicule mis à jour dans fleet_vehicles: ${finalVehiclePlate}`, {
               driver_id: userId,
@@ -1607,7 +1607,7 @@ export const updateDriverType = async (req: RequestWithUser, res: Response): Pro
     }
 
     // Vérifier que le profil driver existe
-    const profileResult = await (pool as any).query(
+    const profileResult = await pool.query(
       'SELECT id, driver_type FROM driver_profiles WHERE user_id = $1',
       [userId]
     );
@@ -1619,7 +1619,7 @@ export const updateDriverType = async (req: RequestWithUser, res: Response): Pro
       logger.info(`Profil driver non trouvé pour ${maskUserId(userId)}, création automatique avec driver_type=${driver_type}`);
       
       // Récupérer les informations de l'utilisateur depuis la table users
-      const userResult = await (pool as any).query(
+      const userResult = await pool.query(
         'SELECT email, phone FROM users WHERE id = $1',
         [userId]
       );
@@ -1664,7 +1664,7 @@ export const updateDriverType = async (req: RequestWithUser, res: Response): Pro
       logger.info(`Profil driver créé avec succès pour ${maskUserId(userId)} avec driver_type=${driver_type}`);
     } else {
       // Le profil existe → mettre à jour le driver_type
-      const updateResult = await (pool as any).query(
+      const updateResult = await pool.query(
         `UPDATE driver_profiles 
          SET driver_type = $1, updated_at = NOW()
          WHERE user_id = $2
@@ -1714,7 +1714,7 @@ export const updateDriverB2BPreference = async (req: RequestWithUser, res: Respo
       return;
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `UPDATE driver_profiles
        SET accepts_b2b_orders = $1, updated_at = NOW()
        WHERE user_id = $2

@@ -22,7 +22,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
 
     let result;
     try {
-      result = await (pool as any).query(query);
+      result = await pool.query(query);
       logger.info(`[getAdminUsers] Requête réussie: ${result.rows.length} utilisateurs récupérés`);
     } catch (queryError: any) {
       logger.error('[getAdminUsers] Erreur lors de la requête SQL:', queryError);
@@ -76,7 +76,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
       return;
     }
 
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users WHERE id = $1 AND role = 'client'`,
       [clientId]
@@ -95,7 +95,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
@@ -114,7 +114,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
       FROM orders WHERE user_id = $3
     `;
 
-    const statsResult = await (pool as any).query(statsQuery, [
+    const statsResult = await pool.query(statsQuery, [
       startOfWeek.toISOString(),
       startOfMonth.toISOString(),
       clientId,
@@ -124,11 +124,11 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
     let averageRatingGiven = 0;
     let totalRatingsGiven = 0;
     try {
-      const ratingsTableCheck = await (pool as any).query(
+      const ratingsTableCheck = await pool.query(
         `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ratings')`
       );
       if (ratingsTableCheck.rows[0]?.exists) {
-        const ratingResult = await (pool as any).query(
+        const ratingResult = await pool.query(
           `SELECT COALESCE(AVG(rating)::numeric, 0) as avg_rating, COUNT(*) as count FROM ratings WHERE user_id = $1`,
           [clientId]
         );
@@ -143,7 +143,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
 
     let loyaltyPoints = 0;
     try {
-      const loyaltyResult = await (pool as any).query(`SELECT loyalty_points FROM users WHERE id = $1`, [clientId]);
+      const loyaltyResult = await pool.query(`SELECT loyalty_points FROM users WHERE id = $1`, [clientId]);
       if (loyaltyResult.rows[0]?.loyalty_points) {
         loyaltyPoints = parseInt(loyaltyResult.rows[0].loyalty_points || '0');
       }
@@ -170,7 +170,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
           AND o.status = 'completed'
         ORDER BY t.created_at DESC
       `;
-      const deferredResult = await (pool as any).query(deferredTransactionsQuery, [clientId]);
+      const deferredResult = await pool.query(deferredTransactionsQuery, [clientId]);
       const transactions = deferredResult.rows || [];
 
       let totalPaid = 0;
@@ -248,7 +248,7 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
@@ -267,7 +267,7 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
       FROM orders WHERE user_id = $3
     `;
 
-    const statsResult = await (pool as any).query(statsQuery, [
+    const statsResult = await pool.query(statsQuery, [
       startOfWeek.toISOString(),
       startOfMonth.toISOString(),
       clientId,
@@ -277,11 +277,11 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
     let averageRatingGiven = 0;
     let totalRatingsGiven = 0;
     try {
-      const ratingsTableCheck = await (pool as any).query(
+      const ratingsTableCheck = await pool.query(
         `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ratings')`
       );
       if (ratingsTableCheck.rows[0]?.exists) {
-        const ratingResult = await (pool as any).query(
+        const ratingResult = await pool.query(
           `SELECT COALESCE(AVG(rating)::numeric, 0) as avg_rating, COUNT(*) as count FROM ratings WHERE user_id = $1`,
           [clientId]
         );
@@ -296,7 +296,7 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
 
     let loyaltyPoints = 0;
     try {
-      const loyaltyResult = await (pool as any).query(`SELECT loyalty_points FROM users WHERE id = $1`, [clientId]);
+      const loyaltyResult = await pool.query(`SELECT loyalty_points FROM users WHERE id = $1`, [clientId]);
       if (loyaltyResult.rows[0]?.loyalty_points) {
         loyaltyPoints = parseInt(loyaltyResult.rows[0].loyalty_points || '0');
       }
@@ -333,7 +333,7 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
       return;
     }
 
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users WHERE id = $1 AND (role = 'admin' OR role = 'super_admin')`,
       [adminId]
@@ -376,7 +376,7 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
         LIMIT 50
       `;
 
-      const partialPaymentsResult = await (pool as any).query(partialPaymentsQuery);
+      const partialPaymentsResult = await pool.query(partialPaymentsQuery);
       clientsWithPartialPayments = partialPaymentsResult.rows.map((row: any) => ({
         clientId: row.client_id,
         firstName: row.first_name,

@@ -80,7 +80,7 @@ export async function loadClientProfileForOrder(userId: string): Promise<{
   phone?: string;
 }> {
   try {
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       'SELECT first_name, last_name, avatar_url, phone, email FROM users WHERE id = $1',
       [userId]
     );

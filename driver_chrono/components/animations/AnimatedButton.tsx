@@ -16,6 +16,8 @@ interface AnimatedButtonProps {
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'outline';
   hapticFeedback?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -27,6 +29,8 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   disabled = false,
   variant = 'primary',
   hapticFeedback = true,
+  accessibilityLabel,
+  accessibilityHint,
 }) => {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
@@ -97,6 +101,11 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
       onPressOut={handlePressOut}
       disabled={disabled}
       activeOpacity={1}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
     >
       {children}
     </AnimatedTouchable>

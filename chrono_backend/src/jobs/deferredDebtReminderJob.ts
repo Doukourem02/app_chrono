@@ -38,7 +38,7 @@ export async function runDeferredDebtReminderJob(): Promise<void> {
   logger.info('[debt-reminder] Lancement du job');
 
   try {
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT
          t.user_id,
          SUM(t.amount)::numeric                              AS total_amount,

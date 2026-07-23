@@ -1222,7 +1222,7 @@ async function attachPartnerDriver(
   warning?: string;
   error?: { status: number; message: string };
 }> {
-  const client = await (pool as any).connect();
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
@@ -1338,7 +1338,7 @@ export const removePartnerDriver = async (req: Request, res: Response): Promise<
   const partnerId = req.params.id ?? req.params.partnerId;
   const driverUserId = req.params.driverUserId;
 
-  const result = await (pool as any).query(
+  const result = await pool.query(
     'DELETE FROM partner_drivers WHERE partner_id = $1 AND driver_user_id = $2 RETURNING id',
     [partnerId, driverUserId]
   );
@@ -1354,7 +1354,7 @@ export const removePartnerDriver = async (req: Request, res: Response): Promise<
 export const setDefaultPartnerDriver = async (req: Request, res: Response): Promise<void> => {
   const partnerId = req.params.id ?? req.params.partnerId;
   const driverUserId = req.params.driverUserId;
-  const client = await (pool as any).connect();
+  const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
@@ -1567,7 +1567,7 @@ export const getPartnerOrderTracking = async (req: Request, res: Response): Prom
   }
 
   try {
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT
         o.id,
         o.status,
@@ -1709,7 +1709,7 @@ export const getPartnerOrderQRCode = async (req: Request, res: Response): Promis
   }
 
   try {
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT
          o.id,
          o.status,

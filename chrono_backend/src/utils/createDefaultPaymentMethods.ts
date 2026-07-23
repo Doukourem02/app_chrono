@@ -17,7 +17,7 @@ export async function createDefaultPaymentMethods(
 ): Promise<boolean> {
   try {
     // Vérifier si l'utilisateur a déjà des méthodes de paiement
-    const existingMethods = await (pool as any).query(
+    const existingMethods = await pool.query(
       'SELECT id FROM payment_methods WHERE user_id = $1',
       [userId]
     );

@@ -157,7 +157,12 @@ export default function VerificationScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={handleGoBack}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
       </View>
@@ -184,14 +189,18 @@ export default function VerificationScreen() {
               keyboardType="numeric"
               maxLength={1}
               selectTextOnFocus
+              accessibilityLabel={`Chiffre ${index + 1} sur 6 du code de vérification`}
             />
           ))}
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.confirmButton, isLoading && styles.buttonDisabled]}
           onPress={handleConfirm}
           disabled={isLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Confirmer le code"
+          accessibilityState={{ disabled: isLoading, busy: isLoading }}
         >
           <Text style={styles.confirmButtonText}>
             {isLoading ? 'Vérification...' : 'Confirmer'}
@@ -200,7 +209,13 @@ export default function VerificationScreen() {
 
         <View style={styles.resendContainer}>
           <Text style={styles.resendText}>Vous n&apos;avez pas reçu le code ? </Text>
-          <TouchableOpacity onPress={handleResend} disabled={resendCooldown > 0 || isResending}>
+          <TouchableOpacity
+            onPress={handleResend}
+            disabled={resendCooldown > 0 || isResending}
+            accessibilityRole="button"
+            accessibilityLabel="Renvoyer le code"
+            accessibilityState={{ disabled: resendCooldown > 0 || isResending }}
+          >
             <Text style={[styles.resendLink, (resendCooldown > 0 || isResending) && { opacity: 0.4 }]}>
               {isResending ? 'Envoi...' : resendCooldown > 0 ? `Renvoyer (${resendCooldown}s)` : 'Renvoyer'}
             </Text>

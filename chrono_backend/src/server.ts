@@ -140,7 +140,7 @@ io.use(async (socket, next) => {
 
           // Essayer PostgreSQL d'abord
           try {
-            const result = await (pool as any).query(
+            const result = await pool.query(
               'SELECT id, role FROM users WHERE id = $1 OR email = $2',
               [user.id, user.email ?? '']
             );

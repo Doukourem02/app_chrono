@@ -12,7 +12,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
       return;
     }
 
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users WHERE id = $1 AND role = 'driver'`,
       [driverId]
@@ -27,7 +27,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
 
     let driverProfile: any = null;
     try {
-      const profileResult = await (pool as any).query(
+      const profileResult = await pool.query(
         `SELECT id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders FROM driver_profiles WHERE user_id = $1`, [driverId]
       );
       if (profileResult.rows.length > 0) {
@@ -37,7 +37,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
       logger.warn('Table driver_profiles non disponible:', profileError);
     }
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
@@ -64,7 +64,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
       FROM orders WHERE driver_id = $3
     `;
 
-    const statsResult = await (pool as any).query(statsQuery, [
+    const statsResult = await pool.query(statsQuery, [
       startOfToday.toISOString(), startOfWeek.toISOString(), driverId,
     ]);
     const stats = statsResult.rows[0] || {};
@@ -72,11 +72,11 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
     let averageRating = 5.0;
     let totalRatings = 0;
     try {
-      const ratingsTableCheck = await (pool as any).query(
+      const ratingsTableCheck = await pool.query(
         `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ratings')`
       );
       if (ratingsTableCheck.rows[0]?.exists) {
-        const ratingResult = await (pool as any).query(
+        const ratingResult = await pool.query(
           `SELECT COALESCE(AVG(rating)::numeric, 5.0) as avg_rating, COUNT(*) as count FROM ratings WHERE driver_id = $1`,
           [driverId]
         );
@@ -89,7 +89,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
       logger.warn('Erreur calcul rating:', ratingError);
     }
 
-    const acceptanceResult = await (pool as any).query(
+    const acceptanceResult = await pool.query(
       `SELECT
         COUNT(*) FILTER (WHERE status IN ('accepted', 'enroute', 'picked_up', 'completed')) as accepted,
         COUNT(*) as total_assigned
@@ -100,7 +100,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
       ? (acceptanceResult.rows[0].accepted / acceptanceResult.rows[0].total_assigned) * 100
       : 0;
 
-    const cancelledResult = await (pool as any).query(
+    const cancelledResult = await pool.query(
       `SELECT COUNT(*) as cancelled_count FROM orders WHERE driver_id = $1 AND status = 'cancelled'`,
       [driverId]
     );
@@ -108,7 +108,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
 
     let pendingPaymentOrders: any[] = [];
     try {
-      const allCompletedOrdersResult = await (pool as any).query(`
+      const allCompletedOrdersResult = await pool.query(`
         SELECT
           o.id as order_id, o.created_at as order_created_at, o.status as order_status,
           ${priceColumn || '0'} as order_amount,
@@ -124,7 +124,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
 
       for (const orderRow of allCompletedOrdersResult.rows) {
         const orderId = orderRow.order_id;
-        const transactionsResult = await (pool as any).query(
+        const transactionsResult = await pool.query(
           `SELECT id, amount, partial_amount, remaining_amount, is_partial, payment_method_type, status, created_at
            FROM transactions WHERE order_id = $1 ORDER BY created_at DESC`,
           [orderId]
@@ -206,7 +206,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
 
     let recentOrders: any[] = [];
     try {
-      const recentOrdersResult = await (pool as any).query(`
+      const recentOrdersResult = await pool.query(`
         SELECT
           o.id, o.status, o.created_at, o.accepted_at, o.completed_at, o.cancelled_at,
           ${priceColumn || '0'} as price, o.distance, o.delivery_method,
@@ -231,7 +231,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         const orderId = row.id;
         const orderAmount = parseFloat(row.price || '0');
 
-        const transactionsResult = await (pool as any).query(
+        const transactionsResult = await pool.query(
           `SELECT id, amount, partial_amount, remaining_amount, is_partial, payment_method_type, status, created_at
            FROM transactions WHERE order_id = $1 ORDER BY created_at DESC`,
           [orderId]
@@ -364,7 +364,7 @@ export const updateAdminDriverStatus = async (req: Request, res: Response): Prom
     }
 
     try {
-      await (pool as any).query(
+      await pool.query(
         `UPDATE driver_profiles SET is_online = $1, is_available = $1, updated_at = NOW() WHERE user_id = $2`,
         [isActive, driverId]
       );
@@ -428,7 +428,7 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
                dp.driver_type, dp.is_online, dp.is_available, dp.accepts_b2b_orders, cb.balance, cb.commission_rate, cb.is_suspended
                ORDER BY u.created_at DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     const counts = { total: result.rows.length, partners: 0, internals: 0, active: 0, suspended: 0 };
 
@@ -477,13 +477,15 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
           has_balance: balance > 0,
           total_deliveries: parseInt(row.total_deliveries || 0),
           completed_deliveries: parseInt(row.completed_deliveries || 0),
+          average_rating: null as number | null,
+          totalRatings: 0,
         };
       })
-      .filter((driver: any) => driver !== null);
+      .filter((driver) => driver !== null);
 
     for (const driver of formatted) {
       try {
-        const ratingResult = await (pool as any).query(
+        const ratingResult = await pool.query(
           `SELECT AVG(rating) as avg_rating, COUNT(*) as total_ratings FROM ratings WHERE driver_id = $1`,
           [driver.id]
         );
@@ -518,7 +520,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
       return;
     }
 
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users WHERE id = $1 AND role = 'driver'`,
       [driverId]
@@ -533,7 +535,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
 
     let driverProfile: any = null;
     try {
-      const profileResult = await (pool as any).query(
+      const profileResult = await pool.query(
         `SELECT id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders FROM driver_profiles WHERE user_id = $1`, [driverId]
       );
       if (profileResult.rows.length > 0) {
@@ -546,7 +548,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
     let commissionAccount: any = null;
     if (driverProfile?.driver_type === 'partner') {
       try {
-        const commissionResult = await (pool as any).query(
+        const commissionResult = await pool.query(
           `SELECT balance, commission_rate, is_suspended, updated_at FROM commission_balance WHERE driver_id = $1`,
           [driverId]
         );
@@ -563,7 +565,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
       }
     }
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
@@ -578,13 +580,13 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
         COALESCE(SUM(${priceColumn || '0'}) FILTER (WHERE status = 'completed'), 0) as total_revenue
       FROM orders WHERE driver_id = $1
     `;
-    const statsResult = await (pool as any).query(statsQuery, [driverId]);
+    const statsResult = await pool.query(statsQuery, [driverId]);
     const stats = statsResult.rows[0] || {};
 
     let averageRating: number | null = null;
     let totalRatings = 0;
     try {
-      const ratingResult = await (pool as any).query(
+      const ratingResult = await pool.query(
         `SELECT AVG(rating) as avg_rating, COUNT(*) as total_ratings FROM ratings WHERE driver_id = $1`,
         [driverId]
       );
@@ -635,7 +637,7 @@ export const rechargeAdminDriverCommission = async (req: Request, res: Response)
       return;
     }
 
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`, [driverId]
     );
 
@@ -649,7 +651,7 @@ export const rechargeAdminDriverCommission = async (req: Request, res: Response)
       return;
     }
 
-    const rechargeResult = await (pool as any).query(
+    const rechargeResult = await pool.query(
       `SELECT recharge_commission_balance($1, $2, $3, NULL, NULL, $4) as transaction_id`,
       [driverId, amount, method, notes || `Recharge manuelle par admin`]
     );
@@ -671,7 +673,7 @@ export const suspendAdminDriverCommission = async (req: Request, res: Response):
 
     logger.info('🚀 [suspendAdminDriverCommission] DÉBUT', { driverId, is_suspended });
 
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`, [driverId]
     );
 
@@ -685,7 +687,7 @@ export const suspendAdminDriverCommission = async (req: Request, res: Response):
       return;
     }
 
-    await (pool as any).query(
+    await pool.query(
       `UPDATE commission_balance
        SET is_suspended = $1,
            suspended_at = CASE WHEN $1 = true THEN NOW() ELSE NULL END,
@@ -715,7 +717,7 @@ export const updateAdminDriverCommissionRate = async (req: Request, res: Respons
       return;
     }
 
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`, [driverId]
     );
 
@@ -729,7 +731,7 @@ export const updateAdminDriverCommissionRate = async (req: Request, res: Respons
       return;
     }
 
-    await (pool as any).query(
+    await pool.query(
       `UPDATE commission_balance SET commission_rate = $1, updated_at = NOW() WHERE driver_id = $2`,
       [commission_rate, driverId]
     );
@@ -771,7 +773,7 @@ export const getAdminDriverCommissionTransactions = async (req: Request, res: Re
     query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     const transactions = result.rows.map((tx: any) => ({
       id: tx.id,

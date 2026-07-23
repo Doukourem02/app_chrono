@@ -73,7 +73,7 @@ export async function persistAdminFeedNotification(
   }
 
   try {
-    await (pool as any).query(
+    await pool.query(
       `INSERT INTO public.admin_notification_feed (category, title, body, payload)
        VALUES ($1, $2, $3, $4::jsonb)`,
       ['admin_feed', row.title, row.body, JSON.stringify(row.payload)]

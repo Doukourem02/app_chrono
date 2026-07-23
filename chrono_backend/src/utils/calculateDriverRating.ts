@@ -10,7 +10,7 @@ export async function calculateDriverRating(
   }
 
   try {
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 
         FROM information_schema.tables 
@@ -26,7 +26,7 @@ export async function calculateDriverRating(
       return 5.0;
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT 
         COALESCE(AVG(rating)::numeric, 5.0) as average_rating,
         COUNT(*) as total_ratings

@@ -73,7 +73,7 @@ export const getTrackByToken = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const orderResult = await (pool as any).query(
+    const orderResult = await pool.query(
       `SELECT 
         o.id,
         o.status,

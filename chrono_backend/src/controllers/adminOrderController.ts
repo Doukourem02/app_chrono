@@ -30,7 +30,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
                      WHERE status IN ('pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering')
                      ORDER BY created_at DESC`;
       try {
-        const result = await (pool as any).query(query);
+        const result = await pool.query(query);
         rows = result.rows || [];
         logger.info(`[getAdminOngoingDeliveries] Pool: ${rows.length} lignes récupérées`);
       } catch (queryError: any) {
@@ -77,7 +77,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     if (userIds.length > 0) {
       try {
         if (!usedFallback) {
-          const usersResult = await (pool as any).query(
+          const usersResult = await pool.query(
             `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
             [userIds]
           );
@@ -107,7 +107,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     if (driverIds.length > 0) {
       try {
         if (!usedFallback) {
-          const driversResult = await (pool as any).query(
+          const driversResult = await pool.query(
             `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
             [driverIds]
           );
@@ -258,7 +258,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
 
     let result;
     try {
-      result = await (pool as any).query(query, queryParams);
+      result = await pool.query(query, queryParams);
     } catch (queryError: any) {
       logger.error('[getAdminOrdersByStatus] Erreur lors de la requête SQL:', queryError);
       throw queryError;
@@ -288,7 +288,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
 
     let countsResult;
     try {
-      countsResult = await (pool as any).query(countsQuery, [
+      countsResult = await pool.query(countsQuery, [
         startOfCurrentMonth.toISOString(),
         startOfLastMonth.toISOString(),
         endOfLastMonth.toISOString(),
@@ -384,7 +384,7 @@ export const getAdminOrderById = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT
         o.*,
         d.first_name as driver_first_name, d.last_name as driver_last_name,
@@ -524,7 +524,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       }
     }
 
-    const clientResult = await (pool as any).query(
+    const clientResult = await pool.query(
       'SELECT id, email, phone, first_name, last_name, avatar_url FROM users WHERE id = $1 AND role = $2',
       [userId, 'client']
     );
@@ -807,7 +807,7 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
 
     logger.info(`🔧 [cancelAdminOrder] Tentative d'annulation de la commande ${orderId} par l'admin`);
 
-    const dbResult = await (pool as any).query('SELECT * FROM orders WHERE id = $1', [orderId]);
+    const dbResult = await pool.query('SELECT * FROM orders WHERE id = $1', [orderId]);
 
     if (!dbResult.rows || dbResult.rows.length === 0) {
       res.status(404).json({ success: false, message: 'Commande non trouvée' });
@@ -823,7 +823,7 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    await (pool as any).query(
+    await pool.query(
       'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
       ['cancelled', orderId]
     );

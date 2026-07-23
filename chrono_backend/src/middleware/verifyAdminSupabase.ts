@@ -26,7 +26,7 @@ async function queryAdminUserFromPool(userId: string, email: string) {
   let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await (pool as any).query('SELECT id, role FROM users WHERE id = $1 OR email = $2', [
+      return await pool.query('SELECT id, role FROM users WHERE id = $1 OR email = $2', [
         userId,
         email,
       ]);
@@ -101,7 +101,7 @@ export const verifyAdminSupabase = async (
       const decoded = verifyAccessToken(token);
       const userId = decoded.id;
 
-      const result = await (pool as any).query('SELECT id, role FROM users WHERE id = $1', [userId]);
+      const result = await pool.query('SELECT id, role FROM users WHERE id = $1', [userId]);
       if (result.rows.length === 0) {
         res.status(401).json({ success: false, message: 'Utilisateur non trouvé' });
         return;

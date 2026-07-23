@@ -48,7 +48,7 @@ export const createDelivery = async (
       return;
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       'INSERT INTO deliveries(user_id, pickup, delivery, method, status) VALUES($1,$2,$3,$4,$5) RETURNING *',
       [userId, pickup, delivery, method, 'pending']
     );
@@ -194,10 +194,10 @@ export const getUserDeliveries = async (
     query += ` ORDER BY created_at DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
     queryParams.push(limit, offset);
 
-    const result = await (pool as any).query(query, queryParams);
+    const result = await pool.query(query, queryParams);
 
     const countParams = status && status !== 'all' ? [userId, status] : [userId];
-    const countResult = await (pool as any).query(countQuery, countParams);
+    const countResult = await pool.query(countQuery, countParams);
     const total = parseInt(countResult.rows[0]?.count || '0');
 
     const rows = result.rows || [];
@@ -364,7 +364,7 @@ export const updateDeliveryStatus = async (
     });
 
     try {
-      await (pool as any).query('UPDATE deliveries SET status=$1 WHERE id=$2', [
+      await pool.query('UPDATE deliveries SET status=$1 WHERE id=$2', [
         order.status,
         orderId,
       ]);
@@ -452,7 +452,7 @@ export const cancelOrder = async (
 
     const order = activeOrders.get(orderId);
     if (!order) {
-      const dbResult = await (pool as any).query(
+      const dbResult = await pool.query(
         'SELECT id, status FROM orders WHERE id = $1 AND user_id = $2',
         [orderId, userId]
       );
@@ -472,7 +472,7 @@ export const cancelOrder = async (
       return;
     }
 
-    await (pool as any).query(
+    await pool.query(
       'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
       ['cancelled', orderId]
     );
@@ -514,7 +514,7 @@ export const cancelOrder = async (
     (order as any).cancelledAt = new Date();
 
     try {
-      await (pool as any).query(
+      await pool.query(
         'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
         ['cancelled', orderId]
       );
@@ -642,7 +642,7 @@ export const getUserStatistics = async (
     }
 
     try {
-      const completedOrdersResult = await (pool as any).query(
+      const completedOrdersResult = await pool.query(
         `SELECT COUNT(*) as count FROM orders WHERE user_id = $1 AND status = 'completed'`,
         [userId]
       );
@@ -656,7 +656,7 @@ export const getUserStatistics = async (
       try {
         // Calculer le montant total des dettes différées non payées
         // (même logique que getDeferredDebts pour cohérence)
-        const deferredDebtsResult = await (pool as any).query(
+        const deferredDebtsResult = await pool.query(
           `SELECT COALESCE(SUM(amount), 0) as total 
            FROM transactions 
            WHERE user_id = $1 

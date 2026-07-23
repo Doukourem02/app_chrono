@@ -409,7 +409,7 @@ async function loadClientProfileForOrder(userId: string): Promise<{
   phone?: string;
 }> {
   try {
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       'SELECT first_name, last_name, avatar_url, phone, email FROM users WHERE id = $1',
       [userId]
     );
@@ -1527,7 +1527,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         if (DEBUG) logger.debug(`Statut commande ${maskOrderId(orderId)} mis à jour en DB`);
 
         try {
-          await (pool as any).query(
+          await pool.query(
             `UPDATE invoices SET driver_id = $1 WHERE order_id = $2 AND driver_id IS NULL`,
             [driverId, orderId]
           );
@@ -1622,7 +1622,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           let phone = driverData.phone;
           let avatarUrl = driverData.avatar_url || driverData.avatar || driverData.profile_image_url;
           try {
-            const userResult = await (pool as any).query(
+            const userResult = await pool.query(
               `SELECT u.first_name, u.last_name, u.phone, u.avatar_url,
                       dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
                       dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
@@ -2066,7 +2066,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           if (status === 'picked_up') {
             try {
               // Récupérer les informations de paiement depuis la base de données
-              const paymentInfoResult = await (pool as any).query(
+              const paymentInfoResult = await pool.query(
                 `SELECT payment_method_type, payment_payer, payment_status 
                  FROM orders 
                  WHERE id = $1`,
@@ -2086,7 +2086,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                   currentPaymentStatus !== 'paid'
                 ) {
                   // Mettre à jour le statut de paiement dans orders
-                  await (pool as any).query(
+                  await pool.query(
                     `UPDATE orders 
                      SET payment_status = 'paid', updated_at = NOW() 
                      WHERE id = $1`,
@@ -2094,7 +2094,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
                   );
 
                   // Mettre à jour le statut de paiement dans transactions
-                  await (pool as any).query(
+                  await pool.query(
                     `UPDATE transactions 
                      SET status = 'paid', updated_at = NOW() 
                      WHERE order_id = $1 AND payer_type = 'client' AND status != 'paid'`,
@@ -2125,7 +2125,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         if (userSocketId) {
           let driverInfoForClient: any = null;
           try {
-            const driverInfoResult = await (pool as any).query(
+            const driverInfoResult = await pool.query(
               `SELECT u.id, u.email, u.phone, u.first_name, u.last_name, u.avatar_url,
                       dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
                       dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
@@ -2604,7 +2604,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           for (const dbOrder of dbOrders) {
             // Enrichir avec les informations driver si nécessaire
             if (dbOrder.driver_id) {
-              const driverResult = await (pool as any).query(
+              const driverResult = await pool.query(
                 `SELECT u.id, u.email, u.phone, u.first_name, u.last_name, u.avatar_url,
                         dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
                         dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
@@ -2728,7 +2728,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           for (const dbOrder of dbOrders) {
             // CRITIQUE : Vérifier directement le statut réel dans la DB pour éviter les données obsolètes
             try {
-              const statusCheck = await (pool as any).query(
+              const statusCheck = await pool.query(
                 'SELECT status FROM orders WHERE id = $1',
                 [dbOrder.id]
               );
@@ -2773,7 +2773,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             
             // Enrichir avec les informations user si nécessaire
             if (dbOrder.user_id) {
-              const userResult = await (pool as any).query(
+              const userResult = await pool.query(
                 'SELECT id, email, phone, first_name, last_name, avatar_url FROM users WHERE id = $1',
                 [dbOrder.user_id]
               );

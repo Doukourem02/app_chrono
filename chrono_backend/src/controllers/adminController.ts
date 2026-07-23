@@ -152,7 +152,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     const { rangeStart, rangeEnd, previousStart, previousEnd } = getDateRange(startDate, endDate);
 
     // Commandes en cours (dans la période sélectionnée)
-    const activeOrdersResult = await (pool as any).query(
+    const activeOrdersResult = await pool.query(
       `SELECT COUNT(*) as count FROM orders 
        WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')
        AND created_at <= $2
@@ -162,7 +162,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     const onDelivery = parseInt(activeOrdersResult.rows[0]?.count || '0');
 
     // Vérifier quelle colonne de prix existe
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -188,7 +188,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     }
 
     // Livraisons complétées cette semaine
-    const completedCurrentRangeResult = await (pool as any).query(
+    const completedCurrentRangeResult = await pool.query(
       `SELECT COUNT(*) as count, COALESCE(SUM(${priceColumn}), 0) as total_revenue
        FROM orders 
        WHERE status = 'completed' 
@@ -200,7 +200,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     const revenue = parseFloat(completedCurrentRangeResult.rows[0]?.total_revenue || '0');
 
     // Livraisons complétées pendant la période précédente (même durée)
-    const completedPreviousRangeResult = await (pool as any).query(
+    const completedPreviousRangeResult = await pool.query(
       `SELECT COUNT(*) as count, COALESCE(SUM(${priceColumn}), 0) as total_revenue
        FROM orders 
        WHERE status = 'completed' 
@@ -211,7 +211,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     const successDeliveriesLastWeek = parseInt(completedPreviousRangeResult.rows[0]?.count || '0');
     const revenueLastWeek = parseFloat(completedPreviousRangeResult.rows[0]?.total_revenue || '0');
 
-    const activeOrdersPreviousRangeResult = await (pool as any).query(
+    const activeOrdersPreviousRangeResult = await pool.query(
       `SELECT COUNT(*) as count FROM orders 
        WHERE status IN ('pending', 'accepted', 'enroute', 'picked_up')
        AND created_at <= $2
@@ -237,14 +237,14 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     let averageRating = 0;
     let totalRatings = 0;
     try {
-      const ratingsTableCheck = await (pool as any).query(
+      const ratingsTableCheck = await pool.query(
         `SELECT EXISTS (
           SELECT 1 FROM information_schema.tables 
           WHERE table_schema = 'public' AND table_name = 'ratings'
         )`
       );
       if (ratingsTableCheck.rows[0]?.exists) {
-        const ratingsResult = await (pool as any).query(
+        const ratingsResult = await pool.query(
           `SELECT COALESCE(AVG(rating)::numeric, 0) as avg_rating, COUNT(*) as count
            FROM ratings
            WHERE created_at >= $1 AND created_at <= $2`,
@@ -262,7 +262,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     // Temps moyen de livraison (en minutes)
     let averageDeliveryTime = 0;
     try {
-      const deliveryTimeResult = await (pool as any).query(
+      const deliveryTimeResult = await pool.query(
         `SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 60) as avg_time
          FROM orders 
          WHERE status = 'completed' 
@@ -279,7 +279,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     }
 
     // Taux d'annulation
-    const cancelledCurrentRangeResult = await (pool as any).query(
+    const cancelledCurrentRangeResult = await pool.query(
       `SELECT COUNT(*) as count FROM orders 
        WHERE status = 'cancelled' 
        AND created_at >= $1`,
@@ -292,7 +292,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
       : 0;
 
     // Nombre de clients actifs (qui ont passé au moins une commande cette semaine)
-    const activeClientsResult = await (pool as any).query(
+    const activeClientsResult = await pool.query(
       `SELECT COUNT(DISTINCT user_id) as count FROM orders 
        WHERE created_at >= $1`,
       [rangeStart.toISOString()]
@@ -300,7 +300,7 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
     const activeClients = parseInt(activeClientsResult.rows[0]?.count || '0');
 
     // Nombre de drivers actifs (qui ont complété au moins une livraison cette semaine)
-    const activeDriversResult = await (pool as any).query(
+    const activeDriversResult = await pool.query(
       `SELECT COUNT(DISTINCT driver_id) as count FROM orders 
        WHERE status = 'completed' 
        AND completed_at >= $1 
@@ -365,7 +365,7 @@ export const getAdminDeliveryAnalytics = async (req: Request, res: Response): Pr
       rangeStart = normalizeDate(rangeStart);
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT 
         DATE_TRUNC('month', created_at) as month,
         COUNT(*) FILTER (WHERE status = 'completed') as delivered,
@@ -428,7 +428,7 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
     }
 
     // Vérifier d'abord si la table orders a des données
-    const countResult = await (pool as any).query(`SELECT COUNT(*) as count FROM orders`);
+    const countResult = await pool.query(`SELECT COUNT(*) as count FROM orders`);
     const totalOrders = parseInt(countResult.rows[0]?.count || '0');
     logger.debug(`Total de commandes dans la table orders: ${totalOrders}`);
 
@@ -461,7 +461,7 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
 
     let result;
     try {
-      result = await (pool as any).query(query, params);
+      result = await pool.query(query, params);
       logger.info(`[getAdminRecentActivities] Requête réussie: ${result.rows.length} lignes récupérées`);
     } catch (queryError: any) {
       logger.error('[getAdminRecentActivities] Erreur lors de la requête SQL:', queryError);
@@ -624,7 +624,7 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
     }
 
     // Vérifier si price_cfa ou price existe dans orders
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -788,19 +788,19 @@ export const getAdminGlobalSearch = async (req: Request, res: Response): Promise
         ordersParams.push(`${upperQuery}%`, upperQuery);
       }
       logger.info('🔍 [getAdminGlobalSearch] Exécution requête commandes avec params:', ordersParams);
-      ordersResult = await (pool as any).query(ordersQuery, ordersParams);
+      ordersResult = await pool.query(ordersQuery, ordersParams);
       logger.info(`[getAdminGlobalSearch] Commandes trouvées: ${ordersResult.rows.length}`);
 
       // Pour les livreurs : searchTerm, exactSearchTerm, searchTerm (pour le tri)
       const driversParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
       logger.info('🔍 [getAdminGlobalSearch] Exécution requête livreurs avec params:', driversParams);
-      driversResult = await (pool as any).query(driversQuery, driversParams);
+      driversResult = await pool.query(driversQuery, driversParams);
       logger.info(`[getAdminGlobalSearch] Livreurs trouvés: ${driversResult.rows.length}`);
 
       // Pour les clients : searchTerm, exactSearchTerm, searchTerm (pour le tri)
       const clientsParams = [searchTerm, exactSearchTerm, `${exactSearchTerm}%`];
       logger.info('🔍 [getAdminGlobalSearch] Exécution requête clients avec params:', clientsParams);
-      clientsResult = await (pool as any).query(clientsQuery, clientsParams);
+      clientsResult = await pool.query(clientsQuery, clientsParams);
       logger.info(`[getAdminGlobalSearch] Clients trouvés: ${clientsResult.rows.length}`);
     } catch (queryError: any) {
       logger.error('[getAdminGlobalSearch] Erreur lors de la requête SQL:', queryError);
@@ -967,7 +967,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
       logger.info('📝 [getAdminOngoingDeliveries] Requête SQL pool:', { query });
 
       try {
-        const result = await (pool as any).query(query);
+        const result = await pool.query(query);
         rows = result.rows || [];
         logger.info(`[getAdminOngoingDeliveries] Pool: ${rows.length} lignes récupérées`);
       } catch (queryError: any) {
@@ -1023,7 +1023,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     if (userIds.length > 0) {
       try {
         if (!usedFallback) {
-          const usersResult = await (pool as any).query(
+          const usersResult = await pool.query(
             `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
             [userIds]
           );
@@ -1053,7 +1053,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
     if (driverIds.length > 0) {
       try {
         if (!usedFallback) {
-          const driversResult = await (pool as any).query(
+          const driversResult = await pool.query(
             `SELECT id, email, phone, first_name, last_name, avatar_url, role FROM users WHERE id = ANY($1)`,
             [driverIds]
           );
@@ -1254,7 +1254,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
 
     let result;
     try {
-      result = await (pool as any).query(query, queryParams);
+      result = await pool.query(query, queryParams);
       logger.info(`[getAdminOrdersByStatus] Requête réussie: ${result.rows.length} lignes récupérées`);
     } catch (queryError: any) {
       logger.error('[getAdminOrdersByStatus] Erreur lors de la requête SQL:', queryError);
@@ -1287,7 +1287,7 @@ export const getAdminOrdersByStatus = async (req: Request, res: Response): Promi
 
     let countsResult;
     try {
-      countsResult = await (pool as any).query(countsQuery, [
+      countsResult = await pool.query(countsQuery, [
         startOfCurrentMonth.toISOString(),
         startOfLastMonth.toISOString(),
         endOfLastMonth.toISOString(),
@@ -1422,7 +1422,7 @@ export const getAdminOrderById = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT 
         o.*,
         d.first_name as driver_first_name,
@@ -1590,7 +1590,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
 
     let result;
     try {
-      result = await (pool as any).query(query);
+      result = await pool.query(query);
       logger.info(`[getAdminUsers] Requête réussie: ${result.rows.length} utilisateurs récupérés`);
     } catch (queryError: any) {
       logger.error('[getAdminUsers] Erreur lors de la requête SQL:', queryError);
@@ -1699,7 +1699,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
 
     // Vérifier quelles colonnes order existent : certaines bases prod n'ont pas encore
     // toutes les colonnes paiement, mais les stats doivent rester calculables.
-    const orderColumnsInfo = await (pool as any).query(
+    const orderColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'
        AND column_name = ANY($1)`,
@@ -1770,7 +1770,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
 
     let revenueResult: any = { rows: [{}] };
     try {
-      revenueResult = await (pool as any).query(revenueQuery, revenueParams);
+      revenueResult = await pool.query(revenueQuery, revenueParams);
     } catch (err: any) {
       logger.error('[financial-stats] Erreur revenueQuery:', err.message);
       financialStatsWarnings.push('revenue');
@@ -1779,7 +1779,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     // Transactions par méthode de paiement (hors commandes annulées/refusées)
     const transactionsByMethod: Record<string, number> = { orange_money: 0, wave: 0, cash: 0, deferred: 0 };
     try {
-      const transactionsByMethodResult = await (pool as any).query(`
+      const transactionsByMethodResult = await pool.query(`
         SELECT
           t.payment_method_type,
           COALESCE(SUM(t.amount), 0) as total
@@ -1803,7 +1803,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     // Statut des paiements
     const paymentStatus: Record<string, number> = { pending: 0, paid: 0, refused: 0, delayed: 0 };
     try {
-      const paymentStatusResult = await (pool as any).query(`
+      const paymentStatusResult = await pool.query(`
         SELECT t.status, t.payment_method_type, COUNT(*) as count
         FROM transactions t
         LEFT JOIN orders o ON t.order_id = o.id
@@ -1868,7 +1868,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         WHERE (o.delivery_qr_code IS NOT NULL OR o.delivery_verification_code IS NOT NULL)
           AND (o.created_at >= $4 OR ${orderLossDateExpression} >= $4)
       `;
-      const qrScannedResult = await (pool as any).query(qrScannedQuery, periodParams);
+      const qrScannedResult = await pool.query(qrScannedQuery, periodParams);
       const qr = qrScannedResult.rows[0] || {};
       const makeQrPeriod = (suffix: string) => ({
         scanned: parseInt(qr[`scanned_${suffix}`] || '0'),
@@ -1935,8 +1935,8 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
         ) deferred_losses
       `;
       const [cancelledStatsResult, cancelledDeferredResult] = await Promise.all([
-        (pool as any).query(cancelledStatsQuery, periodParams),
-        (pool as any).query(cancelledDeferredQuery, periodParams),
+        pool.query(cancelledStatsQuery, periodParams),
+        pool.query(cancelledDeferredQuery, periodParams),
       ]);
       const cs = cancelledStatsResult.rows[0] || {};
       const cd = cancelledDeferredResult.rows[0] || {};
@@ -1964,7 +1964,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     // Revenus par driver (top 10)
     let revenueByDriverRows: any[] = [];
     try {
-      const revenueByDriverResult = await (pool as any).query(`
+      const revenueByDriverResult = await pool.query(`
         SELECT o.driver_id, COUNT(*) as deliveries, COALESCE(SUM(${priceColumn}), 0) as revenue
         FROM orders o
         WHERE o.status = 'completed' AND o.completed_at >= $1 AND o.driver_id IS NOT NULL
@@ -1978,7 +1978,7 @@ export const getAdminFinancialStats = async (req: Request, res: Response): Promi
     // Revenus par type de livraison
     const revenueByDeliveryType: Record<string, number> = { moto: 0, vehicule: 0, cargo: 0 };
     try {
-      const revenueByDeliveryTypeResult = await (pool as any).query(`
+      const revenueByDeliveryTypeResult = await pool.query(`
         SELECT delivery_method, COALESCE(SUM(${priceColumn}), 0) as revenue
         FROM orders WHERE status = 'completed' AND completed_at >= $1
         GROUP BY delivery_method
@@ -2129,8 +2129,8 @@ export const getAdminTransactions = async (req: Request, res: Response): Promise
     query += ` ORDER BY t.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
-    const countResult = await (pool as any).query(countQuery, params.slice(0, -2));
+    const result = await pool.query(query, params);
+    const countResult = await pool.query(countQuery, params.slice(0, -2));
     const total = parseInt(countResult.rows[0]?.count || '0');
 
     res.json({
@@ -2224,7 +2224,7 @@ export const getAdminReportDeliveries = async (req: Request, res: Response): Pro
 
     query += ` ORDER BY o.created_at DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     res.json({
       success: true,
@@ -2253,7 +2253,7 @@ export const getAdminReportRevenues = async (req: Request, res: Response): Promi
       return;
     }
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -2305,7 +2305,7 @@ export const getAdminReportRevenues = async (req: Request, res: Response): Promi
 
     query += ` GROUP BY DATE_TRUNC('day', completed_at), delivery_method ORDER BY date DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     res.json({
       success: true,
@@ -2364,7 +2364,7 @@ export const getAdminReportClients = async (req: Request, res: Response): Promis
 
     query += ` GROUP BY u.id, u.email, u.phone, u.first_name, u.last_name, u.role, u.created_at ORDER BY total_orders DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     res.json({
       success: true,
@@ -2391,7 +2391,7 @@ export const getAdminReportDrivers = async (req: Request, res: Response): Promis
       return;
     }
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -2432,20 +2432,20 @@ export const getAdminReportDrivers = async (req: Request, res: Response): Promis
 
     query += ` GROUP BY u.id, u.email, u.phone, u.first_name, u.last_name, u.created_at ORDER BY total_revenue DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     // Ajouter les ratings pour chaque driver
     const driversWithRatings = await Promise.all(
       result.rows.map(async (driver: any) => {
         try {
-          const ratingsTableCheck = await (pool as any).query(
+          const ratingsTableCheck = await pool.query(
             `SELECT EXISTS (
               SELECT 1 FROM information_schema.tables 
               WHERE table_schema = 'public' AND table_name = 'ratings'
             )`
           );
           if (ratingsTableCheck.rows[0]?.exists) {
-            const ratingResult = await (pool as any).query(
+            const ratingResult = await pool.query(
               `SELECT COALESCE(AVG(rating)::numeric, 5.0) as avg_rating, COUNT(*) as count 
                FROM ratings WHERE driver_id = $1`,
               [driver.id]
@@ -2533,7 +2533,7 @@ export const getAdminReportPayments = async (req: Request, res: Response): Promi
       ORDER BY normalized.date DESC
     `;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     res.json({
       success: true,
@@ -2560,7 +2560,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
     }
 
     // Récupérer les infos utilisateur
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users
        WHERE id = $1 AND role = 'driver'`,
@@ -2577,7 +2577,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
     // Récupérer le profil driver (si table existe)
     let driverProfile: any = null;
     try {
-      const profileResult = await (pool as any).query(
+      const profileResult = await pool.query(
         `SELECT id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders FROM driver_profiles WHERE user_id = $1`,
         [driverId]
       );
@@ -2589,7 +2589,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
     }
 
     // Statistiques
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -2618,7 +2618,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
       WHERE driver_id = $3
     `;
 
-    const statsResult = await (pool as any).query(statsQuery, [
+    const statsResult = await pool.query(statsQuery, [
       startOfToday.toISOString(),
       startOfWeek.toISOString(),
       driverId,
@@ -2630,14 +2630,14 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
     let averageRating = 5.0;
     let totalRatings = 0;
     try {
-      const ratingsTableCheck = await (pool as any).query(
+      const ratingsTableCheck = await pool.query(
         `SELECT EXISTS (
           SELECT 1 FROM information_schema.tables 
           WHERE table_schema = 'public' AND table_name = 'ratings'
         )`
       );
       if (ratingsTableCheck.rows[0]?.exists) {
-        const ratingResult = await (pool as any).query(
+        const ratingResult = await pool.query(
           `SELECT COALESCE(AVG(rating)::numeric, 5.0) as avg_rating, COUNT(*) as count 
            FROM ratings WHERE driver_id = $1`,
           [driverId]
@@ -2659,7 +2659,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
       FROM orders
       WHERE driver_id = $1
     `;
-    const acceptanceResult = await (pool as any).query(acceptanceQuery, [driverId]);
+    const acceptanceResult = await pool.query(acceptanceQuery, [driverId]);
     const acceptanceRate =
       acceptanceResult.rows[0]?.total_assigned > 0
         ? (acceptanceResult.rows[0].accepted / acceptanceResult.rows[0].total_assigned) * 100
@@ -2671,7 +2671,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
       FROM orders
       WHERE driver_id = $1 AND status = 'cancelled'
     `;
-    const cancelledResult = await (pool as any).query(cancelledQuery, [driverId]);
+    const cancelledResult = await pool.query(cancelledQuery, [driverId]);
     const cancelledDeliveries = parseInt(cancelledResult.rows[0]?.cancelled_count || '0');
 
     // Récupérer les courses en attente de paiement (orders complétées avec paiement partiel/différé ou sans transaction complète)
@@ -2697,7 +2697,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         ORDER BY o.created_at DESC
         LIMIT 500
       `;
-      const allCompletedOrdersResult = await (pool as any).query(allCompletedOrdersQuery, [driverId]);
+      const allCompletedOrdersResult = await pool.query(allCompletedOrdersQuery, [driverId]);
 
       logger.info(`[getAdminDriverDetails] Récupéré ${allCompletedOrdersResult.rows.length} orders complétées pour driver ${driverId}`);
 
@@ -2724,7 +2724,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
           WHERE order_id = $1
           ORDER BY created_at DESC
         `;
-        const transactionsResult = await (pool as any).query(transactionsQuery, [orderId]);
+        const transactionsResult = await pool.query(transactionsQuery, [orderId]);
         const transactions = transactionsResult.rows || [];
 
         // Calculer le montant total payé
@@ -2849,7 +2849,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
         ORDER BY o.created_at DESC
         LIMIT 200
       `;
-      const recentOrdersResult = await (pool as any).query(recentOrdersQuery, [driverId]);
+      const recentOrdersResult = await pool.query(recentOrdersQuery, [driverId]);
 
       logger.info(`[getAdminDriverDetails] Récupéré ${recentOrdersResult.rows.length} orders pour l'historique du driver ${driverId}`);
 
@@ -2873,7 +2873,7 @@ export const getAdminDriverDetails = async (req: Request, res: Response): Promis
           WHERE order_id = $1
           ORDER BY created_at DESC
         `;
-        const transactionsResult = await (pool as any).query(allTransactionsQuery, [orderId]);
+        const transactionsResult = await pool.query(allTransactionsQuery, [orderId]);
         const transactions = transactionsResult.rows || [];
 
         // Calculer le montant total payé
@@ -3018,7 +3018,7 @@ export const updateAdminDriverStatus = async (req: Request, res: Response): Prom
     // Mettre à jour dans users (ajouter un champ is_active si nécessaire, ou utiliser un autre mécanisme)
     // Pour l'instant, on peut mettre à jour driver_profiles
     try {
-      await (pool as any).query(
+      await pool.query(
         `UPDATE driver_profiles SET is_online = $1, is_available = $1, updated_at = NOW() WHERE user_id = $2`,
         [isActive, driverId]
       );
@@ -3052,7 +3052,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
     }
 
     // Récupérer les infos utilisateur
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users
        WHERE id = $1 AND role = 'client'`,
@@ -3072,7 +3072,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -3093,7 +3093,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
       WHERE user_id = $3
     `;
 
-    const statsResult = await (pool as any).query(statsQuery, [
+    const statsResult = await pool.query(statsQuery, [
       startOfWeek.toISOString(),
       startOfMonth.toISOString(),
       clientId,
@@ -3105,14 +3105,14 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
     let averageRatingGiven = 0;
     let totalRatingsGiven = 0;
     try {
-      const ratingsTableCheck = await (pool as any).query(
+      const ratingsTableCheck = await pool.query(
         `SELECT EXISTS (
           SELECT 1 FROM information_schema.tables 
           WHERE table_schema = 'public' AND table_name = 'ratings'
         )`
       );
       if (ratingsTableCheck.rows[0]?.exists) {
-        const ratingResult = await (pool as any).query(
+        const ratingResult = await pool.query(
           `SELECT COALESCE(AVG(rating)::numeric, 0) as avg_rating, COUNT(*) as count 
            FROM ratings WHERE user_id = $1`,
           [clientId]
@@ -3129,7 +3129,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
     // Points de fidélité (si table existe)
     let loyaltyPoints = 0;
     try {
-      const loyaltyResult = await (pool as any).query(
+      const loyaltyResult = await pool.query(
         `SELECT loyalty_points FROM users WHERE id = $1`,
         [clientId]
       );
@@ -3172,7 +3172,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
         ORDER BY t.created_at DESC
       `;
 
-      const deferredResult = await (pool as any).query(deferredTransactionsQuery, [clientId]);
+      const deferredResult = await pool.query(deferredTransactionsQuery, [clientId]);
       const transactions = deferredResult.rows || [];
 
       // Calculer les totaux
@@ -3263,7 +3263,7 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -3283,7 +3283,7 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
       WHERE user_id = $3
     `;
 
-    const statsResult = await (pool as any).query(statsQuery, [
+    const statsResult = await pool.query(statsQuery, [
       startOfWeek.toISOString(),
       startOfMonth.toISOString(),
       clientId,
@@ -3294,14 +3294,14 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
     let averageRatingGiven = 0;
     let totalRatingsGiven = 0;
     try {
-      const ratingsTableCheck = await (pool as any).query(
+      const ratingsTableCheck = await pool.query(
         `SELECT EXISTS (
           SELECT 1 FROM information_schema.tables 
           WHERE table_schema = 'public' AND table_name = 'ratings'
         )`
       );
       if (ratingsTableCheck.rows[0]?.exists) {
-        const ratingResult = await (pool as any).query(
+        const ratingResult = await pool.query(
           `SELECT COALESCE(AVG(rating)::numeric, 0) as avg_rating, COUNT(*) as count 
            FROM ratings WHERE user_id = $1`,
           [clientId]
@@ -3317,7 +3317,7 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
 
     let loyaltyPoints = 0;
     try {
-      const loyaltyResult = await (pool as any).query(
+      const loyaltyResult = await pool.query(
         `SELECT loyalty_points FROM users WHERE id = $1`,
         [clientId]
       );
@@ -3373,7 +3373,7 @@ export const getAdminRatings = async (req: Request, res: Response): Promise<void
     }
 
     // Vérifier si la table ratings existe
-    const ratingsTableCheck = await (pool as any).query(
+    const ratingsTableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'ratings'
@@ -3446,8 +3446,8 @@ export const getAdminRatings = async (req: Request, res: Response): Promise<void
     query += ` ORDER BY r.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
-    const countResult = await (pool as any).query(countQuery, params.slice(0, -2));
+    const result = await pool.query(query, params);
+    const countResult = await pool.query(countQuery, params.slice(0, -2));
     const total = parseInt(countResult.rows[0]?.count || '0');
 
     res.json({
@@ -3480,7 +3480,7 @@ export const deleteAdminRating = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const ratingsTableCheck = await (pool as any).query(
+    const ratingsTableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'ratings'
@@ -3492,7 +3492,7 @@ export const deleteAdminRating = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const deleteResult = await (pool as any).query(`DELETE FROM ratings WHERE id = $1 RETURNING *`, [
+    const deleteResult = await pool.query(`DELETE FROM ratings WHERE id = $1 RETURNING *`, [
       ratingId,
     ]);
 
@@ -3524,7 +3524,7 @@ export const getAdminPromoCodes = async (req: Request, res: Response): Promise<v
     }
 
     // Vérifier si la table existe
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'promo_codes'
@@ -3536,7 +3536,7 @@ export const getAdminPromoCodes = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `SELECT * FROM promo_codes ORDER BY created_at DESC`
     );
 
@@ -3565,7 +3565,7 @@ export const createAdminPromoCode = async (req: Request, res: Response): Promise
     }
 
     // Vérifier si la table existe, sinon créer une structure simple
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'promo_codes'
@@ -3574,7 +3574,7 @@ export const createAdminPromoCode = async (req: Request, res: Response): Promise
 
     if (!tableCheck.rows[0]?.exists) {
       // Créer la table si elle n'existe pas
-      await (pool as any).query(`
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS promo_codes (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           code VARCHAR(50) UNIQUE NOT NULL,
@@ -3591,7 +3591,7 @@ export const createAdminPromoCode = async (req: Request, res: Response): Promise
       `);
     }
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `INSERT INTO promo_codes (code, discount_type, discount_value, max_uses, valid_from, valid_until, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
@@ -3630,7 +3630,7 @@ export const getAdminDisputes = async (req: Request, res: Response): Promise<voi
     }
 
     // Vérifier si la table existe
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'payment_disputes'
@@ -3672,8 +3672,8 @@ export const getAdminDisputes = async (req: Request, res: Response): Promise<voi
     query += ` ORDER BY d.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
-    const countResult = await (pool as any).query(countQuery, params.slice(0, -2));
+    const result = await pool.query(query, params);
+    const countResult = await pool.query(countQuery, params.slice(0, -2));
     const total = parseInt(countResult.rows[0]?.count || '0');
 
     res.json({
@@ -3707,7 +3707,7 @@ export const updateAdminDispute = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    const tableCheck = await (pool as any).query(
+    const tableCheck = await pool.query(
       `SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'payment_disputes'
@@ -3743,7 +3743,7 @@ export const updateAdminDispute = async (req: Request, res: Response): Promise<v
     updateFields.push(`updated_at = NOW()`);
     params.push(disputeId);
 
-    const result = await (pool as any).query(
+    const result = await pool.query(
       `UPDATE payment_disputes SET ${updateFields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
       params
     );
@@ -3778,7 +3778,7 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
     }
 
     // Récupérer les infos utilisateur
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users
        WHERE id = $1 AND (role = 'admin' OR role = 'super_admin')`,
@@ -3828,7 +3828,7 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
         LIMIT 50
       `;
 
-      const partialPaymentsResult = await (pool as any).query(partialPaymentsQuery);
+      const partialPaymentsResult = await pool.query(partialPaymentsQuery);
       clientsWithPartialPayments = partialPaymentsResult.rows.map((row: any) => ({
         clientId: row.client_id,
         firstName: row.first_name,
@@ -3931,7 +3931,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     }
 
     // Récupérer les informations du client
-    const clientResult = await (pool as any).query(
+    const clientResult = await pool.query(
       'SELECT id, email, phone, first_name, last_name, avatar_url FROM users WHERE id = $1 AND role = $2',
       [userId, 'client']
     );
@@ -4317,7 +4317,7 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
     logger.info(`🔧 [cancelAdminOrder] Tentative d'annulation de la commande ${orderId} par l'admin`);
 
     // Vérifier si la commande existe dans la base de données
-    const dbResult = await (pool as any).query(
+    const dbResult = await pool.query(
       'SELECT * FROM orders WHERE id = $1',
       [orderId]
     );
@@ -4344,7 +4344,7 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
     }
 
     // Mettre à jour le statut dans la base de données
-    await (pool as any).query(
+    await pool.query(
       'UPDATE orders SET status = $1, cancelled_at = NOW() WHERE id = $2',
       ['cancelled', orderId]
     );
@@ -4492,7 +4492,7 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
                dp.driver_type, dp.is_online, dp.is_available, dp.accepts_b2b_orders, cb.balance, cb.commission_rate, cb.is_suspended
                ORDER BY u.created_at DESC`;
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     // Calculer les statistiques
     const counts = {
@@ -4561,14 +4561,16 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
           has_balance: balance > 0, // Indique si le livreur a un solde
           total_deliveries: parseInt(row.total_deliveries || 0),
           completed_deliveries: parseInt(row.completed_deliveries || 0),
+          average_rating: null as number | null,
+          totalRatings: 0,
         };
       })
-      .filter((driver: any) => driver !== null);
+      .filter((driver) => driver !== null);
 
     // Récupérer les ratings pour chaque driver
     for (const driver of formatted) {
       try {
-        const ratingResult = await (pool as any).query(
+        const ratingResult = await pool.query(
           `SELECT AVG(rating) as avg_rating, COUNT(*) as total_ratings
            FROM ratings
            WHERE driver_id = $1`,
@@ -4618,7 +4620,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
     }
 
     // Récupérer les infos utilisateur
-    const userResult = await (pool as any).query(
+    const userResult = await pool.query(
       `SELECT id, email, phone, first_name, last_name, role, created_at, avatar_url
        FROM users
        WHERE id = $1 AND role = 'driver'`,
@@ -4635,7 +4637,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
     // Récupérer le profil driver
     let driverProfile: any = null;
     try {
-      const profileResult = await (pool as any).query(
+      const profileResult = await pool.query(
         `SELECT id, user_id, email, phone, first_name, last_name, vehicle_type, vehicle_plate, vehicle_model, vehicle_brand, vehicle_color, license_number, is_online, is_available, current_latitude, current_longitude, last_location_update, rating, total_deliveries, completed_deliveries, profile_image_url, created_at, updated_at, driver_type, heading_degrees, accepts_b2b_orders FROM driver_profiles WHERE user_id = $1`,
         [driverId]
       );
@@ -4650,7 +4652,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
     let commissionAccount: any = null;
     if (driverProfile?.driver_type === 'partner') {
       try {
-        const commissionResult = await (pool as any).query(
+        const commissionResult = await pool.query(
           `SELECT balance, commission_rate, is_suspended, updated_at
            FROM commission_balance
            WHERE driver_id = $1`,
@@ -4670,7 +4672,7 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
     }
 
     // Statistiques
-    const priceColumnsInfo = await (pool as any).query(
+    const priceColumnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns 
        WHERE table_schema = 'public' AND table_name = 'orders' 
        AND column_name = ANY($1)`,
@@ -4687,14 +4689,14 @@ export const getAdminDriverFullDetails = async (req: Request, res: Response): Pr
       WHERE driver_id = $1
     `;
 
-    const statsResult = await (pool as any).query(statsQuery, [driverId]);
+    const statsResult = await pool.query(statsQuery, [driverId]);
     const stats = statsResult.rows[0] || {};
 
     // Rating
     let averageRating: number | null = null;
     let totalRatings = 0;
     try {
-      const ratingResult = await (pool as any).query(
+      const ratingResult = await pool.query(
         `SELECT AVG(rating) as avg_rating, COUNT(*) as total_ratings
          FROM ratings
          WHERE driver_id = $1`,
@@ -4754,7 +4756,7 @@ export const rechargeAdminDriverCommission = async (req: Request, res: Response)
     }
 
     // Vérifier que c'est un livreur partenaire
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
       [driverId]
     );
@@ -4776,7 +4778,7 @@ export const rechargeAdminDriverCommission = async (req: Request, res: Response)
     }
 
     // Recharger le compte
-    const rechargeResult = await (pool as any).query(
+    const rechargeResult = await pool.query(
       `SELECT recharge_commission_balance(
         $1, -- driver_id
         $2, -- amount
@@ -4820,7 +4822,7 @@ export const suspendAdminDriverCommission = async (req: Request, res: Response):
     logger.info('🚀 [suspendAdminDriverCommission] DÉBUT', { driverId, is_suspended });
 
     // Vérifier que c'est un livreur partenaire
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
       [driverId]
     );
@@ -4842,7 +4844,7 @@ export const suspendAdminDriverCommission = async (req: Request, res: Response):
     }
 
     // Mettre à jour le statut
-    await (pool as any).query(
+    await pool.query(
       `UPDATE commission_balance
        SET is_suspended = $1,
            suspended_at = CASE WHEN $1 = true THEN NOW() ELSE NULL END,
@@ -4887,7 +4889,7 @@ export const updateAdminDriverCommissionRate = async (req: Request, res: Respons
     }
 
     // Vérifier que c'est un livreur partenaire
-    const driverCheck = await (pool as any).query(
+    const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`,
       [driverId]
     );
@@ -4909,7 +4911,7 @@ export const updateAdminDriverCommissionRate = async (req: Request, res: Respons
     }
 
     // Mettre à jour le taux
-    await (pool as any).query(
+    await pool.query(
       `UPDATE commission_balance
        SET commission_rate = $1,
            updated_at = NOW()
@@ -4987,7 +4989,7 @@ export const getAdminDriverCommissionTransactions = async (req: Request, res: Re
     query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
-    const result = await (pool as any).query(query, params);
+    const result = await pool.query(query, params);
 
     const transactions = result.rows.map((tx: any) => ({
       id: tx.id,
