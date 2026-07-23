@@ -10,7 +10,7 @@ export function isDriverValid(driver: OnlineDriver): boolean {
     return false
   }
 
-  if (!driver.updated_at) {
+  if (!driver.updated_at)  {
     return false
   }
 
