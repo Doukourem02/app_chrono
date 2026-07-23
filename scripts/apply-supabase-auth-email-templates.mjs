@@ -48,8 +48,8 @@ function projectRefFromUrl(url) {
 }
 
 async function main() {
-  await loadEnvFile('chrono_backend/.env');
-  await loadEnvFile('admin_chrono/.env.local');
+  await loadEnvFile('krono_backend/.env');
+  await loadEnvFile('admin_krono/.env.local');
 
   const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
   const projectRef =

@@ -1,0 +1,257 @@
+/**
+ * Enregistrement du token Expo Push sur l’API (app livreur).
+ * Aligné sur app_krono/services/clientPushService.ts
+ */
+import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
+import { AppState, Platform } from "react-native";
+import { router } from "expo-router";
+import { config } from "../config";
+import { logger } from "../utils/logger";
+import { apiFetch } from "../utils/apiFetch";
+import { apiService } from "./apiService";
+
+let handlerConfigured = false;
+let coldStartNotificationHandled = false;
+
+function asPushString(v: unknown): string | undefined {
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return undefined;
+}
+
+/** Payload `data` des notifs Expo livreur (ex. message commande). */
+export function navigateFromDriverPushPayload(
+  data: Record<string, unknown> | undefined | null
+): void {
+  if (!data || typeof data !== "object") return;
+  const type = asPushString(data.type);
+  const conversationId = asPushString(data.conversationId);
+  const orderId = asPushString(data.orderId);
+
+  if (type === "order_chat_message" && conversationId) {
+    router.push(`/messages/${encodeURIComponent(conversationId)}` as any);
+    return;
+  }
+  if (type === "order_chat_message" && orderId) {
+    router.push(`/(tabs)` as any);
+    logger.warn(
+      "notification push: conversationId manquant — redirection accueil",
+      "driverPush",
+      { orderIdPrefix: orderId.slice(0, 8) }
+    );
+    return;
+  }
+  if (type === "batch_assigned") {
+    const batchId = asPushString(data.batchId);
+    if (batchId) {
+      router.push(`/batch/${batchId}` as any);
+    }
+  }
+}
+
+async function waitForIosPushKeychainReady(): Promise<void> {
+  if (Platform.OS !== "ios") return;
+  await new Promise<void>((resolve) => {
+    const finish = () => setTimeout(resolve, 500);
+    if (AppState.currentState === "active") {
+      finish();
+      return;
+    }
+    const timeout = setTimeout(() => {
+      sub.remove();
+      finish();
+    }, 12000);
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") {
+        clearTimeout(timeout);
+        sub.remove();
+        finish();
+      }
+    });
+  });
+}
+
+export function processDriverPushColdStartNavigation(): void {
+  if (coldStartNotificationHandled) return;
+  coldStartNotificationHandled = true;
+  void Notifications.getLastNotificationResponseAsync()
+    .then((response) => {
+      if (!response) return;
+      const data = response.notification.request.content
+        .data as Record<string, unknown>;
+      navigateFromDriverPushPayload(data);
+    })
+    .catch((e) => {
+      logger.warn("getLastNotificationResponseAsync (non bloquant)", "driverPush", e);
+    });
+}
+
+function ensureNotificationHandler(): void {
+  if (handlerConfigured) return;
+  handlerConfigured = true;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
+
+async function registerTokenWithBackend(expoPushToken: string): Promise<boolean> {
+  const { token } = await apiService.ensureAccessToken();
+  if (!token) {
+    logger.warn("registerPush: pas de JWT", "driverPush");
+    return false;
+  }
+  const platform = Platform.OS === "ios" ? "ios" : "android";
+  const response = await apiFetch(`${config.apiUrl}/api/push/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      expoPushToken,
+      platform,
+      app: "driver",
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    let errCode: string | undefined;
+    try {
+      const j = JSON.parse(text) as { errCode?: string; message?: string };
+      errCode = j.errCode;
+    } catch {
+      /* ignore */
+    }
+    logger.warn("registerPush: HTTP non OK — aucune ligne créée dans push_tokens", "driverPush", {
+      status: response.status,
+      errCode,
+      body: text.slice(0, 300),
+    });
+    return false;
+  }
+  return true;
+}
+
+export async function unregisterDriverPushNotifications(): Promise<void> {
+  if (Platform.OS === "web") return;
+
+  const { token } = await apiService.ensureAccessToken();
+  if (!token) return;
+
+  const projectId =
+    (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
+      ?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId || typeof projectId !== "string") return;
+
+  try {
+    const push = await Notifications.getExpoPushTokenAsync({ projectId });
+    await apiFetch(`${config.apiUrl}/api/push/register`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        app: "driver",
+        expoPushToken: push.data,
+      }),
+    });
+  } catch (e) {
+    logger.warn("unregisterPush: échec non bloquant", "driverPush", e);
+  }
+}
+
+/**
+ * Permission + envoi du token à POST /api/push/register (après connexion).
+ */
+export async function initializeDriverPushNotifications(_userId: string): Promise<void> {
+  if (Platform.OS === "web") return;
+
+  try {
+    await waitForIosPushKeychainReady();
+
+    ensureNotificationHandler();
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "Krono pro",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        sound: "default",
+      });
+    }
+
+    let existing: Notifications.PermissionStatus;
+    try {
+      const perm = await Notifications.getPermissionsAsync();
+      existing = perm.status;
+    } catch (e) {
+      logger.warn("getPermissionsAsync (notifications) — Keychain / timing iOS ?", "driverPush", e);
+      return;
+    }
+    let finalStatus = existing;
+    if (existing !== "granted") {
+      try {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      } catch (e) {
+        logger.warn("requestPermissionsAsync (notifications)", "driverPush", e);
+        return;
+      }
+    }
+    if (finalStatus !== "granted") {
+      logger.warn("Notifications refusées par l’utilisateur", "driverPush");
+      return;
+    }
+
+    const projectId =
+      (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
+        ?.projectId ?? Constants.easConfig?.projectId;
+
+    if (!projectId || typeof projectId !== "string") {
+      logger.warn("EAS projectId manquant (extra.eas.projectId) — token push impossible", "driverPush");
+      return;
+    }
+
+    try {
+      const push = await Notifications.getExpoPushTokenAsync({ projectId });
+      const saved = await registerTokenWithBackend(push.data);
+      if (saved) {
+        logger.info("Token push livreur enregistré côté API", "driverPush", { platform: Platform.OS });
+      }
+    } catch (e) {
+      logger.warn(
+        "getExpoPushTokenAsync ou register échoué (Android : FCM sur expo.dev — voir docs/krono-reference-unique.md)",
+        "driverPush",
+        e
+      );
+    }
+  } catch (e) {
+    logger.warn("initializeDriverPushNotifications (non bloquant)", "driverPush", e);
+  }
+}
+
+export function setupDriverPushListeners(onRefresh: () => void): () => void {
+  ensureNotificationHandler();
+
+  const sub1 = Notifications.addNotificationReceivedListener(() => {
+    onRefresh();
+  });
+  const sub2 = Notifications.addNotificationResponseReceivedListener((response) => {
+    const data = response.notification.request.content
+      .data as Record<string, unknown>;
+    navigateFromDriverPushPayload(data);
+    onRefresh();
+  });
+
+  return () => {
+    sub1.remove();
+    sub2.remove();
+  };
+}

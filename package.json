@@ -1,5 +1,5 @@
 {
-  "name": "projet-chrono",
+  "name": "projet-krono",
   "private": true,
   "scripts": {
     "check:prod": "node scripts/check-prod-readiness.js",
@@ -7,6 +7,6 @@
     "set-local-ip": "node scripts/set-local-ip.js",
     "update-ip": "node scripts/set-local-ip.js",
     "supabase:auth-emails": "node scripts/apply-supabase-auth-email-templates.mjs",
-    "eas:ios": "cd app_chrono && eas build --platform ios --profile production"
+    "eas:ios": "cd app_krono && eas build --platform ios --profile production"
   }
 }

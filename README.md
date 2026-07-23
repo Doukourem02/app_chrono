@@ -2,17 +2,17 @@
 
 Plateforme de livraison en temps réel connectant clients, chauffeurs **et administrateurs**. Ce dépôt rassemble :
 
-- `chrono_backend/` → API REST + Socket.IO
-- `admin_chrono/` → Dashboard web (Next.js 16 / React 19)
-- `app_chrono/` → App mobile client (Expo / React Native)
-- `driver_chrono/` → App mobile chauffeur (Expo / React Native)
+- `krono_backend/` → API REST + Socket.IO
+- `admin_krono/` → Dashboard web (Next.js 16 / React 19)
+- `app_krono/` → App mobile client (Expo / React Native)
+- `driver_krono/` → App mobile chauffeur (Expo / React Native)
 
 ```
 PROJET_KRONO/
-├── chrono_backend/
-├── admin_chrono/
-├── app_chrono/
-├── driver_chrono/
+├── krono_backend/
+├── admin_krono/
+├── app_krono/
+├── driver_krono/
 ├── docs/                 # Docs vivants : actions + référence projet
 ├── supabase/             # SQL / RLS (selon usage)
 ├── scripts/              # IP locale, utilitaires repo
@@ -39,10 +39,10 @@ PROJET_KRONO/
 
 | Composant         | Stack                                     | Description                                              |
 | ----------------- | ----------------------------------------- | -------------------------------------------------------- |
-| `chrono_backend/` | Node.js + Express + Socket.IO             | API REST, WebSocket, migrations SQL                      |
-| `admin_chrono/`   | Next.js 16, React Query, Socket.IO client | Dashboard ops/admin + portail partenaire B2B             |
-| `app_chrono/`     | Expo, React Native, Expo Router           | Application client (commande / tracking)                 |
-| `driver_chrono/`  | Expo, React Native                        | Application chauffeur (livraisons, revenus, gamification)|
+| `krono_backend/` | Node.js + Express + Socket.IO             | API REST, WebSocket, migrations SQL                      |
+| `admin_krono/`   | Next.js 16, React Query, Socket.IO client | Dashboard ops/admin + portail partenaire B2B             |
+| `app_krono/`     | Expo, React Native, Expo Router           | Application client (commande / tracking)                 |
+| `driver_krono/`  | Expo, React Native                        | Application chauffeur (livraisons, revenus, gamification)|
 
 ---
 
@@ -55,7 +55,7 @@ PROJET_KRONO/
 - Expo CLI (pour les apps mobiles)
 - **Mapbox** : token **pk.** pour admin (`NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`) et apps (`EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN`) — voir section [Mapbox](#mapbox-configuration)
 - Compte **Supabase** (recommandé)
-- **OTP SMS** : compte **Twilio** (principal dans le backend) ou **Vonage** (alternative) — variables dans `chrono_backend/.env.example`
+- **OTP SMS** : compte **Twilio** (principal dans le backend) ou **Vonage** (alternative) — variables dans `krono_backend/.env.example`
 
 ---
 
@@ -66,14 +66,14 @@ git clone <repo>
 cd PROJET_KRONO
 
 # Backend
-cd chrono_backend && npm install && cd -
+cd krono_backend && npm install && cd -
 
 # Dashboard admin
-cd admin_chrono && npm install && cd -
+cd admin_krono && npm install && cd -
 
 # Apps mobiles
-cd app_chrono && npm install && cd -
-cd driver_chrono && npm install && cd -
+cd app_krono && npm install && cd -
+cd driver_krono && npm install && cd -
 ```
 
 ---
@@ -86,16 +86,16 @@ cd driver_chrono && npm install && cd -
 2. Copiez les fichiers `.env.example` de chaque app.
 3. Appliquez les migrations :
    ```bash
-   cd chrono_backend/migrations
+   cd krono_backend/migrations
    # suivre le README local pour l'ordre exact
    ```
 
 ### 2. Variables d’environnement
 
-#### Backend (`chrono_backend/.env`)
+#### Backend (`krono_backend/.env`)
 
 ```bash
-cp chrono_backend/.env.example chrono_backend/.env
+cp krono_backend/.env.example krono_backend/.env
 ```
 
 Variables clés :
@@ -109,10 +109,10 @@ Variables clés :
 - `VONAGE_*` — (Optionnel) SMS alternatif si pas Twilio
 - `SENTRY_DSN` - (Optionnel) Monitoring d'erreurs Sentry
 
-#### Dashboard admin (`admin_chrono/.env.local`)
+#### Dashboard admin (`admin_krono/.env.local`)
 
 ```bash
-cp admin_chrono/.env.local.example admin_chrono/.env.local
+cp admin_krono/.env.local.example admin_krono/.env.local
 ```
 
 Variables clés :
@@ -124,11 +124,11 @@ Variables clés :
 
 **Important :** Le CSP (Content Security Policy) est configuré automatiquement dans `next.config.ts` pour autoriser l'URL définie dans `NEXT_PUBLIC_API_URL`. Redémarrez le serveur après modification.
 
-#### Apps mobiles (`app_chrono/.env`, `driver_chrono/.env`)
+#### Apps mobiles (`app_krono/.env`, `driver_krono/.env`)
 
 ```bash
-cp app_chrono/.env.example app_chrono/.env
-cp driver_chrono/.env.example driver_chrono/.env
+cp app_krono/.env.example app_krono/.env
+cp driver_krono/.env.example driver_krono/.env
 ```
 
 Variables clés :
@@ -146,20 +146,20 @@ Variables clés :
 
 ```bash
 # Backend
-cd chrono_backend
+cd krono_backend
 npm run dev          # http://localhost:4000
 # Documentation API Swagger : http://localhost:4000/api-docs
 
 # Dashboard admin
-cd admin_chrono
+cd admin_krono
 npm run dev -- --hostname 0.0.0.0 --port 3000
 # http://localhost:3000/dashboard
 
 # App client
-cd app_chrono && npm start   # ou npx expo start
+cd app_krono && npm start   # ou npx expo start
 
 # App chauffeur
-cd driver_chrono && npm start   # ou npx expo start
+cd driver_krono && npm start   # ou npx expo start
 ```
 
 Expo propose ensuite `i` (iOS), `a` (Android), ou QR code via Expo Go.
@@ -168,10 +168,10 @@ Expo propose ensuite `i` (iOS), `a` (Android), ou QR code via Expo Go.
 
 ## 📁 Structure du projet
 
-### Backend (`chrono_backend/`)
+### Backend (`krono_backend/`)
 
 ```
-chrono_backend/
+krono_backend/
 ├── src/
 │   ├── controllers/   # Auth, deliveries, drivers, admin…
 │   ├── routes/        # Routes Express
@@ -185,10 +185,10 @@ chrono_backend/
 └── logs/
 ```
 
-### Dashboard admin (`admin_chrono/`)
+### Dashboard admin (`admin_krono/`)
 
 ```
-admin_chrono/
+admin_krono/
 ├── app/                 # App Router (pages / api routes)
 ├── components/          # KPI cards, tables, tracker, etc.
 ├── hooks/               # useRealTimeTracking, useSocketConnection…
@@ -198,10 +198,10 @@ admin_chrono/
 └── utils/               # formatDeliveryId, debug helpers
 ```
 
-### Apps Expo (`app_chrono/` & `driver_chrono/`)
+### Apps Expo (`app_krono/` & `driver_krono/`)
 
 ```
-app_chrono/
+app_krono/
 ├── app/ (Expo Router)
 ├── components/
 ├── hooks/
@@ -211,7 +211,7 @@ app_chrono/
 └── types/
 ```
 
-`driver_chrono/` reprend la même organisation adaptée au flux chauffeur.
+`driver_krono/` reprend la même organisation adaptée au flux chauffeur.
 
 ---
 
@@ -463,7 +463,7 @@ Routes dédiées au tableau de bord partenaire (accès restreint par JWT partena
 - **Cache:** Redis (optionnel)
 - **Sécurité:** Helmet, CORS, Rate Limiting, Brute Force Protection
 
-### Dashboard (`admin_chrono`)
+### Dashboard (`admin_krono`)
 
 - **Framework:** Next.js 16 (App Router) + React 19
 - **State Management:** React Query (TanStack Query) + Zustand
@@ -485,7 +485,7 @@ Routes dédiées au tableau de bord partenaire (accès restreint par JWT partena
 - **State Management:** Zustand
 - **WebSocket:** Socket.IO client
 - **Cartes:** `@rnmapbox/maps` (Mapbox)
-- **Scanner:** Expo Barcode Scanner (nécessite développement build pour `driver_chrono`)
+- **Scanner:** Expo Barcode Scanner (nécessite développement build pour `driver_krono`)
 - **Localisation:** Expo Location
 - **Monitoring:** Sentry React Native
 - **Stockage:** AsyncStorage
@@ -531,7 +531,7 @@ npm run update-ip        # Mettre à jour l'IP dans .env
 
 ## ✨ Fonctionnalités principales
 
-### Dashboard Admin (`admin_chrono`)
+### Dashboard Admin (`admin_krono`)
 
 - 📊 **Tableau de bord** (`/dashboard`) - KPIs, revenus et livraisons en temps réel
 - 🗺️ **Tracking live** (`/tracking`) - Suivi des chauffeurs et livraisons en cours sur carte Mapbox
@@ -539,7 +539,7 @@ npm run update-ip        # Mettre à jour l'IP dans .env
 - 👥 **Gestion des utilisateurs** :
   - `/users` - Vue globale (clients, livreurs, admins) — création, modification, recherche par nom/email/téléphone
   - `/drivers` - Vue opérationnelle des livreurs : badge Partenaire/Interne, solde commission (alertes vert/orange/rouge), statut Actif/Suspendu, recharge et suspension, rafraîchissement automatique toutes les 30 s
-  - Voir `admin_chrono/docs/DIFFERENCE_USERS_VS_DRIVERS.md` pour le détail
+  - Voir `admin_krono/docs/DIFFERENCE_USERS_VS_DRIVERS.md` pour le détail
 - 🤝 **Portail partenaires** (`/partners`) - Gestion des partenaires B2B, abonnements, chauffeurs affiliés, factures, quota d'usage
 - 🚗 **Flotte** (`/maintenance`) - Véhicules, carburant, maintenance, documents réglementaires, suivi financier et kilométrique
 - 📈 **Analytics** (`/analytics`) - KPIs temps réel, données de performance, export
@@ -556,7 +556,7 @@ npm run update-ip        # Mettre à jour l'IP dans .env
 - ⚙️ **Paramètres** (`/settings`) - Configuration système
 - 👤 **Profil** (`/profile`) - Gestion du profil admin
 
-### App Client (`app_chrono`)
+### App Client (`app_krono`)
 
 - 📦 **Création de commandes** de livraison avec géolocalisation automatique
 - 🗺️ **Suivi en temps réel** de la livraison sur carte interactive
@@ -574,7 +574,7 @@ npm run update-ip        # Mettre à jour l'IP dans .env
 - 🔔 **Notifications** en temps réel
 - 📊 **Statistiques personnelles** (commandes, dépenses)
 
-### App Driver (`driver_chrono`)
+### App Driver (`driver_krono`)
 
 - 📱 **Acceptation/refus de commandes** avec notifications en temps réel
 - 🗺️ **Navigation** avec carte interactive et calcul d'ETA
@@ -620,28 +620,28 @@ npm run update-ip        # Mettre à jour l'IP dans .env
 
 | Paquet | Framework | Commande | Couverture |
 |--------|-----------|----------|------------|
-| `chrono_backend` | Jest (unit + intégration) | `npm test` | ~14 % (seuil configuré, CI obligatoire) |
-| `admin_chrono` | Vitest | `npm test` | utils purs (phone, ETA, formatId, statuts) |
-| `app_chrono` | — | — | pas encore de tests unitaires |
-| `driver_chrono` | — | — | pas encore de tests unitaires |
+| `krono_backend` | Jest (unit + intégration) | `npm test` | ~14 % (seuil configuré, CI obligatoire) |
+| `admin_krono` | Vitest | `npm test` | utils purs (phone, ETA, formatId, statuts) |
+| `app_krono` | — | — | pas encore de tests unitaires |
+| `driver_krono` | — | — | pas encore de tests unitaires |
 
 ### Lancer les tests
 
 ```bash
 # Backend (unit + intégration, coverage)
-cd chrono_backend
+cd krono_backend
 npm test                 # tous les tests
 npm run test:coverage    # avec rapport de couverture
 npm run test:unit        # tests unitaires seulement
 npm run test:integration # tests d'intégration seulement
 
 # Dashboard admin
-cd admin_chrono
+cd admin_krono
 npm test                 # 35 tests Vitest sur les utilitaires
 
 # Apps Expo (lint uniquement pour l'instant)
-cd app_chrono && npm run lint
-cd driver_chrono && npm run lint
+cd app_krono && npm run lint
+cd driver_krono && npm run lint
 ```
 
 ### Pipeline CI (`.github/workflows/ci.yml`)
@@ -652,9 +652,9 @@ cd driver_chrono && npm run lint
 | Backend — Lint & TypeScript | push/PR | oui |
 | Security Scan (audit + TruffleHog) | push/PR | oui |
 | Admin — Lint, TypeScript & Build | push/PR | oui |
-| Expo — Lint (app_chrono, driver_chrono) | push/PR | oui |
+| Expo — Lint (app_krono, driver_krono) | push/PR | oui |
 
-> **Note sécurité :** `jsPDF` et `xlsx` dans `admin_chrono` ont des vulnérabilités sans correctif disponible (pas de version patchée publiée). Ils sont tracés et l'audit CI passe en mode informatif pour ces dépendances.
+> **Note sécurité :** `jsPDF` et `xlsx` dans `admin_krono` ont des vulnérabilités sans correctif disponible (pas de version patchée publiée). Ils sont tracés et l'audit CI passe en mode informatif pour ces dépendances.
 
 ### Procédure nouveau développeur
 
@@ -663,21 +663,21 @@ git clone <repo>
 cd PROJET_KRONO
 
 # 1. Backend
-cd chrono_backend
+cd krono_backend
 cp .env.example .env        # remplir DATABASE_URL, SUPABASE_*, JWT_SECRET, TWILIO_*
 npm install
-# Appliquer les migrations (voir chrono_backend/migrations/README.md pour l'ordre)
+# Appliquer les migrations (voir krono_backend/migrations/README.md pour l'ordre)
 npm run dev                  # http://localhost:4000
 
 # 2. Admin
-cd ../admin_chrono
+cd ../admin_krono
 cp .env.local.example .env.local  # remplir NEXT_PUBLIC_API_URL, SUPABASE_*, MAPBOX_TOKEN
 npm install
 npm run dev                  # http://localhost:3000
 
 # 3. Apps mobiles
-cd ../app_chrono && cp .env.example .env && npm install
-cd ../driver_chrono && cp .env.example .env && npm install
+cd ../app_krono && cp .env.example .env && npm install
+cd ../driver_krono && cp .env.example .env && npm install
 npx expo start               # scanner QR avec Expo Go ou npm run android/ios
 ```
 
@@ -690,13 +690,13 @@ npx expo start               # scanner QR avec Expo Go ou npm run android/ios
 | WebSocket indisponible                   | Vérifier backend, `*_SOCKET_URL`, CORS                                                                   |
 | DB inaccessible                          | Migrations exécutées ? `DATABASE_URL` correct ?                                                          |
 | Carte vide                               | Vérifier `MAPBOX_ACCESS_TOKEN` / `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN`                                       |
-| Dashboard boucle de fetch                | Tenir compte des instructions dans `admin_chrono/README` local (filtres de dates, query keys stabilisés) |
-| **Erreur CSP (Content Security Policy)** | Voir [Configuration CSP](#configuration-csp-pour-admin_chrono)                                           |
+| Dashboard boucle de fetch                | Tenir compte des instructions dans `admin_krono/README` local (filtres de dates, query keys stabilisés) |
+| **Erreur CSP (Content Security Policy)** | Voir [Configuration CSP](#configuration-csp-pour-admin_krono)                                           |
 | **Scanner QR code ne fonctionne pas**    | Nécessite un développement build (voir [Apps mobiles](#apps-mobiles))                                    |
 | **Crash lors de la 2ème commande**       | Vérifier que le backend est à jour avec les dernières corrections                                        |
 | **Erreur "aucun userId"**                | L'utilisateur doit être connecté avant de créer une commande                                             |
 
-### Configuration CSP pour `admin_chrono`
+### Configuration CSP pour `admin_krono`
 
 Le dashboard admin utilise Content Security Policy (CSP) pour la sécurité. Si vous voyez des erreurs CSP bloquant les connexions au backend :
 
@@ -714,20 +714,20 @@ Les cartes utilisent Mapbox. Configurez `MAPBOX_ACCESS_TOKEN` (backend) et `EXPO
 
 Certaines fonctionnalités nécessitent un **développement build** (pas Expo Go) :
 
-- **Scanner QR code** (`expo-barcode-scanner`) dans `driver_chrono`
+- **Scanner QR code** (`expo-barcode-scanner`) dans `driver_krono`
 
 Pour créer un développement build :
 
 ```bash
 # iOS
-cd driver_chrono
+cd driver_krono
 npx expo run:ios
 
 # Android
 npx expo run:android
 ```
 
-**Guide complet :** Voir `driver_chrono/docs/TROUBLESHOOTING.md`
+**Guide complet :** Voir `driver_krono/docs/TROUBLESHOOTING.md`
 
 ---
 
@@ -737,16 +737,16 @@ npx expo run:android
 
 - **Référence projet** (priorités validées, Live Activity, Android ongoing, prod, app mature) : `docs/krono-reference-unique.md`
 - **Référence projet** (carte fichiers, décisions produit, push, prod, pricing, paiements / QR, PSP) : `docs/krono-reference-unique.md`
-- **Variables** : fichiers `.env.example` à la racine de chaque package (`chrono_backend`, `admin_chrono`, `app_chrono`, `driver_chrono`)
+- **Variables** : fichiers `.env.example` à la racine de chaque package (`krono_backend`, `admin_krono`, `app_krono`, `driver_krono`)
 
-- **Scaling et production** : `chrono_backend/docs/SCALING_SETUP.md`
+- **Scaling et production** : `krono_backend/docs/SCALING_SETUP.md`
   - Configuration Redis Adapter pour Socket.IO
   - Configuration PostgreSQL Pool
   - Tests et vérification
 
 ### Guides de dépannage
 
-- **Scanner QR Code (Driver)** : `driver_chrono/docs/TROUBLESHOOTING.md`
+- **Scanner QR Code (Driver)** : `driver_krono/docs/TROUBLESHOOTING.md`
   - Configuration du développement build
   - Résolution des erreurs de modules natifs
   - Problèmes courants avec Expo
@@ -757,13 +757,13 @@ npx expo run:android
 PROJET_KRONO/
 ├── docs/
 │   └── krono-reference-unique.md      # Référence projet, contrat produit, décisions
-├── admin_chrono/docs/
+├── admin_krono/docs/
 │   ├── DIFFERENCE_USERS_VS_DRIVERS.md  # Différence entre /users et /drivers
 │   ├── NOTIFICATIONS_BEHAVIOR.md       # Comportement des notifications
 │   └── PROPOSITION_GESTION_LIVREURS_PARTENAIRES.md
-├── driver_chrono/docs/
+├── driver_krono/docs/
 │   └── TROUBLESHOOTING.md              # Dépannage app chauffeur
-└── chrono_backend/docs/
+└── krono_backend/docs/
     ├── SCALING_SETUP.md                # Configuration Redis et PostgreSQL Pool
     ├── BACKUP_RECOVERY.md              # Backup et restauration
     └── SWAGGER_ADDITIONS.md            # Documentation Swagger

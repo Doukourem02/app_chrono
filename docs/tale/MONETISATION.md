@@ -56,7 +56,7 @@ Décision importante : un livreur peut générer du chiffre d'affaires pour Kron
 
 ## 2. Grille tarifaire de base
 
-Source : `chrono_backend/src/services/priceCalculator.ts`
+Source : `krono_backend/src/services/priceCalculator.ts`
 
 Seule la **moto** est active en production. Véhicule et cargo sont désactivés.
 
@@ -106,7 +106,7 @@ Si aucun ID n'est passé, le **défaut** s'applique automatiquement.
 
 ## 4. Tarification dynamique (niveau C)
 
-Source : `chrono_backend/src/services/dynamicPricing.ts`
+Source : `krono_backend/src/services/dynamicPricing.ts`
 
 Le prix de base est multiplié par un **facteur contextuel combiné**, plafonné à **×1.85**.
 
@@ -128,7 +128,7 @@ subtotalBeforeContext = lineSubtotal + timePremium
 
 ### 4.2 Facteur météo
 
-Source : `chrono_backend/src/services/openMeteoPricing.ts`
+Source : `krono_backend/src/services/openMeteoPricing.ts`
 
 Interroge l'API **Open-Meteo** (sans clé, gratuite) en temps réel aux coordonnées du pickup.
 
@@ -146,7 +146,7 @@ En cas d'échec API (timeout 2.2 s, réseau) : facteur = **1** (pas de majoratio
 
 ### 4.3 Facteur surge (forte demande)
 
-Source : `chrono_backend/src/services/surgePricing.ts`
+Source : `krono_backend/src/services/surgePricing.ts`
 
 Basé sur la tension live : **commandes en attente / livreurs connectés** (données socket temps réel).
 
@@ -201,7 +201,7 @@ Le plafond **×1.85** protège le client d'une addition trop élevée en cas de 
 
 ## 5. Supplément B2B
 
-Source : `chrono_backend/src/services/dynamicPricing.ts`
+Source : `krono_backend/src/services/dynamicPricing.ts`
 
 Toute commande passée via un partenaire (`partner_id` présent) est considérée **B2B prioritaire** et bénéficie de services supplémentaires (QR code de livraison, portail partenaire, notification prioritaire des livreurs, etc.).
 
@@ -233,7 +233,7 @@ Soit environ **+23% par rapport au B2C** en conditions normales.
 
 ## 6. Commission partenaire B2B
 
-Source : `chrono_backend/src/services/b2bCommissionService.ts`
+Source : `krono_backend/src/services/b2bCommissionService.ts`
 
 La commission est calculée **après** le prix dynamique et ajoutée au `finalPrice` retourné au partenaire. Elle est propre à chaque partenaire et à son plan d'abonnement.
 
@@ -348,8 +348,8 @@ Point de cohérence produit : le backend actuel applique Starter **3%**, Pro **2
 ## 7. Rémunération des livreurs
 
 Sources actuelles :
-- `chrono_backend/src/services/commissionService.ts` pour le modèle livreur externe prépayé
-- `chrono_backend/src/controllers/driverController.ts` et `driver_chrono/app/(tabs)/revenus.tsx` pour l'affichage des gains
+- `krono_backend/src/services/commissionService.ts` pour le modèle livreur externe prépayé
+- `krono_backend/src/controllers/driverController.ts` et `driver_krono/app/(tabs)/revenus.tsx` pour l'affichage des gains
 - modèle moto Krono : **décision produit à implémenter** (pas encore persistée comme gain net réel)
 
 ### 7.1 Principe : revenu Krono ≠ gain livreur
@@ -719,14 +719,14 @@ Le modèle final est cohérent si Krono garde ces règles :
 
 | Fichier | Rôle |
 |---|---|
-| `chrono_backend/src/services/priceCalculator.ts` | Grille de base, forfaits, calcul `lineSubtotal` |
-| `chrono_backend/src/services/dynamicPricing.ts` | Facteurs contextuels, supplément B2B, formule finale |
-| `chrono_backend/src/services/openMeteoPricing.ts` | Facteur météo (API Open-Meteo) |
-| `chrono_backend/src/services/surgePricing.ts` | Facteur surge (tension live socket) |
-| `chrono_backend/src/services/b2bCommissionService.ts` | Commission partenaire B2B, gestion quota |
-| `chrono_backend/src/services/commissionService.ts` | Commission livreur partenaire (solde prépayé) |
-| `chrono_backend/src/controllers/driverController.ts` | Statistiques/gains livreur actuels (à faire évoluer vers gains nets) |
-| `chrono_backend/src/controllers/orderRecordController.ts` | Orchestration complète : calcul + création commande |
+| `krono_backend/src/services/priceCalculator.ts` | Grille de base, forfaits, calcul `lineSubtotal` |
+| `krono_backend/src/services/dynamicPricing.ts` | Facteurs contextuels, supplément B2B, formule finale |
+| `krono_backend/src/services/openMeteoPricing.ts` | Facteur météo (API Open-Meteo) |
+| `krono_backend/src/services/surgePricing.ts` | Facteur surge (tension live socket) |
+| `krono_backend/src/services/b2bCommissionService.ts` | Commission partenaire B2B, gestion quota |
+| `krono_backend/src/services/commissionService.ts` | Commission livreur partenaire (solde prépayé) |
+| `krono_backend/src/controllers/driverController.ts` | Statistiques/gains livreur actuels (à faire évoluer vers gains nets) |
+| `krono_backend/src/controllers/orderRecordController.ts` | Orchestration complète : calcul + création commande |
 
 ---
 

@@ -93,29 +93,29 @@ function main() {
 
   const updated = [];
 
-  // driver_chrono
-  const driverEnv = path.join(PROJECT_ROOT, 'driver_chrono', '.env');
+  // driver_krono
+  const driverEnv = path.join(PROJECT_ROOT, 'driver_krono', '.env');
   if (updateEnvFile(driverEnv, {
     EXPO_PUBLIC_API_URL: apiUrl,
     EXPO_PUBLIC_SOCKET_URL: apiUrl,
   })) {
-    updated.push('driver_chrono/.env');
+    updated.push('driver_krono/.env');
   }
 
-  // app_chrono
-  const appEnv = path.join(PROJECT_ROOT, 'app_chrono', '.env');
+  // app_krono
+  const appEnv = path.join(PROJECT_ROOT, 'app_krono', '.env');
   if (updateEnvFile(appEnv, {
     EXPO_PUBLIC_API_URL: apiUrl,
     EXPO_PUBLIC_SOCKET_URL: apiUrl,
     EXPO_PUBLIC_TRACK_BASE_URL: adminUrl,
   })) {
-    updated.push('app_chrono/.env');
+    updated.push('app_krono/.env');
   }
 
-  // admin_chrono
-  const adminEnv = path.join(PROJECT_ROOT, 'admin_chrono', '.env.local');
-  const adminBase = path.join(PROJECT_ROOT, 'admin_chrono', '.env');
-  const adminExample = path.join(PROJECT_ROOT, 'admin_chrono', '.env.local.example');
+  // admin_krono
+  const adminEnv = path.join(PROJECT_ROOT, 'admin_krono', '.env.local');
+  const adminBase = path.join(PROJECT_ROOT, 'admin_krono', '.env');
+  const adminExample = path.join(PROJECT_ROOT, 'admin_krono', '.env.local.example');
   if (!fs.existsSync(adminEnv)) {
     // Copier depuis .env (valeurs réelles) si dispo, sinon depuis l'exemple
     if (fs.existsSync(adminBase)) {
@@ -132,7 +132,7 @@ function main() {
     // IP seule : affichée par npm run dev (Next indique souvent 0.0.0.0 car -H 0.0.0.0)
     LAN_DEV_HOST: ip === 'localhost' ? '127.0.0.1' : ip,
   })) {
-    updated.push('admin_chrono/.env.local');
+    updated.push('admin_krono/.env.local');
   }
 
   if (updated.length > 0) {
@@ -143,7 +143,7 @@ function main() {
     console.log('\n💡 Redémarrez les apps pour appliquer les changements.');
   } else {
     console.log('ℹ️  Aucun fichier .env trouvé à mettre à jour.');
-    console.log('   Créez .env dans driver_chrono et app_chrono, .env.local dans admin_chrono.');
+    console.log('   Créez .env dans driver_krono et app_krono, .env.local dans admin_krono.');
   }
 }
 

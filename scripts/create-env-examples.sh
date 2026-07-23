@@ -5,7 +5,7 @@
 echo "📝 Création des fichiers .env.example..."
 
 # Backend
-cat > chrono_backend/.env.example << 'EOF'
+cat > krono_backend/.env.example << 'EOF'
 # ============================================
 # CHRONO BACKEND - Variables d'Environnement
 # ============================================
@@ -88,7 +88,7 @@ DEBUG_SOCKETS=false
 EOF
 
 # Admin
-cat > admin_chrono/.env.local.example << 'EOF'
+cat > admin_krono/.env.local.example << 'EOF'
 # ============================================
 # ADMIN CHRONO - Variables d'Environnement
 # ============================================
@@ -117,7 +117,7 @@ NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your-mapbox-access-token
 EOF
 
 # App Client
-cat > app_chrono/.env.example << 'EOF'
+cat > app_krono/.env.example << 'EOF'
 # ============================================
 # APP CHRONO (Client) - Variables d'Environnement
 # ============================================
@@ -153,7 +153,7 @@ EXPO_PUBLIC_SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
 EOF
 
 # Driver
-cat > driver_chrono/.env.example << 'EOF'
+cat > driver_krono/.env.example << 'EOF'
 # ============================================
 # DRIVER CHRONO (Chauffeur) - Variables d'Environnement
 # ============================================
@@ -197,13 +197,13 @@ EOF
 echo "✅ Fichiers .env.example créés avec succès!"
 echo ""
 echo "📋 Fichiers créés:"
-echo "  - chrono_backend/.env.example"
-echo "  - admin_chrono/.env.local.example"
-echo "  - app_chrono/.env.example"
-echo "  - driver_chrono/.env.example"
+echo "  - krono_backend/.env.example"
+echo "  - admin_krono/.env.local.example"
+echo "  - app_krono/.env.example"
+echo "  - driver_krono/.env.example"
 echo ""
 echo "⚠️  N'oubliez pas de:"
-echo "  1. Copier chaque fichier vers .env (ou .env.local pour admin_chrono)"
+echo "  1. Copier chaque fichier vers .env (ou .env.local pour admin_krono)"
 echo "  2. Remplir toutes les variables avec vos valeurs réelles"
 echo "  3. Ne jamais commiter les fichiers .env dans Git"
 

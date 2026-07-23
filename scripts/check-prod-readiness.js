@@ -86,17 +86,17 @@ function requiredEnv(env, names, scope) {
 }
 
 function main() {
-  const appPackage = readJson(path.join(rootDir, "app_chrono/package.json"));
-  const backendPackage = readJson(path.join(rootDir, "chrono_backend/package.json"));
+  const appPackage = readJson(path.join(rootDir, "app_krono/package.json"));
+  const backendPackage = readJson(path.join(rootDir, "krono_backend/package.json"));
   const rootPackage = readJson(path.join(rootDir, "package.json"));
-  const appConfig = require(path.join(rootDir, "app_chrono/app.config.js"));
+  const appConfig = require(path.join(rootDir, "app_krono/app.config.js"));
   const expo = appConfig.expo || {};
   const plugins = expo.plugins || [];
 
   check(Boolean(rootPackage.scripts?.["check:prod"]), "Root package is missing check:prod script.");
   check(Boolean(rootPackage.scripts?.["eas:ios"]), "Root package is missing eas:ios script.");
-  check(appPackage.dependencies?.["expo-widgets"], "app_chrono: expo-widgets dependency is missing.");
-  check(backendPackage.dependencies?.jsonwebtoken, "chrono_backend: jsonwebtoken dependency is missing.");
+  check(appPackage.dependencies?.["expo-widgets"], "app_krono: expo-widgets dependency is missing.");
+  check(backendPackage.dependencies?.jsonwebtoken, "krono_backend: jsonwebtoken dependency is missing.");
 
   check(expo.owner === "doukourem02", "app.config.js: expo.owner should be doukourem02.");
   check(expo.slug === "app_chrono", "app.config.js: expo.slug should be app_chrono.");
@@ -149,7 +149,7 @@ function main() {
     `iOS buildNumber (${expo.ios?.buildNumber}) and Android versionCode (${expo.android?.versionCode}) are not aligned.`
   );
 
-  const appEnv = mergedEnv("app_chrono/.env", ".env");
+  const appEnv = mergedEnv("app_krono/.env", ".env");
   requiredEnv(
     appEnv,
     [
@@ -165,11 +165,11 @@ function main() {
     "EAS/client env"
   );
   warn(
-    fs.existsSync(path.join(rootDir, "app_chrono/google-services.json")),
-    "app_chrono/google-services.json is missing locally. Android FCM push needs it in EAS or the repo workspace."
+    fs.existsSync(path.join(rootDir, "app_krono/google-services.json")),
+    "app_krono/google-services.json is missing locally. Android FCM push needs it in EAS or the repo workspace."
   );
 
-  const backendEnv = mergedEnv("chrono_backend/.env", ".env");
+  const backendEnv = mergedEnv("krono_backend/.env", ".env");
   requiredEnv(
     backendEnv,
     ["APNS_ENV", "APNS_BUNDLE_ID", "APNS_TEAM_ID", "APNS_KEY_ID"],
@@ -189,19 +189,19 @@ function main() {
   }
 
   check(
-    fs.existsSync(path.join(rootDir, "chrono_backend/migrations/027_live_activity_tokens.sql")),
+    fs.existsSync(path.join(rootDir, "krono_backend/migrations/027_live_activity_tokens.sql")),
     "Migration 027_live_activity_tokens.sql is missing."
   );
   check(
-    fs.existsSync(path.join(rootDir, "app_chrono/services/orderLiveActivity.ts")),
+    fs.existsSync(path.join(rootDir, "app_krono/services/orderLiveActivity.ts")),
     "Client Live Activity service is missing."
   );
   check(
-    fs.existsSync(path.join(rootDir, "chrono_backend/src/services/liveActivityApnsService.ts")),
+    fs.existsSync(path.join(rootDir, "krono_backend/src/services/liveActivityApnsService.ts")),
     "Backend APNs Live Activity service is missing."
   );
 
-  infos.push("Run before real validation: app_chrono tsc, chrono_backend tsc, git diff --check.");
+  infos.push("Run before real validation: app_krono tsc, krono_backend tsc, git diff --check.");
   infos.push("Then apply migration 027, set Render APNs env, build EAS iOS production, test on device/TestFlight.");
 
   console.log("\nKrono production readiness check\n");

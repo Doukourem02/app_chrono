@@ -20,84 +20,84 @@ Règle :
 
 | Sujet | Fichier |
 |---|---|
-| Live Activity / Dynamic Island | `app_chrono/services/orderLiveActivity.ts` |
-| UI Dynamic Island SwiftUI/Expo UI | `app_chrono/widgets/orderTrackingLiveActivity.tsx` |
-| Sync Live Activity depuis le store | `app_chrono/hooks/useOrderLiveActivitySync.ts` |
-| Socket commande client | `app_chrono/services/userOrderSocketService.ts` |
-| Push client / tap notification | `app_chrono/services/clientPushService.ts` |
-| Notification Android foreground service client | `app_chrono/services/clientBackgroundLocation.ts` |
-| Écran suivi commande | `app_chrono/app/order-tracking/[orderId].tsx` |
-| Auth client | `app_chrono/store/useAuthStore.ts` |
-| Refresh token client | `app_chrono/utils/secureTokenStorage.ts` |
-| **Onboarding B2B** | `app_chrono/app/(auth)/business-onboarding.tsx` |
-| **Store mode business / tournées** | `app_chrono/store/useBusinessStore.ts` |
-| **API partenaire mobile** | `app_chrono/services/partnerApi.ts` |
-| **Modal livraison client B2B (Profil 1)** | `app_chrono/components/NewB2BShippingModal.tsx` |
-| **Bottom sheet tournée (Profil 2)** | `app_chrono/components/BatchShippingBottomSheet.tsx` |
-| **Cartes d'action (standard + B2B)** | `app_chrono/components/ActionCards.tsx` |
+| Live Activity / Dynamic Island | `app_krono/services/orderLiveActivity.ts` |
+| UI Dynamic Island SwiftUI/Expo UI | `app_krono/widgets/orderTrackingLiveActivity.tsx` |
+| Sync Live Activity depuis le store | `app_krono/hooks/useOrderLiveActivitySync.ts` |
+| Socket commande client | `app_krono/services/userOrderSocketService.ts` |
+| Push client / tap notification | `app_krono/services/clientPushService.ts` |
+| Notification Android foreground service client | `app_krono/services/clientBackgroundLocation.ts` |
+| Écran suivi commande | `app_krono/app/order-tracking/[orderId].tsx` |
+| Auth client | `app_krono/store/useAuthStore.ts` |
+| Refresh token client | `app_krono/utils/secureTokenStorage.ts` |
+| **Onboarding B2B** | `app_krono/app/(auth)/business-onboarding.tsx` |
+| **Store mode business / tournées** | `app_krono/store/useBusinessStore.ts` |
+| **API partenaire mobile** | `app_krono/services/partnerApi.ts` |
+| **Modal livraison client B2B (Profil 1)** | `app_krono/components/NewB2BShippingModal.tsx` |
+| **Bottom sheet tournée (Profil 2)** | `app_krono/components/BatchShippingBottomSheet.tsx` |
+| **Cartes d'action (standard + B2B)** | `app_krono/components/ActionCards.tsx` |
 
 ### App chauffeur
 
 | Sujet | Fichier |
 |---|---|
-| Push chauffeur / tap notification | `driver_chrono/services/driverPushService.ts` |
-| Notification Android foreground service chauffeur | `driver_chrono/services/driverBackgroundLocation.ts` |
-| Auth chauffeur | `driver_chrono/store/useDriverStore.ts` |
-| Sockets commandes | `driver_chrono/services/orderSocketService.ts` |
-| Sockets messages | `driver_chrono/services/driverMessageSocketService.ts` |
-| Dépannage app chauffeur | `driver_chrono/docs/TROUBLESHOOTING.md` |
-| **Store tournée active** | `driver_chrono/store/useBatchStore.ts` |
-| **API tournées chauffeur** | `driver_chrono/services/batchApiService.ts` |
-| **Écran tournée B2B** | `driver_chrono/app/batch/[batchId].tsx` |
-| **Encart admin / B2B / hors-ligne** | `driver_chrono/components/AdminOrderInfo.tsx` |
-| **Normalisation flags commande** | `driver_chrono/utils/mapAdminOrderFlags.ts` |
-| **Store commande livreur** | `driver_chrono/store/useOrderStore.ts` |
+| Push chauffeur / tap notification | `driver_krono/services/driverPushService.ts` |
+| Notification Android foreground service chauffeur | `driver_krono/services/driverBackgroundLocation.ts` |
+| Auth chauffeur | `driver_krono/store/useDriverStore.ts` |
+| Sockets commandes | `driver_krono/services/orderSocketService.ts` |
+| Sockets messages | `driver_krono/services/driverMessageSocketService.ts` |
+| Dépannage app chauffeur | `driver_krono/docs/TROUBLESHOOTING.md` |
+| **Store tournée active** | `driver_krono/store/useBatchStore.ts` |
+| **API tournées chauffeur** | `driver_krono/services/batchApiService.ts` |
+| **Écran tournée B2B** | `driver_krono/app/batch/[batchId].tsx` |
+| **Encart admin / B2B / hors-ligne** | `driver_krono/components/AdminOrderInfo.tsx` |
+| **Normalisation flags commande** | `driver_krono/utils/mapAdminOrderFlags.ts` |
+| **Store commande livreur** | `driver_krono/store/useOrderStore.ts` |
 
 ### Backend
 
 | Sujet | Fichier |
 |---|---|
-| Socket commande | `chrono_backend/src/sockets/orderSocket.ts` |
-| Push Expo | `chrono_backend/src/services/expoPushService.ts` |
-| Notifications destinataire | `chrono_backend/src/services/recipientOrderNotifyService.ts` |
-| SMS Twilio | `chrono_backend/src/services/twilioSmsService.ts` |
-| Track public | `chrono_backend/src/controllers/trackController.ts`, `routes/trackRoutes.ts` |
-| Prix livraison | `chrono_backend/src/services/priceCalculator.ts` |
-| Tarification dynamique | `chrono_backend/src/services/dynamicPricing.ts` |
-| QR livraison | `chrono_backend/src/services/qrCodeService.ts` |
-| Commission livreur | `chrono_backend/src/services/commissionService.ts` |
-| **Création commande admin (hors-ligne / téléphone / B2B)** | `chrono_backend/src/controllers/adminController.ts` (`createAdminOrder`, `_chrono_admin`) |
-| **Contrôleur partenaire — CRUD/statut** | `chrono_backend/src/controllers/partnerCrudController.ts` |
-| **Contrôleur partenaire — invitations portail** | `chrono_backend/src/controllers/partnerUserController.ts` |
-| **Contrôleur partenaire — abonnements/factures** | `chrono_backend/src/controllers/partnerSubscriptionController.ts` |
-| **Contrôleur partenaire — livreurs dédiés** | `chrono_backend/src/controllers/partnerDriverController.ts` |
+| Socket commande | `krono_backend/src/sockets/orderSocket.ts` |
+| Push Expo | `krono_backend/src/services/expoPushService.ts` |
+| Notifications destinataire | `krono_backend/src/services/recipientOrderNotifyService.ts` |
+| SMS Twilio | `krono_backend/src/services/twilioSmsService.ts` |
+| Track public | `krono_backend/src/controllers/trackController.ts`, `routes/trackRoutes.ts` |
+| Prix livraison | `krono_backend/src/services/priceCalculator.ts` |
+| Tarification dynamique | `krono_backend/src/services/dynamicPricing.ts` |
+| QR livraison | `krono_backend/src/services/qrCodeService.ts` |
+| Commission livreur | `krono_backend/src/services/commissionService.ts` |
+| **Création commande admin (hors-ligne / téléphone / B2B)** | `krono_backend/src/controllers/adminController.ts` (`createAdminOrder`, `_chrono_admin`) |
+| **Contrôleur partenaire — CRUD/statut** | `krono_backend/src/controllers/partnerCrudController.ts` |
+| **Contrôleur partenaire — invitations portail** | `krono_backend/src/controllers/partnerUserController.ts` |
+| **Contrôleur partenaire — abonnements/factures** | `krono_backend/src/controllers/partnerSubscriptionController.ts` |
+| **Contrôleur partenaire — livreurs dédiés** | `krono_backend/src/controllers/partnerDriverController.ts` |
 | **`partnerController.ts` (legacy)** | Code mort à ~95 % (mêmes noms de fonctions que les 4 fichiers ci-dessus, jamais routés) — seules `getPartnerOrderTracking`/`getPartnerOrderQRCode` y sont encore branchées (`partnerRoutes.ts`) |
-| **Contrôleur tournées** | `chrono_backend/src/controllers/batchController.ts` |
-| **Commission B2B** | `chrono_backend/src/services/b2bCommissionService.ts` |
-| **Job facturation mensuel** | `chrono_backend/src/jobs/partnerInvoiceJob.ts` |
-| **Middleware auth portail partenaire** | `chrono_backend/src/middleware/verifyPartnerUser.ts` |
-| **E-mail lien portail (magic / recovery)** | `chrono_backend/src/services/emailService.ts` (`sendPartnerPortalMagicLinkEmail`) |
-| **Notification socket tournée** | `chrono_backend/src/sockets/orderSocket.ts` (`emitBatchAssigned`) |
-| **Optimisation itinéraire** | `chrono_backend/src/utils/haversine.ts` |
+| **Contrôleur tournées** | `krono_backend/src/controllers/batchController.ts` |
+| **Commission B2B** | `krono_backend/src/services/b2bCommissionService.ts` |
+| **Job facturation mensuel** | `krono_backend/src/jobs/partnerInvoiceJob.ts` |
+| **Middleware auth portail partenaire** | `krono_backend/src/middleware/verifyPartnerUser.ts` |
+| **E-mail lien portail (magic / recovery)** | `krono_backend/src/services/emailService.ts` (`sendPartnerPortalMagicLinkEmail`) |
+| **Notification socket tournée** | `krono_backend/src/sockets/orderSocket.ts` (`emitBatchAssigned`) |
+| **Optimisation itinéraire** | `krono_backend/src/utils/haversine.ts` |
 
 ### Admin / web
 
 | Sujet | Fichier |
 |---|---|
-| Page tracking public | `admin_chrono/app/track/[token]/page.tsx` |
-| Web push tracking | `admin_chrono/public/sw.js` |
-| Performance dashboard / analytics | `admin_chrono/app/(dashboard)/gamification/page.tsx` |
-| Performance analytics API | `admin_chrono/app/api/analytics/performance/route.ts` |
-| **Liste partenaires B2B** | `admin_chrono/app/(dashboard)/partners/page.tsx` |
-| **Fiche partenaire (KPIs + abonnement + factures)** | `admin_chrono/app/(dashboard)/partners/[id]/page.tsx` |
-| **Layout portail partenaire** | `admin_chrono/app/(partner)/partner/[partnerId]/layout.tsx` |
-| **Page upgrade (Starter / none bloqué portail)** | `admin_chrono/app/(partner)/partner/[partnerId]/upgrade/page.tsx` |
-| **Dashboard portail partenaire** | `admin_chrono/app/(partner)/partner/[partnerId]/dashboard/page.tsx` |
-| **Commandes portail partenaire** | `admin_chrono/app/(partner)/partner/[partnerId]/orders/page.tsx` |
-| **Nouvelle commande portail** | `admin_chrono/app/(partner)/partner/[partnerId]/orders/new/page.tsx` |
-| **Facturation portail partenaire** | `admin_chrono/app/(partner)/partner/[partnerId]/billing/page.tsx` |
-| **Équipe portail partenaire** | `admin_chrono/app/(partner)/partner/[partnerId]/team/page.tsx` |
-| **Service API portail partenaire** | `admin_chrono/lib/partnerApiService.ts` |
+| Page tracking public | `admin_krono/app/track/[token]/page.tsx` |
+| Web push tracking | `admin_krono/public/sw.js` |
+| Performance dashboard / analytics | `admin_krono/app/(dashboard)/gamification/page.tsx` |
+| Performance analytics API | `admin_krono/app/api/analytics/performance/route.ts` |
+| **Liste partenaires B2B** | `admin_krono/app/(dashboard)/partners/page.tsx` |
+| **Fiche partenaire (KPIs + abonnement + factures)** | `admin_krono/app/(dashboard)/partners/[id]/page.tsx` |
+| **Layout portail partenaire** | `admin_krono/app/(partner)/partner/[partnerId]/layout.tsx` |
+| **Page upgrade (Starter / none bloqué portail)** | `admin_krono/app/(partner)/partner/[partnerId]/upgrade/page.tsx` |
+| **Dashboard portail partenaire** | `admin_krono/app/(partner)/partner/[partnerId]/dashboard/page.tsx` |
+| **Commandes portail partenaire** | `admin_krono/app/(partner)/partner/[partnerId]/orders/page.tsx` |
+| **Nouvelle commande portail** | `admin_krono/app/(partner)/partner/[partnerId]/orders/new/page.tsx` |
+| **Facturation portail partenaire** | `admin_krono/app/(partner)/partner/[partnerId]/billing/page.tsx` |
+| **Équipe portail partenaire** | `admin_krono/app/(partner)/partner/[partnerId]/team/page.tsx` |
+| **Service API portail partenaire** | `admin_krono/lib/partnerApiService.ts` |
 
 ---
 
@@ -124,7 +124,7 @@ Règles générales :
 - Le client ne doit jamais avoir à deviner si le livreur va chercher le colis ou va le livrer.
 - Le destinataire ne voit que ce qui l'aide à recevoir le colis.
 
-**Statuts canoniques — source de vérité technique (unifiés le 2026-07-22)** : l'enum Postgres `order_status` a 11 valeurs, mais **9 seulement sont le canon applicatif** : `pending, accepted, enroute, in_progress, picked_up, delivering, completed, declined, cancelled`. `draft` et `searching_driver` existent dans l'enum mais ne sont produits ni consommés par aucun code actuel (backend ou front) — documentés ici pour le jour où ils seraient activés. Type source : `chrono_backend/src/types/index.ts` (`OrderStatus`), répliqué dans `admin_chrono/types/index.ts` et `driver_chrono/types/index.ts`. Dette connue, non traitée volontairement : `app_chrono/types/index.ts` (`ShipmentStatus`) et `useShipmentStore.ts` forment un système de statut parallèle utilisé uniquement par `app/summary.tsx`, un écran mort (aucune navigation ne pointe dessus) — candidat à suppression sur demande explicite seulement, car supprimer un écran est une décision produit.
+**Statuts canoniques — source de vérité technique (unifiés le 2026-07-22)** : l'enum Postgres `order_status` a 11 valeurs, mais **9 seulement sont le canon applicatif** : `pending, accepted, enroute, in_progress, picked_up, delivering, completed, declined, cancelled`. `draft` et `searching_driver` existent dans l'enum mais ne sont produits ni consommés par aucun code actuel (backend ou front) — documentés ici pour le jour où ils seraient activés. Type source : `krono_backend/src/types/index.ts` (`OrderStatus`), répliqué dans `admin_krono/types/index.ts` et `driver_krono/types/index.ts`. Dette connue, non traitée volontairement : `app_krono/types/index.ts` (`ShipmentStatus`) et `useShipmentStore.ts` forment un système de statut parallèle utilisé uniquement par `app/summary.tsx`, un écran mort (aucune navigation ne pointe dessus) — candidat à suppression sur demande explicite seulement, car supprimer un écran est une décision produit.
 
 ---
 
@@ -207,11 +207,11 @@ Règles :
 ### Ce qui existe
 
 - Tokens Expo via `POST /api/push/register`.
-- Apps `app_chrono` / `driver_chrono` avec `expo-notifications`.
-- Envoi backend via `chrono_backend/src/services/expoPushService.ts`.
+- Apps `app_krono` / `driver_krono` avec `expo-notifications`.
+- Envoi backend via `krono_backend/src/services/expoPushService.ts`.
 - `DeviceNotRegistered` invalide la ligne en base.
-- Tap notification client : `app_chrono/services/clientPushService.ts`.
-- Tap notification chauffeur : `driver_chrono/services/driverPushService.ts`.
+- Tap notification client : `app_krono/services/clientPushService.ts`.
+- Tap notification chauffeur : `driver_krono/services/driverPushService.ts`.
 - Résolution destinataire par téléphone : `recipient_user_id` si compte client unique.
 - Anti-doublon statut par commande : `order_status_push_sent` si migration `026` appliquée.
 
@@ -274,7 +274,7 @@ Règles produit :
 
 ### PSP mobile money plus tard
 
-**État actuel (2026-07-22)** : `chrono_backend/src/services/mobileMoneyService.ts` est un **stub explicite** — `initiateOrangeMoneyPayment`/`initiateWavePayment`/`initiateMtnMoneyPayment`/`checkPaymentStatus` ne font aucun appel API réel, ils renvoient `status: 'pending'` avec un ID fictif. Un garde-fou bloque désormais tout paiement en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas explicitement à `true` (impossible de l'activer par accident). Ce qui reste à faire pour l'intégration réelle (travail hors code + fichiers/lignes précis) : `docs/integration_paiement_en_ligne.md`.
+**État actuel (2026-07-22)** : `krono_backend/src/services/mobileMoneyService.ts` est un **stub explicite** — `initiateOrangeMoneyPayment`/`initiateWavePayment`/`initiateMtnMoneyPayment`/`checkPaymentStatus` ne font aucun appel API réel, ils renvoient `status: 'pending'` avec un ID fictif. Un garde-fou bloque désormais tout paiement en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas explicitement à `true` (impossible de l'activer par accident). Ce qui reste à faire pour l'intégration réelle (travail hors code + fichiers/lignes précis) : `docs/integration_paiement_en_ligne.md`.
 
 **Alertes solde commission livreur** : `commissionService.ts` (`checkAndSendAlerts`) envoie un vrai push (`expoPushService.sendCampaignPushToUser`) aux trois seuils — suspendu (solde ≤ 0), très faible (≤ 1 000 FCFA), faible (≤ 3 000 FCFA).
 
@@ -313,10 +313,10 @@ Décision ouverte hors tournée : pour les commandes classiques, scan obligatoir
 
 | Thème | Côté code |
 |---|---|
-| Prix unifiés, base + km, options vitesse | `chrono_backend/src/services/priceCalculator.ts`, `app_chrono/services/orderApi.ts` |
-| Distance / durée route Mapbox, fallback Haversine | `app_chrono/utils/mapboxDirections.ts`, `useMapLogic.ts` |
-| Tarification dynamique météo / surge / heure / trafic | `chrono_backend/src/services/dynamicPricing.ts`, `openMeteoPricing.ts`, `surgePricing.ts` |
-| Transparence route / ligne droite | `app_chrono/utils/routePricingLabels.ts` |
+| Prix unifiés, base + km, options vitesse | `krono_backend/src/services/priceCalculator.ts`, `app_krono/services/orderApi.ts` |
+| Distance / durée route Mapbox, fallback Haversine | `app_krono/utils/mapboxDirections.ts`, `useMapLogic.ts` |
+| Tarification dynamique météo / surge / heure / trafic | `krono_backend/src/services/dynamicPricing.ts`, `openMeteoPricing.ts`, `surgePricing.ts` |
+| Transparence route / ligne droite | `app_krono/utils/routePricingLabels.ts` |
 
 Règles :
 
@@ -343,7 +343,7 @@ Règles :
 
 **Routes deliveries/drivers (audit 2026-07-22)** : toutes les routes de `deliveryRoutes.ts` et `driverRoutes.ts` (historique commandes, statistiques, revenus livreur, détails livreur, liste livreurs en ligne) sont protégées par `verifyJWT` **et** un contrôle d'ownership (`req.user.id !== userId` → 403) dans les contrôleurs. Un utilisateur ne peut lire que ses propres données.
 
-**Backend fail-fast en production** : `chrono_backend/src/config/db.ts` fait `process.exit(1)` avec un log `FATAL` si `DATABASE_URL` est absent ou si la création du pool échoue, **quand `NODE_ENV=production`**. Le `mockPool` (réponses vides silencieuses) reste utilisable seulement en dev/test — plus de risque de service "up" sans base réelle en prod.
+**Backend fail-fast en production** : `krono_backend/src/config/db.ts` fait `process.exit(1)` avec un log `FATAL` si `DATABASE_URL` est absent ou si la création du pool échoue, **quand `NODE_ENV=production`**. Le `mockPool` (réponses vides silencieuses) reste utilisable seulement en dev/test — plus de risque de service "up" sans base réelle en prod.
 
 **Audit sécurité 2026-07-22** : passage complet du monorepo, tout corrigé sauf ce qui dépend de l'intégration mobile money réelle (voir `docs/integration_paiement_en_ligne.md`). Acquis à retenir :
 - Révocation de session : route `POST /api/auth-simple/logout` (`verifyJWT` + `revokeRefreshToken()`) — avant, aucun moyen de révoquer un refresh token compromis.
@@ -357,7 +357,7 @@ Règles :
 - **MTN** (`05`) / **Moov** (`01`) → OTP par **SMS classique** en premier.
 - **Fallback universel** → bouton "Renvoyer par WhatsApp" sur l'écran de vérification, quel que soit l'opérateur.
 
-Implémentation : détection opérateur par préfixe national dans `chrono_backend/src/utils/phoneE164CI.ts` (`detectCarrierCI`, testé) ; logique de choix de canal dans `authController.ts` (`sendOTPCode`) ; bouton fallback dans `app_chrono/app/(auth)/verification.tsx` et `driver_chrono/app/(auth)/verification.tsx`. WhatsApp Sender Twilio opérationnel (`+19788624416`, "Krono Livraison"). Reste à faire côté utilisateur (template WhatsApp, etc.) : voir `docs/taches.md`.
+Implémentation : détection opérateur par préfixe national dans `krono_backend/src/utils/phoneE164CI.ts` (`detectCarrierCI`, testé) ; logique de choix de canal dans `authController.ts` (`sendOTPCode`) ; bouton fallback dans `app_krono/app/(auth)/verification.tsx` et `driver_krono/app/(auth)/verification.tsx`. WhatsApp Sender Twilio opérationnel (`+19788624416`, "Krono Livraison"). Reste à faire côté utilisateur (template WhatsApp, etc.) : voir `docs/taches.md`.
 
 ---
 
@@ -415,7 +415,7 @@ Smoke tests prod :
 
 ## 13. Migrations importantes
 
-**Régénérées le 2026-07-22** : les fichiers 016, 017, 020, 021, 022, 024 (commission, QR, driver_type, tracking_token, driver_locations/admin_notification_feed, profiles/payment_methods/transactions/invoices/order_status_history/conversations/messages, index qr_code_scans, users.first_name/last_name/avatar_url) étaient absents du disque bien que le schéma existe en prod — ils ont été reconstruits par introspection directe de la base Supabase réelle (`chrono_delivery`) et sont maintenant sur le disque. 018 (gamification) et 019 (support) n'ont **jamais** été appliqués en prod (`driver_badges`/`support_tickets` n'existent pas) — aucun fichier recréé pour ces deux-là, ce n'est pas un oubli. Détail complet et ordre exact d'application : `chrono_backend/migrations/README.md`.
+**Régénérées le 2026-07-22** : les fichiers 016, 017, 020, 021, 022, 024 (commission, QR, driver_type, tracking_token, driver_locations/admin_notification_feed, profiles/payment_methods/transactions/invoices/order_status_history/conversations/messages, index qr_code_scans, users.first_name/last_name/avatar_url) étaient absents du disque bien que le schéma existe en prod — ils ont été reconstruits par introspection directe de la base Supabase réelle (`chrono_delivery`) et sont maintenant sur le disque. 018 (gamification) et 019 (support) n'ont **jamais** été appliqués en prod (`driver_badges`/`support_tickets` n'existent pas) — aucun fichier recréé pour ces deux-là, ce n'est pas un oubli. Détail complet et ordre exact d'application : `krono_backend/migrations/README.md`.
 
 | Migration | Sujet |
 |---|---|
@@ -432,7 +432,7 @@ Smoke tests prod :
 | `041_partner_dedicated_driver_requests.sql` | Livreurs dédiés partenaires : `partner_drivers`, demandes `partner_driver_requests`, unicité `(partner_id, driver_user_id)` et un seul défaut |
 | `042_commission_deduction_lock_idempotency.sql` | `deduct_commission()` verrouille la ligne (`FOR UPDATE`) avant lecture/modification du solde + contrainte unique `commission_transactions_order_deduction_uidx` empêchant deux déductions pour la même commande |
 
-Migrations SQL : voir `chrono_backend/migrations/README.md`. État d'application (quelles migrations restent à jouer en prod) : `docs/taches.md`.
+Migrations SQL : voir `krono_backend/migrations/README.md`. État d'application (quelles migrations restent à jouer en prod) : `docs/taches.md`.
 
 ---
 
@@ -500,10 +500,10 @@ Revenus Krono : forfait prévisible + commissions sur excédents. Valeur partena
 
 | Profil | Description | App | Volume | Abonnement |
 |--------|-------------|-----|--------|------------|
-| **Profil 0** | Client particulier B2C | `app_chrono` | 1 commande à la fois | Non |
-| **Profil 1** | Petit commerçant mobile (revendeur, boutique de quartier) | `app_chrono` mode business | 5–20 commandes/jour | Optionnel |
-| **Profil 2** | Vendeur à volume (live TikTok, 20+ commandes d'un coup) | `app_chrono` mode tournée | 20+ à la session | Optionnel |
-| **Profil 3** | B2B professionnel structuré (restaurant, pharmacie, boutique) | `admin_chrono` portail partenaire | Régulier et prévisible | Oui (mensuel) |
+| **Profil 0** | Client particulier B2C | `app_krono` | 1 commande à la fois | Non |
+| **Profil 1** | Petit commerçant mobile (revendeur, boutique de quartier) | `app_krono` mode business | 5–20 commandes/jour | Optionnel |
+| **Profil 2** | Vendeur à volume (live TikTok, 20+ commandes d'un coup) | `app_krono` mode tournée | 20+ à la session | Optionnel |
+| **Profil 3** | B2B professionnel structuré (restaurant, pharmacie, boutique) | `admin_krono` portail partenaire | Régulier et prévisible | Oui (mensuel) |
 
 **Paiement Profil 1** : commandes pour ses clients → compte business, immédiat ou différé si éligible ; commandes pour lui-même → contexte client, règles Profil 0.
 
@@ -512,13 +512,13 @@ Revenus Krono : forfait prévisible + commissions sur excédents. Valeur partena
 ### Interfaces — qui utilise quoi
 
 ```text
-app_chrono      → Profil 0 (client B2C)
+app_krono      → Profil 0 (client B2C)
                 → Profil 1 (petit commerçant, mode business)
                 → Profil 2 (vendeur volume, mode tournée)
 
-driver_chrono   → livreurs (menus différents selon driver_type)
+driver_krono   → livreurs (menus différents selon driver_type)
 
-admin_chrono
+admin_krono
   └── (admin)   → équipe Krono uniquement — jamais exposé aux partenaires
   └── (partner) → Profil 3, portail web (Phase 1 — même projet, layout séparé)
 
@@ -584,9 +584,9 @@ Ces deux actions sont distinctes et séquentielles :
 #### Gap architectural — vérifié résolu le 2026-07-23 (implémentation a changé depuis)
 
 Ce que cette section décrivait (`NewB2BShippingModal` qui bloquerait si `user.partner_id` est null) ne correspond plus au code actuel :
-- `app_chrono/components/NewB2BShippingModal.tsx` **n'est importé nulle part** dans `app_chrono` — code mort. Il ne contient d'ailleurs aucun blocage sur `partner_id` (il le transmet tel quel, y compris `null`).
+- `app_krono/components/NewB2BShippingModal.tsx` **n'est importé nulle part** dans `app_krono` — code mort. Il ne contient d'ailleurs aucun blocage sur `partner_id` (il le transmet tel quel, y compris `null`).
 - Le vrai déclencheur du bouton "Nouvelle Livraison" pour un utilisateur `is_business: true` est `ActionCards.tsx`, qui route simplement vers `/(tabs)/map` — le flux de création de commande **standard**, identique à un utilisateur B2C. Aucun blocage sur `partner_id` n'existe sur ce chemin.
-- `app_chrono/store/useAuthStore.ts` (`validateUser`) synchronise déjà `partner_id`/`is_business`/`company_name` depuis le backend à chaque validation de session — pas de bug de désynchronisation constaté.
+- `app_krono/store/useAuthStore.ts` (`validateUser`) synchronise déjà `partner_id`/`is_business`/`company_name` depuis le backend à chaque validation de session — pas de bug de désynchronisation constaté.
 
 Donc Profil 1 (`partner_id=null`) peut déjà créer des livraisons sans blocage — simplement via le flux standard, sans commission B2B spécifique tant qu'aucun `partner_id` n'est rattaché (`computeB2BCommission` n'est appelé que si `partner_id` est présent). Rien à corriger ici pour l'instant.
 
@@ -799,7 +799,7 @@ Après acceptation :
 - Le livreur peut sélectionner n'importe quel arrêt restant ; aucun arrêt précédent ne doit bloquer la livraison choisie.
 - Le backend vérifie que l'arrêt appartient bien à la tournée et au livreur avant de le clôturer.
 
-### Flux détaillé côté livreur (driver_chrono) — vérifié 2026-07-23
+### Flux détaillé côté livreur (driver_krono) — vérifié 2026-07-23
 
 Fichiers impliqués : `app/batch/[batchId].tsx` (écran tournée), `components/BatchDeliveryFlow.tsx` (bouton collecte flottant sur la carte principale + bannière tournée + nettoyage du store au retour accueil), `store/useBatchStore.ts`, `services/batchApiService.ts`, `components/MapboxNavigationScreen.tsx`, `hooks/useGeofencing.ts`.
 
@@ -813,9 +813,9 @@ Fichiers impliqués : `app/batch/[batchId].tsx` (écran tournée), `components/B
 
 **Fin de tournée** : quand tous les arrêts sont `completed`/`cancelled`, écran de fin + bouton "Retour à l'accueil" qui réinitialise le store (`clearBatch()`) — un `useFocusEffect` de sécurité dans `BatchDeliveryFlow.tsx` vide aussi le store si l'utilisateur revient à l'accueil autrement (tous les arrêts traités mais store pas encore vidé). La bannière "Tournée · N restant(s)" sur la carte principale disparaît automatiquement dès que le store est vide (lecture réactive Zustand).
 
-**ETA / navigation** : les deux phases (collecte et livraison) écrivent l'ETA courant dans `useBatchStore.setLastEtaMinutes()` à chaque tick Mapbox ; la bannière "Tournée · N restant(s)" affiche cette valeur en direct. Le **statut de la commande** (`picked_up`/`accepted`/`completed`/`cancelled`) est aussi émis en direct au client (payeur) via `emitOrderStatusToPayer()` (`orderSocket.ts`, ajouté le 2026-07-23) — c'est ce qui alimente la Live Activity/Dynamic Island côté `app_chrono`.
+**ETA / navigation** : les deux phases (collecte et livraison) écrivent l'ETA courant dans `useBatchStore.setLastEtaMinutes()` à chaque tick Mapbox ; la bannière "Tournée · N restant(s)" affiche cette valeur en direct. Le **statut de la commande** (`picked_up`/`accepted`/`completed`/`cancelled`) est aussi émis en direct au client (payeur) via `emitOrderStatusToPayer()` (`orderSocket.ts`, ajouté le 2026-07-23) — c'est ce qui alimente la Live Activity/Dynamic Island côté `app_krono`.
 
-**Langue de navigation** : la navigation Mapbox est forcée en français des deux côtés — iOS via `options.locale = Locale(identifier: "fr_FR")` (patch existant), Android via un patch ajouté le 2026-07-23 (`driver_chrono/scripts/patches/MapboxNavigationView.kt`, copié sur `node_modules` au postinstall par `apply-mapbox-navigation-patch.js`) qui remplace le `Locale.US.language` codé en dur par `"fr"` pour la voix, et ajoute `.language("fr")` aux options de route pour la bannière de manœuvre. **Non vérifié sur un vrai build Android** (build local bloqué par le souci Gradle/JDK déjà connu) — à confirmer lors du prochain build réel.
+**Langue de navigation** : la navigation Mapbox est forcée en français des deux côtés — iOS via `options.locale = Locale(identifier: "fr_FR")` (patch existant), Android via un patch ajouté le 2026-07-23 (`driver_krono/scripts/patches/MapboxNavigationView.kt`, copié sur `node_modules` au postinstall par `apply-mapbox-navigation-patch.js`) qui remplace le `Locale.US.language` codé en dur par `"fr"` pour la voix, et ajoute `.language("fr")` aux options de route pour la bannière de manœuvre. **Non vérifié sur un vrai build Android** (build local bloqué par le souci Gradle/JDK déjà connu) — à confirmer lors du prochain build réel.
 
 ---
 
@@ -870,15 +870,15 @@ Un partenaire ne voit jamais les données d'un autre partenaire. Un partenaire n
 
 ### Portail — invitation, e-mail déjà dans Supabase Auth et configuration
 
-**Comportement implémenté (backend)** : `inviteUserByEmail` est tenté en premier. Si Supabase renvoie une erreur du type *e-mail déjà enregistré*, le backend ne traite plus l’opération comme un échec fatal : résolution de l’utilisateur (`public.users`, puis liste Auth admin en secours), assurance du profil public (`ensurePublicUserProfileForAuthUser`), `upsert` sur `partner_users`, génération d’un lien **`magiclink`** via `auth.admin.generateLink` (repli **`recovery`** si besoin) avec `redirectTo = PARTNER_PORTAL_URL` (fallback codé vers la page de login portail prod si la variable est absente), envoi du lien par SMTP Krono quand il est configuré (`sendPartnerPortalMagicLinkEmail` dans `chrono_backend/src/services/emailService.ts`). Points d’entrée : `invitePartnerUser`, `invitePortalUser` (`chrono_backend/src/controllers/partnerUserController.ts`), et à l’activation `activatePartner` (`chrono_backend/src/controllers/partnerCrudController.ts`, auto-invitation best-effort sur l’e-mail fiche partenaire).
+**Comportement implémenté (backend)** : `inviteUserByEmail` est tenté en premier. Si Supabase renvoie une erreur du type *e-mail déjà enregistré*, le backend ne traite plus l’opération comme un échec fatal : résolution de l’utilisateur (`public.users`, puis liste Auth admin en secours), assurance du profil public (`ensurePublicUserProfileForAuthUser`), `upsert` sur `partner_users`, génération d’un lien **`magiclink`** via `auth.admin.generateLink` (repli **`recovery`** si besoin) avec `redirectTo = PARTNER_PORTAL_URL` (fallback codé vers la page de login portail prod si la variable est absente), envoi du lien par SMTP Krono quand il est configuré (`sendPartnerPortalMagicLinkEmail` dans `krono_backend/src/services/emailService.ts`). Points d’entrée : `invitePartnerUser`, `invitePortalUser` (`krono_backend/src/controllers/partnerUserController.ts`), et à l’activation `activatePartner` (`krono_backend/src/controllers/partnerCrudController.ts`, auto-invitation best-effort sur l’e-mail fiche partenaire).
 
 **À valider en exploitation** (le code seul ne suffit pas) : déployer ou redémarrer le backend sur l’environnement cible ; tester « Inviter au portail » avec le **même** e-mail qu’un compte app client — la réponse doit réussir (plus de message brut *A user with this email address has already been registered*) ; **Supabase Dashboard → Authentication → URL configuration** : déclarer l’URL exacte de **`PARTNER_PORTAL_URL`** (page de connexion du portail) dans **Redirect URLs**, sinon les liens magic / recovery sont rejetés après clic.
 
-**SMTP Krono** : dans `chrono_backend/.env`, renseigner `EMAIL_USER`, `EMAIL_PASS`, idéalement `EMAIL_FROM_NAME`, `EMAIL_FROM_ADDRESS`, et `EMAIL_HOST` / `EMAIL_PORT` si le fournisseur n’est pas celui par défaut ; redémarrer le backend ; retester réception du mail « Se connecter au portail ». Référence des variables : `chrono_backend/.env.example`.
+**SMTP Krono** : dans `krono_backend/.env`, renseigner `EMAIL_USER`, `EMAIL_PASS`, idéalement `EMAIL_FROM_NAME`, `EMAIL_FROM_ADDRESS`, et `EMAIL_HOST` / `EMAIL_PORT` si le fournisseur n’est pas celui par défaut ; redémarrer le backend ; retester réception du mail « Se connecter au portail ». Référence des variables : `krono_backend/.env.example`.
 
 **Sans SMTP Krono** : s’appuyer sur **Mot de passe oublié** sur la page de login du portail (SMTP / templates Auth côté Supabase) ; communiquer l’URL du portail et la consigne : une fois la ligne `partner_users` créée, la réinitialisation mot de passe Supabase permet la première connexion.
 
-**Données / parcours (encore ouverts)** : rendre l’e-mail portail **obligatoire** à l’étape forfait (`app_chrono/app/(auth)/business-onboarding.tsx`) si le produit l’exige — aujourd’hui le flux peut partir sans e-mail portail si `users.email` est vide et que la validation ne bloque pas. (Vérifié 2026-07-23 : il n'y a pas de colonne `users.partner_id` à aligner — `partner_id` est toujours calculé depuis `partner_users` à la lecture, aucun risque de désynchronisation.)
+**Données / parcours (encore ouverts)** : rendre l’e-mail portail **obligatoire** à l’étape forfait (`app_krono/app/(auth)/business-onboarding.tsx`) si le produit l’exige — aujourd’hui le flux peut partir sans e-mail portail si `users.email` est vide et que la validation ne bloque pas. (Vérifié 2026-07-23 : il n'y a pas de colonne `users.partner_id` à aligner — `partner_id` est toujours calculé depuis `partner_users` à la lecture, aucun risque de désynchronisation.)
 
 **Recette bout en bout** : app (parcours boutique → partenaire `pending`) → admin (activation, auto-liaison / invitation si e-mail connu) → admin (« Inviter au portail » ou renvoi) → portail (connexion, dashboard, commandes, facturation selon besoin).
 
@@ -915,7 +915,7 @@ Inscription → OTP → CompleteProfile → business-onboarding
 
 #### 3. Admin crée et active un partenaire
 ```
-admin_chrono → /partners → Nouveau partenaire → name, commission_rate
+admin_krono → /partners → Nouveau partenaire → name, commission_rate
   → POST /api/partners → partners.status="pending"
   → Fiche partenaire → Créer abonnement Pro → POST /api/partners/:id/subscriptions
   → Confirmer paiement → PATCH .../activate → is_active=true, plan="pro"
@@ -1068,49 +1068,49 @@ Si le livreur est hors ligne au moment du socket, la push `batch_assigned` (`dri
 | Sujet | Fichier |
 |---|---|
 | Contrôleur partenaire (CRUD/statut, invitations, abonnements, livreurs dédiés) | `partnerCrudController.ts`, `partnerUserController.ts`, `partnerSubscriptionController.ts`, `partnerDriverController.ts` (voir section 1 pour le détail — `partnerController.ts` est un fichier legacy à ~95 % mort) |
-| E-mail lien portail (magic / recovery) | `chrono_backend/src/services/emailService.ts` |
-| Contrôleur tournées | `chrono_backend/src/controllers/batchController.ts` |
-| Logique commission B2B | `chrono_backend/src/services/b2bCommissionService.ts` |
-| Job facturation mensuel | `chrono_backend/src/jobs/partnerInvoiceJob.ts` |
-| Middleware auth partenaire | `chrono_backend/src/middleware/verifyPartnerUser.ts` |
-| Routes partenaire (admin) | `chrono_backend/src/routes/partnerRoutes.ts` |
-| Routes tournées (JWT) | `chrono_backend/src/routes/batchRoutes.ts` |
-| Optimisation itinéraire | `chrono_backend/src/utils/haversine.ts` |
-| Notification socket tournée | `chrono_backend/src/sockets/orderSocket.ts` (`emitBatchAssigned`) |
+| E-mail lien portail (magic / recovery) | `krono_backend/src/services/emailService.ts` |
+| Contrôleur tournées | `krono_backend/src/controllers/batchController.ts` |
+| Logique commission B2B | `krono_backend/src/services/b2bCommissionService.ts` |
+| Job facturation mensuel | `krono_backend/src/jobs/partnerInvoiceJob.ts` |
+| Middleware auth partenaire | `krono_backend/src/middleware/verifyPartnerUser.ts` |
+| Routes partenaire (admin) | `krono_backend/src/routes/partnerRoutes.ts` |
+| Routes tournées (JWT) | `krono_backend/src/routes/batchRoutes.ts` |
+| Optimisation itinéraire | `krono_backend/src/utils/haversine.ts` |
+| Notification socket tournée | `krono_backend/src/sockets/orderSocket.ts` (`emitBatchAssigned`) |
 
-**Admin (`admin_chrono`)**
-
-| Sujet | Fichier |
-|---|---|
-| Liste partenaires | `admin_chrono/app/(dashboard)/partners/page.tsx` |
-| Fiche partenaire | `admin_chrono/app/(dashboard)/partners/[id]/page.tsx` |
-| Layout portail partenaire | `admin_chrono/app/(partner)/partner/[partnerId]/layout.tsx` |
-| Page upgrade (Starter / none bloqué portail) | `admin_chrono/app/(partner)/partner/[partnerId]/upgrade/page.tsx` |
-| Dashboard portail | `admin_chrono/app/(partner)/partner/[partnerId]/dashboard/page.tsx` |
-| Commandes portail | `admin_chrono/app/(partner)/partner/[partnerId]/orders/page.tsx` |
-| Nouvelle commande portail | `admin_chrono/app/(partner)/partner/[partnerId]/orders/new/page.tsx` |
-| Facturation portail | `admin_chrono/app/(partner)/partner/[partnerId]/billing/page.tsx` |
-| Équipe portail | `admin_chrono/app/(partner)/partner/[partnerId]/team/page.tsx` |
-| Service API portail | `admin_chrono/lib/partnerApiService.ts` |
-
-**App client (`app_chrono`)**
+**Admin (`admin_krono`)**
 
 | Sujet | Fichier |
 |---|---|
-| Onboarding B2B | `app_chrono/app/(auth)/business-onboarding.tsx` |
-| Store mode business / tournées | `app_chrono/store/useBusinessStore.ts` |
-| API partenaire mobile | `app_chrono/services/partnerApi.ts` |
-| Modal livraison client (Profil 1) | `app_chrono/components/NewB2BShippingModal.tsx` |
-| Bottom sheet tournée (Profil 2) | `app_chrono/components/BatchShippingBottomSheet.tsx` |
-| Cartes d'action (standard + B2B) | `app_chrono/components/ActionCards.tsx` |
+| Liste partenaires | `admin_krono/app/(dashboard)/partners/page.tsx` |
+| Fiche partenaire | `admin_krono/app/(dashboard)/partners/[id]/page.tsx` |
+| Layout portail partenaire | `admin_krono/app/(partner)/partner/[partnerId]/layout.tsx` |
+| Page upgrade (Starter / none bloqué portail) | `admin_krono/app/(partner)/partner/[partnerId]/upgrade/page.tsx` |
+| Dashboard portail | `admin_krono/app/(partner)/partner/[partnerId]/dashboard/page.tsx` |
+| Commandes portail | `admin_krono/app/(partner)/partner/[partnerId]/orders/page.tsx` |
+| Nouvelle commande portail | `admin_krono/app/(partner)/partner/[partnerId]/orders/new/page.tsx` |
+| Facturation portail | `admin_krono/app/(partner)/partner/[partnerId]/billing/page.tsx` |
+| Équipe portail | `admin_krono/app/(partner)/partner/[partnerId]/team/page.tsx` |
+| Service API portail | `admin_krono/lib/partnerApiService.ts` |
 
-**App chauffeur (`driver_chrono`)**
+**App client (`app_krono`)**
 
 | Sujet | Fichier |
 |---|---|
-| Store tournée active | `driver_chrono/store/useBatchStore.ts` |
-| API tournées | `driver_chrono/services/batchApiService.ts` |
-| Écran tournée B2B | `driver_chrono/app/batch/[batchId].tsx` |
+| Onboarding B2B | `app_krono/app/(auth)/business-onboarding.tsx` |
+| Store mode business / tournées | `app_krono/store/useBusinessStore.ts` |
+| API partenaire mobile | `app_krono/services/partnerApi.ts` |
+| Modal livraison client (Profil 1) | `app_krono/components/NewB2BShippingModal.tsx` |
+| Bottom sheet tournée (Profil 2) | `app_krono/components/BatchShippingBottomSheet.tsx` |
+| Cartes d'action (standard + B2B) | `app_krono/components/ActionCards.tsx` |
+
+**App chauffeur (`driver_krono`)**
+
+| Sujet | Fichier |
+|---|---|
+| Store tournée active | `driver_krono/store/useBatchStore.ts` |
+| API tournées | `driver_krono/services/batchApiService.ts` |
+| Écran tournée B2B | `driver_krono/app/batch/[batchId].tsx` |
 
 ---
 

@@ -6,13 +6,13 @@ Remplace `docs/audit_krono.md` (audit du 2026-07-22, terminé — contenu utile 
 
 ## 1. Recharge de commission sans paiement — trou de sécurité fermé le 2026-07-23
 
-`chrono_backend/src/controllers/commissionController.ts` — `POST /commission/:userId/recharge` créditait le solde directement **sans jamais appeler** `initiateMobileMoneyPayment`, donc sans jamais passer par le garde-fou de production décrit ci-dessus. C'était un vrai trou exploitable en prod (contrairement aux points #2 et #3, correctement protégés par le garde-fou), pas juste une limitation du stub — corrigé : l'endpoint appelle maintenant `initiateMobileMoneyPayment` avant tout crédit, donc bloqué en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas activé, comme le reste du système de paiement.
+`krono_backend/src/controllers/commissionController.ts` — `POST /commission/:userId/recharge` créditait le solde directement **sans jamais appeler** `initiateMobileMoneyPayment`, donc sans jamais passer par le garde-fou de production décrit ci-dessus. C'était un vrai trou exploitable en prod (contrairement aux points #2 et #3, correctement protégés par le garde-fou), pas juste une limitation du stub — corrigé : l'endpoint appelle maintenant `initiateMobileMoneyPayment` avant tout crédit, donc bloqué en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas activé, comme le reste du système de paiement.
 
 Reste à faire au moment de l'intégration réelle (comme les points #2 et #3) : appeler l'API réelle de l'opérateur et ne créditer qu'après confirmation du callback/webhook — actuellement le crédit a lieu dès que `initiateMobileMoneyPayment` renvoie `success: true`, ce qui n'arrivera qu'en dev/test tant que l'intégration réelle n'est pas branchée.
 
 ## 2. Dette marquée "payée" sans confirmation réelle
 
-`chrono_backend/src/controllers/paymentController.ts:829-852` (`repayDeferred`) — seul `paymentResult.success` est testé, pas `paymentResult.status`.
+`krono_backend/src/controllers/paymentController.ts:829-852` (`repayDeferred`) — seul `paymentResult.success` est testé, pas `paymentResult.status`.
 
 À faire : vérifier le statut réel renvoyé par l'opérateur avant de marquer la dette réglée.
 
