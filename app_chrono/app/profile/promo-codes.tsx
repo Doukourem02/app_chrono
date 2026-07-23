@@ -12,23 +12,16 @@ interface PromoCode {
   isUsed: boolean;
 }
 
+// Aucune route backend de validation/application de code promo n'existe encore
+// (seule la gestion admin des promo_codes est implémentée, pas la rédemption côté client).
+// L'écran affichait "Code appliqué avec succès" pour n'importe quelle saisie, sans jamais
+// rien vérifier ni appliquer : désactivé honnêtement plutôt que de mentir à l'utilisateur.
 export default function PromoCodesPage() {
   const [promoCodes] = useState<PromoCode[]>([]);
   const [inputCode, setInputCode] = useState('');
 
   const handleApplyCode = () => {
-    if (!inputCode.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un code promo');
-      return;
-    }
-
-    // TODO: Valider et appliquer le code promo via l'API
-    Alert.alert(
-      'Code appliqué',
-      `Le code "${inputCode}" a été appliqué avec succès !`,
-      [{ text: 'OK' }]
-    );
-    setInputCode('');
+    Alert.alert('Bientôt disponible', 'Les codes promo ne sont pas encore disponibles.');
   };
 
   return (
@@ -45,6 +38,7 @@ export default function PromoCodesPage() {
         {/* Zone de saisie */}
         <View style={styles.inputSection}>
           <Text style={styles.sectionTitle}>Ajouter un code promo</Text>
+          <Text style={styles.emptyText}>Fonctionnalité bientôt disponible.</Text>
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -53,6 +47,7 @@ export default function PromoCodesPage() {
               placeholder="Entrez votre code promo"
               placeholderTextColor="#9CA3AF"
               autoCapitalize="characters"
+              editable={false}
             />
             <TouchableOpacity style={styles.applyButton} onPress={handleApplyCode}>
               <Text style={styles.applyButtonText}>Appliquer</Text>

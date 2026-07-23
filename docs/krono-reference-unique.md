@@ -67,7 +67,11 @@ Règle :
 | QR livraison | `chrono_backend/src/services/qrCodeService.ts` |
 | Commission livreur | `chrono_backend/src/services/commissionService.ts` |
 | **Création commande admin (hors-ligne / téléphone / B2B)** | `chrono_backend/src/controllers/adminController.ts` (`createAdminOrder`, `_chrono_admin`) |
-| **Contrôleur partenaire (admin + invitation portail)** | `chrono_backend/src/controllers/partnerController.ts` |
+| **Contrôleur partenaire — CRUD/statut** | `chrono_backend/src/controllers/partnerCrudController.ts` |
+| **Contrôleur partenaire — invitations portail** | `chrono_backend/src/controllers/partnerUserController.ts` |
+| **Contrôleur partenaire — abonnements/factures** | `chrono_backend/src/controllers/partnerSubscriptionController.ts` |
+| **Contrôleur partenaire — livreurs dédiés** | `chrono_backend/src/controllers/partnerDriverController.ts` |
+| **`partnerController.ts` (legacy)** | Code mort à ~95 % (mêmes noms de fonctions que les 4 fichiers ci-dessus, jamais routés) — seules `getPartnerOrderTracking`/`getPartnerOrderQRCode` y sont encore branchées (`partnerRoutes.ts`) |
 | **Contrôleur tournées** | `chrono_backend/src/controllers/batchController.ts` |
 | **Commission B2B** | `chrono_backend/src/services/b2bCommissionService.ts` |
 | **Job facturation mensuel** | `chrono_backend/src/jobs/partnerInvoiceJob.ts` |
@@ -103,7 +107,7 @@ Une commande Krono doit rester lisible pour trois publics : **client**, **chauff
 La question principale est toujours : **où est mon colis, qui s'en occupe, dans combien de temps, et que dois-je faire ?**
 
 | Étape produit | Statuts techniques typiques | Client | Chauffeur | Dynamic Island / Live Activity | Notification | Temps affiché | Passage suivant |
-
+|---|---|---|---|---|---|---|---|
 | Recherche livreur | `pending` | `Recherche livreur` ou `Recherche` | N/A | Compact/lock screen sans temps | Push seulement si attente longue, échec ou aucun livreur | Aucun temps | Un chauffeur accepte |
 | Livreur accepté / vers collecte | `accepted`, `enroute` | `Prise en charge dans X min` | Mission acceptée, aller au point de collecte | Avatar, véhicule, plaque, progression vers collecte | Push client utile une seule fois, puis Live Activity prend le relais | Chauffeur -> point de collecte | Chauffeur arrive ou confirme présence |
 | Arrivé collecte | `in_progress`, `arrived`, `at_pickup` | `Livreur arrivé` ou `Prise en charge dans 1 min` | Récupérer / vérifier le colis | Avatar + indicateur d'arrivée, sans libellé vague | Silencieux sauf action nécessaire | `1 min` si un temps est requis | Colis marqué récupéré |
@@ -119,6 +123,8 @@ Règles générales :
 - L'étape visible doit suivre la réalité métier, pas seulement un libellé technique.
 - Le client ne doit jamais avoir à deviner si le livreur va chercher le colis ou va le livrer.
 - Le destinataire ne voit que ce qui l'aide à recevoir le colis.
+
+**Statuts canoniques — source de vérité technique (unifiés le 2026-07-22)** : l'enum Postgres `order_status` a 11 valeurs, mais **9 seulement sont le canon applicatif** : `pending, accepted, enroute, in_progress, picked_up, delivering, completed, declined, cancelled`. `draft` et `searching_driver` existent dans l'enum mais ne sont produits ni consommés par aucun code actuel (backend ou front) — documentés ici pour le jour où ils seraient activés. Type source : `chrono_backend/src/types/index.ts` (`OrderStatus`), répliqué dans `admin_chrono/types/index.ts` et `driver_chrono/types/index.ts`. Dette connue, non traitée volontairement : `app_chrono/types/index.ts` (`ShipmentStatus`) et `useShipmentStore.ts` forment un système de statut parallèle utilisé uniquement par `app/summary.tsx`, un écran mort (aucune navigation ne pointe dessus) — candidat à suppression sur demande explicite seulement, car supprimer un écran est une décision produit.
 
 ---
 
@@ -153,7 +159,7 @@ Objectif : raconter une commande en cours de façon simple, utile et élégante.
 ### États visibles côté client
 
 | État commande | Message principal | Support système attendu |
-
+|---|---|---|
 | `pending` / recherche | `Recherche` / `Recherche livreur` | Dynamic Island compact + lock screen sans temps |
 | livreur accepté / vers collecte | `Prise en charge dans X min` | Live Activity avec véhicule, plaque, avatar, progression |
 | colis récupéré / livraison | `Livraison dans X min` | Même composant, progression vers destination |
@@ -178,7 +184,7 @@ Les mêmes informations doivent alimenter l'écran suivi, les sockets, les push,
 Un champ visible dans une surface ne doit pas disparaître dans une autre surface sans raison produit.
 
 | Donnée | Source prioritaire | Fallback accepté | Surfaces concernées |
-
+|---|---|---|---|
 | Avatar livreur | `users.avatar_url` | `profile_image_url`, autre champ historique, initiales | Suivi client, Live Activity, tracking si autorisé |
 | Nom livreur | `users.first_name`, `users.last_name` | nom composé ou libellé Krono | Suivi client, chauffeur, support |
 | Téléphone livreur | champ téléphone utilisateur/chauffeur | aucun affichage si absent | App client, appel/SMS si autorisé |
@@ -229,7 +235,7 @@ Règles :
 ### Types de notifications
 
 | Type | Exemple | Règle |
-
+|---|---|---|
 | Opérationnelle | livreur accepté, colis récupéré | Envoyer une seule fois si utile |
 | Critique | annulation, aucun livreur, problème paiement | Toujours privilégier une push claire |
 | Silencieuse / système | refresh statut, update Live Activity | Ne pas déranger l'utilisateur |
@@ -268,17 +274,9 @@ Règles produit :
 
 ### PSP mobile money plus tard
 
-Travail hors code en premier :
+**État actuel (2026-07-22)** : `chrono_backend/src/services/mobileMoneyService.ts` est un **stub explicite** — `initiateOrangeMoneyPayment`/`initiateWavePayment`/`initiateMtnMoneyPayment`/`checkPaymentStatus` ne font aucun appel API réel, ils renvoient `status: 'pending'` avec un ID fictif. Un garde-fou bloque désormais tout paiement en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas explicitement à `true` (impossible de l'activer par accident). Ce qui reste à faire pour l'intégration réelle (travail hors code + fichiers/lignes précis) : `docs/integration_paiement_en_ligne.md`.
 
-- Compte marchand / agrégateur pour Orange Money, Wave, MTN.
-- Clés API sandbox puis production.
-- Webhooks signés, retries, idempotence.
-- KYC, litiges, remboursements.
-- Branchement backend : `paymentController`, `commissionController`, transactions.
-
-**État actuel (2026-07-22)** : `chrono_backend/src/services/mobileMoneyService.ts` est un **stub explicite** — `initiateOrangeMoneyPayment`/`initiateWavePayment`/`initiateMtnMoneyPayment`/`checkPaymentStatus` ne font aucun appel API réel, ils renvoient `status: 'pending'` avec un ID fictif. Un garde-fou bloque désormais tout paiement en production tant que `MOBILE_MONEY_REAL_INTEGRATION_ENABLED` n'est pas explicitement à `true` (impossible de l'activer par accident). Reste à faire : intégrer réellement Orange Money CI et Wave, ajouter le webhook de confirmation (ne pas se baser sur l'initiation seule).
-
-**Alertes solde commission livreur** : `commissionService.ts` (`checkAndSendAlerts`) envoie un vrai push (`expoPushService.sendCampaignPushToUser`) aux trois seuils — suspendu (solde ≤ 0), très faible (≤ 1 000 FCFA), faible (≤ 3 000 FCFA). Pas encore vérifié sur un vrai appareil.
+**Alertes solde commission livreur** : `commissionService.ts` (`checkAndSendAlerts`) envoie un vrai push (`expoPushService.sendCampaignPushToUser`) aux trois seuils — suspendu (solde ≤ 0), très faible (≤ 1 000 FCFA), faible (≤ 3 000 FCFA).
 
 ---
 
@@ -314,7 +312,7 @@ Décision ouverte hors tournée : pour les commandes classiques, scan obligatoir
 ### Déjà en place
 
 | Thème | Côté code |
-
+|---|---|
 | Prix unifiés, base + km, options vitesse | `chrono_backend/src/services/priceCalculator.ts`, `app_chrono/services/orderApi.ts` |
 | Distance / durée route Mapbox, fallback Haversine | `app_chrono/utils/mapboxDirections.ts`, `useMapLogic.ts` |
 | Tarification dynamique météo / surge / heure / trafic | `chrono_backend/src/services/dynamicPricing.ts`, `openMeteoPricing.ts`, `surgePricing.ts` |
@@ -343,9 +341,23 @@ Règles :
 - Les logs peuvent contenir des identifiants techniques, mais pas de données sensibles inutiles.
 - Toute nouvelle surface publique doit être relue avec la question : "est-ce que cette information aide vraiment à livrer ?"
 
-**Routes deliveries/drivers (audit 2026-07-22)** : toutes les routes de `deliveryRoutes.ts` et `driverRoutes.ts` (historique commandes, statistiques, revenus livreur, détails livreur, liste livreurs en ligne) sont protégées par `verifyJWT` **et** un contrôle d'ownership (`req.user.id !== userId` → 403) dans les contrôleurs. Un utilisateur ne peut lire que ses propres données. Reste à faire : auditer les routes backend hors delivery/driver pour confirmer qu'aucune n'a été oubliée.
+**Routes deliveries/drivers (audit 2026-07-22)** : toutes les routes de `deliveryRoutes.ts` et `driverRoutes.ts` (historique commandes, statistiques, revenus livreur, détails livreur, liste livreurs en ligne) sont protégées par `verifyJWT` **et** un contrôle d'ownership (`req.user.id !== userId` → 403) dans les contrôleurs. Un utilisateur ne peut lire que ses propres données.
 
 **Backend fail-fast en production** : `chrono_backend/src/config/db.ts` fait `process.exit(1)` avec un log `FATAL` si `DATABASE_URL` est absent ou si la création du pool échoue, **quand `NODE_ENV=production`**. Le `mockPool` (réponses vides silencieuses) reste utilisable seulement en dev/test — plus de risque de service "up" sans base réelle en prod.
+
+**Audit sécurité 2026-07-22** : passage complet du monorepo, tout corrigé sauf ce qui dépend de l'intégration mobile money réelle (voir `docs/integration_paiement_en_ligne.md`). Acquis à retenir :
+- Révocation de session : route `POST /api/auth-simple/logout` (`verifyJWT` + `revokeRefreshToken()`) — avant, aucun moyen de révoquer un refresh token compromis.
+- IDOR corrigé sur `/check/:email` et `/check-by-id/:userId` (`authController.ts`) — même contrôle d'ownership que sur les autres routes profil.
+- Rate-limit OTP : la clé de verrouillage priorise téléphone normalisé puis e-mail, IP seulement en dernier recours — empêche le contournement par rotation d'IP.
+- Comparaison du code OTP en `crypto.timingSafeEqual` (Redis, mémoire, fallback DB) — empêche une attaque par timing.
+- RLS confirmée active (pas un trou) sur `commission_balance`, `commission_transactions`, `partners`, `partner_users`, `partner_drivers`, `partner_subscriptions`, `partner_usage`, `partner_invoices`, `payment_disputes` — policies `service_role` uniquement, `anon`/`authenticated` refusés.
+
+**Authentification OTP hybride par opérateur (Orange CI)** — validé et routage implémenté le 2026-07-22 (remplace `docs/plan_auth_otp_hybride_orange_whatsapp.md`, supprimé). Constat : les OTP SMS classiques via Twilio ne sont pas délivrés de façon fiable aux numéros Orange CI (MTN/Moov n'ont pas ce problème). Décision produit :
+- **Orange** (préfixe `07`) → OTP envoyé **exclusivement par WhatsApp**.
+- **MTN** (`05`) / **Moov** (`01`) → OTP par **SMS classique** en premier.
+- **Fallback universel** → bouton "Renvoyer par WhatsApp" sur l'écran de vérification, quel que soit l'opérateur.
+
+Implémentation : détection opérateur par préfixe national dans `chrono_backend/src/utils/phoneE164CI.ts` (`detectCarrierCI`, testé) ; logique de choix de canal dans `authController.ts` (`sendOTPCode`) ; bouton fallback dans `app_chrono/app/(auth)/verification.tsx` et `driver_chrono/app/(auth)/verification.tsx`. WhatsApp Sender Twilio opérationnel (`+19788624416`, "Krono Livraison"). Reste à faire côté utilisateur (template WhatsApp, etc.) : voir `docs/taches.md`.
 
 ---
 
@@ -403,62 +415,24 @@ Smoke tests prod :
 
 ## 13. Migrations importantes
 
-**Régénérées le 2026-07-22** : les fichiers 016, 017, 020, 021, 022, 024 (commission, QR, driver_type, tracking_token, driver_locations/admin_notification_feed, profiles/payment_methods/transactions/invoices/order_status_history/conversations/messages, index qr_code_scans, users.first_name/last_name/avatar_url) étaient absents du disque bien que le schéma existe en prod — ils ont été reconstruits par introspection directe de la base Supabase réelle (`chrono_delivery`) et sont maintenant sur le disque. 018 (gamification) et 019 (support) n'ont **jamais** été appliqués en prod (`driver_badges`/`support_tickets` n'existent pas) — aucun fichier recréé pour ces deux-là, ce n'est pas un oubli. Détail complet et ordre exact d'application : `chrono_backend/migrations/README.md`. Reste à faire : tester le chemin "base Supabase vide → 001 à 041" de bout en bout (nécessite une branche Supabase payante, pas encore lancée).
+**Régénérées le 2026-07-22** : les fichiers 016, 017, 020, 021, 022, 024 (commission, QR, driver_type, tracking_token, driver_locations/admin_notification_feed, profiles/payment_methods/transactions/invoices/order_status_history/conversations/messages, index qr_code_scans, users.first_name/last_name/avatar_url) étaient absents du disque bien que le schéma existe en prod — ils ont été reconstruits par introspection directe de la base Supabase réelle (`chrono_delivery`) et sont maintenant sur le disque. 018 (gamification) et 019 (support) n'ont **jamais** été appliqués en prod (`driver_badges`/`support_tickets` n'existent pas) — aucun fichier recréé pour ces deux-là, ce n'est pas un oubli. Détail complet et ordre exact d'application : `chrono_backend/migrations/README.md`.
 
 | Migration | Sujet |
-
+|---|---|
 | `023_create_push_tokens.sql` | `push_tokens` Expo push client / driver |
 | `024_users_name_avatar_columns.sql` | `users.first_name`, `last_name`, `avatar_url` |
 | `025_orders_recipient_user_id.sql` | lien compte destinataire |
 | `026_order_status_push_dedup.sql` | anti-doublon notifications par `(order_id, status)` |
-| `032_create_b2b_partners_core.sql` *(à appliquer)* | Tables `partners`, `partner_users`, `partner_drivers` |
-| `033_create_b2b_subscriptions_billing.sql` *(à appliquer)* | Tables `partner_subscriptions`, `partner_usage`, `partner_invoices` |
-| `034_create_b2b_batches.sql` *(à appliquer)* | Tables `delivery_batches`, `batch_orders` |
-| `035_orders_add_b2b_columns.sql` *(à appliquer)* | `ALTER TABLE orders ADD COLUMN partner_id` + `is_b2b_order` |
-| `036_migrate_existing_b2b_partners.sql` *(à appliquer)* | Backfill partenaires existants : crée `partners` + `partner_users` + remplit `orders.partner_id` |
-| `037_partners_add_inactive_status.sql` *(à appliquer)* | **Critique** — ajoute `inactive` au CHECK constraint de `partners.status` |
-| `041_partner_dedicated_driver_requests.sql` *(à appliquer)* | Livreurs dédiés partenaires : `partner_drivers`, demandes `partner_driver_requests`, unicité `(partner_id, driver_user_id)` et un seul défaut |
+| `032_create_b2b_partners_core.sql` | Tables `partners`, `partner_users`, `partner_drivers` |
+| `033_create_b2b_subscriptions_billing.sql` | Tables `partner_subscriptions`, `partner_usage`, `partner_invoices` |
+| `034_create_b2b_batches.sql` | Tables `delivery_batches`, `batch_orders` |
+| `035_orders_add_b2b_columns.sql` | `ALTER TABLE orders ADD COLUMN partner_id` + `is_b2b_order` |
+| `036_migrate_existing_b2b_partners.sql` | Backfill partenaires existants : crée `partners` + `partner_users` + remplit `orders.partner_id` |
+| `037_partners_add_inactive_status.sql` | Ajoute `inactive` au CHECK constraint de `partners.status` |
+| `041_partner_dedicated_driver_requests.sql` | Livreurs dédiés partenaires : `partner_drivers`, demandes `partner_driver_requests`, unicité `(partner_id, driver_user_id)` et un seul défaut |
+| `042_commission_deduction_lock_idempotency.sql` | `deduct_commission()` verrouille la ligne (`FOR UPDATE`) avant lecture/modification du solde + contrainte unique `commission_transactions_order_deduction_uidx` empêchant deux déductions pour la même commande |
 
-Migrations SQL : voir `chrono_backend/migrations/README.md`.
-
-### Catalogue des tables (rôle de chaque table)
-
-Repris de l'ancien `docs/tables/TABLES_SUPABASE.md` (supprimé le 2026-07-22, snapshot de comptage de lignes du 2026-05-04 jugé trop périmé pour être conservé tel quel — seul le rôle durable de chaque table est gardé ici).
-
-| Domaine | Table | Rôle |
-|---|---|---|
-| Commandes | `orders` | Table centrale — chaque commande (client, adresse, prix, statut, driver assigné) |
-| Commandes | `order_assignments` | Historique des assignations d'une commande à un livreur |
-| Commandes | `order_status_history` | Log immuable des changements de statut |
-| Commandes | `order_status_push_sent` | Anti-doublon notifications par `(order_id, status)` |
-| Batch | `delivery_batches` | Header d'une tournée groupée (partner ou user + driver assigné) |
-| Batch | `batch_orders` | Liaison `delivery_batches` ↔ `orders` avec position optimisée |
-| Batch | `delivery_mileage_logs` | Kilométrage par livraison (collecte GPS pas encore activée en prod) |
-| Utilisateurs | `users` | Comptes de base (email, téléphone, rôle) |
-| Utilisateurs | `profiles` | Profil étendu (nom, avatar, préférences) |
-| Utilisateurs | `otp_codes` | Codes OTP temporaires, supprimés après validation |
-| Livreurs | `driver_profiles` | Profil métier (`driver_type`, véhicule, disponibilité) |
-| Livreurs | `driver_locations` | Positions GPS temps réel |
-| Livreurs | `driver_payouts` | Virements Krono → livreurs (Orange Money/Wave/bancaire) — **module pas encore activé, table à garder** pour son rôle futur |
-| Commissions | `commission_balance` | Solde prépayé livreur `partner`, suspension si < minimum |
-| Commissions | `commission_transactions` | Historique recharges/déductions (`recharge_commission_balance`, `deduct_commission`) |
-| Partners B2B | `partners`, `partner_users`, `partner_drivers`, `partner_subscriptions`, `partner_usage`, `partner_invoices` | Voir section 16 (schéma B2B complet) |
-| Paiements | `transactions` | Transactions financières (paiements, remboursements) |
-| Paiements | `invoices` | Factures client par commande |
-| Paiements | `payment_methods` | Méthodes de paiement enregistrées |
-| Paiements | `payment_disputes` | Litiges de paiement |
-| Flotte | `fleet_vehicles`, `vehicle_documents`, `vehicle_maintenance`, `vehicle_fuel_logs`, `vehicle_financial_summary` | Gestion flotte (véhicules, documents légaux, maintenance, carburant, résumé financier) — module existe mais peu alimenté depuis l'admin |
-| Notifications | `push_tokens` | Tokens Expo Push par appareil |
-| Notifications | `live_activity_tokens` | Tokens APNs iOS Live Activity |
-| Notifications | `track_web_push_subscriptions` | Web Push tracking navigateur (destinataires) |
-| Notifications | `admin_notification_feed` | Fil de notifications admin |
-| Notifications | `notification_campaign_deliveries` | Suivi des envois de campagnes marketing push |
-| Notifications | ~~`notifications`~~ | **Inutilisée** — remplacée par Expo Push direct (`push_tokens` + `expoPushService.ts`). Candidate à suppression si confirmé inutile ailleurs |
-| Messagerie | `conversations`, `messages` | Fils de discussion client ↔ livreur liés à une commande |
-| Divers | `ratings` | Notes/avis client après livraison |
-| Divers | `qr_code_scans` | Historique des scans QR (preuve de remise) |
-
-**Tables supprimées (2026-05-04)** : `driver_wallets` et `driver_wallet_transactions` — orphelines, aucune référence backend. Les gains livreurs sont calculés depuis `orders`, les commissions via `commission_balance`. **Ne pas les recréer** sans une vraie raison produit (voir aussi la persistance `driver_earning_cfa` cible en section 17).
+Migrations SQL : voir `chrono_backend/migrations/README.md`. État d'application (quelles migrations restent à jouer en prod) : `docs/taches.md`.
 
 ---
 
@@ -601,23 +575,20 @@ Ces deux actions sont distinctes et séquentielles :
 | Action | Qui la fait | Ce que ça crée |
 |--------|-------------|----------------|
 | **Créer un partenaire** | Admin Krono | Une ligne dans `partners` (nom, plan, quota, taux commission) |
-| **Lier un utilisateur** | Admin Krono | `users.partner_id = partners.id` + une ligne dans `partner_users` |
+| **Lier un utilisateur** | Admin Krono | Une ligne dans `partner_users` (`users` n'a pas de colonne `partner_id` propre — `partner_id` est toujours dérivé par jointure sur `partner_users` côté API, jamais un champ stocké désynchronisable) |
 
 > **Exemple :** L'admin crée "MedExpress" dans `partners` (étape 1). Ensuite il prend le compte de Moussa (manager chez MedExpress) et lui assigne `partner_id = MedExpress.id` (étape 2). Moussa peut désormais créer des commandes B2B rattachées à MedExpress et accéder au portail. Avant ce lien, Moussa avait `is_business: true` mais ses commandes n'étaient pas facturables sous le contrat MedExpress.
 
 ---
 
-#### Gap architectural actuel et règle produit
+#### Gap architectural — vérifié résolu le 2026-07-23 (implémentation a changé depuis)
 
-Dans l'implémentation actuelle, `NewB2BShippingModal` bloque si `user.partner_id` est null. C'est trop restrictif par rapport à la stratégie :
+Ce que cette section décrivait (`NewB2BShippingModal` qui bloquerait si `user.partner_id` est null) ne correspond plus au code actuel :
+- `app_chrono/components/NewB2BShippingModal.tsx` **n'est importé nulle part** dans `app_chrono` — code mort. Il ne contient d'ailleurs aucun blocage sur `partner_id` (il le transmet tel quel, y compris `null`).
+- Le vrai déclencheur du bouton "Nouvelle Livraison" pour un utilisateur `is_business: true` est `ActionCards.tsx`, qui route simplement vers `/(tabs)/map` — le flux de création de commande **standard**, identique à un utilisateur B2C. Aucun blocage sur `partner_id` n'existe sur ce chemin.
+- `app_chrono/store/useAuthStore.ts` (`validateUser`) synchronise déjà `partner_id`/`is_business`/`company_name` depuis le backend à chaque validation de session — pas de bug de désynchronisation constaté.
 
-| Profil | `is_business` | `partner_id` | Accès B2B attendu |
-|--------|--------------|--------------|-------------------|
-| Profil 1 (petit commerçant) | `true` | `null` | ✅ Doit pouvoir créer des livraisons — frais selon `partners.commission_rate` ou règle métier sans abonnement (voir grille) |
-| Profil 2 (volume modéré) | `true` | `null` ou lié | ✅ Tournées disponibles — commission selon abonnement si lié |
-| Profil 3 (entreprise) | `true` | lié par admin | ✅ Quota, facturation, portail — commission selon plan |
-
-Le `partner_id` est requis seulement pour les fonctionnalités liées à l'abonnement (quota, facturation, portail). La création de commande B2B de base doit fonctionner avec `is_business: true` seul, avec un taux de commission par défaut. **Ce point est à corriger** dans `NewB2BShippingModal` et `b2bCommissionService` (voir "Reste à faire" en fin de section).
+Donc Profil 1 (`partner_id=null`) peut déjà créer des livraisons sans blocage — simplement via le flux standard, sans commission B2B spécifique tant qu'aucun `partner_id` n'est rattaché (`computeB2BCommission` n'est appelé que si `partner_id` est présent). Rien à corriger ici pour l'instant.
 
 ---
 
@@ -637,10 +608,7 @@ Le `partner_id` est requis seulement pour les fonctionnalités liées à l'abonn
 | **Invitations `partner_users` si reclassé Starter** | Lien `partner_users` conservé ; accès portail bloqué automatiquement par `verifyPartnerUser` (status `active` requis). |
 | **Tier calculé** | Dérivé du plan dans l'API — pas de champ `b2b_segment` persisté en base. |
 
-**Backlog technique (à implémenter, pas de décision produit bloquante) :**
-- Inventorier précisément les écrans/boutons « grand only » à bloquer côté `app_chrono` (entrées portail, invite équipe, etc.).
-- Resync profil après passage Starter → Pro (admin ou paiement).
-- Filtre / colonne Petit (Starter) vs Grand (Pro/Business) sur la liste partenaires dans l'admin (optionnel, utile ops).
+Backlog technique lié à cette segmentation (pas de décision produit bloquante) : `docs/taches.md`.
 
 ---
 
@@ -656,7 +624,7 @@ Un abonnement réduit les frais de service sur les livraisons dans le quota par 
 | **Business** | 29 000 | 110 | 2 % | 3 % |
 
 Sans abonnement : `partners.commission_rate = 0.07` (7 % sur chaque livraison — taux le plus élevé pour inciter à l'abonnement).
-Ces valeurs sont les constantes uniques : toute modification passe par `PLAN_DEFAULTS` dans `partnerController.ts` et `QUOTA_COMMISSION` dans `b2bCommissionService.ts`, puis propagée app + admin + doc.
+Ces valeurs sont les constantes uniques : toute modification passe par `PLAN_DEFAULTS` dans `partnerControllerUtils.ts` et `QUOTA_COMMISSION` dans `b2bCommissionService.ts`, puis propagée app + admin + doc.
 
 ### Principes produit, glossaire et parcours partenaire
 
@@ -677,7 +645,7 @@ Ces valeurs sont les constantes uniques : toute modification passe par `PLAN_DEF
 
 **Copy et cohérence** : les écrans app (`business-onboarding.tsx`, succès, profil), admin (liste, fiche, portail facturation) et les messages API doivent reprendre les **mêmes chiffres** que la grille ; pas de « livraisons illimitées » contradictoire avec un quota chiffré ; pas d'anciens paliers (15k / 40k / 100k, 20 % implicite, etc.).
 
-**Périmètre encore ouvert (hors doc seule)** : suppression ou fusion partenaire côté admin (API + FK) ; comportement explicite si `commission_rate` absent sans abonnement ; assouplissement `NewB2BShippingModal` / `partner_id` ; CGU alignées sur la grille ; simulateur d'estimation mensuelle = backlog produit.
+**Périmètre encore ouvert** : voir `docs/taches.md` (suppression/fusion partenaire, CGU, simulateur d'estimation, etc.).
 
 ### Axes de monétisation futurs (Axes 3–6)
 
@@ -714,7 +682,7 @@ La table `orders` reçoit une colonne `partner_id UUID REFERENCES partners(id)` 
 Pour une commande B2B rattachée à un `partner_id`, le service lit l'abonnement actif (`is_active`, `payment_status = active`) puis l'usage du mois (`partner_usage`) :
 
 1. **Abonnement actif + quota non dépassé** → taux **in-quota** (`QUOTA_COMMISSION`) : Starter **5 %**, Pro **3 %**, Business **2 %**.
-2. **Abonnement actif + quota dépassé** → `excess_commission_rate` de la souscription (aligné sur `PLAN_DEFAULTS` dans `partnerController.ts`, ex. Starter **6 %**, Pro **5 %**, Business **3 %**).
+2. **Abonnement actif + quota dépassé** → `excess_commission_rate` de la souscription (aligné sur `PLAN_DEFAULTS` dans `partnerControllerUtils.ts`, ex. Starter **6 %**, Pro **5 %**, Business **3 %**).
 3. **Pas d'abonnement actif** → `partners.commission_rate` (souvent **0,07** pour paiement à la course ; pas de repli implicite type 20 % sur données propres).
 
 Branchement : `orderRecordController` appelle `computeB2BCommission` puis `incrementPartnerUsage`. Le compteur `partner_usage.deliveries_count` est incrémenté via un `INSERT … ON CONFLICT DO UPDATE` SQL atomique pour éviter les doublons en cas de requêtes simultanées.
@@ -809,7 +777,7 @@ Un partenaire B2B livre souvent plusieurs commandes en une seule sortie (ex : 8 
 
 Règle centrale : **une tournée B2B = une popup, une acceptation, une assignation** ; les livraisons enfants ne déclenchent pas de popups séparées.
 
-Règle terrain : **le chauffeur choisit librement l'ordre des arrêts**. La tournée B2B est un lot business unique, mais côté conduite elle doit se comporter comme une liste de livraisons simples. Voir `docs/CHECKLIST_TOURNEES_B2B_LIBRES.md`.
+Règle terrain : **le chauffeur choisit librement l'ordre des arrêts**. La tournée B2B est un lot business unique, mais côté conduite elle doit se comporter comme une liste de livraisons simples.
 
 Notification livreur :
 - L'offre de tournée est émise au niveau `batchId` via `batch-assigned` avec `status: "offer"` et `ordersCount`.
@@ -830,6 +798,24 @@ Après acceptation :
 - Chaque arrêt propose scan QR, saisie manuelle du code, ou preuve alternative encadrée.
 - Le livreur peut sélectionner n'importe quel arrêt restant ; aucun arrêt précédent ne doit bloquer la livraison choisie.
 - Le backend vérifie que l'arrêt appartient bien à la tournée et au livreur avant de le clôturer.
+
+### Flux détaillé côté livreur (driver_chrono) — vérifié 2026-07-23
+
+Fichiers impliqués : `app/batch/[batchId].tsx` (écran tournée), `components/BatchDeliveryFlow.tsx` (bouton collecte flottant sur la carte principale + bannière tournée + nettoyage du store au retour accueil), `store/useBatchStore.ts`, `services/batchApiService.ts`, `components/MapboxNavigationScreen.tsx`, `hooks/useGeofencing.ts`.
+
+**Réception et acceptation** : le serveur envoie l'offre via socket (`pendingOffer` dans le store) ; popup d'acceptation ; si acceptée → `router.push('/batch/[batchId]')`.
+
+**Phase collecte** : dès que la tournée est chargée avec des coordonnées de collecte, la navigation vers le point de collecte démarre **automatiquement** (pas de bouton manuel). L'arrivée est détectée par le callback natif Mapbox (`onArrive`) pour la navigation elle-même, et par un second geofencing dans `BatchDeliveryFlow.tsx` qui affiche un bouton flottant "Tous les colis récupérés" sur la carte principale. Confirmer appelle `confirmBatchPickup` (`PATCH /api/batches/:id/pickup`) → `pickedUp: true`. Fallback : si aucune coordonnée de collecte n'est fournie, une carte simple avec le bouton de confirmation s'affiche directement (rien à géolocaliser).
+
+**Phase livraison** : liste des arrêts triés par position, chacun avec ses actions (Démarrer, Scanner QR, Entrer le code, Preuve alternative). Arrivée détectée par geofencing. Une fois un arrêt validé (`validateBatchOrder`), le livreur est **automatiquement dirigé vers l'arrêt suivant** sans dialogue de confirmation intermédiaire — mais reste libre de choisir un autre arrêt manuellement dans la liste.
+
+**Méthodes de preuve** : `qr_scan`, `manual_code`, `photo_signature`, `batch_driver_confirmation`.
+
+**Fin de tournée** : quand tous les arrêts sont `completed`/`cancelled`, écran de fin + bouton "Retour à l'accueil" qui réinitialise le store (`clearBatch()`) — un `useFocusEffect` de sécurité dans `BatchDeliveryFlow.tsx` vide aussi le store si l'utilisateur revient à l'accueil autrement (tous les arrêts traités mais store pas encore vidé). La bannière "Tournée · N restant(s)" sur la carte principale disparaît automatiquement dès que le store est vide (lecture réactive Zustand).
+
+**ETA / navigation** : les deux phases (collecte et livraison) écrivent l'ETA courant dans `useBatchStore.setLastEtaMinutes()` à chaque tick Mapbox ; la bannière "Tournée · N restant(s)" affiche cette valeur en direct. Le **statut de la commande** (`picked_up`/`accepted`/`completed`/`cancelled`) est aussi émis en direct au client (payeur) via `emitOrderStatusToPayer()` (`orderSocket.ts`, ajouté le 2026-07-23) — c'est ce qui alimente la Live Activity/Dynamic Island côté `app_chrono`.
+
+**Langue de navigation** : la navigation Mapbox est forcée en français des deux côtés — iOS via `options.locale = Locale(identifier: "fr_FR")` (patch existant), Android via un patch ajouté le 2026-07-23 (`driver_chrono/scripts/patches/MapboxNavigationView.kt`, copié sur `node_modules` au postinstall par `apply-mapbox-navigation-patch.js`) qui remplace le `Locale.US.language` codé en dur par `"fr"` pour la voix, et ajoute `.language("fr")` aux options de route pour la bannière de manœuvre. **Non vérifié sur un vrai build Android** (build local bloqué par le souci Gradle/JDK déjà connu) — à confirmer lors du prochain build réel.
 
 ---
 
@@ -859,7 +845,7 @@ Contenu de la facture générée :
 
 **`activatePartner` (admin)** : `pending` → `active`, création de `partner_subscriptions` **active** si un plan forfait est déjà choisi, invitation portail best-effort sur `partners.email`.
 
-**Séparation inactif administratif / sanction** : les actions admin « Désactiver » / « Suspendre » doivent rester **tracées** (`actor = admin`) dans les audits pour ne pas être confondues avec le toggle utilisateur (voir « Reste à faire » — table d'audit dédiée si absente).
+**Séparation inactif administratif / sanction** : les actions admin « Désactiver » / « Suspendre » doivent rester **tracées** (`actor = admin`) dans les audits pour ne pas être confondues avec le toggle utilisateur (table d'audit dédiée pas encore créée — voir `docs/taches.md`).
 
 **Lien `partner_users`** : conservé pour l'historique ; une désactivation agrément ne supprime pas automatiquement le lien utilisateur ↔ partenaire.
 
@@ -884,7 +870,7 @@ Un partenaire ne voit jamais les données d'un autre partenaire. Un partenaire n
 
 ### Portail — invitation, e-mail déjà dans Supabase Auth et configuration
 
-**Comportement implémenté (backend)** : `inviteUserByEmail` est tenté en premier. Si Supabase renvoie une erreur du type *e-mail déjà enregistré*, le backend ne traite plus l’opération comme un échec fatal : résolution de l’utilisateur (`public.users`, puis liste Auth admin en secours), assurance du profil public (`ensurePublicUserProfileForAuthUser`), `upsert` sur `partner_users`, génération d’un lien **`magiclink`** via `auth.admin.generateLink` (repli **`recovery`** si besoin) avec `redirectTo = PARTNER_PORTAL_URL` (fallback codé vers la page de login portail prod si la variable est absente), envoi du lien par SMTP Krono quand il est configuré (`sendPartnerPortalMagicLinkEmail` dans `chrono_backend/src/services/emailService.ts`). Points d’entrée : `invitePartnerUser`, `invitePortalUser`, et à l’activation `activatePartner` (auto-invitation best-effort sur l’e-mail fiche partenaire). Fichier : `chrono_backend/src/controllers/partnerController.ts`.
+**Comportement implémenté (backend)** : `inviteUserByEmail` est tenté en premier. Si Supabase renvoie une erreur du type *e-mail déjà enregistré*, le backend ne traite plus l’opération comme un échec fatal : résolution de l’utilisateur (`public.users`, puis liste Auth admin en secours), assurance du profil public (`ensurePublicUserProfileForAuthUser`), `upsert` sur `partner_users`, génération d’un lien **`magiclink`** via `auth.admin.generateLink` (repli **`recovery`** si besoin) avec `redirectTo = PARTNER_PORTAL_URL` (fallback codé vers la page de login portail prod si la variable est absente), envoi du lien par SMTP Krono quand il est configuré (`sendPartnerPortalMagicLinkEmail` dans `chrono_backend/src/services/emailService.ts`). Points d’entrée : `invitePartnerUser`, `invitePortalUser` (`chrono_backend/src/controllers/partnerUserController.ts`), et à l’activation `activatePartner` (`chrono_backend/src/controllers/partnerCrudController.ts`, auto-invitation best-effort sur l’e-mail fiche partenaire).
 
 **À valider en exploitation** (le code seul ne suffit pas) : déployer ou redémarrer le backend sur l’environnement cible ; tester « Inviter au portail » avec le **même** e-mail qu’un compte app client — la réponse doit réussir (plus de message brut *A user with this email address has already been registered*) ; **Supabase Dashboard → Authentication → URL configuration** : déclarer l’URL exacte de **`PARTNER_PORTAL_URL`** (page de connexion du portail) dans **Redirect URLs**, sinon les liens magic / recovery sont rejetés après clic.
 
@@ -892,22 +878,13 @@ Un partenaire ne voit jamais les données d'un autre partenaire. Un partenaire n
 
 **Sans SMTP Krono** : s’appuyer sur **Mot de passe oublié** sur la page de login du portail (SMTP / templates Auth côté Supabase) ; communiquer l’URL du portail et la consigne : une fois la ligne `partner_users` créée, la réinitialisation mot de passe Supabase permet la première connexion.
 
-**Données / parcours (encore ouverts)** : rendre l’e-mail portail **obligatoire** à l’étape forfait (`app_chrono/app/(auth)/business-onboarding.tsx`) si le produit l’exige — aujourd’hui le flux peut partir sans e-mail portail si `users.email` est vide et que la validation ne bloque pas ; colonne **`users.partner_id`** : migration SQL et alignement avec `partner_users` si l’app ou les écrans admin doivent s’en servir comme source unique.
+**Données / parcours (encore ouverts)** : rendre l’e-mail portail **obligatoire** à l’étape forfait (`app_chrono/app/(auth)/business-onboarding.tsx`) si le produit l’exige — aujourd’hui le flux peut partir sans e-mail portail si `users.email` est vide et que la validation ne bloque pas. (Vérifié 2026-07-23 : il n'y a pas de colonne `users.partner_id` à aligner — `partner_id` est toujours calculé depuis `partner_users` à la lecture, aucun risque de désynchronisation.)
 
 **Recette bout en bout** : app (parcours boutique → partenaire `pending`) → admin (activation, auto-liaison / invitation si e-mail connu) → admin (« Inviter au portail » ou renvoi) → portail (connexion, dashboard, commandes, facturation selon besoin).
 
 **Vigilance** : vider les tables **`partners`** / B2B en SQL **ne supprime pas** les comptes **Supabase Authentication**. Les conflits « e-mail déjà utilisé » viennent d’Auth, pas seulement des lignes `partners`.
 
-### Portail partenaire — alignement rôle unique et points ouverts
-
-Cette liste regroupe le travail restant pour que le portail B2B, l'API et les types reflètent le même modèle d'accès (sans rôle intermédiaire « manager » si le produit ne le propose plus). À traiter en implémentation ; quand une règle devient définitive, la résumer dans les sections concernées ci-dessus et retirer l'item d'ici si besoin.
-
-- **Rôles `partner_users`** : passer tous les enregistrements en `owner` et n'accepter que `owner` côté API — un seul modèle d'accès web ; éviter un rôle `manager` encore en base alors qu'on ne veut plus le produit ainsi.
-- **UI portail** : retirer la logique « manager » dans le layout et la page Mon équipe (`admin_chrono/app/(partner)/partner/[partnerId]/layout.tsx`, `.../team/page.tsx`) — menu, textes, invitation « manager » — pour que l'UI colle au même modèle et ne suggère pas un accès restreint imposé par Krono.
-- **Types TypeScript** : aligner `role`, `invitePartnerUser`, etc. (`admin_chrono/types`, `partnerApiService`) — éviter incohérences et bugs entre front et réalité des données.
-- **Invitation équipe** : vérifier ou implémenter `POST /api/partners/:id/users/invite` (ou retirer l'appel côté front) — le portail s'en sert pour l'équipe ; sans route valide, la fonctionnalité est inutile ou cassée.
-- **Séparation des droits** : revue courte des droits admin Krono vs portail partenaire — un compte partenaire ne doit pas pouvoir déclencher des actions réservées à l'équipe Krono.
-- **Communication partenaire** : une phrase côté doc / FAQ partenaire — qui est invité au portail relève du choix de l'entreprise partenaire (responsabilité claire sans alourdir le produit).
+Le portail vise à terme un modèle d'accès à rôle unique (`owner`), sans rôle intermédiaire « manager ». Travail d'alignement restant (API, UI, types) : `docs/taches.md`.
 
 ---
 
@@ -1090,7 +1067,7 @@ Si le livreur est hors ligne au moment du socket, la push `batch_assigned` (`dri
 
 | Sujet | Fichier |
 |---|---|
-| Contrôleur partenaire | `chrono_backend/src/controllers/partnerController.ts` |
+| Contrôleur partenaire (CRUD/statut, invitations, abonnements, livreurs dédiés) | `partnerCrudController.ts`, `partnerUserController.ts`, `partnerSubscriptionController.ts`, `partnerDriverController.ts` (voir section 1 pour le détail — `partnerController.ts` est un fichier legacy à ~95 % mort) |
 | E-mail lien portail (magic / recovery) | `chrono_backend/src/services/emailService.ts` |
 | Contrôleur tournées | `chrono_backend/src/controllers/batchController.ts` |
 | Logique commission B2B | `chrono_backend/src/services/b2bCommissionService.ts` |
@@ -1243,76 +1220,20 @@ Si deux événements `batch-assigned` arrivent pour le même `batchId`, l'app ch
 
 ---
 
-### État d'avancement B2B (au 2026-05-07)
-
-| Bloc | Contenu | Statut |
-|---|---|---|
-| **Bloc 1** | Migrations SQL `032`→`037` (8 tables + `partner_id` sur `orders` + statut `inactive`) | ⏳ À appliquer sur chaque projet Supabase (SQL Editor, dans l'ordre) |
-| **Bloc 2** | Routes backend, `computeB2BCommission` dans `orderRecordController`, tournées, facturation, middleware | ✅ Implémenté |
-| **Bloc 3** | Interface admin : créer/gérer partenaires, activer abonnements + portail partenaire complet | ✅ Implémenté |
-| **Bloc 4** | `app_chrono` : onboarding B2B, Profil 1 (livraison client), Profil 2 (tournée), ActionCards, `setBusinessMode` pour le toggle | ✅ Implémenté |
-| **Bloc 5** | `driver_chrono` : réception tournée groupée (1 popup), déduplication par `batchId`, vue ordonnée, QR/code/preuve alternative par livraison, contexte partenaire | ✅ Implémenté |
-| **Bloc 6** | Grille tarifaire v2 (forfaits + paiement à la course) | ✅ Alignée doc + `PLAN_DEFAULTS` + `QUOTA_COMMISSION` (toute évolution : une seule source puis propagation) |
-| **Bloc 7** | Statuts, séparation agrément / mode business, sécurité portail, sync admin temps réel | ✅ Implémenté (ajustements audit voir ci-dessous) |
-| **Bloc 8** | Segmentation Starter (petit B2B) vs Pro/Business (grand B2B) : blocage portail API 403 + redirection frontend page upgrade + `b2b_tier` / `portal_eligible` exposés dans `getPartner` | ✅ Implémenté |
-| **Bloc 9** | Livreurs dédiés partenaires : gestion admin, demandes portail, sélection commande/tournée, opt-in B2B et fallback automatique | ✅ Implémenté |
-
-**Reste à faire :**
-1. Appliquer les migrations `032` → `037`, puis `041` sur l'environnement Supabase cible (dans l'ordre) — la `037` ajoute `inactive` au CHECK de `partners.status`, la `041` ajoute les demandes de livreur dédié et renforce `partner_drivers`.
-2. Synchroniser `partner_id` dans `useAuthStore` lors du `validateUser` si besoin (éviter alertes « compte non lié » après onboarding sans re-login).
-3. Assouplir la condition `partner_id` dans `NewB2BShippingModal` : Profil 1 (`is_business=true`, `partner_id=null`) doit pouvoir créer des livraisons avec commission selon règle métier (voir section « Concepts fondamentaux » et grille sans abonnement).
-4. **Audit / traçabilité** (non implémenté) : journaliser désactivation, réactivation et suspension avec `user_id` / `partner_id` / `ancien_statut` / `nouveau_statut` / `timestamp` / `source` (`app` | `admin` | `portail`). Créer une table `partner_audit_logs` ou enrichir les logs backend existants.
-5. Activer Realtime sur la table `partners` dans Supabase Dashboard (Database → Replication) pour que la sync admin instantanée fonctionne.
-6. API suppression / fusion partenaire, unicité stricte, CGU : voir « Périmètre encore ouvert » dans la section principes partenaire ci-dessus.
-
-### Roadmap produit
-
-**Phase 1bis / Phase 2 — Monétisation scale**
-- [ ] Paiement abonnement récurrent / automatisé (prestataires locaux : OM, Wave, MTN)
-- [ ] Renouvellement auto `partner_subscriptions` : `cancelled_at`, politique `ends_at` nullable
-
-**Phase 2 — ~6 mois après lancement**
-- [ ] Portail partenaire : Facturation + Équipe (côté partenaire self-service)
-- [ ] Table `partner_api_keys`
-- [ ] Endpoint `POST /api/partner/orders` (Axe 3)
-- [ ] Webhooks signés avec retries
-- [ ] WhatsApp bot pour création de commande rapide
-
-**Phase 3 — ~12 mois et au-delà**
-- [ ] Marque blanche (Axe 4)
-- [ ] Flotte dédiée Enterprise (Axe 5)
-- [ ] Publicité et analytics (Axe 6)
-- [ ] Séparation `partner_chrono` en app indépendante si nécessaire
+Les 9 blocs fonctionnels du B2B (migrations, backend, admin, app client, app chauffeur, grille tarifaire, statuts, segmentation, livreurs dédiés) sont implémentés — détail de chaque bloc dans les sous-sections ci-dessus. Statut d'application des migrations et roadmap produit future : `docs/taches.md`.
 
 ---
 
 ### Feature Commissionnaire (hors périmètre B2B)
 
-Le commissionnaire est une feature **B2C** distincte : le livreur agit à la place du client (courses, achats ponctuels) — ce n'est pas une livraison classique point A → point B avec colis déjà prêt. Pas de mélange avec la logique B2B (tables `partners`, abonnements, pricing).
-
-À documenter dans `docs/commissionnaire.md` : parcours, pricing, avance de fonds, qui avance l'argent, plafond budget, article indisponible, assurance / litiges.
+Le commissionnaire est une feature **B2C** distincte : le livreur agit à la place du client (courses, achats ponctuels) — ce n'est pas une livraison classique point A → point B avec colis déjà prêt. Pas de mélange avec la logique B2B (tables `partners`, abonnements, pricing). Documentation détaillée à écrire (parcours, pricing, avance de fonds) : voir `docs/taches.md`.
 
 ---
 
-## 17. Stabilisation App Store — reste à faire
+## 17. Documents vivants
 
-Issu de l'audit de stabilisation pré-App Store (`docs/recommandation/recommandation.md`, supprimé le 2026-07-22 une fois son contenu utile intégré ici). Les points déjà résolus de cet audit sont documentés dans leurs sections respectives ci-dessus (10, 7, 13). Ce qui suit reste ouvert.
+Deux fichiers vivants dans `docs/` :
 
-| Sujet | Blocage | Détail |
-|---|---|---|
-| **Documents légaux** (confidentialité, CGU) | Nécessite des infos réelles sur l'entreprise (identité responsable de traitement, adresse, contact DPO) que seul l'utilisateur peut fournir | `admin_chrono/app/legal/confidentialite/page.tsx` et `.../cgu/page.tsx` sont des placeholders explicites — Apple refuse une app sans politique de confidentialité réelle et hébergée sur une URL stable |
-| **Grille B2B officielle** | Décision de séquencement à prendre par l'utilisateur | 3 grilles trouvées en conflit : technique actuelle in-quota Starter 3%/Pro 2%/Business 0% (`b2bCommissionService.ts` + portail billing), doc `krono-reference-unique.md` (section 16) 5%/3%/2%, grille commerciale **cible validée** dans `docs/tale/MONETISATION.md` (%+frais fixe FCFA, ex. Starter 8%+100 in-quota). La cible validée est identifiée mais pas implémentée (touche backend, app client, admin, portail). Décision : tout implémenter maintenant vs stopgap simple d'abord |
-| **Gain livreur réel / marge Krono persistés** | Dépend de la décision grille B2B ci-dessus (même formule de prix final) | `docs/tale/MONETISATION.md` section 7/10 : ajouter `driver_earning_cfa`, `krono_delivery_margin_cfa`, `b2b_fee_cfa`, `driver_payout_model` par commande ; aujourd'hui certains écrans confondent encore prix de course et gain livreur |
-| **WhatsApp non validé bout-en-bout** | Nécessite un numéro WhatsApp Business réel approuvé Meta | `twilioWhatsAppService.ts` est bien écrit (fallback SMS, templates) mais l'état réel en prod (variables renseignées ? templates approuvés ?) n'est pas documenté |
-| **Écrans paiement/promo incomplets** | Aucun — juste pas encore fait | `app_chrono/app/profile/payment-methods.tsx` (`setDefault`/`deleteMethod` non câblés), `driver_chrono/app/profile/payments.tsx` (page vide), `app_chrono/app/profile/promo-codes.tsx` (code promo non validé via API) — soit câbler, soit masquer les boutons |
-| **Tournées B2B pas totalement stabilisées** | Aucun — investigation à faire | Notifications intermédiaires non reçues en test (seul `completed` a été notifié, 3×). Pistes à vérifier dans l'ordre : (A) `confirmBatchPickup()` dans `batchController.ts` (~lignes 330-374) — vérifier que le passage en `picked_up` déclenche `notifyAllForOrderStatus()` pour **chaque** commande, pas juste un UPDATE SQL silencieux ; (B) `accept-batch` dans `orderSocket.ts` (~ligne 1899) — vérifier que le statut `accepted` est notifié par commande, pas seulement le code de livraison via `notifyB2BBatchRecipientsProof()` ; (C) déduplication `order_status_push_sent` potentiellement trop agressive si un test précédent a déjà consommé ces statuts. Autres points : ETA Dynamic Island non alimenté par la tournée, store batch non réinitialisé au retour accueil |
-| **Divergence versions mobiles** | Décision de roadmap — upgrader une app mobile en prod est risqué | `app_chrono` Expo 55/RN 0.83 vs `driver_chrono` Expo 54/RN 0.81 — décider si volontaire (documenter) ou aligner progressivement |
-| **Tests d'intégration insuffisants** | Aucun — effort à planifier | Zones prioritaires : auth/ownership, transitions de statut, paiement différé, commission, pricing B2B, batch/tournée, QR/preuve, anti-doublon notifications |
-
----
-
-## 18. Documents vivants
-
-Il doit rester un fichier principal de référence dans `docs/` :
-
-- `docs/krono-reference-unique.md` : référence projet, contrat produit, décisions, cartes de fichiers — y compris principes, glossaire, parcours et dette ouverte **partenaire B2B** (section 16), source unique à tenir alignée avec le code.
+- `docs/krono-reference-unique.md` : **orientation uniquement** — contrat produit, règles durables, architecture, cartes de fichiers, décisions. Ne doit pas contenir de tâches à exécuter (voir règle en tête de ce document).
+- `docs/taches.md` : tout ce qui reste à faire (backlog, migrations à appliquer, stabilisation App Store, roadmap B2B). Une tâche terminée est supprimée de ce fichier ; si elle change une règle durable, elle est résumée ici.
+- `docs/integration_paiement_en_ligne.md` : reste à faire spécifique à l'intégration mobile money réelle.

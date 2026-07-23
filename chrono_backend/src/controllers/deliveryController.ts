@@ -14,6 +14,7 @@ interface RequestWithApp extends Request {
   app: any;
   user?: {
     id: string;
+    role?: string;
   };
 }
 
@@ -62,10 +63,15 @@ export const createDelivery = async (
 };
 
 export const getUserDeliveries = async (
-  req: Request,
+  req: RequestWithApp,
   res: Response
 ): Promise<void> => {
   const { userId } = req.params;
+  const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+  if (!isAdmin && req.user?.id !== userId) {
+    res.status(403).json({ success: false, message: 'Accès refusé' });
+    return;
+  }
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 20;
   const status = req.query.status as string | undefined;
@@ -602,7 +608,7 @@ export const uploadDeliveryProof = async (
 };
 
 export const getUserStatistics = async (
-  req: Request,
+  req: RequestWithApp,
   res: Response
 ): Promise<void> => {
   try {
@@ -613,6 +619,12 @@ export const getUserStatistics = async (
         success: false,
         message: 'userId est requis',
       });
+      return;
+    }
+
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    if (!isAdmin && req.user?.id !== userId) {
+      res.status(403).json({ success: false, message: 'Accès refusé' });
       return;
     }
 

@@ -294,17 +294,14 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
 
     try {
       const ratingsResult = await (pool as any).query(
-        `SELECT 
+        `SELECT
           r.id,
           r.order_id,
           r.rating,
           r.comment,
           r.created_at,
-          r.updated_at,
-          u.email as user_email,
-          u.phone as user_phone
+          r.updated_at
         FROM ratings r
-        LEFT JOIN users u ON u.id = r.user_id
         WHERE r.driver_id = $1
         ORDER BY r.created_at DESC
         LIMIT $2 OFFSET $3`,
@@ -326,8 +323,6 @@ export const getDriverRatings = async (req: Request, res: Response): Promise<voi
           comment: rating.comment,
           createdAt: rating.created_at,
           updatedAt: rating.updated_at,
-          userEmail: rating.user_email,
-          userPhone: rating.user_phone
         })),
         pagination: {
           page,

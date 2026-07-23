@@ -17,7 +17,7 @@ jest.mock('../../../src/sockets/orderSocket.js', () => ({
 }));
 
 describe('deliveryController', () => {
-  let mockRequest: Partial<Request>;
+  let mockRequest: Partial<Request> & { user?: { id: string; role?: string } };
   let mockResponse: Partial<Response>;
   let mockSocketIO: Partial<SocketIOServer>;
 
@@ -143,6 +143,40 @@ describe('deliveryController', () => {
       );
     });
 
+    it('should return 403 when requesting another user\'s deliveries', async () => {
+      mockRequest.params = { userId: 'someone-else-id' };
+      mockRequest.query = { page: '1', limit: '20' };
+      // mockRequest.user reste 'test-user-id' (défini dans le beforeEach global)
+
+      await deliveryController.getUserDeliveries(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({ success: false })
+      );
+    });
+
+    it('should allow an admin to view another user\'s deliveries', async () => {
+      mockRequest.user = { id: 'admin-id', role: 'admin' } as any;
+      mockRequest.params = { userId: 'someone-else-id' };
+      mockRequest.query = { page: '1', limit: '20' };
+
+      const mockQuery = (jest.fn() as any)
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] });
+      (pool as any).query = mockQuery;
+
+      await deliveryController.getUserDeliveries(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      expect(mockResponse.status).not.toHaveBeenCalledWith(403);
+    });
+
     it('should fallback to memory orders when database is unavailable', async () => {
       // Add order to memory
       activeOrders.set('order-memory-1', {
@@ -180,6 +214,33 @@ describe('deliveryController', () => {
           meta: { source: 'memory' },
         })
       );
+    });
+  });
+
+  describe('getUserStatistics', () => {
+    it('should return 403 when requesting another user\'s statistics', async () => {
+      mockRequest.params = { userId: 'someone-else-id' };
+
+      await deliveryController.getUserStatistics(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+    });
+
+    it('should return statistics for the authenticated user', async () => {
+      mockRequest.params = { userId: 'test-user-id' };
+      const mockQuery = (jest.fn() as any).mockResolvedValue({ rows: [{ count: '0' }] });
+      (pool as any).query = mockQuery;
+      process.env.DATABASE_URL = 'postgres://fake';
+
+      await deliveryController.getUserStatistics(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      expect(mockResponse.status).not.toHaveBeenCalledWith(403);
     });
   });
 

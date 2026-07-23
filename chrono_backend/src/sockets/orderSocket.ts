@@ -1903,14 +1903,25 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           logger.warn('[accept-batch] notifications destinataires B2B:', notifyErr?.message || notifyErr);
         });
 
-        // Notifier chaque commande (pending→accepted) : push payeur + destinataire + SMS fallback
+        // Notifier chaque commande (pending→accepted) : socket payeur live + push + destinataire SMS fallback + admin
         for (const { orderId: batchOrderId, payerUserId } of pendingOrdersWithPayer) {
+          void emitOrderStatusToPayer(io, {
+            orderId: batchOrderId,
+            payerUserId,
+            status: 'accepted',
+            driverId,
+          }).catch((e: unknown) => {
+            logger.warn('[accept-batch] emit live payeur:', e instanceof Error ? e.message : String(e));
+          });
           void notifyAllForOrderStatus({
             orderId: batchOrderId,
             status: 'accepted',
             payerUserId,
           }).catch((e: unknown) => {
             logger.warn('[accept-batch] notify accepted per order:', e instanceof Error ? e.message : String(e));
+          });
+          broadcastOrderUpdateToAdmins(io, 'order:status:update', {
+            order: { id: batchOrderId, status: 'accepted' },
           });
         }
       } catch (error: any) {
@@ -2925,9 +2936,76 @@ const setupOrderSocket = (io: SocketIOServer): void => {
   });
 };
 
+/**
+ * Émet order:status:update en direct au socket du payeur (hors flux update-delivery-status
+ * classique). Utilisé par les endpoints batch (confirmBatchPickup, validateBatchOrder,
+ * accept-batch) qui ne passent pas par ce handler — sans cet appel, le store client
+ * (useOrderStore) et donc la Live Activity / Dynamic Island ne se mettent jamais à jour
+ * pour les commandes d'une tournée B2B.
+ */
+async function emitOrderStatusToPayer(
+  io: SocketIOServer,
+  params: { orderId: string; payerUserId: string; status: string; driverId?: string | null; location?: unknown }
+): Promise<void> {
+  const userSocketId = connectedUsers.get(params.payerUserId);
+  if (!userSocketId) return;
+  const userSocket = io.sockets.sockets.get(userSocketId);
+  if (!userSocket || !userSocket.connected) return;
+
+  let driverInfoForClient: any = null;
+  if (params.driverId) {
+    try {
+      const driverInfoResult = await pool.query(
+        `SELECT u.id, u.email, u.phone, u.first_name, u.last_name, u.avatar_url,
+                dp.profile_image_url, dp.vehicle_plate, dp.vehicle_type,
+                dp.vehicle_brand, dp.vehicle_model, dp.vehicle_color
+         FROM users u
+         LEFT JOIN driver_profiles dp ON dp.user_id = u.id
+         WHERE u.id = $1`,
+        [params.driverId]
+      );
+      const driverRow = (driverInfoResult as any)?.rows?.[0];
+      if (driverRow) {
+        const avatarUrl = driverRow.avatar_url || driverRow.profile_image_url || null;
+        driverInfoForClient = {
+          id: driverRow.id,
+          email: driverRow.email,
+          phone: driverRow.phone,
+          first_name: driverRow.first_name,
+          last_name: driverRow.last_name,
+          name:
+            driverRow.first_name && driverRow.last_name
+              ? `${driverRow.first_name} ${driverRow.last_name}`.trim()
+              : driverRow.first_name || driverRow.last_name || driverRow.email,
+          avatar: avatarUrl,
+          avatar_url: avatarUrl,
+          profile_image_url: avatarUrl,
+          vehicle_plate: driverRow.vehicle_plate || null,
+          vehicle_type: driverRow.vehicle_type || null,
+          vehicle_brand: driverRow.vehicle_brand || null,
+          vehicle_model: driverRow.vehicle_model || null,
+          vehicle_color: driverRow.vehicle_color || null,
+        };
+      }
+    } catch (e: any) {
+      logger.warn('[emitOrderStatusToPayer] enrichissement driver ignoré:', e?.message || e);
+    }
+  }
+
+  userSocket.emit('order:status:update', {
+    order: {
+      id: params.orderId,
+      status: params.status,
+      ...(driverInfoForClient ? { driver: driverInfoForClient, driverId: params.driverId } : {}),
+    },
+    location: params.location ?? null,
+  });
+}
+
 export {
   activeOrders, calculatePrice, connectedDrivers,
   connectedUsers, estimateDuration,
   findNearbyDrivers, findAllAvailableDrivers, setupOrderSocket, notifyDriversForOrder,
   emitBatchAssigned, emitBatchOfferToDrivers, emitBatchOfferToAllConnectedDrivers,
+  emitOrderStatusToPayer,
 };

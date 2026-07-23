@@ -1,62 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import {View,Text,StyleSheet,TouchableOpacity,ScrollView,ActivityIndicator} from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { logger } from '../../utils/logger';
 
-interface PaymentMethod {
-  id: string;
-  type: 'orange_money' | 'wave' | 'bank';
-  account: string;
-  isDefault: boolean;
-}
-
+// Le versement des gains (Orange Money/Wave/bancaire) n'est pas encore un module actif
+// côté backend (voir docs/krono-reference-unique.md section 13, table driver_payouts).
+// Cet écran affichait un CTA "Ajouter une méthode" qui pointait vers une route inexistante
+// (/profile/add-payment-method) : retiré tant que le module n'est pas branché, plutôt que
+// de laisser un flux cassé. Le lien vers l'écran Revenus reste le seul repère fiable pour
+// le livreur en attendant.
 export default function PaymentsPage() {
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadPaymentMethods();
-  }, []);
-
-  const loadPaymentMethods = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Charger les méthodes de paiement depuis l'API
-      setPaymentMethods([]);
-    } catch (error) {
-      logger.error('Erreur chargement méthodes:', undefined, error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getMethodIcon = (type: string) => {
-    switch (type) {
-      case 'orange_money':
-        return 'phone-portrait';
-      case 'wave':
-        return 'wallet';
-      case 'bank':
-        return 'card';
-      default:
-        return 'card';
-    }
-  };
-
-  const getMethodLabel = (type: string) => {
-    switch (type) {
-      case 'orange_money':
-        return 'Orange Money';
-      case 'wave':
-        return 'Wave';
-      case 'bank':
-        return 'Compte bancaire';
-      default:
-        return type;
-    }
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -64,61 +17,24 @@ export default function PaymentsPage() {
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Paiements</Text>
-        <TouchableOpacity
-          onPress={() => router.push('/profile/add-payment-method' as any)}
-          style={styles.addButton}
-        >
-          <Ionicons name="add" size={24} color="#8B5CF6" />
-        </TouchableOpacity>
+        <View style={styles.addButton} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8B5CF6" />
-          </View>
-        ) : paymentMethods.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="card-outline" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyText}>Aucune méthode de paiement</Text>
-            <Text style={styles.emptySubtext}>
-              Ajoutez une méthode pour recevoir vos gains
-            </Text>
-            <TouchableOpacity
-              style={styles.addFirstButton}
-              onPress={() => router.push('/profile/add-payment-method' as any)}
-            >
-              <Text style={styles.addFirstButtonText}>Ajouter une méthode</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          paymentMethods.map((method) => (
-            <View key={method.id} style={styles.methodCard}>
-              <View style={styles.methodHeader}>
-                <View style={styles.methodInfo}>
-                  <View style={styles.methodIconContainer}>
-                    <Ionicons
-                      name={getMethodIcon(method.type) as any}
-                      size={24}
-                      color="#8B5CF6"
-                    />
-                  </View>
-                  <View style={styles.methodDetails}>
-                    <Text style={styles.methodLabel}>
-                      {getMethodLabel(method.type)}
-                    </Text>
-                    <Text style={styles.methodAccount}>{method.account}</Text>
-                    {method.isDefault && (
-                      <View style={styles.defaultBadge}>
-                        <Text style={styles.defaultBadgeText}>Par défaut</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </View>
-            </View>
-          ))
-        )}
+        <View style={styles.emptyContainer}>
+          <Ionicons name="card-outline" size={64} color="#9CA3AF" />
+          <Text style={styles.emptyText}>Bientôt disponible</Text>
+          <Text style={styles.emptySubtext}>
+            La gestion des moyens de versement de vos gains n&apos;est pas encore activée.
+            Retrouvez vos revenus dans l&apos;onglet Revenus.
+          </Text>
+          <TouchableOpacity
+            style={styles.addFirstButton}
+            onPress={() => router.push('/(tabs)/revenus' as any)}
+          >
+            <Text style={styles.addFirstButtonText}>Voir mes revenus</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );

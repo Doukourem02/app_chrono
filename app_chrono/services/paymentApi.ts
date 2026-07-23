@@ -258,6 +258,71 @@ class PaymentApiService {
   }
 
   /**
+   * Définir une méthode de paiement comme méthode par défaut
+   */
+  async setDefaultPaymentMethod(methodId: string): Promise<{
+    success: boolean;
+    data?: PaymentMethod;
+    message?: string;
+  }> {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/payments/methods/${methodId}/default`, {
+        method: 'PATCH',
+        headers: this.getAuthHeaders(),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: parseApiErrorBody(data, response.status, 'Erreur lors de la mise à jour'),
+        };
+      }
+
+      return { success: true, data: data?.data };
+    } catch (error) {
+      logger.error('❌ Erreur setDefaultPaymentMethod:', undefined, error);
+      return {
+        success: false,
+        message: transportOrErrorMessage(error, 'Erreur lors de la mise à jour'),
+      };
+    }
+  }
+
+  /**
+   * Supprimer une méthode de paiement
+   */
+  async deletePaymentMethod(methodId: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/api/payments/methods/${methodId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: parseApiErrorBody(data, response.status, 'Erreur lors de la suppression'),
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error('❌ Erreur deletePaymentMethod:', undefined, error);
+      return {
+        success: false,
+        message: transportOrErrorMessage(error, 'Erreur lors de la suppression'),
+      };
+    }
+  }
+
+  /**
    * Initier un paiement
    */
   async initiatePayment(params: {

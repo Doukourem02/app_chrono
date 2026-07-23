@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 /* eslint-env node */
-/* global __dirname */
 /**
  * Applique le patch MapboxNavigationView pour activer la navigation turn-by-turn complète.
  * Le package Fleetbase n'affiche que la carte sans calculer la route ni présenter NavigationViewController.
@@ -31,6 +30,29 @@ if (!fs.existsSync(path.dirname(targetPath))) {
 
 fs.copyFileSync(patchPath, targetPath);
 console.log('[apply-mapbox-navigation-patch] Applied MapboxNavigationView turn-by-turn patch');
+
+// Patch Android : force le français (voix + bannière manœuvre) au lieu de l'anglais codé en dur.
+// Miroir du patch iOS ci-dessus (options.locale = Locale(identifier: "fr_FR")).
+const androidPatchPath = path.join(__dirname, 'patches', 'MapboxNavigationView.kt');
+const androidTargetPath = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  '@fleetbase',
+  'react-native-mapbox-navigation',
+  'android',
+  'src',
+  'main',
+  'java',
+  'com',
+  'fleetbase',
+  'mapboxnavigation',
+  'MapboxNavigationView.kt'
+);
+if (fs.existsSync(androidPatchPath) && fs.existsSync(path.dirname(androidTargetPath))) {
+  fs.copyFileSync(androidPatchPath, androidTargetPath);
+  console.log('[apply-mapbox-navigation-patch] Applied MapboxNavigationView.kt French language patch');
+}
 
 // Fleetbase pinne MapboxNavigation ~> 2.12.0 → MapboxMaps ~> 10.12.x uniquement, en conflit avec @rnmapbox/maps.
 // MapboxNavigation 2.20.x dépend de MapboxMaps ~> 10.19 (toujours < 11), compatible avec rnmapbox en 10.19.x.

@@ -10,6 +10,12 @@ import logger from '../utils/logger.js';
 export const optimizeDeliveryRoute = async (req: Request, res: Response): Promise<void> => {
   try {
     const { orderIds, driverPosition } = req.body;
+    const driverId = (req as any).user?.id;
+
+    if (!driverId) {
+      res.status(401).json({ error: 'Non autorisé' });
+      return;
+    }
 
     if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
       res.status(400).json({ error: 'Liste de commandes requise' });
@@ -21,16 +27,16 @@ export const optimizeDeliveryRoute = async (req: Request, res: Response): Promis
       return;
     }
 
-    // Récupérer les commandes
+    // Récupérer uniquement les commandes assignées au livreur appelant
     const result = await pool.query(
-      `SELECT id, 
+      `SELECT id,
         (pickup->>'latitude')::float as pickup_lat,
         (pickup->>'longitude')::float as pickup_lng,
         (dropoff->>'latitude')::float as dropoff_lat,
         (dropoff->>'longitude')::float as dropoff_lng
        FROM orders
-       WHERE id = ANY($1::uuid[])`,
-      [orderIds]
+       WHERE id = ANY($1::uuid[]) AND driver_id = $2`,
+      [orderIds, driverId]
     );
 
     const orders = result.rows.map(row => ({

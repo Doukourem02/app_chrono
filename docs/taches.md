@@ -1,0 +1,71 @@
+# Tâches — Krono
+
+Ce fichier liste tout ce qui **reste à faire**. `docs/krono-reference-unique.md` ne doit contenir que de l'orientation produit (règles, architecture, cartes de fichiers, décisions) — pas de tâches. Une tâche traitée est supprimée d'ici ; si elle change une règle durable, elle est résumée dans la référence.
+
+Paiement / mobile money : fichier dédié `docs/integration_paiement_en_ligne.md` (ne pas dupliquer ici).
+
+---
+
+## 🔴 Urgent — rotation de secrets compromis (action manuelle, pas du code)
+
+- **`SUPABASE_ACCESS_TOKEN`** potentiellement compromis (était dans un fichier local) : aller sur `supabase.com/dashboard/account/tokens`, le révoquer, en générer un nouveau si besoin.
+- **`service_role` key Supabase** potentiellement compilée dans des builds mobile précédents (était dans `app_chrono/.env`) : Supabase Dashboard → Settings → API → régénérer la `service_role` key pour invalider l'ancienne.
+- **Token Twilio** en clair dans `.env` : à faire tourner (rotation côté console Twilio).
+- **`SENTRY_AUTH_TOKEN`** : à sortir des `.env` locaux et déplacer dans les secrets EAS (ne doit pas rester en clair dans un fichier committable).
+- **M-7 — token BetterStack/Logtail** : BetterStack → Sources → New Source → créer une source "Krono Driver Mobile", puis remplacer le token dans `driver_chrono/.env` et dans les secrets EAS.
+- **M-3 — `HEALTH_SECRET` backend Render** : ajouter la variable `HEALTH_SECRET` dans les variables d'environnement du dashboard Render (valeur déjà générée — ne pas la committer en clair dans ce fichier ni ailleurs dans le repo), puis configurer la sonde monitoring pour envoyer le header `x-health-secret: <valeur>` dans ses requêtes.
+
+---
+
+## Sécurité / Backend
+
+- Tester le chemin "base Supabase vide → migrations 001 à 041" de bout en bout (nécessite une branche Supabase payante, pas encore lancée).
+- Vérifier sur un vrai appareil les alertes push de solde commission livreur (`commissionService.checkAndSendAlerts`).
+
+## OTP / Auth (Orange CI)
+
+- **Bloquant prod** : faire approuver un template WhatsApp (Twilio/Meta Content Template Builder) puis renseigner `TWILIO_WHATSAPP_CONTENT_SID` en `.env`.
+- Vérifier côté console Twilio s'il existe une route SMS dédiée/enregistrée pour Orange CI.
+- Vérifier l'impact coût (conversation WhatsApp vs SMS) sur le volume Orange une fois en prod.
+
+## B2B / Partenaires
+
+**Nécessitent une décision produit avant tout code (rien à faire seul dessus) :**
+- **Fusion de deux fiches partenaire** : que devient un abonnement/quota en double, un utilisateur lié aux deux fiches, un historique de factures divergent ? Pas implémenté, pas de règle définie.
+- **Documenter la feature Commissionnaire** dans `docs/commissionnaire.md` : aucun code n'existe pour cette feature, et le pricing/l'avance de fonds/le plafond budget/l'assurance-litiges ne sont pas décidés. Rédiger cette doc reviendrait à inventer des règles produit ; à faire une fois ces décisions prises.
+- **E-mail portail obligatoire à l'étape forfait** (`app_chrono/app/(auth)/business-onboarding.tsx:106`, actuellement `portalEmail.trim() || undefined`, jamais bloquant) : la tâche elle-même est conditionnelle ("si le produit l'exige") — décision à prendre : le rendre obligatoire ou non.
+- Filtre Petit/Grand B2B sur la liste partenaires admin (optionnel, utile ops — pas prioritaire).
+
+### Grille B2B / monétisation cible
+
+- Décider : implémenter maintenant la grille commerciale **cible validée** de `docs/tale/MONETISATION.md` (%+frais fixe FCFA, ex. Starter 8%+100 in-quota — différente de la grille technique actuelle 5%/3%/2%), ou stopgap simple d'abord. Touche backend, app client, admin, portail.
+- Persister gain livreur réel / marge Krono par commande (`driver_earning_cfa`, `krono_delivery_margin_cfa`, `b2b_fee_cfa`, `driver_payout_model`) — dépend de la décision grille ci-dessus (`docs/tale/MONETISATION.md` section 7/10). Certains écrans confondent aujourd'hui prix de la course et gain livreur.
+
+### Roadmap produit (peu prioritaire, jalons futurs)
+
+**Phase 1bis / Phase 2 — Monétisation scale**
+- [ ] Paiement abonnement récurrent / automatisé (prestataires locaux : OM, Wave, MTN)
+- [ ] Renouvellement auto `partner_subscriptions` : `cancelled_at`, politique `ends_at` nullable
+
+**Phase 2 — ~6 mois après lancement**
+- [ ] Portail partenaire : Facturation + Équipe (côté partenaire self-service)
+- [ ] Table `partner_api_keys`
+- [ ] Endpoint `POST /api/partner/orders` (Axe 3)
+- [ ] Webhooks signés avec retries
+- [ ] WhatsApp bot pour création de commande rapide
+
+**Phase 3 — ~12 mois et au-delà**
+- [ ] Marque blanche (Axe 4)
+- [ ] Flotte dédiée Enterprise (Axe 5)
+- [ ] Publicité et analytics (Axe 6)
+- [ ] Séparation `partner_chrono` en app indépendante si nécessaire
+
+## Tournées B2B (driver_chrono)
+
+- **Patch Android navigation en français à valider sur un vrai build** : voir `krono-reference-unique.md` section 16 (Tournées, "Langue de navigation") — appliqué le 2026-07-23 mais non testé, build Android local bloqué.
+
+## App Store / Stabilisation
+
+- **Documents légaux** (confidentialité, CGU) — **bloquant Apple**. `admin_chrono/app/legal/confidentialite/page.tsx` et `.../cgu/page.tsx` sont des placeholders explicites ; nécessite des infos réelles sur l'entreprise (identité responsable de traitement, adresse, contact DPO) que seul l'utilisateur peut fournir.
+- **Divergence versions mobiles** : merger `chore/align-expo-driver-chrono-55` (Expo 55, commit `afbf357`, poussée sur le remote) après validation build Android réel (device/émulateur ou `eas build`) + test manuel navigation turn-by-turn Mapbox sur device — bloqué localement par un souci Gradle/JDK (`JvmVendorSpec.IBM_SEMERU`), probable problème d'environnement machine.
+- Tests d'intégration : `auth/ownership` couvert le 2026-07-23 (régression sur les IDOR corrigés : `deliveryController`, `driverController`, `ratingController`). Reste à couvrir : transitions de statut, paiement différé, commission, pricing B2B, batch/tournée, QR/preuve, anti-doublon notifications.

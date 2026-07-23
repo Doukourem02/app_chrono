@@ -133,6 +133,85 @@ export const getPaymentMethods = async (req: RequestWithUser, res: Response): Pr
   }
 };
 
+export const setDefaultPaymentMethod = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+
+    const { methodId } = req.params;
+
+    const owned = await (pool as any).query(
+      'SELECT id FROM payment_methods WHERE id = $1 AND user_id = $2 AND is_active = true',
+      [methodId, userId]
+    );
+    if (!owned.rows.length) {
+      res.status(404).json({ success: false, message: 'Méthode de paiement introuvable' });
+      return;
+    }
+
+    await (pool as any).query(
+      'UPDATE payment_methods SET is_default = false WHERE user_id = $1',
+      [userId]
+    );
+    const result = await (pool as any).query(
+      'UPDATE payment_methods SET is_default = true WHERE id = $1 RETURNING *',
+      [methodId]
+    );
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    logger.error('Erreur définition méthode de paiement par défaut:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+};
+
+export const deletePaymentMethod = async (req: RequestWithUser, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Non authentifié' });
+      return;
+    }
+
+    const { methodId } = req.params;
+
+    const owned = await (pool as any).query(
+      'SELECT id, is_default FROM payment_methods WHERE id = $1 AND user_id = $2 AND is_active = true',
+      [methodId, userId]
+    );
+    if (!owned.rows.length) {
+      res.status(404).json({ success: false, message: 'Méthode de paiement introuvable' });
+      return;
+    }
+
+    await (pool as any).query(
+      'UPDATE payment_methods SET is_active = false, is_default = false WHERE id = $1',
+      [methodId]
+    );
+
+    // Si c'était la méthode par défaut, promouvoir la plus récente restante.
+    if (owned.rows[0].is_default) {
+      await (pool as any).query(
+        `UPDATE payment_methods SET is_default = true
+         WHERE id = (
+           SELECT id FROM payment_methods
+           WHERE user_id = $1 AND is_active = true
+           ORDER BY created_at DESC LIMIT 1
+         )`,
+        [userId]
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('Erreur suppression méthode de paiement:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+};
+
 function isValidLatLon(lat: number, lon: number): boolean {
   return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
 }

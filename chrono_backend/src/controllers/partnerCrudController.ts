@@ -13,6 +13,30 @@ import {
 } from './partnerControllerUtils.js';
 import { supabaseAdmin } from '../config/supabase.js';
 
+async function logPartnerAudit(params: {
+  partnerId: string;
+  adminId: string;
+  oldStatus: string | null;
+  newStatus: string;
+}): Promise<void> {
+  try {
+    const { error } = await db()
+      .from('partner_audit_logs')
+      .insert({
+        partner_id: params.partnerId,
+        admin_id: params.adminId,
+        action: 'status_change',
+        old_status: params.oldStatus,
+        new_status: params.newStatus,
+      });
+    if (error) {
+      logger.warn('[partnerController] logPartnerAudit insert échoué:', error.message);
+    }
+  } catch (err) {
+    logger.warn('[partnerController] logPartnerAudit échoué:', err);
+  }
+}
+
 export const createPartner = async (req: Request, res: Response): Promise<void> => {
   const { name, email, phone, commission_rate, notes } = req.body as {
     name: string;
@@ -115,6 +139,8 @@ export const updatePartnerStatus = async (req: Request, res: Response): Promise<
     return;
   }
 
+  const { data: before } = await db().from('partners').select('status').eq('id', id).maybeSingle();
+
   const { data, error } = await db()
     .from('partners')
     .update({ status, updated_at: new Date().toISOString() })
@@ -126,6 +152,11 @@ export const updatePartnerStatus = async (req: Request, res: Response): Promise<
     logger.error('[partnerController] updatePartnerStatus error:', error);
     res.status(500).json({ success: false, message: 'Erreur lors du changement de statut' });
     return;
+  }
+
+  const adminId = (req as any).user?.id;
+  if (adminId) {
+    void logPartnerAudit({ partnerId: id, adminId, oldStatus: before?.status ?? null, newStatus: status });
   }
 
   res.json({ success: true, data });
@@ -146,6 +177,11 @@ export const activatePartner = async (req: Request, res: Response): Promise<void
     logger.error('[partnerController] activatePartner error:', error);
     res.status(500).json({ success: false, message: "Erreur lors de l'activation" });
     return;
+  }
+
+  const activateAdminId = (req as any).user?.id;
+  if (activateAdminId) {
+    void logPartnerAudit({ partnerId: id, adminId: activateAdminId, oldStatus: 'pending', newStatus: 'active' });
   }
 
   if (data.plan && PLAN_DEFAULTS[data.plan]) {

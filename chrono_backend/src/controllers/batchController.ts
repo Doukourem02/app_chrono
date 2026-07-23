@@ -4,8 +4,9 @@ import path from 'path';
 import { supabase, supabaseAdmin } from '../config/supabase.js';
 import pool from '../config/db.js';
 import { optimizeRouteOrder } from '../utils/haversine.js';
-import { emitBatchAssigned, emitBatchOfferToAllConnectedDrivers, emitBatchOfferToDrivers, findAllAvailableDrivers } from '../sockets/orderSocket.js';
+import { emitBatchAssigned, emitBatchOfferToAllConnectedDrivers, emitBatchOfferToDrivers, findAllAvailableDrivers, emitOrderStatusToPayer } from '../sockets/orderSocket.js';
 import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService.js';
+import { broadcastOrderUpdateToAdmins } from '../sockets/adminSocket.js';
 import logger from '../utils/logger.js';
 import type { JWTPayload } from '../types/index.js';
 import qrCodeService from '../services/qrCodeService.js';
@@ -373,9 +374,20 @@ export const confirmBatchPickup = async (req: AuthenticatedRequest, res: Respons
     return null;
   });
 
-  // Notifier chaque commande : push "Colis récupéré" → payeur + destinataire + SMS fallback
+  // Notifier chaque commande : socket payeur live + push "Colis récupéré" + destinataire + SMS fallback
   if (pickedUpResult?.rows?.length) {
+    const io = (req as any).app?.get?.('io');
     for (const row of pickedUpResult.rows) {
+      if (io) {
+        void emitOrderStatusToPayer(io, {
+          orderId: row.id,
+          payerUserId: row.user_id,
+          status: 'picked_up',
+          driverId: req.user?.id,
+        }).catch((e: any) => {
+          logger.warn('[batchController] emit live payeur picked_up:', e?.message);
+        });
+      }
       void notifyAllForOrderStatus({
         orderId: row.id,
         status: 'picked_up',
@@ -383,6 +395,11 @@ export const confirmBatchPickup = async (req: AuthenticatedRequest, res: Respons
       }).catch((e: any) => {
         logger.warn('[batchController] notify picked_up per order:', e?.message);
       });
+      if (io) {
+        broadcastOrderUpdateToAdmins(io, 'order:status:update', {
+          order: { id: row.id, status: 'picked_up' },
+        });
+      }
     }
   }
 
@@ -584,7 +601,7 @@ export const createBatch = async (req: AuthenticatedRequest, res: Response): Pro
 };
 
 // ─── GET /api/batches/:id — détail tournée + statuts ────────────────────────
-export const getBatch = async (req: Request, res: Response): Promise<void> => {
+export const getBatch = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
   const { data: batch, error: batchErr } = await db()
@@ -595,6 +612,11 @@ export const getBatch = async (req: Request, res: Response): Promise<void> => {
 
   if (batchErr || !batch) {
     res.status(404).json({ success: false, message: 'Tournée introuvable' });
+    return;
+  }
+
+  if (req.user?.id && (batch as any).driver_id && (batch as any).driver_id !== req.user.id) {
+    res.status(403).json({ success: false, message: 'Cette tournée ne vous est pas assignée' });
     return;
   }
 
@@ -686,7 +708,7 @@ export const validateBatchOrder = async (req: AuthenticatedRequest, res: Respons
   }
 
   const orderCheck = await pool.query(
-    `SELECT id, status, driver_id FROM orders WHERE id = $1`,
+    `SELECT id, status, driver_id, user_id FROM orders WHERE id = $1`,
     [orderId]
   );
   const orderRow = orderCheck.rows[0];
@@ -758,6 +780,33 @@ export const validateBatchOrder = async (req: AuthenticatedRequest, res: Respons
     logger.error('[batchController] validateBatchOrder update error:', orderErr);
     res.status(500).json({ success: false, message: 'Erreur lors de la mise à jour de la commande' });
     return;
+  }
+
+  // Notifier payeur (live socket + push) / destinataire + admin pour CHAQUE transition
+  // (le dédup order_status_push_sent évite un double envoi si qrCodeController a déjà
+  // notifié via le scan QR/code).
+  const ioForNotify = (req as any).app?.get?.('io');
+  if (ioForNotify) {
+    void emitOrderStatusToPayer(ioForNotify, {
+      orderId,
+      payerUserId: orderRow.user_id,
+      status,
+      driverId: orderRow.driver_id,
+    }).catch((e: any) => {
+      logger.warn('[batchController] emit live payeur validateBatchOrder:', e?.message);
+    });
+  }
+  void notifyAllForOrderStatus({
+    orderId,
+    status,
+    payerUserId: orderRow.user_id,
+  }).catch((e: any) => {
+    logger.warn('[batchController] notify validateBatchOrder:', e?.message);
+  });
+  if (ioForNotify) {
+    broadcastOrderUpdateToAdmins(ioForNotify, 'order:status:update', {
+      order: { id: orderId, status },
+    });
   }
 
   if (status === 'completed' && req.user?.id && !['qr_scan', 'manual_code'].includes(String(proofMethod))) {

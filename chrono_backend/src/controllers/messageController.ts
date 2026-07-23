@@ -276,6 +276,15 @@ export const markMessagesAsRead = async (req: AuthenticatedRequest, res: Respons
 
     const { conversationId } = req.params;
 
+    const canAccess = await messageService.canAccessConversation(
+      userId,
+      conversationId,
+      userRole
+    );
+    if (!canAccess) {
+      return res.status(403).json({ success: false, message: 'Accès refusé' });
+    }
+
     // Pour les admins, marquer TOUS les messages comme lus
     // Pour les autres utilisateurs, marquer seulement les messages qu'ils n'ont pas envoyés
     const isAdmin = userRole === 'admin' || userRole === 'super_admin';

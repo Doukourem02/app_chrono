@@ -69,15 +69,17 @@ export default function PaymentMethodsPage() {
   };
 
   const handleSetDefault = async (methodId: string) => {
-    try {
-      // TODO: Mettre à jour la méthode par défaut via l'API
-      setPaymentMethods(methods =>
-        methods.map(m => ({ ...m, is_default: m.id === methodId }))
-      );
-      Alert.alert('Succès', 'Méthode de paiement par défaut mise à jour');
-    } catch {
-      Alert.alert('Erreur', 'Impossible de mettre à jour la méthode');
+    const previous = paymentMethods;
+    setPaymentMethods(methods =>
+      methods.map(m => ({ ...m, is_default: m.id === methodId }))
+    );
+    const result = await paymentApi.setDefaultPaymentMethod(methodId);
+    if (!result.success) {
+      setPaymentMethods(previous);
+      Alert.alert('Erreur', result.message || 'Impossible de mettre à jour la méthode');
+      return;
     }
+    Alert.alert('Succès', 'Méthode de paiement par défaut mise à jour');
   };
 
   const handleDelete = (methodId: string) => {
@@ -90,13 +92,15 @@ export default function PaymentMethodsPage() {
           text: 'Supprimer',
           style: 'destructive',
           onPress: async () => {
-            try {
-              // TODO: Supprimer via l'API
-              setPaymentMethods(methods => methods.filter(m => m.id !== methodId));
-              Alert.alert('Succès', 'Méthode supprimée');
-            } catch {
-              Alert.alert('Erreur', 'Impossible de supprimer la méthode');
+            const previous = paymentMethods;
+            setPaymentMethods(methods => methods.filter(m => m.id !== methodId));
+            const result = await paymentApi.deletePaymentMethod(methodId);
+            if (!result.success) {
+              setPaymentMethods(previous);
+              Alert.alert('Erreur', result.message || 'Impossible de supprimer la méthode');
+              return;
             }
+            Alert.alert('Succès', 'Méthode supprimée');
           },
         },
       ]

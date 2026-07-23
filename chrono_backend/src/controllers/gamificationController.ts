@@ -7,9 +7,19 @@ import logger from '../utils/logger.js';
  * GET /api/gamification/badges/:driverId
  * Récupère les badges d'un livreur
  */
+function checkDriverOwnershipOrAdmin(req: Request, driverId: string): boolean {
+  const authUser = (req as any).user as { id?: string; role?: string } | undefined;
+  const isAdmin = authUser?.role === 'admin' || authUser?.role === 'super_admin';
+  return isAdmin || authUser?.id === driverId;
+}
+
 export const getDriverBadges = async (req: Request, res: Response): Promise<void> => {
   try {
     const { driverId } = req.params;
+    if (!checkDriverOwnershipOrAdmin(req, driverId)) {
+      res.status(403).json({ error: 'Accès refusé' });
+      return;
+    }
 
     const result = await pool.query(
       `SELECT badge_id, unlocked_at
@@ -33,6 +43,10 @@ export const getDriverBadges = async (req: Request, res: Response): Promise<void
 export const checkBadges = async (req: Request, res: Response): Promise<void> => {
   try {
     const { driverId } = req.params;
+    if (!checkDriverOwnershipOrAdmin(req, driverId)) {
+      res.status(403).json({ error: 'Accès refusé' });
+      return;
+    }
 
     const unlockedBadges = await checkAndUnlockBadges(driverId);
 
@@ -74,6 +88,10 @@ export const getLeaderboardRanking = async (req: Request, res: Response): Promis
 export const getDriverScore = async (req: Request, res: Response): Promise<void> => {
   try {
     const { driverId } = req.params;
+    if (!checkDriverOwnershipOrAdmin(req, driverId)) {
+      res.status(403).json({ error: 'Accès refusé' });
+      return;
+    }
 
     const score = await calculateDriverScore(driverId);
 

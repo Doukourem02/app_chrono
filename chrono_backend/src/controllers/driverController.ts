@@ -20,6 +20,7 @@ interface DriverStatus {
 interface RequestWithUser extends Request {
   user?: {
     id: string;
+    role?: string;
   };
 }
 
@@ -260,7 +261,7 @@ export const updateDriverStatus = async (req: RequestWithUser, res: Response): P
   }
 };
 
-export const getDriverRevenues = async (req: Request, res: Response): Promise<void> => {
+export const getDriverRevenues = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
     const period = (req.query.period as string) || 'today';
@@ -273,6 +274,15 @@ export const getDriverRevenues = async (req: Request, res: Response): Promise<vo
       res.status(400).json({
         success: false,
         message: 'userId est requis'
+      });
+      return;
+    }
+
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    if (!isAdmin && req.user?.id !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez consulter que vos propres revenus'
       });
       return;
     }
@@ -764,9 +774,11 @@ export const getOnlineDrivers = async (req: Request, res: Response): Promise<voi
   }
 };
 
-export const getDriverDetails = async (req: Request, res: Response): Promise<void> => {
+export const getDriverDetails = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const { driverId } = req.params;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    const isSelf = req.user?.id === driverId;
 
     // Utiliser PostgreSQL (pool) - driver_profiles est dans la DB principale (comme getAdminDriverDetails)
     let driver: any = null;
@@ -816,13 +828,17 @@ export const getDriverDetails = async (req: Request, res: Response): Promise<voi
       logger.warn('Erreur calcul revenus:', earningsError);
     }
 
+    const canViewPrivateFields = isAdmin || isSelf;
+    const { email, phone, ...publicDriverFields } = driver;
+
     res.json({
       success: true,
       message: 'Détails chauffeur récupérés',
       data: {
-        ...driver,
+        ...publicDriverFields,
+        ...(canViewPrivateFields ? { email, phone } : {}),
         rating,
-        total_earnings: totalEarnings,
+        total_earnings: canViewPrivateFields ? totalEarnings : undefined,
         completed_deliveries: driver.completed_deliveries || 0,
       }
     });
@@ -1038,7 +1054,7 @@ export const updateDriverWorkTime = async (req: RequestWithUser, res: Response):
   }
 };
 
-export const getDriverStatistics = async (req: Request, res: Response): Promise<void> => {
+export const getDriverStatistics = async (req: RequestWithUser, res: Response): Promise<void> => {
   try {
     const { userId } = req.params;
 
@@ -1046,6 +1062,15 @@ export const getDriverStatistics = async (req: Request, res: Response): Promise<
       res.status(400).json({
         success: false,
         message: 'userId est requis'
+      });
+      return;
+    }
+
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
+    if (!isAdmin && req.user?.id !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez consulter que vos propres statistiques'
       });
       return;
     }
