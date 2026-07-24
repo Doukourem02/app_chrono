@@ -1,6 +1,12 @@
-import { Vonage } from '@vonage/server-sdk';
+import { createRequire } from 'module';
 import { sendOTPEmail } from './emailService.js';
 import logger from './logger.js';
+
+// @vonage/server-sdk chargé en CJS : sa build ESM référence un chunk vide
+// (@vonage/messages/dist/esm) que la pipeline de déploiement Render supprime
+// silencieusement (fichiers 0 octet), causant un ERR_MODULE_NOT_FOUND au démarrage.
+const require = createRequire(import.meta.url);
+const { Vonage } = require('@vonage/server-sdk');
 
 const vonage =
   process.env.VONAGE_API_KEY && process.env.VONAGE_API_SECRET

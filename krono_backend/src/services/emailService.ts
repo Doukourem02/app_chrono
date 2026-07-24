@@ -1,11 +1,17 @@
 import nodemailer, { Transporter } from 'nodemailer';
-import { Vonage } from '@vonage/server-sdk';
+import { createRequire } from 'module';
 import { OTP_TTL_MINUTES } from '../config/otpTtl.js';
 import logger from '../utils/logger.js';
 import {
   isTwilioSmsConfigured,
   sendOTPSMSTwilio,
 } from './twilioSmsService.js';
+
+// @vonage/server-sdk chargé en CJS : sa build ESM référence un chunk vide
+// (@vonage/messages/dist/esm) que la pipeline de déploiement Render supprime
+// silencieusement (fichiers 0 octet), causant un ERR_MODULE_NOT_FOUND au démarrage.
+const require = createRequire(import.meta.url);
+const { Vonage } = require('@vonage/server-sdk');
 
 let transporter: Transporter | null = null;
 
