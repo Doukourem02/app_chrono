@@ -10,6 +10,7 @@
     "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/unit",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/integration",
     "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --ci --coverage --maxWorkers=2",
+    "postinstall": "node scripts/patch-nodemailer.js",
     "build": "tsc && npm run bundle",
     "bundle": "esbuild dist/src/server.js --bundle --platform=node --format=esm --outfile=dist/src/bundle.mjs --external:swagger-ui-express --external:swagger-ui-dist --banner:js=\"import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);\"",
     "dev": "tsx watch src/server.ts",
