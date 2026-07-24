@@ -21,6 +21,7 @@ Paiement / mobile money : fichier dédié `docs/integration_paiement_en_ligne.md
 
 - Tester le chemin "base Supabase vide → migrations 001 à 041" de bout en bout (nécessite une branche Supabase payante, pas encore lancée).
 - Vérifier sur un vrai appareil les alertes push de solde commission livreur (`commissionService.checkAndSendAlerts`).
+- **Tester le flux d'invitation staff de bout en bout** : inviter un vrai email depuis la page Utilisateurs (en tant que `super_admin`), vérifier la réception du mail et la définition du mot de passe via `/reset-password`.
 
 ## OTP / Auth (Orange CI)
 

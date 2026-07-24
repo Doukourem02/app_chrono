@@ -6,6 +6,11 @@ import { getDateRange, normalizeDate } from './adminControllerUtils.js';
 
 export const getAdminDashboardStats = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Le chiffre d'affaires est une vision globale de l'argent de l'entreprise,
+    // réservée à super_admin (voir docs/roles_admin_super_admin.md) — un simple
+    // admin reçoit `null` (pas 0, pour distinguer "pas le droit" de "vraiment zéro").
+    const isSuperAdmin = (req as any).user?.role === 'super_admin';
+
     if (!process.env.DATABASE_URL) {
       logger.warn('DATABASE_URL non configuré pour getAdminDashboardStats');
       res.json({
@@ -15,8 +20,8 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
           onDeliveryChange: 0,
           successDeliveries: 0,
           successDeliveriesChange: 0,
-          revenue: 0,
-          revenueChange: 0,
+          revenue: isSuperAdmin ? 0 : null,
+          revenueChange: isSuperAdmin ? 0 : null,
         },
       });
       return;
@@ -52,8 +57,8 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
           onDeliveryChange: 0,
           successDeliveries: 0,
           successDeliveriesChange: 0,
-          revenue: 0,
-          revenueChange: 0,
+          revenue: isSuperAdmin ? 0 : null,
+          revenueChange: isSuperAdmin ? 0 : null,
         },
       });
       return;
@@ -180,8 +185,8 @@ export const getAdminDashboardStats = async (req: Request, res: Response): Promi
         onDeliveryChange: Math.round(onDeliveryChange * 10) / 10,
         successDeliveries,
         successDeliveriesChange: Math.round(successDeliveriesChange * 10) / 10,
-        revenue,
-        revenueChange: Math.round(revenueChange * 10) / 10,
+        revenue: isSuperAdmin ? revenue : null,
+        revenueChange: isSuperAdmin ? Math.round(revenueChange * 10) / 10 : null,
         averageRating: Math.round(averageRating * 10) / 10,
         totalRatings,
         averageDeliveryTime,

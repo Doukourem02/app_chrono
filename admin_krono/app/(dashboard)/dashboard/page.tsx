@@ -20,9 +20,11 @@ import NewShippingModal from '@/components/orders/NewShippingModal'
 import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
 import { useTranslation } from '@/hooks/useTranslation'
+import { useAuthStore } from '@/stores/authStore'
 import { useLanguageStore } from '@/stores/languageStore'
 
 export default function DashboardPage() {
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const queryClient = useQueryClient()
   const { dateFilter, dateRange } = useDateFilter()
   const { startDate, endDate } = dateRange
@@ -434,18 +436,20 @@ export default function DashboardPage() {
               compact
               style={leftKpiCardStyle}
             />
-            <KPICard
-              title={t('dashboard.kpis.revenue.title')}
-              value={statsLoading ? '...' : formatRevenue(stats?.revenue || 0)}
-              change={stats?.revenueChange || 0}
-              subtitle={t('dashboard.kpis.revenue.subtitle')}
-              icon={DollarSign}
-              iconColor="text-purple-600"
-              isLoading={statsLoading}
-              index={2}
-              compact
-              style={leftKpiCardStyle}
-            />
+            {isSuperAdmin && (
+              <KPICard
+                title={t('dashboard.kpis.revenue.title')}
+                value={statsLoading ? '...' : formatRevenue(stats?.revenue || 0)}
+                change={stats?.revenueChange || 0}
+                subtitle={t('dashboard.kpis.revenue.subtitle')}
+                icon={DollarSign}
+                iconColor="text-purple-600"
+                isLoading={statsLoading}
+                index={2}
+                compact
+                style={leftKpiCardStyle}
+              />
+            )}
           </div>
 
           {/* Colonne du milieu : Delivery Analytics */}

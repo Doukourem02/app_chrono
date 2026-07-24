@@ -11,6 +11,7 @@ import { themeColors } from '@/utils/theme'
 import type { Partner } from '@/types'
 import { useTranslation } from '@/hooks/useTranslation'
 import { useLanguageStore } from '@/stores/languageStore'
+import { useAuthStore } from '@/stores/authStore'
 
 const PLAN_LABELS: Record<string, string> = {
   starter: 'Starter',
@@ -189,6 +190,7 @@ function DeletePartnerModal({
 // ─── Page principale ───────────────────────────────────────────────────────────
 export default function PartnersPage() {
   const t = useTranslation()
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const language = useLanguageStore((state) => state.language)
   const dateLocale = language === 'en' ? 'en-US' : 'fr-FR'
   const router = useRouter()
@@ -260,13 +262,15 @@ export default function PartnersPage() {
                 : t('partnersPage.partnerCountMany', { count: filtered.length })}
             </p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-          >
-            <Plus size={16} />
-            {t('partnersPage.newPartner')}
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setShowCreate(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <Plus size={16} />
+              {t('partnersPage.newPartner')}
+            </button>
+          )}
         </div>
 
         {/* Filtres */}
@@ -404,7 +408,7 @@ export default function PartnersPage() {
                       </td>
                       <td style={{ padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {partner.status === 'pending' && (
+                          {isSuperAdmin && partner.status === 'pending' && (
                             <button
                               onClick={(e) => handleActivate(e, partner.id)}
                               disabled={activating === partner.id}
@@ -420,14 +424,16 @@ export default function PartnersPage() {
                           >
                             <Eye size={14} /> {t('common.view')}
                           </button>
-                          <button
-                            type="button"
-                            title={t('partnersPage.deleteTitle')}
-                            onClick={(e) => { e.stopPropagation(); setPartnerToDelete(partner) }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${themeColors.redPrimary}`, backgroundColor: 'transparent', color: themeColors.redPrimary, fontSize: 13, cursor: 'pointer' }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              type="button"
+                              title={t('partnersPage.deleteTitle')}
+                              onClick={(e) => { e.stopPropagation(); setPartnerToDelete(partner) }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${themeColors.redPrimary}`, backgroundColor: 'transparent', color: themeColors.redPrimary, fontSize: 13, cursor: 'pointer' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

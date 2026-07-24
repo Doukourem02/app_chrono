@@ -106,7 +106,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, isSuperAdmin } = useAuthStore();
   const theme = useThemeStore((state) => state.theme);
   const isDarkMode = theme === 'dark';
   const t = useTranslation();
@@ -117,14 +117,18 @@ export default function Sidebar() {
     label: t(`sidebar.mainNav.${item.key}`)
   }));
   
-  const navigationSections: NavSection[] = navigationSectionsKeys.map(section => ({
-    ...section,
-    label: t(`sidebar.sections.${section.key}.title`),
-    items: section.items.map(item => ({
-      ...item,
-      label: t(`sidebar.sections.${section.key}.${item.key}`)
-    }))
-  }));
+  const navigationSections: NavSection[] = navigationSectionsKeys
+    // "analyses" (analytics/reports) et "finances" (transactions/commissions) : vision globale
+    // de l'argent de l'entreprise, réservée au super_admin (docs/roles_admin_super_admin.md).
+    .filter(section => isSuperAdmin || (section.id !== 'analyses' && section.id !== 'finances'))
+    .map(section => ({
+      ...section,
+      label: t(`sidebar.sections.${section.key}.title`),
+      items: section.items.map(item => ({
+        ...item,
+        label: t(`sidebar.sections.${section.key}.${item.key}`)
+      }))
+    }));
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);

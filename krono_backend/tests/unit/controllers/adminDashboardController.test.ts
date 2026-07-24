@@ -24,7 +24,12 @@ describe('adminDashboardController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPool.query.mockReset();
-    mockRequest = { params: {}, body: {}, query: {} } as unknown as Partial<Request>;
+    mockRequest = {
+      params: {},
+      body: {},
+      query: {},
+      user: { id: 'test-super-admin', role: 'super_admin' },
+    } as unknown as Partial<Request>;
     mockResponse = {
       status: jest.fn().mockReturnThis() as any,
       json: jest.fn().mockReturnThis() as any,
@@ -67,6 +72,31 @@ describe('adminDashboardController', () => {
         expect.objectContaining({
           success: true,
           data: expect.objectContaining({ successDeliveries: 5, revenue: 10000, revenueChange: 100 }),
+        })
+      );
+    });
+
+    it('masque le chiffre d\'affaires (revenue à null) pour un admin simple, pas super_admin', async () => {
+      process.env.DATABASE_URL = 'postgres://test';
+      (mockRequest as any).user = { id: 'test-admin', role: 'admin' };
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ count: '3' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ column_name: 'price_cfa' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ count: '5', total_revenue: '10000' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ count: '2', total_revenue: '5000' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ exists: false }] } as any)
+        .mockResolvedValueOnce({ rows: [{ avg_time: null }] } as any)
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ count: '2' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ count: '1' }] } as any);
+
+      await adminDashboardController.getAdminDashboardStats(mockRequest as Request, mockResponse as Response);
+
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({ successDeliveries: 5, revenue: null, revenueChange: null }),
         })
       );
     });

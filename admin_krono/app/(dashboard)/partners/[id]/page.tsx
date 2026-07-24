@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import type { Driver, PartnerDriver, PartnerDriverRequest, PartnerInvoice, PartnerPaymentMethod, PartnerSubscription } from '@/types'
+import { useAuthStore } from '@/stores/authStore'
 
 const PLAN_DEFAULTS: Record<string, { price: number; quota: number | null; label: string }> = {
   starter:  { price: 8_000,  quota: 35,  label: 'Starter — 8 000 FCFA / mois' },
@@ -376,6 +377,7 @@ function CreateSubscriptionModal({ partnerId, onClose, onCreated }: { partnerId:
 
 // ─── Carte abonnement ─────────────────────────────────────────────────────────
 function SubscriptionCard({ sub, partnerId, onRefresh }: { sub: PartnerSubscription; partnerId: string; onRefresh: () => void }) {
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const [showPayment, setShowPayment] = useState(false)
 
   const isPending = sub.payment_status === 'pending_payment'
@@ -407,7 +409,7 @@ function SubscriptionCard({ sub, partnerId, onRefresh }: { sub: PartnerSubscript
             </p>
           )}
         </div>
-        {isPending && (
+        {isPending && isSuperAdmin && (
           <button
             onClick={() => setShowPayment(true)}
             style={{ padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.greenPrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
@@ -680,6 +682,7 @@ function PartnerDedicatedDriversSection({ partnerId }: { partnerId: string }) {
 // ─── Page principale ───────────────────────────────────────────────────────────
 export default function PartnerDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const router = useRouter()
   const queryClient = useQueryClient()
   const [showCreateSub, setShowCreateSub] = useState(false)
@@ -800,8 +803,8 @@ export default function PartnerDetailPage() {
         </div>
       )}
 
-      {/* Gestion du statut */}
-      {(() => {
+      {/* Gestion du statut — super_admin uniquement (décision commerciale) */}
+      {isSuperAdmin && (() => {
         const s = partner.status
         const actions: { label: string; status: 'active' | 'inactive' | 'suspended'; Icon: React.ElementType; bg: string; color: string }[] = []
         if (s === 'pending')   actions.push({ label: 'Activer',     status: 'active',    Icon: Zap,       bg: '#D97706', color: '#fff' })
@@ -868,12 +871,14 @@ export default function PartnerDetailPage() {
       <div style={{ backgroundColor: themeColors.cardBg, border: `1px solid ${themeColors.cardBorder}`, borderRadius: 12, padding: '16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: themeColors.textPrimary }}>Abonnement</h2>
-          <button
-            onClick={() => setShowCreateSub(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-          >
-            + Nouvel abonnement
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setShowCreateSub(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${themeColors.purplePrimary}`, backgroundColor: 'transparent', color: themeColors.purplePrimary, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              + Nouvel abonnement
+            </button>
+          )}
         </div>
         {partner.active_subscription ? (
           <SubscriptionCard sub={partner.active_subscription} partnerId={id} onRefresh={refresh} />
@@ -927,7 +932,7 @@ export default function PartnerDetailPage() {
                       : '—'}
                   </td>
                   <td style={{ padding: '10px 12px' }}>
-                    {inv.status !== 'paid' ? (
+                    {inv.status !== 'paid' && isSuperAdmin ? (
                       <button
                         type="button"
                         onClick={() => setPayingInvoice(inv)}
@@ -946,20 +951,22 @@ export default function PartnerDetailPage() {
         )}
       </div>
 
-      {/* Suppression (admin) */}
-      <div style={{ backgroundColor: themeColors.redLight, border: `1px solid ${themeColors.redPrimary}`, borderRadius: 12, padding: '16px 20px' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: themeColors.redPrimary, marginBottom: 8 }}>Zone sensible</h2>
-        <p style={{ fontSize: 13, color: themeColors.textSecondary, marginBottom: 12 }}>
-          Supprimer définitivement ce partenaire et ses données de facturation B2B. Les commandes historiques conservent une trace sans lien partenaire.
-        </p>
-        <button
-          type="button"
-          onClick={() => setShowDelete(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-        >
-          <Trash2 size={15} /> Supprimer le partenaire
-        </button>
-      </div>
+      {/* Suppression (super_admin) */}
+      {isSuperAdmin && (
+        <div style={{ backgroundColor: themeColors.redLight, border: `1px solid ${themeColors.redPrimary}`, borderRadius: 12, padding: '16px 20px' }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: themeColors.redPrimary, marginBottom: 8 }}>Zone sensible</h2>
+          <p style={{ fontSize: 13, color: themeColors.textSecondary, marginBottom: 12 }}>
+            Supprimer définitivement ce partenaire et ses données de facturation B2B. Les commandes historiques conservent une trace sans lien partenaire.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowDelete(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: themeColors.redPrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            <Trash2 size={15} /> Supprimer le partenaire
+          </button>
+        </div>
+      )}
 
       {showCreateSub && (
         <CreateSubscriptionModal

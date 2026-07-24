@@ -651,9 +651,11 @@ export const rechargeAdminDriverCommission = async (req: Request, res: Response)
       return;
     }
 
+    const performedBy = (req as any).user?.id ?? null;
+
     const rechargeResult = await pool.query(
-      `SELECT recharge_commission_balance($1, $2, $3, NULL, NULL, $4) as transaction_id`,
-      [driverId, amount, method, notes || `Recharge manuelle par admin`]
+      `SELECT recharge_commission_balance($1, $2, $3, NULL, NULL, $4, $5) as transaction_id`,
+      [driverId, amount, method, notes || `Recharge manuelle par admin`, performedBy]
     );
 
     const transactionId = rechargeResult.rows[0].transaction_id;

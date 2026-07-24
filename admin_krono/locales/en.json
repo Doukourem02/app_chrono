@@ -403,6 +403,7 @@
   },
   "financePage": {
     "title": "Finance",
+    "restrictedToSuperAdmin": "Restricted to super admin",
     "refresh": "Refresh",
     "export": "Export",
     "periods": {
@@ -466,6 +467,7 @@
   },
   "reportsPage": {
     "title": "Reports",
+    "restrictedToSuperAdmin": "Restricted to super admin",
     "export": "Export (PDF/Excel)",
     "filters": {
       "title": "Period filters",
@@ -751,6 +753,22 @@
     },
     "pagination": {
       "showing": "Showing {{from}} to {{to}} of {{total}} entries"
+    },
+    "invite": {
+      "button": "Invite a member",
+      "modalTitle": "Invite a staff member",
+      "emailLabel": "Email",
+      "emailPlaceholder": "first.last@krono.com",
+      "roleLabel": "Role",
+      "roleAdmin": "Admin",
+      "roleSuperAdmin": "Super admin",
+      "submit": "Send invitation",
+      "submitting": "Sending...",
+      "cancel": "Cancel",
+      "success": "Invitation sent. The person will receive an email to set their password.",
+      "errorGeneric": "Could not send the invitation.",
+      "errorExists": "An account with this email already exists.",
+      "errorRateLimit": "Too many attempts, try again later."
     }
   },
   "drivers": {
@@ -840,6 +858,7 @@
   "promoCodes": {
     "title": "Promo codes",
     "newCode": "New code",
+    "comingSoon": "Creating promo codes isn't available yet: no discount created here currently applies to any order.",
     "searchPlaceholder": "Search a promo code...",
     "empty": "No promo code found",
     "createTitle": "Create a promo code",
@@ -874,6 +893,7 @@
   },
   "commissions": {
     "title": "Commissions",
+    "restrictedToSuperAdmin": "Restricted to super admin",
     "searchPlaceholder": "Search (driver, order...)",
     "exportCsv": "Export CSV",
     "empty": "No transaction found",
@@ -912,6 +932,7 @@
   },
   "analytics": {
     "title": "Advanced analytics",
+    "restrictedToSuperAdmin": "Restricted to super admin",
     "tabs": {
       "overview": "Overview",
       "ratings": "Ratings"

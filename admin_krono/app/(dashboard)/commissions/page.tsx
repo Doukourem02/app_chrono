@@ -11,6 +11,7 @@ import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
 import { useTranslation } from '@/hooks/useTranslation'
 import { useLanguageStore } from '@/stores/languageStore'
+import { useAuthStore } from '@/stores/authStore'
 
 interface CommissionTransaction {
   id: string
@@ -27,6 +28,7 @@ interface CommissionTransaction {
 export default function CommissionsPage() {
   const router = useRouter()
   const t = useTranslation()
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const language = useLanguageStore((state) => state.language)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | 'recharge' | 'deduction' | 'refund'>('all')
@@ -190,6 +192,16 @@ export default function CommissionsPage() {
     a.download = `commissions_${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
+  }
+
+  if (!isSuperAdmin) {
+    return (
+      <ScreenTransition>
+        <div style={{ padding: '40px', textAlign: 'center', color: themeColors.textSecondary, backgroundColor: themeColors.cardBg, borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, margin: '24px' }}>
+          {t('commissions.restrictedToSuperAdmin')}
+        </div>
+      </ScreenTransition>
+    )
   }
 
   return (

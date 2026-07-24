@@ -1,23 +1,5 @@
 import express, { Router } from 'express';
-import {
-  getFleetVehicles,
-  getFleetVehicleDetails,
-  createFleetVehicle,
-  updateFleetVehicle,
-  addFuelLog,
-  getFuelLogs,
-  createMaintenance,
-  updateMaintenance,
-  getMaintenanceHistory,
-  uploadVehicleDocumentImage,
-  upsertVehicleDocument,
-  getVehicleDocuments,
-  getExpiringDocuments,
-  getVehicleFinancialSummary,
-  calculateFinancialSummary,
-  logDeliveryMileage,
-  getMileageHistory,
-} from '../controllers/fleetController.js';
+import {getFleetVehicles,getFleetVehicleDetails,createFleetVehicle,updateFleetVehicle,addFuelLog,getFuelLogs,createMaintenance,updateMaintenance,getMaintenanceHistory,uploadVehicleDocumentImage,upsertVehicleDocument,getVehicleDocuments,getExpiringDocuments,getVehicleFinancialSummary,calculateFinancialSummary,logDeliveryMileage,getMileageHistory,} from '../controllers/fleetController.js';
 import { verifyAdminSupabase } from '../middleware/verifyAdminSupabase.js';
 import { verifyJWT } from '../middleware/verifyToken.js';
 

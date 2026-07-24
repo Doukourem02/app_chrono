@@ -11,6 +11,7 @@ import { themeColors } from '@/utils/theme'
 import { exportToPDF, exportToExcel } from '@/utils/exportUtils'
 import { useTranslation } from '@/hooks/useTranslation'
 import { useLanguageStore } from '@/stores/languageStore'
+import { useAuthStore } from '@/stores/authStore'
 
 interface ZoneData {
   zone: string
@@ -38,6 +39,7 @@ interface ExportOrder {
 
 export default function AnalyticsPage() {
   const t = useTranslation()
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const language = useLanguageStore((state) => state.language)
   const dateLocale = language === 'en' ? 'en-US' : 'fr-FR'
   const [activeTab, setActiveTab] = useState<TabType>('overview')
@@ -332,6 +334,7 @@ export default function AnalyticsPage() {
 
       {/* Contenu onglet Overview */}
       {activeTab === 'overview' && (
+        isSuperAdmin ? (
         <>
 
       {/* KPIs en temps réel */}
@@ -650,7 +653,13 @@ export default function AnalyticsPage() {
           </div>
         </div>
       )}
-      </>)}
+      </>
+        ) : (
+          <div style={{ padding: '40px', textAlign: 'center', color: themeColors.textSecondary, backgroundColor: themeColors.cardBg, borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}` }}>
+            {t('analytics.restrictedToSuperAdmin')}
+          </div>
+        )
+      )}
 
       {/* Contenu onglet Évaluations */}
       {activeTab === 'ratings' && (

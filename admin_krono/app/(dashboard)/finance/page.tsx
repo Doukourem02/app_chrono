@@ -9,6 +9,7 @@ import { exportData } from '@/utils/exportUtils'
 import { themeColors } from '@/utils/theme'
 import { useLanguageStore } from '@/stores/languageStore'
 import { useTranslation } from '@/hooks/useTranslation'
+import { useAuthStore } from '@/stores/authStore'
 import {BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,} from 'recharts'
 
 type Period = 'today' | 'week' | 'month' | 'year' | 'custom'
@@ -28,6 +29,7 @@ interface Transaction {
 
 export default function FinancePage() {
   const t = useTranslation()
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const language = useLanguageStore((state) => state.language)
   const locale = language === 'fr' ? 'fr-FR' : 'en-US'
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('month')
@@ -434,6 +436,16 @@ export default function FinancePage() {
           <div>{t('financePage.table.loading')}</div>
         </div>
       </div>
+    )
+  }
+
+  if (!isSuperAdmin) {
+    return (
+      <ScreenTransition direction="fade" duration={0.3}>
+        <div style={{ padding: '40px', textAlign: 'center', color: themeColors.textSecondary, backgroundColor: themeColors.cardBg, borderRadius: '8px', border: `1px solid ${themeColors.cardBorder}`, margin: '24px' }}>
+          {t('financePage.restrictedToSuperAdmin')}
+        </div>
+      </ScreenTransition>
     )
   }
 

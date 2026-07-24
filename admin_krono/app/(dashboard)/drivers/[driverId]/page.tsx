@@ -9,6 +9,7 @@ import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import type { Driver } from '@/types'
 import { useTranslation } from '@/hooks/useTranslation'
+import { useAuthStore } from '@/stores/authStore'
 
 type TabType = 'overview' | 'commission' | 'deliveries' | 'ratings'
 
@@ -26,6 +27,7 @@ export default function DriverDetailPage() {
   const router = useRouter()
   const params = useParams()
   const t = useTranslation()
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const driverId = params?.driverId as string
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<TabType>('overview')
@@ -390,22 +392,24 @@ export default function DriverDetailPage() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowRechargeModal(true)}
-                  style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    backgroundColor: '#8B5CF6',
-                    color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <CreditCard size={16} style={{ display: 'inline', marginRight: '8px' }} />
-                  {t('drivers.detail.recharge')}
-                </button>
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => setShowRechargeModal(true)}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      backgroundColor: '#8B5CF6',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <CreditCard size={16} style={{ display: 'inline', marginRight: '8px' }} />
+                    {t('drivers.detail.recharge')}
+                  </button>
+                )}
               </div>
 
               {/* Statistiques Commission */}

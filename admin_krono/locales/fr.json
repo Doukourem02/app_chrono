@@ -403,6 +403,7 @@
   },
   "financePage": {
     "title": "Finance",
+    "restrictedToSuperAdmin": "Réservé au super administrateur",
     "refresh": "Actualiser",
     "export": "Exporter",
     "periods": {
@@ -466,6 +467,7 @@
   },
   "reportsPage": {
     "title": "Rapports",
+    "restrictedToSuperAdmin": "Réservé au super administrateur",
     "export": "Exporter (PDF/Excel)",
     "filters": {
       "title": "Filtres de période",
@@ -751,6 +753,22 @@
     },
     "pagination": {
       "showing": "Affichage de {{from}} à {{to}} sur {{total}} entrées"
+    },
+    "invite": {
+      "button": "Inviter un membre",
+      "modalTitle": "Inviter un membre du staff",
+      "emailLabel": "Email",
+      "emailPlaceholder": "prenom.nom@krono.com",
+      "roleLabel": "Rôle",
+      "roleAdmin": "Admin",
+      "roleSuperAdmin": "Super admin",
+      "submit": "Envoyer l'invitation",
+      "submitting": "Envoi...",
+      "cancel": "Annuler",
+      "success": "Invitation envoyée. La personne recevra un email pour définir son mot de passe.",
+      "errorGeneric": "Impossible d'envoyer l'invitation.",
+      "errorExists": "Un compte existe déjà avec cet email.",
+      "errorRateLimit": "Trop de tentatives, réessayez plus tard."
     }
   },
   "drivers": {
@@ -840,6 +858,7 @@
   "promoCodes": {
     "title": "Codes promo",
     "newCode": "Nouveau code",
+    "comingSoon": "La création de codes promo n'est pas encore disponible : aucune remise créée ici ne s'applique pour l'instant à une commande.",
     "searchPlaceholder": "Rechercher un code promo...",
     "empty": "Aucun code promo trouvé",
     "createTitle": "Créer un code promo",
@@ -874,6 +893,7 @@
   },
   "commissions": {
     "title": "Commissions",
+    "restrictedToSuperAdmin": "Réservé au super administrateur",
     "searchPlaceholder": "Rechercher (livreur, commande...)",
     "exportCsv": "Exporter CSV",
     "empty": "Aucune transaction trouvée",
@@ -912,6 +932,7 @@
   },
   "analytics": {
     "title": "Analytics avancés",
+    "restrictedToSuperAdmin": "Réservé au super administrateur",
     "tabs": {
       "overview": "Vue d'ensemble",
       "ratings": "Évaluations"

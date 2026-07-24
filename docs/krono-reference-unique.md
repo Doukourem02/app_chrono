@@ -359,6 +359,12 @@ Règles :
 
 Implémentation : détection opérateur par préfixe national dans `krono_backend/src/utils/phoneE164CI.ts` (`detectCarrierCI`, testé) ; logique de choix de canal dans `authController.ts` (`sendOTPCode`) ; bouton fallback dans `app_krono/app/(auth)/verification.tsx` et `driver_krono/app/(auth)/verification.tsx`. WhatsApp Sender Twilio opérationnel (`+19788624416`, "Krono Livraison"). Reste à faire côté utilisateur (template WhatsApp, etc.) : voir `docs/taches.md`.
 
+**Rôles `admin` / `super_admin` sur `admin_krono` — implémenté le 2026-07-24.** Aucune auto-inscription sur le dashboard : un compte staff n'existe que via invitation par un `super_admin` (bouton sur la page Utilisateurs → email → `supabase.auth.admin.inviteUserByEmail` → la personne définit son mot de passe via `/reset-password`, réutilisé pour ce cas). Découpage des droits (middleware `requireSuperAdmin`, `krono_backend/src/middleware/requireSuperAdmin.ts`) :
+- `admin` garde tout le suivi opérationnel quotidien : commandes, avis, litiges clients, messagerie, flotte, livreurs dédiés partenaires, lecture générale (hors chiffre d'affaires).
+- `super_admin` exclusif : recharger la commission d'un livreur (tracé via `commission_transactions.performed_by`, migration `046`), créer/activer/statut/supprimer un partenaire, créer/activer un abonnement, marquer une facture payée, inviter un membre du staff, et la vision financière globale de l'entreprise (`/analytics`, `/reports`, `/finance`, `/commissions`, carte "Chiffre d'affaires" du dashboard).
+- Changer le rôle d'un membre du staff existant : `PUT /api/admin/users/:userId/role` (`updateStaffRole`), réservé `super_admin`, avec garde-fou — impossible de faire tomber le nombre de `super_admin` actifs à zéro.
+- Code promo : création masquée honnêtement (pas de rôle attribué) car aucune rédemption n'existe encore côté prix — voir `docs/futur_feature_admin_krono.md`.
+
 ---
 
 ## 11. Support / diagnostic rapide

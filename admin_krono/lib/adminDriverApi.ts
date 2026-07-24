@@ -47,6 +47,30 @@ export class AdminDriverApi extends AdminFinanceApi {
   }
 
   /**
+   * Change le rôle d'un membre du staff existant (admin <-> super_admin).
+   * Réservé super_admin côté backend (requireSuperAdmin).
+   */
+  async updateStaffRole(userId: string, role: 'admin' | 'super_admin'): Promise<{
+    success: boolean
+    message?: string
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/users/${userId}/role`, {
+        method: 'PUT',
+        body: JSON.stringify({ role }),
+      })
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) {
+        return { success: result.success || false, message: typeof result.message === 'string' ? result.message : undefined }
+      }
+      return { success: false }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Error in updateStaffRole:', error)
+      return { success: false }
+    }
+  }
+
+  /**
    * Met à jour le statut d'un driver
    */
   async updateDriverStatus(driverId: string, isActive: boolean): Promise<{

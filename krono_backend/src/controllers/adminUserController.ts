@@ -414,3 +414,66 @@ export const getAdminAdminDetails = async (req: Request, res: Response): Promise
     res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
   }
 };
+
+/**
+ * Change le rôle d'un membre du staff existant (admin <-> super_admin uniquement).
+ * Réservé à super_admin (voir requireSuperAdmin sur la route).
+ * Garde-fou : impossible de faire tomber le nombre de super_admin actifs à zéro.
+ */
+export const updateStaffRole = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (role !== 'admin' && role !== 'super_admin') {
+      res.status(400).json({ success: false, message: 'Rôle invalide — doit être "admin" ou "super_admin"' });
+      return;
+    }
+
+    if (!process.env.DATABASE_URL) {
+      res.status(404).json({ success: false, message: 'Membre du staff non trouvé' });
+      return;
+    }
+
+    const targetResult = await pool.query(
+      `SELECT id, role FROM users WHERE id = $1 AND (role = 'admin' OR role = 'super_admin')`,
+      [userId]
+    );
+
+    if (targetResult.rows.length === 0) {
+      res.status(404).json({ success: false, message: 'Membre du staff non trouvé' });
+      return;
+    }
+
+    const target = targetResult.rows[0];
+
+    if (target.role === role) {
+      res.json({ success: true, message: 'Rôle déjà à jour', data: { id: target.id, role } });
+      return;
+    }
+
+    // Garde-fou : ne jamais faire tomber le nombre de super_admin actifs à zéro.
+    if (target.role === 'super_admin' && role !== 'super_admin') {
+      const countResult = await pool.query(
+        `SELECT COUNT(*) as count FROM users WHERE role = 'super_admin'`
+      );
+      const superAdminCount = parseInt(countResult.rows[0]?.count || '0', 10);
+      if (superAdminCount <= 1) {
+        res.status(400).json({
+          success: false,
+          message: 'Impossible : il doit toujours rester au moins un super administrateur',
+        });
+        return;
+      }
+    }
+
+    await pool.query(`UPDATE users SET role = $1 WHERE id = $2`, [role, userId]);
+
+    logger.info('[updateStaffRole] Rôle mis à jour', { userId, previousRole: target.role, newRole: role, performedBy: (req as any).user?.id });
+
+    res.json({ success: true, message: 'Rôle mis à jour', data: { id: userId, role } });
+  } catch (error: any) {
+    logger.error('Erreur updateStaffRole:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
+  }
+};

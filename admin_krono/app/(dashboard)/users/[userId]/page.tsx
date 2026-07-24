@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import { adminApiService } from '@/lib/adminApiService'
+import { useAuthStore } from '@/stores/authStore'
 import {ArrowLeft,Mail,Phone,Calendar,Truck,MapPin,Power,User,Shield,CreditCard,Download,} from 'lucide-react'
 import { exportData } from '@/utils/exportUtils'
 import { logger } from '@/utils/logger'
@@ -225,6 +226,7 @@ function displayEmail(email?: string | null): string {
 export default function UserDetailsPage() {
   const router = useRouter()
   const params = useParams()
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const userId = params?.userId as string
   const queryClient = useQueryClient()
 
@@ -332,6 +334,21 @@ export default function UserDetailsPage() {
       return await adminApiService.updateDriverStatus(userId, isActive)
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-details', userId] })
+    },
+  })
+
+  const [roleChangeError, setRoleChangeError] = React.useState<string | null>(null)
+  const updateRoleMutation = useMutation({
+    mutationFn: async (role: 'admin' | 'super_admin') => {
+      return await adminApiService.updateStaffRole(userId, role)
+    },
+    onSuccess: (result) => {
+      if (!result.success) {
+        setRoleChangeError(result.message || 'Impossible de changer le rôle.')
+        return
+      }
+      setRoleChangeError(null)
       queryClient.invalidateQueries({ queryKey: ['user-details', userId] })
     },
   })
@@ -1013,9 +1030,27 @@ export default function UserDetailsPage() {
                     <Shield size={16} style={{ color: '#6B7280' }} />
                     <div>
                       <div style={{ fontSize: '12px', color: '#6B7280' }}>Rôle</div>
-                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                        {user.role === 'super_admin' ? 'Super Administrateur' : 'Administrateur'}
-                      </div>
+                      {isSuperAdmin ? (
+                        <select
+                          value={user.role === 'super_admin' ? 'super_admin' : 'admin'}
+                          disabled={updateRoleMutation.isPending}
+                          onChange={(e) => {
+                            const nextRole = e.target.value as 'admin' | 'super_admin'
+                            updateRoleMutation.mutate(nextRole)
+                          }}
+                          style={{ fontSize: '14px', fontWeight: 600, color: '#111827', padding: '4px 8px', borderRadius: 6, border: '1px solid #D1D5DB' }}
+                        >
+                          <option value="admin">Administrateur</option>
+                          <option value="super_admin">Super Administrateur</option>
+                        </select>
+                      ) : (
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                          {user.role === 'super_admin' ? 'Super Administrateur' : 'Administrateur'}
+                        </div>
+                      )}
+                      {roleChangeError && (
+                        <div style={{ fontSize: '12px', color: '#DC2626', marginTop: '4px' }}>{roleChangeError}</div>
+                      )}
                     </div>
                   </div>
                   <div style={infoItemStyle}>

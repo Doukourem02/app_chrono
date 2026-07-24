@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import config from '@/lib/config'
 import { useAuthStore } from '@/stores/authStore'
@@ -14,7 +15,9 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [configError, setConfigError] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const { setUser, checkAdminRole } = useAuthStore()
 
   useEffect(() => {
@@ -28,6 +31,10 @@ export default function LoginForm() {
     const errorParam = searchParams.get('error')
     if (errorParam === 'access_denied') {
       setError('Accès refusé. Vous devez être administrateur.')
+    }
+
+    if (searchParams.get('reset') === 'success') {
+      setSuccess('Mot de passe mis à jour. Connectez-vous avec votre nouveau mot de passe.')
     }
   }, [searchParams])
 
@@ -150,6 +157,30 @@ export default function LoginForm() {
     padding: '12px 16px',
     borderRadius: '8px',
     fontSize: '14px',
+  }
+
+  const successStyle: React.CSSProperties = {
+    backgroundColor: '#F0FDF4',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#BBF7D0',
+    color: '#166534',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    fontSize: '14px',
+  }
+
+  const belowCardStyle: React.CSSProperties = {
+    marginTop: '24px',
+    fontSize: '14px',
+    color: '#6B7280',
+    textAlign: 'center',
+  }
+
+  const forgotLinkStyle: React.CSSProperties = {
+    color: '#8B5CF6',
+    fontWeight: 500,
+    textDecoration: 'none',
   }
 
   const labelStyle: React.CSSProperties = {
@@ -280,8 +311,14 @@ export default function LoginForm() {
         </div>
 
         <form onSubmit={handleLogin} style={formStyle}>
+          {success && !error && (
+            <div style={successStyle} role="status">
+              {success}
+            </div>
+          )}
+
           {error && (
-            <div style={errorStyle}>
+            <div style={errorStyle} role="alert" aria-live="polite">
               {error}
             </div>
           )}
@@ -296,6 +333,8 @@ export default function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoFocus
+              autoComplete="email"
               placeholder="admin@krono.com"
               style={{
                 ...inputStyle,
@@ -315,25 +354,59 @@ export default function LoginForm() {
             <label htmlFor="password" style={labelStyle}>
               Mot de passe
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              style={{
-                ...inputStyle,
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#8B5CF6'
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#D1D5DB'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                style={{
+                  ...inputStyle,
+                  paddingRight: '44px',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#8B5CF6'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#D1D5DB'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  padding: '4px',
+                  cursor: 'pointer',
+                  color: '#6B7280',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           <button
@@ -354,6 +427,13 @@ export default function LoginForm() {
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
+      </div>
+
+      <div style={belowCardStyle}>
+        Mot de passe oublié ?{' '}
+        <Link href="/forgot-password" style={forgotLinkStyle}>
+          Réinitialiser
+        </Link>
       </div>
     </div>
   )

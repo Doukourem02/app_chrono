@@ -3,13 +3,15 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Search, User, Truck, Shield, Eye } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, User, Truck, Shield, Eye, UserPlus } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import { asApiArray } from '@/types/api'
 import { useTranslation } from '@/hooks/useTranslation'
+import { useAuthStore } from '@/stores/authStore'
+import InviteMemberModal from '@/components/users/InviteMemberModal'
 
 interface UserData {
   id: string
@@ -27,9 +29,11 @@ const VISIBLE_USER_ROLES = new Set(['client', 'driver', 'admin', 'super_admin'])
 export default function UsersPage() {
   const router = useRouter()
   const t = useTranslation()
+  const { isSuperAdmin } = useAuthStore()
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [showInviteModal, setShowInviteModal] = useState(false)
   const itemsPerPage = 10
 
   const { data: usersData, isLoading } = useQuery({
@@ -304,7 +308,30 @@ export default function UsersPage() {
     <ScreenTransition direction="fade" duration={0.3}>
       <div style={containerStyle}>
       <div style={headerStyle}>
-        <h1 style={titleStyle}>{t('users.title')}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 style={titleStyle}>{t('users.title')}</h1>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setShowInviteModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                backgroundColor: themeColors.purplePrimary,
+                color: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <UserPlus size={16} />
+              {t('users.invite.button')}
+            </button>
+          )}
+        </div>
         <div style={statsContainerStyle}>
           <div style={statCardStyle}>
             <div style={statIconStyle('#DBEAFE')}>
@@ -547,6 +574,7 @@ export default function UsersPage() {
         )}
       </div>
     </div>
+    {showInviteModal && <InviteMemberModal onClose={() => setShowInviteModal(false)} />}
     </ScreenTransition>
   )
 }

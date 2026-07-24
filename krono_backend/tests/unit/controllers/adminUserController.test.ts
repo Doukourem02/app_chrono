@@ -87,4 +87,56 @@ describe('adminUserController', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(404);
     });
   });
+
+  describe('updateStaffRole', () => {
+    it('rejette un rôle invalide sans toucher la base', async () => {
+      mockRequest.params = { userId: 'staff-1' };
+      mockRequest.body = { role: 'client' };
+
+      await adminUserController.updateStaffRole(mockRequest as Request, mockResponse as Response);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockPool.query).not.toHaveBeenCalled();
+    });
+
+    it("refuse de démettre le dernier super_admin", async () => {
+      mockRequest.params = { userId: 'super-1' };
+      mockRequest.body = { role: 'admin' };
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ id: 'super-1', role: 'super_admin' }] } as any) // fetch cible
+        .mockResolvedValueOnce({ rows: [{ count: '1' }] } as any); // count super_admin
+
+      await adminUserController.updateStaffRole(mockRequest as Request, mockResponse as Response);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({ success: false, message: expect.stringContaining('au moins un super administrateur') })
+      );
+    });
+
+    it("autorise la rétrogradation s'il reste d'autres super_admin", async () => {
+      mockRequest.params = { userId: 'super-1' };
+      mockRequest.body = { role: 'admin' };
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ id: 'super-1', role: 'super_admin' }] } as any)
+        .mockResolvedValueOnce({ rows: [{ count: '2' }] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any); // UPDATE
+
+      await adminUserController.updateStaffRole(mockRequest as Request, mockResponse as Response);
+
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({ success: true, data: { id: 'super-1', role: 'admin' } })
+      );
+    });
+
+    it('404 si la cible n\'est pas un compte staff (client/driver)', async () => {
+      mockRequest.params = { userId: 'client-1' };
+      mockRequest.body = { role: 'admin' };
+      mockPool.query.mockResolvedValueOnce({ rows: [] } as any);
+
+      await adminUserController.updateStaffRole(mockRequest as Request, mockResponse as Response);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(404);
+    });
+  });
 });

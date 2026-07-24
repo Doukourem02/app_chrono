@@ -4,10 +4,14 @@ import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import { logger } from '@/utils/logger'
 
+type AdminRole = 'admin' | 'super_admin' | null
+
 interface AuthState {
   user: User | null
   loading: boolean
   isAdmin: boolean
+  role: AdminRole
+  isSuperAdmin: boolean
   setUser: (user: User | null) => void
   setLoading: (loading: boolean) => void
   checkAdminRole: () => Promise<boolean>
@@ -20,6 +24,8 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       loading: true,
       isAdmin: false,
+      role: null,
+      isSuperAdmin: false,
 
       setUser: (user) => set({ user }),
 
@@ -52,7 +58,7 @@ export const useAuthStore = create<AuthState>()(
             if (emailError || !emailData) {
               logger.error('Admin role check failed:', error || emailError)
               logger.warn('User not found in users table. Make sure the user exists with the correct ID or email.')
-              set({ isAdmin: false })
+              set({ isAdmin: false, role: null, isSuperAdmin: false })
               return false
             }
 
@@ -69,28 +75,30 @@ export const useAuthStore = create<AuthState>()(
           }
 
           if (!data) {
-            set({ isAdmin: false })
+            set({ isAdmin: false, role: null, isSuperAdmin: false })
             return false
           }
 
           const isAdmin = data.role === 'admin' || data.role === 'super_admin'
-          set({ isAdmin })
+          const isSuperAdmin = data.role === 'super_admin'
+          set({ isAdmin, role: isAdmin ? (data.role as AdminRole) : null, isSuperAdmin })
           return isAdmin
         } catch (error) {
           logger.error('Error checking admin role:', error)
-          set({ isAdmin: false })
+          set({ isAdmin: false, role: null, isSuperAdmin: false })
           return false
         }
       },
 
       signOut: async () => {
         await supabase.auth.signOut()
-        set({ user: null, isAdmin: false })
+        set({ user: null, isAdmin: false, role: null, isSuperAdmin: false })
       },
     }),
     {
       name: 'admin-auth-storage',
-      // isAdmin exclu intentionnellement — ne jamais persister un flag de privilege en localStorage
+      // isAdmin/role/isSuperAdmin exclus intentionnellement — ne jamais persister un flag
+      // de privilège en localStorage, toujours revérifié via checkAdminRole() au chargement.
       partialize: (state) => ({ user: state.user }),
     }
   )
