@@ -1,6 +1,12 @@
+import dns from 'node:dns';
 import pkg from 'pg';
 import { Pool, PoolClient } from 'pg';
 import logger from '../utils/logger.js';
+
+// L'hôte Postgres (Supabase) résout en IPv4 ET IPv6 ; certains réseaux d'hébergeurs
+// (Render notamment) n'ont pas de route sortante IPv6, d'où des ENETUNREACH si l'adresse
+// IPv6 est tentée en premier. On force l'ordre IPv4 pour éviter ce cas.
+dns.setDefaultResultOrder('ipv4first');
 
 const { Pool: PoolClass } = pkg;
 let pool: Pool | null = null;
