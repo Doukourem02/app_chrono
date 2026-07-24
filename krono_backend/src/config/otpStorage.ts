@@ -250,7 +250,7 @@ export async function verifyOTP(
   if (poolAvailable) {
     try {
       const found = await pool.query(
-        `SELECT id, code FROM otp_codes
+        `SELECT code FROM otp_codes
          WHERE email = $1 AND phone = $2 AND role = $3 AND expires_at > NOW()
          ORDER BY created_at DESC LIMIT 1`,
         [normalizeEmail(email), normalizePhoneForOtp(phone), role]
@@ -258,7 +258,10 @@ export async function verifyOTP(
 
       const row = found.rows?.[0];
       if (row && timingSafeEqualStr(row.code, code)) {
-        await pool.query(`DELETE FROM otp_codes WHERE id = $1`, [row.id]);
+        await pool.query(
+          `DELETE FROM otp_codes WHERE email = $1 AND phone = $2 AND role = $3`,
+          [normalizeEmail(email), normalizePhoneForOtp(phone), role]
+        );
         logger.info('Code OTP vérifié et supprimé de la base de données');
         return true;
       }
@@ -326,7 +329,7 @@ export async function cleanupExpiredOTP(): Promise<number> {
 
   try {
     const result = await pool.query(
-      `DELETE FROM otp_codes WHERE expires_at < NOW() RETURNING id`
+      `DELETE FROM otp_codes WHERE expires_at < NOW() RETURNING email, phone, role`
     ) as any;
 
     if (result.rows && result.rows.length > 0) {
