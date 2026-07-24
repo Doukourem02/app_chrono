@@ -1237,3 +1237,4 @@ Deux fichiers vivants dans `docs/` :
 - `docs/krono-reference-unique.md` : **orientation uniquement** — contrat produit, règles durables, architecture, cartes de fichiers, décisions. Ne doit pas contenir de tâches à exécuter (voir règle en tête de ce document).
 - `docs/taches.md` : tout ce qui reste à faire (backlog, migrations à appliquer, stabilisation App Store, roadmap B2B). Une tâche terminée est supprimée de ce fichier ; si elle change une règle durable, elle est résumée ici.
 - `docs/integration_paiement_en_ligne.md` : reste à faire spécifique à l'intégration mobile money réelle.
+- `docs/mode-emploi-krono.md` : guide utilisateur orienté usage (client, chauffeur, commerçant, partenaire, admin) — comment utiliser chaque fonctionnalité, pas une référence technique.
