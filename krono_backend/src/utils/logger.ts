@@ -1,12 +1,13 @@
 import winston from 'winston';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { Logtail } from '@logtail/node';
 import { LogtailTransport } from '@logtail/winston';
 import { requestContext } from './requestContext.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Ancré sur process.cwd() plutôt que sur __dirname/import.meta.url : une fois le code
+// bundlé (esbuild), tous les modules partagent le chemin du seul fichier de sortie, ce qui
+// fausserait un calcul relatif basé sur la profondeur d'origine de ce fichier.
+const logsDir = path.join(process.cwd(), 'logs');
 
 const requestIdFormat = winston.format((info) => {
   const requestId = requestContext.getStore()?.requestId;
@@ -33,25 +34,25 @@ const logger = winston.createLogger({
   defaultMeta: { service: 'chrono-backend' },
   transports: [
     new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/error.log'),
+      filename: path.join(logsDir, 'error.log'),
       level: 'error',
       maxsize: 5242880,
       maxFiles: 5,
     }),
     new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/combined.log'),
+      filename: path.join(logsDir, 'combined.log'),
       maxsize: 5242880,
       maxFiles: 5,
     }),
   ],
   exceptionHandlers: [
     new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/exceptions.log'),
+      filename: path.join(logsDir, 'exceptions.log'),
     }),
   ],
   rejectionHandlers: [
     new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/rejections.log'),
+      filename: path.join(logsDir, 'rejections.log'),
     }),
   ],
 });
