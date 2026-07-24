@@ -629,8 +629,8 @@ const sendOTPCode = async (
     await storeOTP(otpEmail, phoneStr, role, otpCode);
 
     if (effectiveMethod === 'sms') {
-      logger.info(`Code OTP ${otpCode} pour SMS au ${maskPhone(phoneStr)} (Twilio/Vonage)`);
-      // Attendre l’API SMS : évite un 200 alors que Twilio/Vonage a refusé ; la livraison opérateur peut encore prendre du retard.
+      logger.info(`Code OTP ${otpCode} pour SMS au ${maskPhone(phoneStr)} (Twilio)`);
+      // Attendre l’API SMS : évite un 200 alors que Twilio a refusé ; la livraison opérateur peut encore prendre du retard.
       const smsResult = await sendOTPSMS(phoneStr, otpCode, role);
       if (!smsResult.success) {
         logger.error('Échec envoi SMS:', smsResult.error);

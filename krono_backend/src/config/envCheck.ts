@@ -82,12 +82,9 @@ export function validateEnvironment(): void {
         (process.env.TWILIO_SMS_FROM?.trim() ||
           process.env.TWILIO_SMS_MESSAGING_SERVICE_SID?.trim())
     );
-    const vonageReady = Boolean(
-      process.env.VONAGE_API_KEY?.trim() && process.env.VONAGE_API_SECRET?.trim()
-    );
-    if (!twilioSmsReady && !vonageReady) {
+    if (!twilioSmsReady) {
       warnings.push(
-        'OTP par SMS : aucun fournisseur configuré (Twilio SMS : TWILIO_SMS_FROM ou TWILIO_SMS_MESSAGING_SERVICE_SID + SID/token, ou Vonage VONAGE_*). Les envois send-otp (sms) échoueront.'
+        'OTP par SMS : aucun fournisseur configuré (Twilio SMS : TWILIO_SMS_FROM ou TWILIO_SMS_MESSAGING_SERVICE_SID + SID/token). Les envois send-otp (sms) échoueront.'
       );
     }
 
