@@ -9,7 +9,12 @@ const API_BASE_URL = config.apiUrl
 
 // Créer un client Supabase pour vérifier l'authentification
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
   : null
 
 /**

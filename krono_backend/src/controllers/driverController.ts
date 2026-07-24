@@ -5,6 +5,7 @@ import logger from '../utils/logger.js';
 import { maskUserId, maskAmount, maskOrderId, maskFinancialStats } from '../utils/maskSensitiveData.js';
 import { calculateDriverRating } from '../utils/calculateDriverRating.js';
 import { recordDriverLocationThrottled } from '../services/driverLocationAuditService.js';
+import { isSelfOrAdmin } from '../middleware/isSelfOrAdmin.js';
 
 interface DriverStatus {
   user_id: string;
@@ -270,8 +271,7 @@ export const getDriverRevenues = async (req: RequestWithUser, res: Response): Pr
       return;
     }
 
-    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
-    if (!isAdmin && req.user?.id !== userId) {
+    if (!isSelfOrAdmin(req.user, userId)) {
       res.status(403).json({
         success: false,
         message: 'Vous ne pouvez consulter que vos propres revenus'
@@ -1042,8 +1042,7 @@ export const getDriverStatistics = async (req: RequestWithUser, res: Response): 
       return;
     }
 
-    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
-    if (!isAdmin && req.user?.id !== userId) {
+    if (!isSelfOrAdmin(req.user, userId)) {
       res.status(403).json({
         success: false,
         message: 'Vous ne pouvez consulter que vos propres statistiques'

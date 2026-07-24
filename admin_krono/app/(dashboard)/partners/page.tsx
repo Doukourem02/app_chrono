@@ -196,6 +196,7 @@ export default function PartnersPage() {
   const [search, setSearch] = useState('')
   const [planFilter, setPlanFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [segmentFilter, setSegmentFilter] = useState<'all' | 'small' | 'large'>('all')
   const [showCreate, setShowCreate] = useState(false)
   const [activating, setActivating] = useState<string | null>(null)
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null)
@@ -230,14 +231,20 @@ export default function PartnersPage() {
   const partners: Partner[] = useMemo(() => (data?.data ?? []) as Partner[], [data])
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return partners
+    let list = partners
+    if (segmentFilter === 'small') {
+      list = list.filter(p => p.plan === 'starter')
+    } else if (segmentFilter === 'large') {
+      list = list.filter(p => p.plan === 'pro' || p.plan === 'business')
+    }
+    if (!search.trim()) return list
     const q = search.toLowerCase()
-    return partners.filter(p =>
+    return list.filter(p =>
       p.name.toLowerCase().includes(q) ||
       p.email?.toLowerCase().includes(q) ||
       p.phone?.includes(q)
     )
-  }, [partners, search])
+  }, [partners, search, segmentFilter])
 
   return (
     <ScreenTransition>
@@ -301,6 +308,20 @@ export default function PartnersPage() {
               ['starter', PLAN_LABELS.starter],
               ['pro', PLAN_LABELS.pro],
               ['business', PLAN_LABELS.business],
+            ].map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
+          <select
+            value={segmentFilter}
+            onChange={(e) => setSegmentFilter(e.target.value as 'all' | 'small' | 'large')}
+            aria-label={t('partnersPage.filterSegmentAria')}
+            style={{ padding: '9px 12px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: themeColors.cardBg, color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer', outline: 'none' }}
+          >
+            {[
+              ['all', t('partnersPage.segmentAll')],
+              ['small', t('partnersPage.segmentSmall')],
+              ['large', t('partnersPage.segmentLarge')],
             ].map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}

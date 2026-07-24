@@ -9,6 +9,7 @@ import { notifyAllForOrderStatus } from '../services/recipientOrderNotifyService
 import { autoLogDeliveryMileage } from './fleetController.js';
 import logger from '../utils/logger.js';
 import { cancelDeferredTransactionForOrder } from '../utils/createTransactionForOrder.js';
+import { isSelfOrAdmin } from '../middleware/isSelfOrAdmin.js';
 
 interface RequestWithApp extends Request {
   app: any;
@@ -33,8 +34,7 @@ export const getUserDeliveries = async (
   res: Response
 ): Promise<void> => {
   const { userId } = req.params;
-  const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
-  if (!isAdmin && req.user?.id !== userId) {
+  if (!isSelfOrAdmin(req.user, userId)) {
     res.status(403).json({ success: false, message: 'Accès refusé' });
     return;
   }
@@ -579,8 +579,7 @@ export const getUserStatistics = async (
       return;
     }
 
-    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin';
-    if (!isAdmin && req.user?.id !== userId) {
+    if (!isSelfOrAdmin(req.user, userId)) {
       res.status(403).json({ success: false, message: 'Accès refusé' });
       return;
     }

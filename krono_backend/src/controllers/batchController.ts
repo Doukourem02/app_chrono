@@ -13,6 +13,7 @@ import qrCodeService from '../services/qrCodeService.js';
 import { completeTransactionsForOrder } from '../utils/createTransactionForOrder.js';
 import { saveDeliveryProofRecord } from '../config/orderStorage.js';
 import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
+import { isSelfOrAdmin } from '../middleware/isSelfOrAdmin.js';
 import { computeB2BCommission, incrementPartnerUsage } from '../services/b2bCommissionService.js';
 import { haversineDistanceKm } from '../services/priceCalculator.js';
 
@@ -436,7 +437,7 @@ export const createBatch = async (req: AuthenticatedRequest, res: Response): Pro
     res.status(400).json({ success: false, message: 'pickup_address est requis pour créer une tournée' });
     return;
   }
-  if (user_id && req.user?.id && req.user.id !== user_id && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+  if (user_id && req.user?.id && !isSelfOrAdmin(req.user, user_id)) {
     res.status(403).json({ success: false, message: 'Accès refusé pour cet utilisateur' });
     return;
   }
