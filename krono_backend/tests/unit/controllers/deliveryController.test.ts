@@ -51,62 +51,6 @@ describe('deliveryController', () => {
     };
   });
 
-  describe('createDelivery', () => {
-    it('should create a delivery successfully', async () => {
-      const mockQuery = (jest.fn() as any).mockResolvedValue({
-        rows: [{
-          id: 'delivery-123',
-          user_id: 'test-user-id',
-          pickup: { address: 'Pickup Address' },
-          delivery: { address: 'Delivery Address' },
-          method: 'moto',
-          status: 'pending',
-        }],
-      });
-
-      (pool as any).query = mockQuery;
-
-      mockRequest.body = {
-        userId: 'test-user-id',
-        pickup: { address: 'Pickup Address' },
-        delivery: { address: 'Delivery Address' },
-        method: 'moto',
-      };
-
-      await deliveryController.createDelivery(
-        mockRequest as any,
-        mockResponse as Response
-      );
-
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO deliveries'),
-        expect.arrayContaining(['test-user-id', expect.anything(), expect.anything(), 'moto', 'pending'])
-      );
-      expect(mockSocketIO.emit).toHaveBeenCalledWith('new_delivery', expect.any(Object));
-      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({ id: 'delivery-123' }));
-    });
-
-    it('should handle database errors', async () => {
-      const mockQuery = (jest.fn() as any).mockRejectedValue(new Error('Database error'));
-      (pool as any).query = mockQuery;
-
-      mockRequest.body = {
-        userId: 'test-user-id',
-        pickup: { address: 'Pickup Address' },
-        delivery: { address: 'Delivery Address' },
-        method: 'moto',
-      };
-
-      await deliveryController.createDelivery(
-        mockRequest as any,
-        mockResponse as Response
-      );
-
-      expect(mockResponse.status).toHaveBeenCalledWith(500);
-      expect(mockResponse.json).toHaveBeenCalledWith({ message: 'Erreur serveur' });
-    });
-  });
-
   describe('getUserDeliveries', () => {
     it('should return user deliveries from database', async () => {
       const mockQuery = (jest.fn() as any)

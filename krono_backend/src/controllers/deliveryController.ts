@@ -18,13 +18,6 @@ interface RequestWithApp extends Request {
   };
 }
 
-interface CreateDeliveryBody {
-  userId: string;
-  pickup: any;
-  delivery: any;
-  method: string;
-}
-
 interface UpdateDeliveryStatusBody {
   status: string;
   location?: any;
@@ -34,33 +27,6 @@ interface UploadProofBody {
   proofBase64: string;
   proofType?: string;
 }
-
-export const createDelivery = async (
-  req: RequestWithApp,
-  res: Response
-): Promise<void> => {
-  try {
-    const { pickup, delivery, method } = req.body as CreateDeliveryBody;
-    const userId = (req as any).user?.id;
-
-    if (!userId) {
-      res.status(401).json({ message: 'Non autorisé' });
-      return;
-    }
-
-    const result = await pool.query(
-      'INSERT INTO deliveries(user_id, pickup, delivery, method, status) VALUES($1,$2,$3,$4,$5) RETURNING *',
-      [userId, pickup, delivery, method, 'pending']
-    );
-
-    const io = req.app.get('io');
-    io.emit('new_delivery', result.rows[0]);
-    res.json(result.rows[0]);
-  } catch (error: any) {
-    logger.error(error);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-};
 
 export const getUserDeliveries = async (
   req: RequestWithApp,
@@ -362,15 +328,6 @@ export const updateDeliveryStatus = async (
       const msg = e instanceof Error ? e.message : String(e);
       logger.warn('[recipient-notify] updateDeliveryStatus:', msg);
     });
-
-    try {
-      await pool.query('UPDATE deliveries SET status=$1 WHERE id=$2', [
-        order.status,
-        orderId,
-      ]);
-    } catch (err: any) {
-      logger.warn('Warning: failed to persist delivery status to DB', err.message || err);
-    }
 
     if (status === 'completed') {
       // Prélever la commission pour les livreurs partenaires
