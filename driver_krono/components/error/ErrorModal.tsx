@@ -31,7 +31,7 @@ interface ErrorModalProps {
 }
 
 export const ErrorModal: React.FC<ErrorModalProps> = ({ visible, error }) => {
-  // 🔒 Hooks toujours appelés sans condition
+  // Hooks toujours appelés sans condition
   const overlayOpacity = useSharedValue(0);
   const modalScale = useSharedValue(0.8);
   const modalTranslateY = useSharedValue(50);

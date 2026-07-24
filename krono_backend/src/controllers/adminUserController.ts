@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 
 export const getAdminUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    logger.info('🚀 [getAdminUsers] DÉBUT');
+    logger.info('[getAdminUsers] DÉBUT');
 
     if (!process.env.DATABASE_URL) {
       logger.warn('DATABASE_URL non configuré pour getAdminUsers');
@@ -69,7 +69,7 @@ export const getAdminUsers = async (req: Request, res: Response): Promise<void> 
 export const getAdminClientDetails = async (req: Request, res: Response): Promise<void> => {
   try {
     const { clientId } = req.params;
-    logger.info('🚀 [getAdminClientDetails] DÉBUT', { clientId });
+    logger.info('[getAdminClientDetails] DÉBUT', { clientId });
 
     if (!process.env.DATABASE_URL) {
       res.status(404).json({ success: false, message: 'Client non trouvé' });
@@ -235,7 +235,7 @@ export const getAdminClientDetails = async (req: Request, res: Response): Promis
 export const getAdminClientStatistics = async (req: Request, res: Response): Promise<void> => {
   try {
     const { clientId } = req.params;
-    logger.info('🚀 [getAdminClientStatistics] DÉBUT', { clientId });
+    logger.info('[getAdminClientStatistics] DÉBUT', { clientId });
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: {} });
@@ -326,7 +326,7 @@ export const getAdminClientStatistics = async (req: Request, res: Response): Pro
 export const getAdminAdminDetails = async (req: Request, res: Response): Promise<void> => {
   try {
     const { adminId } = req.params;
-    logger.info('🚀 [getAdminAdminDetails] DÉBUT', { adminId });
+    logger.info('[getAdminAdminDetails] DÉBUT', { adminId });
 
     if (!process.env.DATABASE_URL) {
       res.status(404).json({ success: false, message: 'Admin non trouvé' });

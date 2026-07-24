@@ -92,7 +92,7 @@ export function useMapOrderManagement({
         o.driver
     );
 
-    logger.debug('📊 État des commandes (useEffect recherche)', 'useMapOrderManagement', {
+    logger.debug('État des commandes (useEffect recherche)', 'useMapOrderManagement', {
       totalActiveOrders: activeOrders.length,
       pendingCount: allPendingOrders.length,
       acceptedCount: allAcceptedOrders.length,
@@ -174,7 +174,7 @@ export function useMapOrderManagement({
         selectedOrderId === pendingOrder.id || selectedOrderId === null;
 
       if (orderAge > 30000 && isSelectedOrder) {
-        logger.info('🧹 Nettoyage commande bloquée en attente', 'useMapOrderManagement', {
+        logger.info('Nettoyage commande bloquée en attente', 'useMapOrderManagement', {
           orderId: pendingOrder.id,
           orderAge,
         });
@@ -253,7 +253,7 @@ export function useMapOrderManagement({
         const completedAt = (order as any)?.completed_at || (order as any)?.completedAt;
         const orderAge = completedAt ? now - new Date(completedAt).getTime() : Infinity;
         if (!ratingStore.showRatingBottomSheet && orderAge > 60000) {
-          logger.info('🧹 Nettoyage commande complétée ancienne au montage initial', 'useMapOrderManagement', { orderId: order.id, orderAge });
+          logger.info('Nettoyage commande complétée ancienne au montage initial', 'useMapOrderManagement', { orderId: order.id, orderAge });
           store.removeOrder(order.id);
           didClearRoute = true;
         }
@@ -263,7 +263,7 @@ export function useMapOrderManagement({
       if (order.status === 'pending') {
         const orderAge = order.createdAt ? now - new Date(order.createdAt).getTime() : Infinity;
         if (orderAge > 10000) {
-          logger.info('🧹 Nettoyage pendingOrder bloqué au montage initial', 'useMapOrderManagement', { orderId: order.id, orderAge });
+          logger.info('Nettoyage pendingOrder bloqué au montage initial', 'useMapOrderManagement', { orderId: order.id, orderAge });
           store.removeOrder(order.id);
           didClearRoute = true;
         }
@@ -280,7 +280,7 @@ export function useMapOrderManagement({
     }
 
     if (ratingStore.showRatingBottomSheet && store.activeOrders.length === 0) {
-      logger.info('🧹 Fermeture RatingBottomSheet au montage initial (pas de commande active)', 'useMapOrderManagement');
+      logger.info('Fermeture RatingBottomSheet au montage initial (pas de commande active)', 'useMapOrderManagement');
       ratingStore.resetRatingBottomSheet();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

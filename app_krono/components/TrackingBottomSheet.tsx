@@ -112,7 +112,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
     // Ne pas utiliser de valeur par défaut, utiliser le statut réel de la commande
     const currentStatus = currentOrder?.status ? String(currentOrder.status) : "pending";
     if (__DEV__) {
-      logger.debug('🔍 TrackingBottomSheet status:', undefined, {
+      logger.debug('TrackingBottomSheet status:', undefined, {
         orderId: currentOrder?.id,
         status: currentStatus,
         rawStatus: currentOrder?.status,
@@ -173,7 +173,7 @@ const TrackingBottomSheet: React.FC<TrackingBottomSheetProps> = ({
   const canCancel = React.useMemo(() => {
     const canCancelOrder = (status === 'pending' || status === 'accepted') && onCancel;
     if (__DEV__) {
-      logger.debug('🔍 TrackingBottomSheet canCancel:', undefined, {
+      logger.debug('TrackingBottomSheet canCancel:', undefined, {
         status,
         hasOnCancel: !!onCancel,
         canCancel: canCancelOrder,

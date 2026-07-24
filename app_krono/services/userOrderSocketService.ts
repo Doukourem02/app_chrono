@@ -196,18 +196,18 @@ class UserOrderSocketService {
   connect(userId: string) {
     // Déjà connecté
     if (this.socket && this.isConnected && this.socket.connected && this.userId === userId && this.listenersSetup) {
-      logger.debug('🔌 Socket déjà connecté avec le même userId, ignoré', 'userOrderSocketService');
+      logger.debug('Socket déjà connecté avec le même userId, ignoré', 'userOrderSocketService');
       return;
     }
     // Même user, socket en cours de connexion (handshake) : ne pas recréer (sinon 400 sur l’ancien sid)
     if (this.socket && this.userId === userId && this.listenersSetup && this.socket.active) {
-      logger.debug('🔌 Socket commandes déjà actif pour ce userId (handshake ou reconnect), ignoré', 'userOrderSocketService');
+      logger.debug('Socket commandes déjà actif pour ce userId (handshake ou reconnect), ignoré', 'userOrderSocketService');
       return;
     }
 
     // Nettoyer l'ancien socket s'il existe
     if (this.socket) {
-      logger.info('🔄 Nettoyage de l\'ancien socket', 'userOrderSocketService');
+      logger.info('Nettoyage de l\'ancien socket', 'userOrderSocketService');
       try {
         this.socket.removeAllListeners();
         this.socket.disconnect();
@@ -230,7 +230,7 @@ class UserOrderSocketService {
     const tokenExp = readJwtExpEpochSeconds(token);
     const tokenTtlSec =
       typeof tokenExp === 'number' ? tokenExp - Math.floor(Date.now() / 1000) : null;
-    logger.info('🔌 Connexion au socket...', 'userOrderSocketService', { socketUrl });
+    logger.info('Connexion au socket...', 'userOrderSocketService', { socketUrl });
     logger.info('Socket auth diagnostic', 'userOrderSocketService', {
       hasToken: Boolean(token),
       tokenExp,
@@ -428,9 +428,9 @@ class UserOrderSocketService {
   private installEventListeners(userId: string) {
     if (!this.socket) return;
 
-    // 📦 Confirmation création commande
+    // Confirmation création commande
     this.socket.on('order-created', (data) => {
-      logger.info('📦 Commande créée', 'userOrderSocketService', data);
+      logger.info('Commande créée', 'userOrderSocketService', data);
       // Stocker comme commande active
       try {
         const order = data?.order;
@@ -522,7 +522,7 @@ class UserOrderSocketService {
             driver: driverInfo,
           };
 
-          logger.info('🔄 Mise à jour du store avec order-accepted', 'userOrderSocketService', {
+          logger.info('Mise à jour du store avec order-accepted', 'userOrderSocketService', {
             orderId: order.id,
             status: orderWithStatus.status,
             hasDriver: !!driverInfo,
@@ -532,7 +532,7 @@ class UserOrderSocketService {
           const store = useOrderStore.getState();
           const existingOrder = store.activeOrders.find(o => o.id === order.id);
 
-          logger.info('📦 État actuel du store', 'userOrderSocketService', {
+          logger.info('État actuel du store', 'userOrderSocketService', {
             existingOrderFound: !!existingOrder,
             existingOrderStatus: existingOrder?.status,
             totalActiveOrders: store.activeOrders.length,
@@ -540,7 +540,7 @@ class UserOrderSocketService {
 
           if (existingOrder) {
             // Utiliser updateFromSocket pour garantir que le statut est bien propagé et déclenche les effets
-            logger.info('🔄 Utilisation de updateFromSocket pour commande existante', 'userOrderSocketService', {
+            logger.info('Utilisation de updateFromSocket pour commande existante', 'userOrderSocketService', {
               orderId: order.id,
               oldStatus: existingOrder.status,
               newStatus: orderWithStatus.status,
@@ -550,7 +550,7 @@ class UserOrderSocketService {
             // Forcer aussi la mise à jour du statut avec updateOrderStatus pour garantir la cohérence
             store.updateOrderStatus(order.id, 'accepted');
           } else {
-            logger.info('➕ Ajout de nouvelle commande au store', 'userOrderSocketService', {
+            logger.info('Ajout de nouvelle commande au store', 'userOrderSocketService', {
               orderId: order.id,
               status: orderWithStatus.status,
             });
@@ -770,7 +770,7 @@ class UserOrderSocketService {
     });
 
     this.socket.on('order:status:update', (data) => {
-      logger.info('🔄 [order:status:update] Événement reçu', 'userOrderSocketService', {
+      logger.info('[order:status:update] Événement reçu', 'userOrderSocketService', {
         orderId: data?.order?.id,
         status: data?.order?.status,
         hasOrder: !!data?.order,
@@ -785,7 +785,7 @@ class UserOrderSocketService {
           const existingOrder = store.activeOrders.find(o => o.id === order.id);
           const statusLocation = normalizeSocketLocation(location);
           
-          logger.info('📦 [order:status:update] État AVANT updateFromSocket', 'userOrderSocketService', {
+          logger.info('[order:status:update] État AVANT updateFromSocket', 'userOrderSocketService', {
             orderId: order.id,
             newStatus: order.status,
             existingStatus: existingOrder?.status,
@@ -814,7 +814,7 @@ class UserOrderSocketService {
             void syncOrderLiveActivity(updatedOrder, { driverCoords: statusLocation });
           }
           
-          logger.info('✅ [order:status:update] État APRÈS updateFromSocket', 'userOrderSocketService', {
+          logger.info('[order:status:update] État APRÈS updateFromSocket', 'userOrderSocketService', {
             orderId: order.id,
             expectedStatus: order.status,
             actualStatus: updatedOrder?.status,
@@ -824,10 +824,10 @@ class UserOrderSocketService {
             activeOrdersCount: updatedStore.activeOrders.length,
           });
         } else {
-          logger.warn('⚠️ [order:status:update] order.id manquant', 'userOrderSocketService', { data });
+          logger.warn('[order:status:update] order.id manquant', 'userOrderSocketService', { data });
         }
       } catch (err) {
-        logger.error('❌ [order:status:update] Erreur', 'userOrderSocketService', err);
+        logger.error('[order:status:update] Erreur', 'userOrderSocketService', err);
       }
     });
 
@@ -905,7 +905,7 @@ class UserOrderSocketService {
 
     this.socket.on('connect', () => {
       useRealtimeDegradedStore.getState().setSocketDegraded(false);
-      logger.info('🔌 Socket user connecté pour commandes', 'userOrderSocketService');
+      logger.info('Socket user connecté pour commandes', 'userOrderSocketService');
       this.isConnected = true;
       this.connectedAt = Date.now();
       this.retryCount = 0; // Réinitialiser le compteur de retry en cas de succès
@@ -919,7 +919,7 @@ class UserOrderSocketService {
       // CRITIQUE : Installer les listeners AVANT d'émettre user-connect
       // Cela garantit que si le serveur envoie un événement immédiatement après user-connect,
       // le listener est déjà en place pour le recevoir
-      logger.info('🔄 Réinstallation des listeners après reconnexion (AVANT user-connect)', 'userOrderSocketService');
+      logger.info('Réinstallation des listeners après reconnexion (AVANT user-connect)', 'userOrderSocketService');
       // Installer tous les listeners sauf connect/disconnect (pour éviter la récursion)
       if (this.socket) {
         this.socket.removeAllListeners('order-accepted');
@@ -938,7 +938,7 @@ class UserOrderSocketService {
 
       // S'identifier comme user - toujours ré-émettre même si déjà connecté
       // Cela garantit que le serveur a bien le userId associé au socket actuel
-      logger.info('👤 Identification comme user', 'userOrderSocketService', { userId });
+      logger.info('Identification comme user', 'userOrderSocketService', { userId });
       this.socket?.emit('user-connect', userId);
 
       // Attendre un peu pour s'assurer que le serveur a bien enregistré l'association
@@ -947,7 +947,7 @@ class UserOrderSocketService {
         // (backend should reply with an event like `resync-order-state`)
         try {
           this.socket?.emit('user-reconnect', { userId });
-          logger.debug('🔄 user-reconnect émis', 'userOrderSocketService', { userId });
+          logger.debug('user-reconnect émis', 'userOrderSocketService', { userId });
         } catch (err) {
           logger.warn('Resync emit failed', 'userOrderSocketService', err);
         }
@@ -955,14 +955,14 @@ class UserOrderSocketService {
     });
 
     this.socket.on('disconnect', (reason) => {
-      logger.info('🔌 Socket user déconnecté', 'userOrderSocketService', { reason });
+      logger.info('Socket user déconnecté', 'userOrderSocketService', { reason });
       this.isConnected = false;
 
       // Laisser Socket.IO gérer la reconnexion automatique
       // Ne pas forcer une reconnexion manuelle pour éviter les doubles connexions
       if (reason === 'io server disconnect') {
         // Le serveur a forcé la déconnexion, laisser Socket.IO se reconnecter
-        logger.info('🔄 Le serveur a forcé la déconnexion, reconnexion automatique...', 'userOrderSocketService');
+        logger.info('Le serveur a forcé la déconnexion, reconnexion automatique...', 'userOrderSocketService');
       }
     });
 
@@ -996,7 +996,7 @@ class UserOrderSocketService {
       this.userId === userId;
     if (socketOk) return;
 
-    logger.info('🔄 Reconnexion socket commandes (JWT ou état lien)', 'userOrderSocketService');
+    logger.info('Reconnexion socket commandes (JWT ou état lien)', 'userOrderSocketService');
     if (this.socket) {
       try {
         this.socket.removeAllListeners();
@@ -1031,7 +1031,7 @@ class UserOrderSocketService {
     }
   }
 
-  // 📦 Créer une nouvelle commande
+  // Créer une nouvelle commande
   createOrder(orderData: {
     pickup: {
       address: string;
@@ -1270,7 +1270,7 @@ class UserOrderSocketService {
         estimatedDuration: dbRecord.etaLabel || undefined,
       };
 
-      logger.info('📦 Envoi commande (avec ack):', 'userOrderSocketService', payload);
+      logger.info('Envoi commande (avec ack):', 'userOrderSocketService', payload);
 
       // Emit with acknowledgement callback (server should call the ack)
       let settled = false;
@@ -1343,7 +1343,7 @@ class UserOrderSocketService {
       return false;
     }
 
-    logger.info('🔄 Tentative de connexion du socket...', 'userOrderSocketService');
+    logger.info('Tentative de connexion du socket...', 'userOrderSocketService');
     this.connect(this.userId);
 
     // Attendre que la connexion s'établisse (maximum 3 secondes)

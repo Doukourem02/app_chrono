@@ -108,7 +108,7 @@ if (process.env.DATABASE_URL) {
             idleCount: pool.idleCount,
             waitingCount: pool.waitingCount,
           };
-          logger.debug('📊 Pool PostgreSQL stats:', poolStats);
+          logger.debug('Pool PostgreSQL stats:', poolStats);
         }
       }, 30000); // Toutes les 30 secondes
     }

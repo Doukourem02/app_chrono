@@ -96,14 +96,14 @@ class DriverMessageSocketService {
 
     this.socket.on('connect', () => {
       useRealtimeDegradedStore.getState().setMessagesSocketDegraded(false);
-      logger.info('🔌 Socket connecté pour messagerie', 'driverMessageSocketService');
+      logger.info('Socket connecté pour messagerie', 'driverMessageSocketService');
       this.isConnected = true;
       this.connectErrorRetryCount = 0;
       this.socket?.emit('driver-connect', driverId);
     });
 
     this.socket.on('disconnect', (reason) => {
-      logger.info('🔌 Socket déconnecté pour messagerie', 'driverMessageSocketService', { reason });
+      logger.info('Socket déconnecté pour messagerie', 'driverMessageSocketService', { reason });
       this.isConnected = false;
     });
 
@@ -149,7 +149,7 @@ class DriverMessageSocketService {
 
     // Écouter les nouveaux messages
     this.socket.on('new-message', (data: { message: Message; conversation: Conversation }) => {
-      logger.info('📨 Nouveau message reçu', 'driverMessageSocketService', data);
+      logger.info('Nouveau message reçu', 'driverMessageSocketService', data);
       this.messageCallbacks.forEach((callback) => {
         callback(data.message, data.conversation);
       });

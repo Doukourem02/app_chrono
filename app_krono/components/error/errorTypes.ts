@@ -32,9 +32,6 @@ export const ErrorTypes = {
     };
   },
 
-  /**
-   * Erreur de session expirée
-   */
   SESSION_EXPIRED: (onReconnect?: () => void): ErrorModalData => ({
     title: 'Session expirée',
     message: 'Votre session a expiré. Veuillez vous reconnecter pour continuer.',
@@ -52,9 +49,6 @@ export const ErrorTypes = {
     onClose: () => {},
   }),
 
-  /**
-   * Erreur de permission
-   */
   PERMISSION: (type: 'localisation' | 'photos' | 'caméra' = 'localisation'): ErrorModalData => {
     const configs = {
       localisation: {
@@ -102,9 +96,6 @@ export const ErrorTypes = {
     };
   },
 
-  /**
-   * Erreur de validation
-   */
   VALIDATION: (message: string): ErrorModalData => ({
     title: 'Information requise',
     message,
@@ -197,9 +188,6 @@ export const ErrorTypes = {
     };
   },
 
-  /**
-   * Erreur de compte incomplet
-   */
   INCOMPLETE_ACCOUNT: (onReconnect?: () => void): ErrorModalData => ({
     title: 'Compte incomplet',
     message: 'Votre compte n\'est pas totalement configuré. Veuillez vous reconnecter pour synchroniser votre profil.',
@@ -217,9 +205,6 @@ export const ErrorTypes = {
     onClose: () => {},
   }),
 
-  /**
-   * Erreur de connexion requise
-   */
   LOGIN_REQUIRED: (): ErrorModalData => ({
     title: 'Connexion requise',
     message: 'Vous devez vous connecter ou créer un compte pour utiliser cette fonctionnalité.',
@@ -239,9 +224,6 @@ export const ErrorTypes = {
     onClose: () => {},
   }),
 
-  /**
-   * Erreur de service indisponible
-   */
   SERVICE_UNAVAILABLE: (service: string = 'ce service', onRetry?: () => void): ErrorModalData => ({
     title: 'Service indisponible',
     message: `${service} est temporairement indisponible. Réessayez plus tard.`,
@@ -259,9 +241,6 @@ export const ErrorTypes = {
     onClose: () => {},
   }),
 
-  /**
-   * Erreur d'application externe
-   */
   EXTERNAL_APP: (app: 'email' | 'téléphone' | 'whatsapp' | 'navigation'): ErrorModalData => {
     const configs = {
       email: {
@@ -314,9 +293,6 @@ export const ErrorTypes = {
     };
   },
 
-  /**
-   * Erreur générique
-   */
   GENERIC: (title: string = 'Une erreur est survenue', message: string = 'Désolé, une erreur inattendue s\'est produite.', onRetry?: () => void): ErrorModalData => ({
     title,
     message,

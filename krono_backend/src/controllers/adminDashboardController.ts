@@ -262,8 +262,8 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
     const hasFilters = Boolean(startDate || endDate);
     const range = hasFilters ? getDateRange(startDate, endDate) : null;
 
-    logger.info('🚀 [getAdminRecentActivities] DÉBUT, limit:', limit);
-    logger.debug('🔍 [getAdminRecentActivities] User from middleware:', (req as any).user);
+    logger.info('[getAdminRecentActivities] DÉBUT, limit:', limit);
+    logger.debug('[getAdminRecentActivities] User from middleware:', (req as any).user);
 
     if (!process.env.DATABASE_URL) {
       logger.warn('DATABASE_URL non configuré pour getAdminRecentActivities');
@@ -358,7 +358,7 @@ export const getAdminRecentActivities = async (req: Request, res: Response): Pro
 export const getAdminGlobalSearch = async (req: Request, res: Response): Promise<void> => {
   try {
     const query = req.query.q as string | undefined;
-    logger.info('🚀 [getAdminGlobalSearch] DÉBUT, query:', query);
+    logger.info('[getAdminGlobalSearch] DÉBUT, query:', query);
 
     if (!query || query.trim().length === 0) {
       res.json({ success: true, data: { orders: [], drivers: [], clients: [] } });

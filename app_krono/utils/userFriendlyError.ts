@@ -10,9 +10,6 @@ import { ErrorTypes } from '../components/error/errorTypes';
  * Modals animés ; le détail technique est journalisé plutôt qu’affiché pour les erreurs sensibles (ex. SAVE_ERROR).
  */
 export class UserFriendlyError {
-  /**
-   * Affiche un message d'erreur générique user-friendly
-   */
   static showGenericError(
     title: string = 'Une erreur est survenue',
     message: string = 'Désolé, une erreur inattendue s\'est produite. Veuillez réessayer ou contacter le support si le problème persiste.',
@@ -38,9 +35,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData);
   }
 
-  /**
-   * Erreur de session expirée
-   */
   static showSessionExpired() {
     const errorData = ErrorTypes.SESSION_EXPIRED(() => {
       router.replace('/(auth)');
@@ -51,9 +45,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData);
   }
 
-  /**
-   * Erreur de permission
-   */
   static showPermissionError(permission: 'localisation' | 'photos' | 'caméra' = 'localisation') {
     const errorData = ErrorTypes.PERMISSION(permission);
     errorData.onClose = () => {
@@ -62,9 +53,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData);
   }
 
-  /**
-   * Erreur de validation (champs manquants, etc.)
-   */
   static showValidationError(message: string) {
     const errorData = ErrorTypes.VALIDATION(message);
     errorData.onClose = () => {
@@ -129,9 +117,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData);
   }
 
-  /**
-   * Erreur de compte incomplet
-   */
   static showIncompleteAccount(onReconnect?: () => void) {
     const errorData = ErrorTypes.INCOMPLETE_ACCOUNT(() => {
       if (onReconnect) {
@@ -146,9 +131,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData);
   }
 
-  /**
-   * Erreur de connexion requise
-   */
   static showLoginRequired() {
     const errorData = ErrorTypes.LOGIN_REQUIRED();
     errorData.onAction = () => {
@@ -161,9 +143,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData);
   }
 
-  /**
-   * Erreur de service indisponible
-   */
   static showServiceUnavailable(service: string = 'ce service', onRetry?: () => void) {
     const errorData = ErrorTypes.SERVICE_UNAVAILABLE(service, onRetry);
     errorData.onClose = () => {
@@ -172,9 +151,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData);
   }
 
-  /**
-   * Erreur lors de l'ouverture d'une application externe
-   */
   static showExternalAppError(app: 'email' | 'téléphone' | 'whatsapp' | 'navigation') {
     const errorData = ErrorTypes.EXTERNAL_APP(app);
     errorData.onClose = () => {
@@ -183,9 +159,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData);
   }
 
-  /**
-   * Message de succès
-   */
   static showSuccess(message: string, onPress?: () => void) {
     Alert.alert(
       'Succès',
@@ -194,9 +167,6 @@ export class UserFriendlyError {
     );
   }
 
-  /**
-   * Message d'information
-   */
   static showInfo(title: string, message: string) {
     Alert.alert(
       title,
@@ -205,9 +175,6 @@ export class UserFriendlyError {
     );
   }
 
-  /**
-   * Confirmation avec actions
-   */
   static showConfirmation(
     title: string,
     message: string,
@@ -225,10 +192,6 @@ export class UserFriendlyError {
     );
   }
 
-  /**
-   * Erreur de paiement différé - quota atteint
-   * Utilise le modal dédié avec explications détaillées
-   */
   static showDeferredPaymentError(
     message: string,
     details?: {
@@ -265,18 +228,13 @@ export class UserFriendlyError {
     useDeferredPaymentErrorStore.getState().showError(errorData);
   }
 
-  /**
-   * Gère une erreur inconnue et affiche un message user-friendly
-   */
   static handleUnknownError(error: any, context?: string, onRetry?: () => void) {
-    // Logger l'erreur technique (pas visible à l'utilisateur)
     logger.error(
       `Erreur inconnue${context ? ` dans ${context}` : ''}`,
       context || 'Unknown',
       error
     );
 
-    // Afficher un message user-friendly
     this.showGenericError(
       'Une erreur est survenue',
       'Désolé, une erreur inattendue s\'est produite. Veuillez réessayer ou contacter le support si le problème persiste.',

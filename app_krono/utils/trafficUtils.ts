@@ -40,15 +40,12 @@ export function calculateETAWithTraffic(
   vehicleMultiplier: number = 1.0
 ): number | null {
   const { durationInTraffic, durationBase } = trafficData
-
-  // Utiliser duration_in_traffic si disponible, sinon duration
   const baseDuration = durationInTraffic || durationBase
 
   if (!baseDuration) {
     return null
   }
 
-  // Appliquer le multiplicateur selon le type de véhicule
   return Math.round(baseDuration * vehicleMultiplier)
 }
 

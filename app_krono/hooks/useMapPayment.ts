@@ -29,7 +29,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     const order = currentOrder || pendingOrder;
 
     if (__DEV__) {
-      logger.debug('🔍 PaymentBottomSheet useEffect:', undefined, {
+      logger.debug('PaymentBottomSheet useEffect:', undefined, {
         orderStatus,
         hasCurrentOrder: !!currentOrder,
         hasPendingOrder: !!pendingOrder,
@@ -89,7 +89,7 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
     // Pour les paiements en espèces ou différé, pas besoin d'afficher le PaymentBottomSheet
     if (selectedPaymentMethodType === 'cash' || selectedPaymentMethodType === 'deferred') {
       if (__DEV__) {
-        logger.debug('✅ Paiement en espèces ou différé - pas de paiement électronique requis');
+        logger.debug('Paiement en espèces ou différé - pas de paiement électronique requis');
       }
       return;
     }
@@ -102,12 +102,12 @@ export function useMapPayment({ currentOrder, pendingOrder }: UseMapPaymentProps
       !selectedPaymentMethodType
     ) {
       if (__DEV__) {
-        logger.debug('✅ Affichage du PaymentBottomSheet dans 500ms');
+        logger.debug('Affichage du PaymentBottomSheet dans 500ms');
       }
       const timer = setTimeout(() => {
         setShowPaymentSheet(true);
         if (__DEV__) {
-          logger.debug('✅ PaymentBottomSheet affiché');
+          logger.debug('PaymentBottomSheet affiché');
         }
       }, 500);
 

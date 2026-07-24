@@ -20,13 +20,13 @@ class UserMessageSocketService {
 
     // Même user, handshake ou reconnexion en cours : ne pas recréer (évite sid invalide → 400 / xhr poll error)
     if (this.socket && this.userId === userId && this.socket.active) {
-      logger.debug('🔌 Socket messagerie déjà actif pour ce userId (handshake ou reconnect), ignoré', 'userMessageSocketService');
+      logger.debug('Socket messagerie déjà actif pour ce userId (handshake ou reconnect), ignoré', 'userMessageSocketService');
       return;
     }
 
     // Nettoyer l'ancien socket s'il existe
     if (this.socket) {
-      logger.info('🔄 Nettoyage de l\'ancien socket', 'userMessageSocketService');
+      logger.info('Nettoyage de l\'ancien socket', 'userMessageSocketService');
       this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
@@ -40,7 +40,7 @@ class UserMessageSocketService {
       logger.warn('Impossible de connecter le socket de messagerie: accessToken manquant', 'userMessageSocketService');
       return;
     }
-    logger.info('🔌 Connexion au socket de messagerie...', 'userMessageSocketService', { socketUrl });
+    logger.info('Connexion au socket de messagerie...', 'userMessageSocketService', { socketUrl });
     this.socket = io(socketUrl, {
       transports: __DEV__ ? ['websocket', 'polling'] : ['polling'],
       reconnection: true,
@@ -62,14 +62,14 @@ class UserMessageSocketService {
     });
 
     this.socket.on('connect', () => {
-      logger.info('🔌 Socket connecté pour messagerie', 'userMessageSocketService');
+      logger.info('Socket connecté pour messagerie', 'userMessageSocketService');
       this.isConnected = true;
       // S'identifier comme user
       this.socket?.emit('user-connect', userId);
     });
 
     this.socket.on('disconnect', (reason) => {
-      logger.info('🔌 Socket déconnecté pour messagerie', 'userMessageSocketService', { reason });
+      logger.info('Socket déconnecté pour messagerie', 'userMessageSocketService', { reason });
       this.isConnected = false;
     });
 
@@ -95,7 +95,7 @@ class UserMessageSocketService {
 
     // Écouter les nouveaux messages
     this.socket.on('new-message', (data: { message: Message; conversation: Conversation }) => {
-      logger.info('📨 Nouveau message reçu', 'userMessageSocketService', data);
+      logger.info('Nouveau message reçu', 'userMessageSocketService', data);
       this.messageCallbacks.forEach((callback) => {
         callback(data.message, data.conversation);
       });

@@ -98,10 +98,10 @@ filesToProcess.forEach((file) => {
     if (modified) {
       fs.writeFileSync(filePath, content, "utf-8");
       totalReplacements += fileReplacements;
-      console.log(`✓ ${file}: ${fileReplacements} remplacements`);
+      console.log(`${file}: ${fileReplacements} remplacements`);
     }
   } catch (error) {
-    console.error(`✗ Erreur lors du traitement de ${file}:`, error.message);
+    console.error(`Erreur lors du traitement de ${file}:`, error.message);
   }
 });
 
@@ -110,4 +110,4 @@ function getRelativePath(from, to) {
   return relative.startsWith(".") ? relative : "./" + relative;
 }
 
-console.log(`\n✅ Total: ${totalReplacements} remplacements effectués`);
+console.log(`\nTotal: ${totalReplacements} remplacements effectués`);

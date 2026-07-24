@@ -338,7 +338,7 @@ export default function OrderTrackingPage() {
         }
       } else {
         // Le socket n'est pas encore connecté, attendre un peu
-        logger.debug('⚠️ [order-tracking] Socket non connecté, report du chargement API', 'order-tracking', { orderId });
+        logger.debug('[order-tracking] Socket non connecté, report du chargement API', 'order-tracking', { orderId });
         setTimeout(checkAndLoad, 500);
       }
     };

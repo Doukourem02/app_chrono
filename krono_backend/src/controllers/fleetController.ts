@@ -3,9 +3,7 @@ import pool from '../config/db.js';
 import logger from '../utils/logger.js';
 import { supabaseAdmin } from '../config/supabase.js';
 
-// ============================================
 // Types pour la gestion de flotte
-// ============================================
 interface RequestWithUser extends Request {
   user?: {
     id: string;
@@ -14,9 +12,7 @@ interface RequestWithUser extends Request {
   };
 }
 
-// ============================================
 // VÉHICULES - CRUD
-// ============================================
 
 /**
  * GET /api/fleet/vehicles
@@ -330,9 +326,7 @@ export const updateFleetVehicle = async (req: RequestWithUser, res: Response): P
   }
 };
 
-// ============================================
 // RAVITAILLEMENT (CARBURANT/ÉLECTRICITÉ)
-// ============================================
 
 /**
  * POST /api/fleet/vehicles/:vehiclePlate/fuel
@@ -443,9 +437,7 @@ export const getFuelLogs = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// ============================================
 // MAINTENANCE
-// ============================================
 
 /**
  * POST /api/fleet/vehicles/:vehiclePlate/maintenance
@@ -643,9 +635,7 @@ export const getMaintenanceHistory = async (req: Request, res: Response): Promis
   }
 };
 
-// ============================================
 // DOCUMENTS LÉGAUX
-// ============================================
 
 /**
  * POST /api/fleet/vehicles/:vehiclePlate/documents/upload
@@ -942,9 +932,7 @@ export const getExpiringDocuments = async (req: Request, res: Response): Promise
   }
 };
 
-// ============================================
 // STATISTIQUES FINANCIÈRES
-// ============================================
 
 /**
  * GET /api/fleet/vehicles/:vehiclePlate/financial-summary
@@ -1144,9 +1132,7 @@ export const calculateFinancialSummary = async (req: RequestWithUser, res: Respo
   }
 };
 
-// ============================================
 // KILOMÉTRAGE
-// ============================================
 
 /**
  * Fonction helper pour enregistrer automatiquement le kilométrage après une livraison

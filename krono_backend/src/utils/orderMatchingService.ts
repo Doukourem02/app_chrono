@@ -55,7 +55,6 @@ class OrderMatchingService {
    */
   private async getDriverStats(driverId: string, activeOrdersCount: number): Promise<DriverStats & { recentOrdersCount: number; driverType: 'internal' | 'partner' }> {
     try {
-      // Récupérer le type de livreur (internal/partner)
       const driverTypeQuery = `
         SELECT COALESCE(driver_type, 'partner') as driver_type
         FROM driver_profiles
@@ -64,38 +63,35 @@ class OrderMatchingService {
       const driverTypeResult = await pool.query(driverTypeQuery, [driverId]);
       const driverType = (driverTypeResult.rows[0]?.driver_type || 'partner') as 'internal' | 'partner';
 
-      // Calculer le taux d'acceptation
       const acceptanceQuery = `
-        SELECT 
+        SELECT
           COUNT(*) FILTER (WHERE accepted_at IS NOT NULL) as accepted,
           COUNT(*) as total_assigned
         FROM order_assignments
         WHERE driver_id = $1
       `;
-      
+
       const acceptanceResult = await pool.query(acceptanceQuery, [driverId]);
       const acceptanceRate =
         acceptanceResult.rows[0]?.total_assigned > 0
           ? (acceptanceResult.rows[0].accepted / acceptanceResult.rows[0].total_assigned)
           : 0.8; // Par défaut 80% si pas d'historique
 
-      // Calcul de la note moyenne
       const avgRating = await calculateDriverRating(driverId);
 
-      // Calculer le nombre de commandes reçues récemment (pour l'équité)
       const recentOrdersQuery = `
         SELECT COUNT(*) as count
         FROM order_assignments
         WHERE driver_id = $1
           AND assigned_at >= NOW() - INTERVAL '${this.FAIRNESS_PERIOD_HOURS} hours'
       `;
-      
+
       const recentOrdersResult = await pool.query(recentOrdersQuery, [driverId]);
       const recentOrdersCount = parseInt(recentOrdersResult.rows[0]?.count || '0', 10);
 
       return {
-        acceptanceRate: Math.max(0, Math.min(1, acceptanceRate)), // Clamp entre 0 et 1
-        avgRating: Math.max(0, Math.min(5, avgRating)), // Clamp entre 0 et 5
+        acceptanceRate: Math.max(0, Math.min(1, acceptanceRate)),
+        avgRating: Math.max(0, Math.min(5, avgRating)),
         currentLoad: activeOrdersCount,
         recentOrdersCount,
         driverType,
@@ -105,13 +101,12 @@ class OrderMatchingService {
         `[OrderMatchingService] Erreur récupération stats pour ${maskUserId(driverId)}:`,
         error.message
       );
-      // Retourner des valeurs par défaut en cas d'erreur
       return {
         acceptanceRate: 0.8,
         avgRating: 5.0,
         currentLoad: activeOrdersCount,
         recentOrdersCount: 0,
-        driverType: 'partner', // Par défaut partenaire
+        driverType: 'partner',
       };
     }
   }
@@ -126,19 +121,17 @@ class OrderMatchingService {
     recentOrdersCount: number,
     averageRecentOrders: number
   ): number {
-    // Score de note normalisé (0-5 → 0-1), poids 70%
     const ratingScore = (rating / 5) * 0.7;
-    
-    // Score d'équité (bonus pour livreurs moins sollicités) - 30%
+
     let fairnessScore = 1.0;
     if (averageRecentOrders > 0) {
       const ratio = recentOrdersCount / Math.max(1, averageRecentOrders);
       if (ratio <= 0.5) {
-        fairnessScore = 1.0; // Moins de 50% de la moyenne = score max
+        fairnessScore = 1.0;
       } else if (ratio >= 2.0) {
-        fairnessScore = 0.0; // Plus de 200% de la moyenne = score min
+        fairnessScore = 0.0;
       } else {
-        fairnessScore = 1 - ((ratio - 0.5) / 1.5); // Interpolation
+        fairnessScore = 1 - ((ratio - 0.5) / 1.5);
       }
     }
     const fairnessScoreWeighted = fairnessScore * 0.3;
@@ -176,7 +169,6 @@ class OrderMatchingService {
       );
     }
 
-    // Étape 1 : Calculer les stats de tous les livreurs
     const scoredDrivers: Array<ScoredDriver & { recentOrdersCount: number; priorityScore: number }> = [];
     const recentOrdersCounts: number[] = [];
 
@@ -190,30 +182,25 @@ class OrderMatchingService {
       }
     }
 
-    // Calculer la moyenne de commandes récentes pour l'équité
     const averageRecentOrders = recentOrdersCounts.length > 0
       ? recentOrdersCounts.reduce((a, b) => a + b, 0) / recentOrdersCounts.length
       : 0;
 
-    // Calcul de la priorité pour chaque livreur
-    // PRIORISATION : Les internes sont TOUJOURS prioritaires sur B2B/planifiées/sensibles
+    // Les internes sont toujours prioritaires sur les commandes B2B/planifiées/sensibles
     const isPriorityOrder = orderInfo?.isB2B || orderInfo?.isScheduled || orderInfo?.isSensitive;
-    
+
     for (const driver of nearbyDrivers) {
       try {
         const currentLoad = activeOrdersCount(driver.driverId);
         const stats = await this.getDriverStats(driver.driverId, currentLoad);
-        
-        // Calcul du score de priorité (notes 70% + équité 30%)
+
         let priorityScore = this.calculatePriorityScore(
           stats.avgRating,
           stats.recentOrdersCount,
           averageRecentOrders
         );
 
-        // BONUS PRIORITÉ INTERNES : Si commande B2B/planifiée/sensible, les internes sont TOUJOURS en premier
         if (isPriorityOrder && stats.driverType === 'internal') {
-          // Ajouter un bonus énorme pour que les internes soient toujours en premier
           priorityScore += 1000; // Bonus suffisant pour garantir la priorité
           if (this.DEBUG) {
             logger.debug(
@@ -227,17 +214,17 @@ class OrderMatchingService {
           distance: driver.distance,
           score: priorityScore,
           details: {
-            distanceScore: 0, // Plus utilisé
-            acceptanceScore: 0, // Plus utilisé
-            ratingScore: stats.avgRating / 5, // Pour debug
-            loadScore: 0, // Plus utilisé
+            distanceScore: 0,
+            acceptanceScore: 0,
+            ratingScore: stats.avgRating / 5,
+            loadScore: 0,
           },
           acceptanceRate: stats.acceptanceRate,
           avgRating: stats.avgRating,
           currentLoad: stats.currentLoad,
           driverType: stats.driverType,
-          recentOrdersCount: stats.recentOrdersCount, // Pour debug uniquement
-          priorityScore, // Pour le tri
+          recentOrdersCount: stats.recentOrdersCount,
+          priorityScore,
         });
 
         if (this.DEBUG) {
@@ -254,10 +241,9 @@ class OrderMatchingService {
           `[OrderMatchingService] Erreur calcul priorité pour ${maskUserId(driver.driverId)}:`,
           error.message
         );
-        // En cas d'erreur, utiliser une note par défaut et équité maximale
         let priorityScore = this.calculatePriorityScore(5.0, 0, averageRecentOrders);
-        
-        // Bonus interne si commande prioritaire (même en cas d'erreur, on essaie de récupérer le type)
+
+        // Même en cas d'erreur, on essaie de récupérer le type pour le bonus interne
         if (isPriorityOrder) {
           try {
             const driverTypeQuery = `
@@ -271,10 +257,10 @@ class OrderMatchingService {
               priorityScore += 1000;
             }
           } catch {
-            // Ignorer l'erreur, on continue avec le score par défaut
+            // score par défaut conservé
           }
         }
-        
+
         scoredDrivers.push({
           driverId: driver.driverId,
           distance: driver.distance,
@@ -285,15 +271,14 @@ class OrderMatchingService {
             ratingScore: 1.0,
             loadScore: 0,
           },
-          driverType: 'partner', // Par défaut en cas d'erreur
-          recentOrdersCount: 0, // Pour debug uniquement
-          priorityScore, // Pour le tri
+          driverType: 'partner',
+          recentOrdersCount: 0,
+          priorityScore,
         });
       }
     }
 
-    // Tri par priorité décroissante
-    // MAIS TOUS les livreurs sont retournés (pas de limite)
+    // Tous les livreurs sont retournés, triés par priorité décroissante
     const sortedDrivers = scoredDrivers.sort((a, b) => b.score - a.score);
 
     if (this.DEBUG) {
@@ -310,11 +295,9 @@ class OrderMatchingService {
       });
     }
 
-    // Retourner TOUS les livreurs (pas de limite)
     return sortedDrivers.map(({ recentOrdersCount, ...rest }) => rest);
   }
 }
 
-// Export d'une instance singleton
 export const orderMatchingService = new OrderMatchingService();
 

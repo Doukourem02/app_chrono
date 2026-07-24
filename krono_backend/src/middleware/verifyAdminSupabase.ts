@@ -51,11 +51,11 @@ export const verifyAdminSupabase = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  logger.debug('🔍 [verifyAdminSupabase] Checking auth for:', req.path);
+  logger.debug('[verifyAdminSupabase] Checking auth for:', req.path);
   const auth = req.headers.authorization || req.headers.Authorization;
 
   if (!auth) {
-    logger.warn('⚠️ [verifyAdminSupabase] No authorization header for:', req.path);
+    logger.warn('[verifyAdminSupabase] No authorization header for:', req.path);
     res.status(401).json({
       success: false,
       message: 'Non autorisé - En-tête Authorization manquant',
@@ -141,7 +141,7 @@ export const verifyAdminSupabase = async (
       }
     } catch (dbError: unknown) {
       const errMsg = dbError instanceof Error ? dbError.message : String(dbError);
-      logger.warn('⚠️ [verifyAdminSupabase] Erreur de connexion PostgreSQL, utilisation de Supabase comme fallback:', { error: errMsg });
+      logger.warn('[verifyAdminSupabase] Erreur de connexion PostgreSQL, utilisation de Supabase comme fallback:', { error: errMsg });
       
       // Fallback: utiliser Supabase pour vérifier le rôle
       if (supabaseUrl && supabaseServiceKey) {

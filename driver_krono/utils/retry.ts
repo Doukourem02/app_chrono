@@ -1,8 +1,3 @@
-/**
- * Utilitaire de retry pour les appels API
- * Implémente une stratégie de retry avec backoff exponentiel
- */
-
 import { logger } from './logger';
 
 export interface RetryOptions {
@@ -30,42 +25,31 @@ const DEFAULT_OPTIONS: Required<Omit<RetryOptions, 'shouldRetry' | 'onRetry'>> =
   retryableStatusCodes: [408, 429, 500, 502, 503, 504],
 };
 
-/**
- * Calcule le délai avant le prochain retry avec backoff exponentiel
- */
 function calculateDelay(attempt: number, options: Required<Omit<RetryOptions, 'shouldRetry' | 'onRetry'>>): number {
   const delay = options.initialDelay * Math.pow(options.backoffFactor, attempt - 1);
   return Math.min(delay, options.maxDelay);
 }
 
-/**
- * Détermine si une erreur est retryable
- */
 function isRetryableError(error: any, response: Response | undefined, options: RetryOptions): boolean {
-  // Erreur réseau (timeout, connexion refusée, etc.)
   if (error instanceof TypeError && error.message.includes('Network request failed')) {
     return true;
   }
 
-  // Erreur de timeout
   if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('Timeout'))) {
     return true;
   }
 
-  // Erreur HTTP avec code retryable
   if (response) {
     const retryableCodes = options.retryableStatusCodes || DEFAULT_OPTIONS.retryableStatusCodes;
     if (retryableCodes.includes(response.status)) {
       return true;
     }
 
-    // Ne pas retry les erreurs 4xx (sauf 408, 429)
     if (response.status >= 400 && response.status < 500 && !retryableCodes.includes(response.status)) {
       return false;
     }
   }
 
-  // Utiliser la fonction personnalisée si fournie
   if (options.shouldRetry) {
     return options.shouldRetry(error, 0);
   }
@@ -73,16 +57,10 @@ function isRetryableError(error: any, response: Response | undefined, options: R
   return false;
 }
 
-/**
- * Attend un délai donné
- */
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Exécute une fonction avec retry automatique
- */
 export async function retry<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {}
@@ -94,65 +72,52 @@ export async function retry<T>(
   for (let attempt = 1; attempt <= opts.maxAttempts; attempt++) {
     try {
       const result = await fn();
-      
-      // Si c'est une Response fetch, vérifier le statut
+
       if (result instanceof Response) {
         lastResponse = result;
-        
-        // Si le statut est retryable, lancer une erreur pour déclencher le retry
+
         if (isRetryableError(null, result, opts)) {
           throw new Error(`HTTP ${result.status}: ${result.statusText}`);
         }
-        
-        // Si c'est un succès, retourner la réponse
+
         if (result.ok) {
           return result as T;
         }
       }
-      
+
       return result;
     } catch (error: any) {
       lastError = error;
-      
-      // Si c'est la dernière tentative, lancer l'erreur
+
       if (attempt === opts.maxAttempts) {
         break;
       }
-      
-      // Vérifier si l'erreur est retryable
+
       if (!isRetryableError(error, lastResponse, opts)) {
         throw error;
       }
-      
-      // Calculer le délai avant le prochain retry
+
       const delay = calculateDelay(attempt, opts);
-      
-      // Appeler le callback onRetry si fourni
+
       if (options.onRetry) {
         options.onRetry(attempt, error);
       }
-      
-      // Logger le retry en développement
+
       if (__DEV__) {
-        logger.warn(`⚠️ Tentative ${attempt}/${opts.maxAttempts} échouée, retry dans ${delay}ms...`, undefined, { error: error.message, attempt, maxAttempts: opts.maxAttempts, delay });
+        logger.warn(`Tentative ${attempt}/${opts.maxAttempts} échouée, retry dans ${delay}ms...`, undefined, { error: error.message, attempt, maxAttempts: opts.maxAttempts, delay });
       }
-      
-      // Attendre avant le prochain retry
+
       await sleep(delay);
     }
   }
-  
-  // Toutes les tentatives ont échoué
+
   if (__DEV__) {
-    logger.error(`❌ Toutes les tentatives (${opts.maxAttempts}) ont échoué`);
+    logger.error(`Toutes les tentatives (${opts.maxAttempts}) ont échoué`);
   }
-  
+
   throw lastError;
 }
 
-/**
- * Wrapper pour fetch avec retry automatique
- */
 export async function fetchWithRetry(
   url: string,
   init?: RequestInit,
@@ -163,28 +128,23 @@ export async function fetchWithRetry(
     {
       ...retryOptions,
       shouldRetry: (error, attempt) => {
-        // Ne pas retry les erreurs 4xx (sauf 408, 429)
         if (error instanceof Response) {
           const status = error.status;
           if (status >= 400 && status < 500 && ![408, 429].includes(status)) {
             return false;
           }
         }
-        
-        // Utiliser la fonction personnalisée si fournie
+
         if (retryOptions?.shouldRetry) {
           return retryOptions.shouldRetry(error, attempt);
         }
-        
+
         return true;
       },
     }
   );
 }
 
-/**
- * Retry avec backoff exponentiel pour les appels API spécifiques
- */
 export async function retryApiCall<T>(
   apiCall: () => Promise<{ success: boolean; data?: T; message?: string }>,
   options: RetryOptions = {}
@@ -192,40 +152,27 @@ export async function retryApiCall<T>(
   return retry(
     async () => {
       const result = await apiCall();
-      
-      // Si l'API retourne success: false, considérer comme une erreur retryable
-      // sauf si c'est une erreur client (4xx)
+
       if (!result.success) {
-        // Ne pas retry les erreurs de validation ou d'authentification
-        if (result.message?.includes('validation') || 
-            result.message?.includes('authentification') ||
-            result.message?.includes('Session expirée')) {
-          throw new Error(result.message || 'Erreur API');
-        }
-        
-        // Retry les autres erreurs
         throw new Error(result.message || 'Erreur API');
       }
-      
+
       return result;
     },
     {
       ...options,
       shouldRetry: (error, attempt) => {
-        // Ne pas retry les erreurs d'authentification
-        if (error.message?.includes('Session expirée') || 
+        if (error.message?.includes('Session expirée') ||
             error.message?.includes('authentification')) {
           return false;
         }
-        
-        // Utiliser la fonction personnalisée si fournie
+
         if (options.shouldRetry) {
           return options.shouldRetry(error, attempt);
         }
-        
+
         return true;
       },
     }
   );
 }
-

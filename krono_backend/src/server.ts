@@ -188,16 +188,16 @@ io.use(async (socket, next) => {
       logger.info('Socket.IO Redis Adapter activé - Scaling horizontal disponible');
     } catch (error: any) {
       logger.error('Erreur lors de l\'activation du Redis Adapter:', error.message);
-      logger.warn(' Socket.IO fonctionnera en mode standalone');
+      logger.warn('Socket.IO fonctionnera en mode standalone');
     }
   } else {
-    logger.info(' Socket.IO fonctionne en mode standalone (Redis non disponible)');
-    logger.info('💡 Pour activer le scaling horizontal, configurez REDIS_URL');
+    logger.info('Socket.IO fonctionne en mode standalone (Redis non disponible)');
+    logger.info('Pour activer le scaling horizontal, configurez REDIS_URL');
   }
 })();
 
 io.on('connection', (socket) => {
-  logger.info('🟢 Client connecté', { socketId: socket.id });
+  logger.info('Client connecté', { socketId: socket.id });
 
   // Rooms utiles pour limiter les broadcasts (évite fuite de données)
   const user = (socket.data as any)?.user as { id?: string; role?: string } | undefined;
@@ -210,7 +210,7 @@ io.on('connection', (socket) => {
   deliverySocket(io, socket);
 
   socket.on('disconnect', () => {
-    logger.info('🔴 Client déconnecté', { socketId: socket.id });
+    logger.info('Client déconnecté', { socketId: socket.id });
   });
 });
 
@@ -225,9 +225,9 @@ app.set('io', io);
 const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  logger.info(`🚀 Serveur lancé sur ${HOST}:${PORT}`);
+  logger.info(`Serveur lancé sur ${HOST}:${PORT}`);
   if (isDevelopment) {
-    logger.info(`📱 Accessible depuis Expo Go via: http://192.168.1.96:${PORT}`);
+    logger.info(`Accessible depuis Expo Go via: http://192.168.1.96:${PORT}`);
   }
 
   if (process.env.SENTRY_DSN) {
@@ -254,7 +254,7 @@ server.listen(PORT, HOST, () => {
 
 // Nettoyage propre à l'arrêt du serveur
 process.on('SIGTERM', async () => {
-  logger.info('🛑 SIGTERM reçu, fermeture propre du serveur...');
+  logger.info('SIGTERM reçu, fermeture propre du serveur...');
   await closeRedis();
   server.close(() => {
     logger.info('Serveur fermé proprement');
@@ -263,7 +263,7 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', async () => {
-  logger.info('🛑 SIGINT reçu, fermeture propre du serveur...');
+  logger.info('SIGINT reçu, fermeture propre du serveur...');
   await closeRedis();
   server.close(() => {
     logger.info('Serveur fermé proprement');

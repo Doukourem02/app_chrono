@@ -47,11 +47,11 @@ export function validateEnvironment(): {
     const value = process.env[envVar.name];
     if (!value) {
       errors.push(
-        `❌ ${envVar.name} est REQUIS: ${envVar.description}`
+        `${envVar.name} est REQUIS: ${envVar.description}`
       );
     } else if (value.includes('your-') || value.includes('example')) {
       errors.push(
-        `❌ ${envVar.name} contient une valeur d'exemple. Veuillez la remplacer.`
+        `${envVar.name} contient une valeur d'exemple. Veuillez la remplacer.`
       );
     }
   }
@@ -61,7 +61,7 @@ export function validateEnvironment(): {
     const value = process.env[envVar.name];
     if (!value) {
       warnings.push(
-        `⚠️ ${envVar.name} non défini: ${envVar.description}`
+        `${envVar.name} non défini: ${envVar.description}`
       );
     }
   }
@@ -71,14 +71,14 @@ export function validateEnvironment(): {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (apiUrl && !apiUrl.startsWith('https://')) {
       errors.push(
-        '❌ NEXT_PUBLIC_API_URL doit utiliser HTTPS en production'
+        'NEXT_PUBLIC_API_URL doit utiliser HTTPS en production'
       );
     }
 
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
     if (socketUrl && !socketUrl.startsWith('https://') && !socketUrl.startsWith('wss://')) {
       errors.push(
-        '❌ NEXT_PUBLIC_SOCKET_URL doit utiliser WSS (WebSocket Secure) en production'
+        'NEXT_PUBLIC_SOCKET_URL doit utiliser WSS (WebSocket Secure) en production'
       );
     }
   }
@@ -95,7 +95,7 @@ if (typeof window === 'undefined') {
   const validation = validateEnvironment();
   
   if (!validation.isValid) {
-    console.error('🚨 ERREURS DE CONFIGURATION:');
+    console.error('ERREURS DE CONFIGURATION:');
     validation.errors.forEach((error) => console.error(error));
     
     if (process.env.NODE_ENV === 'production') {
@@ -106,12 +106,12 @@ if (typeof window === 'undefined') {
   }
   
   if (validation.warnings.length > 0) {
-    console.warn('⚠️ AVERTISSEMENTS:');
+    console.warn('AVERTISSEMENTS:');
     validation.warnings.forEach((warning) => console.warn(warning));
   }
   
   if (validation.isValid && validation.warnings.length === 0) {
-    console.log('✅ Configuration validée avec succès');
+    console.log('Configuration validée avec succès');
   }
 }
 

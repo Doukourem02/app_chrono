@@ -40,28 +40,13 @@ function stripAccentsLower(s: string): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Pourquoi il y a une liste de noms (Abobo, Cocody, Attécoubé, etc.) ?
- * ---------------------------------------------------------------------------
- * Ce ne sont PAS des adresses saisies par les utilisateurs : rien n’est
- * « stocké » ici pour la base de données.
- *
- * Les API (Mapbox, OpenStreetMap…) renvoient souvent une longue chaîne avec
- * des virgules, par exemple :
- *   "Rue Panama City, 772, Adjamé, Abidjan, Côte d'Ivoire"
- * On découpe par virgule et on enlève les morceaux de FIN qui ne sont que
- * du contexte administratif (commune, ville, pays), pour n’afficher que la
- * partie utile en appli locale — comme Yango.
- *
- * Les noms ci-dessous sont en minuscules SANS ACCENTS : on compare ainsi au
- * dernier segment (ex. "Adjamé" → "adjame") pour décider de l’ôter.
- *
- * Attécoubé apparaît parfois écrit "attecoube", parfois "attcoube" selon la
- * source : ce sont deux orthographes pour LA MÊME commune, pas deux lieux.
- * ---------------------------------------------------------------------------
+ * Les API (Mapbox, OpenStreetMap…) renvoient une longue chaîne avec des
+ * virgules (ex. "Rue Panama City, 772, Adjamé, Abidjan, Côte d'Ivoire") ; on
+ * découpe et on enlève les segments de fin qui ne sont que du contexte
+ * administratif, pour n'afficher que la partie utile en appli locale.
+ * Comparaison en minuscules sans accent (ex. "Adjamé" → "adjame") ;
+ * "attecoube" et "attcoube" désignent la même commune.
  */
-
-/** Pays / ville : toujours retirés s’ils sont le dernier segment après une virgule. */
 function isCountryOrCityTail(n: string): boolean {
   if (n.startsWith('cote d')) return true;
   if (n === 'ci' || n === 'ci.' || n === 'ivoire') return true;

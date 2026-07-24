@@ -223,7 +223,7 @@ export async function checkAndSendAlerts(
     // Alertes selon le niveau de solde
     if (balance <= 0) {
       // Suspension automatique déjà gérée par la fonction SQL
-      logger.warn(`⚠️ Compte suspendu pour ${maskUserId(driverId)}: solde = ${maskAmount(balance)} FCFA`);
+      logger.warn(`Compte suspendu pour ${maskUserId(driverId)}: solde = ${maskAmount(balance)} FCFA`);
       await sendCampaignPushToUser({
         userId: driverId,
         appRole: 'driver',
@@ -232,7 +232,7 @@ export async function checkAndSendAlerts(
         data: { type: 'commission_balance_suspended' },
       }).catch((e: unknown) => logger.warn('[commission-alert] push suspendu:', e instanceof Error ? e.message : String(e)));
     } else if (balance <= 1000) {
-      logger.warn(`⚠️ Solde très faible pour ${maskUserId(driverId)}: ${maskAmount(balance)} FCFA`);
+      logger.warn(`Solde très faible pour ${maskUserId(driverId)}: ${maskAmount(balance)} FCFA`);
       await sendCampaignPushToUser({
         userId: driverId,
         appRole: 'driver',
@@ -241,7 +241,7 @@ export async function checkAndSendAlerts(
         data: { type: 'commission_balance_critical' },
       }).catch((e: unknown) => logger.warn('[commission-alert] push critique:', e instanceof Error ? e.message : String(e)));
     } else if (balance <= 3000) {
-      logger.info(`💡 Solde faible pour ${maskUserId(driverId)}: ${maskAmount(balance)} FCFA`);
+      logger.info(`Solde faible pour ${maskUserId(driverId)}: ${maskAmount(balance)} FCFA`);
       await sendCampaignPushToUser({
         userId: driverId,
         appRole: 'driver',

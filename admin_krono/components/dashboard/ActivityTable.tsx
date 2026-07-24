@@ -114,7 +114,7 @@ export default function ActivityTable() {
       endDate: endDate.toISOString().split('T')[0],
     }
     
-    logger.debug('📅 [ActivityTable] Date range calculated:', {
+    logger.debug('[ActivityTable] Date range calculated:', {
       filter: localDateFilter,
       startDate: result.startDate,
       endDate: result.endDate,
@@ -139,7 +139,7 @@ export default function ActivityTable() {
   const { data: activities, isLoading, isError, error } = useQuery({
     queryKey,
     queryFn: () => {
-      logger.debug('🚀 [ActivityTable] Fetching activities with filter:', { 
+      logger.debug('[ActivityTable] Fetching activities with filter:', { 
         localDateFilter,
         startDate, 
         endDate,
@@ -160,8 +160,8 @@ export default function ActivityTable() {
   // Debug: logger les données reçues
   useEffect(() => {
     if (activities) {
-      logger.debug('🔍 [ActivityTable] Activities data received:', activities)
-      logger.debug('🔍 [ActivityTable] Activities count:', activities.length)
+      logger.debug('[ActivityTable] Activities data received:', activities)
+      logger.debug('[ActivityTable] Activities count:', activities.length)
     }
     if (isError) {
       logger.error('[ActivityTable] Error loading activities:', error)

@@ -58,7 +58,7 @@ export const useOnlineDrivers = (options: UseOnlineDriversOptions = {}) => {
           setDrivers(onlineOnly);
           setLastUpdate(new Date());
           if (onlineOnly.length > 0) {
-            logger.debug(`🚗 ${onlineOnly.length} chauffeur(s) en ligne`);
+            logger.debug(`${onlineOnly.length} chauffeur(s) en ligne`);
           }
         } else {
           setError(result.message || 'Erreur de récupération');

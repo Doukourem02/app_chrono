@@ -5,7 +5,7 @@ import logger from '../utils/logger.js';
 export const getAdminDriverDetails = async (req: Request, res: Response): Promise<void> => {
   try {
     const { driverId } = req.params;
-    logger.info('🚀 [getAdminDriverDetails] DÉBUT', { driverId });
+    logger.info('[getAdminDriverDetails] DÉBUT', { driverId });
 
     if (!process.env.DATABASE_URL) {
       res.status(404).json({ success: false, message: 'Driver non trouvé' });
@@ -356,7 +356,7 @@ export const updateAdminDriverStatus = async (req: Request, res: Response): Prom
     const { driverId } = req.params;
     const { isActive } = req.body;
 
-    logger.info('🚀 [updateAdminDriverStatus] DÉBUT', { driverId, isActive });
+    logger.info('[updateAdminDriverStatus] DÉBUT', { driverId, isActive });
 
     if (!process.env.DATABASE_URL) {
       res.status(400).json({ success: false, message: 'Database non disponible' });
@@ -385,7 +385,7 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
     const status = req.query.status as string | undefined;
     const search = req.query.search as string | undefined;
 
-    logger.info('🚀 [getAdminDrivers] DÉBUT', { type, status, search });
+    logger.info('[getAdminDrivers] DÉBUT', { type, status, search });
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [], counts: { total: 0, partners: 0, internals: 0, active: 0, suspended: 0 } });
@@ -513,7 +513,7 @@ export const getAdminDrivers = async (req: Request, res: Response): Promise<void
 export const getAdminDriverFullDetails = async (req: Request, res: Response): Promise<void> => {
   try {
     const { driverId } = req.params;
-    logger.info('🚀 [getAdminDriverFullDetails] DÉBUT', { driverId });
+    logger.info('[getAdminDriverFullDetails] DÉBUT', { driverId });
 
     if (!process.env.DATABASE_URL) {
       res.status(404).json({ success: false, message: 'Driver non trouvé' });
@@ -630,7 +630,7 @@ export const rechargeAdminDriverCommission = async (req: Request, res: Response)
     const { driverId } = req.params;
     const { amount, method = 'admin_manual', notes } = req.body;
 
-    logger.info('🚀 [rechargeAdminDriverCommission] DÉBUT', { driverId, amount, method });
+    logger.info('[rechargeAdminDriverCommission] DÉBUT', { driverId, amount, method });
 
     if (!amount || amount < 10000) {
       res.status(400).json({ success: false, message: 'Le montant minimum de recharge est de 10 000 FCFA' });
@@ -671,7 +671,7 @@ export const suspendAdminDriverCommission = async (req: Request, res: Response):
     const { driverId } = req.params;
     const { is_suspended, reason } = req.body;
 
-    logger.info('🚀 [suspendAdminDriverCommission] DÉBUT', { driverId, is_suspended });
+    logger.info('[suspendAdminDriverCommission] DÉBUT', { driverId, is_suspended });
 
     const driverCheck = await pool.query(
       `SELECT driver_type FROM driver_profiles WHERE user_id = $1`, [driverId]
@@ -710,7 +710,7 @@ export const updateAdminDriverCommissionRate = async (req: Request, res: Respons
     const { driverId } = req.params;
     const { commission_rate } = req.body;
 
-    logger.info('🚀 [updateAdminDriverCommissionRate] DÉBUT', { driverId, commission_rate });
+    logger.info('[updateAdminDriverCommissionRate] DÉBUT', { driverId, commission_rate });
 
     if (!commission_rate || ![10, 20].includes(commission_rate)) {
       res.status(400).json({ success: false, message: 'Le taux de commission doit être 10 ou 20' });
@@ -753,7 +753,7 @@ export const getAdminDriverCommissionTransactions = async (req: Request, res: Re
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
 
-    logger.info('🚀 [getAdminDriverCommissionTransactions] DÉBUT', { driverId, limit, offset, type });
+    logger.info('[getAdminDriverCommissionTransactions] DÉBUT', { driverId, limit, offset, type });
 
     let query = `
       SELECT

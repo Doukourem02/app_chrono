@@ -15,7 +15,7 @@ import {
 
 export const getAdminFinancialStats = async (req: Request, res: Response): Promise<void> => {
   try {
-    logger.info('🚀 [getAdminFinancialStats] DÉBUT');
+    logger.info('[getAdminFinancialStats] DÉBUT');
 
     if (!process.env.DATABASE_URL) {
       logger.warn('DATABASE_URL non configuré pour getAdminFinancialStats');
@@ -357,7 +357,7 @@ export const getAdminTransactions = async (req: Request, res: Response): Promise
     const search = req.query.search as string | undefined;
     const view = req.query.view as 'active' | 'cancelled' | undefined;
 
-    logger.info('🚀 [getAdminTransactions] DÉBUT', { page, limit, status, method, view });
+    logger.info('[getAdminTransactions] DÉBUT', { page, limit, status, method, view });
 
     if (!process.env.DATABASE_URL) {
       logger.warn('DATABASE_URL non configuré pour getAdminTransactions');
@@ -432,7 +432,7 @@ export const getAdminReportDeliveries = async (req: Request, res: Response): Pro
     const status = req.query.status as string | undefined;
     const driverId = req.query.driverId as string | undefined;
 
-    logger.info('🚀 [getAdminReportDeliveries] DÉBUT', { startDate, endDate, status, driverId });
+    logger.info('[getAdminReportDeliveries] DÉBUT', { startDate, endDate, status, driverId });
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [] });
@@ -491,7 +491,7 @@ export const getAdminReportRevenues = async (req: Request, res: Response): Promi
     const driverId = req.query.driverId as string | undefined;
     const deliveryType = req.query.deliveryType as string | undefined;
 
-    logger.info('🚀 [getAdminReportRevenues] DÉBUT');
+    logger.info('[getAdminReportRevenues] DÉBUT');
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [] });
@@ -544,7 +544,7 @@ export const getAdminReportClients = async (req: Request, res: Response): Promis
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
 
-    logger.info('🚀 [getAdminReportClients] DÉBUT');
+    logger.info('[getAdminReportClients] DÉBUT');
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [] });
@@ -581,7 +581,7 @@ export const getAdminReportDrivers = async (req: Request, res: Response): Promis
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
 
-    logger.info('🚀 [getAdminReportDrivers] DÉBUT');
+    logger.info('[getAdminReportDrivers] DÉBUT');
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [] });
@@ -659,7 +659,7 @@ export const getAdminReportPayments = async (req: Request, res: Response): Promi
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
 
-    logger.info('🚀 [getAdminReportPayments] DÉBUT');
+    logger.info('[getAdminReportPayments] DÉBUT');
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [] });

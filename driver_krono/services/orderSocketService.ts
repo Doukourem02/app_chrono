@@ -331,7 +331,7 @@ class OrderSocketService {
     // Mise à jour du statut de commande (canonique event)
     this.socket.on('order:status:update', (data) => {
       try {
-        logger.info('🔄 order:status:update reçu (driver)', undefined, data);
+        logger.info('order:status:update reçu (driver)', undefined, data);
         const { order } = data || {};
         
         if (!order || !order.id) {
@@ -362,7 +362,7 @@ class OrderSocketService {
           order.status === 'picked_up' ||
           order.status === 'delivering'
         )) {
-          logger.info('📦 Commande active reçue via order:status:update, ajout au store', undefined, { orderId: order.id, status: order.status });
+          logger.info('Commande active reçue via order:status:update, ajout au store', undefined, { orderId: order.id, status: order.status });
           store.addOrder(order as OrderRequest);
           if (!store.selectedOrderId) {
             store.setSelectedOrder(order.id);
@@ -774,7 +774,7 @@ class OrderSocketService {
     }
 
     // Log pour debug
-    logger.info(`🔄 Mise à jour statut: ${orderId.slice(0, 8)}... → ${status}`, 'orderSocketService', { orderId, status, hasLocation: !!location });
+    logger.info(`Mise à jour statut: ${orderId.slice(0, 8)}... → ${status}`, 'orderSocketService', { orderId, status, hasLocation: !!location });
 
     // Émettre l'événement socket immédiatement
     this.socket.emit('update-delivery-status', {

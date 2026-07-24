@@ -7,9 +7,6 @@ import { logger } from './logger'
  * Utilise des modals animés avec explications détaillées
  */
 export class UserFriendlyError {
-  /**
-   * Affiche un message d'erreur générique user-friendly
-   */
   static showGenericError(
     title: string = 'Une erreur est survenue',
     message: string = 'Désolé, une erreur inattendue s\'est produite. Veuillez réessayer ou contacter le support si le problème persiste.',
@@ -35,9 +32,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData)
   }
 
-  /**
-   * Erreur de session expirée
-   */
   static showSessionExpired(onReconnect?: () => void) {
     const errorData = ErrorTypes.SESSION_EXPIRED(onReconnect)
     errorData.onClose = () => {
@@ -46,9 +40,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData)
   }
 
-  /**
-   * Erreur de permission
-   */
   static showPermissionError(permission: 'localisation' | 'photos' | 'caméra' = 'localisation') {
     const errorData = ErrorTypes.PERMISSION(permission)
     errorData.onClose = () => {
@@ -57,9 +48,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData)
   }
 
-  /**
-   * Erreur de validation (champs manquants, etc.)
-   */
   static showValidationError(message: string) {
     const errorData = ErrorTypes.VALIDATION(message)
     errorData.onClose = () => {
@@ -124,9 +112,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData)
   }
 
-  /**
-   * Erreur de compte incomplet
-   */
   static showIncompleteAccount(onReconnect?: () => void) {
     const errorData = ErrorTypes.INCOMPLETE_ACCOUNT(onReconnect)
     errorData.onClose = () => {
@@ -135,9 +120,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData)
   }
 
-  /**
-   * Erreur de connexion requise
-   */
   static showLoginRequired() {
     const errorData = ErrorTypes.LOGIN_REQUIRED()
     errorData.onAction = () => {
@@ -150,9 +132,6 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData)
   }
 
-  /**
-   * Erreur de service indisponible
-   */
   static showServiceUnavailable(service: string = 'ce service', onRetry?: () => void) {
     const errorData = ErrorTypes.SERVICE_UNAVAILABLE(service, onRetry)
     errorData.onClose = () => {
@@ -161,16 +140,11 @@ export class UserFriendlyError {
     useErrorModalStore.getState().showError(errorData)
   }
 
-  /**
-   * Gère une erreur inconnue et affiche un message user-friendly
-   */
   static handleUnknownError(error: unknown, context?: string, onRetry?: () => void) {
-    // Logger l'erreur technique (pas visible à l'utilisateur)
     if (process.env.NODE_ENV === 'development') {
       logger.error(`Erreur inconnue${context ? ` dans ${context}` : ''}:`, error)
     }
 
-    // Afficher un message user-friendly
     this.showGenericError(
       'Une erreur est survenue',
       'Désolé, une erreur inattendue s\'est produite. Veuillez réessayer ou contacter le support si le problème persiste.',

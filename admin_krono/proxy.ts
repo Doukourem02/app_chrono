@@ -10,13 +10,11 @@ import { EXACT_WORKSPACE_PATH_SET } from '@/lib/workspacePaths'
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Routes publiques qui ne nécessitent pas d'authentification
   const publicRoutes = ['/login', '/api/auth']
   if (publicRoutes.some(route => pathname.startsWith(route))) {
     return NextResponse.next()
   }
 
-  // Routes API
   if (pathname.startsWith('/api/')) {
     return NextResponse.next()
   }
@@ -28,16 +26,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(url)
   }
 
-  // Protéger toutes les routes /dashboard/*
-  // Note: La vérification complète de l'authentification se fait dans layout.tsx côté client
-  // car Supabase stocke les tokens dans des cookies HTTP-only qui ne sont pas facilement accessibles
-  // dans le middleware Next.js. Le layout.tsx vérifie déjà l'authentification et le rôle admin.
-  // Ce middleware sert principalement de première ligne de défense.
-  
+  // La vérification complète de l'authentification se fait dans layout.tsx côté client,
+  // car Supabase stocke les tokens dans des cookies HTTP-only peu accessibles au middleware
+  // Next.js. Ce middleware sert principalement de première ligne de défense.
   if (pathname.startsWith('/dashboard')) {
-    // Pour l'instant, on laisse passer - la vérification complète se fait dans layout.tsx
-    // En production, on pourrait implémenter une vérification via une API route
-    // ou utiliser des cookies HTTP-only personnalisés
     return NextResponse.next()
   }
 

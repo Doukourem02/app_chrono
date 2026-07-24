@@ -24,7 +24,7 @@ export function initSentry() {
 
   if (!sentryDsn) {
     if (__DEV__) {
-      logger.debug('⚠️ Sentry DSN non configuré - monitoring d\'erreurs désactivé');
+      logger.debug('Sentry DSN non configuré - monitoring d\'erreurs désactivé');
     }
     return;
   }
@@ -44,7 +44,7 @@ export function initSentry() {
   });
 
   if (__DEV__) {
-    logger.debug('✅ Sentry initialisé pour le monitoring d\'erreurs');
+    logger.debug('Sentry initialisé pour le monitoring d\'erreurs');
   }
 }
 

@@ -436,7 +436,7 @@ class ApiService {
       let response: Response;
       try {
       if (__DEV__) {
-        logger.debug('🔍 [apiService.getDriverRevenues] Appel API:', 'apiService', url);
+        logger.debug('[apiService.getDriverRevenues] Appel API:', 'apiService', url);
       }
       response = await apiFetch(url, {
         method: 'GET',
@@ -786,9 +786,6 @@ class ApiService {
     }
   }
 
-  /**
-   * 👤 Récupérer le profil utilisateur complet
-   */
   async getUserProfile(userId: string): Promise<{
     success: boolean;
     message?: string;
@@ -839,9 +836,6 @@ class ApiService {
     }
   }
 
-  /**
-   * 👤 Mettre à jour le profil utilisateur
-   */
   async updateProfile(
     userId: string,
     profileData: {
@@ -967,9 +961,6 @@ class ApiService {
     }
   }
 
-  /**
-   * 📸 Uploader un avatar
-   */
   async uploadAvatar(
     userId: string,
     imageBase64: string,
@@ -1032,7 +1023,7 @@ class ApiService {
   }
 
   /**
-   * 🚗 Mettre à jour les informations du véhicule du driver
+   * Mettre à jour les informations du véhicule du driver
    */
   async updateDriverVehicle(
     userId: string,
@@ -1093,7 +1084,7 @@ class ApiService {
   }
 
   /**
-   * 📄 Récupérer les documents légaux d'un véhicule
+   * Récupérer les documents légaux d'un véhicule
    */
   async getVehicleDocuments(vehiclePlate: string): Promise<{
     success: boolean;
@@ -1148,7 +1139,7 @@ class ApiService {
   }
 
   /**
-   * 📄 Uploader un document légal (carte grise, assurance, etc.)
+   * Uploader un document légal (carte grise, assurance, etc.)
    */
   async uploadVehicleDocument(
     vehiclePlate: string,
@@ -1225,7 +1216,7 @@ class ApiService {
   }
 
   /**
-   * 🔄 Mettre à jour le type de livreur (internal/partner)
+   * Mettre à jour le type de livreur (internal/partner)
    */
   async updateDriverType(
     userId: string,
@@ -1274,7 +1265,7 @@ class ApiService {
   }
 
   /**
-   * 🏢 Activer/désactiver la réception des commandes B2B.
+   * Activer/désactiver la réception des commandes B2B.
    */
   async updateDriverB2BPreference(
     userId: string,
@@ -1322,9 +1313,6 @@ class ApiService {
     }
   }
 
-  /**
-   * 🚗 Récupérer le profil driver complet
-   */
   async getDriverProfile(userId: string): Promise<{
     success: boolean;
     message?: string;
@@ -1365,9 +1353,6 @@ class ApiService {
     }
   }
 
-  /**
-   * 💳 Récupérer le solde commission
-   */
   async getCommissionBalance(userId: string): Promise<{
     success: boolean;
     message?: string;
@@ -1437,7 +1422,7 @@ class ApiService {
   }
 
   /**
-   * 💳 Récupérer l'historique des transactions commission
+   * Récupérer l'historique des transactions commission
    */
   async getCommissionTransactions(userId: string, limit: number = 50): Promise<{
     success: boolean;
@@ -1502,9 +1487,6 @@ class ApiService {
     }
   }
 
-  /**
-   * 💳 Recharger le compte commission
-   */
   async rechargeCommission(
     userId: string,
     amount: number,

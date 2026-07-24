@@ -12,14 +12,14 @@ export default function SuccessScreen() {
   const { isNewUser, clearTempData } = useTempDriverStore();
   const { needsDriverTypeSelection } = useDriverStore();
 
-  // ✅ Vérifier au montage si redirection nécessaire
+  // Vérifier au montage si redirection nécessaire
   useEffect(() => {
     if (needsDriverTypeSelection()) {
       router.replace('/(auth)/driver-type-selection' as any);
     }
   }, [needsDriverTypeSelection]);
 
-  // ✅ Animation lancée UNE SEULE FOIS
+  // Animation lancée UNE SEULE FOIS
   useEffect(() => {
     Animated.sequence([
       Animated.timing(scaleAnim, {

@@ -141,7 +141,7 @@ export default function Sidebar() {
     if (!user?.id) return;
 
     try {
-      logger.debug('🔄 [Sidebar] Loading profile for user:', user.id);
+      logger.debug('[Sidebar] Loading profile for user:', user.id);
       const { data: userData, error } = await supabase
         .from('users')
         .select('avatar_url, phone, first_name, last_name')
@@ -187,7 +187,7 @@ export default function Sidebar() {
         // Corriger l'URL si elle contient un double "avatars/avatars"
         if (newAvatarUrl && newAvatarUrl.includes('/avatars/avatars/')) {
           newAvatarUrl = newAvatarUrl.replace('/avatars/avatars/', '/avatars/');
-          logger.debug('🔧 [Sidebar] Corrected URL from double avatars:', newAvatarUrl);
+          logger.debug('[Sidebar] Corrected URL from double avatars:', newAvatarUrl);
         }
         
         // Vérifier que l'URL est valide
@@ -231,7 +231,7 @@ export default function Sidebar() {
   useEffect(() => {
     const handleAvatarUpdate = (event: CustomEvent) => {
       const { avatarUrl: newAvatarUrl } = event.detail;
-      logger.debug('📢 [Sidebar] Received avatar-updated event:', { newAvatarUrl });
+      logger.debug('[Sidebar] Received avatar-updated event:', { newAvatarUrl });
       if (newAvatarUrl) {
         let correctedUrl = newAvatarUrl;
         if (newAvatarUrl.includes('/avatars/avatars/')) {
@@ -629,7 +629,7 @@ export default function Sidebar() {
 
   // Calculer le style de l'avatar dynamiquement pour qu'il se mette à jour
   const avatarStyle: React.CSSProperties = useMemo(() => {
-    logger.debug('🎨 [Sidebar] Computing avatarStyle with avatarUrl:', avatarUrl);
+    logger.debug('[Sidebar] Computing avatarStyle with avatarUrl:', avatarUrl);
     const style: React.CSSProperties = {
       width: '48px',
       height: '48px',
@@ -670,12 +670,12 @@ export default function Sidebar() {
   
   // Log pour déboguer les changements d'avatarUrl
   useEffect(() => {
-    logger.debug('🔄 [Sidebar] avatarUrl changed:', avatarUrl);
+    logger.debug('[Sidebar] avatarUrl changed:', avatarUrl);
   }, [avatarUrl]);
 
   // Log pour déboguer le menu de profil
   useEffect(() => {
-    logger.debug('🔍 [Sidebar] Profile menu state:', {
+    logger.debug('[Sidebar] Profile menu state:', {
       showProfileMenu,
       menuPosition,
       shouldDisplay: showProfileMenu && menuPosition !== null,

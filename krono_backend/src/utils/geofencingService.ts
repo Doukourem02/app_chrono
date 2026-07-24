@@ -33,15 +33,11 @@ function toRad(degrees: number): number {
   return (degrees * Math.PI) / 180;
 }
 
-/**
- * Rayon de la zone de géofencing en mètres 
- */
-export const GEOFENCE_RADIUS = 50; // 50 mètres par défaut
+/** Rayon de la zone de géofencing en mètres */
+export const GEOFENCE_RADIUS = 50;
 
-/**
- * Durée minimale dans la zone avant validation automatique
- */
-export const AUTO_VALIDATE_DELAY = 10000; // 10 secondes
+/** Durée minimale (ms) dans la zone avant validation automatique */
+export const AUTO_VALIDATE_DELAY = 10000;
 
 /**
  * Vérifie si le livreur est dans la zone de géofencing
@@ -87,10 +83,10 @@ export function getDistanceToGeofence(
  * Détermine le statut de géofencing
  */
 export enum GeofenceStatus {
-  OUTSIDE = 'outside', // Hors de la zone
-  ENTERING = 'entering', // Entrant dans la zone
-  INSIDE = 'inside', // Dans la zone
-  VALIDATED = 'validated', // Validé automatiquement
+  OUTSIDE = 'outside',
+  ENTERING = 'entering',
+  INSIDE = 'inside',
+  VALIDATED = 'validated',
 }
 
 export interface GeofenceState {
@@ -114,7 +110,6 @@ export function calculateGeofenceState(
   const distance = getDistanceToGeofence(driverPosition, targetPosition, radius);
 
   if (!isInside) {
-    // Hors de la zone
     return {
       status: GeofenceStatus.OUTSIDE,
       distance,
@@ -123,16 +118,14 @@ export function calculateGeofenceState(
     };
   }
 
-  // Dans la zone
-  const wasInside = previousState?.status === GeofenceStatus.INSIDE || 
+  const wasInside = previousState?.status === GeofenceStatus.INSIDE ||
                   previousState?.status === GeofenceStatus.ENTERING;
-  const enteredAt = wasInside && previousState?.enteredAt 
-    ? previousState.enteredAt 
+  const enteredAt = wasInside && previousState?.enteredAt
+    ? previousState.enteredAt
     : now;
 
   const timeInZone = now - enteredAt;
 
-  // Si vient d'entrer dans la zone
   if (!wasInside) {
     return {
       status: GeofenceStatus.ENTERING,
@@ -142,7 +135,6 @@ export function calculateGeofenceState(
     };
   }
 
-  // Si déjà dans la zone depuis un moment
   return {
     status: GeofenceStatus.INSIDE,
     distance,

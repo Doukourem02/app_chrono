@@ -138,7 +138,7 @@ export function useMapNewOrder({
         selectedMethod
       ) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        logger.info('📦 Envoi commande avec détails...', 'useMapNewOrder');
+        logger.info('Envoi commande avec détails...', 'useMapNewOrder');
 
         try {
           stopDriverSearch();

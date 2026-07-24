@@ -6,11 +6,6 @@
  * @returns Rayon en mètres
  */
 export function calculateOptimalRadius(zoom: number): number {
-  // À zoom élevé (15+), rayon plus petit (80-100m) pour éviter que les marqueurs soient trop éloignés
-  // À zoom moyen (12-15), rayon moyen (120-150m) pour une séparation visible
-  // À zoom faible (10-12), rayon plus grand (180-200m) pour une meilleure visibilité
-  // À zoom très faible (<10), rayon très grand (250-300m)
-  
   if (zoom >= 15) {
     return 100 // Zoom élevé : séparation fine mais visible
   } else if (zoom >= 13) {
@@ -40,13 +35,10 @@ export function calculateMarkerOffset(
   totalInGroup: number,
   radiusMeters: number = 100
 ): { lat: number; lng: number } {
-  // Si un seul marqueur, pas besoin de décalage
   if (totalInGroup <= 1) {
     return position
   }
 
-  // Calculer l'angle pour placer les marqueurs en cercle
-  // Répartir uniformément autour du cercle (360° / nombre de marqueurs)
   const angleStep = (2 * Math.PI) / totalInGroup
   const angle = index * angleStep
 
@@ -87,32 +79,28 @@ export function calculateDriverOffsets<T extends { userId: string; current_latit
       lng: driver.current_longitude,
     }
     
-    // Trouver un groupe existant avec une position similaire
     let foundGroup = false
     for (const [groupKey, groupDrivers] of positionGroups.entries()) {
       const [groupLat, groupLng] = groupKey.split(',').map(Number)
       const latDiff = Math.abs(position.lat - groupLat)
       const lngDiff = Math.abs(position.lng - groupLng)
-      
+
       if (latDiff < TOLERANCE && lngDiff < TOLERANCE) {
         groupDrivers.push(driver)
         foundGroup = true
         break
       }
     }
-    
-    // Si aucun groupe trouvé, créer un nouveau groupe
+
     if (!foundGroup) {
       const groupKey = `${position.lat},${position.lng}`
       positionGroups.set(groupKey, [driver])
     }
   })
   
-  // Calculer le rayon optimal en fonction du zoom
   // Rayon par défaut plus grand pour une meilleure visibilité même sans zoom
-  const optimalRadius = zoom ? calculateOptimalRadius(zoom) : 200 // Par défaut 200m si pas de zoom
-  
-  // Calculer les offsets pour chaque groupe
+  const optimalRadius = zoom ? calculateOptimalRadius(zoom) : 200
+
   positionGroups.forEach((groupDrivers, groupKey) => {
     const [centerLat, centerLng] = groupKey.split(',').map(Number)
     const centerPosition = { lat: centerLat, lng: centerLng }

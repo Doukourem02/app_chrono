@@ -38,8 +38,8 @@ export async function initializeRedis(): Promise<{
 
   // Si REDIS_URL n'est pas configuré, fonctionner sans Redis (mode standalone)
   if (!redisUrl) {
-    logger.warn('⚠️  REDIS_URL non configuré - Socket.IO fonctionnera en mode standalone (non scalable)');
-    logger.info('💡 Pour activer le scaling horizontal, configurez REDIS_URL');
+    logger.warn('REDIS_URL non configuré - Socket.IO fonctionnera en mode standalone (non scalable)');
+    logger.info('Pour activer le scaling horizontal, configurez REDIS_URL');
     return { pubClient: null, subClient: null, isAvailable: false };
   }
 
@@ -47,7 +47,7 @@ export async function initializeRedis(): Promise<{
     logger.error(
       'REDIS_URL est une URL HTTP(S) (ex. REST Upstash). Le client Redis attend une URL TCP du type rediss://default:TOKEN@host:6379 (onglet TCP sur Upstash).',
     );
-    logger.warn('⚠️  Socket.IO fonctionnera en mode standalone (non scalable)');
+    logger.warn('Socket.IO fonctionnera en mode standalone (non scalable)');
     return { pubClient: null, subClient: null, isAvailable: false };
   }
 
@@ -58,7 +58,7 @@ export async function initializeRedis(): Promise<{
       socket: {
         reconnectStrategy: (retries) => {
           if (retries > 10) {
-            logger.error('❌ Redis: Trop de tentatives de reconnexion, abandon');
+            logger.error('Redis: Trop de tentatives de reconnexion, abandon');
             return new Error('Trop de tentatives de reconnexion');
           }
           // Retry avec délai exponentiel : 100ms, 200ms, 400ms, etc.
@@ -73,12 +73,12 @@ export async function initializeRedis(): Promise<{
 
     // Gestion des erreurs
     pubClient.on('error', (err) => {
-      logger.error('❌ Redis Publisher Error:', err);
+      logger.error('Redis Publisher Error:', err);
       isRedisAvailable = false;
     });
 
     subClient.on('error', (err) => {
-      logger.error('❌ Redis Subscriber Error:', err);
+      logger.error('Redis Subscriber Error:', err);
       isRedisAvailable = false;
     });
 
@@ -117,7 +117,7 @@ export async function initializeRedis(): Promise<{
         'Astuce Invalid URL : pas de guillemets dans REDIS_URL sur Render, utiliser l’URL TCP rediss:// (Upstash → Connect → TCP), et encoder les caractères spéciaux du mot de passe dans l’URL si besoin.',
       );
     }
-    logger.warn('⚠️  Socket.IO fonctionnera en mode standalone (non scalable)');
+    logger.warn('Socket.IO fonctionnera en mode standalone (non scalable)');
     
     // Nettoyer les clients en cas d'erreur
     try {

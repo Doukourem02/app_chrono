@@ -16,7 +16,6 @@ export async function createDefaultPaymentMethods(
   userId: string
 ): Promise<boolean> {
   try {
-    // Vérifier si l'utilisateur a déjà des méthodes de paiement
     const existingMethods = await pool.query(
       'SELECT id FROM payment_methods WHERE user_id = $1',
       [userId]
@@ -29,10 +28,6 @@ export async function createDefaultPaymentMethods(
       return true;
     }
 
-    // Cash et Deferred sont toujours disponibles dans le code, pas besoin de les créer en DB
-    // Cette fonction est prête pour quand Orange Money/Wave seront configurés
-    // Pour l'instant, on ne crée rien car cash et deferred sont gérés côté code
-    
     logger.debug(
       `Aucune méthode de paiement à créer pour utilisateur ${maskUserId(userId)} (cash et deferred sont toujours disponibles)`
     );

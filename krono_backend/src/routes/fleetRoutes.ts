@@ -23,44 +23,32 @@ import { verifyJWT } from '../middleware/verifyToken.js';
 
 const router: Router = express.Router();
 
-// ============================================
-// VÉHICULES
-// ============================================
+// Véhicules
 router.get('/vehicles', verifyAdminSupabase, getFleetVehicles);
 router.get('/vehicles/:vehiclePlate', verifyAdminSupabase, getFleetVehicleDetails);
 router.post('/vehicles', verifyAdminSupabase, createFleetVehicle);
 router.put('/vehicles/:vehiclePlate', verifyAdminSupabase, updateFleetVehicle);
 
-// ============================================
-// RAVITAILLEMENT
-// ============================================
+// Ravitaillement
 router.post('/vehicles/:vehiclePlate/fuel', verifyAdminSupabase, addFuelLog);
 router.get('/vehicles/:vehiclePlate/fuel', verifyAdminSupabase, getFuelLogs);
 
-// ============================================
-// MAINTENANCE
-// ============================================
+// Maintenance
 router.post('/vehicles/:vehiclePlate/maintenance', verifyAdminSupabase, createMaintenance);
 router.put('/maintenance/:maintenanceId', verifyAdminSupabase, updateMaintenance);
 router.get('/vehicles/:vehiclePlate/maintenance', verifyAdminSupabase, getMaintenanceHistory);
 
-// ============================================
-// DOCUMENTS
-// ============================================
+// Documents
 router.post('/vehicles/:vehiclePlate/documents/upload', verifyAdminSupabase, uploadVehicleDocumentImage);
 router.post('/vehicles/:vehiclePlate/documents', verifyAdminSupabase, upsertVehicleDocument);
 router.get('/vehicles/:vehiclePlate/documents', verifyAdminSupabase, getVehicleDocuments);
 router.get('/documents/expiring', verifyAdminSupabase, getExpiringDocuments);
 
-// ============================================
-// STATISTIQUES FINANCIÈRES
-// ============================================
+// Statistiques financières
 router.get('/vehicles/:vehiclePlate/financial-summary', verifyAdminSupabase, getVehicleFinancialSummary);
 router.post('/vehicles/:vehiclePlate/calculate-financial-summary', verifyAdminSupabase, calculateFinancialSummary);
 
-// ============================================
-// KILOMÉTRAGE
-// ============================================
+// Kilométrage
 router.post('/delivery-mileage', verifyJWT, logDeliveryMileage); // Appelé après livraison ; auth requise (pas besoin d'être admin)
 router.get('/vehicles/:vehiclePlate/mileage', verifyAdminSupabase, getMileageHistory);
 

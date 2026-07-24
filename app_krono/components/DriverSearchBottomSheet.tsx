@@ -150,7 +150,7 @@ export const DriverSearchBottomSheet: React.FC<DriverSearchBottomSheetProps> = (
     
     // Debug en développement
     if (__DEV__) {
-      logger.debug('📦 Driver info:', undefined, {
+      logger.debug('Driver info:', undefined, {
         id: driver.id,
         first_name: driver.first_name,
         last_name: driver.last_name,

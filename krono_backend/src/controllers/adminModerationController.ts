@@ -13,7 +13,7 @@ export const getAdminRatings = async (req: Request, res: Response): Promise<void
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
 
-    logger.info('🚀 [getAdminRatings] DÉBUT', { page, limit, driverId, clientId });
+    logger.info('[getAdminRatings] DÉBUT', { page, limit, driverId, clientId });
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
@@ -78,7 +78,7 @@ export const getAdminRatings = async (req: Request, res: Response): Promise<void
 export const deleteAdminRating = async (req: Request, res: Response): Promise<void> => {
   try {
     const { ratingId } = req.params;
-    logger.info('🚀 [deleteAdminRating] DÉBUT', { ratingId });
+    logger.info('[deleteAdminRating] DÉBUT', { ratingId });
 
     if (!process.env.DATABASE_URL) {
       res.status(400).json({ success: false, message: 'Database non disponible' });
@@ -113,7 +113,7 @@ export const deleteAdminRating = async (req: Request, res: Response): Promise<vo
 
 export const getAdminPromoCodes = async (req: Request, res: Response): Promise<void> => {
   try {
-    logger.info('🚀 [getAdminPromoCodes] DÉBUT');
+    logger.info('[getAdminPromoCodes] DÉBUT');
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [] });
@@ -143,7 +143,7 @@ export const getAdminPromoCodes = async (req: Request, res: Response): Promise<v
 export const createAdminPromoCode = async (req: Request, res: Response): Promise<void> => {
   try {
     const { code, discountType, discountValue, maxUses, validFrom, validUntil, isActive } = req.body;
-    logger.info('🚀 [createAdminPromoCode] DÉBUT', { code });
+    logger.info('[createAdminPromoCode] DÉBUT', { code });
 
     if (!process.env.DATABASE_URL) {
       res.status(400).json({ success: false, message: 'Database non disponible' });
@@ -196,7 +196,7 @@ export const getAdminDisputes = async (req: Request, res: Response): Promise<voi
     const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
 
-    logger.info('🚀 [getAdminDisputes] DÉBUT', { page, limit, status });
+    logger.info('[getAdminDisputes] DÉBUT', { page, limit, status });
 
     if (!process.env.DATABASE_URL) {
       res.json({ success: true, data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
@@ -255,7 +255,7 @@ export const updateAdminDispute = async (req: Request, res: Response): Promise<v
     const { disputeId } = req.params;
     const { status, adminNotes } = req.body;
 
-    logger.info('🚀 [updateAdminDispute] DÉBUT', { disputeId, status });
+    logger.info('[updateAdminDispute] DÉBUT', { disputeId, status });
 
     if (!process.env.DATABASE_URL) {
       res.status(400).json({ success: false, message: 'Database non disponible' });

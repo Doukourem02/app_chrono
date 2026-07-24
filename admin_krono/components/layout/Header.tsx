@@ -99,7 +99,7 @@ export default function Header() {
   // Log pour déboguer les résultats de recherche
   useEffect(() => {
     if (searchResults?.data) {
-      logger.debug('🔍 [Header] Résultats de recherche:', {
+      logger.debug('[Header] Résultats de recherche:', {
         query: debouncedQuery,
         ordersCount: searchResults.data.orders?.length || 0,
         driversCount: searchResults.data.drivers?.length || 0,

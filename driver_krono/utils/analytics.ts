@@ -70,7 +70,7 @@ class AnalyticsService {
     }
 
     if (__DEV__) {
-      logger.debug('📊 Analytics service initialisé (driver)', undefined, { enabled: this.enabled });
+      logger.debug('Analytics service initialisé (driver)', undefined, { enabled: this.enabled });
     }
   }
 
@@ -104,12 +104,12 @@ class AnalyticsService {
     };
 
     if (__DEV__) {
-      logger.debug('📊 Analytics Event (driver):', undefined, { event, properties: eventData.properties });
+      logger.debug('Analytics Event (driver):', undefined, { event, properties: eventData.properties });
     }
 
     this.sendToBackend(eventData).catch(error => {
       if (__DEV__) {
-        logger.warn('⚠️ Erreur envoi analytics au backend:', undefined, error);
+        logger.warn('Erreur envoi analytics au backend:', undefined, error);
       }
     });
   }

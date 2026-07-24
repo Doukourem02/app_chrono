@@ -77,7 +77,7 @@ export default function SettingsPage() {
         let correctedAvatarUrl = dbAvatarUrl;
         if (dbAvatarUrl && dbAvatarUrl.includes('/avatars/avatars/')) {
           correctedAvatarUrl = dbAvatarUrl.replace('/avatars/avatars/', '/avatars/');
-          logger.debug('🔧 [Settings] Corrected URL from double avatars:', correctedAvatarUrl);
+          logger.debug('[Settings] Corrected URL from double avatars:', correctedAvatarUrl);
         }
         
         // Vérifier que l'URL est valide

@@ -397,7 +397,7 @@ export default function MapPage() {
 
 
   const cleanupOrderState = useCallback(async () => {
-    logger.info("🧹 Nettoyage complet de l'état de commande", "map.tsx");
+    logger.info("Nettoyage complet de l'état de commande", "map.tsx");
     
     if (isSearchingDriver) {
       stopDriverSearch();
@@ -523,7 +523,7 @@ export default function MapPage() {
     const status = currentOrder?.status;
     
     if (status === "cancelled" || status === "declined") {
-      logger.info("🧹 Nettoyage commande terminée/annulée/refusée", "map.tsx", {
+      logger.info("Nettoyage commande terminée/annulée/refusée", "map.tsx", {
         status,
       });
       cleanupOrderState();
@@ -635,7 +635,7 @@ export default function MapPage() {
   );
 
   useEffect(() => {
-    logger.debug("🔍 RatingBottomSheet state changed", "map.tsx", {
+    logger.debug("RatingBottomSheet state changed", "map.tsx", {
       showRatingBottomSheet, 
       ratingOrderId,
       isExpanded: ratingIsExpanded,
@@ -1176,7 +1176,7 @@ export default function MapPage() {
           onPress: async () => {
             try {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                logger.info("🔄 Annulation commande...", "map.tsx", {
+                logger.info("Annulation commande...", "map.tsx", {
                   orderId,
                 });
               

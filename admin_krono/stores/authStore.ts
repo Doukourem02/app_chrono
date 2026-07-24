@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
 
             if (emailError || !emailData) {
               logger.error('Admin role check failed:', error || emailError)
-              logger.warn('⚠️ User not found in users table. Make sure the user exists with the correct ID or email.')
+              logger.warn('User not found in users table. Make sure the user exists with the correct ID or email.')
               set({ isAdmin: false })
               return false
             }

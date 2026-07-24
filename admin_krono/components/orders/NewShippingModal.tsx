@@ -259,7 +259,7 @@ export default function NewShippingModal({
           // Jouer le son de succès
           const { soundService } = await import('@/utils/soundService')
           if (process.env.NODE_ENV === 'development') {
-            logger.debug('[NewShippingModal] 🔊 Tentative de jouer le son de succès')
+            logger.debug('[NewShippingModal] Tentative de jouer le son de succès')
           }
           soundService.playSuccess().catch((err) => {
             logger.warn('[NewShippingModal] Erreur lecture son succès:', err)

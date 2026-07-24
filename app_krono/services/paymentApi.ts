@@ -159,7 +159,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      logger.error('❌ Erreur calculatePrice:', undefined, error);
+      logger.error('Erreur calculatePrice:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -249,7 +249,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      logger.error('❌ Erreur createPaymentMethod:', undefined, error);
+      logger.error('Erreur createPaymentMethod:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -282,7 +282,7 @@ class PaymentApiService {
 
       return { success: true, data: data?.data };
     } catch (error) {
-      logger.error('❌ Erreur setDefaultPaymentMethod:', undefined, error);
+      logger.error('Erreur setDefaultPaymentMethod:', undefined, error);
       return {
         success: false,
         message: transportOrErrorMessage(error, 'Erreur lors de la mise à jour'),
@@ -314,7 +314,7 @@ class PaymentApiService {
 
       return { success: true };
     } catch (error) {
-      logger.error('❌ Erreur deletePaymentMethod:', undefined, error);
+      logger.error('Erreur deletePaymentMethod:', undefined, error);
       return {
         success: false,
         message: transportOrErrorMessage(error, 'Erreur lors de la suppression'),
@@ -366,7 +366,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      logger.error('❌ Erreur initiatePayment:', undefined, error);
+      logger.error('Erreur initiatePayment:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -402,7 +402,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      logger.error('❌ Erreur checkPaymentStatus:', undefined, error);
+      logger.error('Erreur checkPaymentStatus:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -456,7 +456,7 @@ class PaymentApiService {
         pagination: data.pagination,
       };
     } catch (error) {
-      logger.error('❌ Erreur getTransactions:', undefined, error);
+      logger.error('Erreur getTransactions:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -499,7 +499,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      logger.error('❌ Erreur createDispute:', undefined, error);
+      logger.error('Erreur createDispute:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -535,7 +535,7 @@ class PaymentApiService {
         data: data.data,
       };
     } catch (error) {
-      logger.error('❌ Erreur getDeferredPaymentLimits:', undefined, error);
+      logger.error('Erreur getDeferredPaymentLimits:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -584,7 +584,7 @@ class PaymentApiService {
         data: data.data || [],
       };
     } catch (error) {
-      logger.error('❌ Erreur getDeferredDebts:', undefined, error);
+      logger.error('Erreur getDeferredDebts:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',
@@ -610,7 +610,7 @@ class PaymentApiService {
         message: data.message,
       };
     } catch (error) {
-      logger.error('❌ Erreur repayDeferred:', undefined, error);
+      logger.error('Erreur repayDeferred:', undefined, error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Erreur de connexion',

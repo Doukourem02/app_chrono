@@ -45,14 +45,14 @@ class AdminMessageSocketService {
 
     this.socket.on('new-message', (data: { message: Message; conversation: Conversation }) => {
       logger.info('[adminMessageSocketService] New message received', data)
-      logger.debug('[adminMessageSocketService] 💬 Nouveau message reçu:', {
+      logger.debug('[adminMessageSocketService] Nouveau message reçu:', {
         messageId: data.message?.id,
         senderId: data.message?.sender_id,
         conversationId: data.conversation?.id,
       })
       // Jouer le son de nouveau message (même si on est sur la page Messages)
       if (typeof window !== 'undefined') {
-        logger.debug('[adminMessageSocketService] 🔊 Tentative de jouer le son pour nouveau message')
+        logger.debug('[adminMessageSocketService] Tentative de jouer le son pour nouveau message')
         import('@/utils/soundService').then(({ soundService }) => {
           soundService.playNewMessage().catch((err) => {
             logger.warn('[adminMessageSocketService] Erreur lecture son nouveau message:', err)
@@ -61,7 +61,7 @@ class AdminMessageSocketService {
           logger.warn('[adminMessageSocketService] Erreur chargement soundService:', err)
         })
       } else {
-        logger.warn('[adminMessageSocketService] ⚠️ window undefined, impossible de jouer le son')
+        logger.warn('[adminMessageSocketService] window undefined, impossible de jouer le son')
       }
       this.messageCallbacks.forEach((callback) => {
         callback(data.message, data.conversation)

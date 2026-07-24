@@ -41,7 +41,7 @@ export default function DeliveryAnalytics() {
       ) {
         return prev
       }
-      logger.debug('🔑 [DeliveryAnalytics] QueryKey calculated:', latestKey)
+      logger.debug('[DeliveryAnalytics] QueryKey calculated:', latestKey)
       return latestKey
     })
   }, [latestKey])
@@ -49,7 +49,7 @@ export default function DeliveryAnalytics() {
   const { data: analyticsData, isLoading } = useQuery({
     queryKey,
     queryFn: () => {
-      logger.debug('🚀 [DeliveryAnalytics] queryFn CALLED - getDeliveryAnalytics', { startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
+      logger.debug('[DeliveryAnalytics] queryFn CALLED - getDeliveryAnalytics', { startDate, endDate, timestamp: new Date().toISOString(), stack: new Error().stack })
       return getDeliveryAnalytics(startDate, endDate)
     },
     refetchInterval: false, // Pas de refresh automatique - les analytics changent rarement
@@ -59,7 +59,7 @@ export default function DeliveryAnalytics() {
     refetchOnReconnect: false,
     placeholderData: (previousData) => {
       if (previousData) {
-        logger.debug('📦 [DeliveryAnalytics] Using cached data, skipping fetch')
+        logger.debug('[DeliveryAnalytics] Using cached data, skipping fetch')
       }
       return previousData
     },

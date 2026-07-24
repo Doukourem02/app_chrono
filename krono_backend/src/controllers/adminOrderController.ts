@@ -18,7 +18,7 @@ import { isUsableLatLon, positiveNumber, DeliveryCodeSmsStatus, sendAdminOrderDe
 
 export const getAdminOngoingDeliveries = async (req: Request, res: Response): Promise<void> => {
   try {
-    logger.info('🚀 [getAdminOngoingDeliveries] DÉBUT');
+    logger.info('[getAdminOngoingDeliveries] DÉBUT');
 
     const ongoingStatuses = ['pending', 'accepted', 'enroute', 'in_progress', 'picked_up', 'delivering'];
 
@@ -211,7 +211,7 @@ export const getAdminOngoingDeliveries = async (req: Request, res: Response): Pr
 export const getAdminOrdersByStatus = async (req: Request, res: Response): Promise<void> => {
   try {
     const status = req.query.status as string | undefined;
-    logger.info('🚀 [getAdminOrdersByStatus] DÉBUT, status:', status);
+    logger.info('[getAdminOrdersByStatus] DÉBUT, status:', status);
 
     const emptyCountsResponse = {
       success: true,
@@ -805,7 +805,7 @@ export const cancelAdminOrder = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    logger.info(`🔧 [cancelAdminOrder] Tentative d'annulation de la commande ${orderId} par l'admin`);
+    logger.info(`[cancelAdminOrder] Tentative d'annulation de la commande ${orderId} par l'admin`);
 
     const dbResult = await pool.query('SELECT * FROM orders WHERE id = $1', [orderId]);
 

@@ -101,7 +101,7 @@ class AdminSocketService {
 
         // Envoyer l'événement admin-connect avec l'ID de l'admin
         if (session.user?.id) {
-          logger.debug('[adminSocketService] 🔐 Envoi admin-connect avec adminId:', session.user.id)
+          logger.debug('[adminSocketService] Envoi admin-connect avec adminId:', session.user.id)
           this.socket?.emit('admin-connect', session.user.id)
         }
       })

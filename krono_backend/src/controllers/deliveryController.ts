@@ -390,7 +390,7 @@ export const updateDeliveryStatus = async (
             );
           } else {
             logger.warn(
-              `⚠️ Échec prélèvement commission (REST) pour ${driverId}: ${commissionResult.error}`
+              `Échec prélèvement commission (REST) pour ${driverId}: ${commissionResult.error}`
             );
           }
         } catch (commissionError: any) {

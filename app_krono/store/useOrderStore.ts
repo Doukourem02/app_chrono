@@ -187,7 +187,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
                           orderToRemove.status === 'declined';
       
       if (!isFinalStatus) {
-        logger.warn('⚠️ Tentative de retirer une commande active - ignorée', undefined, { orderId, status: orderToRemove.status });
+        logger.warn('Tentative de retirer une commande active - ignorée', undefined, { orderId, status: orderToRemove.status });
         return state;
       }
     }
@@ -253,7 +253,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
         
         // Log détaillé pour debug
         if (__DEV__) {
-          logger.debug('🔄 updateFromSocket appelé', undefined, {
+          logger.debug('updateFromSocket appelé', undefined, {
             orderId: order.id,
             newStatus: status,
             existingStatus: existingOrder?.status,
@@ -284,7 +284,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
           } else {
             // Le statut a changé, mettre à jour avec le nouveau statut
             if (__DEV__) {
-              logger.debug(`✅ updateFromSocket - Changement de statut détecté: ${existingOrder.status} → ${status}`);
+              logger.debug(`updateFromSocket - Changement de statut détecté: ${existingOrder.status} → ${status}`);
             }
             
             // Jouer le son si la commande est complétée
@@ -318,7 +318,7 @@ export const useOrderStore = create<OrderStore>((set, get) => ({
               
               if (__DEV__) {
                 const updatedOrder = updatedOrders.find(o => o.id === order.id);
-                logger.debug('✅ updateFromSocket - Commande mise à jour dans le store', undefined, {
+                logger.debug('updateFromSocket - Commande mise à jour dans le store', undefined, {
                   orderId: order.id,
                   oldStatus: existingOrder?.status,
                   newStatus: status,

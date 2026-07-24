@@ -39,12 +39,12 @@ export default function TrackerCard({ deliveries: providedDeliveries, isLoading:
   const { data: deliveriesResponse, isLoading: queryLoading } = useQuery({
     queryKey: ['ongoing-delivery-card'],
     queryFn: async () => {
-      logger.warn('🚀🚀🚀 [TrackerCard] queryFn CALLED - getOngoingDeliveries', {
+      logger.warn('[TrackerCard] queryFn CALLED - getOngoingDeliveries', {
         timestamp: new Date().toISOString(),
         stack: new Error().stack?.split('\n').slice(2, 15).join('\n'),
       })
       const result = await adminApiService.getOngoingDeliveries()
-      logger.debug('✅ [TrackerCard] getOngoingDeliveries SUCCESS', {
+      logger.debug('[TrackerCard] getOngoingDeliveries SUCCESS', {
         hasData: !!result.data && (result.data as Delivery[]).length > 0,
         timestamp: new Date().toISOString(),
       })

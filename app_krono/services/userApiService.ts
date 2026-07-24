@@ -22,11 +22,7 @@ class UserApiService {
   /** Une seule requête refresh à la fois - les autres attendent */
   private refreshPromise: Promise<{ token: string | null; revoked?: boolean }> | null = null;
 
-  /**
-   * 🚗 GESTION DES CHAUFFEURS
-   */
-
-  // Récupérer tous les chauffeurs online
+  // Gestion des chauffeurs
   async getOnlineDrivers(userLocation?: {
     latitude: number;
     longitude: number;
@@ -49,7 +45,7 @@ class UserApiService {
     }[];
   }> {
     try {
-      logger.debug('🔍 Récupération chauffeurs online...');
+      logger.debug('Récupération chauffeurs online...');
 
       let url = `${config.apiUrl}/api/drivers/online`;
 
@@ -144,11 +140,7 @@ class UserApiService {
     }
   }
 
-  /**
-   * 📦 GESTION DES COMMANDES
-   */
-
-  // Récupérer l'historique des commandes de l'utilisateur
+  // Gestion des commandes
   async getUserDeliveries(
     userId: string,
     options?: {
@@ -244,7 +236,6 @@ class UserApiService {
     }
   }
 
-  // Annuler une commande
   async cancelOrder(orderId: string, currentStatus?: string): Promise<{
     success: boolean;
     message?: string;
@@ -475,7 +466,7 @@ class UserApiService {
 
   private async refreshAccessToken(refreshToken: string): Promise<{ token: string | null; revoked?: boolean }> {
     try {
-      logger.debug('🔄 Tentative de rafraîchissement du token...', 'userApiService');
+      logger.debug('Tentative de rafraîchissement du token...', 'userApiService');
 
       const response = await apiFetch(
         `${config.apiUrl}/api/auth-simple/refresh-token`,
@@ -518,7 +509,7 @@ class UserApiService {
   }
 
   /**
-   * 📊 Récupérer les statistiques du client
+   * Récupérer les statistiques du client
    * Retourne : nombre de commandes complétées, points de fidélité, économies totales
    */
   async getUserStatistics(userId: string): Promise<{
@@ -565,7 +556,7 @@ class UserApiService {
   }
 
   /**
-   * ⭐ Soumettre une évaluation d'un livreur
+   * Soumettre une évaluation d'un livreur
    */
   async submitRating(orderId: string, rating: number, comment?: string): Promise<{
     success: boolean;
@@ -614,7 +605,7 @@ class UserApiService {
   }
 
   /**
-   * 🔍 Vérifier si une commande a déjà été évaluée
+   * Vérifier si une commande a déjà été évaluée
    */
   async getOrderRating(orderId: string): Promise<{
     success: boolean;
@@ -658,7 +649,7 @@ class UserApiService {
   }
 
   /**
-   * 👤 Mettre à jour le profil utilisateur
+   * Mettre à jour le profil utilisateur
    */
   async updateProfile(
     userId: string,
@@ -776,7 +767,7 @@ class UserApiService {
   }
 
   /**
-   * 👤 Récupérer le profil utilisateur complet
+   * Récupérer le profil utilisateur complet
    */
   async getUserProfile(userId: string): Promise<{
     success: boolean;
@@ -837,7 +828,7 @@ class UserApiService {
   }
 
   /**
-   * 📸 Uploader un avatar
+   * Uploader un avatar
    */
   async uploadAvatar(
     userId: string,
