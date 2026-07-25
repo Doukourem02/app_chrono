@@ -196,10 +196,21 @@ io.use(async (socket, next) => {
   }
 })();
 
+const ROLE_LABELS: Record<string, string> = {
+  client: 'Client',
+  driver: 'Livreur',
+  admin: 'Admin',
+  super_admin: 'Super admin',
+};
+
 io.on('connection', (socket) => {
   // Rooms utiles pour limiter les broadcasts (évite fuite de données)
   const user = (socket.data as any)?.user as { id?: string; role?: string } | undefined;
-  logger.info('Client connecté', { socketId: socket.id, role: user?.role || 'non authentifié', userId: user?.id });
+  const role = user?.role || 'non authentifié';
+  const roleLabel = ROLE_LABELS[role] || 'Non authentifié';
+  // Rôle inclus directement dans le message (pas seulement en métadonnée) : les vues de logs
+  // compactes (Render, etc.) n'affichent que le champ "message", pas les métadonnées JSON.
+  logger.info(`${roleLabel} connecté`, { socketId: socket.id, role, userId: user?.id });
   if (user?.id) {
     socket.join(`user:${user.id}`);
     if (user.role === 'driver') socket.join('drivers');
@@ -209,7 +220,7 @@ io.on('connection', (socket) => {
   deliverySocket(io, socket);
 
   socket.on('disconnect', () => {
-    logger.info('Client déconnecté', { socketId: socket.id, role: user?.role || 'non authentifié', userId: user?.id });
+    logger.info(`${roleLabel} déconnecté`, { socketId: socket.id, role, userId: user?.id });
   });
 });
 
