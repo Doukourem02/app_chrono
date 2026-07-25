@@ -121,7 +121,7 @@ const createDriverProfile = async (
     }
 
     // Ne pas envoyer driver_type : l’app livreur doit proposer le choix interne / partenaire.
-    // Si l’insert échoue (colonne NOT NULL sans défaut NULL), exécuter en SQL :
+    // Si l’insert échoue (colonne NOT NULL sans défaut NULL), exécuter en SQL:
     //   ALTER TABLE driver_profiles ALTER COLUMN driver_type DROP NOT NULL;
     //   ALTER TABLE driver_profiles ALTER COLUMN driver_type DROP DEFAULT;
     const { data: driverProfile, error: insertError } = await clientForInsert
