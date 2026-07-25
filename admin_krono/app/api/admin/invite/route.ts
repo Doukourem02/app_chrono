@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { resolveMx } from 'dns/promises'
 import { rateLimit, getRateLimitIdentifier } from '@/lib/rateLimit'
 import { logger } from '@/utils/logger'
 
@@ -27,6 +28,20 @@ type InviteRole = (typeof VALID_ROLES)[number]
 
 function isValidRole(role: unknown): role is InviteRole {
   return typeof role === 'string' && (VALID_ROLES as readonly string[]).includes(role)
+}
+
+// Vérifie que le domaine de l'email a un serveur mail configuré (MX record).
+// Attrape les domaines inexistants/mal tapés. Ne confirme pas que la boîte
+// précise existe : ça, seul le clic sur le lien d'invitation le prouve.
+async function domainCanReceiveMail(email: string): Promise<boolean> {
+  const domain = email.split('@')[1]
+  if (!domain) return false
+  try {
+    const records = await resolveMx(domain)
+    return records.length > 0
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -96,6 +111,10 @@ export async function POST(request: NextRequest) {
     }
     if (!isValidRole(role)) {
       return NextResponse.json({ error: 'Rôle invalide — admin ou super_admin uniquement' }, { status: 400 })
+    }
+
+    if (!(await domainCanReceiveMail(email))) {
+      return NextResponse.json({ error: 'Adresse mail introuvable : vérifier l\'adresse' }, { status: 400 })
     }
 
     // Garde-fou "dernier super_admin" : pas nécessaire ICI, une invitation ne
