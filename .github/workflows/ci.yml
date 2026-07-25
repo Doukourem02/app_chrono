@@ -163,6 +163,11 @@ jobs:
 
       - name: Build
         working-directory: ./admin_krono
+        env:
+          NEXT_PUBLIC_API_URL: https://api.krono-ci.test
+          NEXT_PUBLIC_SOCKET_URL: wss://api.krono-ci.test
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
         run: npm run build
 
       - name: npm audit admin (informationnel — jsPDF et xlsx sans fix disponible)
@@ -198,3 +203,51 @@ jobs:
       - name: Lint
         working-directory: ./${{ matrix.project }}
         run: npm run lint
+
+  # ────────────────────────────────────────────────
+  # Job 6 : Déploiement backend (Render) — seulement si tout est vert
+  # ────────────────────────────────────────────────
+  # Prérequis (à faire une seule fois, manuellement) :
+  #   1. Dans Render : Settings > Deploy Hook > copier l'URL, puis désactiver
+  #      "Auto-Deploy" sur le service (sinon Render déploie aussi tout seul,
+  #      sans attendre le résultat de cette CI).
+  #   2. Dans GitHub : Settings > Secrets and variables > Actions > New repository
+  #      secret > nom RENDER_DEPLOY_HOOK_URL, coller l'URL copiée à l'étape 1.
+  deploy-backend:
+    name: Déploiement — Backend (Render)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [build-and-test, security-scan, lint-and-type-check]
+    steps:
+      - name: Déclencher le déploiement Render
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL non configuré — déploiement backend ignoré. Voir commentaire du job pour la config."
+            exit 0
+          fi
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+  # ────────────────────────────────────────────────
+  # Job 7 : Déploiement admin (Vercel) — seulement si tout est vert
+  # ────────────────────────────────────────────────
+  # Prérequis (à faire une seule fois, manuellement) :
+  #   1. Dans Vercel : Project Settings > Git > désactiver le déploiement
+  #      automatique sur push pour la branche main (sinon Vercel déploie
+  #      aussi tout seul, sans attendre le résultat de cette CI).
+  #   2. Dans Vercel : Project Settings > Git > Deploy Hooks > créer un hook
+  #      sur la branche main, copier l'URL.
+  #   3. Dans GitHub : Settings > Secrets and variables > Actions > New repository
+  #      secret > nom VERCEL_DEPLOY_HOOK_URL, coller l'URL copiée à l'étape 2.
+  deploy-admin:
+    name: Déploiement — Admin (Vercel)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [admin-build]
+    steps:
+      - name: Déclencher le déploiement Vercel
+        run: |
+          if [ -z "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL non configuré — déploiement admin ignoré. Voir commentaire du job pour la config."
+            exit 0
+          fi
+          curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"

@@ -637,7 +637,7 @@ const sendOTPCode = async (
         res.status(503).json({
           success: false,
           message: "Impossible d'envoyer le code par SMS pour le moment. Réessayez dans un instant.",
-          error: process.env.NODE_ENV === 'development' ? smsResult.error : undefined,
+          error: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? smsResult.error : undefined,
         });
         return;
       }
@@ -652,7 +652,7 @@ const sendOTPCode = async (
           message: carrier === 'orange' || isResend
             ? "Impossible d'envoyer le code par WhatsApp. Vérifiez que WhatsApp est installé et actif sur ce numéro."
             : "Impossible d'envoyer le code par WhatsApp",
-          error: process.env.NODE_ENV === 'development' ? waResult.error : undefined,
+          error: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? waResult.error : undefined,
         });
         return;
       }
@@ -669,7 +669,7 @@ const sendOTPCode = async (
         phone: phoneStr,
         role,
         otpExpiresInMinutes: OTP_TTL_MINUTES,
-        debug_code: process.env.NODE_ENV === 'development' ? otpCode : undefined,
+        debug_code: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') ? otpCode : undefined,
       },
     });
   } catch (error: any) {

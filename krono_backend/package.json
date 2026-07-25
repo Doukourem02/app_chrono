@@ -70,7 +70,8 @@
     "winston": "^3.18.3"
   },
   "overrides": {
-    "iconv-lite": "0.6.3"
+    "iconv-lite": "0.6.3",
+    "brace-expansion": "^5.0.8"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
