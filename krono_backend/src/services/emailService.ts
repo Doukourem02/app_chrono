@@ -19,7 +19,7 @@ const escapeHtml = (value: string): string =>
 const createTransporter = (): Transporter => {
   if (!transporter) {
     transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      host: process.env.EMAIL_HOST || 'smtp.resend.com',
       port: parseInt(process.env.EMAIL_PORT || '587'),
       secure: false,
       auth: {
@@ -90,7 +90,9 @@ export async function sendPartnerPortalMagicLinkEmail(
   }
   try {
     const fromName = process.env.EMAIL_FROM_NAME || 'Krono';
-    const fromAddr = process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER;
+    // EMAIL_USER vaut littéralement "resend" avec le SMTP Resend (nom d'utilisateur
+    // d'auth, pas une adresse) — ne jamais l'utiliser comme fallback d'expéditeur.
+    const fromAddr = process.env.EMAIL_FROM_ADDRESS || 'no-reply@mail.kro-no-delivery.com';
     const logoUrl = process.env.EMAIL_LOGO_URL || 'https://admin.kro-no-delivery.com/assets/chrono.png';
     const safePartnerName = escapeHtml(partnerName || 'votre entreprise');
     const safeActionLink = escapeHtml(actionLink);

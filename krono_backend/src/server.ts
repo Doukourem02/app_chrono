@@ -197,10 +197,9 @@ io.use(async (socket, next) => {
 })();
 
 io.on('connection', (socket) => {
-  logger.info('Client connecté', { socketId: socket.id });
-
   // Rooms utiles pour limiter les broadcasts (évite fuite de données)
   const user = (socket.data as any)?.user as { id?: string; role?: string } | undefined;
+  logger.info('Client connecté', { socketId: socket.id, role: user?.role || 'non authentifié', userId: user?.id });
   if (user?.id) {
     socket.join(`user:${user.id}`);
     if (user.role === 'driver') socket.join('drivers');
@@ -210,7 +209,7 @@ io.on('connection', (socket) => {
   deliverySocket(io, socket);
 
   socket.on('disconnect', () => {
-    logger.info('Client déconnecté', { socketId: socket.id });
+    logger.info('Client déconnecté', { socketId: socket.id, role: user?.role || 'non authentifié', userId: user?.id });
   });
 });
 
