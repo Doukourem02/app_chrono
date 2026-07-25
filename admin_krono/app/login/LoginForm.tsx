@@ -97,6 +97,7 @@ export default function LoginForm() {
   const containerStyle: React.CSSProperties = {
     minHeight: '100vh',
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F9FAFB',
@@ -171,7 +172,7 @@ export default function LoginForm() {
   }
 
   const belowCardStyle: React.CSSProperties = {
-    marginTop: '24px',
+    marginTop: '32px',
     fontSize: '14px',
     color: '#6B7280',
     textAlign: 'center',
