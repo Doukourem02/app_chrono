@@ -12,7 +12,7 @@ import { themeColors } from "@/utils/theme";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 const parseDateToISO = (value?: string) => {
   if (!value) return undefined;
@@ -88,7 +88,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
-  const router = useRouter();
+
   const searchParams = useSearchParams();
   const t = useTranslation();
 
@@ -461,21 +461,6 @@ export default function OrdersPage() {
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h1 style={titleStyle}>{t("ordersPage.title")}</h1>
-          <button
-            onClick={() => router.push("/orders/new")}
-            style={{
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: "none",
-              backgroundColor: themeColors.purplePrimary,
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            + Nouvelle commande
-          </button>
         </div>
 
         <div style={tabsContainerStyle}>

@@ -54,6 +54,14 @@ export default function NewShippingModal({
   const [approximatePickupZone, setApproximatePickupZone] = useState('')
   const [driverNotes, setDriverNotes] = useState('')
 
+  // Création d'un client qui n'existe pas encore dans la base
+  const [showCreateClient, setShowCreateClient] = useState(false)
+  const [newClientPhone, setNewClientPhone] = useState('')
+  const [newClientFirstName, setNewClientFirstName] = useState('')
+  const [newClientLastName, setNewClientLastName] = useState('')
+  const [newClientLoading, setNewClientLoading] = useState(false)
+  const [newClientError, setNewClientError] = useState('')
+
   // Calculated values
   const [distance, setDistance] = useState<number | null>(null)
   const [price, setPrice] = useState<number | null>(null)
@@ -159,6 +167,50 @@ export default function NewShippingModal({
     setSearchQuery('')
   }
 
+  const handleCreateNewClient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newClientPhone.trim()) {
+      setNewClientError('Numéro de téléphone requis')
+      return
+    }
+    const phoneErr = getPhoneValidationError(newClientPhone.trim())
+    if (phoneErr) {
+      setNewClientError(phoneErr)
+      return
+    }
+    setNewClientLoading(true)
+    setNewClientError('')
+    try {
+      const result = await adminApiService.createMinimalClient({
+        phone: newClientPhone.trim(),
+        firstName: newClientFirstName.trim() || undefined,
+        lastName: newClientLastName.trim() || undefined,
+      })
+      if (!result.success || !result.data) {
+        setNewClientError(result.message || 'Impossible de créer ce client')
+        return
+      }
+      setSelectedClient({
+        id: result.data.id,
+        email: result.data.email,
+        phone: result.data.phone,
+        first_name: result.data.first_name,
+        last_name: result.data.last_name,
+        role: 'client',
+      })
+      // Un client créé à la volée pendant l'appel est par défaut une commande téléphonique.
+      setIsPhoneOrder(true)
+      setStep('pickup')
+      setShowCreateClient(false)
+      setSearchQuery('')
+    } catch (error) {
+      logger.error('Error creating new client:', error)
+      setNewClientError('Une erreur est survenue lors de la création du client')
+    } finally {
+      setNewClientLoading(false)
+    }
+  }
+
   const handlePickupNext = () => {
     if (pickupAddress) {
       setStep('dropoff')
@@ -188,6 +240,11 @@ export default function NewShippingModal({
     setPrice(null)
     setStep('client')
     setSearchQuery('')
+    setShowCreateClient(false)
+    setNewClientPhone('')
+    setNewClientFirstName('')
+    setNewClientLastName('')
+    setNewClientError('')
   }, [])
 
   useEffect(() => {
@@ -560,6 +617,86 @@ export default function NewShippingModal({
                       <User size={20} style={{ color: '#2563EB' }} />
                     </div>
                   ))
+                )}
+              </div>
+
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+                {!showCreateClient ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateClient(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#8B5CF6',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    Client introuvable ? Créer un nouveau client
+                  </button>
+                ) : (
+                  <form onSubmit={handleCreateNewClient} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={labelStyle}>Nouveau client (non enregistré chez Krono)</div>
+                    <input
+                      type="tel"
+                      placeholder="Téléphone du client *"
+                      style={inputStyle}
+                      value={newClientPhone}
+                      onChange={(e) => setNewClientPhone(e.target.value)}
+                    />
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <input
+                        type="text"
+                        placeholder="Prénom (optionnel)"
+                        style={{ ...inputStyle, flex: 1 }}
+                        value={newClientFirstName}
+                        onChange={(e) => setNewClientFirstName(e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Nom (optionnel)"
+                        style={{ ...inputStyle, flex: 1 }}
+                        value={newClientLastName}
+                        onChange={(e) => setNewClientLastName(e.target.value)}
+                      />
+                    </div>
+                    {newClientError && (
+                      <div style={{ fontSize: '12px', color: '#DC2626' }}>{newClientError}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="submit"
+                        disabled={newClientLoading}
+                        style={{
+                          ...buttonStyle,
+                          backgroundColor: '#8B5CF6',
+                          color: '#FFFFFF',
+                          opacity: newClientLoading ? 0.6 : 1,
+                          cursor: newClientLoading ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {newClientLoading ? 'Création...' : 'Créer et continuer'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreateClient(false)
+                          setNewClientError('')
+                        }}
+                        style={{
+                          ...buttonStyle,
+                          backgroundColor: '#FFFFFF',
+                          color: '#374151',
+                          border: '1px solid #E5E7EB',
+                        }}
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </form>
                 )}
               </div>
             </>
