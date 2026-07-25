@@ -501,7 +501,7 @@ export class AdminDriverApi extends AdminFinanceApi {
    */
   async updateDriverCommissionRate(
     driverId: string,
-    commissionRate: 10 | 20
+    commissionRate: 12 | 15
   ): Promise<{
     success: boolean
     message?: string
@@ -529,6 +529,44 @@ export class AdminDriverApi extends AdminFinanceApi {
     } catch (error: unknown) {
       logger.error('[adminApiService] Error in updateDriverCommissionRate:', error)
       return { success: false, message: 'Erreur lors de la mise à jour' }
+    }
+  }
+
+  /**
+   * Applique un taux de commission par défaut à tous les livreurs partenaires en une fois.
+   * Complément de updateDriverCommissionRate (individuel), qui reste utilisable pour les exceptions.
+   */
+  async bulkUpdateDriverCommissionRate(
+    commissionRate: 12 | 15
+  ): Promise<{
+    success: boolean
+    message?: string
+    updatedCount?: number
+  }> {
+    try {
+      const response = await this.fetchWithAuth(
+        `${API_BASE_URL}/api/admin/drivers/commission/rate/bulk`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ commission_rate: commissionRate }),
+        }
+      )
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Erreur lors de la mise à jour en masse' }))
+        return { success: false, message: error.message || 'Erreur lors de la mise à jour en masse' }
+      }
+      const result: unknown = await response.json()
+      if (isApiResponse(result)) {
+        return {
+          success: result.success || false,
+          message: result.message,
+          updatedCount: (result as { updatedCount?: number }).updatedCount,
+        }
+      }
+      return { success: false, message: 'Erreur lors de la mise à jour en masse' }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Error in bulkUpdateDriverCommissionRate:', error)
+      return { success: false, message: 'Erreur lors de la mise à jour en masse' }
     }
   }
 

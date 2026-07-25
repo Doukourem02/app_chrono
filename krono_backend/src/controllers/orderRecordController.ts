@@ -8,6 +8,7 @@ import pool from '../config/db.js';
 import { notifyDriversForOrder } from '../sockets/orderSocket.js';
 import { haversineDistanceKm } from '../services/priceCalculator.js';
 import qrCodeService from '../services/qrCodeService.js';
+import { validateAndApplyPromoCode, incrementPromoCodeUsage, type PromoApplication } from '../services/promoCodeService.js';
 
 type AuthenticatedRequest = Request & {
   body: {
@@ -25,6 +26,7 @@ type AuthenticatedRequest = Request & {
     notes?: string;
     notifyDrivers?: boolean;
     preferred_driver_id?: string | null;
+    promoCode?: string;
   };
   user?: JWTPayload;
 };
@@ -415,6 +417,7 @@ export const createOrderRecord = async (
       notes,
       notifyDrivers,
       preferred_driver_id,
+      promoCode,
     } = req.body;
     const isB2BRecord = Boolean(partner_id && typeof partner_id === 'string');
 
@@ -533,6 +536,25 @@ export const createOrderRecord = async (
       }
     }
 
+    // ─── Code promo : jamais sur les commandes B2B (tarification négociée séparément) ──
+    // Commission livreur calculée sur le prix PLEIN (avant réduction) — décision produit
+    // du 2026-07-25 : Krono absorbe seul le coût de la promo, pas le livreur.
+    let promoApplication: PromoApplication | null = null;
+    if (!isB2BRecord && typeof promoCode === 'string' && promoCode.trim()) {
+      const promoResult = await validateAndApplyPromoCode(promoCode, finalPrice);
+      if (promoResult.error) {
+        logOrderRecord('warn', 'promo_code_rejected', { code: promoCode, reason: promoResult.error });
+        res.status(400).json({ success: false, message: promoResult.error });
+        return;
+      }
+      promoApplication = promoResult.application;
+    }
+
+    const fullPriceBeforeDiscount = finalPrice;
+    if (promoApplication) {
+      finalPrice = Math.max(0, fullPriceBeforeDiscount - promoApplication.discountAmountCfa);
+    }
+
     const client = supabaseAdmin ?? supabase;
     if (!supabaseAdmin) {
       logger.warn(
@@ -547,6 +569,13 @@ export const createOrderRecord = async (
       p_method: method,
       p_price: finalPrice,
       p_distance: effectiveDistanceKm,
+      ...(promoApplication
+        ? {
+            p_promo_code_id: promoApplication.promoCodeId,
+            p_discount_amount_cfa: promoApplication.discountAmountCfa,
+            p_full_price_cfa: fullPriceBeforeDiscount,
+          }
+        : {}),
     });
 
     if (error) {
@@ -565,6 +594,10 @@ export const createOrderRecord = async (
 
     const orderId = data as string;
     logOrderRecord('info', 'success', { orderId });
+
+    if (promoApplication) {
+      void incrementPromoCodeUsage(promoApplication.promoCodeId);
+    }
 
     // ─── Post-création B2B : metadata, QR, quota, notifs livreurs ───────────
     if (isB2BRecord) {
@@ -640,6 +673,9 @@ export const createOrderRecord = async (
           contextFactorApplied: dynamic.contextFactorApplied,
         },
         ...(b2bCommission ? { b2bCommission } : {}),
+        ...(promoApplication
+          ? { discountAmountCfa: promoApplication.discountAmountCfa, fullPriceCfa: fullPriceBeforeDiscount }
+          : {}),
       },
     });
   } catch (e: unknown) {

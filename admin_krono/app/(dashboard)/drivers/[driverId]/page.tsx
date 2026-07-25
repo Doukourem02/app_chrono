@@ -10,6 +10,7 @@ import { SkeletonLoader } from '@/components/animations'
 import type { Driver } from '@/types'
 import { useTranslation } from '@/hooks/useTranslation'
 import { useAuthStore } from '@/stores/authStore'
+import { useDriverOnlineStatus } from '@/hooks/useDriverOnlineStatus'
 
 type TabType = 'overview' | 'commission' | 'deliveries' | 'ratings'
 
@@ -34,6 +35,8 @@ export default function DriverDetailPage() {
   const [showRechargeModal, setShowRechargeModal] = useState(false)
   const [rechargeAmount, setRechargeAmount] = useState('')
   const [rechargeNotes, setRechargeNotes] = useState('')
+  const [showRateModal, setShowRateModal] = useState(false)
+  const [rateError, setRateError] = useState('')
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ['driver', driverId],
@@ -69,7 +72,28 @@ export default function DriverDetailPage() {
     },
   })
 
-  const driver = driverData?.data as (Driver & {
+  const updateRateMutation = useMutation({
+    mutationFn: async (commissionRate: 12 | 15) => {
+      const result = await adminApiService.updateDriverCommissionRate(driverId, commissionRate)
+      if (!result.success) {
+        throw new Error(result.message || t('drivers.detail.rateUpdateError'))
+      }
+      return result
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driver', driverId] })
+      queryClient.invalidateQueries({ queryKey: ['drivers'] })
+      setShowRateModal(false)
+      setRateError('')
+    },
+    onError: (error: Error) => {
+      setRateError(error.message || t('drivers.detail.rateUpdateError'))
+    },
+  })
+
+  const { onlineStatus, isConnected: isSocketConnected } = useDriverOnlineStatus()
+
+  const driverRaw = driverData?.data as (Driver & {
     commission_account?: {
       balance: number
       commission_rate: number
@@ -77,6 +101,12 @@ export default function DriverDetailPage() {
       last_updated: string
     }
   }) | undefined
+
+  // Une fois le socket connecté, il fait foi pour is_online (temps réel), comme sur
+  // la carte de suivi — avant connexion, on garde la valeur du dernier fetch API.
+  const driver = driverRaw && isSocketConnected
+    ? { ...driverRaw, is_online: onlineStatus.get(driverRaw.id) === true }
+    : driverRaw
 
   const transactions = React.useMemo(() => transactionsData?.data || [], [transactionsData?.data])
 
@@ -372,8 +402,25 @@ export default function DriverDetailPage() {
                     <div style={{ fontSize: '32px', fontWeight: 700, color: balanceColor }}>
                       {formatCurrency(balance)}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
-                      {t('drivers.detail.rate')}: {commissionAccount?.commission_rate || 10}%
+                    <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{t('drivers.detail.rate')}: {commissionAccount?.commission_rate || 12}%</span>
+                      {isSuperAdmin && (
+                        <button
+                          onClick={() => { setRateError(''); setShowRateModal(true) }}
+                          style={{
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #E5E7EB',
+                            backgroundColor: '#FFFFFF',
+                            color: '#8B5CF6',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {t('drivers.detail.changeRate')}
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -637,6 +684,83 @@ export default function DriverDetailPage() {
                   }}
                 >
                   {rechargeMutation.isPending ? t('drivers.detail.recharging') : t('drivers.detail.recharge')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showRateModal && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+            onClick={() => setShowRateModal(false)}
+          >
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                padding: '24px',
+                width: '90%',
+                maxWidth: '400px',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>{t('drivers.detail.changeRateTitle')}</h3>
+              <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '16px' }}>{t('drivers.detail.changeRateDescription')}</p>
+              {rateError && (
+                <div style={{ marginBottom: '16px', padding: '10px 12px', borderRadius: '8px', backgroundColor: '#FEF2F2', color: '#DC2626', fontSize: '13px' }}>
+                  {rateError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {[12, 15].map((rateOption) => (
+                  <button
+                    key={rateOption}
+                    onClick={() => updateRateMutation.mutate(rateOption as 12 | 15)}
+                    disabled={updateRateMutation.isPending}
+                    style={{
+                      flex: 1,
+                      padding: '14px',
+                      borderRadius: '8px',
+                      border: commissionAccount?.commission_rate === rateOption ? '2px solid #8B5CF6' : '1px solid #E5E7EB',
+                      backgroundColor: commissionAccount?.commission_rate === rateOption ? '#F5F3FF' : '#FFFFFF',
+                      color: '#111827',
+                      fontSize: '16px',
+                      fontWeight: 700,
+                      cursor: updateRateMutation.isPending ? 'not-allowed' : 'pointer',
+                      opacity: updateRateMutation.isPending ? 0.6 : 1,
+                    }}
+                  >
+                    {rateOption}%
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button
+                  onClick={() => setShowRateModal(false)}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>

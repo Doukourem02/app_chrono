@@ -18,6 +18,7 @@ import logger from '../utils/logger.js';
 import { computeOrderPriceCfa } from '../services/priceCalculator.js';
 import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
 import { setSurgeSnapshotGetter } from '../services/surgePricing.js';
+import { validateAndApplyPromoCode, incrementPromoCodeUsage, type PromoApplication } from '../services/promoCodeService.js';
 import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCoastEta.js';
 import type { SocketAckCallback, UpdateDeliveryStatusData, SendProofData } from '../types/socketEvents.js';
 interface OrderCoordinates {
@@ -103,6 +104,8 @@ interface CreateOrderData {
   routeDurationSeconds?: number;
   /** Durée typique Mapbox, secondes — facteur trafic */
   routeDurationTypicalSeconds?: number;
+  /** Code promo saisi par le client — validé et appliqué côté serveur */
+  promoCode?: string;
 }
 
 interface NearbyDriver {
@@ -1087,6 +1090,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           speedOptionId,
           routeDurationSeconds: routeDurSec,
           routeDurationTypicalSeconds: routeTypSec,
+          promoCode,
         } = orderData;
         // SÉCURITÉ: ne jamais faire confiance au userId fourni par le client
         if (userId && userId !== authUserId) {
@@ -1140,9 +1144,64 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         const price = serverPrice;
         const estimatedDuration = estimateDuration(distance, deliveryMethod, rd);
 
+        // Code promo : jamais sur les commandes B2B — ce handler ne sert que les commandes
+        // client classiques (le flux B2B/batch passe par un autre chemin), donc pas d'exclusion
+        // à vérifier ici. Krono absorbe seul le coût de la promo, pas le livreur (commission
+        // calculée sur full_price_cfa, voir plus bas).
+        //
+        // IMPORTANT : app_krono crée déjà la commande via POST /api/orders/record (REST,
+        // orderRecordController.ts) AVANT d'émettre cet événement socket, avec le MÊME
+        // orderId (providedOrderId) — c'est là que le code promo est normalement validé,
+        // appliqué et son compteur d'usage incrémenté. Si on revalidait/réappliquait ici,
+        // on incrémenterait current_uses une seconde fois pour la même commande logique.
+        // On ne revalide donc le code promo dans CE handler que si aucune ligne n'existe
+        // déjà pour cet orderId (cas d'un futur appelant qui émettrait ce socket sans être
+        // passé par la route REST au préalable) — sinon on réutilise tel quel ce que la
+        // route REST a déjà calculé et persisté.
+        let fullPriceBeforeDiscount = price;
+        let finalPrice = price;
+        let promoApplication: PromoApplication | null = null;
+        let existingOrderRow: { price_cfa: number | null; full_price_cfa: number | null; discount_amount_cfa: number | null; promo_code_id: string | null } | null = null;
+
+        if (providedOrderId) {
+          try {
+            const existing = await pool.query(
+              `SELECT price_cfa, full_price_cfa, discount_amount_cfa, promo_code_id FROM orders WHERE id = $1`,
+              [providedOrderId]
+            );
+            if (existing.rows.length > 0) existingOrderRow = existing.rows[0];
+          } catch (lookupErr: any) {
+            logger.warn(`[create-order] Échec lecture commande existante ${maskOrderId(providedOrderId)}:`, lookupErr?.message);
+          }
+        }
+
+        if (existingOrderRow) {
+          // Commande déjà créée côté REST (avec promo déjà appliqué le cas échéant) : on
+          // réutilise ses valeurs sans revalider/réincrémenter le code promo.
+          finalPrice = existingOrderRow.price_cfa != null ? Number(existingOrderRow.price_cfa) : price;
+          fullPriceBeforeDiscount = existingOrderRow.full_price_cfa != null ? Number(existingOrderRow.full_price_cfa) : finalPrice;
+          if (existingOrderRow.promo_code_id) {
+            promoApplication = {
+              promoCodeId: existingOrderRow.promo_code_id,
+              discountAmountCfa: existingOrderRow.discount_amount_cfa != null ? Number(existingOrderRow.discount_amount_cfa) : 0,
+            };
+          }
+        } else if (typeof promoCode === 'string' && promoCode.trim()) {
+          const promoResult = await validateAndApplyPromoCode(promoCode, fullPriceBeforeDiscount);
+          if (promoResult.error) {
+            socket.emit('order-error', { success: false, message: promoResult.error });
+            if (typeof ack === 'function') ack({ success: false, message: promoResult.error });
+            return;
+          }
+          promoApplication = promoResult.application;
+          if (promoApplication) {
+            finalPrice = Math.max(0, fullPriceBeforeDiscount - promoApplication.discountAmountCfa);
+          }
+        }
+
         // Valider les limites de paiement différé si c'est un paiement différé par le client
         if (paymentMethodType === 'deferred' && (paymentPayerType === 'client' || !paymentPayerType)) {
-          const validation = await canUseDeferredPayment(userId, price);
+          const validation = await canUseDeferredPayment(userId, finalPrice);
           if (!validation.canUse) {
             const errorMsg = validation.reason || 'Paiement différé non autorisé';
   if (DEBUG) {
@@ -1161,7 +1220,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             return;
           }
   if (DEBUG) {
-    logger.debug(`Paiement différé autorisé pour ${maskUserId(userId)} - Montant: ${price} FCFA`);
+    logger.debug(`Paiement différé autorisé pour ${maskUserId(userId)} - Montant: ${finalPrice} FCFA`);
           }
         }
 
@@ -1189,7 +1248,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           dropoff: dropoffMerged,
           recipient: recipient || (dropoff?.details?.phone ? { phone: dropoff.details.phone } : null),
           packageImages: packageImages || dropoff?.details?.photos || [],
-          price,
+          price: finalPrice,
           deliveryMethod,
           distance: Math.round(distance * 100) / 100,
           estimatedDuration,
@@ -1203,6 +1262,9 @@ const setupOrderSocket = (io: SocketIOServer): void => {
         (order as any).payment_status = initialPaymentStatus;
         (order as any).payment_payer = paymentPayerType || 'client'; (order as any).is_partial_payment = isPartialPayment || false; (order as any).partial_amount = isPartialPayment && partialAmount ? partialAmount : null; (order as any).recipient_user_id = recipientUserId || null;
         (order as any).recipient_is_registered = recipientIsRegistered || false;
+        (order as any).full_price_cfa = fullPriceBeforeDiscount;
+        (order as any).discount_amount_cfa = promoApplication ? promoApplication.discountAmountCfa : null;
+        (order as any).promo_code_id = promoApplication ? promoApplication.promoCodeId : null;
 
         activeOrders.set(order.id, order);
 
@@ -1215,6 +1277,11 @@ const setupOrderSocket = (io: SocketIOServer): void => {
           await saveOrder(order);
           dbSaved = true;
           if (DEBUG) logger.debug(`Commande ${maskOrderId(order.id)} sauvegardée en DB`);
+          if (promoApplication && !existingOrderRow) {
+            // N'incrémenter que si le code vient d'être validé ICI — sinon la route REST
+            // (/api/orders/record) l'a déjà fait pour cette même commande.
+            void incrementPromoCodeUsage(promoApplication.promoCodeId);
+          }
 
           // Générer le token de suivi public (pour le destinataire sans compte)
           try {
@@ -1249,20 +1316,20 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             // Ne pas bloquer la création de commande si le QR code échoue
           }
 
-          if (paymentMethodType && price) {
+          if (paymentMethodType && finalPrice) {
             try {
               const { transactionId, invoiceId } = await createTransactionAndInvoiceForOrder(
                 order.id,
                 userId,
                 paymentMethodType,
-                price,
+                finalPrice,
                 order.distance || null,
                 null,
                 0,
                 null,
                 isPartialPayment || false,
                 isPartialPayment && partialAmount ? partialAmount : undefined,
-                isPartialPayment && partialAmount ? (price - partialAmount) : undefined,
+                isPartialPayment && partialAmount ? (finalPrice - partialAmount) : undefined,
                 paymentPayerType || 'client', recipientUserId, paymentMethodId || null);
 
               if (transactionId && invoiceId) {
@@ -1273,7 +1340,7 @@ const setupOrderSocket = (io: SocketIOServer): void => {
             } catch (transactionError: any) { logger.error(`Échec création transaction/facture pour ${maskOrderId(order.id)}:`, transactionError.message, transactionError.stack); }
           } else {
   if (DEBUG) {
-    logger.debug(`Transaction non créée pour commande ${maskOrderId(order.id)}: paymentMethodType=${paymentMethodType}, price=${price}`);
+    logger.debug(`Transaction non créée pour commande ${maskOrderId(order.id)}: paymentMethodType=${paymentMethodType}, price=${finalPrice}`);
             }
           }
         } catch (dbError: any) {
@@ -2272,10 +2339,13 @@ const setupOrderSocket = (io: SocketIOServer): void => {
 
           // Prélever la commission pour les livreurs partenaires
           try {
+            // Commission calculée sur le prix PLEIN (avant réduction code promo) —
+            // décision produit 2026-07-25 : Krono absorbe seul le coût de la promo.
+            const commissionBase = (order as any).full_price_cfa ?? order.price;
             const commissionResult = await deductCommissionAfterDelivery(
               driverId,
               orderId,
-              order.price
+              commissionBase
             );
 
             if (commissionResult.success) {

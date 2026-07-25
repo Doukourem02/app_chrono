@@ -112,7 +112,9 @@ export async function createOrderInDatabase(params: {
   routeDurationSeconds?: number;
   routeDurationTypicalSeconds?: number;
   partnerId?: string | null;
-}): Promise<{ orderId: string; priceCfa: number; distanceKm: number }> {
+  /** Code promo optionnel — ignoré côté serveur pour les commandes B2B (partnerId défini). */
+  promoCode?: string;
+}): Promise<{ orderId: string; priceCfa: number; distanceKm: number; discountAmountCfa?: number }> {
   const token = await userApiService.ensureAccessToken();
   if (!token) {
     const err = new Error('Session expirée. Veuillez vous reconnecter.');
@@ -144,6 +146,7 @@ export async function createOrderInDatabase(params: {
           ? { routeDurationTypicalSeconds: params.routeDurationTypicalSeconds }
           : {}),
         ...(params.partnerId ? { partner_id: params.partnerId } : {}),
+        ...(params.promoCode && params.promoCode.trim() ? { promoCode: params.promoCode.trim() } : {}),
       }),
     });
   } catch (e: unknown) {
@@ -186,7 +189,9 @@ export async function createOrderInDatabase(params: {
 
   const data =
     body && typeof body === 'object' && 'data' in body
-      ? (body as { data?: { orderId?: string; priceCfa?: number; distanceKm?: number } }).data
+      ? (body as {
+          data?: { orderId?: string; priceCfa?: number; distanceKm?: number; discountAmountCfa?: number };
+        }).data
       : undefined;
   const orderId = data?.orderId;
   if (typeof orderId !== 'string' || !orderId) {
@@ -209,6 +214,7 @@ export async function createOrderInDatabase(params: {
       typeof data.distanceKm === 'number' && Number.isFinite(data.distanceKm)
         ? data.distanceKm
         : params.distanceKm,
+    ...(typeof data.discountAmountCfa === 'number' ? { discountAmountCfa: data.discountAmountCfa } : {}),
   };
 }
 
@@ -225,6 +231,7 @@ export async function createOrderRecord(options: {
   /** Durée typique Mapbox (secondes) — facteur trafic côté serveur */
   routeDurationTypicalSeconds?: number;
   partnerId?: string | null;
+  promoCode?: string;
 }) {
   // NOTE: we intentionally do NOT pre-check for profile existence here.
   // The database RPC `fn_create_order` already contains logic to create a
@@ -265,6 +272,7 @@ export async function createOrderRecord(options: {
     routeDurationSeconds: options.routeDurationSeconds,
     routeDurationTypicalSeconds: options.routeDurationTypicalSeconds,
     partnerId: options.partnerId,
+    promoCode: options.promoCode,
   });
 
   return {
@@ -273,6 +281,7 @@ export async function createOrderRecord(options: {
     distanceKm: saved.distanceKm,
     etaMinutes,
     etaLabel,
+    discountAmountCfa: saved.discountAmountCfa,
   };
 }
 

@@ -46,8 +46,9 @@ interface OrderDetailsSheetProps {
     payerType?: 'client' | 'recipient',
     isPartialPayment?: boolean,
     partialAmount?: number,
-    paymentMethodType?: PaymentMethodType, 
-    paymentMethodId?: string | null 
+    paymentMethodType?: PaymentMethodType,
+    paymentMethodId?: string | null,
+    promoCode?: string
   ) => void;
 }
 
@@ -95,6 +96,7 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
   const [isPartialPayment, setIsPartialPayment] = useState(false);
   const [partialAmount, setPartialAmount] = useState<string>('');
   const [selectedPaymentMethodType, setSelectedPaymentMethodType] = useState<PaymentMethodType | null>(null);
+  const [promoCode, setPromoCode] = useState('');
   
   const { loadPaymentMethods, paymentMethods, selectedPaymentMethod } = usePaymentStore();
   
@@ -189,8 +191,9 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
       payerType,
       isPartialPayment,
       isPartialPayment && partialAmount ? parseFloat(partialAmount) : undefined,
-      selectedPaymentMethodType || undefined, 
-      paymentMethodId || null 
+      selectedPaymentMethodType || undefined,
+      paymentMethodId || null,
+      promoCode.trim() || undefined
     );
   };
 
@@ -646,6 +649,19 @@ export const OrderDetailsSheet: React.FC<OrderDetailsSheetProps> = ({
                 />
               </View>
             )}
+            {/* Code promo */}
+            <View style={styles.paymentMethodSection}>
+              <Text style={styles.inputLabel}>Code promo</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Entrez un code (optionnel)"
+                placeholderTextColor="#9CA3AF"
+                value={promoCode}
+                onChangeText={(text) => setPromoCode(text.toUpperCase())}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+            </View>
           </View>
 
 

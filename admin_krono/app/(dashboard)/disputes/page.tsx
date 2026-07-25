@@ -508,11 +508,11 @@ export default function DisputesPage() {
                 <tr>
                   <th style={thStyle}>ID</th>
                   <th style={thStyle}>{t('disputes.table.type')}</th>
-                  <th style={thStyle}>Client</th>
+                  <th style={thStyle}>{t('disputes.table.client')}</th>
                   <th style={thStyle}>Transaction</th>
                   <th style={thStyle}>{t('disputes.table.amount')}</th>
                   <th style={thStyle}>{t('disputes.table.status')}</th>
-                  <th style={thStyle}>Date</th>
+                  <th style={thStyle}>{t('disputes.table.date')}</th>
                   <th style={thStyle}>{t('disputes.table.actions')}</th>
                 </tr>
               </thead>

@@ -66,6 +66,36 @@ export class AdminOrderApi extends AdminDriverApi {
   }
 
   /**
+   * Cherche un client existant par téléphone, ou en crée un minimal
+   * (téléphone + nom, sans mot de passe/OTP) pour une commande passée au téléphone.
+   */
+  async createMinimalClient(params: {
+    phone: string
+    firstName?: string
+    lastName?: string
+  }): Promise<{
+    success: boolean
+    data?: { id: string; email: string; phone: string; first_name: string | null; last_name: string | null }
+    alreadyExisted?: boolean
+    message?: string
+  }> {
+    try {
+      const response = await this.fetchWithAuth(`${API_BASE_URL}/api/admin/clients/minimal`, {
+        method: 'POST',
+        body: JSON.stringify(params),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result.success) {
+        return { success: false, message: result.message || 'Erreur lors de la création du client' }
+      }
+      return { success: true, data: result.data, alreadyExisted: result.alreadyExisted }
+    } catch (error: unknown) {
+      logger.error('[adminApiService] Error createMinimalClient:', getErrorMessage(error))
+      return { success: false, message: 'Erreur lors de la création du client' }
+    }
+  }
+
+  /**
    * Crée une nouvelle commande (admin uniquement)
    */
   async createOrder(orderData: {

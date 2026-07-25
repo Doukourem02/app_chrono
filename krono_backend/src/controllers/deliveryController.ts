@@ -333,10 +333,13 @@ export const updateDeliveryStatus = async (
       // Prélever la commission pour les livreurs partenaires
       if (driverId) {
         try {
+          // Commission calculée sur le prix PLEIN (avant réduction code promo) —
+          // décision produit 2026-07-25 : Krono absorbe seul le coût de la promo.
+          const commissionBase = (order as any).full_price_cfa ?? order.price;
           const commissionResult = await deductCommissionAfterDelivery(
             driverId,
             orderId,
-            order.price
+            commissionBase
           );
 
           if (commissionResult.success) {

@@ -1,6 +1,51 @@
 import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import logger from '../utils/logger.js';
+import { syntheticEmailFromPhone } from '../config/otpStorage.js';
+
+/**
+ * Crée un compte client minimal (téléphone + nom, sans mot de passe/OTP) pour une
+ * commande passée au téléphone par un admin. Si le livreur/client rappelle un jour
+ * pour utiliser l'app normalement, le flux OTP existant (verifyOTPController)
+ * retrouve ce compte par téléphone et le rattache à une vraie identité Supabase Auth.
+ */
+export const createAdminMinimalClient = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone, firstName, lastName } = req.body;
+
+    if (!phone || typeof phone !== 'string' || !phone.trim()) {
+      res.status(400).json({ success: false, message: 'Numéro de téléphone requis' });
+      return;
+    }
+
+    const phoneTrimmed = phone.trim();
+
+    const existing = await pool.query(
+      `SELECT id, email, phone, first_name, last_name FROM users WHERE phone = $1 LIMIT 1`,
+      [phoneTrimmed]
+    );
+
+    if (existing.rows.length > 0) {
+      res.json({ success: true, data: existing.rows[0], alreadyExisted: true });
+      return;
+    }
+
+    const syntheticEmail = syntheticEmailFromPhone(phoneTrimmed);
+
+    const inserted = await pool.query(
+      `INSERT INTO users (email, phone, role, first_name, last_name, created_at, updated_at)
+       VALUES ($1, $2, 'client', $3, $4, NOW(), NOW())
+       RETURNING id, email, phone, first_name, last_name`,
+      [syntheticEmail, phoneTrimmed, firstName || null, lastName || null]
+    );
+
+    logger.info('[createAdminMinimalClient] Client minimal créé', { phone: phoneTrimmed });
+    res.json({ success: true, data: inserted.rows[0], alreadyExisted: false });
+  } catch (error: any) {
+    logger.error('Erreur createAdminMinimalClient:', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur', error: error.message });
+  }
+};
 
 export const getAdminUsers = async (req: Request, res: Response): Promise<void> => {
   try {

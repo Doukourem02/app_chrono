@@ -714,8 +714,8 @@ export const updateAdminDriverCommissionRate = async (req: Request, res: Respons
 
     logger.info('[updateAdminDriverCommissionRate] DÉBUT', { driverId, commission_rate });
 
-    if (!commission_rate || ![10, 20].includes(commission_rate)) {
-      res.status(400).json({ success: false, message: 'Le taux de commission doit être 10 ou 20' });
+    if (!commission_rate || ![12, 15].includes(commission_rate)) {
+      res.status(400).json({ success: false, message: 'Le taux de commission doit être 12 ou 15' });
       return;
     }
 
@@ -743,6 +743,42 @@ export const updateAdminDriverCommissionRate = async (req: Request, res: Respons
   } catch (error: any) {
     logger.error('Erreur updateAdminDriverCommissionRate:', error);
     res.status(500).json({ success: false, message: 'Erreur lors de la mise à jour', error: error.message });
+  }
+};
+
+/**
+ * Applique un taux de commission par défaut à TOUS les livreurs partenaires en une seule requête.
+ * Complément de updateAdminDriverCommissionRate (individuel) — pour les cas d'exception,
+ * continuer à utiliser la route individuelle après ce réglage en masse.
+ */
+export const bulkUpdateAdminDriverCommissionRate = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { commission_rate } = req.body;
+
+    logger.info('[bulkUpdateAdminDriverCommissionRate] DÉBUT', { commission_rate });
+
+    if (!commission_rate || ![12, 15].includes(commission_rate)) {
+      res.status(400).json({ success: false, message: 'Le taux de commission doit être 12 ou 15' });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE commission_balance cb
+       SET commission_rate = $1, updated_at = NOW()
+       FROM driver_profiles dp
+       WHERE dp.user_id = cb.driver_id AND dp.driver_type = 'partner'`,
+      [commission_rate]
+    );
+
+    logger.info(`Taux commission mis à jour en masse: ${commission_rate}% pour ${result.rowCount} livreur(s) partenaire(s)`);
+    res.json({
+      success: true,
+      message: `Taux de commission mis à jour pour ${result.rowCount} livreur(s) partenaire(s)`,
+      updatedCount: result.rowCount,
+    });
+  } catch (error: any) {
+    logger.error('Erreur bulkUpdateAdminDriverCommissionRate:', error);
+    res.status(500).json({ success: false, message: 'Erreur lors de la mise à jour en masse', error: error.message });
   }
 };
 

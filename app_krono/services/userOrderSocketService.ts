@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import Constants from 'expo-constants';
 import { config } from '../config';
@@ -1077,6 +1078,7 @@ class UserOrderSocketService {
     paymentPhone?: string;
     estimatedPrice?: number;
     partnerId?: string | null;
+    promoCode?: string;
   }): Promise<boolean> {
     return new Promise<boolean>(async (resolve) => {
       // Protection contre les appels multiples simultanés
@@ -1154,6 +1156,7 @@ class UserOrderSocketService {
           routeDurationSeconds: orderData.routeDurationSeconds,
           routeDurationTypicalSeconds: orderData.routeDurationTypicalSeconds,
           partnerId: orderData.partnerId,
+          promoCode: orderData.promoCode,
         });
       } catch (error: any) {
         // Log full error for debugging (httpStatus / requestId si createOrderInDatabase les a posés)
@@ -1192,7 +1195,9 @@ class UserOrderSocketService {
         const errorMessage = error?.message ?? String(error);
         const errorCode = error?.code ?? null;
 
-        if (errorCode === 'PO001' || errorCode === 'MISSING_PROFILE' || /does not exist|profiles?/i.test(errorMessage)) {
+        if (/code promo/i.test(errorMessage)) {
+          Alert.alert('Code promo', errorMessage);
+        } else if (errorCode === 'PO001' || errorCode === 'MISSING_PROFILE' || /does not exist|profiles?/i.test(errorMessage)) {
           UserFriendlyError.showIncompleteAccount(() => {
             // Try to trigger a logout so the app returns to auth flow and
             // re-creates any missing server profile on next sign-in.

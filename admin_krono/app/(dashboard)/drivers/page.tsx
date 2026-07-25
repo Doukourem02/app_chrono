@@ -1,15 +1,17 @@
 'use client'
 
 import React, { useState, useMemo, useTransition } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Search, Filter, User, Briefcase, Wallet, AlertCircle, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
+import { useDriverOnlineStatus } from '@/hooks/useDriverOnlineStatus'
 import { ScreenTransition } from '@/components/animations'
 import { SkeletonLoader } from '@/components/animations'
 import { themeColors } from '@/utils/theme'
 import type { Driver } from '@/types'
 import { useTranslation } from '@/hooks/useTranslation'
+import { useAuthStore } from '@/stores/authStore'
 
 type DriverType = 'all' | 'partner' | 'internal'
 type BalanceStatus = 'all' | 'active' | 'suspended' | 'low_balance'
@@ -17,13 +19,38 @@ type BalanceStatus = 'all' | 'active' | 'suspended' | 'low_balance'
 export default function DriversPage() {
   const router = useRouter()
   const t = useTranslation()
+  const queryClient = useQueryClient()
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin)
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<DriverType>('all')
   const [balanceStatusFilter, setBalanceStatusFilter] = useState<BalanceStatus>('all')
   const [, startTransition] = useTransition()
+  const [showBulkRateModal, setShowBulkRateModal] = useState(false)
+  const [bulkRateError, setBulkRateError] = useState('')
+  const [bulkRateSuccess, setBulkRateSuccess] = useState('')
   const itemsPerPage = 20
+
+  const bulkRateMutation = useMutation({
+    mutationFn: (rate: 12 | 15) => adminApiService.bulkUpdateDriverCommissionRate(rate),
+    onSuccess: (result) => {
+      if (result.success) {
+        setBulkRateError('')
+        setBulkRateSuccess(result.message || '')
+        queryClient.invalidateQueries({ queryKey: ['drivers'] })
+        setTimeout(() => {
+          setShowBulkRateModal(false)
+          setBulkRateSuccess('')
+        }, 1500)
+      } else {
+        setBulkRateError(result.message || t('drivers.bulkRate.error'))
+      }
+    },
+    onError: () => {
+      setBulkRateError(t('drivers.bulkRate.error'))
+    },
+  })
 
   // Debounce pour la recherche
   React.useEffect(() => {
@@ -49,10 +76,19 @@ export default function DriversPage() {
     placeholderData: (previousData) => previousData, // Garder les données précédentes pendant le chargement
   })
 
+  const { onlineStatus, isConnected: isSocketConnected } = useDriverOnlineStatus()
+
   const drivers = useMemo(() => {
     if (!driversData?.data) return []
-    return (driversData.data as Driver[]) || []
-  }, [driversData])
+    const raw = (driversData.data as Driver[]) || []
+    // Une fois le socket connecté, il fait foi pour is_online (temps réel) ;
+    // avant connexion, on garde la valeur du dernier fetch API en fallback.
+    if (!isSocketConnected) return raw
+    return raw.map((driver) => ({
+      ...driver,
+      is_online: onlineStatus.get(driver.id) === true,
+    }))
+  }, [driversData, onlineStatus, isSocketConnected])
 
   const counts = driversData?.counts || {
     total: 0,
@@ -297,7 +333,26 @@ export default function DriversPage() {
     <ScreenTransition>
       <div style={containerStyle}>
         <div style={headerStyle}>
-          <h1 style={titleStyle}>{t('drivers.title')}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <h1 style={titleStyle}>{t('drivers.title')}</h1>
+            {isSuperAdmin && (
+              <button
+                onClick={() => { setBulkRateError(''); setBulkRateSuccess(''); setShowBulkRateModal(true) }}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #E5E7EB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#8B5CF6',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {t('drivers.bulkRate.button')}
+              </button>
+            )}
+          </div>
 
           {/* Statistiques */}
           <div style={statsContainerStyle}>
@@ -587,6 +642,91 @@ export default function DriversPage() {
           </div>
         )}
       </div>
+
+      {showBulkRateModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => !bulkRateMutation.isPending && setShowBulkRateModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              padding: '24px',
+              width: '90%',
+              maxWidth: '420px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>{t('drivers.bulkRate.title')}</h3>
+            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '16px' }}>
+              {t('drivers.bulkRate.description', { count: counts.partners })}
+            </p>
+            {bulkRateError && (
+              <div style={{ marginBottom: '16px', padding: '10px 12px', borderRadius: '8px', backgroundColor: '#FEF2F2', color: '#DC2626', fontSize: '13px' }}>
+                {bulkRateError}
+              </div>
+            )}
+            {bulkRateSuccess && (
+              <div style={{ marginBottom: '16px', padding: '10px 12px', borderRadius: '8px', backgroundColor: '#F0FDF4', color: '#166534', fontSize: '13px' }}>
+                {bulkRateSuccess}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {[12, 15].map((rateOption) => (
+                <button
+                  key={rateOption}
+                  onClick={() => bulkRateMutation.mutate(rateOption as 12 | 15)}
+                  disabled={bulkRateMutation.isPending}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    borderRadius: '8px',
+                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    cursor: bulkRateMutation.isPending ? 'not-allowed' : 'pointer',
+                    opacity: bulkRateMutation.isPending ? 0.6 : 1,
+                  }}
+                >
+                  {rateOption}%
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button
+                onClick={() => setShowBulkRateModal(false)}
+                disabled={bulkRateMutation.isPending}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid #E5E7EB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#111827',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </ScreenTransition>
   )
 }

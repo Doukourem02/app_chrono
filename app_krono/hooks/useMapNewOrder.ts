@@ -107,7 +107,8 @@ export function useMapNewOrder({
       isPartialPayment?: boolean,
       partialAmount?: number,
       paymentMethodType?: PaymentMethodType,
-      paymentMethodId?: string | null
+      paymentMethodId?: string | null,
+      promoCode?: string
     ) => {
       // Vérifier l'authentification avant de créer la commande
       if (!user) {
@@ -216,6 +217,7 @@ export function useMapNewOrder({
           recipientUserId: recipientInfo.userId,
           recipientIsRegistered: recipientInfo.isRegistered,
           partnerId: user.is_business && user.partner_id ? user.partner_id : undefined,
+          promoCode: promoCode?.trim() || undefined,
         };
 
         // Définir les états de paiement AVANT de créer la commande

@@ -219,8 +219,8 @@ export default function PlanningPage() {
       
       // Nom du client
       const clientName = order.client
-        ? `${order.client.first_name || ''} ${order.client.last_name || ''}`.trim() || 'Client'
-        : 'Client'
+        ? `${order.client.first_name || ''} ${order.client.last_name || ''}`.trim() || t('common.client')
+        : t('common.client')
       
       if (!grouped[orderDate]) {
         grouped[orderDate] = []
@@ -240,7 +240,7 @@ export default function PlanningPage() {
     })
     
     return grouped
-  }, [b2bOrders])
+  }, [b2bOrders, t])
 
   const getWeekDays = () => {
     const startOfWeek = new Date(currentDate)

@@ -84,6 +84,7 @@ export interface CreateOrderData {
   price?: number;
   distance?: number;
   estimatedDuration?: string;
+  promoCode?: string;
   [key: string]: unknown;
 }
 

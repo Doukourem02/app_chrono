@@ -205,7 +205,7 @@ export async function saveOrder(order: Order): Promise<boolean> {
 
     const columnsInfo = await pool.query(
       `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = ANY($1)`,
-      [['pickup', 'pickup_address', 'dropoff', 'dropoff_address', 'driver_id', 'price', 'price_cfa', 'distance', 'distance_km', 'accepted_at', 'completed_at', 'cancelled_at', 'updated_at', 'recipient', 'package_images', 'payment_method_id', 'payment_method_type', 'payment_status', 'payment_payer', 'client_paid_amount', 'recipient_user_id', 'recipient_is_registered', 'recipient_paid_amount', 'recipient_payment_status', 'recipient_payment_method_type']]
+      [['pickup', 'pickup_address', 'dropoff', 'dropoff_address', 'driver_id', 'price', 'price_cfa', 'distance', 'distance_km', 'accepted_at', 'completed_at', 'cancelled_at', 'updated_at', 'recipient', 'package_images', 'payment_method_id', 'payment_method_type', 'payment_status', 'payment_payer', 'client_paid_amount', 'recipient_user_id', 'recipient_is_registered', 'recipient_paid_amount', 'recipient_payment_status', 'recipient_payment_method_type', 'promo_code_id', 'discount_amount_cfa', 'full_price_cfa']]
     );
     
     const columnSet = new Set(columnsInfo.rows.map((row: any) => row.column_name));
@@ -334,7 +334,28 @@ export async function saveOrder(order: Order): Promise<boolean> {
       placeholders.push(`$${paramIndex}`);
       paramIndex++;
     }
-    
+
+    if (columnSet.has('promo_code_id')) {
+      columns.push('promo_code_id');
+      values.push((order as any).promo_code_id || null);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    if (columnSet.has('discount_amount_cfa')) {
+      columns.push('discount_amount_cfa');
+      values.push((order as any).discount_amount_cfa != null ? (order as any).discount_amount_cfa : null);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
+    if (columnSet.has('full_price_cfa')) {
+      columns.push('full_price_cfa');
+      values.push((order as any).full_price_cfa != null ? (order as any).full_price_cfa : null);
+      placeholders.push(`$${paramIndex}`);
+      paramIndex++;
+    }
+
     if (columnSet.has('updated_at')) {
       columns.push('updated_at');
       values.push(updatedAt);
@@ -418,6 +439,18 @@ export async function saveOrder(order: Order): Promise<boolean> {
     
     if (columnSet.has('recipient_user_id')) {
       updateClauses.push(`recipient_user_id = EXCLUDED.recipient_user_id`);
+    }
+
+    if (columnSet.has('promo_code_id')) {
+      updateClauses.push(`promo_code_id = EXCLUDED.promo_code_id`);
+    }
+
+    if (columnSet.has('discount_amount_cfa')) {
+      updateClauses.push(`discount_amount_cfa = EXCLUDED.discount_amount_cfa`);
+    }
+
+    if (columnSet.has('full_price_cfa')) {
+      updateClauses.push(`full_price_cfa = EXCLUDED.full_price_cfa`);
     }
     
     if (columnSet.has('recipient_is_registered')) {

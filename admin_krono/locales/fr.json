@@ -16,7 +16,8 @@
     "previous": "Précédent",
     "confirm": "Confirmer",
     "yes": "Oui",
-    "no": "Non"
+    "no": "Non",
+    "client": "Client"
   },
   "sidebar": {
     "logo": "Dashboard Krono",
@@ -717,7 +718,8 @@
       "client": "Client",
       "amount": "Montant",
       "status": "Statut",
-      "actions": "Actions"
+      "actions": "Actions",
+      "date": "Date"
     },
     "actions": {
       "reject": "Rejeter",
@@ -783,6 +785,12 @@
       "internals": "Internes",
       "active": "Actifs",
       "suspended": "Suspendus"
+    },
+    "bulkRate": {
+      "button": "Taux par défaut (tous les partenaires)",
+      "title": "Appliquer un taux par défaut",
+      "description": "Cette action va modifier le taux de commission de {{count}} livreur(s) partenaire(s). Les taux individuels définis pour des cas particuliers seront écrasés.",
+      "error": "Erreur lors de la mise à jour en masse"
     },
     "filters": {
       "all": "Tous",
@@ -852,7 +860,12 @@
       "minimumAmountError": "Le montant minimum est de 10 000 FCFA",
       "notesOptional": "Notes (optionnel)",
       "rechargeReasonPlaceholder": "Raison de la recharge...",
-      "recharging": "Rechargement..."
+      "recharging": "Rechargement...",
+      "changeRate": "Modifier le taux",
+      "changeRateTitle": "Modifier le taux de commission",
+      "changeRateDescription": "Choisissez le nouveau taux de commission pour ce livreur partenaire.",
+      "updatingRate": "Mise à jour...",
+      "rateUpdateError": "Erreur lors de la mise à jour du taux"
     }
   },
   "promoCodes": {

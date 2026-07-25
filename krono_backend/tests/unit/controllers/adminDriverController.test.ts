@@ -2,7 +2,7 @@
  * Tests unitaires pour adminDriverController — actions admin sur la commission
  * des livreurs partenaires (argent). Déjà admin-gated au niveau routes ; on couvre
  * les règles métier propres : montant minimum de recharge, réservé aux livreurs
- * `partner`, taux de commission limité à 10 ou 20.
+ * `partner`, taux de commission limité à 12 ou 15.
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
@@ -111,9 +111,9 @@ describe('adminDriverController', () => {
   });
 
   describe('updateAdminDriverCommissionRate', () => {
-    it('rejette un taux hors {10, 20} (400) sans toucher à la base', async () => {
+    it('rejette un taux hors {12, 15} (400) sans toucher à la base', async () => {
       mockRequest.params = { driverId: 'driver-1' };
-      mockRequest.body = { commission_rate: 15 };
+      mockRequest.body = { commission_rate: 20 };
 
       await adminDriverController.updateAdminDriverCommissionRate(mockRequest as Request, mockResponse as Response);
 
@@ -123,7 +123,7 @@ describe('adminDriverController', () => {
 
     it('rejette un livreur non-partenaire (400)', async () => {
       mockRequest.params = { driverId: 'driver-1' };
-      mockRequest.body = { commission_rate: 20 };
+      mockRequest.body = { commission_rate: 15 };
       mockPool.query.mockResolvedValueOnce({ rows: [{ driver_type: 'internal' }] } as any);
 
       await adminDriverController.updateAdminDriverCommissionRate(mockRequest as Request, mockResponse as Response);
@@ -133,7 +133,7 @@ describe('adminDriverController', () => {
 
     it('met à jour le taux pour un livreur partenaire valide', async () => {
       mockRequest.params = { driverId: 'driver-1' };
-      mockRequest.body = { commission_rate: 20 };
+      mockRequest.body = { commission_rate: 15 };
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ driver_type: 'partner' }] } as any)
         .mockResolvedValueOnce({ rowCount: 1 } as any);
@@ -141,6 +141,28 @@ describe('adminDriverController', () => {
       await adminDriverController.updateAdminDriverCommissionRate(mockRequest as Request, mockResponse as Response);
 
       expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+    });
+  });
+
+  describe('bulkUpdateAdminDriverCommissionRate', () => {
+    it('rejette un taux hors {12, 15} (400) sans toucher à la base', async () => {
+      mockRequest.body = { commission_rate: 20 };
+
+      await adminDriverController.bulkUpdateAdminDriverCommissionRate(mockRequest as Request, mockResponse as Response);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(400);
+      expect(mockPool.query).not.toHaveBeenCalled();
+    });
+
+    it('met à jour le taux pour tous les livreurs partenaires et renvoie le nombre modifié', async () => {
+      mockRequest.body = { commission_rate: 12 };
+      mockPool.query.mockResolvedValueOnce({ rowCount: 37 } as any);
+
+      await adminDriverController.bulkUpdateAdminDriverCommissionRate(mockRequest as Request, mockResponse as Response);
+
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({ success: true, updatedCount: 37 })
+      );
     });
   });
 });
