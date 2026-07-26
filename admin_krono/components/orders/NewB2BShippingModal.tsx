@@ -10,6 +10,7 @@ import { logger } from '@/utils/logger'
 import { themeColors } from '@/utils/theme'
 import { getPhoneValidationError } from '@/utils/phoneValidation'
 import { useLanguageStore } from '@/stores/languageStore'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface UserData {
   id: string
@@ -28,10 +29,10 @@ interface NewB2BShippingModalProps {
   scheduledTime?: string // Heure planifiée (HH:mm) depuis le calendrier
 }
 
-const B2B_INSTRUCTION_PRESETS: string[] = [
-  `Demander le code de livraison`,
-  `Appeler le client avant d'arriver`,
-]
+const B2B_INSTRUCTION_PRESETS: Record<'fr' | 'en', string[]> = {
+  fr: [`Demander le code de livraison`, `Appeler le client avant d'arriver`],
+  en: ['Ask for the delivery code', 'Call the client before arriving'],
+}
 
 export default function NewB2BShippingModal({
   isOpen,
@@ -42,6 +43,7 @@ export default function NewB2BShippingModal({
   const router = useRouter()
   const language = useLanguageStore((state) => state.language)
   const locale = language === 'fr' ? 'fr-FR' : 'en-US'
+  const t = useTranslation()
   const [step, setStep] = useState<'client' | 'pickup' | 'dropoff' | 'details'>('client')
   const [users, setUsers] = useState<UserData[]>([])
   const [filteredUsers, setFilteredUsers] = useState<UserData[]>([])
@@ -186,7 +188,7 @@ export default function NewB2BShippingModal({
   const handlePickupNext = () => {
     if (!pickupAddress) return
     if (!pickupCoordinates) {
-      alert('Sélectionnez l’adresse de pickup dans les suggestions pour enregistrer le point GPS.')
+      alert(t('newB2BShipping.alerts.pickupGpsRequired'))
       return
     }
     setStep('dropoff')
@@ -195,7 +197,7 @@ export default function NewB2BShippingModal({
   const handleDropoffNext = () => {
     if (!dropoffAddress) return
     if (!dropoffCoordinates) {
-      alert('Sélectionnez l’adresse de livraison dans les suggestions pour enregistrer le point GPS.')
+      alert(t('newB2BShipping.alerts.dropoffGpsRequired'))
       return
     }
     setStep('details')
@@ -244,24 +246,22 @@ export default function NewB2BShippingModal({
   const handleCreateOrder = async () => {
     // Validation
     if (!selectedClient || !pickupAddress || !dropoffAddress) {
-      alert('Veuillez remplir tous les champs obligatoires')
+      alert(t('newShipping.alerts.fillRequired'))
       return
     }
     if (!pickupCoordinates || !dropoffCoordinates) {
-      alert('Sélectionnez les adresses dans les suggestions autocomplete pour fixer les coordonnées GPS.')
+      alert(t('newB2BShipping.alerts.gpsCoordsRequired'))
       return
     }
 
     if (!scheduledDateValue || !scheduledTimeValue) {
-      alert('Veuillez sélectionner une date et une heure pour la livraison planifiée')
+      alert(t('newB2BShipping.alerts.dateTimeRequired'))
       return
     }
 
     const destPhone = recipientPhone.trim()
     if (!destPhone) {
-      alert(
-        'Le numéro de téléphone du client pour cette course est obligatoire (ex. celui avec lequel il a contacté l’administrateur).'
-      )
+      alert(t('newShipping.alerts.recipientPhoneRequired'))
       return
     }
     const phoneError = getPhoneValidationError(destPhone)
@@ -307,22 +307,22 @@ export default function NewB2BShippingModal({
         if (deliveryCode) {
           const smsLabel =
             smsStatus === 'sent'
-              ? 'SMS envoyé au destinataire.'
+              ? t('newShipping.alerts.smsSent')
               : smsStatus === 'failed'
-                ? 'SMS non envoyé : donnez ce code au client par téléphone.'
-                : 'SMS non envoyé automatiquement : donnez ce code au client par téléphone.'
-          alert(`Commande entreprise créée.\nCode de livraison destinataire : ${deliveryCode}\n${smsLabel}`)
+                ? t('newShipping.alerts.smsFailed')
+                : t('newShipping.alerts.smsUnknown')
+          alert(t('newB2BShipping.alerts.orderCreated', { code: deliveryCode, smsLabel }))
         }
         resetForm()
         onClose()
         // Navigate to planning page to see the new B2B order
         router.push(`/planning`)
       } else {
-        alert(result.message || 'Impossible de créer la commande entreprise')
+        alert(result.message || t('newB2BShipping.alerts.createOrderFailed'))
       }
     } catch (error) {
       logger.error('Error creating B2B order:', error)
-      alert('Une erreur est survenue lors de la création de la commande entreprise')
+      alert(t('newB2BShipping.alerts.createOrderError'))
     } finally {
       setIsCreating(false)
     }
@@ -332,7 +332,7 @@ export default function NewB2BShippingModal({
     if (user.first_name || user.last_name) {
       return `${user.first_name || ''} ${user.last_name || ''}`.trim()
     }
-    return user.phone || 'Client'
+    return user.phone || t('newShipping.clientFallback')
   }
 
   if (!isOpen) return null
@@ -482,7 +482,7 @@ export default function NewB2BShippingModal({
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h2 style={titleStyle}>Nouvelle livraison entreprise</h2>
+            <h2 style={titleStyle}>{t('newB2BShipping.title')}</h2>
             <span style={{
               padding: '4px 8px',
               borderRadius: '6px',
@@ -491,7 +491,7 @@ export default function NewB2BShippingModal({
               fontSize: '11px',
               fontWeight: 600,
             }}>
-              Entreprise
+              {t('newB2BShipping.badge')}
             </span>
           </div>
           <button
@@ -510,13 +510,13 @@ export default function NewB2BShippingModal({
 
         <div style={contentStyle}>
           <div style={stepIndicatorStyle}>
-            <span style={stepItemStyle(step === 'client', false)}>1. Client</span>
+            <span style={stepItemStyle(step === 'client', false)}>1. {t('newShipping.steps.client')}</span>
             <span style={{ color: themeColors.textTertiary }}>→</span>
-            <span style={stepItemStyle(step === 'pickup', step === 'dropoff' || step === 'details')}>2. Pickup</span>
+            <span style={stepItemStyle(step === 'pickup', step === 'dropoff' || step === 'details')}>2. {t('newShipping.steps.pickup')}</span>
             <span style={{ color: themeColors.textTertiary }}>→</span>
-            <span style={stepItemStyle(step === 'dropoff', step === 'details')}>3. Dropoff</span>
+            <span style={stepItemStyle(step === 'dropoff', step === 'details')}>3. {t('newShipping.steps.dropoff')}</span>
             <span style={{ color: themeColors.textTertiary }}>→</span>
-            <span style={stepItemStyle(step === 'details', false)}>4. Détails</span>
+            <span style={stepItemStyle(step === 'details', false)}>4. {t('newShipping.steps.details')}</span>
           </div>
 
           {step === 'client' && (
@@ -534,7 +534,7 @@ export default function NewB2BShippingModal({
                 />
                 <input
                   type="text"
-                  placeholder="Rechercher un client..."
+                  placeholder={t('newShipping.searchPlaceholder')}
                   style={searchInputStyle}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -544,11 +544,11 @@ export default function NewB2BShippingModal({
               <div style={userListStyle}>
                 {isLoading ? (
                   <div style={{ padding: '20px', textAlign: 'center', color: themeColors.textSecondary }}>
-                    Chargement...
+                    {t('newShipping.loading')}
                   </div>
                 ) : filteredUsers.length === 0 ? (
                   <div style={{ padding: '20px', textAlign: 'center', color: themeColors.textSecondary }}>
-                    Aucun client trouvé
+                    {t('newShipping.noClientFound')}
                   </div>
                 ) : (
                   filteredUsers.map((user) => (
@@ -617,7 +617,7 @@ export default function NewB2BShippingModal({
             <>
               {selectedClient && (
                 <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: themeColors.grayLight, borderRadius: '8px' }}>
-                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Client sélectionné</div>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{t('newShipping.selectedClient')}</div>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
                     {getUserDisplayName(selectedClient)}
                   </div>
@@ -631,11 +631,11 @@ export default function NewB2BShippingModal({
                     setPickupAddress(address)
                     setPickupCoordinates(coordinates)
                   }}
-                  placeholder="Ex: Cocody, Abidjan"
+                  placeholder={t('newShipping.pickupPlaceholder')}
                   label={
                     <span>
                       <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary, verticalAlign: 'middle' }} />
-                      Adresse de pickup
+                      {t('newShipping.pickupLabel')}
                     </span>
                   }
                 />
@@ -655,10 +655,10 @@ export default function NewB2BShippingModal({
                 <AlertTriangle size={16} style={{ color: themeColors.yellowDark, marginTop: '2px', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: themeColors.yellowDark, marginBottom: '4px' }}>
-                    Commande entreprise - Adresse autocomplete requise
+                    {t('newB2BShipping.pickupGpsRequiredTitle')}
                   </div>
                   <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
-                    Sélectionnez une suggestion pour enregistrer le point GPS et permettre la navigation livreur.
+                    {t('newB2BShipping.pickupGpsRequiredHint')}
                   </div>
                 </div>
               </div>
@@ -674,11 +674,11 @@ export default function NewB2BShippingModal({
                     setDropoffAddress(address)
                     setDropoffCoordinates(coordinates)
                   }}
-                  placeholder="Ex: Yopougon, Abidjan"
+                  placeholder={t('newShipping.dropoffPlaceholder')}
                   label={
                     <span>
                       <MapPin size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary, verticalAlign: 'middle' }} />
-                      Adresse de livraison
+                      {t('newShipping.dropoffLabel')}
                     </span>
                   }
                 />
@@ -686,22 +686,22 @@ export default function NewB2BShippingModal({
 
               {isEstimating && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.cardBg, borderRadius: '8px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>Calcul du prix...</div>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{t('newShipping.calculatingPrice')}</div>
                 </div>
               )}
 
               {!isEstimating && distance !== null && price !== null && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.purpleLight, borderRadius: '8px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{language === 'fr' ? 'Estimation' : 'Estimate'}</div>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{t('newShipping.estimate')}</div>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
-                    {language === 'fr' ? 'Distance' : 'Distance'}: {distance} km • {language === 'fr' ? 'Prix' : 'Price'}: {price.toLocaleString(locale)} FCFA
+                    {t('newShipping.distance')}: {distance} km • {t('newShipping.price')}: {price.toLocaleString(locale)} FCFA
                   </div>
                 </div>
               )}
               {!isEstimating && (distance === null || price === null) && pickupAddress && dropoffAddress && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.yellowLight, borderRadius: '8px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
-                    Sélectionnez les deux adresses dans la liste pour enregistrer les coordonnées GPS et afficher un devis.
+                    {t('newB2BShipping.dropoffQuoteGpsHint')}
                   </div>
                 </div>
               )}
@@ -715,7 +715,7 @@ export default function NewB2BShippingModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                   <Calendar size={16} style={{ color: themeColors.purplePrimary }} />
                   <label style={{ ...labelStyle, marginBottom: 0 }}>
-                    Date et heure planifiée
+                    {t('newB2BShipping.scheduledDateTimeLabel')}
                   </label>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
@@ -742,7 +742,7 @@ export default function NewB2BShippingModal({
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
                   <Package size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary }} />
-                  Service disponible
+                  {t('newShipping.serviceLabel')}
                 </label>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <button
@@ -762,29 +762,29 @@ export default function NewB2BShippingModal({
                     Moto
                   </button>
                   <span style={{ fontSize: 12, color: themeColors.textSecondary }}>
-                    Voiture et cargo ne sont pas actifs côté client.
+                    {t('newShipping.vehicleCargoDisabled')}
                   </span>
                 </div>
               </div>
 
               {isEstimating && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.cardBg, borderRadius: '8px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>Calcul du prix...</div>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary }}>{t('newShipping.calculatingPrice')}</div>
                 </div>
               )}
 
               {!isEstimating && distance !== null && price !== null && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.purpleLight, borderRadius: '8px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>Estimation</div>
+                  <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '4px' }}>{t('newShipping.estimate')}</div>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: themeColors.textPrimary }}>
-                    Distance: {distance} km • Prix: {price.toLocaleString('fr-FR')} FCFA
+                    {t('newShipping.distance')}: {distance} km • {t('newShipping.price')}: {price.toLocaleString(locale)} FCFA
                   </div>
                 </div>
               )}
               {!isEstimating && (distance === null || price === null) && pickupAddress && dropoffAddress && (
                 <div style={{ padding: '12px', backgroundColor: themeColors.yellowLight, borderRadius: '8px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', color: themeColors.yellowDark }}>
-                    Sélectionnez les deux adresses dans l’autocomplete pour fixer les coordonnées GPS.
+                    {t('newB2BShipping.detailsGpsHint')}
                   </div>
                 </div>
               )}
@@ -792,24 +792,24 @@ export default function NewB2BShippingModal({
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
                   <DollarSign size={16} style={{ display: 'inline', marginRight: '8px', color: themeColors.textSecondary }} />
-                  {language === 'fr' ? 'Méthode de paiement' : 'Payment method'}
+                  {t('newShipping.paymentMethodLabel')}
                 </label>
                 <select
                   style={inputStyle}
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
                 >
-                  <option value="cash">{language === 'fr' ? 'Espèces' : 'Cash'}</option>
+                  <option value="cash">{t('newShipping.cash')}</option>
                   <option value="orange_money">Orange Money</option>
                   <option value="wave">Wave</option>
-                  <option value="deferred">{language === 'fr' ? 'Différé' : 'Deferred'}</option>
+                  <option value="deferred">{t('newShipping.deferred')}</option>
                 </select>
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Téléphone du client pour cette course (obligatoire)</label>
+                <label style={labelStyle}>{t('newShipping.recipientPhoneLabel')}</label>
                 <div style={{ fontSize: '12px', color: themeColors.textSecondary, marginBottom: '8px' }}>
-                  Saisissez le numéro avec lequel le client vous a contacté. Le livreur pourra l’utiliser depuis l’app.
+                  {t('newB2BShipping.recipientPhoneHint')}
                 </div>
                 <input
                   type="tel"
@@ -823,10 +823,10 @@ export default function NewB2BShippingModal({
               {/* Détails de l'appel */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
-                  Détails de l&apos;appel
+                  {t('newB2BShipping.callDetailsLabel')}
                 </label>
                 <textarea
-                  placeholder="Détails de l'appel client, volume de la commande, instructions spéciales..."
+                  placeholder={t('newB2BShipping.callDetailsPlaceholder')}
                   style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
                   value={b2bNotes}
                   onChange={(e) => setB2bNotes(e.target.value)}
@@ -834,9 +834,9 @@ export default function NewB2BShippingModal({
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Consignes pour le livreur</label>
+                <label style={labelStyle}>{t('newB2BShipping.driverInstructionsLabel')}</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {B2B_INSTRUCTION_PRESETS.map((instruction) => {
+                  {B2B_INSTRUCTION_PRESETS[language].map((instruction) => {
                     const selected = selectedB2BInstructions.includes(instruction)
                     return (
                       <button
@@ -866,9 +866,9 @@ export default function NewB2BShippingModal({
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Notes générales (optionnel)</label>
+                <label style={labelStyle}>{t('newB2BShipping.generalNotesLabel')}</label>
                 <textarea
-                  placeholder="Instructions supplémentaires..."
+                  placeholder={t('newB2BShipping.generalNotesPlaceholder')}
                   style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -878,10 +878,10 @@ export default function NewB2BShippingModal({
               {/* Notes pour le livreur */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>
-                  Précisions libres pour le livreur (optionnel)
+                  {t('newB2BShipping.driverNotesLabel')}
                 </label>
                 <textarea
-                    placeholder="Précisez un détail libre pour le livreur (ex: code portail, colis fragile)..."
+                    placeholder={t('newB2BShipping.driverNotesPlaceholder')}
                   style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
                   value={driverNotes}
                   onChange={(e) => setDriverNotes(e.target.value)}
@@ -900,7 +900,7 @@ export default function NewB2BShippingModal({
               }}>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: themeColors.yellowDark }}>📞</span>
                 <span style={{ fontSize: '12px', color: themeColors.yellowDark }}>
-                  Cette commande sera marquée comme &quot;Commande entreprise par téléphone&quot;. Les adresses doivent venir de l’autocomplete pour activer la navigation.
+                  {t('newB2BShipping.phoneOrderNotice')}
                 </span>
               </div>
             </>
@@ -927,7 +927,7 @@ export default function NewB2BShippingModal({
                 border: `1px solid ${themeColors.cardBorder}`,
               }}
             >
-              Retour
+              {t('newShipping.back')}
             </button>
           )}
           {step === 'client' && (
@@ -941,7 +941,7 @@ export default function NewB2BShippingModal({
                 border: `1px solid ${themeColors.cardBorder}`,
               }}
             >
-              Annuler
+              {t('newShipping.cancel')}
             </button>
           )}
           {step === 'pickup' && (
@@ -957,7 +957,7 @@ export default function NewB2BShippingModal({
                 cursor: !pickupAddress || !pickupCoordinates ? 'not-allowed' : 'pointer',
               }}
             >
-              Suivant
+              {t('newShipping.next')}
             </button>
           )}
           {step === 'dropoff' && (
@@ -973,7 +973,7 @@ export default function NewB2BShippingModal({
                 cursor: !dropoffAddress || !dropoffCoordinates ? 'not-allowed' : 'pointer',
               }}
             >
-              Suivant
+              {t('newShipping.next')}
             </button>
           )}
           {step === 'details' && (
@@ -989,7 +989,7 @@ export default function NewB2BShippingModal({
                 cursor: isCreating || !selectedClient || !pickupAddress || !pickupCoordinates || !dropoffAddress || !dropoffCoordinates || !scheduledDateValue || !scheduledTimeValue ? 'not-allowed' : 'pointer',
               }}
             >
-              {isCreating ? 'Création...' : 'Créer la commande entreprise'}
+              {isCreating ? t('newShipping.creating') : t('newB2BShipping.createOrder')}
             </button>
           )}
         </div>

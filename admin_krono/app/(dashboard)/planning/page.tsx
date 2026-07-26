@@ -576,7 +576,7 @@ export default function PlanningPage() {
 
         {viewMode === 'month' && (
           <div style={{ textAlign: 'center', padding: '40px', color: themeColors.textSecondary }}>
-            Vue mensuelle à venir
+            {t('planning.monthViewComingSoon')}
           </div>
         )}
       </div>

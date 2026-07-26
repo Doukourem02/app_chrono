@@ -1247,6 +1247,23 @@ Les 9 blocs fonctionnels du B2B (migrations, backend, admin, app client, app cha
 
 ---
 
+### Admin — deux points d'entrée de création de commande (Dashboard vs Planning) — décision 2026-07-26
+
+À ne pas confondre avec `app_krono/components/NewB2BShippingModal.tsx` (mobile, section ci-dessus) : ici il s'agit de deux modals **admin_krono**, tous deux appelés depuis le dashboard web.
+
+**Constat (audit code, 2026-07-26)** :
+- `admin_krono/components/orders/NewShippingModal.tsx` (bouton "+ Nouvelle livraison" du Dashboard) — flux générique : client existant ou créé à la volée (numéro jamais inscrit chez Krono), livraison immédiate. Contient aussi un sélecteur `partnerId` optionnel (`t('newShipping.partnerLabel')`) qui est **le seul endroit du code** qui relie réellement une commande à un partenaire B2B facturable (déclenche commission + incrément de quota, cf. `computeB2BCommission` / `applyB2BPartnerMetadata` dans `adminOrderController.ts`).
+- `admin_krono/components/orders/NewB2BShippingModal.tsx` (bouton "Nouvelle livraison B2B" de `admin_krono/app/(dashboard)/planning/page.tsx`) — force `isB2BOrder: true` et `isPhoneOrder: true` mais **ne propose aucune sélection de partenaire réel** (pas de champ `partnerId`). La date/heure "programmée" saisie à l'étape Détails est **capturée dans l'UI mais jamais envoyée au backend** (absente du payload `createOrder` et du contrôleur) — fonctionnalité de programmation actuellement inopérante.
+- Les deux modals postent vers le même endpoint (`POST /api/admin/orders` → `createAdminOrder`), avec des règles de flags qui se chevauchent sans coordination.
+
+**Décision produit retenue** :
+- **Dashboard "Nouvelle livraison"** reste le point d'entrée générique/immédiat : n'importe quel type de client, y compris ceux qui n'ont jamais utilisé Krono (création à la volée). Le sélecteur de partenaire B2B doit en être **retiré** — B2B ne s'y traite plus.
+- **Planning**, renommé **"Commande B2B programmée"**, devient le point d'entrée **exclusif** du B2B : sélection d'un partenaire réel obligatoire (déplacer le sélecteur `partnerId` depuis le Dashboard) + date/heure de livraison réellement persistée côté serveur (corriger le payload/contrôleur pour ne plus la perdre). Le champ date/heure reste **obligatoire** (pas de commande B2B "immédiate" depuis cet écran) pour que le rôle des deux écrans reste sans ambiguïté.
+
+**Statut** : décision validée avec l'utilisateur, **pas encore implémentée**. Prochaine étape explicite : déplacer le sélecteur partenaire vers `NewB2BShippingModal.tsx`, le retirer de `NewShippingModal.tsx`, faire persister `scheduledDate`/`scheduledTime` (front + `adminOrderApi.ts` + `adminOrderController.ts` + migration si colonne manquante), renommer le libellé du bouton Planning.
+
+---
+
 ### Feature Commissionnaire (hors périmètre B2B)
 
 Le commissionnaire est une feature **B2C** distincte : le livreur agit à la place du client (courses, achats ponctuels) — ce n'est pas une livraison classique point A → point B avec colis déjà prêt. Pas de mélange avec la logique B2B (tables `partners`, abonnements, pricing). Documentation détaillée à écrire (parcours, pricing, avance de fonds) : voir `docs/taches.md`.
