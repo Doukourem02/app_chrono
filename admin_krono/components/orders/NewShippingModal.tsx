@@ -54,6 +54,11 @@ export default function NewShippingModal({
   const [approximatePickupZone, setApproximatePickupZone] = useState('')
   const [driverNotes, setDriverNotes] = useState('')
 
+  // Rattachement optionnel à un partenaire B2B (commande passée en son nom)
+  const [partners, setPartners] = useState<import('@/types').Partner[]>([])
+  const [partnersLoading, setPartnersLoading] = useState(false)
+  const [selectedPartnerId, setSelectedPartnerId] = useState('')
+
   // Création d'un client qui n'existe pas encore dans la base
   const [showCreateClient, setShowCreateClient] = useState(false)
   const [newClientPhone, setNewClientPhone] = useState('')
@@ -97,6 +102,18 @@ export default function NewShippingModal({
       loadUsers()
     }
   }, [isOpen, step, loadUsers])
+
+  useEffect(() => {
+    if (!isOpen || step !== 'details' || partners.length > 0 || partnersLoading) return
+    setPartnersLoading(true)
+    adminApiService
+      .getPartners({ status: 'active' })
+      .then((result) => {
+        if (result.success && result.data) setPartners(result.data)
+      })
+      .catch((error) => logger.error('Error loading partners:', error))
+      .finally(() => setPartnersLoading(false))
+  }, [isOpen, step, partners.length, partnersLoading])
 
   useEffect(() => {
     if (searchQuery) {
@@ -245,6 +262,7 @@ export default function NewShippingModal({
     setNewClientFirstName('')
     setNewClientLastName('')
     setNewClientError('')
+    setSelectedPartnerId('')
   }, [])
 
   useEffect(() => {
@@ -303,7 +321,8 @@ export default function NewShippingModal({
         price: price ?? undefined,
         notes: notes || undefined,
         isPhoneOrder: isPhoneOrder || undefined,
-        isB2BOrder: false, // Les commandes créées depuis NewShippingModal ne sont pas B2B
+        isB2BOrder: false, // isB2BOrderEffective côté serveur devient true dès que partnerId est fourni
+        partnerId: selectedPartnerId || undefined,
         driverNotes: driverNotes || undefined,
         approximatePickupZone:
           isPhoneOrder && !hasPickupGps ? approximatePickupZone.trim() || undefined : undefined,
@@ -826,6 +845,28 @@ export default function NewShippingModal({
                   </div>
                 </div>
               )}
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={labelStyle}>Rattacher à un partenaire B2B (optionnel)</label>
+                <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '8px' }}>
+                  Si le partenaire vous demande de passer la commande à sa place : la commission B2B sera calculée et ajoutée au prix, son quota mensuel sera incrémenté.
+                </div>
+                <select
+                  style={inputStyle}
+                  value={selectedPartnerId}
+                  onChange={(e) => setSelectedPartnerId(e.target.value)}
+                >
+                  <option value="">— Aucun (commande standard) —</option>
+                  {partners.map((partner) => (
+                    <option key={partner.id} value={partner.id}>
+                      {partner.name}
+                    </option>
+                  ))}
+                </select>
+                {partnersLoading && (
+                  <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>Chargement des partenaires…</div>
+                )}
+              </div>
 
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>

@@ -1001,6 +1001,23 @@ setInterval 24h → maybeRunInvoiceJob()
       anti-doublon → INSERT partner_invoices
 ```
 
+#### 9. Admin passe une commande au nom d'un partenaire B2B (2026-07-26)
+```
+Dashboard admin → "Nouvelle livraison" → client existant ou nouveau client par téléphone
+  → étape Détails → sélecteur optionnel "Rattacher à un partenaire B2B" (GET /api/partners)
+  → createOrder({ ..., partnerId })
+  → POST /api/admin/orders (verifyAdminSupabase) → createAdminOrder
+      partnerId fourni → isB2BOrder implicite (tarification prioritaire, notif tous livreurs)
+      → computeB2BCommission(partnerId) → commission ajoutée au prix serveur (même service
+        que /api/orders/record, pas de logique dupliquée)
+      → saveOrder() puis UPDATE orders SET partner_id, is_b2b_order=true (saveOrder ne connaît
+        pas ces colonnes — écriture séparée, cf. applyB2BPartnerMetadata)
+      → incrementPartnerUsage(partnerId)
+```
+Différence avec le flux `/api/orders/record` (app partenaire) : ce chemin admin n'a pas la
+contrainte `userId === authUser.id` (l'admin agit pour un tiers), et ne passe jamais par la RPC
+`fn_create_order` — il réutilise le chemin `saveOrder` déjà utilisé par les autres commandes admin.
+
 ---
 
 ### Routes B2B exposées

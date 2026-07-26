@@ -15,6 +15,39 @@ import { formatEtaMinutes, realisticEtaMinutesFromRoute } from '../utils/ivoryCo
 import { computeDynamicDeliveryPrice } from '../services/dynamicPricing.js';
 import { haversineDistanceKm } from '../services/priceCalculator.js';
 import { isUsableLatLon, positiveNumber, DeliveryCodeSmsStatus, sendAdminOrderDeliveryCodeSms } from './adminControllerUtils.js';
+import { computeB2BCommission, incrementPartnerUsage } from '../services/b2bCommissionService.js';
+
+/**
+ * Rattache une commande admin déjà créée à un partenaire B2B : écrit partner_id/is_b2b_order
+ * en base via UPDATE (saveOrder ne connaît pas ces colonnes) et incrémente le quota mensuel.
+ * Non bloquant : une erreur ici ne doit jamais faire échouer la création de la commande.
+ */
+async function applyB2BPartnerMetadata(orderId: string, partnerId: string): Promise<void> {
+  try {
+    const columnsInfo = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = ANY($1)`,
+      [['partner_id', 'is_b2b_order']]
+    );
+    const columnSet = new Set(columnsInfo.rows.map((row: any) => row.column_name));
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    let index = 1;
+    if (columnSet.has('partner_id')) {
+      setClauses.push(`partner_id = $${index}`);
+      values.push(partnerId);
+      index++;
+    }
+    if (columnSet.has('is_b2b_order')) {
+      setClauses.push(`is_b2b_order = true`);
+    }
+    if (!setClauses.length) return;
+    values.push(orderId);
+    await pool.query(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${index}`, values);
+    await incrementPartnerUsage(partnerId);
+  } catch (err) {
+    logger.warn('[createAdminOrder] applyB2BPartnerMetadata non bloquant:', err);
+  }
+}
 
 export const getAdminOngoingDeliveries = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -500,7 +533,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
 
     const {
       userId, pickup, dropoff, deliveryMethod, paymentMethodType,
-      distance, price, notes, isPhoneOrder, isB2BOrder, driverNotes,
+      distance, price, notes, isPhoneOrder, isB2BOrder, driverNotes, partnerId,
     } = req.body;
 
     if (!userId || !pickup || !dropoff || !deliveryMethod) {
@@ -510,6 +543,16 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       });
       return;
     }
+
+    const partnerIdTrimmed = typeof partnerId === 'string' && partnerId.trim() ? partnerId.trim() : null;
+    if (partnerIdTrimmed) {
+      const partnerResult = await pool.query('SELECT id FROM partners WHERE id = $1', [partnerIdTrimmed]);
+      if (partnerResult.rows.length === 0) {
+        res.status(404).json({ success: false, message: 'Partenaire introuvable' });
+        return;
+      }
+    }
+    const isB2BOrderEffective = isB2BOrder === true || !!partnerIdTrimmed;
 
     const isPhoneOrderBool = isPhoneOrder === true;
 
@@ -613,7 +656,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       method: deliveryMethod,
       pickupLatitude: pickupCoords?.latitude,
       pickupLongitude: pickupCoords?.longitude,
-      isB2BPriority: isB2BOrder === true,
+      isB2BPriority: isB2BOrderEffective,
     });
     const serverPrice = dynamic.totalCfa;
 
@@ -624,12 +667,25 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       logger.warn('[createAdminOrder] Écart prix admin/serveur', { clientPrice, serverPrice, serverDistance, deliveryMethod, labels: dynamic.labels });
     }
 
+    // Commission B2B : calculée avant la création pour l'appliquer au prix (même logique
+    // que createOrderRecord/orderRecordController.ts) — Krono facture la commission au partenaire.
+    let finalPrice = serverPrice;
+    if (partnerIdTrimmed) {
+      try {
+        const commission = await computeB2BCommission(partnerIdTrimmed);
+        const commissionAmount = Math.round(serverPrice * commission.rate);
+        finalPrice = serverPrice + commissionAmount;
+      } catch (commErr) {
+        logger.warn('[createAdminOrder] commission B2B non bloquante', commErr);
+      }
+    }
+
     const estimatedDuration = formatEtaMinutes(
       realisticEtaMinutesFromRoute({ distanceMeters: Math.max(0, serverDistance) * 1000, vehicleType: deliveryMethod })
     );
 
     const orderId = uuidv4();
-    const chrono_admin = { placed_by_admin: true, is_phone_order: isPhoneOrderBool, is_b2b_order: isB2BOrder === true };
+    const chrono_admin = { placed_by_admin: true, is_phone_order: isPhoneOrderBool, is_b2b_order: isB2BOrderEffective };
     const dropoffDetailsMerged: Record<string, unknown> = {
       ...(typeof dropoff.details === 'object' && dropoff.details ? dropoff.details : {}),
       phone: recipientPhoneInput,
@@ -673,7 +729,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
       },
       recipient: { phone: recipientPhoneInput },
       packageImages: [],
-      price: serverPrice,
+      price: finalPrice,
       deliveryMethod,
       distance: Math.round(serverDistance * 100) / 100,
       estimatedDuration,
@@ -685,7 +741,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     (order as any).payment_status = paymentMethodType === 'deferred' ? 'delayed' : 'pending';
     (order as any).payment_payer = 'client';
     if (isPhoneOrderBool) (order as any).is_phone_order = true;
-    if (isB2BOrder === true) (order as any).is_b2b_order = true;
+    if (isB2BOrderEffective) (order as any).is_b2b_order = true;
     if (typeof notes === 'string' && notes.trim()) (order as any).notes = notes.trim();
     if (typeof driverNotes === 'string' && driverNotes.trim()) (order as any).driver_notes = driverNotes.trim();
 
@@ -696,6 +752,10 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
     try {
       await saveOrder(order);
       logger.info(`[createAdminOrder] Commande ${orderId} créée par admin ${adminUser.id}`);
+
+      if (partnerIdTrimmed) {
+        await applyB2BPartnerMetadata(orderId, partnerIdTrimmed);
+      }
 
       try {
         const trackingToken = await generateAndSaveTrackingToken(orderId);
@@ -741,7 +801,7 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
         broadcastOrderUpdateToAdmins(io, 'order:created', { order });
 
         const finalPickupCoords = order.pickup.coordinates;
-        const isB2BOrderValue = isB2BOrder === true;
+        const isB2BOrderValue = isB2BOrderEffective;
 
         if (isB2BOrderValue) {
           logger.info(`[createAdminOrder] Commande B2B ${orderId} - notification de tous les livreurs disponibles`);
@@ -762,11 +822,11 @@ export const createAdminOrder = async (req: Request, res: Response): Promise<voi
         }
       }
 
-      if (paymentMethodType && serverPrice) {
+      if (paymentMethodType && finalPrice) {
         try {
           const { createTransactionAndInvoiceForOrder } = await import('../utils/createTransactionForOrder.js');
           await createTransactionAndInvoiceForOrder(
-            orderId, userId, paymentMethodType, serverPrice, serverDistance,
+            orderId, userId, paymentMethodType, finalPrice, serverDistance,
             null, 0, null, false, undefined, undefined, 'client', undefined, null
           );
         } catch (transactionError: any) {

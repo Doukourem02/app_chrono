@@ -119,6 +119,8 @@ export class AdminOrderApi extends AdminDriverApi {
     driverNotes?: string
     /** Commune / zone du retrait si commande téléphonique sans GPS (centroïde côté serveur pour matching livreurs) */
     approximatePickupZone?: string
+    /** Rattache la commande à un partenaire B2B : commission calculée et ajoutée au prix, quota partenaire incrémenté */
+    partnerId?: string
   }): Promise<{
     success: boolean
     data?: {

@@ -27,6 +27,48 @@ await jest.unstable_mockModule('../../../src/sockets/orderSocket.js', () => ({
   notifyDriversForOrder: jest.fn(() => Promise.resolve()),
 }));
 
+const mockComputeDynamicDeliveryPrice = jest.fn<(...args: any[]) => Promise<any>>();
+await jest.unstable_mockModule('../../../src/services/dynamicPricing.js', () => ({
+  __esModule: true,
+  computeDynamicDeliveryPrice: mockComputeDynamicDeliveryPrice,
+}));
+
+const mockComputeB2BCommission = jest.fn<(...args: any[]) => Promise<any>>();
+const mockIncrementPartnerUsage = jest.fn<(...args: any[]) => Promise<any>>();
+await jest.unstable_mockModule('../../../src/services/b2bCommissionService.js', () => ({
+  __esModule: true,
+  computeB2BCommission: mockComputeB2BCommission,
+  incrementPartnerUsage: mockIncrementPartnerUsage,
+}));
+
+const mockSaveOrder = jest.fn<(...args: any[]) => Promise<any>>(() => Promise.resolve(true));
+const mockGenerateAndSaveTrackingToken = jest.fn<(...args: any[]) => Promise<any>>(() => Promise.resolve(null));
+await jest.unstable_mockModule('../../../src/config/orderStorage.js', () => ({
+  __esModule: true,
+  saveOrder: mockSaveOrder,
+  generateAndSaveTrackingToken: mockGenerateAndSaveTrackingToken,
+}));
+
+await jest.unstable_mockModule('../../../src/services/qrCodeService.js', () => ({
+  __esModule: true,
+  default: { generateDeliveryQRCode: jest.fn(() => Promise.resolve({ verificationCode: 'CODE123' })) },
+}));
+
+await jest.unstable_mockModule('../../../src/controllers/adminControllerUtils.js', () => ({
+  __esModule: true,
+  isUsableLatLon: (value: any) =>
+    !!value &&
+    typeof value.latitude === 'number' &&
+    Number.isFinite(value.latitude) &&
+    typeof value.longitude === 'number' &&
+    Number.isFinite(value.longitude),
+  positiveNumber: (value: unknown) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  },
+  sendAdminOrderDeliveryCodeSms: jest.fn(() => Promise.resolve({ status: 'not_attempted', reason: 'test' })),
+}));
+
 const adminOrderController = await import('../../../src/controllers/adminOrderController.js');
 
 describe('adminOrderController', () => {
@@ -118,6 +160,65 @@ describe('adminOrderController', () => {
       await adminOrderController.createAdminOrder(mockRequest, mockResponse as Response);
 
       expect(mockResponse.status).toHaveBeenCalledWith(400);
+    });
+  });
+
+  describe('createAdminOrder — rattachement partenaire B2B', () => {
+    const validPickup = { address: 'Cocody', coordinates: { latitude: 5.34, longitude: -3.98 } };
+    const validDropoff = {
+      address: 'Marcory',
+      coordinates: { latitude: 5.28, longitude: -3.98 },
+      details: { phone: '0700000000' },
+    };
+
+    it('renvoie 404 si le partnerId ne correspond à aucun partenaire', async () => {
+      mockRequest.user = { id: 'admin-1', role: 'admin' };
+      mockRequest.body = {
+        userId: 'client-1', pickup: validPickup, dropoff: validDropoff, deliveryMethod: 'moto',
+        partnerId: 'partner-inconnu',
+      };
+      mockPool.query.mockResolvedValueOnce({ rows: [] } as any); // partenaire introuvable
+
+      await adminOrderController.createAdminOrder(mockRequest, mockResponse as Response);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(404);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({ success: false, message: 'Partenaire introuvable' })
+      );
+      expect(mockSaveOrder).not.toHaveBeenCalled();
+    });
+
+    it('ajoute la commission B2B au prix, rattache la commande au partenaire et incrémente son quota', async () => {
+      mockRequest.user = { id: 'admin-1', role: 'admin' };
+      mockRequest.body = {
+        userId: 'client-1', pickup: validPickup, dropoff: validDropoff, deliveryMethod: 'moto',
+        partnerId: 'partner-1',
+      };
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ id: 'partner-1' }] } as any) // partenaire trouvé
+        .mockResolvedValueOnce({
+          rows: [{ id: 'client-1', email: 'a@b.com', first_name: 'A', last_name: 'B' }],
+        } as any) // client trouvé
+        .mockResolvedValueOnce({
+          rows: [{ column_name: 'partner_id' }, { column_name: 'is_b2b_order' }],
+        } as any) // columnsInfo (applyB2BPartnerMetadata)
+        .mockResolvedValueOnce({ rows: [] } as any); // UPDATE orders SET partner_id...
+
+      mockComputeDynamicDeliveryPrice.mockResolvedValueOnce({ totalCfa: 2000, labels: [] } as any);
+      mockComputeB2BCommission.mockResolvedValueOnce({
+        rate: 0.05, type: 'in_quota', subscriptionId: 'sub-1', plan: 'starter',
+      } as any);
+
+      await adminOrderController.createAdminOrder(mockRequest, mockResponse as Response);
+
+      // 2000 + 5% de commission = 2100
+      expect(mockSaveOrder).toHaveBeenCalledWith(expect.objectContaining({ price: 2100 }));
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE orders SET'),
+        expect.arrayContaining(['partner-1'])
+      );
+      expect(mockIncrementPartnerUsage).toHaveBeenCalledWith('partner-1');
+      expect(mockResponse.status).toHaveBeenCalledWith(201);
     });
   });
 
