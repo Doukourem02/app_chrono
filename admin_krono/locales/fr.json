@@ -175,6 +175,19 @@
       "description": "Tu supprimes définitivement {{name}}. Les factures et abonnements liés seront effacés ; les commandes restent en base sans lien partenaire.",
       "deleteError": "Impossible de supprimer ce partenaire.",
       "deleting": "Suppression…"
+    },
+    "mergeBar": {
+      "selected": "2 fiches sélectionnées",
+      "mergeButton": "Fusionner",
+      "clearSelection": "Annuler la sélection"
+    },
+    "mergeModal": {
+      "title": "Fusionner deux fiches",
+      "description": "Choisis quelle fiche garder. L'autre sera archivée (statut « fusionnée », jamais supprimée) : son historique (commandes, factures, abonnement, quota, livreurs dédiés, accès équipe) sera transféré dans la fiche gardée.",
+      "keepThisOne": "Garder celle-ci",
+      "mergeError": "Impossible de fusionner ces fiches.",
+      "merging": "Fusion…",
+      "mergedNotice": "Fusion effectuée."
     }
   },
   "dashboard": {

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, Building2, Eye, CheckCircle, XCircle, Zap, Trash2, AlertTriangle, GitMerge } from 'lucide-react'
+import { Search, Plus, Building2, Eye, CheckCircle, XCircle, Zap, Trash2, AlertTriangle, GitMerge, X } from 'lucide-react'
 import { adminApiService } from '@/lib/adminApiService'
 import { supabase } from '@/lib/supabase'
 import { ScreenTransition, SkeletonLoader } from '@/components/animations'
@@ -137,6 +137,75 @@ function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCre
   )
 }
 
+// ─── Modal fusionner deux fiches sélectionnées ────────────────────────────────
+function MergeSelectedPartnersModal({
+  partners,
+  onClose,
+  onMerged,
+}: {
+  partners: [Partner, Partner]
+  onClose: () => void
+  onMerged: (message?: string) => void
+}) {
+  const t = useTranslation()
+  const [survivorId, setSurvivorId] = useState(partners[0].id)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleConfirm = async () => {
+    const loserId = partners.find((p) => p.id !== survivorId)!.id
+    setLoading(true)
+    setError('')
+    const result = await adminApiService.mergePartners(survivorId, loserId)
+    setLoading(false)
+    if (result.success) {
+      onMerged(result.message)
+    } else {
+      setError(result.message ?? t('partnersPage.mergeModal.mergeError'))
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+      <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 16, padding: 28, width: '100%', maxWidth: 460, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <GitMerge size={22} color={themeColors.purplePrimary} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: themeColors.textPrimary }}>{t('partnersPage.mergeModal.title')}</h2>
+        </div>
+        <p style={{ fontSize: 13, color: themeColors.textSecondary, lineHeight: 1.5, marginBottom: 16 }}>
+          {t('partnersPage.mergeModal.description')}
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {partners.map((p) => (
+            <label
+              key={p.id}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: `1px solid ${survivorId === p.id ? themeColors.purplePrimary : themeColors.cardBorder}`, backgroundColor: survivorId === p.id ? themeColors.purpleLight : 'transparent', cursor: 'pointer' }}
+            >
+              <input type="radio" checked={survivorId === p.id} onChange={() => setSurvivorId(p.id)} />
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: themeColors.textPrimary }}>{p.name}</p>
+                <p style={{ fontSize: 12, color: themeColors.textSecondary }}>{p.email ?? '—'} · {t(`partnersPage.status.${p.status}`)}</p>
+              </div>
+              {survivorId === p.id && (
+                <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: themeColors.purplePrimary }}>{t('partnersPage.mergeModal.keepThisOne')}</span>
+              )}
+            </label>
+          ))}
+        </div>
+        {error && <p style={{ fontSize: 13, color: themeColors.redPrimary, marginBottom: 12 }}>{error}</p>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 14, cursor: 'pointer' }}>
+            {t('common.cancel')}
+          </button>
+          <button type="button" onClick={handleConfirm} disabled={loading} style={{ padding: '10px 20px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+            {loading ? t('partnersPage.mergeModal.merging') : t('common.confirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Modal suppression partenaire ─────────────────────────────────────────────
 function DeletePartnerModal({
   partner,
@@ -203,6 +272,17 @@ export default function PartnersPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [activating, setActivating] = useState<string | null>(null)
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [showMergeConfirm, setShowMergeConfirm] = useState(false)
+  const [mergeNotice, setMergeNotice] = useState('')
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id)
+      if (prev.length >= 2) return prev
+      return [...prev, id]
+    })
+  }
 
   const handleActivate = async (e: React.MouseEvent, partnerId: string) => {
     e.stopPropagation()
@@ -252,6 +332,11 @@ export default function PartnersPage() {
     )
   }, [partners, search, segmentFilter, statusFilter])
 
+  const selectedPartners = useMemo(
+    () => partners.filter((p) => selectedIds.includes(p.id)),
+    [partners, selectedIds]
+  )
+
   return (
     <ScreenTransition>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -276,6 +361,15 @@ export default function PartnersPage() {
             </button>
           )}
         </div>
+
+        {mergeNotice && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderRadius: 10, backgroundColor: themeColors.greenLight, border: `1px solid ${themeColors.greenPrimary}` }}>
+            <span style={{ fontSize: 13, color: themeColors.greenPrimary }}>{mergeNotice}</span>
+            <button type="button" onClick={() => setMergeNotice('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: themeColors.greenPrimary, display: 'flex' }}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Filtres */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -337,6 +431,29 @@ export default function PartnersPage() {
           </select>
         </div>
 
+        {/* Barre de fusion — visible dès que 2 fiches sont sélectionnées */}
+        {isSuperAdmin && selectedIds.length === 2 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderRadius: 10, backgroundColor: themeColors.purpleLight, border: `1px solid ${themeColors.purplePrimary}` }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: themeColors.purplePrimary }}>{t('partnersPage.mergeBar.selected')}</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${themeColors.cardBorder}`, backgroundColor: 'transparent', color: themeColors.textPrimary, fontSize: 13, cursor: 'pointer' }}
+              >
+                <X size={14} /> {t('partnersPage.mergeBar.clearSelection')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMergeConfirm(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', backgroundColor: themeColors.purplePrimary, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                <GitMerge size={14} /> {t('partnersPage.mergeBar.mergeButton')}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div style={{ backgroundColor: themeColors.cardBg, borderRadius: 12, border: `1px solid ${themeColors.cardBorder}`, overflow: 'hidden' }}>
           {isLoading ? (
@@ -352,6 +469,7 @@ export default function PartnersPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${themeColors.cardBorder}` }}>
+                  {isSuperAdmin && <th style={{ width: 36, padding: '12px 8px' }} />}
                   {[t('partnersPage.colPartner'), t('partnersPage.colPlan'), t('partnersPage.colCommission'), t('partnersPage.colApproval'), t('partnersPage.colCreated'), t('partnersPage.colActions')].map((h) => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: themeColors.textSecondary, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
@@ -362,14 +480,27 @@ export default function PartnersPage() {
                   const agr = STATUS_STYLE[partner.status]
                   const AgrIcon = agr.Icon
                   const statusLabel = t(`partnersPage.status.${partner.status}`)
+                  const isSelected = selectedIds.includes(partner.id)
+                  const selectDisabled = partner.status === 'merged' || (!isSelected && selectedIds.length >= 2)
                   return (
                     <tr
                       key={partner.id}
                       onClick={() => router.push(`/partners/${partner.id}`)}
-                      style={{ borderBottom: `1px solid ${themeColors.cardBorder}`, cursor: 'pointer', transition: 'background 0.15s' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = themeColors.grayLight }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent' }}
+                      style={{ borderBottom: `1px solid ${themeColors.cardBorder}`, cursor: 'pointer', transition: 'background 0.15s', backgroundColor: isSelected ? themeColors.purpleLight : undefined }}
+                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.backgroundColor = themeColors.grayLight }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = isSelected ? themeColors.purpleLight : 'transparent' }}
                     >
+                      {isSuperAdmin && (
+                        <td style={{ padding: '14px 8px' }} onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={selectDisabled}
+                            onChange={() => toggleSelect(partner.id)}
+                            style={{ cursor: selectDisabled ? 'not-allowed' : 'pointer', width: 16, height: 16 }}
+                          />
+                        </td>
+                      )}
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ fontWeight: 600, fontSize: 14, color: themeColors.textPrimary }}>{partner.name}</div>
                         {partner.email && <div style={{ fontSize: 12, color: themeColors.textSecondary, marginTop: 2 }}>{partner.email}</div>}
@@ -465,6 +596,19 @@ export default function PartnersPage() {
           partner={partnerToDelete}
           onClose={() => setPartnerToDelete(null)}
           onDeleted={() => {
+            queryClient.invalidateQueries({ queryKey: ['partners'] })
+          }}
+        />
+      )}
+
+      {showMergeConfirm && selectedPartners.length === 2 && (
+        <MergeSelectedPartnersModal
+          partners={[selectedPartners[0], selectedPartners[1]]}
+          onClose={() => setShowMergeConfirm(false)}
+          onMerged={(message) => {
+            setShowMergeConfirm(false)
+            setSelectedIds([])
+            setMergeNotice(message ? `${t('partnersPage.mergeModal.mergedNotice')} ${message}` : t('partnersPage.mergeModal.mergedNotice'))
             queryClient.invalidateQueries({ queryKey: ['partners'] })
           }}
         />

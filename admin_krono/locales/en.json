@@ -175,6 +175,19 @@
       "description": "You are permanently deleting {{name}}. Related invoices and subscriptions will be removed; orders stay in the database without a partner link.",
       "deleteError": "Could not delete this partner.",
       "deleting": "Deleting…"
+    },
+    "mergeBar": {
+      "selected": "2 records selected",
+      "mergeButton": "Merge",
+      "clearSelection": "Clear selection"
+    },
+    "mergeModal": {
+      "title": "Merge two records",
+      "description": "Choose which record to keep. The other will be archived (status \"merged\", never deleted): its history (orders, invoices, subscription, quota, dedicated drivers, team access) will be transferred to the kept record.",
+      "keepThisOne": "Keep this one",
+      "mergeError": "Could not merge these records.",
+      "merging": "Merging…",
+      "mergedNotice": "Merge completed."
     }
   },
   "dashboard": {

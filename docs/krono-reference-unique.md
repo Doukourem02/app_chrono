@@ -723,6 +723,7 @@ Contenu de la facture générée :
 - **E-mail de la fiche archivée mis à `NULL`** pour libérer `partners_email_unique_idx` (l'identité canonique devient la fiche survivante).
 - Log d'audit `partner_audit_logs` (action `'merge'`) — protégé par un `SAVEPOINT` pour qu'un échec d'insertion du log n'annule jamais la fusion elle-même.
 - Migration associée : `048_partner_merge_support.sql` (colonne `merged_into_partner_id`, statut `'merged'`, action `'merge'` sur `partner_audit_logs`).
+- UI admin (`admin_krono`, page liste `/partners`) : sélection à cocher (max 2 fiches) → barre d'action "Fusionner" → modale de confirmation où l'admin choisit laquelle des deux garder. Pas d'action de fusion sur la page détail d'une fiche individuelle.
 
 ---
 
