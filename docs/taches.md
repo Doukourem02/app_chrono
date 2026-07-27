@@ -38,8 +38,8 @@ Paiement / mobile money : fichier dédié `docs/integration_paiement_en_ligne.md
 
 ### Grille B2B / monétisation cible
 
-- Décider : implémenter maintenant la grille commerciale **cible validée** de `docs/tale/MONETISATION.md` (%+frais fixe FCFA, ex. Starter 8%+100 in-quota — différente de la grille technique actuelle 5%/3%/2%), ou stopgap simple d'abord. Touche backend, app client, admin, portail.
-- Persister gain livreur réel / marge Krono par commande (`driver_earning_cfa`, `krono_delivery_margin_cfa`, `b2b_fee_cfa`, `driver_payout_model`) — dépend de la décision grille ci-dessus (`docs/tale/MONETISATION.md` section 7/10). Certains écrans confondent aujourd'hui prix de la course et gain livreur.
+- Décider : implémenter maintenant la grille commerciale **cible validée** de `docs/MONETISATION.md` (%+frais fixe FCFA, ex. Starter 8%+100 in-quota — différente de la grille technique actuelle 5%/3%/2%), ou stopgap simple d'abord. Touche backend, app client, admin, portail.
+- Persister gain livreur réel / marge Krono par commande (`driver_earning_cfa`, `krono_delivery_margin_cfa`, `b2b_fee_cfa`, `driver_payout_model`) — dépend de la décision grille ci-dessus (`docs/MONETISATION.md` section 7/10). Certains écrans confondent aujourd'hui prix de la course et gain livreur.
 
 ### Roadmap produit (peu prioritaire, jalons futurs)
 

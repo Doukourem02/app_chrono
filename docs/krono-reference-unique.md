@@ -103,28 +103,7 @@ Règle :
 
 ## 2. Cycle officiel d'une commande
 
-Une commande Krono doit rester lisible pour trois publics : **client**, **chauffeur** et **destinataire**.
-La question principale est toujours : **où est mon colis, qui s'en occupe, dans combien de temps, et que dois-je faire ?**
-
-| Étape produit | Statuts techniques typiques | Client | Chauffeur | Dynamic Island / Live Activity | Notification | Temps affiché | Passage suivant |
-|---|---|---|---|---|---|---|---|
-| Recherche livreur | `pending` | `Recherche livreur` ou `Recherche` | N/A | Compact/lock screen sans temps | Push seulement si attente longue, échec ou aucun livreur | Aucun temps | Un chauffeur accepte |
-| Livreur accepté / vers collecte | `accepted`, `enroute` | `Prise en charge dans X min` | Mission acceptée, aller au point de collecte | Avatar, véhicule, plaque, progression vers collecte | Push client utile une seule fois, puis Live Activity prend le relais | Chauffeur -> point de collecte | Chauffeur arrive ou confirme présence |
-| Arrivé collecte | `in_progress`, `arrived`, `at_pickup` | `Livreur arrivé` ou `Prise en charge dans 1 min` | Récupérer / vérifier le colis | Avatar + indicateur d'arrivée, sans libellé vague | Silencieux sauf action nécessaire | `1 min` si un temps est requis | Colis marqué récupéré |
-| Colis récupéré | `picked_up` | `Livraison dans X min` | Aller vers destination | Même composant, progression recalibrée vers destination | Push court possible : `Colis récupéré` | Point de collecte ou position livreur -> destination | Chauffeur se rapproche / arrive |
-| Vers livraison | `delivering` | `Livraison dans X min` | Continuer vers destinataire | Minutes + progression vers destination | Pas de push répétée si Live Activity active | Position livreur -> destination | Arrivé destination |
-| Arrivé destination | `at_dropoff`, `arrived_dropoff` | `Livreur arrivé` ou `Livraison dans 1 min` | Remettre le colis, scanner QR si requis | Avatar + indicateur d'arrivée | Push si le destinataire doit agir | `1 min` si un temps est requis | QR scanné / remise confirmée |
-| Terminé | `completed` | `Livraison terminée` | Mission terminée, commission comptabilisée | Fin propre de l'activité | Push seulement si app absente ou récap utile | Aucun temps | Historique / note / support |
-| Annulé / aucun livreur | `cancelled`, `declined`, `no_driver` | Message explicite et action possible | Mission retirée ou indisponible | Fin propre de l'activité | Push critique | Aucun temps | Nouvelle tentative, support ou remboursement |
-
-Règles générales :
-
-- Une commande suivie doit avoir une seule représentation système active côté client.
-- L'étape visible doit suivre la réalité métier, pas seulement un libellé technique.
-- Le client ne doit jamais avoir à deviner si le livreur va chercher le colis ou va le livrer.
-- Le destinataire ne voit que ce qui l'aide à recevoir le colis.
-
-**Statuts canoniques — source de vérité technique (unifiés le 2026-07-22)** : l'enum Postgres `order_status` a 11 valeurs, mais **9 seulement sont le canon applicatif** : `pending, accepted, enroute, in_progress, picked_up, delivering, completed, declined, cancelled`. `draft` et `searching_driver` existent dans l'enum mais ne sont produits ni consommés par aucun code actuel (backend ou front) — documentés ici pour le jour où ils seraient activés. Type source : `krono_backend/src/types/index.ts` (`OrderStatus`), répliqué dans `admin_krono/types/index.ts` et `driver_krono/types/index.ts`. Dette connue, non traitée volontairement : `app_krono/types/index.ts` (`ShipmentStatus`) et `useShipmentStore.ts` forment un système de statut parallèle utilisé uniquement par `app/summary.tsx`, un écran mort (aucune navigation ne pointe dessus) — candidat à suppression sur demande explicite seulement, car supprimer un écran est une décision produit.
+**Déplacé dans `docs/logique_livraison.md` (section 1)** — cycle de statuts, tableau étape par étape (client/chauffeur/Live Activity/notification), statuts canoniques `order_status`.
 
 ---
 
@@ -693,135 +672,9 @@ Pour une commande B2B rattachée à un `partner_id`, le service lit l'abonnement
 
 Branchement : `orderRecordController` appelle `computeB2BCommission` puis `incrementPartnerUsage`. Le compteur `partner_usage.deliveries_count` est incrémenté via un `INSERT … ON CONFLICT DO UPDATE` SQL atomique pour éviter les doublons en cas de requêtes simultanées.
 
-### Types de livraison — flags et encart livreur
+### Types de livraison, dispatch B2B, livreurs dédiés et tournées
 
-| Type | Flags / données | Encart livreur (`AdminOrderInfo`) |
-|------|-----------------|-----------------------------------|
-| **En ligne (classique)** | Aucun flag admin | Pas d'encart |
-| **Hors-ligne / opérateur** | `placed_by_admin` dans `_chrono_admin` | Badge « Hors-ligne · Opérateur » |
-| **Téléphonique / coords souples** | `is_phone_order` | Badge fusionné « Hors-ligne · Opérateur » si `placed_by_admin` vrai (comportement actuel conservé — pas de badge séparé « Téléphonique ») |
-| **B2B planning** | `is_b2b_order` | Badge « Commande B2B » + partenaire + tournée si données présentes |
-| **Tournée (batch)** | `batch_id`, `batch_position`, `batch_total`, `partner_name` | Affichage X/Y, contexte partenaire |
-
-**Règle mnémotechnique :** encart = `isB2BOrder` OU `placedByAdmin` OU `isPhoneOrder` (normalisé via `mapAdminOrderFlags`). Priorité badge : B2B > opérateur.
-
-**Décisions arrêtées :**
-- `partner_id` présent → toujours propager `is_b2b_order = true` sur la commande (pas de `partner_id` silencieux sans encart B2B livreur).
-- Tournée hybride (petit B2B sans portail) → batch créé avec `user_id` (pas de `partner_id` requis).
-- Tournée grand B2B → batch avec `partner_id` + `partner_name` remontés côté livreur.
-
-### Matrice segment × type de livraison (arrêtée)
-
-**O** = cas courant, **—** = non prévu.
-
-|  | En ligne | Hors-ligne opérateur | Téléphonique | B2B planning | Tournée (batch) |
-|--|:--------:|:--------------------:|:------------:|:------------:|:---------------:|
-| **Lambda** | O | — | — | — | — |
-| **Hybride (Starter, sans portail)** | O | — | — | O | O (`user_id`) |
-| **Grand B2B (Pro/Business)** | — | O | O | O | O (`partner_id`) |
-
-Lambda : pas de tournée grand public pour l'instant. Hybride : pas de saisie hors-ligne ni téléphonique (flow app uniquement). Grand B2B : pas de commande en ligne classique (passe par admin/portail).
-
----
-
-### Comportement dispatch B2B
-
-- GPS optionnel (contrairement au B2C)
-- Tous les livreurs disponibles notifiés
-- Livreurs **internes** prioritaires sur commandes B2B
-- Paiement **différé** (`deferred`) disponible
-- Si livreur attitré sélectionné pour une commande unitaire → `preferred_driver_id` priorisé, puis fallback automatique si le livreur n'est pas joignable ou refuse.
-- Si livreur attitré sélectionné pour une tournée → `driver_id` explicite sur `/api/batches`, donc assignation directe au livreur choisi.
-
-### Livreurs dédiés partenaires
-
-Définitions :
-- **Livreur B2B opt-in** : livreur qui accepte de recevoir des commandes B2B (`driver_profiles.accepts_b2b_orders = true`).
-- **Livreur dédié partenaire** : livreur explicitement rattaché à un partenaire dans `partner_drivers`.
-- **Priorité douce** : Krono propose d'abord la commande au livreur dédié sélectionné, puis l'assignation automatique prend le relais si besoin.
-
-Règle produit : le partenaire peut demander ou sélectionner un livreur déjà validé, mais il ne rattache jamais directement un livreur à son compte. Le rattachement officiel reste une action admin Krono.
-
-Modèle de données :
-- `partner_drivers.partner_id` + `driver_user_id` identifie le rattachement.
-- Un même livreur peut être dédié à plusieurs partenaires ; l'unicité est seulement sur le couple `(partner_id, driver_user_id)`.
-- Un seul livreur par défaut est autorisé par partenaire (`is_default = true` unique).
-- `partner_driver_requests` couvre trois demandes : `known_driver`, `previous_krono_driver`, `general_request`.
-
-Admin Krono :
-- Liste les livreurs dédiés d'un partenaire avec nom, téléphone, disponibilité, véhicule et opt-in B2B.
-- Ajoute un livreur existant, refuse un utilisateur qui n'a pas `role = driver`, et retourne un warning si le livreur n'accepte pas encore les commandes B2B.
-- Définit le livreur par défaut en remettant les autres rattachements du partenaire à `is_default = false`.
-- Retire un livreur dédié.
-- Liste et traite les demandes partenaire : validation avec `driver_user_id` ou rejet avec note.
-
-Portail partenaire :
-- Affiche les livreurs dédiés en lecture seule.
-- Sur une nouvelle commande, propose "Assignation automatique" et les livreurs dédiés configurés ; les livreurs sans opt-in B2B sont désactivés avec un libellé clair.
-- Sélectionne automatiquement le livreur par défaut si `is_default = true` et `accepts_b2b_orders = true`.
-- Envoie `preferred_driver_id` seulement si la préférence livreur est activée.
-- Permet de demander un livreur dédié depuis l'historique d'une commande livrée par Krono, ou via une demande générale.
-
-Texte produit recommandé :
-
-> Livreur dédié : Krono propose d'abord la commande au livreur sélectionné pour ce partenaire. Si aucun livreur dédié n'est disponible, l'assignation automatique prend le relais.
-
-Texte de demande :
-
-> Vous souhaitez un livreur dédié ? Envoyez une demande à Krono. Notre équipe vérifie le livreur et l'ajoute à votre compte si tout est conforme.
-
----
-
-### Tournées (delivery_batches)
-
-Un partenaire B2B livre souvent plusieurs commandes en une seule sortie (ex : 8 colis confiés à un livreur). Le système :
-
-1. Crée une tournée (`delivery_batches`) regroupant les commandes
-2. Peut proposer un ordre conseillé via l'algorithme nearest-neighbor (haversine), sans l'imposer au livreur
-3. Permet au livreur de valider chaque livraison une par une
-4. Clôture la tournée automatiquement quand toutes les commandes sont `completed` ou `cancelled`
-
-Règle centrale : **une tournée B2B = une popup, une acceptation, une assignation** ; les livraisons enfants ne déclenchent pas de popups séparées.
-
-Règle terrain : **le chauffeur choisit librement l'ordre des arrêts**. La tournée B2B est un lot business unique, mais côté conduite elle doit se comporter comme une liste de livraisons simples.
-
-Notification livreur :
-- L'offre de tournée est émise au niveau `batchId` via `batch-assigned` avec `status: "offer"` et `ordersCount`.
-- Le message côté chauffeur doit présenter la tournée complète, par exemple "Nouvelle tournée B2B - 18 livraisons à effectuer".
-- Le livreur a deux actions principales : accepter ou refuser.
-- L'app chauffeur déduplique par `batchId` pour éviter plusieurs popups si le socket rejoue le même événement.
-- Le backend ne doit pas envoyer `new-order-request` pour chaque livraison enfant d'une tournée.
-
-Acceptation :
-- L'acceptation se fait au niveau `batchId` (`accept-batch`).
-- Si la tournée est libre, elle est assignée au livreur qui accepte.
-- Si elle est déjà assignée au même livreur, l'app ouvre la tournée sans afficher "Tournée indisponible".
-- Si elle est déjà assignée à un autre livreur, alors seulement l'app affiche l'indisponibilité.
-- Le backend verrouille la ligne `delivery_batches` pendant l'acceptation pour rendre le double clic / double événement socket idempotent.
-
-Après acceptation :
-- L'écran `/batch/[batchId]` charge toutes les livraisons enfants via `GET /api/batches/:id`.
-- Chaque arrêt propose scan QR, saisie manuelle du code, ou preuve alternative encadrée.
-- Le livreur peut sélectionner n'importe quel arrêt restant ; aucun arrêt précédent ne doit bloquer la livraison choisie.
-- Le backend vérifie que l'arrêt appartient bien à la tournée et au livreur avant de le clôturer.
-
-### Flux détaillé côté livreur (driver_krono) — vérifié 2026-07-23
-
-Fichiers impliqués : `app/batch/[batchId].tsx` (écran tournée), `components/BatchDeliveryFlow.tsx` (bouton collecte flottant sur la carte principale + bannière tournée + nettoyage du store au retour accueil), `store/useBatchStore.ts`, `services/batchApiService.ts`, `components/MapboxNavigationScreen.tsx`, `hooks/useGeofencing.ts`.
-
-**Réception et acceptation** : le serveur envoie l'offre via socket (`pendingOffer` dans le store) ; popup d'acceptation ; si acceptée → `router.push('/batch/[batchId]')`.
-
-**Phase collecte** : dès que la tournée est chargée avec des coordonnées de collecte, la navigation vers le point de collecte démarre **automatiquement** (pas de bouton manuel). L'arrivée est détectée par le callback natif Mapbox (`onArrive`) pour la navigation elle-même, et par un second geofencing dans `BatchDeliveryFlow.tsx` qui affiche un bouton flottant "Tous les colis récupérés" sur la carte principale. Confirmer appelle `confirmBatchPickup` (`PATCH /api/batches/:id/pickup`) → `pickedUp: true`. Fallback : si aucune coordonnée de collecte n'est fournie, une carte simple avec le bouton de confirmation s'affiche directement (rien à géolocaliser).
-
-**Phase livraison** : liste des arrêts triés par position, chacun avec ses actions (Démarrer, Scanner QR, Entrer le code, Preuve alternative). Arrivée détectée par geofencing. Une fois un arrêt validé (`validateBatchOrder`), le livreur est **automatiquement dirigé vers l'arrêt suivant** sans dialogue de confirmation intermédiaire — mais reste libre de choisir un autre arrêt manuellement dans la liste.
-
-**Méthodes de preuve** : `qr_scan`, `manual_code`, `photo_signature`, `batch_driver_confirmation`.
-
-**Fin de tournée** : quand tous les arrêts sont `completed`/`cancelled`, écran de fin + bouton "Retour à l'accueil" qui réinitialise le store (`clearBatch()`) — un `useFocusEffect` de sécurité dans `BatchDeliveryFlow.tsx` vide aussi le store si l'utilisateur revient à l'accueil autrement (tous les arrêts traités mais store pas encore vidé). La bannière "Tournée · N restant(s)" sur la carte principale disparaît automatiquement dès que le store est vide (lecture réactive Zustand).
-
-**ETA / navigation** : les deux phases (collecte et livraison) écrivent l'ETA courant dans `useBatchStore.setLastEtaMinutes()` à chaque tick Mapbox ; la bannière "Tournée · N restant(s)" affiche cette valeur en direct. Le **statut de la commande** (`picked_up`/`accepted`/`completed`/`cancelled`) est aussi émis en direct au client (payeur) via `emitOrderStatusToPayer()` (`orderSocket.ts`, ajouté le 2026-07-23) — c'est ce qui alimente la Live Activity/Dynamic Island côté `app_krono`.
-
-**Langue de navigation** : la navigation Mapbox est forcée en français des deux côtés — iOS via `options.locale = Locale(identifier: "fr_FR")` (patch existant), Android via un patch ajouté le 2026-07-23 (`driver_krono/scripts/patches/MapboxNavigationView.kt`, copié sur `node_modules` au postinstall par `apply-mapbox-navigation-patch.js`) qui remplace le `Locale.US.language` codé en dur par `"fr"` pour la voix, et ajoute `.language("fr")` aux options de route pour la bannière de manœuvre. **Non vérifié sur un vrai build Android** (build local bloqué par le souci Gradle/JDK déjà connu) — à confirmer lors du prochain build réel.
+**Déplacé dans `docs/logique_livraison.md` (sections 2 et 3)** — types de livraison et flags (`isB2BOrder`/`placedByAdmin`/`isPhoneOrder`), matrice segment × type, comportement dispatch B2B, livreurs dédiés partenaires, tournées (`delivery_batches`) et flux détaillé côté livreur (`driver_krono`).
 
 ---
 
@@ -1063,9 +916,7 @@ contrainte `userId === authUser.id` (l'admin agit pour un tiers), et ne passe ja
 
 ### Notification tournée — règle anti-spam
 
-Un batch de N commandes n'envoie **qu'une seule notification** au livreur via `emitBatchAssigned`. Les N commandes individuelles sont créées silencieusement via REST (pas de `notifyDriversForOrder`). Aucune popup d'offre individuelle n'apparaît pour les commandes appartenant à une tournée.
-
-Si le livreur est hors ligne au moment du socket, la push `batch_assigned` (`driverPushService.ts`) lui permet de naviguer directement vers l'écran `/batch/:id` à l'ouverture de l'app.
+**Déplacé dans `docs/logique_livraison.md` (section 3)**.
 
 ---
 
@@ -1139,107 +990,7 @@ Si le livreur est hors ligne au moment du socket, la push `batch_assigned` (`dri
 
 ### Simulation — comment le livreur reçoit les commandes (référence produit)
 
-Trois cas possibles selon la nature de la commande.
-
-#### Cas 1 — Commande classique (client particulier, 1 livraison)
-
-```
-CLIENT APP              BACKEND                  LIVREUR APP
-    │                      │                          │
-    │── passe commande ──►  │                          │
-    │                      │── socket "new-order" ──► │
-    │                      │                          │ [POPUP s'affiche — 30s]
-    │                      │                          │  "Jean Dupont — 2 500 FCFA"
-    │                      │                          │  [Accepter] [Décliner]
-    │                      │ ◄── "accept-order" ──────│
-    │                      │── confirmation ─────────►│
-    │                      │                          │ [BottomSheet] → navigation
-    │                      │                          │ → [Je pars] → géofencing auto
-    │                      │                          │ → [Scanner QR] → TERMINÉ ✓
-```
-
-#### Cas 2 — Tournée B2B (1 partenaire, N livraisons)
-
-**1 seule notification groupée**, pas N popups séparées.
-
-```
-ADMIN                   BACKEND                  LIVREUR APP
-    │                      │                          │
-    │── crée N livraisons   │                          │
-    │   pour "Resto Chez    │                          │
-    │   Maman" ──────────►  │                          │
-    │                      │ crée batch + optimise     │
-    │                      │ l'ordre (haversine)       │
-    │                      │── socket "batch-assigned"►│
-    │                      │   { batchId, ordersCount, │
-    │                      │     partner_name }        │
-    │                      │                          │ Son + vibration
-    │                      │                          │ → router.push("/batch/id")
-    │                      │                          │ → GET /api/batches/:id
-    │                      │                          │ → liste ordonnée affichée
-```
-
-Écran tournée — ce que voit le livreur :
-
-```
-┌────────────────────────────────────────┐
-│  ←  Resto Chez Maman              🔄   │
-│     #BATCH_XYZ                         │
-│  3/10 livraisons       7 restantes     │
-│  ████████░░░░░░░░░░░░░░░░░░░░░░░       │
-│                                        │
-│  ①  Mamadou Diallo               📞   │
-│     12 Rue des Peupliers              │
-│     [Scanner QR] [Entrer code]        │
-│     [Preuve alternative]              │
-│  ②✓ Aïssa Koné          QR validé     │
-│  ③✓ Ibrahima Sow         Code validé  │
-│  ④  Fatou Traoré                 📞   │
-│     45 Ave de la Paix                 │
-│     [Scanner QR] [Entrer code]        │
-│  ⑤…⑥…⑦…⑧…⑨…⑩                       │
-│                                        │
-│  Appui long sur preuve alternative     │
-│  → annuler une livraison               │
-└────────────────────────────────────────┘
-```
-
-Le livreur valide **stop par stop** dans l'ordre qu'il veut. Chaque stop doit avoir sa propre preuve. Quand tout est `completed` ou `cancelled` → écran "Tournée terminée !".
-
-#### Cas 3 — Commande B2B individuelle (1 livraison d'un partenaire)
-
-Même flux que le Cas 1, mais la popup affiche le contexte B2B :
-
-```
-┌────────────────────────────────────────┐
-│  [🧳 Commande B2B]                     │
-│  Partenaire : Resto Chez Maman         │
-│  Livraison 2/5 de la tournée           │
-│  ─────────────────────────────────     │
-│  Jean Dupont ⭐4.8          2 500 FCFA │
-│  Moto · 3.2 km · 12 min               │
-│  [Décliner]          [Accepter]        │
-└────────────────────────────────────────┘
-```
-
-#### Tableau récapitulatif
-
-| Situation | Notification livreur | Comment valider |
-|---|---|---|
-| Client standard, 1 livraison | Popup d'acceptation (30s) | Géofencing + QR |
-| Partenaire B2B, 1 livraison | Popup avec badge B2B + nom partenaire | Idem |
-| Partenaire B2B, N livraisons (tournée) | 1 popup tournée avec `ordersCount` → écran liste des stops | QR/code/preuve alternative par stop |
-
-#### Règle socket (anti-spam tournée)
-
-```
-Tournée (batch)        → socket "batch-assigned"   → écran /batch/[id]
-Commande individuelle  → socket "new-order-request" → popup d'acceptation
-```
-
-Les N commandes d'un batch sont créées **silencieusement** via REST. Aucune popup individuelle n'apparaît pour une commande appartenant à une tournée.
-
-Si deux événements `batch-assigned` arrivent pour le même `batchId`, l'app chauffeur garde une seule popup visible. Si le livreur refuse, ce `batchId` est mis en sourdine pour la session afin d'éviter une reproposition immédiate en boucle.
+**Déplacé dans `docs/logique_livraison.md` (section 4)** — les 3 cas (commande classique, tournée B2B, commande B2B individuelle) avec schémas de flux et écrans.
 
 ---
 
@@ -1247,20 +998,9 @@ Les 9 blocs fonctionnels du B2B (migrations, backend, admin, app client, app cha
 
 ---
 
-### Admin — deux points d'entrée de création de commande (Dashboard vs Planning) — décision 2026-07-26
+### Livraison programmée & points d'entrée de création de commande (Dashboard vs Planning)
 
-À ne pas confondre avec `app_krono/components/NewB2BShippingModal.tsx` (mobile, section ci-dessus) : ici il s'agit de deux modals **admin_krono**, tous deux appelés depuis le dashboard web.
-
-**Constat (audit code, 2026-07-26)** :
-- `admin_krono/components/orders/NewShippingModal.tsx` (bouton "+ Nouvelle livraison" du Dashboard) — flux générique : client existant ou créé à la volée (numéro jamais inscrit chez Krono), livraison immédiate. Contient aussi un sélecteur `partnerId` optionnel (`t('newShipping.partnerLabel')`) qui est **le seul endroit du code** qui relie réellement une commande à un partenaire B2B facturable (déclenche commission + incrément de quota, cf. `computeB2BCommission` / `applyB2BPartnerMetadata` dans `adminOrderController.ts`).
-- `admin_krono/components/orders/NewB2BShippingModal.tsx` (bouton "Nouvelle livraison B2B" de `admin_krono/app/(dashboard)/planning/page.tsx`) — force `isB2BOrder: true` et `isPhoneOrder: true` mais **ne propose aucune sélection de partenaire réel** (pas de champ `partnerId`). La date/heure "programmée" saisie à l'étape Détails est **capturée dans l'UI mais jamais envoyée au backend** (absente du payload `createOrder` et du contrôleur) — fonctionnalité de programmation actuellement inopérante.
-- Les deux modals postent vers le même endpoint (`POST /api/admin/orders` → `createAdminOrder`), avec des règles de flags qui se chevauchent sans coordination.
-
-**Décision produit retenue** :
-- **Dashboard "Nouvelle livraison"** reste le point d'entrée générique/immédiat : n'importe quel type de client, y compris ceux qui n'ont jamais utilisé Krono (création à la volée). Le sélecteur de partenaire B2B doit en être **retiré** — B2B ne s'y traite plus.
-- **Planning**, renommé **"Commande B2B programmée"**, devient le point d'entrée **exclusif** du B2B : sélection d'un partenaire réel obligatoire (déplacer le sélecteur `partnerId` depuis le Dashboard) + date/heure de livraison réellement persistée côté serveur (corriger le payload/contrôleur pour ne plus la perdre). Le champ date/heure reste **obligatoire** (pas de commande B2B "immédiate" depuis cet écran) pour que le rôle des deux écrans reste sans ambiguïté.
-
-**Statut** : décision validée avec l'utilisateur, **pas encore implémentée**. Prochaine étape explicite : déplacer le sélecteur partenaire vers `NewB2BShippingModal.tsx`, le retirer de `NewShippingModal.tsx`, faire persister `scheduledDate`/`scheduledTime` (front + `adminOrderApi.ts` + `adminOrderController.ts` + migration si colonne manquante), renommer le libellé du bouton Planning.
+**Déplacé dans `docs/logique_livraison.md` (sections 5 et 6)** — décisions du 2026-07-26 : séparation Dashboard (générique/immédiat) vs Planning (B2B exclusif, renommé "Commande B2B programmée"), refonte unifiée de la livraison programmée (app client + Planning), règle de disponibilité livreur au dispatch (plafond 3 commandes, blocage tournée, doublon `orderSocket.ts`/`orderSocketMatching.ts`). Toutes décisions validées, **pas encore implémentées**.
 
 ---
 
@@ -1270,11 +1010,36 @@ Le commissionnaire est une feature **B2C** distincte : le livreur agit à la pla
 
 ---
 
-## 17. Documents vivants
+## 17. Fiabilité infrastructure — constats et pistes
 
-Deux fichiers vivants dans `docs/` :
+Constats honnêtes sur 3 lacunes de fiabilité identifiées le 2026-07-25 (pas des technologies manquantes — le choix de ne pas utiliser Docker/Kubernetes/Prisma à ce stade est délibéré et justifié vu l'échelle actuelle). Les deux premiers points ont depuis fait leurs preuves en conditions réelles ; le troisième reste théorique.
+
+**1. Pas de CD, déploiement 100% manuel**
+- Constat : `.github/workflows/ci.yml` fait tourner build/tests/lint/audit, mais aucun job ne déploie. Le déploiement de `admin_krono` passe entièrement par le dashboard Vercel, à la main.
+- Preuve concrète (2026-07-25) : une session complète a été perdue à déboguer ce type de problème — mauvais Root Directory Vercel (`admin_chrono` vs `admin_krono`), un "Redeploy" qui a repris un vieux commit au lieu du dernier, puis un rollback manuel antérieur qui bloquait `admin.kro-no-delivery.com` sur une version périmée malgré des builds réussis. Un pipeline de déploiement scripté (ou au moins une checklist automatisée de vérification post-déploiement) aurait évité tout ça.
+- Piste : soit un vrai step de déploiement dans `ci.yml` (via Vercel CLI/API token), soit a minima un script de vérification post-déploiement (curl sur les routes clés, comparaison du commit déployé vs `HEAD`).
+
+**2. Aucun test end-to-end, seulement unitaire/intégration**
+- Constat : tous les tests (`krono_backend` : 53 fichiers, `admin_krono` : 5, `app_krono`/`driver_krono` : 1 chacun) sont unitaires ou d'intégration ciblée. Aucun test ne simule le vrai parcours utilisateur de bout en bout à travers plusieurs systèmes.
+- Preuve concrète (2026-07-25) : le bug du code promo. La logique de validation/application avait été construite sur la route REST (`orderRecordController.ts`), entièrement testée et verte. Mais l'app cliente crée en réalité ses commandes via **REST puis Socket.IO** pour la même commande (`userOrderSocketService.ts`) — le handler Socket.IO (`orderSocket.ts`) ignorait complètement le code promo. Tous les tests unitaires passaient parce que chacun testait sa brique isolément ; aucun ne suivait le vrai enchaînement client → REST → Socket.IO.
+- Piste : un test d'intégration qui simule le vrai flux client (au moins REST + Socket.IO enchaînés) pour les parcours critiques (création de commande, paiement), pas juste chaque endpoint séparément.
+
+**3. Aucun garde-fou automatisé sur les migrations**
+- Constat : les migrations sont des fichiers `.sql` numérotés manuellement dans `krono_backend/migrations/`, sans outil dédié (pas de Prisma Migrate/node-pg-migrate).
+- Preuve concrète (2026-07-25) : un `.gitignore` mal réglé (`*.sql` ignoré en bloc avec des exceptions ajoutées une par une, oubliées à partir d'un certain point) a fait que **29 migrations sur 50 n'étaient jamais suivies par git**, découvert par hasard en travaillant sur autre chose, pas détecté par un contrôle quelconque.
+- Piste : un check simple en CI — comparer la liste des fichiers `migrations/*.sql` sur disque avec `git ls-files migrations/` et échouer si un fichier manque au suivi git.
+
+Statut : lacunes documentées, aucune n'est corrigée à ce stade (hors du `.gitignore` migrations, corrigé le 2026-07-25 dans la même session). Décision d'implémentation à prendre par l'utilisateur — voir `docs/taches.md`.
+
+---
+
+## 18. Documents vivants
+
+Fichiers vivants dans `docs/` :
 
 - `docs/krono-reference-unique.md` : **orientation uniquement** — contrat produit, règles durables, architecture, cartes de fichiers, décisions. Ne doit pas contenir de tâches à exécuter (voir règle en tête de ce document).
+- `docs/logique_livraison.md` : récapitulatif dédié de la logique de livraison — cycle de statuts, types de livraison, dispatch B2B, tournées, simulation du flux livreur, et refonte en cours de la livraison programmée. Contenu déplacé depuis ce fichier le 2026-07-26 pour centraliser le sujet.
 - `docs/taches.md` : tout ce qui reste à faire (backlog, migrations à appliquer, stabilisation App Store, roadmap B2B). Une tâche terminée est supprimée de ce fichier ; si elle change une règle durable, elle est résumée ici.
 - `docs/integration_paiement_en_ligne.md` : reste à faire spécifique à l'intégration mobile money réelle.
-- `docs/mode-emploi-krono.md` : guide utilisateur orienté usage (client, chauffeur, commerçant, partenaire, admin) — comment utiliser chaque fonctionnalité, pas une référence technique.
+- `docs/MONETISATION.md` : grille commerciale cible (%+frais fixe FCFA) — voir section 16 pour la grille technique actuellement en vigueur.
+- `docs/supabase_tables_audit.md` : audit du schéma Supabase (tables, colonnes, usage réel).
