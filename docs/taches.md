@@ -8,12 +8,12 @@ Paiement / mobile money : fichier dédié `docs/integration_paiement_en_ligne.md
 
 ## 🔴 Urgent — rotation de secrets compromis (action manuelle, pas du code)
 
-- **`SUPABASE_ACCESS_TOKEN`** potentiellement compromis (était dans un fichier local) : aller sur `supabase.com/dashboard/account/tokens`, le révoquer, en générer un nouveau si besoin.
-- **`service_role` key Supabase** potentiellement compilée dans des builds mobile précédents (était dans `app_krono/.env`) : Supabase Dashboard → Settings → API → régénérer la `service_role` key pour invalider l'ancienne.
-- **Token Twilio** en clair dans `.env` : à faire tourner (rotation côté console Twilio).
-- **`SENTRY_AUTH_TOKEN`** : à sortir des `.env` locaux et déplacer dans les secrets EAS (ne doit pas rester en clair dans un fichier committable).
-- **M-7 — token BetterStack/Logtail** : BetterStack → Sources → New Source → créer une source "Krono Driver Mobile", puis remplacer le token dans `driver_krono/.env` et dans les secrets EAS.
-- **M-3 — `HEALTH_SECRET` backend Render** : ajouter la variable `HEALTH_SECRET` dans les variables d'environnement du dashboard Render (valeur déjà générée — ne pas la committer en clair dans ce fichier ni ailleurs dans le repo), puis configurer la sonde monitoring pour envoyer le header `x-health-secret: <valeur>` dans ses requêtes.
+État au 2026-07-27 — fait : `SUPABASE_ACCESS_TOKEN` révoqué/recréé, `service_role` Supabase migré vers la nouvelle Secret API key `krono_backend_sk` (local + Render), `anon` Supabase migré vers des Publishable keys `web_admin`/`mobile` (local + Vercel + EAS prod/preview), `HEALTH_SECRET` ajouté sur Render, `SENTRY_AUTH_TOKEN` nettoyé du `.env` local d'`app_krono` (déjà en EAS), token BetterStack/Logtail driver (M-7) migré vers une source dédiée "Krono Driver Mobile" (local + EAS production, testé avec succès HTTP 202). Résumé de la nouvelle architecture de clés Supabase ajouté dans `krono-reference-unique.md` (section 10).
+
+Reste à faire (vérifié : aucun de ces tokens n'a jamais été commité dans l'historique git, sauf mention contraire) :
+
+- **Désactiver les clés Supabase legacy** (`anon`/`service_role`, page "Legacy anon, service_role API keys") — volontairement pas encore fait : `app_krono`/`driver_krono` sont déjà publiées avec l'ancienne clé `anon` compilée en dur dans les builds installés ; désactiver maintenant casserait l'app pour tout utilisateur n'ayant pas encore mis à jour. À faire après la prochaine release mobile (nouveau build avec la clé `publishable`).
+- **Token Twilio** — rotation mise en attente : le compte Twilio affiche **"Suspended"** (découvert le 2026-07-27, page Auth Tokens). À investiguer en priorité (onglet Billing du compte Twilio) avant toute rotation — l'OTP SMS/WhatsApp est probablement non fonctionnel en prod tant que le compte est suspendu.
 
 ---
 

@@ -331,6 +331,11 @@ Règles :
 - Comparaison du code OTP en `crypto.timingSafeEqual` (Redis, mémoire, fallback DB) — empêche une attaque par timing.
 - RLS confirmée active (pas un trou) sur `commission_balance`, `commission_transactions`, `partners`, `partner_users`, `partner_drivers`, `partner_subscriptions`, `partner_usage`, `partner_invoices`, `payment_disputes` — policies `service_role` uniquement, `anon`/`authenticated` refusés.
 
+**Clés API Supabase — migration vers le nouveau système (2026-07-27).** Le projet est passé du système historique (`anon`/`service_role`, deux JWT signés par un secret JWT partagé — régénérer l'un régénère forcément l'autre) au nouveau système Supabase (`publishable`/`secret` keys, indépendantes et révocables une par une) :
+- `service_role` → remplacé par la secret key `krono_backend_sk` (`sb_secret_...`), utilisée uniquement dans `krono_backend/.env` (variable toujours nommée `SUPABASE_SERVICE_ROLE_KEY`, le code n'a pas changé) et sur Render. Backend uniquement, jamais dans une app mobile/web cliente.
+- `anon` → remplacé par deux publishable keys (`sb_publishable_...`) : `web_admin` pour `admin_krono` (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, local + Vercel) et `mobile` pour `app_krono`/`driver_krono` (`EXPO_PUBLIC_SUPABASE_ANON_KEY`, local + EAS production et preview, partagée entre les deux apps).
+- Les anciennes clés legacy (`anon`/`service_role`) restent **volontairement actives** sur Supabase (onglet "Legacy anon, service_role API keys") : `app_krono`/`driver_krono` sont déjà publiées avec l'ancienne clé `anon` compilée en dur dans les builds installés. Les désactiver ("Disable JWT-based API keys") casserait l'app pour tout utilisateur n'ayant pas encore reçu le build avec la nouvelle clé — à faire seulement après la prochaine release mobile. Voir `docs/taches.md`.
+
 **Authentification OTP hybride par opérateur (Orange CI)** — validé et routage implémenté le 2026-07-22 (remplace `docs/plan_auth_otp_hybride_orange_whatsapp.md`, supprimé). Constat : les OTP SMS classiques via Twilio ne sont pas délivrés de façon fiable aux numéros Orange CI (MTN/Moov n'ont pas ce problème). Décision produit :
 - **Orange** (préfixe `07`) → OTP envoyé **exclusivement par WhatsApp**.
 - **MTN** (`05`) / **Moov** (`01`) → OTP par **SMS classique** en premier.
